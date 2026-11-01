@@ -42,9 +42,9 @@ task-owned.
 
 The D01 CLI route uses `LiberoMixedControllerV1`; the accepted A reference
 profile is `LiberoMixedControllerV6`, and optional rim control is V7. The only
-active Solution class is optional `LiberoPickPlaceSolutionV8`; V5–V7 identity
-payload builders remain as internal dependencies because V8 binds their frozen
-parent hashes.
+active Solution class is optional `LiberoPickPlaceSolutionV8`; its private V5–V7
+parent-hash chain remains inside identity construction to preserve existing V8
+hashes. Only `solution_identity_v8` is exported as the identity entry point.
 `trajectory/reader.py` accepts the current D01 result schema and optional V8
 Solution schema. It does not dispatch historical worker or Solution versions.
 
@@ -54,6 +54,10 @@ Retired implementations are recoverable from input HEAD
 ```sh
 git show 65891af449918e7162c78dec7c01a3bc0b7eecd0:bench_deploy/libero/solution.py
 ```
+
+Unused `LiberoOperationalSpaceConfigV1` defaults are summarized in the
+[controller profile history supplement](../../docs/archive/phase_ii_01_r_routes/libero-controller-profile-history.md)
+and recoverable from that same input commit.
 
 The R-route documentation snapshots are byte-preserved under
 [`docs/archive/phase_ii_01_r_routes/`](../../docs/archive/phase_ii_01_r_routes/README.md)

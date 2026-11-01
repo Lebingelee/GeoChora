@@ -44,55 +44,6 @@ _GAIN_STABILITY_RATIONALE = (
     'not a stability proof or controller qualification.'
 )
 
-_LEGACY_V2_PROFILE_RECORDS = {
-    'libero-spatial-bowl-to-plate-joint-space-pd-v3': {
-        'kp': (100.0,) * 7,
-        'kd': (20.0, 40.0, 20.0, 20.0, 20.0, 20.0, 20.0),
-        'rationale': (
-            'Native R07 task #1 attempt006 reached 148 successful boundaries before joint2 crossed its source upper limit; '
-            'attempt007 showed uniform Kp=200/Kd=40 saturated all seven torque channels and drove joint4 across its lower '
-            'range within 10 boundaries. This unqualified follow-up restores uniform Kp=100 and Kd=20, raising Kd to 40 '
-            'only for joint2, whose attempt006 public trace retained outward velocity while its target had already reversed. '
-            'The source motor ctrlrange and joint limits remain unchanged; every torque remains clamped to the compiled '
-            'source ctrlrange. This is a bounded control-parameter experiment, not a proof for the coupled 20 Hz '
-            'sample-and-hold system or a controller qualification; native motion and fault gates remain required.'
-        ),
-    },
-    'libero-spatial-bowl-to-plate-joint-space-pd-v4': {
-        'kp': (20.0,) * 7,
-        'kd': (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0),
-        'rationale': (
-            'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
-            'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
-            'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
-            '0.002073 rad. This unqualified follow-up scales the gains fivefold down to Kp=20/Kd=4 (joint2 Kd=8) '
-            'to test lower closed-loop bandwidth under the fixed 20 Hz outer loop and 2 ms x 25 hold. Source motor '
-            'ctrlranges and joint limits remain unchanged; every torque remains clamped to the compiled source '
-            'ctrlrange. This is an experiment, not a stability proof or controller qualification.'
-        ),
-    },
-    'libero-spatial-bowl-to-plate-joint-space-pd-v5': {
-        'kp': (40.0,) * 7,
-        'kd': (8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0),
-        'rationale': (
-            'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
-            'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
-            'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
-            '0.002073 rad. Run010 with source gravity feed-forward and Kp=20/Kd=4 (joint2 Kd=8) remained within '
-            'source limits and emitted no MuJoCo warnings, but all three episodes entered the descend stage only '
-            'near boundary900 and horizon-truncated before task success. This unqualified follow-up doubles the '
-            'gains to Kp=40/Kd=8 (joint2 Kd=16) while preserving the 20 Hz outer loop, 2 ms x 25 hold, and '
-            '2 mm/10 mrad per-boundary motion caps to test reference tracking. Source motor ctrlranges and joint '
-            'limits remain unchanged; every torque remains clamped to the compiled source ctrlrange. This is an '
-            'experiment, not a stability proof or controller qualification.'
-        ),
-    },
-    'libero-spatial-bowl-to-plate-joint-space-pd-v6': {
-        'kp': (20.0,) * 7,
-        'kd': (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0),
-        'rationale': _GAIN_STABILITY_RATIONALE,
-    },
-}
 def build_diagnostic_joint_pd_plan(task_input: dict) -> dict:
     """Describe the retained D01 diagnostic action mapping from task input."""
     native = task_input['native_reference']['controller']
@@ -223,36 +174,12 @@ class LiberoMixedControllerV1:
 
 
 
-@dataclass(frozen=True)
-class LiberoOperationalSpaceConfigV1:
-    """Fixed, task-local OSC_POSE gains and source-model boundary cadence."""
-
-    position_kp_N_per_m: float = 150.0
-    orientation_kp_Nm_per_rad: float = 150.0
-    damping_ratio: float = 1.0
-    nullspace_kp_per_s2: float = 10.0
-    control_frequency_hz: int = 20
-    physics_dt_s: float = 0.002
-    control_substeps: int = 25
-    hold_policy: str = 'torque_zero_order_hold_per_outer_step_v1'
-
-    def validate(self):
-        for value in (self.position_kp_N_per_m, self.orientation_kp_Nm_per_rad,
-                      self.damping_ratio, self.nullspace_kp_per_s2):
-            if isinstance(value, bool) or not math.isfinite(float(value)) or value <= 0.0:
-                raise ValueError('LIBERO OSC gains must be finite and positive')
-        if (self.control_frequency_hz, self.physics_dt_s, self.control_substeps) != (20, 0.002, 25):
-            raise ValueError('LIBERO source OSC profile is fixed to 20 Hz and 2 ms x 25')
-        if self.hold_policy != 'torque_zero_order_hold_per_outer_step_v1':
-            raise ValueError('unsupported LIBERO source OSC torque hold policy')
-
-
 class _SourceOSCController:
     """Shared source-bound OSC math and lifecycle for final task profiles."""
 
     profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-source-v1'
 
-    def __init__(self, operational_config: LiberoOperationalSpaceConfigV1 | None = None,
+    def __init__(self, operational_config: LiberoOperationalSpaceConfigV2,
                  gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
         self.config = LiberoMixedControlConfigV1()
         self.config.validate()
@@ -266,7 +193,9 @@ class _SourceOSCController:
                 source_xml_sha256=gravity_bias_model.source_xml_sha256,
                 source_closure_digest=gravity_bias_model.source_closure_digest,
             )
-        self.operational_config = operational_config or LiberoOperationalSpaceConfigV1()
+        if operational_config is None:
+            raise TypeError('source OSC base requires an explicit physics-rate operational-space config')
+        self.operational_config = operational_config
         self.operational_config.validate()
         if (arm_resolver_identity is not None
                 and (type(arm_resolver_identity) is not str or len(arm_resolver_identity) != 64
@@ -909,5 +838,5 @@ __all__ = [
     'LiberoMixedControlConfigV1', 'LiberoMixedControllerV1',
     'build_diagnostic_joint_pd_plan',
     'LiberoMixedControllerV6', 'LiberoMixedControllerV7',
-    'LiberoOperationalSpaceConfigV1', 'LiberoOperationalSpaceConfigV2',
+    'LiberoOperationalSpaceConfigV2',
 ]

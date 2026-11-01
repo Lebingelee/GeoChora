@@ -4,6 +4,10 @@ This archive preserves the exact planning snapshots that were shortened in the a
 
 The archive records history; it does not change scope, acceptance, qualification, licensing, or release decisions. `planning_manifest.json`, `validation_receipt.json`, frozen releases, F-owned documents, and ignored workspace evidence were not rewritten.
 
+The removed unqualified OSC PD v3–v5 profile notes are preserved in the
+[controller profile history supplement](libero-controller-profile-history.md).
+The exact archived originals listed below remain unchanged.
+
 | Former path | Exact archive copy | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
 | `docs/module/task_env/goal/Phase_II_01/README.md` | [`README.md`](originals/README.md) | 49445 | `eee457312f319bc4109b2e5a7976fef62a823fd012826438efc086536d7ac4d9` |

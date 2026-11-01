@@ -72,7 +72,40 @@ _OPENING_BY_STAGE = {
 }
 
 
-def solution_identity_v5(
+_V5_IDENTITY_PLANNER_DEFAULTS = {
+    "max_translation_per_step": 0.0055,
+    "max_translation_acceleration_per_step": 0.002,
+    "max_rotation_per_step": 0.08,
+    "max_rotation_acceleration_per_step": 0.04,
+}
+_V678_IDENTITY_PLANNER_DEFAULTS = {
+    "max_translation_per_step": 0.0025,
+    "max_translation_acceleration_per_step": 0.001,
+    "max_rotation_per_step": 0.04,
+    "max_rotation_acceleration_per_step": 0.02,
+}
+
+
+def _identity_inputs(config, planner_config, planner_defaults):
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        **planner_defaults, settle_steps=0, max_steps=200,
+    )
+    return selected_config, selected_planner
+
+
+def _identity_motion_config(config):
+    return {
+        "position_tolerance_m": config.position_tolerance_m,
+        "grasp_dwell_steps": config.grasp_dwell_steps,
+        "release_dwell_steps": config.release_dwell_steps,
+        "release_timeout_steps": config.release_timeout_steps,
+        "max_episode_steps": config.max_episode_steps,
+    }
+
+
+def _solution_identity_v5(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
     config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
     planner_config: CartesianPosePlannerConfig | None = None,
@@ -84,15 +117,8 @@ def solution_identity_v5(
         if (type(value) is not str or len(value) != 64
                 or any(character not in "0123456789abcdef" for character in value)):
             raise ValueError(f"LIBERO Solution v5 requires a lowercase {label} SHA-256")
-    selected_config = config or LiberoPickPlaceSolutionConfigV1()
-    selected_config.validate()
-    selected_planner = planner_config or CartesianPosePlannerConfig(
-        max_translation_per_step=0.0055,
-        max_translation_acceleration_per_step=0.002,
-        max_rotation_per_step=0.08,
-        max_rotation_acceleration_per_step=0.04,
-        settle_steps=0,
-        max_steps=200,
+    selected_config, selected_planner = _identity_inputs(
+        config, planner_config, _V5_IDENTITY_PLANNER_DEFAULTS,
     )
     osc = LiberoMixedControllerV6(
         operational_config=LiberoOperationalSpaceConfigV2(),
@@ -144,29 +170,16 @@ def solution_identity_v5(
         },
         "opening_m": _OPENING_BY_STAGE_V5,
         "stage_timeouts": _STAGE_TIMEOUTS_V4,
-        "motion_config": {
-            "position_tolerance_m": selected_config.position_tolerance_m,
-            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
-            "release_dwell_steps": selected_config.release_dwell_steps,
-            "release_timeout_steps": selected_config.release_timeout_steps,
-            "max_episode_steps": selected_config.max_episode_steps,
-        },
+        "motion_config": _identity_motion_config(selected_config),
     })
-def solution_identity_v6(
+def _solution_identity_v6(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
     config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
     planner_config: CartesianPosePlannerConfig | None = None,
 ) -> str:
     """Bind a demonstration-grounded rim grasp and conservative pose path."""
-    selected_config = config or LiberoPickPlaceSolutionConfigV1()
-    selected_config.validate()
-    selected_planner = planner_config or CartesianPosePlannerConfig(
-        max_translation_per_step=0.0025,
-        max_translation_acceleration_per_step=0.001,
-        max_rotation_per_step=0.04,
-        max_rotation_acceleration_per_step=0.02,
-        settle_steps=0,
-        max_steps=200,
+    selected_config, selected_planner = _identity_inputs(
+        config, planner_config, _V678_IDENTITY_PLANNER_DEFAULTS,
     )
     controller_identity = LiberoMixedControllerV7(
         arm_resolver_identity=arm_resolver_identity,
@@ -178,7 +191,7 @@ def solution_identity_v6(
         "source_closure_digest": source_closure_digest,
         "arm_resolver_identity": arm_resolver_identity,
         "controller_identity": controller_identity,
-        "parent_profile_identity": solution_identity_v5(
+        "parent_profile_identity": _solution_identity_v5(
             source_xml_sha256, source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
             config=selected_config, planner_config=selected_planner,
@@ -204,29 +217,16 @@ def solution_identity_v6(
             "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
             "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
         },
-        "motion_config": {
-            "position_tolerance_m": selected_config.position_tolerance_m,
-            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
-            "release_dwell_steps": selected_config.release_dwell_steps,
-            "release_timeout_steps": selected_config.release_timeout_steps,
-            "max_episode_steps": selected_config.max_episode_steps,
-        },
+        "motion_config": _identity_motion_config(selected_config),
     })
-def solution_identity_v7(
+def _solution_identity_v7(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
     config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
     planner_config: CartesianPosePlannerConfig | None = None,
 ) -> str:
     """Bind the demonstrated first-bilateral-contact rim pose and pinch aperture."""
-    selected_config = config or LiberoPickPlaceSolutionConfigV1()
-    selected_config.validate()
-    selected_planner = planner_config or CartesianPosePlannerConfig(
-        max_translation_per_step=0.0025,
-        max_translation_acceleration_per_step=0.001,
-        max_rotation_per_step=0.04,
-        max_rotation_acceleration_per_step=0.02,
-        settle_steps=0,
-        max_steps=200,
+    selected_config, selected_planner = _identity_inputs(
+        config, planner_config, _V678_IDENTITY_PLANNER_DEFAULTS,
     )
     return digest({
         "schema_version": SOLUTION_SCHEMA_V7,
@@ -234,7 +234,7 @@ def solution_identity_v7(
         "source_xml_sha256": source_xml_sha256,
         "source_closure_digest": source_closure_digest,
         "arm_resolver_identity": arm_resolver_identity,
-        "parent_profile_identity": solution_identity_v6(
+        "parent_profile_identity": _solution_identity_v6(
             source_xml_sha256, source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
             config=selected_config, planner_config=selected_planner,
@@ -260,13 +260,7 @@ def solution_identity_v7(
             "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
             "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
         },
-        "motion_config": {
-            "position_tolerance_m": selected_config.position_tolerance_m,
-            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
-            "release_dwell_steps": selected_config.release_dwell_steps,
-            "release_timeout_steps": selected_config.release_timeout_steps,
-            "max_episode_steps": selected_config.max_episode_steps,
-        },
+        "motion_config": _identity_motion_config(selected_config),
     })
 def solution_identity_v8(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
@@ -274,15 +268,8 @@ def solution_identity_v8(
     planner_config: CartesianPosePlannerConfig | None = None,
 ) -> str:
     """Bind the reconstructed demo frame-51 contact pose and measured aperture."""
-    selected_config = config or LiberoPickPlaceSolutionConfigV1()
-    selected_config.validate()
-    selected_planner = planner_config or CartesianPosePlannerConfig(
-        max_translation_per_step=0.0025,
-        max_translation_acceleration_per_step=0.001,
-        max_rotation_per_step=0.04,
-        max_rotation_acceleration_per_step=0.02,
-        settle_steps=0,
-        max_steps=200,
+    selected_config, selected_planner = _identity_inputs(
+        config, planner_config, _V678_IDENTITY_PLANNER_DEFAULTS,
     )
     return digest({
         "schema_version": SOLUTION_SCHEMA_V8,
@@ -290,7 +277,7 @@ def solution_identity_v8(
         "source_xml_sha256": source_xml_sha256,
         "source_closure_digest": source_closure_digest,
         "arm_resolver_identity": arm_resolver_identity,
-        "parent_profile_identity": solution_identity_v7(
+        "parent_profile_identity": _solution_identity_v7(
             source_xml_sha256, source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
             config=selected_config, planner_config=selected_planner,
@@ -325,13 +312,7 @@ def solution_identity_v8(
             "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
             "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
         },
-        "motion_config": {
-            "position_tolerance_m": selected_config.position_tolerance_m,
-            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
-            "release_dwell_steps": selected_config.release_dwell_steps,
-            "release_timeout_steps": selected_config.release_timeout_steps,
-            "max_episode_steps": selected_config.max_episode_steps,
-        },
+        "motion_config": _identity_motion_config(selected_config),
     })
 _OPENING_BY_STAGE_V4 = {
     # Insert narrow fingers inside the bowl, then spread outward against both
