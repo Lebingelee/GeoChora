@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。window003在既有Isaac Native-I/O owner中加入公开 `flush_changes()` 候选，但attempt003被0.25秒采样间隔watchdog在python_bootstrap阶段中止；没有新的物理门验证。正式N2未启动，等待维护者决定是否修整采样器后重试。累计额度与重复失败规则按16.3执行。**
+> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window003 attempt004 的采样门通过，但公开 `flush_changes()` 候选未通过实际物理响应门（残差与相对速度均低于冻结阈值）。正式N2未启动。维护者要求暂停并说明同App C++/Kit SDK依赖：本机Isaac 6.2已带Kit `dev` Carbonite头文件/构建工具，但未找到匹配的 `omni::physx::IPhysx` 头文件或110.4.4生命周期契约；因此当前未证明必须另下完整Kit SDK。window003暂停，保留失败与扣账。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -288,3 +288,15 @@ Core实现/测试本地提交为`c1677f2f`（`feat(task-env): flush DG03 PhysX b
 N1 attempt003于Kit启动后被采样watchdog中止：一段采样间隔 `0.465757s > 0.25s`，worker以 `-15`退出，worker进度仍为`python_bootstrap`且step计数不精确。supervisor因此按本run最大282步保守扣账，native wall `9.668580638s`；**没有到达物理响应检测器，不是本epoch的物理门失败**。采样期间最低MemAvailable `7,907,774,464B`、GPU free `6,959,988,736B`、disk free `523,118,284,800B`，最高PG RSS `3,889,307,648B`；CPU affinity为worker `[0,1,2]`、supervisor `[3]`，进程组报告91个OS线程。峰值线程数已原样记录；affinity限制CPU可运行槽位，但是否满足“最多4 CPU threads”的意图需要复核。进程组消失且独立非阻塞probe确认shared lock释放。详细receipt、日志、postrun检查、失败扣账及可恢复状态见ignored [window003资源停点证据](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/n1_flush_candidate001_postrun_resource_check.json)和[累计ledger](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/run_ledger.json)。
 
 维护者已授权继续实现，但本次资源watchdog异常按冻结prompt停止后续native并等待明确答复：建议在不放宽0.25秒上限下改进/测量采样器，然后冻结一次有界重试；也可停在`PARTIAL`并转Sol复核。window002两次实际物理响应失败保留；window003该decision epoch实际物理失败仍为0，额外的采样watchdog门目前失败1次。Formal N2、独立H5冷读和三路线矩阵仍受live物理门条件约束；F06仅入口准备，F06/F07和Qualification未运行。
+
+<a id="f05-diagnostic04-window003-attempt004-cpp-sdk-pause"></a>
+
+### 16.6 window003 attempt004 实际响应失败与C++开发依赖暂停（2026-11-01）
+
+attempt004使用冻结candidate002计划（SHA `e095bfee7feb071e330138c344b13442bbfa5257a1dd96b6c7713b7f10852ae4`），前置完整性/资源检查通过。该run精确记为100 attempted steps（18 bootstrap、82 nonbootstrap）、worker wall `86.90349225999671s`、supervisor/native wall `90.13052501599304s`、一次native启动。改造后的采样watchdog通过，最大间隔`0.1020052929961821s`，低于原`0.25s`门。
+
+该公开`flush_changes()`候选到达了物理响应检测器，但实际失败：属性频率变化`1.2861003875732422 Hz`，残差差`2.60770320892334e-8 m`（要求`>5e-6 m`），相对速度差`4.240870475769043e-5 m/s`（要求`>1e-4 m/s`）。这在`public_bridge_first_20261101` epoch新增一次实际物理失败，窗口累计native步数为382，其中attempt003的282步是保守扣账、attempt004的100步精确；累计native为3,239步、2,086.6392878470002秒、28次启动。历史正式N2预留6,400步/2,400秒未动，formal N2仍为0。attempt004 worker报告`-11` teardown退出；按维护者说明这属于已解决/独立的已知收尾问题，不是当前C++ SDK阻塞，也不以它替换实际物理失败结果。进程组已退出、共享锁已释放。
+
+Kit/C++的必要性边界现已修正。本机Isaac Sim 6.2 Python环境已经包含约27 MiB的`isaacsim/kit/dev`，含Carbonite plugin C++ headers和`repo.sh`；本机`omni.physx`为110.4.4，其构建元数据指向Kit `110.4.0+feature.385545.40e0c960.gl`。因此“必须再下载整套Kit SDK”目前没有证据。若要在**同一个已运行Isaac App**内取到其PhysX mimic对象，候选路径须经Kit/Carbonite C++ plugin边界查询该App加载的`omni::physx::IPhysx`接口，再调用公开PhysX mimic setter；当前Python绑定没有提供该live-object指针桥。已安装包里没有找到`omni/physx/IPhysx.h`，而公开检索到的NVIDIA头文件属于110.3，不能证明与本机110.4.4接口/句柄生命周期兼容。NVIDIA说明Isaac Sim 6.2使用Kit SDK 110.4.0，[Kit 110.4架构文档](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/110.4.0/guide/kit_overview.html)说明Carbonite是C++ plugin边界；这些说明解释了为何C++桥需要Kit ABI/开发接口，但不证明必须取得整包SDK。依赖安装已获维护者允许，但随后维护者要求先暂停；本窗口未下载或安装SDK/依赖。
+
+维护者要求在此暂停并要求解释上述依赖。窗口状态为`PAUSED_BY_MAINTAINER_PENDING_EXACT_110_4_OMNI_PHYSX_CPP_INTERFACE`，不是Goal完成。详细本机开发树检查、精确receipt/哈希和恢复动作见ignored [same-App C++/Kit SDK blocker note](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/same_app_cpp_sdk_blocker.md)、[attempt004 supervisor receipt](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/n1_flush_candidate002_supervisor_receipt.json)和[累计run ledger](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/run_ledger.json)。F05三路线仍未收口；F06仅准备入口，N2/H5冷读/F06/F07/Qualification均未运行。
