@@ -395,6 +395,7 @@ def _f05_typed_state_extension(trajectory: FrozenTrajectory):
             "f05-geophys-usd-position-synthetic-io-s1-v1",
             "geophys-usd-position-f05-native-v1",
             "geophys-usd-position-f05-dg02-core-v1",
+            "f05-dg04-isaac-native-mimic-v1",
             "f05-dg01-mujoco-core-v1",
     }:
         return None

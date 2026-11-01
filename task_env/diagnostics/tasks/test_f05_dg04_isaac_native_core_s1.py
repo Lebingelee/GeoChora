@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import h5py
 import pytest
 
 from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
@@ -276,6 +277,13 @@ def test_f05_dg04_selected_reference_core_s1_two_episodes(tmp_path):
                 loaded = load_structured_control_records_h5(path)
                 assert result["transition_count"] == loaded["transition_count"] == 8
                 assert result["observation_count"] == loaded["observation_count"] == 9
+                with h5py.File(path, "r") as recorded:
+                    typed_witness = json.loads(
+                        recorded["meta/f05_public_typed_state_witness_v1_json"][()].decode("utf-8")
+                    )
+                assert typed_witness["schema_version"] == "f05-public-typed-state-witness-v1"
+                assert typed_witness["observation_count"] == 9
+                assert [row["boundary_index"] for row in typed_witness["rows"]] == list(range(9))
                 env_meta = loaded["env_meta"]
                 profile = env_meta["reference_profile"]
                 assert env_meta["environment"]["name"] == "SelectedReferenceEnv.F05Dg04IsaacNativePosition"
