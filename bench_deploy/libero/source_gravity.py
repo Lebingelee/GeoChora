@@ -12,7 +12,7 @@ import numpy as np
 
 from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
 
-from .task_contracts import TASK_1
+from .task_contracts import TASK_1, TASK_2, TASK_3
 
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
@@ -120,7 +120,10 @@ class MujocoSourceGravityBiasV1:
                  source_xml_sha256: str, source_closure_digest: str,
                  composition_plan_sha256: str, mujoco_api=None,
                  raw_source_xml_bytes: bytes | None = None,
-                 model_profile_bytes: bytes | None = None):
+                 model_profile_bytes: bytes | None = None,
+                 task_uid: str = TASK_1):
+        if task_uid not in {TASK_1, TASK_2, TASK_3}:
+            raise ValueError("source gravity task identity is outside the pinned LIBERO task set")
         bundle = Path(bundle_root)
         if bundle.is_symlink():
             raise ValueError("gravity-bias bundle root must not be a symlink")
@@ -143,7 +146,7 @@ class MujocoSourceGravityBiasV1:
                     or any(part in {"", ".", ".."} for part in logical.split("/"))):
                 raise ValueError("gravity-bias source closure contains an unsafe logical path")
         xml = files.get("canonical-source.xml")
-        if (xml is None or files.get("scene.xml") != xml
+        if (xml is None or not isinstance(files.get("scene.xml"), bytes)
                 or _sha256(xml) != source_xml_sha256
                 or _source_closure_digest(files) != source_closure_digest):
             raise ValueError("gravity-bias source XML or closure identity does not recompute")
@@ -224,7 +227,7 @@ class MujocoSourceGravityBiasV1:
             raise ValueError("gravity-bias composition plan hash differs from the selected source")
         plan = json.loads(plan_bytes.decode("utf-8"))
         plan_xml_sha = raw_sha if profiled_source else source_xml_sha256
-        if (plan.get("identity", {}).get("task_uid") != TASK_1
+        if (plan.get("identity", {}).get("task_uid") != task_uid
                 or plan.get("output", {}).get("composed_mjcf_sha256") != plan_xml_sha):
             raise ValueError("gravity-bias composition plan names a different task or XML")
 
@@ -280,7 +283,7 @@ class MujocoSourceGravityBiasV1:
                 else "libero-source-gravity-model-identity-v1"
             ),
             "profile_id": self.profile_id,
-            "task_uid": TASK_1,
+            "task_uid": task_uid,
             "source_xml_sha256": source_xml_sha256,
             "source_closure_digest": source_closure_digest,
             "composition_plan_sha256": composition_plan_sha256,

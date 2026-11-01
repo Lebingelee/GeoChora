@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from numbers import Integral, Real
 
 import numpy as np
@@ -58,6 +59,11 @@ class GeoPhysRuntimeBoundary:
         self._ctrl_range = np.asarray(ctrl_range, dtype=np.float32).copy()
         self._actuator_force_limit_overrides: dict[int, float] = {}
         self._simulation_time = 0.0
+        (self._static_world_child_body_ids,
+         self._baseline_static_world_child_positions,
+         self._baseline_static_world_child_orientations) = (
+            self._physics.read_static_world_child_body_poses()
+        )
         self._baseline = {
             name: np.asarray(value).copy()
             for name, value in self._physics.snapshot().items()
@@ -78,9 +84,32 @@ class GeoPhysRuntimeBoundary:
         state: EpisodePhysicsState,
         *,
         refresh_actuator_force: bool = False,
+        static_world_child_poses: Mapping[int, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> ActuatorForceMeasurementV1 | None:
         self._physics.restore(self._baseline)
         self._apply_actuator_force_limit_overrides()
+        if self._static_world_child_body_ids.size:
+            self._physics.write_static_world_child_body_poses(
+                self._static_world_child_body_ids,
+                self._baseline_static_world_child_positions,
+                self._baseline_static_world_child_orientations,
+            )
+        if static_world_child_poses:
+            if not isinstance(static_world_child_poses, Mapping):
+                raise TypeError("static world-child reset poses must be a mapping")
+            ids = tuple(static_world_child_poses)
+            if any(isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral)
+                   for value in ids):
+                raise TypeError("static world-child reset pose keys must be integer body ids")
+            positions = []
+            orientations = []
+            for body_id in ids:
+                pose_value = static_world_child_poses[body_id]
+                if not isinstance(pose_value, (tuple, list)) or len(pose_value) != 2:
+                    raise TypeError("static world-child reset pose must be (position, orientation)")
+                positions.append(pose_value[0])
+                orientations.append(pose_value[1])
+            self._physics.write_static_world_child_body_poses(ids, positions, orientations)
         if state.qpos.size:
             self._physics.write_qpos(state.qpos)
         if state.qvel.size:

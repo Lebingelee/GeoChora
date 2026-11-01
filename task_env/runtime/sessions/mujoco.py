@@ -2456,6 +2456,17 @@ class _MuJoCoSession(_SessionValues):
         if not ranges:
             raise ValueError('physical monitor requires at least one source-limited scalar joint')
         self._physical_monitor_tolerance = 1.0e-8
+        tolerance_overrides = dict(getattr(
+            self._source, 'task_local_joint_limit_tolerance_overrides', {},
+        ))
+        unknown_tolerances = set(tolerance_overrides) - set(ranges)
+        if unknown_tolerances:
+            raise ValueError(
+                'task-local joint limit tolerances reference joints unavailable to the physical monitor: '
+                f'{sorted(unknown_tolerances)}'
+            )
+        for semantic, row in ranges.items():
+            row['tolerance'] = float(tolerance_overrides.get(semantic, self._physical_monitor_tolerance))
         self._physical_monitor = {
             'schema_version': 'physical-state-monitor-v1',
             'source_id': self._source.scene_source.source_id,
@@ -2469,7 +2480,11 @@ class _MuJoCoSession(_SessionValues):
             ).encode()).hexdigest(),
             'joint_ranges': ranges,
             'maximum_excursion': 0.0,
+            'maximum_excursion_by_semantic_id': {semantic: 0.0 for semantic in ranges},
+            'joint_limit_excursions': [],
+            'joint_limit_excursion_count': 0,
             'tolerance': self._physical_monitor_tolerance,
+            'task_local_tolerance_overrides': tolerance_overrides,
             'first_violation': None,
             'warning_counts': self._warning_counts(),
             'samples_including_reset': 0,
@@ -2490,6 +2505,8 @@ class _MuJoCoSession(_SessionValues):
                 'control_boundary': int(control_boundary), 'native_step': int(native_step),
             }
         maximum_excursion = float(monitor['maximum_excursion'])
+        maximum_by_semantic = monitor['maximum_excursion_by_semantic_id']
+        raw_excursions = monitor['joint_limit_excursions']
         if finite:
             for semantic, row in monitor['joint_ranges'].items():
                 value = float(qpos[row['qpos_address']])
@@ -2498,15 +2515,26 @@ class _MuJoCoSession(_SessionValues):
                 row['maximum_observed'] = max(float(row['maximum_observed']), value)
                 excursion = max(0.0, float(low) - value, value - float(high))
                 maximum_excursion = max(maximum_excursion, excursion)
-                if excursion > self._physical_monitor_tolerance and monitor['first_violation'] is None:
+                maximum_by_semantic[semantic] = max(float(maximum_by_semantic[semantic]), excursion)
+                tolerance = float(row['tolerance'])
+                if excursion > 0.0:
+                    raw_excursions.append({
+                        'semantic_id': semantic, 'joint_name': row['joint_name'],
+                        'position': value, 'range': list(row['range']), 'excursion': excursion,
+                        'tolerance': tolerance, 'phase': phase,
+                        'control_boundary': int(control_boundary), 'native_step': int(native_step),
+                    })
+                if excursion > tolerance and monitor['first_violation'] is None:
                     monitor['first_violation'] = {
                         'kind': 'joint_limit_exceeded', 'semantic_id': semantic,
                         'joint_name': row['joint_name'], 'position': value,
                         'range': list(row['range']), 'excursion': excursion,
+                        'tolerance': tolerance,
                         'phase': phase, 'control_boundary': int(control_boundary),
                         'native_step': int(native_step),
                     }
         monitor['maximum_excursion'] = maximum_excursion
+        monitor['joint_limit_excursion_count'] = len(raw_excursions)
         monitor['warning_counts'] = warning_counts
         monitor['samples_including_reset'] = int(monitor['samples_including_reset']) + 1
         any_warning = any(warning_counts)

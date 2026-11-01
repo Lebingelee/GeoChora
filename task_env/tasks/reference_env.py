@@ -202,8 +202,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         """Construct a typed source-bound mixed-control candidate through the existing route."""
         if not isinstance(binding, ReferenceTaskBinding):
             raise TypeError('mixed-control candidate requires the existing ReferenceTaskBinding owner')
-        if (provider, backend) != ('mujoco', 'cpu'):
-            raise ValueError('this mixed-control route admits MuJoCo CPU only')
+        if provider not in {'mujoco', 'geophys'} or backend != 'cpu':
+            raise ValueError('mixed-control candidate currently admits MuJoCo or GeoPhys CPU')
         if (binding.build_mixed_control_profile is None
                 or binding.reset_sample_with_options is None
                 or binding.prepare_mixed_control is None
@@ -307,10 +307,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
             raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
         if _mixed_control_candidate and (
-            (provider, backend) != ('mujoco', 'cpu')
+            (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
             or self.binding.build_mixed_control_profile is None
         ):
-            raise ValueError('mixed-control candidate requires its MuJoCo CPU task binding')
+            raise ValueError('mixed-control candidate requires its scalar CPU task binding')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
         if sum((bool(_mixed_control_candidate), _diagnostic_gripper_control_hz is not None,
@@ -885,10 +885,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 realization = self.value['reset_realizations'].get(self.sample.sample_id)
                 if not isinstance(realization, dict):
                     raise ValueError('mixed-control reset sample has no matching source-derived realization receipt')
+                reset_readback = self.session.reset_readback_v1
+                reset_readback_mapping = (
+                    reset_readback.to_mapping()
+                    if callable(getattr(reset_readback, 'to_mapping', None))
+                    else dict(reset_readback)
+                )
                 self._mixed_reset_context = {
                     'reset_sample_v1': self.sample.to_mapping(),
                     'reset_realization_v1': realization,
-                    'reset_readback_v1': self.session.reset_readback_v1.to_mapping(),
+                    'reset_readback_v1': reset_readback_mapping,
                 }
                 self.info.update({
                     **self._mixed_reset_context,

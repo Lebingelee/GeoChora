@@ -493,7 +493,8 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
         if not isinstance(resolution, CanonicalArmResolutionV1):
             raise TypeError('OSC Controller requires a typed iterative canonical arm resolution')
         resolution.validate()
-        if not resolution.diagnostics.converged:
+        if (not resolution.diagnostics.converged
+                and not getattr(self, '_allow_unconverged_arm_resolution', False)):
             raise ValueError('OSC Controller refuses an unconverged canonical world-pose target')
         arm_target = resolution.target
         q_reference = np.asarray(self.map_arm_target_to_control_order(arm_target), dtype=np.float64)
@@ -716,12 +717,16 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
                  gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
-                 nullspace_reference_joint_position_rad=None):
+                 nullspace_reference_joint_position_rad=None,
+                 allow_unconverged_arm_resolution: bool = False):
         super().__init__(
             operational_config=operational_config or LiberoOperationalSpaceConfigV2(),
             gravity_bias_model=gravity_bias_model,
             arm_resolver_identity=arm_resolver_identity,
         )
+        if type(allow_unconverged_arm_resolution) is not bool:
+            raise TypeError('unconverged arm-resolution policy must be bool')
+        self._allow_unconverged_arm_resolution = allow_unconverged_arm_resolution
         configured_reference = None
         if nullspace_reference_joint_position_rad is not None:
             configured_reference = np.asarray(
@@ -779,6 +784,7 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
 
     def compute_pose_target(self, *args, **kwargs):
         target = super().compute_pose_target(*args, **kwargs)
+        resolution = args[0] if args else kwargs.get('resolution')
         self.last_control_receipt.update({
             'schema_version': (
                 'libero-mixed-control-receipt-v4'
@@ -800,6 +806,10 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
                 else self._configured_nullspace_reference.tolist()
             ),
             'hold_policy': self.operational_config.hold_policy,
+            'arm_resolution_diagnostics': (
+                None if resolution is None else resolution.diagnostics.to_mapping()
+            ),
+            'allow_unconverged_arm_resolution': self._allow_unconverged_arm_resolution,
         })
         return target
 
@@ -824,6 +834,10 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
                 'nullspace_reference_joint_position_rad': self._configured_nullspace_reference.tolist(),
                 'hold_policy': self.operational_config.hold_policy,
             })
+        if self._allow_unconverged_arm_resolution:
+            payload['arm_resolution_policy'] = (
+                'allow_unconverged_ik_auxiliary_target_for_absolute_pose_osc_a_replay_v1'
+            )
         return payload
 
 
@@ -833,11 +847,13 @@ class LiberoMixedControllerV5(LiberoMixedControllerV4):
     profile_id = 'libero-spatial-bowl-to-plate-osc-pose-velocity-feedforward-v1'
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
-                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
+                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
+                 allow_unconverged_arm_resolution: bool = False):
         super().__init__(
             operational_config=operational_config,
             gravity_bias_model=gravity_bias_model,
             arm_resolver_identity=arm_resolver_identity,
+            allow_unconverged_arm_resolution=allow_unconverged_arm_resolution,
         )
         self._last_target_control_step = None
         self._last_target_position = None
@@ -1006,11 +1022,13 @@ class LiberoMixedControllerV7(LiberoMixedControllerV5):
     profile_id = 'libero-spatial-bowl-to-plate-osc-pose-velocity-feedforward-qfrc-bias-v1'
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
-                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
+                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
+                 allow_unconverged_arm_resolution: bool = False):
         super().__init__(
             operational_config=operational_config,
             gravity_bias_model=gravity_bias_model,
             arm_resolver_identity=arm_resolver_identity,
+            allow_unconverged_arm_resolution=allow_unconverged_arm_resolution,
         )
         self.profile_id = type(self).profile_id
         payload = self.identity_mapping()

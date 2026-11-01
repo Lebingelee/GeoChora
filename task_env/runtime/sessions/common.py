@@ -220,6 +220,8 @@ class _SessionValues:
         """Reset from a public Core plan and open rollout after its readback gate."""
         self._require_open()
         if isinstance(plan, ResetPlanV1):
+            if self._provider != 'mujoco':
+                raise ValueError('source-bound ResetPlanV1 is currently admitted for MuJoCo mixed sessions only')
             plan.validate()
             if getattr(self._source, 'mixed_actuator_plan', None) is None:
                 raise ValueError('source-bound ResetPlanV1 requires an admitted typed source profile')
@@ -307,9 +309,9 @@ class _SessionValues:
     def _validate_sample(self, sample):
         self._require_open()
         if isinstance(sample, ResetSampleV1) and (
-                self._provider != 'mujoco'
+                self._provider not in {'mujoco', 'geophys'}
                 or getattr(self._source, 'mixed_actuator_plan', None) is None):
-            raise TypeError('ResetSampleV1 requires an admitted MuJoCo mixed actuator session before reset')
+            raise TypeError('ResetSampleV1 requires an admitted mixed actuator session before reset')
         if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
             raise TypeError('RuntimeSession reset requires an admitted reset sample schema')
         if sample.task_artifact_hash != self._artifact.identity_hash:

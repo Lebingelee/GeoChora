@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from pathlib import Path
 import hashlib
+import math
 import os
 import posixpath
 import re
@@ -266,6 +267,7 @@ class RuntimeSource:
     fixture_bodies: tuple[str, ...] = ()
     contact_geom_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     mixed_actuator_plan: object | None = None
+    task_local_joint_limit_tolerance_overrides: Mapping[str, float] = field(default_factory=dict)
 
     def __post_init__(self):
         for field in (
@@ -282,6 +284,17 @@ class RuntimeSource:
         if len(set(fixtures)) != len(fixtures):
             raise ValueError('fixture body bindings must be unique')
         object.__setattr__(self, 'fixture_bodies', fixtures)
+        tolerances = dict(self.task_local_joint_limit_tolerance_overrides)
+        if any(type(name) is not str or not name.strip() for name in tolerances):
+            raise TypeError('task-local joint limit tolerances require semantic joint names')
+        if set(tolerances) - set(self.joints):
+            raise ValueError('task-local joint limit tolerances must bind source joint semantics')
+        if any(isinstance(value, bool) or not math.isfinite(float(value)) or float(value) <= 0.0
+               for value in tolerances.values()):
+            raise ValueError('task-local joint limit tolerances must be finite and positive')
+        object.__setattr__(self, 'task_local_joint_limit_tolerance_overrides', MappingProxyType(
+            {name: float(value) for name, value in tolerances.items()}
+        ))
         groups = {str(entity): tuple(names) for entity, names in dict(self.contact_geom_groups).items()}
         if any(not entity.strip() or not names or any(type(name) is not str or not name.strip() for name in names)
                or len(set(names)) != len(names) for entity, names in groups.items()):

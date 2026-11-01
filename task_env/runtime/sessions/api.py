@@ -286,9 +286,11 @@ def _mixed_actuator_manifest(artifact, execution, source):
     if not isinstance(artifact, TaskArtifact):
         raise ValueError('mixed actuator admission requires TaskArtifact v0')
     if (execution.physics_provider, execution.backend, execution.render_provider,
-            execution.physics_profile, execution.determinism_mode) != (
-            'mujoco', 'cpu', 'none', PROFILE, 'strict'):
-        raise ValueError('mixed actuator admission requires strict MuJoCo CPU state-only execution')
+            execution.physics_profile, execution.determinism_mode) not in {
+            ('mujoco', 'cpu', 'none', PROFILE, 'strict'),
+            ('geophys', 'cpu', 'none', PROFILE, 'strict'),
+    }:
+        raise ValueError('mixed actuator admission requires strict scalar CPU state-only execution')
     if (plan.task_artifact_hash != artifact.identity_hash
             or plan.source_id != source.scene_source.source_id
             or plan.source_closure_digest != source.source_closure_digest):
@@ -307,13 +309,13 @@ def _mixed_actuator_manifest(artifact, execution, source):
             or source.scene_source.source_id != receipt.source_id
             or source.scene_source.base_dir is None
             or source.source_closure_digest != receipt.source_closure_digest
-            or source.scene_source.xml.encode('utf-8') != receipt.importer_xml
+            or source.scene_source.xml.encode('utf-8') != receipt.closure_files.get('canonical-source.xml')
             or Path(source.scene_source.base_dir).resolve() != receipt.snapshot_root):
-        raise ValueError('mixed actuator admission requires its immutable execution source receipt')
+        raise ValueError('mixed actuator admission requires its immutable canonical/importer source receipt')
     receipt.validate_snapshot()
-    if (hashlib.sha256(receipt.importer_xml).hexdigest() != receipt.canonical_xml_sha256
+    if (hashlib.sha256(receipt.importer_xml).hexdigest() != receipt.importer_xml_sha256
             or receipt.closure_files.get('scene.xml') != receipt.importer_xml):
-        raise ValueError('mixed actuator source receipt does not bind importer XML bytes')
+        raise ValueError('mixed actuator source receipt does not bind its importer XML bytes')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('mixed actuator RuntimeSource differs from the exact Artifact')
     if not source.torque_actuators or not source.position_actuators:
@@ -324,14 +326,28 @@ def _mixed_actuator_manifest(artifact, execution, source):
         f'mixed-actuator-plan={plan.identity_hash}/artifact={artifact.identity_hash}/'
         f'source={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}'
     )
-    base = provider_manifest('mujoco')
+    provider = execution.physics_provider
+    base = provider_manifest(provider)
     claims = tuple(base.capabilities)
     unsupported = base.known_unsupported
+    if provider == 'geophys':
+        if not any(channel.drive_mode == 'joint_torque' for channel in plan.channels):
+            raise ValueError('GeoPhys mixed actuator admission requires a named torque channel')
+        claims += (CapabilityClaim(
+            'joint_torque_actuation', 'tested',
+            f'{evidence}/provider_adapter=task_env.runtime.sessions.geophys',
+        ),)
+        unsupported = tuple(item for item in unsupported if item != 'joint_torque_actuation')
     if source.contact_geom_groups:
+        if provider == 'geophys':
+            raise ValueError('GeoPhys mixed actuator admission does not claim geom-pair contact queries')
         claims += (CapabilityClaim('contact_detection', 'tested', evidence),)
         unsupported = tuple(item for item in unsupported if item != 'contact_detection')
     return replace(
-        base, adapter_version='task-env-mixed-actuator-source-v1',
+        base, adapter_version=(
+            'task-env-mixed-actuator-source-v1' if provider == 'mujoco'
+            else 'task-env-geophys-mixed-actuator-source-v1'
+        ),
         capabilities=claims, known_unsupported=unsupported, evidence_reference=evidence,
     )
 
