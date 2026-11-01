@@ -293,6 +293,40 @@ def test_f06_gripper_readback_failure_reports_exact_boundary_values():
     assert 'target_opening_m=0.0' in message
 
 
+def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue():
+    from types import SimpleNamespace
+
+    from task_env.tasks.reference_env import SelectedReferenceEnv
+
+    def env_for_opening(opening_m):
+        env = object.__new__(SelectedReferenceEnv)
+        env.position_profile = True
+        env.value = {'f06_pickcube_isaac_input': object()}
+        env.state = SimpleNamespace(
+            control_step=52,
+            simulation_time=0.52,
+            joint_position={
+                'panda-v1/finger_joint1': opening_m / 2,
+                'panda-v1/finger_joint2': opening_m / 2,
+            },
+            joint_velocity={
+                'panda-v1/finger_joint1': 0.002,
+                'panda-v1/finger_joint2': 0.002,
+            },
+        )
+        target = SimpleNamespace(gripper=SimpleNamespace(opening_m=0.08))
+        env.last_position_transition = (None, SimpleNamespace(target=target), None)
+        return env
+
+    info = env_for_opening(-5.300285010889638e-7).expert_execution_info()
+    assert info.measured_opening_m == 0.0
+    assert info.target_opening_m == 0.08
+    assert not info.close_ready
+
+    with pytest.raises(ValueError, match='measured_opening_m=-1.000001e-06'):
+        env_for_opening(-1.000001e-6).expert_execution_info()
+
+
 def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
     from task_env.runtime.sessions.native_io import NativeAdvanceReceiptV1
 

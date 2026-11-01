@@ -897,6 +897,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             measured = float(sum(
                 float(positions[f'panda-v1/finger_joint{index}']) for index in (1, 2)
             ))
+            # PhysX can report lower-bounded finger coordinates a fraction of
+            # a micrometer below zero at the joint limit. Normalize only this
+            # numerical residue; larger physical readback violations still
+            # fail the PickCube execution-info contract below.
+            if -1e-6 <= measured < 0.0:
+                measured = 0.0
             measured_speed = float(sum(
                 abs(float(velocities[f'panda-v1/finger_joint{index}'])) for index in (1, 2)
             ))
