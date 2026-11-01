@@ -40,12 +40,6 @@ TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
 SITE_NAME = "gripper0_grip_site"
 BASE_BODY_ID = "robot0_link0"
-_V5_IDENTITY_PLANNER_DEFAULTS = {
-    "max_translation_per_step": 0.0055,
-    "max_translation_acceleration_per_step": 0.002,
-    "max_rotation_per_step": 0.08,
-    "max_rotation_acceleration_per_step": 0.04,
-}
 _V678_IDENTITY_PLANNER_DEFAULTS = {
     "max_translation_per_step": 0.0025,
     "max_translation_acceleration_per_step": 0.001,
@@ -84,8 +78,8 @@ def _source_identity_fields(source_xml_sha256, source_closure_digest, arm_resolv
 
 def _solution_identity_v5(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
-    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
-    planner_config: CartesianPosePlannerConfig | None = None,
+    config: "LiberoPickPlaceSolutionConfigV1",
+    planner_config: CartesianPosePlannerConfig,
 ) -> str:
     """Bind the physics-rate OSC posture policy to the source and shared resolver."""
     for value, label in ((source_xml_sha256, "source XML"),
@@ -94,9 +88,9 @@ def _solution_identity_v5(
         if (type(value) is not str or len(value) != 64
                 or any(character not in "0123456789abcdef" for character in value)):
             raise ValueError(f"LIBERO Solution v5 requires a lowercase {label} SHA-256")
-    selected_config, selected_planner = _identity_inputs(
-        config, planner_config, _V5_IDENTITY_PLANNER_DEFAULTS,
-    )
+    # Private identity parents receive the public builder's resolved inputs.
+    # Re-resolving defaults here would validate and allocate the same planner
+    # again at each level of the V5→V8 hash chain.
     osc = LiberoMixedControllerV6(
         operational_config=LiberoOperationalSpaceConfigV2(),
         arm_resolver_identity=arm_resolver_identity,
@@ -122,12 +116,12 @@ def _solution_identity_v5(
             "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
             "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
             "config": {
-                "max_translation_per_step": selected_planner.max_translation_per_step,
-                "max_translation_acceleration_per_step": selected_planner.max_translation_acceleration_per_step,
-                "max_rotation_per_step": selected_planner.max_rotation_per_step,
-                "max_rotation_acceleration_per_step": selected_planner.max_rotation_acceleration_per_step,
-                "settle_steps": selected_planner.settle_steps,
-                "max_steps": selected_planner.max_steps,
+                "max_translation_per_step": planner_config.max_translation_per_step,
+                "max_translation_acceleration_per_step": planner_config.max_translation_acceleration_per_step,
+                "max_rotation_per_step": planner_config.max_rotation_per_step,
+                "max_rotation_acceleration_per_step": planner_config.max_rotation_acceleration_per_step,
+                "settle_steps": planner_config.settle_steps,
+                "max_steps": planner_config.max_steps,
             },
         },
         "arm_resolution_owner": "CanonicalPandaController.resolve_world_pose_target_iterative_v1",
@@ -146,7 +140,7 @@ def _solution_identity_v5(
         },
         "opening_m": _OPENING_BY_STAGE_V5,
         "stage_timeouts": _STAGE_TIMEOUTS_V4,
-        "motion_config": _identity_motion_config(selected_config),
+        "motion_config": _identity_motion_config(config),
     })
 def _pose_planner_identity(selected_planner):
     return {
@@ -163,14 +157,11 @@ def _pose_planner_identity(selected_planner):
 def _solution_identity_v6_v7(
     version: int, source_xml_sha256: str, source_closure_digest: str,
     *, arm_resolver_identity: str,
-    config: "LiberoPickPlaceSolutionConfigV1 | None",
-    planner_config: CartesianPosePlannerConfig | None,
+    config: "LiberoPickPlaceSolutionConfigV1",
+    planner_config: CartesianPosePlannerConfig,
 ) -> str:
     if version not in (6, 7):
         raise ValueError("legacy Solution identity parent must be v6 or v7")
-    selected_config, selected_planner = _identity_inputs(
-        config, planner_config, _V678_IDENTITY_PLANNER_DEFAULTS,
-    )
     offset, offset_source, opening = (
         (_DEMO_TCP_BOWL_LOCAL_M, "LIBERO task-0 demonstrated pre-lift median",
          _OPENING_BY_STAGE_V6)
@@ -183,12 +174,12 @@ def _solution_identity_v6_v7(
         _solution_identity_v5(
             source_xml_sha256, source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
-            config=selected_config, planner_config=selected_planner,
+            config=config, planner_config=planner_config,
         ) if version == 6 else
         _solution_identity_v6_v7(
             6, source_xml_sha256, source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
-            config=selected_config, planner_config=selected_planner,
+            config=config, planner_config=planner_config,
         )
     )
     payload = {
@@ -209,8 +200,8 @@ def _solution_identity_v6_v7(
         },
         "opening_m": opening,
         "contact_policy": "bilateral_source_finger_contact_two_boundaries_then_retain_pinch_v2",
-        "planner": _pose_planner_identity(selected_planner),
-        "motion_config": _identity_motion_config(selected_config),
+        "planner": _pose_planner_identity(planner_config),
+        "motion_config": _identity_motion_config(config),
     }
     if version == 6:
         payload["controller_identity"] = LiberoMixedControllerV7(
@@ -462,6 +453,11 @@ class LiberoPickPlaceSolutionV8:
         self._pose_plan_index = self._grasp_contact_streak = self._lift_contact_loss_streak = 0
         self._grasp_confirmed = False
 
+    def _clear_pose_plan(self) -> None:
+        self._pose_plan = None
+        self._pose_plan_index = 0
+        self._pose_plan_stage = None
+
     def reset(self, observation, info: Mapping[str, object], metadata, **_kwargs) -> None:
         self._reset_state()
         if not isinstance(metadata, Mapping):
@@ -680,9 +676,7 @@ class LiberoPickPlaceSolutionV8:
         pose_reached = target_error <= self.config.position_tolerance_m and orientation_error <= 0.12
 
         if tracking_position_error > 0.025 or tracking_orientation_error > 0.25:
-            self._pose_plan = None
-            self._pose_plan_index = 0
-            self._pose_plan_stage = None
+            self._clear_pose_plan()
             waypoint_advanced = False
         else:
             position_converged = tracking_position_error <= _WAYPOINT_POSITION_TOLERANCE_V4_M
@@ -762,9 +756,7 @@ class LiberoPickPlaceSolutionV8:
             self.failed = True
             self.failure_reason = f"stage_timeout:{stage_before}"
         if self.stage != stage_before:
-            self._pose_plan = None
-            self._pose_plan_index = 0
-            self._pose_plan_stage = None
+            self._clear_pose_plan()
         self._last_action_receipt = {
             **(self._last_action_receipt or {}),
             "post_step_feedback": {
@@ -841,9 +833,7 @@ class LiberoPickPlaceSolutionV8:
             self._bowl_reference_pose = current_bowl
             self._plate_reference_pose = current_plate
             self._initial_bowl = current_bowl[:3].copy()
-            self._pose_plan = None
-            self._pose_plan_index = 0
-            self._pose_plan_stage = None
+            self._clear_pose_plan()
         return changed
     def _target(self) -> np.ndarray:
         if self._bowl_reference_pose is None or self._plate_reference_pose is None:
