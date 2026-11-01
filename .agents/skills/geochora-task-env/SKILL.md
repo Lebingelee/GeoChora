@@ -1400,7 +1400,7 @@ The F05 three-route closeout reuses already accepted bounded DG01 MuJoCo/Core an
 
 At the F05 DG04 closeout timestamp, F06 was entry-only: DG04’s airborne/free-body diagnostic scene was not the tabletop PickCube task, and no F06/F07 campaign, Expert, Oracle, Judge or Qualification had started. That was the historical state when the previous [window004 TaskEnv Skill refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_receipt.json) and [closeout refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_closeout_receipt.json) were written. F06 has since run as the separate built-in PickCube example described below.
 
-## F06 built-in PickCube Harness example (2026-11-01; PARTIAL pending Sol review)
+## F06 built-in PickCube Harness example (2026-11-01; runtime portion partially accepted)
 
 The versioned `pickcube-harness-example-v1` selects the existing public UID
 `pick-cube-p16-reference-v1` and delegates task, reset, readiness solution,
@@ -1411,45 +1411,56 @@ profile is `r3_continuous_v1`, seeds31/32/33, 1000 control ticks, 0.002 s
 physics with five substeps, and runtime validity is reported separately from
 Task/Expert outcome.
 
-Run the direct public example or the built-in Harness route from the repository
-root with the GeoPhys Python environment and explicit `PYTHONPATH`:
+Run the versioned built-in Harness route from the repository root with the
+GeoPhys Python environment and explicit `PYTHONPATH`. Use a fresh output
+directory for each run and pass the controller profile explicitly:
 
 ```bash
-PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution direct --seed 31
-PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01
-PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-mujoco-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01
+OMNI_KIT_ACCEPT_EULA=YES PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider genesis --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-genesis-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider sapien --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-sapien-seed31-run01
 ```
 
-Use a fresh Harness output directory for every run. Isaac requires the exact
-versioned F06 USD delivery, CUDA `cuda:0`, and its supervised Kit worker; it
-does not use the CPU `RLIMIT_AS` bound. Optional Genesis/SAPIEN are only
-selected through `--execution harness`: an absent `genesis`/`sapien` package
-is persisted as `NOT_RUN_DEPENDENCY` with zero worker starts; an absent Core
-provider manifest is `UNSUPPORTED_CAPABILITY`. Do not install an optional
-engine just to change this disposition.
+Set `OMNI_KIT_ACCEPT_EULA=YES` only after the NVIDIA Omniverse EULA has been
+accepted; the controlled Kit worker needs the environment setting for
+non-interactive startup. Use a fresh Harness output directory for every run.
+Isaac requires the exact versioned F06 USD delivery, CUDA `cuda:0`, and its
+supervised Kit worker; it does not use the CPU `RLIMIT_AS` bound. Optional
+Genesis/SAPIEN are only selected through `--execution harness`: an absent
+`genesis`/`sapien` package is persisted as `NOT_RUN_DEPENDENCY` with zero worker
+starts; an absent Core provider manifest is `UNSUPPORTED_CAPABILITY`. Do not
+install an optional engine just to change this disposition.
 
-Earlier bounded evidence at source HEAD `00c10296255f3a90c6aeb31d0bb0eec5e612cbad`
-had GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX at 3/3 runtime-valid H5 each;
-none of those six episodes solved the task. Those H5 files predate the
-measured-clearance solution identity below. Four earlier MuJoCo R3 seed31
-attempts hit QACC DOF13; historical successful PickCube × MuJoCo evidence used
-production R1 and does not establish the R3 intersection.
+The maintainer partially accepted the runtime/example portion of the final
+shared headroom identity at source
+`017392e86eb754749fc692263e08a1b33c3c5543`, solution
+`27d31d85ad0aae83a72c8d3fcb901fa37678d39dae5394ca1395eb5ce6c2cd67`: MuJoCo
+CPU, GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX each ran seeds31/32/33. All 9/9
+were runtime-valid; each constructed/reset the existing Core task, generated
+and executed the planned public actions, advanced physics/state, recorded an
+H5 with T+1 and identity validation, passed independent cold read, closed, and
+released its worker group and lock. Independent numeric/action/reset auditing
+also confirms finite recorded values, advancing simulation times, distinct
+planned action values and identical Core reset samples across providers for
+each seed. No execution fault occurred.
 
-One maintainer-authorized MuJoCo 3.8.1 CPU / R3 / seed31 measured-clearance run
-at source `ce3f344cb5833dff99c9862ca18a34878bb696cd` was runtime-valid, finalized
-an H5, passed independent cold read, and closed/released the shared lock. It did
-not reproduce QACC. The gate uses measured `state.ee_pose` and the task's
-existing expert `privileged_state.cube_v1_body_pose`; it reads no provider-private
-solver/controller state. Expert execution stopped after 100 vertical-gate hold
-actions: measured TCP clearance was 0.21448994 m versus the unchanged
-0.215 m threshold. The run therefore failed task/Expert completion. Commit
-`dcd71e3cffd540b4ba4b82f7d10ec93afce17523` adds 20 mm of planned transit
-headroom only when R3 measured gates are enabled; the threshold, final hover
-target, task contract and R1 route stay unchanged. Focused PickCube/Harness
-checks pass 28/28, but this follow-up source identity has no native evidence.
-The previous six H5s and this experimental seed31 H5 are not a coherent matrix
-for the final source. Keep F06 **PARTIAL**; do not run another MuJoCo episode
-or seeds32/33 without a new exact maintainer authorization. See the current
-[evidence index](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md)
-and its raw run, trace, cold-read and diagnosis references. No Qualification or
-F07 training follows from these results.
+Task success remains 0/9. Every seed31 Expert stops at
+`measured_tcp_clearance_timeout:over_cube_before_descent`; seeds32/33 run the
+full 1000-tick horizon and report `episode_truncated`. On Isaac seed31 the raw
+last-step task flags are `terminated=false,truncated=false`; the H5 lifecycle
+receipt separately marks the early externally requested recording close as
+`truncated=true,end_reason=external_stop`. This is an Expert-stop recording
+outcome, not a system watchdog. An initial Isaac seed31 startup attempt omitted
+the already accepted EULA environment and exited before physics/H5; its charge
+is preserved, and the retry supplied `OMNI_KIT_ACCEPT_EULA=YES`.
+
+The earlier QACC runs, measured-clearance attempt and 6/9 PARTIAL remain
+historical evidence for their earlier solution identities. This complete
+matrix supersedes their “headroom identity unvalidated” status; it does not
+claim task success, cross-provider trajectory equivalence, D0 replay,
+Qualification, or F07 training. Genesis/SAPIEN remain
+`NOT_RUN_DEPENDENCY` with zero worker starts. See the [final matrix evidence](../../../docs/maintenance/20261101_f06_pickcube_harness_headroom_matrix.md),
+[recording/action/reset integrity audit](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/headroom_identity_017392e8_matrix_002/recording_integrity_audit.json),
+and the [historical PARTIAL snapshot](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md). The tracked Isaac USD generator is `task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py`; its frozen source input and tested delivery are recorded in the matrix report. Regeneration was not validated in the installed Isaac Python environment because its Core import currently lacks `gymnasium`; this does not alter the hash-verified delivery used by the completed matrix. Solution behavior review is deferred to a later stage.

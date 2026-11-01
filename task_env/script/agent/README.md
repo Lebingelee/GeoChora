@@ -59,6 +59,22 @@ runtime.
 | `builtin_example_schema.py` / `harness_compiler.compile_builtin_pickcube_example` | Versioned built-in PickCube example input; delegates to the public Core UID and never creates a CandidateSpec |
 | `builtin_example_validation.py` / `builtin_example_worker.py` | Bounded fixed-seed runtime example, existing Core Recorder H5, identity/finite/T+1 readback and separate task/runtime outcome facts |
 
+## Built-in PickCube runtime example
+
+`--execution harness --provider {mujoco,geophys,isaacsim,genesis,sapien}` selects
+the versioned `pickcube-harness-example-v1` path. It compiles the exact example
+input, then delegates construction to public `task_env.make_env` with UID
+`pick-cube-p16-reference-v1`; the existing PickCube task, reset sampler,
+solution, controller, RuntimeSession and Recorder remain their owners. This
+path does not create a `CandidateSpec`, run the candidate/Oracle/Judge flow, or
+weaken the separate `pick-lift-v0` 20-seed all-solved requirement. Runtime
+validity and Task/Expert outcome are reported separately.
+
+For runnable CPU/CUDA commands and optional-provider behavior, use the
+[PickCube example matrix](../../../examples/README.md#workflow-matrix). The
+current final headroom-identity 3×3 runtime evidence, task outcomes and limits
+are in the [F06 matrix report](../../../docs/maintenance/20261101_f06_pickcube_harness_headroom_matrix.md).
+
 Passing feasibility rows use `harness-feasibility-completion-v1`. The probe,
 construction ledger and pending Judge verifier require raw task/expert outcome,
 termination, fault, reset/step and cleanup evidence; they do not accept a

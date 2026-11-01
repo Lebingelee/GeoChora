@@ -9,6 +9,14 @@ Deliver a checked Candidate Spec + Artifact, hash-bound construction history, Or
 
 Read [the CLI workflow](references/workflow.md). Resolve the supplied Core checkout, Python environment, runtime directory and task workspace. The runtime directory is `<Core>/task_env/script/agent/`; see its README for setup and input contracts. Core must be a clean known snapshot; regenerate the catalog when moving machines. Keep generated work in ignored `workspace/` or outside the checkout. Ordinary candidate construction does not authorize Core edits, task registration, engine installation, or artifact approval/freeze. A separate explicit maintainer maintenance package may authorize a bounded repair in an existing owner.
 
+The versioned built-in PickCube Harness example is an execution route, not
+candidate construction. For user requests to run or extend that example, follow
+the [TaskEnv module Skill](../geochora-task-env/SKILL.md)
+and [provider commands](../../../examples/README.md#workflow-matrix). Its H5
+files and task/Expert outcomes cannot be treated as solved candidate rows or
+packaged as a Candidate/Oracle/Judge result; the 20-seed all-solved gate below
+remains unchanged.
+
 ## Construction decisions
 
 1. Read the upstream task and its referenced asset bundle / semantic examples. Query the requested provider and available templates. Catalog `available` means a manifest is readable, not that physics has run. Unknown capabilities/providers must fail explicitly.
