@@ -293,6 +293,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-dg02-core-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg03-usd-v1'),
+                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg04-native-mimic-v1'),
                 ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
             }
             if execution_route not in allowed_versioned_routes:
@@ -705,6 +706,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         f05_native_input=self.value.get('f05_native_position_input'),
                         f05_dg02_geophys_input=self.value.get('f05_dg02_geophys_input'),
                         f05_dg03_isaac_input=self.value.get('f05_dg03_isaac_input'),
+                        f05_dg04_isaac_native_input=self.value.get('f05_dg04_isaac_native_input'),
                         f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
                     )
             else:
@@ -1070,6 +1072,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if (self.value.get('f04_position_input') is not None
                     or self.value.get('f05_position_input') is not None
                     or self.value.get('f05_dg02_geophys_input') is not None
+                    or self.value.get('f05_dg04_isaac_native_input') is not None
                     or self.value.get('f05_dg01_mujoco_input') is not None):
                 # Versioned USD state-only routes expose the Core-owned typed
                 # publication used by observations and Position control.
@@ -2417,6 +2420,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'canonical_state_view_v1': self.info['canonical_state_view_v1'],
             } if (self.value.get('f05_position_input') is not None
                   or self.value.get('f05_dg02_geophys_input') is not None
+                  or self.value.get('f05_dg04_isaac_native_input') is not None
                   or self.value.get('f05_dg01_mujoco_input') is not None) else {}),
             **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
@@ -3174,7 +3178,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
-            if (f04_input is not None or f05_input is not None or f05_dg02_input is not None):
+            if (f04_input is not None or f05_input is not None or f05_dg02_input is not None
+                    or self.value.get('f05_dg04_isaac_native_input') is not None):
                 native_io = getattr(self.session, '_native_io', None)
                 provenance = getattr(native_io, 'execution_provenance_kind', None)
                 if provenance == 'native_runtime':

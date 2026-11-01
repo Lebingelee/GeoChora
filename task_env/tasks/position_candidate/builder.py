@@ -46,6 +46,7 @@ POSITION_CANDIDATE_VERSION = 'candidate-v1'
 POSITION_CANDIDATE_SEED = 31
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 F05_DG03_ISAAC_USD_PROFILE = 'isaac-gpu-physx-f05-dg03-usd-v1'
+F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 
 
 def _dg02_r3_arm_profile():
@@ -697,6 +698,140 @@ class F05Dg03IsaacUsdCandidateInputV1:
             raise ValueError('DG03 source-calibrated kinematics bytes/hash mismatch')
 
 
+@dataclass(frozen=True)
+class F05Dg04IsaacNativeCandidateInputV1:
+    """DG04 source-bound Isaac profile with one native mimic-driven finger."""
+
+    schema_version: str
+    task_source: TaskSourceV1
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: ExecutionSpecV1
+    reset_plan: EpisodeResetPlanV1
+    kinematics_source_xml: str
+    kinematics_source_sha256: str
+    task_scene_recipe_sha256: str
+    action_config: object
+
+    def validate(self):
+        if self.schema_version != 'f05-dg04-isaac-native-candidate-input-v1':
+            raise ValueError('unsupported F05 DG04 Isaac native candidate input schema')
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1):
+            raise TypeError('DG04 requires exact TaskSource/Artifact/USD/Execution/reset contracts')
+        from task_env.environment.config import ActionConfig
+        if type(self.action_config) is not ActionConfig or self.action_config != ActionConfig(
+                joint_position_correction_gain=1.0,
+                gripper_default_force_N=100.0):
+            raise ValueError('DG04 ActionConfig differs from accepted DG01 Position semantics')
+
+        # Reuse the complete source/task/reset validation owned by DG03 while
+        # projecting only its two profile fields back to the exact DG03 label.
+        from task_env.assembly.usd_delivery import _canonical_hash
+        from dataclasses import replace as dataclass_replace
+        base_options = {
+            'f05_goal': 'DG03',
+            'lowering': 'public-isaac-source-mimic-and-tendon-v4-homogeneous-solimp-corrected-angular-drive',
+            'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
+            'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
+        }
+        representation = self.runtime_source.scene_source.representation
+        base_representation = dataclass_replace(
+            representation, options_sha256=_canonical_hash(base_options),
+        )
+        base_scene_source = dataclass_replace(
+            self.runtime_source.scene_source, representation=base_representation,
+        )
+        base_source = dataclass_replace(self.runtime_source, scene_source=base_scene_source)
+        base_execution = dataclass_replace(
+            self.execution, physics_profile=F05_DG03_ISAAC_USD_PROFILE,
+        )
+        F05Dg03IsaacUsdCandidateInputV1(
+            'f05-dg03-isaac-usd-candidate-input-v1', self.task_source, self.artifact,
+            base_source, base_execution, self.reset_plan, self.kinematics_source_xml,
+            self.kinematics_source_sha256, self.task_scene_recipe_sha256,
+            self.action_config,
+        ).validate()
+
+        options = {
+            'f05_goal': 'DG04',
+            'lowering': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
+            'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
+            'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
+        }
+        if (self.execution.physics_provider, self.execution.physics_backend,
+                self.execution.physics_device, self.execution.physics_profile,
+                self.execution.determinism_mode) != (
+                'isaacsim', 'cuda', 'cuda:0', F05_DG04_ISAAC_NATIVE_PROFILE, 'best_effort'):
+            raise ValueError('DG04 requires its exact versioned Isaac CUDA/native-mimic profile')
+        source = self.runtime_source
+        if (source.scene_source.representation.options_sha256 != _canonical_hash(options)
+                or source.scene_source.representation.provider != 'isaacsim'
+                or source.scene_source.representation.provider_build_identity != 'isaacsim-6.2.0.0'
+                or source.scene_source.representation.representation_format != 'usd'
+                or source.scene_source.representation.runtime_admitted is not False
+                or source.scene_source.loaded_delivery.manifest_bytes_sha256
+                    != F05_DG03_USD_DELIVERY_MANIFEST_SHA256
+                or source.scene_source.loaded_delivery.delivery_sha256
+                    != F05_DG03_USD_DELIVERY_IDENTITY_SHA256
+                or source.scene_source.loaded_delivery.closure_sha256
+                    != F05_DG03_USD_DELIVERY_CLOSURE_SHA256):
+            raise ValueError('DG04 native profile does not bind the exact locally validated source delivery')
+        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
+                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
+                    != self.kinematics_source_sha256
+                or self.kinematics_source_sha256
+                    != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'):
+            raise ValueError('DG04 source-calibrated kinematics bytes/hash mismatch')
+
+
+def build_f05_dg04_isaac_native_candidate(
+    delivery_manifest, *, task_seed=POSITION_CANDIDATE_SEED, horizon=300,
+    environment_type=SelectedReferenceEnv,
+):
+    """Derive an independent native PhysX profile from the frozen DG03 source."""
+    from task_env.assembly.usd_delivery import _canonical_hash, resolve_provider_representation
+    from task_env.environment.config import ActionConfig
+
+    base_input, _ = build_f05_dg03_isaac_usd_candidate(
+        delivery_manifest, task_seed=task_seed, horizon=horizon,
+        environment_type=environment_type,
+    )
+    options = {
+        'f05_goal': 'DG04',
+        'lowering': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
+        'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
+        'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
+    }
+    loaded = base_input.runtime_source.scene_source.loaded_delivery
+    representation = resolve_provider_representation(
+        loaded, provider='isaacsim', provider_build_identity='isaacsim-6.2.0.0',
+        options=options,
+    )
+    if representation.options_sha256 != _canonical_hash(options):
+        raise ValueError('DG04 provider selection did not bind its exact native-adaptation profile')
+    scene_source = replace(base_input.runtime_source.scene_source, representation=representation)
+    runtime_source = replace(base_input.runtime_source, scene_source=scene_source)
+    execution = replace(
+        base_input.execution, physics_profile=F05_DG04_ISAAC_NATIVE_PROFILE,
+    )
+    input_v1 = F05Dg04IsaacNativeCandidateInputV1(
+        'f05-dg04-isaac-native-candidate-input-v1', base_input.task_source,
+        base_input.artifact, runtime_source, execution, base_input.reset_plan,
+        base_input.kinematics_source_xml, base_input.kinematics_source_sha256,
+        base_input.task_scene_recipe_sha256,
+        ActionConfig(joint_position_correction_gain=1.0, gripper_default_force_N=100.0),
+    )
+    input_v1.validate()
+    candidate = build_versioned_position_candidate(
+        input_v1, horizon=horizon, environment_type=environment_type,
+    )
+    return input_v1, candidate
+
+
 def build_f05_dg03_isaac_usd_candidate(delivery_manifest, *, task_seed=POSITION_CANDIDATE_SEED,
                                        horizon=300, environment_type=SelectedReferenceEnv):
     """Build the exact source-bound DG03 candidate through existing Core owners."""
@@ -881,7 +1016,7 @@ class F05Dg01MujocoCandidateInputV1:
             raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg03IsaacUsdCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg03IsaacUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
@@ -890,17 +1025,18 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
                               F05Dg03IsaacUsdCandidateInputV1,
+                              F05Dg04IsaacNativeCandidateInputV1,
                               F05Dg01MujocoCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02/DG03 input contract')
+        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02/DG03/DG04 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
     elif type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1:
         if controller_config is not None and controller_config != input_v1.action_config:
             raise ValueError('DG02 controller override differs from its frozen ActionConfig')
-    elif type(input_v1) is F05Dg03IsaacUsdCandidateInputV1:
+    elif type(input_v1) in (F05Dg03IsaacUsdCandidateInputV1, F05Dg04IsaacNativeCandidateInputV1):
         if controller_config is not None and controller_config != input_v1.action_config:
-            raise ValueError('DG03 controller override differs from its frozen ActionConfig')
+            raise ValueError('DG03/DG04 controller override differs from its frozen ActionConfig')
     elif controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
         raise ValueError('explicit Position ActionConfig is supported only by exact F05 native, DG01, or DG02 candidates')
     source = input_v1.runtime_source
@@ -909,15 +1045,18 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
     native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
     position_config = input_v1.action_config if type(input_v1) in (
         F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1,
+        F05Dg04IsaacNativeCandidateInputV1,
     ) else controller_config
     nullspace_reference_gain = (
         F05_DG02_NULLSPACE_REFERENCE_GAIN
-        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
+        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1,
+                              F05Dg04IsaacNativeCandidateInputV1)
         else 0.0
     )
     arm_tracking_method = (
         'production_r3_continuous_v1'
-        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
+        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1,
+                              F05Dg04IsaacNativeCandidateInputV1)
         else 'canonical_position_v1'
     )
     arm_tracking_profile = (
@@ -934,7 +1073,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             nullspace_reference_gain=nullspace_reference_gain,
             pose_target_method=(
                 F05_DG02_POSE_TARGET_METHOD
-                if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
+                if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1,
+                                      F05Dg04IsaacNativeCandidateInputV1)
                 else 'achieved_state_dls_v1'
             ),
             arm_tracking_method=arm_tracking_method,
@@ -964,6 +1104,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             'f05_native_position_input': input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
             'f05_dg02_geophys_input': input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
             'f05_dg03_isaac_input': input_v1 if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1 else None,
+            'f05_dg04_isaac_native_input': input_v1 if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1 else None,
             'f05_dg01_mujoco_input': input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
@@ -998,6 +1139,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                                 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
                                 else 'F05-DG03-source-preserving-isaac-usd-core-v1'
                                 if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1
+                                else 'F05-DG04-native-physx-mimic-core-v1'
+                                if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1
                                 else 'F05-versioned-geophys-usd-synthetic-s1-v1'),
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
@@ -1015,7 +1158,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
     def evaluate(state, semantics):
         if type(input_v1) not in (
                 F05Dg01MujocoCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
-                F05Dg03IsaacUsdCandidateInputV1):
+                F05Dg03IsaacUsdCandidateInputV1, F05Dg04IsaacNativeCandidateInputV1):
             return SimpleNamespace(reward=0.0, success=False, failure=False, metrics={})
         pose_name = 'free-cube/free_cube'
         cube_pose = state.pose_world.get(pose_name)
@@ -1068,6 +1211,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         f05_native_position_input=input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
         f05_dg02_geophys_input=input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
         f05_dg03_isaac_input=input_v1 if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1 else None,
+        f05_dg04_isaac_native_input=input_v1 if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1 else None,
         f05_dg01_mujoco_input=input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
     )
 

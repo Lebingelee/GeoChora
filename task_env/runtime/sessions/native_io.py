@@ -309,6 +309,7 @@ class NativeAdvanceReceiptV1:
     native_step_index: int
     simulation_time_s: float
     source_tendon_application: Mapping[str, object] | None = None
+    native_adaptation_application: Mapping[str, object] | None = None
 
     def to_mapping(self) -> dict[str, object]:
         result = {
@@ -319,6 +320,8 @@ class NativeAdvanceReceiptV1:
         }
         if self.source_tendon_application is not None:
             result['source_tendon_application'] = dict(self.source_tendon_application)
+        if self.native_adaptation_application is not None:
+            result['native_adaptation_application'] = dict(self.native_adaptation_application)
         return result
 
     def validate(self, expected_index: int, expected_time: float):
@@ -346,6 +349,96 @@ class NativeAdvanceReceiptV1:
                            or not math.isfinite(float(value))
                            for value in application['dof_efforts_N'])):
                 raise ValueError('native source tendon substep receipt is incomplete or malformed')
+        if self.source_tendon_application is not None and self.native_adaptation_application is not None:
+            raise ValueError('native advance cannot claim two different gripper adaptation receipts')
+        if self.native_adaptation_application is not None:
+            application = self.native_adaptation_application
+            numeric_fields = (
+                'reference_position_m', 'follower_position_m',
+                'reference_velocity_m_s', 'follower_velocity_m_s',
+                'relation_error_m', 'reference_target_m',
+                'reference_effort_N', 'maximum_effort_N',
+            )
+            if (not isinstance(application, Mapping)
+                    or application.get('schema_version') != 'native-physx-mimic-substep-application-v1'
+                    or application.get('native_step_index') != expected_index
+                    or application.get('profile_id') != 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
+                    or application.get('provenance_kind') not in {'synthetic_fixture', 'native_runtime'}
+                    or application.get('reference_joint') != 'finger_joint1'
+                    or application.get('follower_joint') != 'finger_joint2'
+                    or application.get('public_effort_api') != (
+                        'Articulation.get_dof_projected_joint_forces'
+                        if application.get('provenance_kind') == 'native_runtime'
+                        else 'synthetic-no-physics'
+                    )
+                    or application.get('effort_measurement_semantics') != (
+                        'projected_active_joint_force'
+                        if application.get('provenance_kind') == 'native_runtime'
+                        else 'synthetic-no-physics'
+                    )
+                    or application.get('native_mimic_api') != 'PhysxMimicJointAPI:transX'
+                    or application.get('native_drive_api') != 'PhysicsDriveAPI:linear'
+                    or not _is_sha256_identity(application.get('drive_receipt_identity_sha256'))
+                    or not _is_sha256_identity(application.get('target_identity_sha256'))
+                    or any(type(application.get(key)) not in (int, float)
+                           or isinstance(application.get(key), bool)
+                           or not math.isfinite(float(application[key]))
+                           for key in numeric_fields)
+                    or not isinstance(application.get('public_contact_witness'), Mapping)
+                    or application['public_contact_witness'].get('schema_version')
+                       != 'f05-dg04-native-contact-witness-v1'
+                    or application['public_contact_witness'].get('provenance_kind')
+                       != application.get('provenance_kind')
+                    or type(application['public_contact_witness'].get('contact_present')) is not bool):
+                raise ValueError('native PhysX mimic substep receipt is incomplete or malformed')
+            if (abs(float(application['relation_error_m'])) > 0.002
+                    or float(application['maximum_effort_N']) != 100.0
+                    or abs(float(application['reference_effort_N'])) > 100.0 + 1e-6):
+                raise ValueError('native PhysX mimic relation or declared effort cap failed')
+            witness = application['public_contact_witness']
+            raw_count = witness.get('raw_contact_count')
+            raw_paths = witness.get('raw_contact_actor_paths')
+            raw_forces = witness.get('raw_contact_normal_forces_N')
+            raw_signed_forces = witness.get('raw_contact_signed_normal_force_scalars_N')
+            raw_normals = witness.get('raw_contact_normals_world')
+            raw_separations = witness.get('raw_contact_separations_m')
+            if application.get('provenance_kind') == 'native_runtime' and (
+                    type(raw_count) is not int or raw_count < 0 or raw_count > 32
+                    or type(raw_paths) is not list or len(raw_paths) != raw_count
+                    or type(raw_forces) is not list or len(raw_forces) != raw_count
+                    or type(raw_signed_forces) is not list or len(raw_signed_forces) != raw_count
+                    or type(raw_normals) is not list or len(raw_normals) != raw_count
+                    or type(raw_separations) is not list or len(raw_separations) != raw_count
+                    or any(type(path) is not str or not path.startswith('/') for path in raw_paths)
+                    or any(type(value) not in (int, float) or isinstance(value, bool)
+                           or not math.isfinite(float(value)) or float(value) < 0.0
+                           for value in raw_forces)):
+                raise ValueError('native PhysX mimic receipt lacks aligned raw actor/contact evidence')
+            if application.get('provenance_kind') == 'native_runtime' and (
+                    witness.get('force_magnitude_mapping')
+                    != 'abs(raw_signed_normal_force_scalar_N)'
+                    or any(type(value) not in (int, float) or isinstance(value, bool)
+                           or not math.isfinite(float(value))
+                           for value in raw_signed_forces)
+                    or any(not math.isclose(float(magnitude), abs(float(value)),
+                                            rel_tol=0.0, abs_tol=1e-7)
+                           for magnitude, value in zip(raw_forces, raw_signed_forces, strict=True))
+                    or any(type(row) is not list or len(row) != 3
+                           or any(type(value) not in (int, float) or isinstance(value, bool)
+                                  or not math.isfinite(float(value)) for value in row)
+                           for row in raw_normals)
+                    or any(type(value) not in (int, float) or isinstance(value, bool)
+                           or not math.isfinite(float(value)) for value in raw_separations)):
+                raise ValueError('native PhysX mimic receipt has malformed signed-force/magnitude contact mapping')
+            if application.get('provenance_kind') == 'synthetic_fixture' and (
+                    witness.get('raw_contact_count') != 0
+                    or witness.get('raw_contact_actor_paths') != []
+                    or witness.get('raw_contact_normal_forces_N') != []
+                    or witness.get('raw_contact_signed_normal_force_scalars_N') != []
+                    or witness.get('raw_contact_normals_world') != []
+                    or witness.get('raw_contact_separations_m') != []
+                    or witness.get('force_magnitude_mapping') != 'synthetic-no-physics'):
+                raise ValueError('synthetic PhysX mimic fixture cannot claim raw physical contact evidence')
 
 
 class NativeRuntimeIOV1(Protocol):
@@ -383,6 +476,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             GeoPhysUsdPositionDriveReceiptV1,
             GeoPhysUsdSourceActuationReceiptV2,
             IsaacNamedPositionDriveReceiptV1,
+            IsaacNativeMimicPositionDriveReceiptV1,
             IsaacSourceTendonDriveReceiptV1,
             compile_isaac_named_position_drive_receipt_from_native_metadata_v1,
         )
@@ -421,11 +515,14 @@ class UsdCoreRuntimeSession(_SessionValues):
                 drive_receipt = replace(drive_receipt, provenance_kind='synthetic_fixture')
         if type(drive_receipt) not in (
                 IsaacNamedPositionDriveReceiptV1,
+                IsaacNativeMimicPositionDriveReceiptV1,
                 IsaacSourceTendonDriveReceiptV1,
                 GeoPhysUsdPositionDriveReceiptV1,
                 GeoPhysUsdSourceActuationReceiptV2):
             raise TypeError('Core RuntimeSession requires a supported named-drive receipt owner')
-        if ((type(drive_receipt) in (IsaacNamedPositionDriveReceiptV1, IsaacSourceTendonDriveReceiptV1)
+        if ((type(drive_receipt) in (IsaacNamedPositionDriveReceiptV1,
+                                     IsaacNativeMimicPositionDriveReceiptV1,
+                                     IsaacSourceTendonDriveReceiptV1)
              and execution.physics_provider != 'isaacsim')
                 or (type(drive_receipt) in (GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2)
                     and execution.physics_provider != 'geophys')):
@@ -434,7 +531,8 @@ class UsdCoreRuntimeSession(_SessionValues):
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')
         receipt_native_names = (
             drive_receipt.native_dof_names
-            if type(drive_receipt) is IsaacSourceTendonDriveReceiptV1
+            if type(drive_receipt) in (IsaacSourceTendonDriveReceiptV1,
+                                       IsaacNativeMimicPositionDriveReceiptV1)
             else tuple(item.native_dof_name for item in sorted(
                 drive_receipt.drives, key=lambda item: item.native_dof_index,
             ))
@@ -444,7 +542,8 @@ class UsdCoreRuntimeSession(_SessionValues):
             raise ValueError('native I/O DOF/build metadata differs from the admitted named-drive receipt')
         receipt_limits = (
             dict(drive_receipt.native_position_limits)
-            if type(drive_receipt) is IsaacSourceTendonDriveReceiptV1
+            if type(drive_receipt) in (IsaacSourceTendonDriveReceiptV1,
+                                       IsaacNativeMimicPositionDriveReceiptV1)
             else {item.native_dof_name: (float(item.lower_limit), float(item.upper_limit))
                   for item in drive_receipt.drives}
         )
@@ -547,6 +646,12 @@ class UsdCoreRuntimeSession(_SessionValues):
         if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1:
             expected = self._drive_receipt.arm_commands(target.arm_servo_position)
         else:
+            if (type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
+                    and not math.isclose(
+                        float(target.gripper.force_limit_N),
+                        float(self._drive_receipt.gripper_force_limit_N),
+                        rel_tol=0.0, abs_tol=1e-9)):
+                raise ValueError('DG04 canonical gripper force limit differs from the fixed native drive cap')
             expected = self._drive_receipt.commands(target.arm_servo_position, target.gripper.servo_opening_m)
         acknowledgement = self._native_io.write_position_targets(target.identity_hash, expected)
         if type(acknowledgement) is not NativePositionWriteAckV1:
@@ -593,6 +698,11 @@ class UsdCoreRuntimeSession(_SessionValues):
              and self._drive_receipt.provenance_kind == 'native_runtime'
              else 'synthetic_source_tendon_and_arm_targets_no_physics'
              if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1
+             else 'native_physx_mimic_leader_drive_and_arm_targets_acknowledged_no_motion_claim'
+             if type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
+             and self._drive_receipt.provenance_kind == 'native_runtime'
+             else 'synthetic_physx_mimic_leader_drive_targets_no_physics'
+             if type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
              else 'native_named_dof_position_target_acknowledged_no_motion_claim'
              if self._drive_receipt.provenance_kind == 'native_runtime'
              else 'synthetic_named_dof_position_targets_no_physics'),
@@ -616,6 +726,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             self._last_interval_advances = tuple(accepted_advances)
             receipt.validate(expected_index, expected_time)
             from .leaf_control import IsaacSourceTendonDriveReceiptV1
+            from .leaf_control import IsaacNativeMimicPositionDriveReceiptV1
             if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1:
                 application = receipt.source_tendon_application
                 ack = self._last_native_source_tendon_ack
@@ -628,6 +739,23 @@ class UsdCoreRuntimeSession(_SessionValues):
                         or application.get('tendon_coefficients') != self._drive_receipt.tendon_coefficients):
                     raise ValueError('DG03 accepted substep is not bound to its target/source tendon effort receipt')
                 self._validate_source_tendon_application(application, ack, expected_index)
+            elif type(self._drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1:
+                application = receipt.native_adaptation_application
+                ack = self._last_native_position_ack
+                if (application is None or ack is None
+                        or application.get('drive_receipt_identity_sha256') != self._drive_receipt.identity_sha256
+                        or application.get('provenance_kind') != self._drive_receipt.provenance_kind
+                        or application.get('target_identity_sha256') != ack.target_identity_sha256
+                        or application.get('native_step_index') != expected_index):
+                    raise ValueError('DG04 accepted substep is not bound to its current target and native drive receipt')
+                try:
+                    target_index = ack.native_names.index('finger_joint1')
+                except ValueError as error:
+                    raise ValueError('DG04 position Ack omits its active leader finger target') from error
+                if not math.isclose(
+                        float(application['reference_target_m']),
+                        float(ack.applied_values[target_index]), rel_tol=0.0, abs_tol=1e-6):
+                    raise ValueError('DG04 physical substep receipt differs from the acknowledged leader target')
             self._native_step_count = expected_index
         self._control_step += 1
         self._state_revision += 1

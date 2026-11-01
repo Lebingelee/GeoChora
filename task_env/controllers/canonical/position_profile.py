@@ -348,8 +348,9 @@ class PandaPositionServoProfileV1:
             if execution.physics_profile not in {
                     'isaac-gpu-physx-f04-position-v1',
                     'geophys-usd-position-f05-native-v1',
-                    'isaac-gpu-physx-f05-dg03-usd-v1'}:
-                raise ValueError('deferred native receipt requires an exact admitted F04, F05 or DG03 profile')
+                    'isaac-gpu-physx-f05-dg03-usd-v1',
+                    'isaac-gpu-physx-f05-dg04-native-mimic-v1'}:
+                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG03 or DG04 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,

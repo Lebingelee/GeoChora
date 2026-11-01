@@ -565,6 +565,7 @@ def materialize_control(
     f05_native_input=None,
     f05_dg02_geophys_input=None,
     f05_dg03_isaac_input=None,
+    f05_dg04_isaac_native_input=None,
     f05_dg01_mujoco_input=None,
 ):
     from ...artifacts import ExecutionSpecV1
@@ -588,8 +589,9 @@ def materialize_control(
     f05_native = f05_native_input is not None
     f05_dg02_native = f05_dg02_geophys_input is not None
     f05_dg03_native = f05_dg03_isaac_input is not None
+    f05_dg04_native = f05_dg04_isaac_native_input is not None
     f05_dg01_mujoco = f05_dg01_mujoco_input is not None
-    if sum((f05_native, f05_dg02_native, f05_dg03_native, f05_dg01_mujoco)) > 1:
+    if sum((f05_native, f05_dg02_native, f05_dg03_native, f05_dg04_native, f05_dg01_mujoco)) > 1:
         raise ValueError('distinct F05 exact-cell inputs cannot overlap')
     if (f05_native or f05_dg02_native or f05_dg03_native) and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
@@ -712,6 +714,27 @@ def materialize_control(
         actual_manifest = _f05_dg03_isaac_capability_manifest(
             artifact, synthetic_s1=f05_dg03_s1_scope is not None,
         )
+    elif f05_dg04_native:
+        from .api import (
+            F05_DG04_ISAAC_NATIVE_PROFILE, _f05_dg04_isaac_capability_manifest,
+            _validate_f05_dg04_isaac_native_input,
+        )
+        from ...artifacts import ExecutionSpec
+
+        _validate_f05_dg04_isaac_native_input(
+            f05_dg04_isaac_native_input, artifact, declared_execution, source,
+        )
+        if (type(declared_execution) is not ExecutionSpecV1
+                or manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+                or declared_execution.physics_profile != F05_DG04_ISAAC_NATIVE_PROFILE):
+            raise ValueError('DG04 exact-cell admission requires its exact input without alternate authorities')
+        execution = ExecutionSpec(
+            'isaacsim', F05_DG04_ISAAC_NATIVE_PROFILE, 'none', 'cuda',
+            declared_execution.provider_seed, 'best_effort',
+        )
+        actual_manifest = _f05_dg04_isaac_capability_manifest(
+            artifact, synthetic_s1=f05_dg03_s1_scope is not None,
+        )
     elif f05_dg01_mujoco:
         from .api import (
             F05_DG01_MUJOCO_PROFILE,
@@ -819,10 +842,11 @@ def materialize_control(
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-            and not f05_dg03_native and not f05_dg01_mujoco and diagnostic_profile is None):
+            and not f05_dg03_native and not f05_dg04_native
+            and not f05_dg01_mujoco and diagnostic_profile is None):
         actual_manifest = provider_manifest(execution.physics_provider)
     elif (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-          and not f05_dg03_native and not f05_dg01_mujoco):
+          and not f05_dg03_native and not f05_dg04_native and not f05_dg01_mujoco):
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
@@ -833,7 +857,9 @@ def materialize_control(
     # DG02 materialize() admits the Core-generated, source-bound manifest
     # alongside its exact candidate input. Keep it on the same public path
     # after the controller-level capability check.
-    admission_manifest = actual_manifest if f05_dg02_native or f05_dg03_native else manifest
+    admission_manifest = actual_manifest if (
+        f05_dg02_native or f05_dg03_native or f05_dg04_native
+    ) else manifest
     profiles = ()
     r1_controller = None
     r1_manifest = None
@@ -853,7 +879,8 @@ def materialize_control(
             if (not profiles or len(profiles) > 2
                     or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)):
                 raise TypeError('unsupported explicit Controller profile set')
-            if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg03_native
+            if (not synthetic_s1 and not f04_native and not f05_native
+                    and not f05_dg03_native and not f05_dg04_native
                     and (execution.physics_provider not in {'geophys', 'mujoco'}
                                 or execution.backend != 'cpu')):
                 raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
@@ -923,6 +950,17 @@ def materialize_control(
                         or dict(source.joints) != expected_joint_map
                         or dict(source.joint_targets) != expected_joint_map):
                     raise ValueError('DG03 Position requires one deferred Arm profile and exact source tendon Joint bindings')
+            elif f05_dg04_native:
+                expected_joint_map = {
+                    **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
+                    'panda-main/finger_joint1': 'finger_joint1',
+                    'panda-main/finger_joint2': 'finger_joint2',
+                }
+                if (len(profiles) != 1 or profiles[0].open_actuator is not None
+                        or profiles[0].native_drive_receipt is not None
+                        or dict(source.joints) != expected_joint_map
+                        or dict(source.joint_targets) != expected_joint_map):
+                    raise ValueError('DG04 Position requires its exact nine-joint source map and deferred native receipt')
             elif dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
             if binding.gripper_semantic_id != profiles[0].gripper_semantic_id:
@@ -985,6 +1023,7 @@ def materialize_control(
         _f05_native_input=f05_native_input,
         _f05_dg02_geophys_input=f05_dg02_geophys_input,
         _f05_dg03_isaac_input=f05_dg03_isaac_input,
+        _f05_dg04_isaac_native_input=f05_dg04_isaac_native_input,
         _f05_dg01_mujoco_input=f05_dg01_mujoco_input,
     )
     if f04_native:

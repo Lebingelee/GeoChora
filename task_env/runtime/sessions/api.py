@@ -32,6 +32,7 @@ F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 F05_DG03_ISAAC_USD_PROFILE = 'isaac-gpu-physx-f05-dg03-usd-v1'
+F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -173,10 +174,13 @@ class _F05Dg03S1NativeIOContext:
     """Private S1 scope replacing only the exact DG03 native I/O port."""
 
     def __init__(self, input_v1, factory):
-        from ...tasks.position_candidate.builder import F05Dg03IsaacUsdCandidateInputV1
+        from ...tasks.position_candidate.builder import (
+            F05Dg03IsaacUsdCandidateInputV1, F05Dg04IsaacNativeCandidateInputV1,
+        )
 
-        if type(input_v1) is not F05Dg03IsaacUsdCandidateInputV1:
-            raise TypeError('DG03 S1 requires the exact versioned source-bound candidate input')
+        if type(input_v1) not in (
+                F05Dg03IsaacUsdCandidateInputV1, F05Dg04IsaacNativeCandidateInputV1):
+            raise TypeError('DG03/DG04 S1 requires an exact versioned source-bound candidate input')
         input_v1.validate()
         if not callable(factory):
             raise TypeError('DG03 S1 factory must be callable')
@@ -448,6 +452,38 @@ def _validate_f05_dg03_isaac_usd_input(input_v1, artifact, execution, source) ->
         raise ValueError('DG03 Core cell is state-only and does not admit a renderer')
 
 
+def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source) -> None:
+    """Admit only the exact source-bound DG04 native PhysX mimic profile."""
+    from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
+
+    if type(input_v1) is not F05Dg04IsaacNativeCandidateInputV1:
+        raise TypeError('DG04 Isaac native materialization requires its exact candidate input')
+    input_v1.validate()
+    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
+            or type(execution) is not ExecutionSpecV1
+            or execution.identity_hash != input_v1.execution.identity_hash):
+        raise ValueError('DG04 materialization differs from its exact Task/Scene/Execution identities')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode) != (
+            'isaacsim', 'cuda', 'cuda:0', F05_DG04_ISAAC_NATIVE_PROFILE, 'best_effort'):
+        raise ValueError('unsupported DG04 Isaac CUDA/native-mimic execution intersection')
+    representation = source.scene_source.representation
+    if (representation.provider, representation.provider_build_identity,
+            representation.representation_format, representation.runtime_admitted,
+            representation.source_verified, source.scene_source.locally_validated,
+            source.scene_source.source_verified) != (
+            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
+        raise ValueError('DG04 production admission requires its exact locally validated non-upstream USD')
+    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
+            != input_v1.runtime_source.scene_source.loaded_delivery.manifest_bytes_sha256
+            or source.scene_source.loaded_delivery.delivery_sha256
+            != input_v1.runtime_source.scene_source.loaded_delivery.delivery_sha256
+            or dict(source.joints) != dict(source.joint_targets)):
+        raise ValueError('DG04 delivery or exact nine-joint source identity changed after candidate validation')
+    if execution.render_default.provider != 'none' or execution.camera_overrides:
+        raise ValueError('DG04 Core cell is state-only and does not admit a renderer')
+
+
 def _f05_dg03_isaac_capability_manifest(artifact, *, synthetic_s1=False):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
 
@@ -468,6 +504,28 @@ def _f05_dg03_isaac_capability_manifest(artifact, *, synthetic_s1=False):
         ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
         'DG03-S1-only-no-runtime-admission' if synthetic_s1
         else 'bounded F05 DG03 Isaac/USD Core cell; no provider-wide qualification',
+    )
+
+
+def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
+    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
+
+    names = sorted(set(artifact.required_capabilities.names) | {
+        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
+        'body_pose_query', 'frame_pose_query',
+    })
+    status = 'tested' if synthetic_s1 else 'implemented'
+    evidence = (
+        'DG04-synthetic-S1-only-no-runtime-admission' if synthetic_s1
+        else 'F05-DG04-versioned-native-PhysX-mimic-Core-cell'
+    )
+    return ProviderCapabilityManifest(
+        'provider-capability-v0', 'isaacsim', '6.2.0.0',
+        'f05-dg04-native-mimic-core-v1', 'cuda', F05_DG04_ISAAC_NATIVE_PROFILE,
+        'none', 'best_effort',
+        tuple(CapabilityClaim(name, status, evidence) for name in names),
+        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
+        'bounded F05 DG04 source-bound native mimic cell; no provider-wide qualification',
     )
 
 
@@ -623,13 +681,89 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
                 _f05_native_input=None, _f05_dg02_geophys_input=None,
-                _f05_dg03_isaac_input=None,
+                _f05_dg03_isaac_input=None, _f05_dg04_isaac_native_input=None,
                 _f05_dg01_mujoco_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if (_f05_dg04_isaac_native_input is not None
+            or (type(execution) is ExecutionSpecV1
+                and execution.physics_profile == F05_DG04_ISAAC_NATIVE_PROFILE)):
+        if _f05_dg04_isaac_native_input is None:
+            raise ValueError('DG04 native PhysX profile requires its exact versioned candidate input')
+        _validate_f05_dg04_isaac_native_input(
+            _f05_dg04_isaac_native_input, artifact, declared_execution, source,
+        )
+        scope = _current_f05_dg03_s1_native_io_context()
+        expected_manifest = _f05_dg04_isaac_capability_manifest(
+            artifact, synthetic_s1=scope is not None,
+        )
+        if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
+                or _materialization_authority is not None or _diagnostic_profile is not None):
+            raise ValueError('DG04 exact admission requires the Core-generated source-bound manifest only')
+        projected_execution = ExecutionSpec(
+            'isaacsim', F05_DG04_ISAAC_NATIVE_PROFILE, 'none', 'cuda',
+            declared_execution.provider_seed, 'best_effort',
+        )
+        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
+        if scope is not None:
+            scope.validate_call(artifact, declared_execution, source)
+            native_io = scope.factory(
+                artifact=artifact, execution=declared_execution, source=source,
+                input_v1=_f05_dg04_isaac_native_input,
+            )
+            required_methods = (
+                'metadata', 'write_reset', 'read_state', 'write_position_targets',
+                'advance', 'close',
+            )
+            if any(not callable(getattr(native_io, name, None)) for name in required_methods):
+                raise TypeError('DG04 S1 fixture must implement only the exact typed NativeRuntimeIO port')
+        else:
+            from .isaac_native_io import create_isaac_native_runtime_io
+
+            native_io = create_isaac_native_runtime_io(
+                artifact, declared_execution, source,
+                dg04_native_input=_f05_dg04_isaac_native_input,
+            )
+        from .leaf_control import IsaacNativeMimicPositionDriveReceiptV1
+        from .native_io import UsdCoreRuntimeSession
+
+        try:
+            receipt = getattr(native_io, 'drive_receipt', None)
+            expected_provenance = 'synthetic_fixture' if scope is not None else 'native_runtime'
+            if (type(receipt) is not IsaacNativeMimicPositionDriveReceiptV1
+                    or receipt.provenance_kind != expected_provenance
+                    or receipt.execution_identity_sha256 != declared_execution.identity_hash
+                    or receipt.source_closure_sha256 != source.source_closure_digest
+                    or receipt.scene_identity_sha256 != source.scene_definition.identity_hash
+                    or len(receipt.native_dof_names) != 9
+                    or set(receipt.native_dof_names) != set(source.joint_targets.values())):
+                raise ValueError('DG04 model-bound native mimic receipt differs from exact source/execution mapping')
+            session = UsdCoreRuntimeSession(
+                artifact, declared_execution, source, native_io, receipt,
+            )
+        except BaseException as materialization_error:
+            try:
+                native_io.close()
+            except BaseException as cleanup_error:
+                materialization_error.add_note(
+                    'DG04 native-I/O cleanup after Core admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            if scope is None:
+                try:
+                    native_io.close_runtime_owner()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'DG04 Isaac App owner cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+            raise
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+        return session
     if (_f05_dg03_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
                 and execution.physics_profile == F05_DG03_ISAAC_USD_PROFILE)):
