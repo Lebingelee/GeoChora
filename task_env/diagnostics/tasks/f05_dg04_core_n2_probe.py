@@ -285,8 +285,9 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     if str(CORE_SITE) not in sys.path:
         sys.path.append(str(CORE_SITE))
 
+    from task_env.runtime.sessions.isaac_native_io import _process_app_owner
     from task_env.diagnostics.tasks.f05_dg04_native_mimic_core_n1 import (
-        _process_app_owner, _validate_loaded_pxr_paths,
+        _validate_loaded_pxr_paths,
     )
     from task_env.tasks.position_candidate.builder import build_f05_dg04_isaac_native_candidate
     from task_env.tasks.reference_env import SelectedReferenceEnv
