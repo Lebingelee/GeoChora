@@ -14,7 +14,12 @@ import subprocess
 import tempfile
 import time
 
-from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+if __package__:
+    from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    from .isaac_core_site_overlay import populate_isaac_core_site_overlay
+else:
+    from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    from isaac_core_site_overlay import populate_isaac_core_site_overlay
 
 CORE = Path(__file__).resolve().parents[3]
 LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
@@ -27,32 +32,7 @@ MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
 ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 
 
-def _populate_isaac_core_site_overlay(core_site, overlay):
-    """Expose Core dependencies to Isaac without shadowing its OpenUSD package."""
-    core_site = Path(core_site).resolve(strict=True)
-    overlay = Path(overlay).resolve()
-    overlay.mkdir(parents=True, exist_ok=True)
-    excluded = []
-    included = []
-    for item in sorted(core_site.iterdir(), key=lambda entry: entry.name):
-        name = item.name
-        if name == 'pxr' or (
-            name.lower().startswith('usd_core-') and name.endswith('.dist-info')
-        ):
-            excluded.append(name)
-            continue
-        (overlay / name).symlink_to(item, target_is_directory=item.is_dir())
-        included.append(name)
-    names_digest = hashlib.sha256(
-        json.dumps(included, separators=(',', ':'), ensure_ascii=True).encode('ascii')
-    ).hexdigest()
-    return {
-        'schema_version': 'isaac-core-site-overlay-v1',
-        'source_site_packages': str(core_site),
-        'excluded_entries': excluded,
-        'included_entry_count': len(included),
-        'included_names_sha256': names_digest,
-    }
+_populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
 
 
 def _write_json(path, value):
@@ -453,7 +433,10 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
                        source_delivery_manifest=manifest)
     scope = ExampleWorkingTreeScopeV1.load(scope_path)
     catalog = json.loads(Path(catalog_path).read_text())
-    from harness_compiler import compile_builtin_pickcube_example
+    if __package__:
+        from .harness_compiler import compile_builtin_pickcube_example
+    else:
+        from harness_compiler import compile_builtin_pickcube_example
     compiled = compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=False)

@@ -21,9 +21,14 @@ if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
     # for Python dependencies that the Isaac distribution does not ship.
     sys.path.append(_CORE_SITE)
 
-from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
-from catalog_query import core_context
-from harness_compiler import compile_builtin_pickcube_example
+if __package__:
+    from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    from .catalog_query import core_context
+    from .harness_compiler import compile_builtin_pickcube_example
+else:
+    from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    from catalog_query import core_context
+    from harness_compiler import compile_builtin_pickcube_example
 
 
 def _write(path: Path, value):

@@ -6,9 +6,14 @@ import json
 import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from harness_spec_schema import CandidateSpec, CheckFinding, CheckReport, save_json
-from catalog_query import build_catalog, core_context, CatalogProvenanceError
-from asset_check import check_assets
+if __package__:
+    from .harness_spec_schema import CandidateSpec, CheckFinding, CheckReport, save_json
+    from .catalog_query import build_catalog, core_context, CatalogProvenanceError
+    from .asset_check import check_assets
+else:
+    from harness_spec_schema import CandidateSpec, CheckFinding, CheckReport, save_json
+    from catalog_query import build_catalog, core_context, CatalogProvenanceError
+    from asset_check import check_assets
 
 COMPILER_VERSION='0.1.0'
 
@@ -114,8 +119,12 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     task. The Isaac branch binds its exact USD closure and F06 profile; compiling
     this route does not itself admit a production provider capability.
     """
-    from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
-    from catalog_query import core_context
+    if __package__:
+        from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+        from .catalog_query import core_context
+    else:
+        from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+        from catalog_query import core_context
 
     if type(spec) is not BuiltinPickCubeExampleV1:
         raise TypeError('compile_builtin_pickcube_example requires the exact versioned F06 example spec')

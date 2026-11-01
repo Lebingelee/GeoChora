@@ -354,6 +354,43 @@ def test_isaac_core_site_overlay_excludes_conflicting_openusd_package(tmp_path):
     assert not (overlay / 'pxr').exists()
 
 
+@pytest.mark.parametrize('module_name', (
+    'harness_compiler', 'builtin_example_validation', 'builtin_example_worker',
+))
+def test_harness_cli_help_supports_direct_and_package_invocation(module_name):
+    core = Path(__file__).resolve().parents[3]
+    env = dict(__import__('os').environ)
+    env['PYTHONPATH'] = f'{core / "GeoPhys/src"}:{core}'
+    direct = subprocess.run(
+        [sys.executable, str(AGENT_DIR / f'{module_name}.py'), '--help'],
+        cwd=core, env=env, text=True, capture_output=True, timeout=20,
+    )
+    assert direct.returncode == 0, direct.stderr
+    assert 'usage:' in direct.stdout.lower()
+
+    packaged = subprocess.run(
+        [sys.executable, '-m', f'task_env.script.agent.{module_name}', '--help'],
+        cwd=core, env=env, text=True, capture_output=True, timeout=20,
+    )
+    assert packaged.returncode == 0, packaged.stderr
+    assert 'usage:' in packaged.stdout.lower()
+
+
+def test_isaac_usd_generator_help_does_not_import_core_or_start_simulator():
+    core = Path(__file__).resolve().parents[3]
+    isaac_python = core / 'workspace/environments/isaacsim-6.2.0/bin/python'
+    if not isaac_python.is_file():
+        pytest.skip('frozen Isaac Python is not installed in this checkout')
+    generator = core / 'task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py'
+    result = subprocess.run(
+        [str(isaac_python), str(generator), '--help'],
+        cwd=core, text=True, capture_output=True, timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert '--core-python' in result.stdout
+    assert '--source-package' in result.stdout
+
+
 def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compile_failure(tmp_path):
     import json
     import builtin_example_worker

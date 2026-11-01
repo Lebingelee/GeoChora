@@ -142,6 +142,28 @@ execution is implemented and verified; presence in the catalog is not runtime
 admission. Example Task/Expert failure is reported separately from a runtime
 fault. It cannot enter the strict 20-seed candidate/Oracle/Judge path.
 
+For the F06 Isaac USD source rebuild, invoke the source file directly so
+`--help` does not import Core or start Isaac. The build runs under Isaac's
+Python, uses the matching Core Python to expose shared dependencies, and keeps
+Isaac's `pxr` package first:
+
+```sh
+CORE=/absolute/path/to/GeoChora
+ISAAC_PY="$CORE/workspace/environments/isaacsim-6.2.0/bin/python"
+CORE_PY=/absolute/path/to/geochora-py312/bin/python
+"$ISAAC_PY" "$CORE/task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py" \
+  --help
+"$ISAAC_PY" "$CORE/task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py" \
+  --core-python "$CORE_PY" \
+  --source-package "$CORE/workspace/path/to/frozen-source-package" \
+  --output "$CORE/workspace/path/to/derived-f06-usd"
+```
+
+The Core and Isaac interpreters must use the same Python major/minor ABI. An
+existing filtered `GEOCHORA_CORE_SITE` overlay may be used instead of
+`--core-python`. This operation validates and writes USD evidence only; it
+does not launch `SimulationApp` or advance physics.
+
 Generate a fresh catalog after each Core commit, then run the three fixed seeds
 for one provider:
 

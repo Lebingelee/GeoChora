@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 import subprocess
 import sys
-from harness_spec_schema import save_json
+if __package__:
+    from .harness_spec_schema import save_json
+else:
+    from harness_spec_schema import save_json
 
 
 def core_context(core_repo):

@@ -15,7 +15,9 @@ the [TaskEnv module Skill](../geochora-task-env/SKILL.md)
 and [provider commands](../../../examples/README.md#workflow-matrix). Its H5
 files and task/Expert outcomes cannot be treated as solved candidate rows or
 packaged as a Candidate/Oracle/Judge result; the 20-seed all-solved gate below
-remains unchanged.
+remains unchanged. For F06 USD source rebuild and dependency-light help, follow
+the dated TaskEnv Skill guidance and the [Harness CLI README](../../../task_env/script/agent/README.md);
+this source preparation does not launch Isaac or establish source verification.
 
 ## Construction decisions
 

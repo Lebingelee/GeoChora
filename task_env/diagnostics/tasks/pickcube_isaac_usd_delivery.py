@@ -1,7 +1,9 @@
 """Generate and locally validate the versioned F06 desktop PickCube USD.
 
-Run with the frozen Isaac Sim 6.2 Python, outside a SimulationApp process:
-``isaacsim-6.2.0/bin/python -m task_env.diagnostics.tasks.pickcube_isaac_usd_delivery``
+Run the script directly with Isaac Sim 6.2 Python, outside a SimulationApp
+process. Pass the matching Core interpreter so its dependencies can be exposed
+without replacing Isaac's OpenUSD package:
+``isaacsim-6.2.0/bin/python task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py --core-python /path/to/geochora/bin/python --source-package ... --output ...``
 This generator consumes the frozen DG03/V4 Menagerie robot package as source
 evidence and writes its derived F06 composition under the requested workspace
 output directory. It does not start Isaac Sim or a physics worker.
@@ -10,17 +12,26 @@ output directory. It does not start Isaac Sim or a physics worker.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import shutil
+import subprocess
+import sys
+import tempfile
 
-from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
-from task_env.assembly.usd_delivery import (
-    _canonical_hash, _inspect_snapshot, load_usd_asset_delivery,
-    variant_selection_hash,
-)
-from task_env.artifacts import UsdLocalValidationReportV1
+CORE_ROOT = Path(__file__).resolve().parents[3]
+CORE_AGENT_TOOLS = CORE_ROOT / "task_env/script/agent"
+if str(CORE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CORE_ROOT))
+if str(CORE_ROOT / "GeoPhys/src") not in sys.path:
+    sys.path.insert(0, str(CORE_ROOT / "GeoPhys/src"))
+if str(CORE_AGENT_TOOLS) not in sys.path:
+    sys.path.insert(0, str(CORE_AGENT_TOOLS))
+
+from isaac_core_site_overlay import populate_isaac_core_site_overlay
 
 
 LOCAL_CHECKS = (
@@ -222,7 +233,51 @@ def _validate_stage(output: Path, entry_rel: str) -> dict[str, object]:
     }
 
 
+@contextmanager
+def _core_dependency_path(core_python: Path | None):
+    """Expose matching Core dependencies after Isaac's native packages."""
+    configured_site = os.environ.get("GEOCHORA_CORE_SITE")
+    if configured_site:
+        site = Path(configured_site).expanduser().resolve(strict=True)
+        sys.path.append(str(site))
+        try:
+            yield
+        finally:
+            sys.path.remove(str(site))
+        return
+    if core_python is None:
+        yield
+        return
+
+    interpreter = core_python.expanduser().resolve(strict=True)
+    details = json.loads(subprocess.check_output(
+        [str(interpreter), "-c",
+         "import json,sys,sysconfig; print(json.dumps({'version': list(sys.version_info[:2]), 'purelib': sysconfig.get_paths()['purelib']}))"],
+        cwd=CORE_ROOT, text=True, timeout=10,
+    ))
+    if details["version"] != list(sys.version_info[:2]):
+        raise ValueError(
+            f"Core Python {details['version']} does not match running Isaac Python "
+            f"{list(sys.version_info[:2])}; native dependency ABI must match"
+        )
+    with tempfile.TemporaryDirectory(prefix="geochora-isaac-core-site-") as temporary:
+        overlay = Path(temporary)
+        populate_isaac_core_site_overlay(details["purelib"], overlay)
+        sys.path.append(str(overlay))
+        try:
+            yield
+        finally:
+            sys.path.remove(str(overlay))
+
+
 def package_delivery(*, source_package: Path, output: Path) -> dict[str, object]:
+    from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
+    from task_env.assembly.usd_delivery import (
+        _canonical_hash, _inspect_snapshot, load_usd_asset_delivery,
+        variant_selection_hash,
+    )
+    from task_env.artifacts import UsdLocalValidationReportV1
+
     source_package = source_package.resolve(strict=True)
     output = output.absolute()
     source_loaded = load_usd_asset_delivery(source_package / "delivery_manifest.json")
@@ -384,11 +439,23 @@ def package_delivery(*, source_package: Path, output: Path) -> dict[str, object]
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--core-python", type=Path,
+        default=Path(os.environ["GEOCHORA_CORE_PYTHON"]) if os.environ.get("GEOCHORA_CORE_PYTHON") else None,
+        help="matching Core Python 3.12 interpreter used to expose dependencies to Isaac",
+    )
     parser.add_argument("--source-package", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(package_delivery(source_package=args.source_package, output=args.output),
-                     sort_keys=True, indent=2, allow_nan=False))
+    try:
+        with _core_dependency_path(args.core_python):
+            result = package_delivery(source_package=args.source_package, output=args.output)
+    except ModuleNotFoundError as error:
+        raise SystemExit(
+            f"required Core/Isaac Python module {error.name!r} is unavailable; "
+            "pass --core-python pointing to the matching Geochora Python environment"
+        ) from error
+    print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
 
 
 if __name__ == "__main__":

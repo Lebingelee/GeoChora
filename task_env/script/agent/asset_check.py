@@ -3,8 +3,12 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from harness_spec_schema import CandidateSpec, CheckFinding, CheckReport
-from catalog_query import core_context, validate_catalog, CatalogProvenanceError
+if __package__:
+    from .harness_spec_schema import CandidateSpec, CheckFinding, CheckReport
+    from .catalog_query import core_context, validate_catalog, CatalogProvenanceError
+else:
+    from harness_spec_schema import CandidateSpec, CheckFinding, CheckReport
+    from catalog_query import core_context, validate_catalog, CatalogProvenanceError
 
 
 def check_assets(spec,catalog,*,catalog_ref='in-memory',artifact_hash=None):
