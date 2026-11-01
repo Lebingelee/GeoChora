@@ -1,5 +1,7 @@
 """Focused F06 PickCube-to-Isaac canonical projection checks."""
 
+import pytest
+
 from task_env.tasks.pick_cube.isaac import compile_pickcube_isaac_task_artifact
 from task_env.tasks.pick_cube.task import _configuration, build_artifact
 
@@ -272,3 +274,49 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
 
     assert observed['artifact'] is rebuilt_artifact
     assert observed['artifact'] is runtime_input.artifact
+
+
+def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
+    from task_env.runtime.sessions.native_io import NativeAdvanceReceiptV1
+
+    application = {
+        'schema_version': 'native-physx-mimic-substep-application-v1',
+        'profile_id': 'isaacsim-6.2-pickcube-physx-mimic-5n-v1',
+        'provenance_kind': 'native_runtime',
+        'drive_receipt_identity_sha256': 'a' * 64,
+        'target_identity_sha256': 'b' * 64,
+        'native_step_index': 1,
+        'reference_joint': 'finger_joint1',
+        'follower_joint': 'finger_joint2',
+        'reference_position_m': 0.02,
+        'follower_position_m': 0.02,
+        'reference_velocity_m_s': 0.0,
+        'follower_velocity_m_s': 0.0,
+        'relation_error_m': 0.0,
+        'reference_target_m': 0.02,
+        'reference_effort_N': 0.25,
+        'maximum_effort_N': 5.0,
+        'public_effort_api': 'Articulation.get_dof_projected_joint_forces',
+        'effort_measurement_semantics': 'projected_active_joint_force',
+        'native_mimic_api': 'PhysxMimicJointAPI:transX',
+        'native_drive_api': 'PhysicsDriveAPI:linear',
+    }
+    assert 'public_contact_witness' not in application
+    NativeAdvanceReceiptV1(
+        'native-advance-receipt-v1', 1, 1, 0.002,
+        native_adaptation_application=application,
+    ).validate(1, 0.002)
+
+    wrong_declared_limit = dict(application, maximum_effort_N=100.0)
+    with pytest.raises(ValueError, match='declared effort cap'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=wrong_declared_limit,
+        ).validate(1, 0.002)
+
+    wrong_profile = dict(application, profile_id='isaacsim-6.2-physx-native-mimic-leader-drive-v1')
+    with pytest.raises(ValueError, match='receipt is incomplete or malformed'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=wrong_profile,
+        ).validate(1, 0.002)

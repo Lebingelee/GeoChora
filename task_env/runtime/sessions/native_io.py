@@ -353,6 +353,14 @@ class NativeAdvanceReceiptV1:
             raise ValueError('native advance cannot claim two different gripper adaptation receipts')
         if self.native_adaptation_application is not None:
             application = self.native_adaptation_application
+            # F06 PickCube has a task-scoped PhysX mimic profile: a 5 N
+            # leader drive and no DG04 cube/support contact-witness claim.
+            # Preserve the stricter F05 DG04 contract while validating F06
+            # against the receipt emitted by its own native adapter.
+            is_f06_pickcube = (
+                isinstance(application, Mapping)
+                and application.get('profile_id') == 'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
+            )
             numeric_fields = (
                 'reference_position_m', 'follower_position_m',
                 'reference_velocity_m_s', 'follower_velocity_m_s',
@@ -362,7 +370,11 @@ class NativeAdvanceReceiptV1:
             if (not isinstance(application, Mapping)
                     or application.get('schema_version') != 'native-physx-mimic-substep-application-v1'
                     or application.get('native_step_index') != expected_index
-                    or application.get('profile_id') != 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
+                    or application.get('profile_id') != (
+                        'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
+                        if is_f06_pickcube
+                        else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
+                    )
                     or application.get('provenance_kind') not in {'synthetic_fixture', 'native_runtime'}
                     or application.get('reference_joint') != 'finger_joint1'
                     or application.get('follower_joint') != 'finger_joint2'
@@ -384,17 +396,23 @@ class NativeAdvanceReceiptV1:
                            or isinstance(application.get(key), bool)
                            or not math.isfinite(float(application[key]))
                            for key in numeric_fields)
-                    or not isinstance(application.get('public_contact_witness'), Mapping)
-                    or application['public_contact_witness'].get('schema_version')
-                       != 'f05-dg04-native-contact-witness-v1'
-                    or application['public_contact_witness'].get('provenance_kind')
-                       != application.get('provenance_kind')
-                    or type(application['public_contact_witness'].get('contact_present')) is not bool):
+                    or (is_f06_pickcube and 'public_contact_witness' in application)
+                    or (not is_f06_pickcube and (
+                        not isinstance(application.get('public_contact_witness'), Mapping)
+                        or application['public_contact_witness'].get('schema_version')
+                           != 'f05-dg04-native-contact-witness-v1'
+                        or application['public_contact_witness'].get('provenance_kind')
+                           != application.get('provenance_kind')
+                        or type(application['public_contact_witness'].get('contact_present')) is not bool
+                    ))):
                 raise ValueError('native PhysX mimic substep receipt is incomplete or malformed')
+            expected_maximum_effort_N = 5.0 if is_f06_pickcube else 100.0
             if (abs(float(application['relation_error_m'])) > 0.002
-                    or float(application['maximum_effort_N']) != 100.0
-                    or abs(float(application['reference_effort_N'])) > 100.0 + 1e-6):
+                    or float(application['maximum_effort_N']) != expected_maximum_effort_N
+                    or abs(float(application['reference_effort_N'])) > expected_maximum_effort_N + 1e-6):
                 raise ValueError('native PhysX mimic relation or declared effort cap failed')
+            if is_f06_pickcube:
+                return
             witness = application['public_contact_witness']
             raw_count = witness.get('raw_contact_count')
             raw_paths = witness.get('raw_contact_actor_paths')
