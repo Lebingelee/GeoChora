@@ -178,6 +178,8 @@ def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp
     scope_path.write_text(json.dumps(scope.to_dict()))
     catalog_path = tmp_path / 'catalog.json'
     catalog_path.write_text('{}')
+    manifest_path = tmp_path / 'delivery_manifest.json'
+    manifest_path.write_text('{}')
     compiled = SimpleNamespace(
         artifact_hash='a' * 64, construction_id='f06', recipe_identity='b' * 64,
         controller_identity='c' * 64, solution_identity='d' * 64,
@@ -191,6 +193,7 @@ def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp
          patch.object(builtin_example_validation, '_run_one', return_value=row):
         result = builtin_example_validation.validate_provider(
             spec_path, catalog_path, scope_path, tmp_path / 'result', only_seed=31,
+            provider_override='isaacsim', source_delivery_manifest=manifest_path,
         )
     assert result['provider'] == 'isaacsim'
     assert result['disposition'] == 'PREFLIGHT'

@@ -366,6 +366,8 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
         manifest = source_delivery_manifest if provider_override == 'isaacsim' else None
         if provider_override == 'isaacsim' and manifest is None:
             manifest = spec.source_delivery_manifest
+        if manifest is not None:
+            manifest = str(Path(manifest).expanduser().resolve(strict=True))
         spec = replace(spec, provider=provider_override, backend=route[0], device=route[1],
                        source_delivery_manifest=manifest)
     scope = ExampleWorkingTreeScopeV1.load(scope_path)
