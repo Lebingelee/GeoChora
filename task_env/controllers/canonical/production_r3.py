@@ -17,6 +17,20 @@ from .kinematics import ARM
 from .production_r2 import ProductionCanonicalPandaControllerR2
 
 
+def _limit_joint_velocity_direction_preserving(qdot_raw, limit_rad_s):
+    """Uniformly limit a joint-velocity vector without changing its direction."""
+    velocity = np.asarray(qdot_raw, dtype=float)
+    limit = float(limit_rad_s)
+    if velocity.ndim != 1 or not np.isfinite(velocity).all():
+        raise ValueError("R3 joint velocity must be a finite one-dimensional vector")
+    if not math.isfinite(limit) or limit <= 0.0:
+        raise ValueError("R3 joint velocity limit must be finite and positive")
+    peak = float(np.max(np.abs(velocity))) if velocity.size else 0.0
+    if peak <= limit:
+        return velocity.copy()
+    return velocity * (limit / peak)
+
+
 class _ProductionR3ArmReference:
     """Shared R3 arm law and memory used by full and arm-only callers."""
 
@@ -149,7 +163,9 @@ class _ProductionR3ArmReference:
         weighted_twist = np.concatenate((v_cmd, weight * omega_cmd))
         system = weighted_jacobian @ weighted_jacobian.T + self.dls_damping**2 * np.eye(6)
         qdot_raw = weighted_jacobian.T @ np.linalg.solve(system, weighted_twist)
-        qdot = np.clip(qdot_raw, -self.joint_velocity_limit_rad_s, self.joint_velocity_limit_rad_s)
+        qdot = _limit_joint_velocity_direction_preserving(
+            qdot_raw, self.joint_velocity_limit_rad_s,
+        )
         velocity_clipped = bool(np.any(np.abs(qdot_raw - qdot) > 1e-12))
         if velocity_clipped:
             self._joint_velocity_clip_events += 1
