@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+> **当前F线入口（2026-11-01）**：新F05原生适配三路线主线已由Sol有界接收（DG04证据Core `fb4c3836`、文档HEAD `740a74a9`），旧F05 PARTIAL、严格DG03及R3未决保留。F06按维护者新裁定组织[PickCube × Harness × 三主要后端example](14_F06_PickCube_Harness_Multi_Backend_Goal.md)，每后端3 seed、任务成功与runtime有效性分开；包已准备待人工转述，尚未执行。下方日期较早的状态为历史。
+
 2026-10-30 Sol复核：F05 successor attempt001为`F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED`。来源闭包和原始字段采集有效；完整S0 inventory PASS未接收，Sol inventory=PARTIAL、readiness=BLOCKED_BY_FEATURE。主要缺口为authored schema遗漏、真实语义负例未接线、归一化/传动力oracle及后续补丁图不足。窗口已用1/3，原F05三轮/PARTIAL保留，S1 native与F06/F07不启动。见[11 Sol复核](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)。
 
 2026-10-30 attempt002完成并待Sol复核：静态审计/负例修复与既有GeoPhys synthetic Core S1已有bounded证据，但三条source-family route的source→public model→consumer必需语义仍未建立，MuJoCo/GeoPhys/Isaac native cell全部`BLOCKED_BY_FEATURE`且native starts/physics steps=0。新结果`F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`，successor窗口2/3；旧F05仍OVERALL_PARTIAL，F06/F07和Qualification未启动。见[完整执行记录](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-execution)。

@@ -1858,14 +1858,15 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "a33c1037d0ca0a38fc2a13e1d50ff4c23bf953c63325f2e31040255bac85cff6",
+    "07_Execution_Order_and_Acceptance.md": "bce46f0de7b013cade51ecb83ebeb59e56dd6f463f3818a6ad85f6425995566b",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "796502022c018b9a4a90eb8ae74a48943b5a13dc0e4bd7323c654a3e64cc5574",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "446e275d74cbad788e17613ef87356ff45a963d344b7d5da382a3c03998caf76",
+    "README.md": "b35ac8dc2a07fa4403dc30dd6002ec2f4157abce97eb7066f6fcaa8f8f3149a4",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "95086fd19595ef5806d3b518e6a277c4eae2ca88f7ea9721c6f83562ddf135b7",
-    "12_F05_F07_Execution_Playbook.md": "5f87a4d8f41dc9709d7683ce6626d43ca313a740e1a28b64b0df1ab2bf32da79",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "a92f2a1774dea2ff30630804a742e9649d11839e78efde1f83d994d237b3a769"
+    "12_F05_F07_Execution_Playbook.md": "2a628970f7ebaa616b35c0224212ce8132f959a8263bc55d307ff642dc7770ce",
+    "13_F05_Early_Diagnostic_Three_Goals.md": "f5083292146ae932c475c4be50824107ac574e4bf49506d08c33e9f1b973d77a",
+    "14_F06_PickCube_Harness_Multi_Backend_Goal.md": "bf008de6e25223ec8ffffbf3718529e63e16d6dc207cf836b87c7e2e051725df"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -7173,5 +7174,43 @@
     "F06_F07_execution": false,
     "qualification_granted": false,
     "validation_policy": "Affected checks and one complete N2/cold-read; no full historic hash or test-matrix sweep"
+  },
+  "f06_pickcube_harness_example": {
+    "date": "2026-11-01",
+    "status": "GOAL_PACKAGE_PREPARED_NOT_DISPATCHED",
+    "maintainer_authority": "Reuse current PickCube; Harness integration and stable multi-provider example; three main providers plus Genesis/SAPIEN optional; 3 seeds; not all task successes required. Explicit request to prepare goal with minimal implementation/tests.",
+    "planning_entry": "14_F06_PickCube_Harness_Multi_Backend_Goal.md",
+    "reviewed_head": "740a74a9c24b076055895edcc742da26c452b2ac",
+    "f05_dependency": "Sol bounded acceptance of native-adaptation three-route mainline; no new Qualification",
+    "required_providers": [
+      "mujoco",
+      "geophys",
+      "isaacsim"
+    ],
+    "optional_providers": [
+      "genesis",
+      "sapien"
+    ],
+    "seeds": [
+      31,
+      32,
+      33
+    ],
+    "default_control_horizon": 1000,
+    "acceptance": "Runtime integration and planning execution with actual task outcome reported separately; no all-solved requirement",
+    "strict_harness_20_seed_candidate_contract": "UNCHANGED",
+    "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f06_001/",
+    "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/",
+    "attempt": 1,
+    "ordinary_window_limit": 3,
+    "expected_active_hours": [
+      4,
+      8
+    ],
+    "window_timebox_hours": 8,
+    "new_branches_worktrees": 0,
+    "preparation_native_starts": 0,
+    "preparation_software_tests": 0,
+    "F07_training_qualification": false
   }
 }

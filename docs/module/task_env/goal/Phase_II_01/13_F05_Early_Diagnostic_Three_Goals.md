@@ -1,5 +1,7 @@
 # 新F05提前诊断实施：三个长期Goal
 
+> **最新Sol决定（2026-11-01）**：按维护者原生适配裁定，新F05主线三路线有界接收：DG01/DG02沿用已接收结论，DG04正式N2 3000步/602观测/600 transitions及冷读/退出证据接收。Sol本轮审阅diff、reader关键门、收据与相关SHA，未重跑测试/reader/native；证据Core `fb4c3836`，文档HEAD `740a74a9`。旧F05 PARTIAL、严格DG03正式0步、R3 PARTIAL与延期研究保持。后续[F06当前合同](14_F06_PickCube_Harness_Multi_Backend_Goal.md)已准备待转述，未执行。下方DG04暂停/待复核措辞保留其历史时点。
+
 > **当前状态（2026-11-01）：DG01/DG02有界接收、R3对照PARTIAL保持；DG03正式N2为0，新F05仍PARTIAL。维护者已批准版本固定、明确记录差异的原生物理适配，MuJoCo特有柔顺定律及传力逐项等价延期研究。当前范围以[第17节](#f05-native-adaptation-scope-decision)为准。window003历史失败保留；window004准备供人工转述，Luna仍暂停，未执行新路线。**
 > 本页是当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)共同使用。第1–16节保留原签署时点的合同与历史；与第17节冲突的后续执行要求由维护者新裁定替代，历史验收不变。
 

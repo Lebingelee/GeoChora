@@ -1,5 +1,7 @@
 # Phase II-01 修订规划交付包
 
+> **当前F线入口（2026-11-01）**：新F05原生适配三路线主线已由Sol有界接收（DG04证据Core `fb4c3836`、文档HEAD `740a74a9`），旧F05 PARTIAL、严格DG03及R3未决保留。F06按维护者新裁定组织[PickCube × Harness × 三主要后端example](14_F06_PickCube_Harness_Multi_Backend_Goal.md)，每后端3 seed、任务成功与runtime有效性分开；包已准备待人工转述，尚未执行。下方日期较早的状态为历史。
+
 **新F05 successor（2026-10-30；attempt001经Sol复核需返工）**：`F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED`；来源字节/原始字段采集有效，完整S0 PASS未接收。inventory=PARTIAL、readiness=BLOCKED_BY_FEATURE。authored schema、真实语义负例接线、归一化/传动核验与具体补丁图需补齐；零native，窗口1/3。旧F05三轮/PARTIAL保留，S1 native及F06/F07未启动。见[Sol复核](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)。
 
 <a id="f05-successor-replan-20261030"></a>
