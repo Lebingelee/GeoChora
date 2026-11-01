@@ -360,8 +360,9 @@ def _bound_errors(bundle: dict) -> list[dict]:
                     _check(joint.get("position_representation") == unit and joint.get("kind") == kind,
                            "joint_unit", f"episode {episode_index} {name} kind/unit differs")
                     values.append(float(pos[0]))
-                    if name.startswith("joint"):
-                        q[name], dq[name] = float(pos[0]), float(vel[0])
+                    # Keep the native finger coordinates in the per-boundary
+                    # maps too; arm-only gates select arm_names explicitly.
+                    q[name], dq[name] = float(pos[0]), float(vel[0])
                 _check(np.array_equal(arrays["joint_position"][boundary_index], np.asarray(values, dtype=np.float32)),
                        "typed_projection", f"episode {episode_index} H5 joint projection differs at {boundary_index}")
             q_rows.append(q)

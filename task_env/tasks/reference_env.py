@@ -3184,7 +3184,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['mujoco_interval_advance_attempts'] = int(advance_attempts)
         f05_dg02_input = self.value.get('f05_dg02_geophys_input')
         if (f03_input is not None or f04_input is not None or f05_input is not None
-                or f05_dg02_input is not None):
+                or f05_dg02_input is not None
+                or self.value.get('f05_dg04_isaac_native_input') is not None):
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())
             advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)

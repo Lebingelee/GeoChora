@@ -277,6 +277,14 @@ def test_f05_dg04_selected_reference_core_s1_two_episodes(tmp_path):
                 loaded = load_structured_control_records_h5(path)
                 assert result["transition_count"] == loaded["transition_count"] == 8
                 assert result["observation_count"] == loaded["observation_count"] == 9
+                first_control = loaded["structured_controls"][0].to_mapping()
+                applied_payload = first_control["writer_controls"][0]["applied_control"]["payload"]
+                position_ack = applied_payload["native_position_write_ack_v1"]
+                assert position_ack["schema_version"] == "native-position-write-ack-v1"
+                assert position_ack["partial"] is False
+                assert len(position_ack["native_names"]) == len(position_ack["applied_values"]) == 8
+                assert applied_payload["native_io_execution_class"] == "synthetic_fixture_no_physics"
+                assert len(applied_payload["native_interval_advance_receipts_v1"]) == 5
                 with h5py.File(path, "r") as recorded:
                     typed_witness = json.loads(
                         recorded["meta/f05_public_typed_state_witness_v1_json"][()].decode("utf-8")
