@@ -110,9 +110,9 @@ def _example_working_tree_context(core_repo, scope):
 def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     """Compile the F06 versioned example without touching strict CandidateSpec.
 
-    The current Core PickCube owner binds MJCF sources to MuJoCo and GeoPhys.
-    Isaac is deliberately not treated as an available generic provider; it is
-    admitted here only after the exact F06 source/profile consumer is added.
+    Construction and source identity remain owned by the current Core PickCube
+    task. The Isaac branch binds its exact USD closure and F06 profile; compiling
+    this route does not itself admit a production provider capability.
     """
     from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
     from catalog_query import core_context
@@ -150,7 +150,8 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     else:
         route = record.get('provider_routes', {}).get('isaacsim')
         if (not isinstance(route, dict) or route.get('backend') != 'cuda'
-                or route.get('device') != 'cuda:0' or route.get('runtime_tested') not in (False, True)):
+                or route.get('device') != 'cuda:0'
+                or type(route.get('runtime_tested')) is not bool):
             raise ValueError('catalog does not expose the exact F06 Isaac execution intersection')
         from task_env.tasks.pick_cube.task import build_isaac_reference
         value = build_isaac_reference(
@@ -163,6 +164,10 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
             or artifact.timebase.control_substeps != spec.control_substeps:
         raise ValueError('built-in PickCube recipe or timebase differs from the F06 example contract')
     source = value['source']
+    source_digest = (
+        source.source_closure_digest if spec.provider == 'isaacsim'
+        else hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
+    )
     return CompiledBuiltinPickCubeExampleV1(
         spec=spec,
         artifact_hash=artifact.identity_hash,
@@ -173,7 +178,7 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         source_revision=value['source_revision'],
         source_sha256=dict(value['source_sha256']),
         runtime_source_id=source.scene_source.source_id,
-        runtime_source_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        runtime_source_sha256=source_digest,
         working_tree_scope=tree,
         repo_dirty=actual_dirty,
     )

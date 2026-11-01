@@ -152,12 +152,16 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
              'controller': SimpleNamespace(identity='b' * 64),
              'solution_identity': 'c' * 64, 'source_revision': 'commit',
              'source_sha256': {'task_env/tasks/pick_cube/isaac.py': 'd' * 64},
-             'source': SimpleNamespace(scene_source=SimpleNamespace(source_id='f06-source', xml='f06')),
+             'source': SimpleNamespace(
+                 scene_source=SimpleNamespace(source_id='f06-source'),
+                 source_closure_digest='e' * 64,
+             ),
          }):
         compiled = harness_compiler.compile_builtin_pickcube_example(
             spec, catalog, working_tree_scope=scope,
         )
         assert compiled.runtime_source_id == 'f06-source'
+        assert compiled.runtime_source_sha256 == 'e' * 64
 
 
 def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp_path):
