@@ -1,4 +1,4 @@
-"""Provider-free F03 gates for typed free-body state and pre-read validation."""
+"""Typed USD free-body state, execution projection, and named Isaac drive contracts."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -322,7 +322,7 @@ def test_execution_spec_v1_projects_only_when_no_v1_only_choice_would_be_lost():
 
 def _isaac_execution_v1():
     return ExecutionSpecV1(
-        "execution-spec-v1", "isaacsim", "cuda", "physx-gpu-f03-s1", 17, "best_effort",
+        "execution-spec-v1", "isaacsim", "cuda", "isaac-gpu-physx-f04-position-v1", 17, "best_effort",
         RendererSelectionV1("renderer-selection-v1", "none", "cpu", "none", None),
         "cuda:0", (),
     )

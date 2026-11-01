@@ -323,7 +323,7 @@ class PandaPositionServoProfileV1:
         from ...runtime.sessions.source import UsdRuntimeSourceV1
         from ...runtime.sessions.leaf_control import (
             GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
-            IsaacNamedPositionDriveReceiptV1, IsaacSourceTendonDriveReceiptV1,
+            IsaacNamedPositionDriveReceiptV1,
         )
         from ...artifacts import ExecutionSpecV1
 
@@ -333,7 +333,7 @@ class PandaPositionServoProfileV1:
         if (native_drive_receipt is not None
                 and type(native_drive_receipt) not in (
                     IsaacNamedPositionDriveReceiptV1, GeoPhysUsdPositionDriveReceiptV1,
-                    GeoPhysUsdSourceActuationReceiptV2, IsaacSourceTendonDriveReceiptV1,
+                    GeoPhysUsdSourceActuationReceiptV2,
                 )):
             raise TypeError('versioned Position profile requires a supported named drive receipt when supplied')
         source.validate()
@@ -352,10 +352,9 @@ class PandaPositionServoProfileV1:
             if execution.physics_profile not in {
                     'isaac-gpu-physx-f04-position-v1',
                     'geophys-usd-position-f05-native-v1',
-                    'isaac-gpu-physx-f05-dg03-usd-v1',
                     'isaac-gpu-physx-f05-dg04-native-mimic-v1',
                     'isaac-gpu-physx-pickcube-f06-v1'}:
-                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG03, DG04 or F06 profile')
+                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG04 or F06 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,
@@ -382,22 +381,15 @@ class PandaPositionServoProfileV1:
         else:
             if any(source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
                 if type(native_drive_receipt) is not GeoPhysUsdPositionDriveReceiptV1:
-                    raise ValueError('synthetic Position USD source joint names differ from the F03 mapping')
-            target_by_joint = (
-                dict(native_drive_receipt.joint_targets)
-                if type(native_drive_receipt) is IsaacSourceTendonDriveReceiptV1
-                else {
-                    f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
-                    for item in native_drive_receipt.drives
-                }
-            )
+                    raise ValueError('Position USD source joint names differ from the frozen Panda mapping')
+            target_by_joint = {
+                f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+                for item in native_drive_receipt.drives
+            }
             if type(native_drive_receipt) in (
                     GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
             ) and dict(source.joints) != target_by_joint:
                 raise ValueError('GeoPhys source Joint names differ from its model-bound drive receipt')
-            if (type(native_drive_receipt) is IsaacSourceTendonDriveReceiptV1
-                    and dict(source.joints) != target_by_joint):
-                raise ValueError('DG03 source Joint names differ from its model-bound source tendon receipt')
             if dict(source.joint_targets) != target_by_joint:
                 raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
         f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
@@ -414,7 +406,7 @@ class PandaPositionServoProfileV1:
                 raise ValueError('PositionServoV1 USD hand state requires an explicit source Frame binding')
             if (type(native_drive_receipt) is IsaacNamedPositionDriveReceiptV1
                     and hand_binding != 'hand'):
-                raise ValueError('synthetic Position USD hand state must retain its exact F03 hand mapping')
+                raise ValueError('Position USD hand state must retain its exact Panda hand mapping')
         if type(kinematics_source_xml) is not str or not kinematics_source_xml.strip():
             raise ValueError('PositionServoV1 requires a nonempty source-calibrated kinematics description')
         config = config or ActionConfig()

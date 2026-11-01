@@ -564,7 +564,6 @@ def materialize_control(
     diagnostic_profile=None,
     f05_native_input=None,
     f05_dg02_geophys_input=None,
-    f05_dg03_isaac_input=None,
     f05_dg04_isaac_native_input=None,
     f05_dg01_mujoco_input=None,
     f06_pickcube_isaac_input=None,
@@ -575,26 +574,25 @@ def materialize_control(
     declared_execution = execution
     from .api import (
         _current_f05_s1_native_io_context,
-        _current_f05_dg03_s1_native_io_context,
+        _current_f05_dg04_s1_native_io_context,
     )
     f05_scope = _current_f05_s1_native_io_context()
-    f05_dg03_s1_scope = _current_f05_dg03_s1_native_io_context()
+    f05_dg04_s1_scope = _current_f05_dg04_s1_native_io_context()
     f05_s1 = f05_scope is not None
-    if sum(scope is not None for scope in (f05_scope, f05_dg03_s1_scope)) > 1:
-        raise ValueError('F05 and DG03 synthetic admission scopes cannot overlap')
+    if sum(scope is not None for scope in (f05_scope, f05_dg04_s1_scope)) > 1:
+        raise ValueError('F05 and DG04 synthetic admission scopes cannot overlap')
     s1_scope = f05_scope
     synthetic_s1 = s1_scope is not None
     f04_native = False
     f05_native = f05_native_input is not None
     f05_dg02_native = f05_dg02_geophys_input is not None
-    f05_dg03_native = f05_dg03_isaac_input is not None
     f05_dg04_native = f05_dg04_isaac_native_input is not None
     f05_dg01_mujoco = f05_dg01_mujoco_input is not None
     f06_pickcube_isaac = f06_pickcube_isaac_input is not None
-    if sum((f05_native, f05_dg02_native, f05_dg03_native, f05_dg04_native,
+    if sum((f05_native, f05_dg02_native, f05_dg04_native,
             f05_dg01_mujoco, f06_pickcube_isaac)) > 1:
         raise ValueError('distinct versioned native exact-cell inputs cannot overlap')
-    if (f05_native or f05_dg02_native or f05_dg03_native) and synthetic_s1:
+    if (f05_native or f05_dg02_native) and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
     if f05_dg01_mujoco and (synthetic_s1 or f04_native):
         raise ValueError('DG01 MuJoCo exact admission cannot overlap another versioned native route')
@@ -686,27 +684,6 @@ def materialize_control(
             ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
             'bounded DG02 source-preserving USD/Core CPU cell; no provider-wide qualification',
         )
-    elif f05_dg03_native:
-        from .api import (
-            F05_DG03_ISAAC_USD_PROFILE, _f05_dg03_isaac_capability_manifest,
-            _validate_f05_dg03_isaac_usd_input,
-        )
-        from ...artifacts import ExecutionSpec
-
-        _validate_f05_dg03_isaac_usd_input(
-            f05_dg03_isaac_input, artifact, declared_execution, source,
-        )
-        if (type(declared_execution) is not ExecutionSpecV1
-                or manifest is not None or diagnostic_profile is not None or leaf_plan is not None
-                or declared_execution.physics_profile != F05_DG03_ISAAC_USD_PROFILE):
-            raise ValueError('DG03 exact-cell admission requires its exact input without alternate authorities')
-        execution = ExecutionSpec(
-            'isaacsim', F05_DG03_ISAAC_USD_PROFILE, 'none', 'cuda',
-            declared_execution.provider_seed, 'best_effort',
-        )
-        actual_manifest = _f05_dg03_isaac_capability_manifest(
-            artifact, synthetic_s1=f05_dg03_s1_scope is not None,
-        )
     elif f05_dg04_native:
         from .api import (
             F05_DG04_ISAAC_NATIVE_PROFILE, _f05_dg04_isaac_capability_manifest,
@@ -726,7 +703,7 @@ def materialize_control(
             declared_execution.provider_seed, 'best_effort',
         )
         actual_manifest = _f05_dg04_isaac_capability_manifest(
-            artifact, synthetic_s1=f05_dg03_s1_scope is not None,
+            artifact, synthetic_s1=f05_dg04_s1_scope is not None,
         )
     elif f06_pickcube_isaac:
         from .api import (
@@ -854,12 +831,12 @@ def materialize_control(
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-            and not f05_dg03_native and not f05_dg04_native
+            and not f05_dg04_native
             and not f05_dg01_mujoco and not f06_pickcube_isaac
             and diagnostic_profile is None):
         actual_manifest = provider_manifest(execution.physics_provider)
     elif (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-          and not f05_dg03_native and not f05_dg04_native and not f05_dg01_mujoco
+          and not f05_dg04_native and not f05_dg01_mujoco
           and not f06_pickcube_isaac):
         from .api import _diagnostic_manifest
         if manifest is not None:
@@ -872,7 +849,7 @@ def materialize_control(
     # alongside its exact candidate input. Keep it on the same public path
     # after the controller-level capability check.
     admission_manifest = actual_manifest if (
-        f05_dg02_native or f05_dg03_native or f05_dg04_native or f06_pickcube_isaac
+        f05_dg02_native or f05_dg04_native or f06_pickcube_isaac
     ) else manifest
     profiles = ()
     r1_controller = None
@@ -894,7 +871,7 @@ def materialize_control(
                     or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)):
                 raise TypeError('unsupported explicit Controller profile set')
             if (not synthetic_s1 and not f04_native and not f05_native
-                    and not f05_dg03_native and not f05_dg04_native and not f06_pickcube_isaac
+                    and not f05_dg04_native and not f06_pickcube_isaac
                     and (execution.physics_provider not in {'geophys', 'mujoco'}
                                 or execution.backend != 'cpu')):
                 raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
@@ -953,17 +930,6 @@ def materialize_control(
                         or profiles[0].native_drive_receipt is not receipt
                         or dict(source.joint_targets) != expected_named_targets):
                     raise ValueError('DG02 Position requires its exact nine-DOF/eight-actuator source receipt')
-            elif f05_dg03_native:
-                expected_joint_map = {
-                    **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
-                    'panda-main/finger_joint1': 'finger_joint1',
-                    'panda-main/finger_joint2': 'finger_joint2',
-                }
-                if (len(profiles) != 1 or profiles[0].open_actuator is not None
-                        or profiles[0].native_drive_receipt is not None
-                        or dict(source.joints) != expected_joint_map
-                        or dict(source.joint_targets) != expected_joint_map):
-                    raise ValueError('DG03 Position requires one deferred Arm profile and exact source tendon Joint bindings')
             elif f05_dg04_native:
                 expected_joint_map = {
                     **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
@@ -1047,7 +1013,6 @@ def materialize_control(
         _diagnostic_profile=diagnostic_profile,
         _f05_native_input=f05_native_input,
         _f05_dg02_geophys_input=f05_dg02_geophys_input,
-        _f05_dg03_isaac_input=f05_dg03_isaac_input,
         _f05_dg04_isaac_native_input=f05_dg04_isaac_native_input,
         _f05_dg01_mujoco_input=f05_dg01_mujoco_input,
         _f06_pickcube_isaac_input=f06_pickcube_isaac_input,
@@ -1144,34 +1109,6 @@ def materialize_control(
             except BaseException as cleanup_error:
                 admission_error.add_note(
                     f'DG02 RuntimeSession cleanup after receipt admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            raise
-    elif f05_dg03_native:
-        try:
-            from .leaf_control import IsaacSourceTendonDriveReceiptV1
-            receipt = getattr(session, '_drive_receipt', None)
-            metadata = getattr(session, '_native_io_metadata', None)
-            expected_provenance = (
-                'synthetic_fixture' if f05_dg03_s1_scope is not None else 'native_runtime'
-            )
-            if (type(receipt) is not IsaacSourceTendonDriveReceiptV1
-                    or receipt.provenance_kind != expected_provenance
-                    or receipt.execution_identity_sha256 != declared_execution.identity_hash
-                    or receipt.source_closure_sha256 != source.source_closure_digest
-                    or receipt.scene_identity_sha256 != source.scene_definition.identity_hash
-                    or dict(receipt.joint_targets) != dict(source.joint_targets)
-                    or metadata.provider_build_identity != 'isaacsim-6.2.0.0'
-                    or metadata.physics_provider != 'isaacsim'
-                    or metadata.native_dof_names != receipt.native_dof_names
-                    or dict(metadata.native_position_limits) != dict(receipt.native_position_limits)):
-                raise ValueError('DG03 Core session lacks the exact model-bound source tendon receipt')
-        except BaseException as admission_error:
-            try:
-                session.close()
-            except BaseException as cleanup_error:
-                admission_error.add_note(
-                    f'DG03 RuntimeSession cleanup after receipt admission failure also failed: '
                     f'{type(cleanup_error).__name__}: {cleanup_error}'
                 )
             raise

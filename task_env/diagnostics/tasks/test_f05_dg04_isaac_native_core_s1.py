@@ -214,7 +214,7 @@ class _SyntheticDg04NativeIO:
         self.operations.append({"op": "advance", **application})
         return NativeAdvanceReceiptV1(
             "native-advance-receipt-v1", 1, self.native_step_index,
-            self.time_s, None, application,
+            self.time_s, application,
         )
 
     def close(self):
@@ -245,7 +245,7 @@ def test_f05_dg04_selected_reference_core_s1_two_episodes(tmp_path):
 
     env = candidate.env
     episode_receipts = []
-    with api._f05_dg03_s1_native_io_context(input_v1, factory):
+    with api._f05_dg04_s1_native_io_context(input_v1, factory):
         try:
             for episode in range(2):
                 observation, _info = env.reset(seed=input_v1.reset_plan.reset_sample.task_seed)

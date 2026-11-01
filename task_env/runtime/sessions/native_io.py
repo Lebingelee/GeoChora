@@ -214,6 +214,7 @@ class NativeResetWriteReceiptV1:
             raise ValueError('native reset receipt does not cover exact source joints, free roots and targets')
 
 
+
 @dataclass(frozen=True)
 class NativePositionWriteAckV1:
     schema_version: str
@@ -257,58 +258,12 @@ class NativePositionWriteAckV1:
         if self.attempted_count is not None and self.attempted_count != len(expected):
             raise ValueError('native Position write Ack attempt count differs from complete Target')
 
-
-@dataclass(frozen=True)
-class NativeSourceTendonWriteAckV1:
-    """Acknowledgement that Core's source tendon target was installed in native I/O."""
-
-    schema_version: str
-    target_identity_sha256: str
-    receipt_identity_sha256: str
-    actuator_name: str
-    control_value: float
-    scalar_force_limit_N: float
-    partial: bool = False
-
-    def to_mapping(self) -> dict[str, object]:
-        return {
-            'schema_version': self.schema_version,
-            'target_identity_sha256': self.target_identity_sha256,
-            'receipt_identity_sha256': self.receipt_identity_sha256,
-            'actuator_name': self.actuator_name,
-            'control_value': float(self.control_value),
-            'scalar_force_limit_N': float(self.scalar_force_limit_N),
-            'partial': self.partial,
-        }
-
-    def validate(self, *, target_identity_sha256: str, receipt_identity_sha256: str,
-                 actuator_name: str, control_value: float, scalar_force_limit_N: float) -> None:
-        values = (self.control_value, self.scalar_force_limit_N)
-        if (self.schema_version != 'native-source-tendon-write-ack-v1'
-                or not _is_sha256_identity(self.target_identity_sha256)
-                or not _is_sha256_identity(self.receipt_identity_sha256)
-                or not _is_sha256_identity(target_identity_sha256)
-                or not _is_sha256_identity(receipt_identity_sha256)
-                or type(self.actuator_name) is not str or not self.actuator_name.strip()
-                or type(actuator_name) is not str or not actuator_name.strip()
-                or self.target_identity_sha256 != target_identity_sha256
-                or self.receipt_identity_sha256 != receipt_identity_sha256
-                or self.actuator_name != actuator_name
-                or type(self.partial) is not bool or self.partial
-                or any(type(value) not in (int, float) or isinstance(value, bool)
-                       or not math.isfinite(float(value)) for value in values)
-                or float(self.control_value) != float(control_value)
-                or float(self.scalar_force_limit_N) != float(scalar_force_limit_N)):
-            raise ValueError('native source tendon Ack differs from the exact Core target/receipt')
-
-
 @dataclass(frozen=True)
 class NativeAdvanceReceiptV1:
     schema_version: str
     completed_count: int
     native_step_index: int
     simulation_time_s: float
-    source_tendon_application: Mapping[str, object] | None = None
     native_adaptation_application: Mapping[str, object] | None = None
 
     def to_mapping(self) -> dict[str, object]:
@@ -318,8 +273,6 @@ class NativeAdvanceReceiptV1:
             'native_step_index': self.native_step_index,
             'simulation_time_s': float(self.simulation_time_s),
         }
-        if self.source_tendon_application is not None:
-            result['source_tendon_application'] = dict(self.source_tendon_application)
         if self.native_adaptation_application is not None:
             result['native_adaptation_application'] = dict(self.native_adaptation_application)
         return result
@@ -333,24 +286,6 @@ class NativeAdvanceReceiptV1:
                 or not math.isfinite(float(self.simulation_time_s))
                 or abs(float(self.simulation_time_s) - expected_time) > 1e-12):
             raise ValueError('native advance must acknowledge exactly one expected timed step')
-        if self.source_tendon_application is not None:
-            application = self.source_tendon_application
-            if (not isinstance(application, Mapping)
-                    or application.get('schema_version') != 'native-source-tendon-substep-v1'
-                    or application.get('native_step_index') != expected_index
-                    or any(type(application.get(key)) not in (int, float)
-                           or isinstance(application.get(key), bool)
-                           or not math.isfinite(float(application[key]))
-                           for key in ('tendon_length_m', 'tendon_rate_m_s',
-                                       'unclipped_scalar_force_N', 'scalar_force_N'))
-                    or type(application.get('dof_efforts_N')) is not tuple
-                    or len(application['dof_efforts_N']) != 2
-                    or any(type(value) not in (int, float) or isinstance(value, bool)
-                           or not math.isfinite(float(value))
-                           for value in application['dof_efforts_N'])):
-                raise ValueError('native source tendon substep receipt is incomplete or malformed')
-        if self.source_tendon_application is not None and self.native_adaptation_application is not None:
-            raise ValueError('native advance cannot claim two different gripper adaptation receipts')
         if self.native_adaptation_application is not None:
             application = self.native_adaptation_application
             # F06 PickCube has a task-scoped PhysX mimic profile: a 5 N
@@ -493,13 +428,6 @@ class NativeRuntimeIOV1(Protocol):
     def close(self) -> None: ...
 
 
-class NativeSourceTendonRuntimeIOV1(Protocol):
-    """DG03-only extension for writing a source tendon actuator target."""
-
-    def write_source_tendon_target(
-        self, target_identity_sha256: str, receipt_identity_sha256: str,
-        actuator_name: str, control_value: float, scalar_force_limit_N: float,
-    ) -> NativeSourceTendonWriteAckV1: ...
 
 
 def _canonical_panda_entity_id(source: UsdRuntimeSourceV1) -> str:
@@ -533,7 +461,6 @@ class UsdCoreRuntimeSession(_SessionValues):
             GeoPhysUsdSourceActuationReceiptV2,
             IsaacNamedPositionDriveReceiptV1,
             IsaacNativeMimicPositionDriveReceiptV1,
-            IsaacSourceTendonDriveReceiptV1,
             compile_isaac_named_position_drive_receipt_from_native_metadata_v1,
         )
         self._initialize_values(artifact, source, execution.physics_provider)
@@ -572,13 +499,11 @@ class UsdCoreRuntimeSession(_SessionValues):
         if type(drive_receipt) not in (
                 IsaacNamedPositionDriveReceiptV1,
                 IsaacNativeMimicPositionDriveReceiptV1,
-                IsaacSourceTendonDriveReceiptV1,
                 GeoPhysUsdPositionDriveReceiptV1,
                 GeoPhysUsdSourceActuationReceiptV2):
             raise TypeError('Core RuntimeSession requires a supported named-drive receipt owner')
         if ((type(drive_receipt) in (IsaacNamedPositionDriveReceiptV1,
-                                     IsaacNativeMimicPositionDriveReceiptV1,
-                                     IsaacSourceTendonDriveReceiptV1)
+                                     IsaacNativeMimicPositionDriveReceiptV1)
              and execution.physics_provider != 'isaacsim')
                 or (type(drive_receipt) in (GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2)
                     and execution.physics_provider != 'geophys')):
@@ -587,8 +512,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')
         receipt_native_names = (
             drive_receipt.native_dof_names
-            if type(drive_receipt) in (IsaacSourceTendonDriveReceiptV1,
-                                       IsaacNativeMimicPositionDriveReceiptV1)
+            if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
             else tuple(item.native_dof_name for item in sorted(
                 drive_receipt.drives, key=lambda item: item.native_dof_index,
             ))
@@ -598,8 +522,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             raise ValueError('native I/O DOF/build metadata differs from the admitted named-drive receipt')
         receipt_limits = (
             dict(drive_receipt.native_position_limits)
-            if type(drive_receipt) in (IsaacSourceTendonDriveReceiptV1,
-                                       IsaacNativeMimicPositionDriveReceiptV1)
+            if type(drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1
             else {item.native_dof_name: (float(item.lower_limit), float(item.upper_limit))
                   for item in drive_receipt.drives}
         )
@@ -614,7 +537,6 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._native_step_count = 0
         self._reset_write_receipt: NativeResetWriteReceiptV1 | None = None
         self._last_native_position_ack: NativePositionWriteAckV1 | None = None
-        self._last_native_source_tendon_ack: NativeSourceTendonWriteAckV1 | None = None
         self._last_interval_advances: tuple[dict[str, object], ...] = ()
         self._last_interval_advance_attempts = 0
         self._last_readback: NativeRuntimeReadbackV1 | None = None
@@ -635,10 +557,7 @@ class UsdCoreRuntimeSession(_SessionValues):
         arm = {f'{robot_entity_id}/joint{index}': sample.joint_position[f'{robot_entity_id}/joint{index}']
                for index in range(1, 8)}
         opening = sum(sample.joint_position[f'{robot_entity_id}/finger_joint{index}'] for index in (1, 2))
-        if type(self._drive_receipt).__name__ == 'IsaacSourceTendonDriveReceiptV1':
-            targets = self._drive_receipt.arm_commands(arm)
-        else:
-            targets = self._drive_receipt.commands(arm, opening)
+        targets = self._drive_receipt.commands(arm, opening)
         receipt = self._native_io.write_reset(sample, targets)
         # Keep the returned fact even when its contract is invalid. A provider
         # may have written some channels before reporting a partial/malformed
@@ -652,7 +571,6 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._native_step_count = 0
         self._position_applied_boundary_ids.clear()
         self._last_native_position_ack = None
-        self._last_native_source_tendon_ack = None
         self._last_interval_advances = ()
         self._last_interval_advance_attempts = 0
         return self._realized(sample)
@@ -699,42 +617,18 @@ class UsdCoreRuntimeSession(_SessionValues):
     def apply_control(self, target):
         from .control import validate_target
         validate_target(self, target)
-        from .leaf_control import IsaacSourceTendonDriveReceiptV1
-        if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1:
-            expected = self._drive_receipt.arm_commands(target.arm_servo_position)
-        else:
-            if (type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
-                    and not math.isclose(
-                        float(target.gripper.force_limit_N),
-                        float(self._drive_receipt.gripper_force_limit_N),
-                        rel_tol=0.0, abs_tol=1e-9)):
-                raise ValueError('DG04 canonical gripper force limit differs from the fixed native drive cap')
-            expected = self._drive_receipt.commands(target.arm_servo_position, target.gripper.servo_opening_m)
+        if (type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
+                and not math.isclose(
+                    float(target.gripper.force_limit_N),
+                    float(self._drive_receipt.gripper_force_limit_N),
+                    rel_tol=0.0, abs_tol=1e-9)):
+            raise ValueError('DG04 canonical gripper force limit differs from the fixed native drive cap')
+        expected = self._drive_receipt.commands(target.arm_servo_position, target.gripper.servo_opening_m)
         acknowledgement = self._native_io.write_position_targets(target.identity_hash, expected)
         if type(acknowledgement) is not NativePositionWriteAckV1:
             raise TypeError('native Position write must return NativePositionWriteAckV1')
         self._last_native_position_ack = acknowledgement
         acknowledgement.validate(target.identity_hash, expected)
-        if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1:
-            writer = getattr(self._native_io, 'write_source_tendon_target', None)
-            if not callable(writer):
-                raise TypeError('DG03 native I/O lacks the source tendon target operation')
-            ctrl, scalar_force_limit = self._drive_receipt.tendon_control(
-                target.gripper.servo_opening_m, target.gripper.force_limit_N,
-            )
-            tendon_ack = writer(
-                target.identity_hash, self._drive_receipt.identity_sha256,
-                self._drive_receipt.actuator_name, ctrl, scalar_force_limit,
-            )
-            if type(tendon_ack) is not NativeSourceTendonWriteAckV1:
-                raise TypeError('DG03 tendon target write must return NativeSourceTendonWriteAckV1')
-            tendon_ack.validate(
-                target_identity_sha256=target.identity_hash,
-                receipt_identity_sha256=self._drive_receipt.identity_sha256,
-                actuator_name=self._drive_receipt.actuator_name,
-                control_value=ctrl, scalar_force_limit_N=scalar_force_limit,
-            )
-            self._last_native_source_tendon_ack = tendon_ack
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         realized = {
             f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': float(value)
@@ -750,12 +644,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             'native_runtime' if self._drive_receipt.provenance_kind == 'native_runtime' else 'synthetic_fixture',
             realized, float(target.gripper.servo_opening_m), float(target.gripper.force_limit_N),
             False,
-            ('native_source_tendon_and_arm_targets_acknowledged; per_substep_tendon_effort_required'
-             if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1
-             and self._drive_receipt.provenance_kind == 'native_runtime'
-             else 'synthetic_source_tendon_and_arm_targets_no_physics'
-             if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1
-             else 'native_physx_mimic_leader_drive_and_arm_targets_acknowledged_no_motion_claim'
+            ('native_physx_mimic_leader_drive_and_arm_targets_acknowledged_no_motion_claim'
              if type(self._drive_receipt).__name__ == 'IsaacNativeMimicPositionDriveReceiptV1'
              and self._drive_receipt.provenance_kind == 'native_runtime'
              else 'synthetic_physx_mimic_leader_drive_targets_no_physics'
@@ -782,21 +671,8 @@ class UsdCoreRuntimeSession(_SessionValues):
             accepted_advances.append(receipt.to_mapping())
             self._last_interval_advances = tuple(accepted_advances)
             receipt.validate(expected_index, expected_time)
-            from .leaf_control import IsaacSourceTendonDriveReceiptV1
             from .leaf_control import IsaacNativeMimicPositionDriveReceiptV1
-            if type(self._drive_receipt) is IsaacSourceTendonDriveReceiptV1:
-                application = receipt.source_tendon_application
-                ack = self._last_native_source_tendon_ack
-                if (application is None or ack is None
-                        or application.get('target_identity_sha256') != ack.target_identity_sha256
-                        or application.get('receipt_identity_sha256') != ack.receipt_identity_sha256
-                        or application.get('actuator_name') != ack.actuator_name
-                        or application.get('control_value') != ack.control_value
-                        or application.get('scalar_force_limit_N') != ack.scalar_force_limit_N
-                        or application.get('tendon_coefficients') != self._drive_receipt.tendon_coefficients):
-                    raise ValueError('DG03 accepted substep is not bound to its target/source tendon effort receipt')
-                self._validate_source_tendon_application(application, ack, expected_index)
-            elif type(self._drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1:
+            if type(self._drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1:
                 application = receipt.native_adaptation_application
                 ack = self._last_native_position_ack
                 if (application is None or ack is None
@@ -818,173 +694,6 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._state_revision += 1
         return self.snapshot()
 
-    def _validate_source_tendon_application(self, application, ack, expected_index):
-        """Recompute the exact DG03 affine tendon law from each public readback row."""
-        from .leaf_control import IsaacSourceEqualityComplianceV1, IsaacSourceTendonDriveReceiptV1
-
-        receipt = self._drive_receipt
-        if type(receipt) is not IsaacSourceTendonDriveReceiptV1:
-            raise TypeError('DG03 source tendon validation requires its exact typed receipt')
-        positions = _finite_tuple(application.get('finger_positions_m'), 2,
-                                  'DG03 native tendon finger positions')
-        velocities = _finite_tuple(application.get('finger_velocities_m_s'), 2,
-                                   'DG03 native tendon finger velocities')
-        efforts = _finite_tuple(application.get('dof_efforts_N'), 2,
-                                'DG03 native tendon DOF efforts')
-        indices = application.get('native_finger_dof_indices')
-        names = application.get('native_finger_joint_names')
-        if (type(application.get('native_step_index')) is not int
-                or application['native_step_index'] != expected_index
-                or names != receipt.tendon_native_joint_names
-                or type(indices) is not tuple
-                or indices != tuple(self._native_io_metadata.native_dof_names.index(name)
-                                    for name in receipt.tendon_native_joint_names)
-                or application.get('tendon_coefficients') != receipt.tendon_coefficients
-                or type(application.get('effort_write_attempted_count')) is not int
-                or application['effort_write_attempted_count'] != 2
-                or type(application.get('effort_write_completed_count')) is not int
-                or application['effort_write_completed_count'] != 2):
-            raise ValueError('DG03 substep did not write both exact source tendon DOFs in source order')
-        expected_length = sum(a * b for a, b in zip(receipt.tendon_coefficients, positions, strict=True))
-        expected_rate = sum(a * b for a, b in zip(receipt.tendon_coefficients, velocities, strict=True))
-        expected_raw = (
-            receipt.actuator_gain * ack.control_value
-            + receipt.actuator_length_bias * expected_length
-            + receipt.actuator_rate_bias * expected_rate
-        )
-        force_low, force_high = receipt.actuator_force_range
-        scalar_limit = min(float(ack.scalar_force_limit_N), force_high)
-        expected_force = min(
-            scalar_limit,
-            max(-scalar_limit, min(force_high, max(force_low, expected_raw))),
-        )
-        expected_efforts = tuple(
-            coefficient * expected_force for coefficient in receipt.tendon_coefficients
-        )
-        applied_efforts = _finite_tuple(
-            application.get('public_applied_efforts_N'), 2,
-            'DG03 public applied tendon effort readback',
-        )
-        equality_residual = positions[1] - positions[0]
-        compliance = receipt.equality_compliance
-        if type(compliance) is not IsaacSourceEqualityComplianceV1:
-            raise TypeError('DG03 receipt lacks the exact source-bound equality compliance mapping')
-        if compliance.mapping_algorithm != 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous':
-            raise ValueError('DG03 typed tendon application requires the corrected v4 homogeneous source mapping')
-        expected_impedance = compliance.impedance(equality_residual)
-        expected_frequency = compliance.natural_frequency_hz(equality_residual)
-        expected_damping_ratio = compliance.damping_ratio_for_residual(equality_residual)
-        def agrees(actual, expected):
-            return _native_public_float_readback_matches(
-                actual, expected, rel_tol=1e-10, abs_tol=1e-10,
-            )
-
-        source_checks = {
-            'tendon_length_m': (application.get('tendon_length_m'), expected_length),
-            'tendon_rate_m_s': (application.get('tendon_rate_m_s'), expected_rate),
-            'unclipped_scalar_force_N': (application.get('unclipped_scalar_force_N'), expected_raw),
-            'scalar_force_N': (application.get('scalar_force_N'), expected_force),
-            'source_equality_residual_m': (
-                application.get('source_equality_residual_m'), equality_residual,
-            ),
-            'source_equality_impedance': (
-                application.get('source_equality_impedance'), expected_impedance,
-            ),
-            'source_mimic_natural_frequency_hz': (
-                application.get('source_mimic_natural_frequency_hz'), expected_frequency,
-            ),
-            'source_mimic_damping_ratio': (
-                application.get('source_mimic_damping_ratio'), expected_damping_ratio,
-            ),
-        }
-        mismatches = {
-            name: {'actual': actual, 'expected': expected}
-            for name, (actual, expected) in source_checks.items()
-            if not agrees(actual, expected)
-        }
-        for index, (actual, expected) in enumerate(zip(efforts, expected_efforts, strict=True)):
-            if not agrees(actual, expected):
-                mismatches[f'dof_efforts_N[{index}]'] = {'actual': actual, 'expected': expected}
-        for index, (actual, expected) in enumerate(zip(applied_efforts, expected_efforts, strict=True)):
-            # Articulation tensor readback is float-backed; match the producer's public
-            # getter tolerance while keeping source-side J^T arithmetic at 1e-10.
-            if not _native_public_float_readback_matches(
-                actual, expected, rel_tol=1e-7, abs_tol=1e-7,
-            ):
-                mismatches[f'public_applied_efforts_N[{index}]'] = {
-                    'actual': actual, 'expected': expected,
-                }
-        for name, actual, expected in (
-            ('public_mimic_frequency_readback_hz',
-             application.get('public_mimic_frequency_readback_hz'), expected_frequency),
-            ('public_mimic_damping_ratio_readback',
-             application.get('public_mimic_damping_ratio_readback'), expected_damping_ratio),
-        ):
-            # PhysX mimic attrs are USD `custom float` values, whose public readback
-            # uses float32 precision. Match the native writer's existing 1e-6 check.
-            if not _native_public_float_readback_matches(
-                actual, expected, rel_tol=0.0, abs_tol=1e-6,
-            ):
-                mismatches[name] = {'actual': actual, 'expected': expected}
-        if mismatches:
-            raise ValueError(f'DG03 source tendon application differs from source/API tolerances: {mismatches!r}')
-        expected_effort_api = (
-            'Articulation.set_dof_efforts'
-            if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
-        )
-        expected_readback_api = (
-            'Articulation.get_dof_efforts'
-            if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
-        )
-        expected_mimic_api = (
-            'Usd.Prim.GetAttribute(...).Set/Get'
-            if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
-        )
-        contact_witness = application.get('public_contact_witness')
-        if not isinstance(contact_witness, Mapping):
-            raise TypeError('DG03 substep requires a typed public contact witness')
-        if receipt.provenance_kind == 'native_runtime':
-            contact_count = contact_witness.get('contact_count')
-            contact_force = contact_witness.get('normal_force_sum_N')
-            raw_contact_count = contact_witness.get('raw_contact_count')
-            actor_paths = contact_witness.get('raw_contact_actor_paths')
-            support_forces = contact_witness.get('support_contact_normal_forces_N')
-            support_path = '/F05Scene/support/collision'
-            if (contact_witness.get('schema_version') != 'f05-dg03-public-contact-witness-v2'
-                    or contact_witness.get('provenance_kind') != 'native_runtime'
-                    or contact_witness.get('api') != 'RigidPrim.get_raw_contact_data'
-                    or contact_witness.get('sensor_path') != '/F05Scene/free_cube'
-                    or contact_witness.get('support_path') != support_path
-                    or type(raw_contact_count) is not int or raw_contact_count < 0 or raw_contact_count > 32
-                    or type(actor_paths) is not list or len(actor_paths) != raw_contact_count
-                    or any(type(path) is not str or not path.startswith('/') for path in actor_paths)
-                    or type(contact_count) is not int or contact_count < 0 or contact_count > raw_contact_count
-                    or type(support_forces) is not list or len(support_forces) != contact_count
-                    or any(type(value) not in (int, float) or isinstance(value, bool)
-                           or not math.isfinite(float(value)) or float(value) < 0.0
-                           for value in support_forces)
-                    or type(contact_force) not in (int, float) or isinstance(contact_force, bool)
-                    or not math.isfinite(float(contact_force)) or float(contact_force) < 0.0
-                    or not math.isclose(math.fsum(float(value) for value in support_forces),
-                                        float(contact_force), rel_tol=1e-7, abs_tol=1e-7)
-                    or sum(path == '/F05Scene/support' or path == support_path
-                           or path.startswith(support_path + '/') for path in actor_paths) != contact_count
-                    or contact_witness.get('contact_present') is not (contact_count > 0)):
-                raise ValueError('DG03 public cube/support contact witness is malformed or mismapped')
-        elif (contact_witness.get('schema_version') != 'f05-dg03-public-contact-witness-v2'
-              or contact_witness.get('provenance_kind') != 'synthetic_fixture'
-              or contact_witness.get('api') != 'synthetic-no-physics'
-              or contact_witness.get('contact_count') != 0
-              or contact_witness.get('raw_contact_count') != 0
-              or contact_witness.get('raw_contact_actor_paths') != []
-              or contact_witness.get('support_contact_normal_forces_N') != []
-              or contact_witness.get('normal_force_sum_N') != 0.0
-              or contact_witness.get('physical_contact_checked') is not False):
-            raise ValueError('DG03 synthetic S1 cannot claim a physical contact measurement')
-        if (application.get('public_effort_api') != expected_effort_api
-                or application.get('public_effort_readback_api') != expected_readback_api
-                or application.get('public_mimic_frequency_api') != expected_mimic_api):
-            raise ValueError('DG03 substep effort/mimic provenance does not match its native/synthetic receipt')
 
     def close(self) -> None:
         if not self._closed:

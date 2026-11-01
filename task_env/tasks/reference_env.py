@@ -331,12 +331,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 _execution_spec_v1.physics_profile,
             )
             allowed_versioned_routes = {
-                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'physx-gpu-f03-s1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f04-position-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-dg02-core-v1'),
-                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg03-usd-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg04-native-mimic-v1'),
                 ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-pickcube-f06-v1'),
@@ -774,7 +772,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         controller_profile=self.position_profiles,
                         f05_native_input=self.value.get('f05_native_position_input'),
                         f05_dg02_geophys_input=self.value.get('f05_dg02_geophys_input'),
-                        f05_dg03_isaac_input=self.value.get('f05_dg03_isaac_input'),
                         f05_dg04_isaac_native_input=self.value.get('f05_dg04_isaac_native_input'),
                         f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
                         f06_pickcube_isaac_input=self.value.get('f06_pickcube_isaac_input'),
@@ -3023,7 +3020,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         'SelectedReferenceEnv.F05MenagerieGeoPhysCpuNativePosition' if f05_native else
                         'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
                         'SelectedReferenceEnv.F05GeoPhysUsdSyntheticIOS1' if f05_route else
-                        'SelectedReferenceEnv.F03VersionedPositionS1'
+                        'SelectedReferenceEnv.VersionedPositionCandidate'
                     ),
                     'task_name': self.artifact.task_id,
                     'task_version': self.artifact.artifact_version,
