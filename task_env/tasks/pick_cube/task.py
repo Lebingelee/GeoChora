@@ -403,9 +403,12 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     recipe = _recipe()
     artifact = build_artifact()
     source = build_runtime_source(artifact, backend=backend)
-    readiness = PickCubeReadinessConfig.from_source(artifact, source)
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    readiness = PickCubeReadinessConfig.from_source(
+        artifact, source,
+        measured_tcp_clearance_gate=(controller_profile == "r3_continuous_v1"),
+    )
     profile_source = None
     if controller_profile == "r1":
         controller = ProductionCanonicalPandaController.from_source(artifact, source)

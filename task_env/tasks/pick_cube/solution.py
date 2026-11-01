@@ -30,6 +30,10 @@ _ABOVE_CLEARANCE = 0.12
 # Keep the approach above the existing hover pose while traversing laterally.
 # The final hover/grasp poses and task geometry remain unchanged.
 _APPROACH_CLEARANCE = 0.10
+# Clearance is confirmed from the public measured EE pose before the preplanned
+# path is allowed to traverse over the cube or descend toward it.
+_MEASURED_CLEARANCE_TOLERANCE = 0.005
+_OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -50,11 +54,33 @@ class SegmentStatus(str, Enum):
 
 
 @dataclass(frozen=True)
+class MeasuredTcpGate:
+    """A public-pose interlock inside a precomputed PickCube action sequence."""
+
+    name: str
+    after_actions: int
+    minimum_height_above_cube_top_m: float
+    max_horizontal_error_m: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.name or type(self.after_actions) is not int or self.after_actions < 0:
+            raise ValueError("measured TCP gate requires a name and nonnegative action boundary")
+        if (not np.isfinite(self.minimum_height_above_cube_top_m)
+                or self.minimum_height_above_cube_top_m <= 0.0):
+            raise ValueError("measured TCP gate clearance must be finite and positive")
+        if (self.max_horizontal_error_m is not None
+                and (not np.isfinite(self.max_horizontal_error_m)
+                     or self.max_horizontal_error_m <= 0.0)):
+            raise ValueError("measured TCP gate horizontal error must be finite and positive")
+
+
+@dataclass(frozen=True)
 class SegmentPlan:
     """One segment's immutable public-action sequence and diagnostic target."""
 
     actions: np.ndarray
     target_pose: np.ndarray
+    measured_tcp_gates: tuple[MeasuredTcpGate, ...] = ()
 
     def __post_init__(self) -> None:
         actions = np.asarray(self.actions, dtype=np.float32).copy()
@@ -63,10 +89,20 @@ class SegmentPlan:
             raise ValueError("segment actions must have shape [N, action_dim] with N >= 1")
         if not np.isfinite(actions).all() or not np.isfinite(target_pose).all():
             raise ValueError("segment plan must contain only finite values")
+        gates = tuple(self.measured_tcp_gates)
+        if any(not isinstance(gate, MeasuredTcpGate) for gate in gates):
+            raise TypeError("segment measured TCP gates must be MeasuredTcpGate values")
+        if any(gate.after_actions > len(actions) for gate in gates):
+            raise ValueError("measured TCP gate lies beyond the segment action sequence")
+        if tuple(gate.after_actions for gate in gates) != tuple(
+            sorted(gate.after_actions for gate in gates)
+        ):
+            raise ValueError("measured TCP gates must follow action order")
         actions.setflags(write=False)
         target_pose.setflags(write=False)
         object.__setattr__(self, "actions", actions)
         object.__setattr__(self, "target_pose", target_pose)
+        object.__setattr__(self, "measured_tcp_gates", gates)
 
 
 PlanBuilder = Callable[[object, Mapping[str, object]], SegmentPlan]
@@ -338,32 +374,45 @@ class PickCubeSolution:
         )
         transit = clear.copy()
         transit[:2] = target[:2]
-        action_segments = (
-            self._planner.plan_translation_only(
-                current_pose=start,
-                target_position=clear[:3],
-                gripper=1.0,
-                settle_steps=0,
-            ),
-            self._planner.plan_translation_only(
-                current_pose=clear,
-                target_position=transit[:3],
-                gripper=1.0,
-                settle_steps=0,
-            ),
-            self._planner.plan_translation_only(
-                current_pose=transit,
-                target_position=target[:3],
-                gripper=1.0,
-                settle_steps=0,
-            ),
+        vertical_actions = self._planner.plan_translation_only(
+            current_pose=start,
+            target_position=clear[:3],
+            gripper=1.0,
+            settle_steps=0,
         )
-        actions = np.concatenate(
-            [segment for segment in action_segments if len(segment)], axis=0,
+        lateral_actions = self._planner.plan_translation_only(
+            current_pose=clear,
+            target_position=transit[:3],
+            gripper=1.0,
+            settle_steps=0,
         )
+        descend_actions = self._planner.plan_translation_only(
+            current_pose=transit,
+            target_position=target[:3],
+            gripper=1.0,
+            settle_steps=0,
+        )
+        action_segments = (vertical_actions, lateral_actions, descend_actions)
+        actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
+        minimum_height = _ABOVE_CLEARANCE + _APPROACH_CLEARANCE - _MEASURED_CLEARANCE_TOLERANCE
+        vertical_end = len(vertical_actions)
+        lateral_end = vertical_end + len(lateral_actions)
         return SegmentPlan(
             actions=actions,
             target_pose=target,
+            measured_tcp_gates=(
+                MeasuredTcpGate(
+                    "vertical_clearance",
+                    vertical_end,
+                    minimum_height_above_cube_top_m=minimum_height,
+                ),
+                MeasuredTcpGate(
+                    "over_cube_before_descent",
+                    lateral_end,
+                    minimum_height_above_cube_top_m=minimum_height,
+                    max_horizontal_error_m=_OVER_CUBE_HORIZONTAL_TOLERANCE,
+                ),
+            ),
         )
 
     def _plan_descend(self, observation, info: Mapping[str, object]) -> SegmentPlan:
@@ -451,10 +500,13 @@ class PickCubeReadinessConfig:
     profile_identity: str
     timeout_derivation: str
     version: str = "pick-cube-readiness-v1"
+    measured_tcp_clearance_gate: bool = False
 
     def __post_init__(self):
         if self.version != "pick-cube-readiness-v1" or self.control_dt <= 0:
             raise ValueError("invalid readiness configuration")
+        if type(self.measured_tcp_clearance_gate) is not bool:
+            raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
         if len(self.policies) != 4 or tuple(p.kind for p in self.policies) != (
             "pose_ready", "pose_ready", "gripper_ready", "task_outcome"
         ):
@@ -463,9 +515,11 @@ class PickCubeReadinessConfig:
             raise ValueError("readiness-v1 requires the existing 20-step close primitive")
 
     @classmethod
-    def from_source(cls, artifact, source):
+    def from_source(cls, artifact, source, *, measured_tcp_clearance_gate=False):
         if source.task_artifact_hash != artifact.identity_hash:
             raise ValueError("source/Artifact mismatch")
+        if type(measured_tcp_clearance_gate) is not bool:
+            raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
         action, gripper = source.config.action, source.config.robot.gripper
         if gripper.kind != "experimental_rate_limited":
             raise ValueError("readiness-v1 requires resolved experimental gripper profile")
@@ -497,6 +551,7 @@ class PickCubeReadinessConfig:
             "pose_threshold_authority": "resolved ActionConfig",
             "position_deadband": action.ik_position_deadband,
             "rotation_deadband": action.ik_rotation_deadband,
+            "measured_tcp_clearance_gate": measured_tcp_clearance_gate,
         }
         derivation = {
             "rate_ticks": rate, "force_adjust_ticks": force,
@@ -504,6 +559,8 @@ class PickCubeReadinessConfig:
             "total_close_ticks": total_close,
             "transition_ticks": base.close_transition_steps, "pose_timeout_s": 1.,
             "formula": "max(ceil(range/opening_step),ceil(range/force_adjust_step))+ceil(margin/control_dt)",
+            "measured_tcp_clearance_gate": measured_tcp_clearance_gate,
+            "measured_tcp_clearance_gate_hold_ticks": 2 * int(pose) if measured_tcp_clearance_gate else 0,
         }
         return cls(
             base, float(dt),
@@ -512,11 +569,15 @@ class PickCubeReadinessConfig:
              policy("gripper_ready", holds, "gripper_readiness_timeout"),
              policy("task_outcome", int(pose), "lift_outcome_timeout")),
             digest(profile), json.dumps(derivation, sort_keys=True),
+            measured_tcp_clearance_gate=measured_tcp_clearance_gate,
         )
 
     @property
     def global_safety_cap(self):
-        return self.base.action_budget + sum(policy.hold_ticks for policy in self.policies)
+        gate_holds = (
+            2 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
+        )
+        return self.base.action_budget + sum(policy.hold_ticks for policy in self.policies) + gate_holds
 
     @property
     def identity(self):
@@ -526,6 +587,7 @@ class PickCubeReadinessConfig:
             "policies": [policy.to_mapping() for policy in self.policies],
             "profile_identity": self.profile_identity,
             "timeout_derivation": self.timeout_derivation,
+            "measured_tcp_clearance_gate": self.measured_tcp_clearance_gate,
             "global_safety_cap": self.global_safety_cap,
         })
 
@@ -537,6 +599,14 @@ class PickCubeReadinessSolution(PickCubeSolution):
 
     def __init__(self, *, config: PickCubeReadinessConfig):
         self.readiness_config = config
+        self.version = (
+            "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
+            if config.measured_tcp_clearance_gate else type(self).version
+        )
+        self._measured_tcp_gate_index = 0
+        self._measured_tcp_gate_wait_ticks = 0
+        self._last_measured_tcp_gate_hold = False
+        self._last_public_observation = None
         super().__init__(config=config.base)
         implementation_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         self.identity = digest({
@@ -567,6 +637,10 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self.total_control_actions_emitted = 0
         self._wait_count = 0
         self.completion_events = []
+        self._measured_tcp_gate_index = 0
+        self._measured_tcp_gate_wait_ticks = 0
+        self._last_measured_tcp_gate_hold = False
+        self._last_public_observation = observation
         super().reset(observation, info, metadata)
         if self._done:
             self._done = bool(info.get("is_success")) and float(
@@ -574,6 +648,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
             ) >= _COLLECTION_LIFT_MARGIN
             if not self._done:
                 self._refresh_current_segment(observation, info)
+        if (self.readiness_config.measured_tcp_clearance_gate
+                and not self.done and not self.failed and self.stage == "move_above_cube"):
+            self._advance_measured_tcp_gates(observation)
 
     def act(self, observation=None, info=None):
         if self.done or self.failed or self._awaiting_observation:
@@ -582,15 +659,33 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._fail("global_control_safety_cap")
             raise RuntimeError("global control safety cap reached")
         segment = self._segments[self._segment_index]
-        self._last_wait = self._action_index >= len(segment.plan.actions)
-        action = segment.plan.actions[-1] if self._last_wait else segment.plan.actions[self._action_index]
+        gate = self._pending_measured_tcp_gate(segment)
+        self._last_measured_tcp_gate_hold = gate is not None
+        self._last_wait = gate is not None or self._action_index >= len(segment.plan.actions)
+        if gate is not None:
+            if gate.after_actions == 0:
+                self._fail(f"measured_tcp_gate_has_no_prior_action:{gate.name}")
+                raise RuntimeError(self.failure_reason)
+            action = segment.plan.actions[gate.after_actions - 1]
+        else:
+            action = segment.plan.actions[-1] if self._last_wait else segment.plan.actions[self._action_index]
         diagnostics = {
             "expert_version": self.version, "readiness_hold": self._last_wait,
             "planned_actions_emitted": self.planned_actions_emitted,
             "readiness_wait_actions_emitted": self.readiness_wait_actions_emitted,
             "total_control_actions_emitted": self.total_control_actions_emitted,
             "planned_segment_steps": len(segment.plan.actions), "stage_wait_ticks": self._wait_count,
+            "measured_tcp_clearance_gate_hold": self._last_measured_tcp_gate_hold,
+            "measured_tcp_clearance_gate": gate.name if gate is not None else None,
+            "measured_tcp_clearance_gate_wait_ticks": self._measured_tcp_gate_wait_ticks,
         }
+        if gate is not None and self._last_public_observation is not None:
+            metrics = self._measured_tcp_gate_metrics(gate, self._last_public_observation)
+            diagnostics.update({
+                "measured_tcp_height_above_cube_top_m": metrics["height_above_cube_top_m"],
+                "required_tcp_height_above_cube_top_m": gate.minimum_height_above_cube_top_m,
+                "measured_tcp_horizontal_error_m": metrics["horizontal_error_m"],
+            })
         self._awaiting_observation = True
         return ExpertAction(action=action, stage=segment.name, diagnostics=diagnostics)
 
@@ -602,9 +697,13 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._execution(execution_info)
         self._awaiting_observation = False
         self.total_control_actions_emitted += 1
+        self._last_public_observation = observation
         if self._last_wait:
             self.readiness_wait_actions_emitted += 1
-            self._wait_count += 1
+            if self._last_measured_tcp_gate_hold:
+                self._measured_tcp_gate_wait_ticks += 1
+            else:
+                self._wait_count += 1
         else:
             self._action_index += 1
             self.planned_actions_emitted += 1
@@ -627,6 +726,13 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if truncated or terminated or info.get("task_failure", False):
             self._fail("episode_truncated" if truncated else "environment_terminated")
             return
+        if self.readiness_config.measured_tcp_clearance_gate and self._segment_index == 0:
+            self._advance_measured_tcp_gates(observation)
+            gate = self._pending_measured_tcp_gate(self._segments[self._segment_index])
+            if gate is not None and self._action_index >= gate.after_actions:
+                if self._measured_tcp_gate_wait_ticks >= self.readiness_config.policies[0].hold_ticks:
+                    self._fail(f"measured_tcp_clearance_timeout:{gate.name}")
+                return
         if not exhausted:
             return
         if ready:
@@ -640,6 +746,58 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._refresh_current_segment(observation, info)
         elif self._wait_count >= policy.hold_ticks:
             self._fail(policy.failure_reason)
+
+    def _pending_measured_tcp_gate(self, segment):
+        if (not self.readiness_config.measured_tcp_clearance_gate
+                or self._segment_index != 0
+                or self._measured_tcp_gate_index >= len(segment.plan.measured_tcp_gates)):
+            return None
+        gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
+        return gate if self._action_index >= gate.after_actions else None
+
+    @classmethod
+    def _measured_tcp_gate_metrics(cls, gate, observation):
+        ee_pose = cls._ee_pose(observation)
+        cube_position = cls._cube_position(observation)
+        if not np.isfinite(ee_pose).all() or not np.isfinite(cube_position).all():
+            raise ValueError("measured TCP clearance gate received a nonfinite public pose")
+        height = float(ee_pose[2] - cube_position[2] - CUBE_HALF_SIZE)
+        horizontal_error = float(np.linalg.norm(ee_pose[:2] - cube_position[:2]))
+        ready = height >= gate.minimum_height_above_cube_top_m
+        if gate.max_horizontal_error_m is not None:
+            ready = ready and horizontal_error <= gate.max_horizontal_error_m
+        return {
+            "ready": bool(ready),
+            "height_above_cube_top_m": height,
+            "horizontal_error_m": horizontal_error,
+            "tcp_pose": ee_pose,
+            "cube_position": cube_position,
+        }
+
+    def _advance_measured_tcp_gates(self, observation):
+        segment = self._segments[self._segment_index]
+        while self._measured_tcp_gate_index < len(segment.plan.measured_tcp_gates):
+            gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
+            if self._action_index < gate.after_actions:
+                return
+            metrics = self._measured_tcp_gate_metrics(gate, observation)
+            if not metrics["ready"]:
+                return
+            self.completion_events.append({
+                "stage": segment.name,
+                "kind": "measured_tcp_clearance",
+                "gate": gate.name,
+                "control_step": self._boundary_step,
+                "height_above_cube_top_m": metrics["height_above_cube_top_m"],
+                "required_height_above_cube_top_m": gate.minimum_height_above_cube_top_m,
+                "horizontal_error_m": metrics["horizontal_error_m"],
+                "max_horizontal_error_m": gate.max_horizontal_error_m,
+                "tcp_pose": metrics["tcp_pose"].tolist(),
+                "cube_position": metrics["cube_position"].tolist(),
+                "wait_ticks": self._measured_tcp_gate_wait_ticks,
+            })
+            self._measured_tcp_gate_index += 1
+            self._measured_tcp_gate_wait_ticks = 0
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
