@@ -1,5 +1,7 @@
 # F05–F07 后继执行指南与 Codex 工作包合同（规划方向已采纳；F05 successor attempt001 S0已执行）
 
+> **当前执行范围（2026-11-01）**：遵循维护者批准的[原生适配裁定与最小验证集](13_F05_Early_Diagnostic_Three_Goals.md#f05-native-adaptation-scope-decision)。DG04 window004 续包准备供人工转述；Luna 仍暂停，未派发或执行。历史完整源柔顺/传力等价门不作为新路线前置条件；历史运行、失败及接收范围保持。压缩恢复只读取新包、当前一页状态和必要证据，不完整重读历史快照/账本。
+
 > **Status: PLANNING_DIRECTION_ADOPTED / ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED / ATTEMPT002_PREPARED_NOT_DISPATCHED.** 本文的阶段设计规格保留原规划含义；2026-10-30冻结首包已完成静态S0、诊断实现与定向验证。该结果不启动S1/F06/F07，也不改写旧F05结果。后续002仅按第9节新完整包，在前置门满足且维护者转述后有条件允许native。
 >
 > 原网页稿SHA-256：`6107b5a70a09b16aa7b06da7617bef0dae44fff1cbdf93139c2b6ad03ac78b5f`。本文与[11的仓库约束澄清](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#repository-adoption)共同使用；`develop-full`是F线规划owner。

@@ -1863,9 +1863,9 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
     "README.md": "446e275d74cbad788e17613ef87356ff45a963d344b7d5da382a3c03998caf76",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "6ad8307650d41b229940491e22933fb8cc6bf03ffb8ba3030b035adb3448ae29",
-    "12_F05_F07_Execution_Playbook.md": "f73cfe82c683e64cf5793ed73a0b35c4f466d4a599dcb5f242b871f6ba2b9e90",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "dea5762a94b4184b95d4c1f2702be97cc901312095f28e3618443c01baa7dbf7"
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "95086fd19595ef5806d3b518e6a277c4eae2ca88f7ea9721c6f83562ddf135b7",
+    "12_F05_F07_Execution_Playbook.md": "5f87a4d8f41dc9709d7683ce6626d43ca313a740e1a28b64b0df1ab2bf32da79",
+    "13_F05_Early_Diagnostic_Three_Goals.md": "a92f2a1774dea2ff30630804a742e9649d11839e78efde1f83d994d237b3a769"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -7152,5 +7152,26 @@
       "preparation_native_starts": 0,
       "preparation_software_tests": 0
     }
+  },
+  "f05_native_adaptation_scope_decision": {
+    "date": "2026-11-01",
+    "status": "MAINTAINER_APPROVED_IMPLEMENTATION_PENDING_MANUAL_RELAY",
+    "authority": "Direct maintainer reply: 允许，我们先确保主线。如还有其他需要确认的务必提来",
+    "current_contract": "13_F05_Early_Diagnostic_Three_Goals.md#f05-native-adaptation-scope-decision",
+    "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_004/",
+    "scope": "One Core Runtime, same Menagerie family, versioned provider-native adaptation and real Isaac Core N2",
+    "deferred_research": [
+      "MuJoCo-specific compliant equality law equivalence",
+      "fixed-tendon force-law equivalence",
+      "live mimic parameter mutation bridge"
+    ],
+    "historical_gate_disposition": "DEFERRED_RESEARCH_NOT_QUALIFIED; historical failures remain failed",
+    "DG01_DG02": "Existing bounded acceptance retained",
+    "DG03_formal_steps": 0,
+    "F05_successor": "PARTIAL",
+    "luna_state": "PAUSED_NOT_DISPATCHED",
+    "F06_F07_execution": false,
+    "qualification_granted": false,
+    "validation_policy": "Affected checks and one complete N2/cold-read; no full historic hash or test-matrix sweep"
   }
 }

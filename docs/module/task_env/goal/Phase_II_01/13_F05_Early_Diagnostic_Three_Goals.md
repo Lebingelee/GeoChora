@@ -1,7 +1,7 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window003 attempt004 的采样门通过，但公开 `flush_changes()` 候选未通过实际物理响应门（残差与相对速度均低于冻结阈值）。正式N2未启动。维护者要求暂停并说明同App C++/Kit SDK依赖：本机Isaac 6.2已带Kit `dev` Carbonite头文件/构建工具，但未找到匹配的 `omni::physx::IPhysx` 头文件或110.4.4生命周期契约；因此当前未证明必须另下完整Kit SDK。window003暂停，保留失败与扣账。**
-> 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
+> **当前状态（2026-11-01）：DG01/DG02有界接收、R3对照PARTIAL保持；DG03正式N2为0，新F05仍PARTIAL。维护者已批准版本固定、明确记录差异的原生物理适配，MuJoCo特有柔顺定律及传力逐项等价延期研究。当前范围以[第17节](#f05-native-adaptation-scope-decision)为准。window003历史失败保留；window004准备供人工转述，Luna仍暂停，未执行新路线。**
+> 本页是当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)共同使用。第1–16节保留原签署时点的合同与历史；与第17节冲突的后续执行要求由维护者新裁定替代，历史验收不变。
 
 ## 1. 授权、历史与真实起点
 
@@ -300,3 +300,44 @@ attempt004使用冻结candidate002计划（SHA `e095bfee7feb071e330138c344b13442
 Kit/C++的必要性边界现已修正。本机Isaac Sim 6.2 Python环境已经包含约27 MiB的`isaacsim/kit/dev`，含Carbonite plugin C++ headers和`repo.sh`；本机`omni.physx`为110.4.4，其构建元数据指向Kit `110.4.0+feature.385545.40e0c960.gl`。因此“必须再下载整套Kit SDK”目前没有证据。若要在**同一个已运行Isaac App**内取到其PhysX mimic对象，候选路径须经Kit/Carbonite C++ plugin边界查询该App加载的`omni::physx::IPhysx`接口，再调用公开PhysX mimic setter；当前Python绑定没有提供该live-object指针桥。已安装包里没有找到`omni/physx/IPhysx.h`，而公开检索到的NVIDIA头文件属于110.3，不能证明与本机110.4.4接口/句柄生命周期兼容。NVIDIA说明Isaac Sim 6.2使用Kit SDK 110.4.0，[Kit 110.4架构文档](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/110.4.0/guide/kit_overview.html)说明Carbonite是C++ plugin边界；这些说明解释了为何C++桥需要Kit ABI/开发接口，但不证明必须取得整包SDK。依赖安装已获维护者允许，但随后维护者要求先暂停；本窗口未下载或安装SDK/依赖。
 
 维护者要求在此暂停并要求解释上述依赖。窗口状态为`PAUSED_BY_MAINTAINER_PENDING_EXACT_110_4_OMNI_PHYSX_CPP_INTERFACE`，不是Goal完成。详细本机开发树检查、精确receipt/哈希和恢复动作见ignored [same-App C++/Kit SDK blocker note](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/same_app_cpp_sdk_blocker.md)、[attempt004 supervisor receipt](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/n1_flush_candidate002_supervisor_receipt.json)和[累计run ledger](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/run_ledger.json)。F05三路线仍未收口；F06仅准备入口，N2/H5冷读/F06/F07/Qualification均未运行。
+
+
+<a id="f05-native-adaptation-scope-decision"></a>
+
+## 17. 维护者裁定：原生物理适配与主线收口（2026-11-01）
+
+**授权原文**：Sol询问“是否允许F05使用明确记录、版本固定的原生物理适配，把MuJoCo特有柔顺定律及传力的逐项等价另列研究”；维护者答复“允许，我们先确保主线。如还有其他需要确认的务必提来”。本节记录范围决定，不声称实现、物理验收或Qualification已经发生。
+
+### 17.1 当前目标与延期项
+
+新F05继续验证同源Menagerie Panda经一个Core Runtime和多个adapter的状态、控制、物理步进与记录闭环。DG01/MuJoCo与DG02/GeoPhys的有界接收沿用；DG03完成Isaac Sim 6.2.0.0 / CUDA:0 / GPU PhysX的版本化原生适配和真实Core N2，随后交Sol复核三路线矩阵。R3跨provider状态/目标差异仍PARTIAL；原同USD三Provider门及旧F05 OVERALL_PARTIAL保持历史处置。
+
+源equality的MuJoCo特有solimp/solref定律、fixed-tendon逐项传力等价、每步修改运行中mimic频率的响应门，登记为`DEFERRED_RESEARCH_NOT_QUALIFIED`。旧失败仍失败，不删除检测器、不调整旧阈值或回填PASS。C++/Kit SDK桥接不再是新路线前置条件。统一物理语义在本路线具体指：身份、结构/坐标/单位、资产物理属性、Canonical State/Control含义及Task评价一致；不宣称跨solver约束定律或数值轨迹等价。
+
+### 17.2 最小实施路径
+
+| 阶段 | 现有owner与允许改动 | 出口 |
+| --- | --- | --- |
+| A 适配合同 | 既有position_candidate/source、assembly与delivery；从当前Menagerie派生独立PhysX表示/配置版本 | 固定joint/frame/TCP、质量/COM/惯性、碰撞、开合/力限语义；逐项记录原生约束和驱动适配及损失。保持同一来源，不另换官方Panda或solver。 |
+| B Core接线 | `tasks/position_candidate/builder.py`、`runtime/sessions/api.py`、`leaf_control.py`、`isaac_native_io.py`及必要`native_io.py` | 复用F04具备证据的公开位置控制/生命周期和可用DG03映射；支持初始化配置的原生mimic/drive。新profile/receipt明确适配身份，不删除旧严格profile的保护；实际Core路径可运行。 |
+| C 最小验证 | 受影响Core S1、已有监督worker/Recorder/独立reader | 完整正式N2和冷读通过；新增抓手适配须证明同步及接触受阻后的物理行为/力限，不能仅用两指收到相同命令代替耦合。 |
+| D 收口 | 三路线矩阵及F06入口清单 | 精确区分适配后通过、历史接收、R3未决和延期研究；共享代码只回归受影响路线；由Sol独立接收。 |
+
+允许在原owner扩展实现、诊断入口和reader；不复制Runtime/Controller/Recorder/task factory，不读provider私有状态。不预设必须重写全部驱动：已通过且适用的映射优先保留。若公开原生适配仍缺关键能力，交具体证据和选项询问；不得自行回到C++桥研究或更换后端。
+
+### 17.3 验收与最小检查集
+
+- 本次只做受影响Core构造/reset/typed state/control/record/close检查和必要坏输入；仅新映射需要短native判别。共享F04代码实际变化时跑对应回归；不重跑未受影响历史测试/篡改全集或DG01/DG02 native。
+- 正式N2保持同一Env两episode，每集300 interval、每interval 5×0.002s，共3000正式physics steps、602 boundary/observation、600 transitions。App bootstrap另记，reset不暗中步进。
+- 沿用已冻结control_oracles的schedule/tracking与original_physical_oracle的物理阈值；原100 interval描述不覆盖300 interval schedule。只有源柔顺/传力逐项等价要求按本节延期；原tracking/FK/抓手开合/自由体落稳/时钟/Task/lifecycle门不放宽。继续使用builder的R3控制路线，不在worker替换控制器。
+- 新抓手适配的力限/接触判别按实际native模式声明指标、单位、预期与失败条件后再运行；复用适用现有检测器，已能覆盖的项目不新增矩阵。与原N2不同的接触夹具/初态只作诊断，不混为正式轨迹。
+- 独立冷读从H5数值核验物理、tracking与T+1；只补新增profile/receipt、错误joint/unit/clock等相关负例，不复制producer判断。真实parent exit0、持久化收据/flush、进程组结束及锁释放保持；复用F04受控退出，不另研自然Kit teardown。
+- 不扩展F06/F07、20 seed、Expert/Oracle/Judge或正式Qualification。F06只复用已有入口清单，标明当前source-bound构造和Harness接线仍需实施。
+
+### 17.4 执行与上下文精简
+
+DG04 window004包目录为`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_004/`，输出为同根`f05_diagnostic04/window_004/`。复用develop-full，不创建分支/worktree。预计主动3–6小时，仅为估计；维护者此前取消的累计步数/时长/启动次数硬上限继续不设。各run仍有限steps/bootstrap/timeout、RAM/VRAM保护、单worker与共享锁，保留原始结果。同一门连续两次实际失败后停该门并询问；接口错误同样适用，原延期门失败不清零、不重试。
+
+当前状态限一页，列出阶段、当前门、最新身份/结果、下一动作、待决问题和worker状态。账本逐run追加，不嵌套旧账本；历史只引用，不每次压缩重读。HEAD/dirty交接核对一次，运行时绑定相关source/recipe/code/controller/reader/plan；停止反复扫描数千历史文件。Skill只定位所需owner/当前路线，行为稳定后按影响刷新一次，不逐轮追加运行历史。已知无关文档范围/数量错误不作为native阻断。
+
+进度以实际主路线推进为准：30–45分钟没有新增实施或判别证据时，立即复评最小路径；每10分钟或里程碑简报，不为了补报告格式或审计数量延后运行。发生合同、依赖或物理映射不确定时，用具体问题及推荐方案询问维护者。准备本节不自动恢复Luna；维护者转述完整新包后才执行。
