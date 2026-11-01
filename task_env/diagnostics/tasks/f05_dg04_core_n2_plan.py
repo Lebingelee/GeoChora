@@ -9,10 +9,13 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from datetime import datetime, timezone
 
 
 CORE = Path(__file__).resolve().parents[3]
+if str(CORE) not in sys.path:
+    sys.path.insert(0, str(CORE))
 MAINT = CORE / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
 PACKAGE = MAINT / "sol_f05_diagnostic04_004"
 WINDOW = MAINT / "f05_diagnostic04/window_004"
