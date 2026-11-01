@@ -294,3 +294,55 @@ def test_isaac_core_site_overlay_excludes_conflicting_openusd_package(tmp_path):
     assert (overlay / 'h5py').is_symlink()
     assert (overlay / 'numpy.py').is_symlink()
     assert not (overlay / 'pxr').exists()
+
+
+def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compile_failure(tmp_path):
+    import builtin_example_worker
+    import task_env.runtime.sessions.isaac_native_io as isaac_native_io
+
+    events = []
+
+    class AppOwner:
+        def __init__(self):
+            self.opened = False
+            self.closed = False
+
+        def open(self):
+            events.append('app_open')
+            self.opened = True
+
+        def close(self):
+            events.append('app_close')
+            self.closed = True
+
+        def close_receipt(self):
+            return {'close_attempted': True, 'close_completed': self.closed}
+
+    owner = AppOwner()
+    spec = _spec(
+        provider='isaacsim', backend='cuda', device='cuda:0',
+        source_delivery_manifest='/frozen/pickcube/delivery_manifest.json',
+    )
+    scope = ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ())
+    catalog = {'core_repo': str(tmp_path)}
+
+    def compile_example(*_args, **_kwargs):
+        events.append('source_compile')
+        assert owner.opened
+        raise RuntimeError('offline compile probe')
+
+    with patch.object(builtin_example_worker, 'core_context', return_value={
+        'core_repo': str(tmp_path), 'core_commit': 'commit', 'core_dirty': False,
+    }), patch.object(isaac_native_io, '_process_app_owner', return_value=owner), \
+         patch.object(builtin_example_worker, 'compile_builtin_pickcube_example', side_effect=compile_example):
+        row = builtin_example_worker.run_one(
+            spec, catalog, scope, seed=31, output=tmp_path / 'isaac-run',
+        )
+
+    assert events == ['app_open', 'source_compile', 'app_close']
+    assert row['isaac_app_precompile_start_attempted'] is True
+    assert row['isaac_app_precompile_start_completed'] is True
+    assert row['isaac_app_owner_close_receipt']['close_completed'] is True
+    assert row['errors'][0]['phase'] == 'compile'
+    assert row['runtime_valid'] is False
+    assert not (tmp_path / 'isaac-run' / 'episode.h5').exists()

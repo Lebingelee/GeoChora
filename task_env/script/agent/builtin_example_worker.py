@@ -295,16 +295,34 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         'recording': None, 'cold_read': None, 'close_attempted': False,
         'close_succeeded': False, 'errors': [], 'status': 'INVALID',
         'qualification': False,
+        'isaac_app_precompile_start_attempted': False,
+        'isaac_app_precompile_start_completed': False,
+        'isaac_app_owner_close_receipt': None,
     }
     env = None
+    app_owner = None
     action_trace = None
     write_action_trace = None
     recording_started = False
     h5 = output / 'episode.h5'
+    execution_phase = 'worker_setup'
     try:
         context = core_context(catalog['core_repo'])
+        if spec.provider == 'isaacsim':
+            # The USD delivery compiler imports OpenUSD while inspecting the
+            # frozen source closure. Kit must configure Isaac's pxr extension
+            # paths before that import, and runtime materialization must reuse
+            # this same process-owned App.
+            execution_phase = 'isaac_app_precompile_startup'
+            row['isaac_app_precompile_start_attempted'] = True
+            from task_env.runtime.sessions.isaac_native_io import _process_app_owner
+
+            app_owner = _process_app_owner()
+            app_owner.open()
+            row['isaac_app_precompile_start_completed'] = True
         # The built-in profile has its own tracked-clean + exact untracked
         # scope; the legacy strict catalog validator correctly remains strict.
+        execution_phase = 'compile'
         compiled = compile_builtin_pickcube_example(
             spec, catalog, working_tree_scope=scope,
         )
@@ -323,6 +341,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                    working_tree_scope=compiled.working_tree_scope,
                    repo_dirty=compiled.repo_dirty,
                    core_commit=context['core_commit'])
+        execution_phase = 'reset'
         _, reset_info = env.reset(seed=seed)
         row['reset_succeeded'] = True
         row['reset_sample'] = {
@@ -340,6 +359,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         action_trace, write_action_trace = _install_action_trace(env, output / 'step_trace.json')
         env.start_recording(h5)
         recording_started = True
+        execution_phase = 'solution_execution'
         episode = run_expert(
             env, seed=seed, horizon=spec.horizon_control_ticks,
             already_reset=True, initial_info=reset_info,
@@ -360,7 +380,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         recording_started = False
     except BaseException as error:
         row['errors'].append({
-            'phase': 'execute', 'type': type(error).__name__, 'message': str(error),
+            'phase': execution_phase, 'type': type(error).__name__, 'message': str(error),
             'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__)),
         })
         fault = getattr(error, 'execution_fault', None)
@@ -393,6 +413,25 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             except BaseException as error:
                 row['errors'].append({'phase': 'close', 'type': type(error).__name__, 'message': str(error),
                                       'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))})
+        if app_owner is not None:
+            # Env/session close normally closes this shared owner. Calling its
+            # idempotent close here also covers compile failures before Env
+            # construction and retains cleanup evidence in the worker receipt.
+            try:
+                app_owner.close()
+            except BaseException as error:
+                row['errors'].append({
+                    'phase': 'isaac_app_close', 'type': type(error).__name__,
+                    'message': str(error),
+                    'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__)),
+                })
+            try:
+                row['isaac_app_owner_close_receipt'] = app_owner.close_receipt()
+            except BaseException as error:
+                row['errors'].append({
+                    'phase': 'isaac_app_close_receipt', 'type': type(error).__name__,
+                    'message': str(error),
+                })
     if h5.is_file():
         try:
             if spec.provider == 'isaacsim':
