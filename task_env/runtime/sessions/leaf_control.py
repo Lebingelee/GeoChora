@@ -533,9 +533,14 @@ class IsaacNativeMimicPositionDriveReceiptV1:
         return result
 
     def commands(self, arm_position: Mapping[str, float], hand_opening_m: float):
-        expected_arm = {f'panda-main/joint{index}' for index in range(1, 8)}
+        f06_profile = self.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+        entity_id = 'panda-v1' if f06_profile else 'panda-main'
+        expected_arm = {f'{entity_id}/joint{index}' for index in range(1, 8)}
         if not isinstance(arm_position, Mapping) or set(arm_position) != expected_arm:
-            raise ValueError('DG04 Arm Position request must cover the exact seven canonical joints')
+            raise ValueError(
+                f'Isaac {"F06" if f06_profile else "DG04"} Arm Position request must '
+                'cover the exact seven canonical joints'
+            )
         if any(type(name) is not str or type(value) not in (int, float)
                or isinstance(value, bool) or not math.isfinite(float(value))
                for name, value in arm_position.items()):
@@ -549,10 +554,10 @@ class IsaacNativeMimicPositionDriveReceiptV1:
                 self.native_position_limits['finger_joint2'][1]) + 2e-9:
             raise ValueError('DG04 hand opening exceeds the exact native two-finger limits')
         positions = {
-            JointReference('panda-main', key.split('/', 1)[1]): float(value)
+            JointReference(entity_id, key.split('/', 1)[1]): float(value)
             for key, value in arm_position.items()
         }
-        positions[JointReference('panda-main', 'finger_joint1')] = min(
+        positions[JointReference(entity_id, 'finger_joint1')] = min(
             float(hand_opening_m) / 2.0,
             self.native_position_limits['finger_joint1'][1],
         )

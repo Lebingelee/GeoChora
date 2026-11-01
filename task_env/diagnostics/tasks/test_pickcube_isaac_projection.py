@@ -50,6 +50,58 @@ def test_f06_pickcube_tcp_is_the_task_ee_site_offset():
     }
 
 
+def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
+    from task_env.artifacts import JointReference
+    from task_env.runtime.sessions.leaf_control import (
+        IsaacNamedPositionDriveV1,
+        IsaacNativeMimicPositionDriveReceiptV1,
+    )
+
+    entity_id = 'panda-v1'
+    native_names = tuple(
+        [f'joint{index}' for index in range(1, 8)]
+        + ['finger_joint1', 'finger_joint2']
+    )
+    limits = {name: (-2.9, 2.9) for name in native_names[:7]}
+    limits.update({'finger_joint1': (0.0, 0.04), 'finger_joint2': (0.0, 0.04)})
+    active_ids = tuple(
+        [f'joint{index}' for index in range(1, 8)] + ['finger_joint1']
+    )
+    drives = tuple(
+        IsaacNamedPositionDriveV1(
+            'isaac-named-position-drive-v1',
+            JointReference(entity_id, joint_id), native_name, native_names.index(native_name),
+            'meter' if joint_id == 'finger_joint1' else 'radian',
+            *limits[native_name],
+        )
+        for joint_id, native_name in zip(active_ids, active_ids, strict=True)
+    )
+    receipt = IsaacNativeMimicPositionDriveReceiptV1(
+        'isaac-native-mimic-position-drive-receipt-v1', 'synthetic_fixture',
+        'a' * 64, 'b' * 64, 'c' * 64, 'isaacsim-6.2.0.0',
+        'isaac-gpu-physx-pickcube-f06-v1', 'cuda', 'cuda:0', 'best_effort',
+        0.002, 5, f'{entity_id}/position-servo-v1', native_names, limits, drives,
+        gripper_drive_stiffness_N_m=5000.0,
+        gripper_drive_damping_N_s_m=120.0,
+        gripper_force_limit_N=5.0,
+    )
+
+    arm = {f'{entity_id}/joint{index}': float(index) / 10.0 for index in range(1, 8)}
+    targets = receipt.commands(arm, 0.06)
+
+    assert tuple(name for _index, name, _value in targets) == active_ids
+    assert tuple(value for _index, _name, value in targets[:7]) == tuple(arm.values())
+    assert targets[-1] == (7, 'finger_joint1', 0.03)
+    try:
+        receipt.commands(
+            {f'panda-main/joint{index}': 0.0 for index in range(1, 8)}, 0.06,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('F06 receipt accepted DG04 canonical entity names')
+
+
 def test_f06_external_binding_constructs_only_the_solution_free_source_once():
     from unittest.mock import patch
 
