@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -61,6 +62,59 @@ def _planned_action_count(trajectory):
     return sum(1 for transition in transitions if transition.planned_action is True)
 
 
+def _validate_f06_bootstrap_receipt(bootstrap, run_plan, *, row):
+    """Validate observed Isaac startup steps against the frozen finite plan."""
+    if (not isinstance(run_plan, dict)
+            or run_plan.get('schema_version') != 'harness-builtin-pickcube-example-run-plan-v1'
+            or run_plan.get('provider') != 'isaacsim'):
+        raise ValueError('F06 Isaac bootstrap has no exact Harness run plan')
+    for key, expected in (
+        ('seed', row.get('seed')),
+        ('core_commit', row.get('source_revision')),
+        ('horizon_control_ticks', row.get('horizon_control_ticks')),
+        ('control_substeps', row.get('control_substeps')),
+        ('physics_dt_s', row.get('physics_dt_s')),
+    ):
+        if run_plan.get(key) != expected:
+            raise ValueError(f'F06 Isaac bootstrap run plan differs at {key}')
+    bootstrap_limit = run_plan.get('bootstrap_physics_steps_upper_bound')
+    horizon = run_plan.get('horizon_control_ticks')
+    substeps = run_plan.get('control_substeps')
+    total_limit = run_plan.get('physics_steps_upper_bound')
+    if (type(bootstrap_limit) is not int or bootstrap_limit < 0
+            or type(horizon) is not int or horizon <= 0
+            or type(substeps) is not int or substeps <= 0
+            or type(total_limit) is not int
+            or total_limit != horizon * substeps + bootstrap_limit):
+        raise ValueError('F06 Isaac run-plan native-step bounds are malformed')
+    if (not isinstance(bootstrap, dict)
+            or bootstrap.get('schema_version') != 'isaac-public-physics-bootstrap-v1'):
+        raise ValueError('F06 v3 H5 omits the public Isaac bootstrap counter receipt')
+    before, after, steps = (
+        bootstrap.get('step_index_before'), bootstrap.get('step_index_after'),
+        bootstrap.get('physics_steps'),
+    )
+    dt, elapsed = bootstrap.get('physics_dt_s'), bootstrap.get('physics_time_s')
+    if (any(type(value) is not int or value < 0 for value in (before, after, steps))
+            or after - before != steps
+            or type(dt) not in (int, float) or not math.isfinite(float(dt))
+            or type(elapsed) not in (int, float) or not math.isfinite(float(elapsed))
+            or float(dt) != float(row['physics_dt_s'])
+            or steps > bootstrap_limit
+            or not math.isclose(float(elapsed), steps * float(dt), rel_tol=0.0, abs_tol=1e-8)):
+        raise ValueError('F06 public Isaac bootstrap counters/time exceed or differ from the run plan')
+    return steps
+
+
+def _validate_f06_planning_action_count(planning_count, *, solution_failed):
+    """A reported pre-plan Expert failure is a task outcome, not an H5 fault."""
+    if type(planning_count) is not int or planning_count < 0:
+        raise ValueError('F06 planned-action count must be a nonnegative integer')
+    if planning_count == 0 and solution_failed is not True:
+        raise ValueError('F06 episode contains no non-hold Core-planned action and no reported solution failure')
+    return planning_count
+
+
 def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
     """Validate the existing generic-v3 Position recorder and planned-action trace."""
     import h5py
@@ -87,22 +141,10 @@ def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
     if (not profile.get('source_closure_digest')
             or profile.get('delivery_manifest_sha256') != row.get('source_delivery_manifest_sha256')):
         raise ValueError('F06 v3 H5 omits its pinned source closure or delivery manifest identity')
-    bootstrap = profile.get('native_public_bootstrap_receipt')
-    if not isinstance(bootstrap, dict) or bootstrap.get('schema_version') != 'isaac-public-physics-bootstrap-v1':
-        raise ValueError('F06 v3 H5 omits the public Isaac bootstrap counter receipt')
-    before, after, bootstrap_steps = (
-        bootstrap.get('step_index_before'), bootstrap.get('step_index_after'),
-        bootstrap.get('physics_steps'),
+    run_plan = json.loads((output / 'run_plan.json').read_text())
+    bootstrap_steps = _validate_f06_bootstrap_receipt(
+        profile.get('native_public_bootstrap_receipt'), run_plan, row=row,
     )
-    dt = bootstrap.get('physics_dt_s')
-    bootstrap_time = bootstrap.get('physics_time_s')
-    if (any(type(value) is not int or value < 0 for value in (before, after, bootstrap_steps))
-            or after - before != bootstrap_steps or type(dt) not in (int, float)
-            or type(bootstrap_time) not in (int, float)
-            or not np.isfinite((dt, bootstrap_time)).all()
-            or dt != row['physics_dt_s'] or bootstrap_steps > 10
-            or not np.isclose(bootstrap_time, bootstrap_steps * dt, rtol=0.0, atol=1e-8)):
-        raise ValueError('F06 public Isaac bootstrap counters/time exceed or differ from the run plan')
     shapes = {}
     with h5py.File(path, 'r') as handle:
         def inspect_dataset(name, value):
@@ -117,6 +159,9 @@ def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
     trace_rows = trace.get('rows', [])
     if len(trace_rows) != transition_count or trace.get('completed_transitions') != transition_count:
         raise ValueError('F06 action trace does not cover every finalized Position transition')
+    if (bootstrap_steps + transition_count * row['control_substeps']
+            > run_plan['physics_steps_upper_bound']):
+        raise ValueError('F06 observed native steps exceed the frozen run-plan upper bound')
     expected_control_dt = row['physics_dt_s'] * row['control_substeps']
     if any(not np.isclose(
             float(item.get('simulation_time_after_s')) - float(item.get('simulation_time_before_s')),
@@ -126,9 +171,9 @@ def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
     controls = generic['structured_controls']
     planned_rows = [item for item in trace_rows
                     if item.get('planned_action') is True and item.get('readiness_hold') is not True]
-    planning_count = len(planned_rows)
-    if planning_count <= 0:
-        raise ValueError('F06 episode contains no non-hold Core-planned action')
+    planning_count = _validate_f06_planning_action_count(
+        len(planned_rows), solution_failed=row.get('solution_failed'),
+    )
     for index, (control, trace_row) in enumerate(zip(controls, trace_rows, strict=True)):
         if control is None:
             raise ValueError(f'F06 H5 transition {index} has no structured control record')
@@ -492,7 +537,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                                   'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))})
     runtime_valid = (
         row['construction_succeeded'] and row['reset_succeeded']
-        and row['executed_transition_count'] > 0 and row['planning_action_count'] > 0
+        and row['executed_transition_count'] > 0
         and row['execution_fault'] is None and not row['errors']
         and row['recording'] is not None and row['close_succeeded']
     )

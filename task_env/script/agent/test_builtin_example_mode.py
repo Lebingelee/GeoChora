@@ -237,6 +237,64 @@ def test_worker_counts_core_planned_actions_from_loaded_canonical_trajectory():
     assert _planned_action_count(SimpleNamespace(transitions=())) == 0
 
 
+def test_isaac_bootstrap_receipt_uses_observed_finite_run_plan_bound():
+    from builtin_example_worker import _validate_f06_bootstrap_receipt
+    from builtin_example_validation import ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND
+
+    row = {
+        'seed': 31, 'source_revision': 'a' * 40,
+        'horizon_control_ticks': 1000, 'control_substeps': 5,
+        'physics_dt_s': 0.002,
+    }
+    plan = {
+        'schema_version': 'harness-builtin-pickcube-example-run-plan-v1',
+        'provider': 'isaacsim', 'seed': 31, 'core_commit': 'a' * 40,
+        'horizon_control_ticks': 1000, 'control_substeps': 5,
+        'physics_dt_s': 0.002, 'bootstrap_physics_steps_upper_bound': 18,
+        'physics_steps_upper_bound': 5018,
+    }
+    receipt = {
+        'schema_version': 'isaac-public-physics-bootstrap-v1',
+        'step_index_before': 0, 'step_index_after': 18,
+        'physics_steps': 18, 'physics_dt_s': 0.002,
+        'physics_time_s': 0.036,
+    }
+
+    assert _validate_f06_bootstrap_receipt(receipt, plan, row=row) == 18
+    assert ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND == 18
+    overrun = dict(receipt, step_index_after=19, physics_steps=19, physics_time_s=0.038)
+    with pytest.raises(ValueError, match='exceed or differ from the run plan'):
+        _validate_f06_bootstrap_receipt(overrun, plan, row=row)
+    malformed_bound = dict(plan, physics_steps_upper_bound=5010)
+    with pytest.raises(ValueError, match='run-plan native-step bounds are malformed'):
+        _validate_f06_bootstrap_receipt(receipt, malformed_bound, row=row)
+
+
+def test_worker_reports_preplan_solution_failure_without_calling_it_h5_failure():
+    from builtin_example_worker import _validate_f06_planning_action_count
+
+    assert _validate_f06_planning_action_count(0, solution_failed=True) == 0
+    assert _validate_f06_planning_action_count(1, solution_failed=False) == 1
+    with pytest.raises(ValueError, match='no non-hold Core-planned action'):
+        _validate_f06_planning_action_count(0, solution_failed=False)
+
+
+def test_provider_matrix_requires_any_core_planned_action_before_passing_route():
+    from builtin_example_validation import _planned_action_route_evidence
+
+    rows = [
+        {'seed': 31, 'planning_action_count': 0},
+        {'seed': 32, 'planning_action_count': 48},
+        {'seed': 33, 'planning_action_count': 0},
+    ]
+    assert _planned_action_route_evidence(rows) == (48, [32])
+    assert _planned_action_route_evidence([
+        {'seed': 31, 'planning_action_count': 0},
+        {'seed': 32, 'planning_action_count': 0},
+        {'seed': 33, 'planning_action_count': 0},
+    ]) == (0, [])
+
+
 def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
     from builtin_example_worker import _install_action_trace
 

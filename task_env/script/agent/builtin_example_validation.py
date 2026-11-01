@@ -22,6 +22,9 @@ CPU_PYTHON = Path('/home/lly/miniconda3/envs/geochora/bin/python')
 ISAAC_PYTHON = CORE / 'workspace/environments/isaacsim-6.2.0/bin/python'
 MAX_WORKER_LOG_BYTES = 64 * 1024**2
 MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
+# Isaac 6.2's accepted F06 startup currently advances 18 public physics
+# substeps before the task reset. Keep that finite bootstrap inside each plan.
+ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 
 
 def _populate_isaac_core_site_overlay(core_site, overlay):
@@ -65,6 +68,20 @@ def _sha256(path):
 
 def _directory_bytes(path):
     return sum(item.stat().st_size for item in Path(path).rglob('*') if item.is_file())
+
+
+def _planned_action_route_evidence(rows):
+    seeds = sorted({
+        item.get('seed') for item in rows
+        if type(item.get('planning_action_count')) is int
+        and item['planning_action_count'] > 0
+    })
+    total = sum(
+        item['planning_action_count'] for item in rows
+        if type(item.get('planning_action_count')) is int
+        and item['planning_action_count'] > 0
+    )
+    return total, seeds
 
 
 def _mem_available_bytes():
@@ -202,9 +219,12 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         'horizon_control_ticks': spec.horizon_control_ticks,
         'physics_dt_s': spec.physics_dt_s, 'control_substeps': spec.control_substeps,
         'native_app_starts_upper_bound': 1 if provider == 'isaacsim' else 0,
-        'bootstrap_physics_steps_upper_bound': 10 if provider == 'isaacsim' else 0,
+        'bootstrap_physics_steps_upper_bound': (
+            ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND if provider == 'isaacsim' else 0
+        ),
         'physics_steps_upper_bound': (
-            spec.horizon_control_ticks * spec.control_substeps + 10
+            spec.horizon_control_ticks * spec.control_substeps
+            + ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND
             if provider == 'isaacsim' else spec.horizon_control_ticks * spec.control_substeps
         ),
         'watchdog_seconds': timeout_s,
@@ -437,6 +457,7 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             save_inputs / 'working_tree_scope.json', seed, run_dir, provider=spec.provider,
         )
         rows.append(row)
+        planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(rows)
         matrix = {
             'schema_version': 'harness-builtin-pickcube-example-matrix-v1',
             'updated_at': datetime.now(timezone.utc).isoformat(),
@@ -459,7 +480,15 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             'rows': rows,
             'runtime_valid_count': sum(item.get('runtime_valid') is True for item in rows),
             'task_solved_count': sum(item.get('task_outcome') == 'SOLVED' for item in rows),
-            'disposition': 'PASS' if len(rows) == 3 and all(item.get('runtime_valid') is True for item in rows)
+            'planned_action_count_total': planned_action_count_total,
+            'planned_action_seed_ids': planned_action_seed_ids,
+            'planned_action_route_gate': (
+                'PASS' if planned_action_count_total > 0 else 'MISSING_CORE_PLANNED_ACTION_EVIDENCE'
+            ),
+            'disposition': 'PASS' if (
+                len(rows) == 3 and all(item.get('runtime_valid') is True for item in rows)
+                and planned_action_count_total > 0
+            )
                            else 'PREFLIGHT' if only_seed is not None and all(item.get('runtime_valid') is True for item in rows)
                            else 'PARTIAL',
             'qualification': False,
