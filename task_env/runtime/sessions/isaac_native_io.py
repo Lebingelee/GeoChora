@@ -964,7 +964,11 @@ class IsaacSimNativeRuntimeIOV1:
                 'naturalFrequency': runtime_frequency,
                 'dampingRatio': runtime_damping_ratio,
             },
-            'solimp_native_mapping': 'live public PhysX mimic naturalFrequency/dampingRatio follow the MuJoCo 3.8.1 source reference coefficients',
+            'solimp_native_mapping': (
+                'public PhysX mimic frequency and damping use the corrected MuJoCo 3.8.1 '
+                'homogeneous single-constraint approximation; the (1-d(r))*a0 term, '
+                'effective mass, and interactions with other constraints are not represented'
+            ),
             'schema_authored_in_delivery': True,
             'runtime_stage_mutated': True,
             'runtime_property_api': 'Usd.Prim.GetAttribute(...).Set/Get',
@@ -1230,8 +1234,13 @@ class IsaacSimNativeRuntimeIOV1:
             float(control_value) * receipt.canonical_opening_range_m / receipt.actuator_control_range[1],
             float(scalar_force_limit_N),
         )
-        if expected_control != float(control_value) or expected_limit != float(scalar_force_limit_N):
-            raise ValueError('source tendon target differs from canonical opening/force mapping')
+        if (not math.isclose(expected_control, float(control_value), rel_tol=0.0, abs_tol=1e-12)
+                or expected_limit != float(scalar_force_limit_N)):
+            raise ValueError(
+                'source tendon target differs from canonical opening/force mapping: '
+                f'control={float(control_value)!r}, roundtrip={expected_control!r}, '
+                f'force_limit={float(scalar_force_limit_N)!r}, mapped_limit={expected_limit!r}'
+            )
         self._source_tendon_target = {
             'target_identity_sha256': target_identity_sha256,
             'receipt_identity_sha256': receipt_identity_sha256,

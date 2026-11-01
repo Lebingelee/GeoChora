@@ -12,6 +12,7 @@ import json
 import math
 import os
 from pathlib import Path
+import subprocess
 import sys
 import time
 import traceback
@@ -20,7 +21,7 @@ import traceback
 CORE = Path(__file__).resolve().parents[3]
 DELIVERY_MANIFEST = CORE / (
     "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
-    "f05_diagnostic04/window_001/isaac_usd_v3/delivery_manifest.json"
+    "f05_diagnostic04/window_002/isaac_usd_v4/delivery_manifest.json"
 )
 ISAAC_SITE = CORE / "workspace/environments/isaacsim-6.2.0/lib/python3.12/site-packages"
 CORE_SITE = Path("/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages")
@@ -127,7 +128,9 @@ def _public_view_state(input_v1, native_io, sample, *, finger_positions, finger_
     if len(roots) != 1:
         raise ValueError(f"DG04 expected one composed public articulation root, got {len(roots)}")
     articulation = Articulation(str(roots[0].GetPath()))
-    names = tuple(str(name) for name in articulation.get_dof_names())
+    # Isaac Sim 6.2 experimental Articulation exposes the public DOF inventory
+    # as ``dof_names`` (the Core adapter uses the same public property).
+    names = tuple(str(name) for name in articulation.dof_names)
     if names != tuple(metadata.native_dof_names):
         raise ValueError("independent public Articulation DOF names differ from Core Runtime-I/O metadata")
     semantic_by_native = {native: semantic for semantic, native in input_v1.runtime_source.joints.items()}
@@ -180,6 +183,39 @@ def _reset(input_v1, native_io, sample, targets):
     return receipt
 
 
+def _diagnostic_contact_reset_sample(sample):
+    """Clone the frozen task reset with a clearly labeled cube/support probe pose.
+
+    F05 support top is z=0.475 m and the source cube half-height is 0.03 m;
+    z=0.504 m gives a 1 mm overlap for a bounded raw-contact witness. The
+    source task reset remains untouched and is still used for force probes and
+    the later formal episodes.
+    """
+    from task_env.artifacts.contracts import PoseWorld
+    from task_env.artifacts.execution import ResetSample
+
+    cube_key = "free-cube/free_cube"
+    if set(sample.poses_world) != {cube_key}:
+        raise ValueError("DG04 contact diagnostic requires the exact single free-cube reset pose")
+    poses = dict(sample.poses_world)
+    source_pose = poses[cube_key]
+    poses[cube_key] = PoseWorld((1.0, 0.5, 0.504), source_pose.quaternion_wxyz)
+    probe = ResetSample.create(
+        schema_version=sample.schema_version,
+        task_artifact_hash=sample.task_artifact_hash,
+        sampler_id="f05-dg04-diagnostic-support-contact-probe",
+        sampler_version="window002-v1",
+        task_seed=sample.task_seed,
+        joint_position=dict(sample.joint_position),
+        poses_world=poses,
+        velocity_policy=sample.velocity_policy,
+        control_policy=sample.control_policy,
+        settle_steps=sample.settle_steps,
+    )
+    probe.validate()
+    return probe
+
+
 def _target(native_io, receipt, *, mode: str, case: str, control: float):
     from task_env.runtime.sessions.native_io import NativeSourceTendonWriteAckV1
 
@@ -213,6 +249,103 @@ def _advance_checked(native_io, validator, ack, expected_index: int):
         validator, application, ack, expected_index,
     )
     return application_receipt, application
+
+
+def _verify_paired_physics_response(mode_receipts: Mapping[str, Mapping[str, object]]) -> dict:
+    """Require source-dependent USD updates to change actual public state evolution.
+
+    Both runs use one composed model and consumer with matching public initial q/qd,
+    reset sample, source-tendon control, and 40-step horizon. Residual and relative
+    velocity are compared so common articulation motion cancels. The response
+    thresholds are 5e-6 m and 1e-4 m/s. For a 0.5 mm initial residual and 80 ms,
+    the independent unit-mass homogeneous oscillator predicts about 7e-6 m
+    residual separation and 1e-3 m/s relative-velocity separation. The position
+    threshold is 5x the public 1e-6 m readback tolerance; velocity is 100x its
+    readback tolerance. This is a diagnostic detector, not solver equivalence.
+    """
+    required = {"source_dynamic", "fixed_endpoint_ablation"}
+    if set(mode_receipts) != required:
+        raise ValueError("DG04 physical-response detector requires exactly both compliance modes")
+    dynamic = mode_receipts["source_dynamic"]
+    fixed = mode_receipts["fixed_endpoint_ablation"]
+    if (dynamic.get("rollout_steps") != 40 or fixed.get("rollout_steps") != 40
+            or dynamic.get("rollout_reset_sample_id") != fixed.get("rollout_reset_sample_id")
+            or dynamic.get("rollout_control_value") != fixed.get("rollout_control_value")):
+        raise ValueError("DG04 response pair differs in reset identity, control, or required 40-step horizon")
+
+    initial_position_delta = max(
+        abs(float(a) - float(b))
+        for a, b in zip(
+            dynamic["rollout_initial_positions_m"], fixed["rollout_initial_positions_m"], strict=True,
+        )
+    )
+    initial_velocity_delta = max(
+        abs(float(a) - float(b))
+        for a, b in zip(
+            dynamic["rollout_initial_velocities_m_s"],
+            fixed["rollout_initial_velocities_m_s"], strict=True,
+        )
+    )
+    if initial_position_delta > 1e-6 or initial_velocity_delta > 1e-6:
+        raise ValueError("DG04 response pair does not share the same public initial q/qd")
+
+    dynamic_trace, fixed_trace = dynamic.get("trace"), fixed.get("trace")
+    if (not isinstance(dynamic_trace, list) or not isinstance(fixed_trace, list)
+            or len(dynamic_trace) != 40 or len(fixed_trace) != 40):
+        raise ValueError("DG04 response pair lacks complete 40-step physical traces")
+    parameter_delta_hz = 0.0
+    position_delta_m = 0.0
+    relative_velocity_delta_m_s = 0.0
+    for left, right in zip(dynamic_trace, fixed_trace, strict=True):
+        if left.get("step_index") != right.get("step_index"):
+            raise ValueError("DG04 response pair step identities are not aligned")
+        if left.get("rollout_control_value") != right.get("rollout_control_value"):
+            raise ValueError("DG04 response pair source-tendon commands differ")
+        parameter_delta_hz = max(
+            parameter_delta_hz,
+            abs(float(left["public_frequency_readback_hz"])
+                - float(right["public_frequency_readback_hz"])),
+        )
+        left_q, right_q = left["post_step_finger_positions_m"], right["post_step_finger_positions_m"]
+        left_qd = left["post_step_finger_velocities_m_s"]
+        right_qd = right["post_step_finger_velocities_m_s"]
+        if any(len(values) != 2 for values in (left_q, right_q, left_qd, right_qd)):
+            raise ValueError("DG04 response pair must expose both public finger q/qd values")
+        position_delta_m = max(
+            position_delta_m,
+            abs((float(left_q[1]) - float(left_q[0]))
+                - (float(right_q[1]) - float(right_q[0]))),
+        )
+        relative_velocity_delta_m_s = max(
+            relative_velocity_delta_m_s,
+            abs((float(left_qd[1]) - float(left_qd[0]))
+                - (float(right_qd[1]) - float(right_qd[0]))),
+        )
+    if parameter_delta_hz < 0.1:
+        raise ValueError("DG04 source and endpoint USD frequency values did not materially separate")
+    if position_delta_m <= 5e-6 or relative_velocity_delta_m_s <= 1e-4:
+        raise ValueError(
+            "DG04 USD mimic properties changed but the actual public physics response did not pass "
+            "the frozen residual/velocity separation thresholds; observed "
+            f"max_public_frequency_delta_hz={parameter_delta_hz!r}, "
+            f"max_post_step_equality_residual_delta_m={position_delta_m!r}, "
+            f"max_post_step_relative_velocity_delta_m_s={relative_velocity_delta_m_s!r}; "
+            "required residual >5e-6 m and relative velocity >1e-4 m/s"
+        )
+    return {
+        "status": "PASS_PUBLIC_PHYSICS_RESPONSE_CHANGES_WITH_SOURCE_MAPPING",
+        "same_reset_and_control": True,
+        "same_initial_public_q_qd": True,
+        "steps_per_mode": 40,
+        "max_public_frequency_delta_hz": parameter_delta_hz,
+        "max_post_step_equality_residual_delta_m": position_delta_m,
+        "max_post_step_relative_velocity_delta_m_s": relative_velocity_delta_m_s,
+        "min_physical_position_delta_m": 5e-6,
+        "min_physical_relative_velocity_delta_m_s": 1e-4,
+        "public_state_readback_abs_tolerance": 1e-6,
+        "threshold_basis": "5x position and 100x velocity public readback tolerance; below independent 0.5 mm/80 ms homogeneous oscillator estimate",
+        "counterfactual": "changed public mimic frequency with fixed endpoint, same model/consumer/input",
+    }
 
 
 def run(mode: str, steps: int, output: Path, progress_path: Path,
@@ -394,7 +527,10 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
             force_cases.append({"case": case, "application": dict(application)})
 
         paired = mode == "paired_dynamic_and_ablation"
+        if paired and steps != 40:
+            raise ValueError("DG04 source-consumer response gate requires the frozen 40 steps per mode")
         compliance_modes = ("source_dynamic", "fixed_endpoint_ablation") if paired else (mode,)
+        rollout_sample = _diagnostic_contact_reset_sample(sample) if paired else sample
         mode_receipts = {}
         combined_trace = []
         for active_mode in compliance_modes:
@@ -403,20 +539,10 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                 # endpoint, in this same App, model, public consumer and rollout.
                 IsaacSourceEqualityComplianceV1.natural_frequency_hz = fixed_frequency_method
                 IsaacSourceEqualityComplianceV1.damping_ratio_for_residual = fixed_damping_method
-            rollout_sample = sample
-            if mode == "paired_dynamic_and_ablation" and steps <= 2:
-                from task_env.artifacts.execution import ResetSample
-
-                sample_mapping = sample.to_mapping()
-                sample_mapping.pop("sample_id")
-                sample_mapping["poses_world"]["free-cube/free_cube"]["position"] = [
-                    1.0, 0.5, 0.504,
-                ]
-                rollout_sample = ResetSample.create(**sample_mapping)
             _reset(input_v1, native_io, rollout_sample, targets)
             rollout_fingers = (
                 {"finger_joint1": 0.024, "finger_joint2": 0.0245}
-                if mode == "paired_dynamic_and_ablation" and steps <= 2
+                if paired
                 else {"finger_joint1": 0.024, "finger_joint2": 0.040}
             )
             _articulation, initial_readback = _public_view_state(
@@ -441,6 +567,10 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                     float(state.joint_position["panda-main/finger_joint1"]),
                     float(state.joint_position["panda-main/finger_joint2"]),
                 )
+                post_qd = (
+                    float(state.joint_velocity["panda-main/finger_joint1"]),
+                    float(state.joint_velocity["panda-main/finger_joint2"]),
+                )
                 post_residual = post_q[1] - post_q[0]
                 witness = application["public_contact_witness"]
                 if witness["contact_present"]:
@@ -449,6 +579,7 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                     "compliance_mode": active_mode,
                     "step_index": index,
                     "simulation_time_s": float(step_receipt.simulation_time_s),
+                    "rollout_control_value": 127.5,
                     "pre_step_finger_positions_m": application["finger_positions_m"],
                     "pre_step_finger_velocities_m_s": application["finger_velocities_m_s"],
                     "source_equality_residual_m": residual,
@@ -458,6 +589,7 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                     "public_frequency_readback_hz": float(application["public_mimic_frequency_readback_hz"]),
                     "public_damping_ratio_readback": float(application["public_mimic_damping_ratio_readback"]),
                     "post_step_finger_positions_m": post_q,
+                    "post_step_finger_velocities_m_s": post_qd,
                     "post_step_equality_residual_m": post_residual,
                     "tendon_length_m": float(application["tendon_length_m"]),
                     "tendon_rate_m_s": float(application["tendon_rate_m_s"]),
@@ -472,7 +604,7 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
             if (abs(float(initial_readback.joint_position["panda-main/finger_joint2"])
                     - float(initial_readback.joint_position["panda-main/finger_joint1"])
                     - expected_start_residual) > 1e-6):
-                raise ValueError(f"DG04 {active_mode} rollout did not start at the frozen 16 mm residual")
+                raise ValueError(f"DG04 {active_mode} rollout did not start at the frozen residual")
             if min(abs(row["source_equality_residual_m"]) for row in trace) >= 0.001:
                 raise ValueError(f"DG04 {active_mode} rollout did not exercise the solimp width")
             if not contact_positive_steps:
@@ -496,8 +628,15 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                 raise ValueError("DG04 fixed endpoint ablation did not diverge from the source solimp curve")
             mode_receipts[active_mode] = {
                 "rollout_steps": len(trace),
+                "rollout_reset_sample_id": rollout_sample.sample_id,
+                "rollout_control_value": 127.5,
                 "rollout_initial_positions_m": [
-                    rollout_fingers["finger_joint1"], rollout_fingers["finger_joint2"],
+                    float(initial_readback.joint_position["panda-main/finger_joint1"]),
+                    float(initial_readback.joint_position["panda-main/finger_joint2"]),
+                ],
+                "rollout_initial_velocities_m_s": [
+                    float(initial_readback.joint_velocity["panda-main/finger_joint1"]),
+                    float(initial_readback.joint_velocity["panda-main/finger_joint2"]),
                 ],
                 "rollout_initial_residual_m": expected_start_residual,
                 "rollout_final_residual_m": trace[-1]["post_step_equality_residual_m"],
@@ -506,6 +645,8 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
                 "trace": trace,
             }
             combined_trace.extend(trace)
+
+        physical_response = _verify_paired_physics_response(mode_receipts) if paired else None
 
         # Do not leave process-global methods patched during ordinary teardown.
         IsaacSourceEqualityComplianceV1.natural_frequency_hz = original_frequency
@@ -521,10 +662,13 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
         return {
             "schema_version": "f05-dg04-native-core-adapter-probe-v1",
             "status": "PASS_DIAGNOSTIC_ONLY",
+            "package_id": "F05_DIAGNOSTIC04_WINDOW002_REPAIR_SOURCE_ORACLE_AND_LIVE_CONSUMER",
+            "input_head": subprocess.check_output(
+                ["git", "-C", str(CORE), "rev-parse", "HEAD"], text=True,
+            ).strip(),
             "compliance_mode": mode,
             "compliance_modes": mode_receipts,
-            "package_id": "F05_DIAGNOSTIC04_WINDOW001_DG03_REPAIR_AND_F05_CLOSURE",
-            "input_head": "9af66009cd0634aec583f96db51ef88e13a824bc",
+            "physical_response_detection": physical_response,
             "artifact_identity_sha256": input_v1.artifact.identity_hash,
             "source_closure_sha256": input_v1.runtime_source.source_closure_digest,
             "delivery_sha256": input_v1.runtime_source.scene_source.loaded_delivery.delivery_sha256,
@@ -550,9 +694,8 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
             ],
             "rollout_initial_residual_m": expected_start_residual,
             "contact_probe_reset_kind": (
-                "diagnostic Core ResetSample places the exact source cube at 1 mm support overlap"
-                if mode == "paired_dynamic_and_ablation" and steps <= 2
-                else "frozen candidate reset sample"
+                "diagnostic ResetSample clone; task/joints preserved; source cube moved to exact 1 mm support overlap"
+                if paired else "frozen candidate reset sample"
             ),
             "contact_probe_reset_sample_id": rollout_sample.sample_id,
             "contact_probe_cube_position_m": list(rollout_sample.poses_world[

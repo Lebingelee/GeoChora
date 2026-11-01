@@ -1011,14 +1011,14 @@ class IsaacSourceEqualityComplianceV1:
     source_solref: tuple[float, float]
     source_solimp_raw: tuple[float, float, float]
     source_solimp_effective: tuple[float, float, float, float, float]
-    mapping_algorithm: str = 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3'
+    mapping_algorithm: str = 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous'
 
     def __post_init__(self):
         if self.schema_version != 'isaac-source-equality-compliance-v1':
             raise ValueError('unsupported Isaac source equality-compliance schema')
         if (self.reference_joint, self.follower_joint) != ('finger_joint1', 'finger_joint2'):
             raise ValueError('DG03 compliance must bind the exact source finger equality pair')
-        if self.mapping_algorithm != 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3':
+        if self.mapping_algorithm != 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous':
             raise ValueError('DG03 compliance mapping must identify the pinned MuJoCo algorithm')
         if (tuple(self.source_solref) != (0.005, 1.0)
                 or tuple(self.source_solimp_raw) != (0.95, 0.99, 0.001)
@@ -1045,21 +1045,24 @@ class IsaacSourceEqualityComplianceV1:
         return d0 + y * (dwidth - d0)
 
     def natural_frequency_hz(self, residual_m: float) -> float:
-        """Map MuJoCo's impedance-scaled stiffness to a PhysX spring frequency."""
+        """Map the source homogeneous equality term to a PhysX spring frequency.
+
+        MuJoCo 3.8.1 uses aref=-B*v-K0*d(r)*r and blends it as
+        a1=(1-d(r))*a0+d(r)*aref.  Under the declared single-constraint,
+        a0=0 approximation, the effective stiffness is d(r)^2*K0.  This
+        does not represent the unconstrained-acceleration blend, effective
+        mass, or interactions with other constraints.
+        """
         d = self.impedance(residual_m)
         _d0, dwidth, _width, _midpoint, _power = self.source_solimp_effective
         timeconst, dampratio = self.source_solref
-        stiffness = d / (dwidth * dwidth * timeconst * timeconst * dampratio * dampratio)
-        return math.sqrt(stiffness) / (2.0 * math.pi)
+        omega = d / (dwidth * timeconst * dampratio)
+        return omega / (2.0 * math.pi)
 
     def damping_ratio_for_residual(self, residual_m: float) -> float:
-        """Map impedance-scaled MuJoCo B/K to the PhysX spring damping ratio."""
-        impedance = self.impedance(residual_m)
-        _d0, dwidth, _width, _midpoint, _power = self.source_solimp_effective
-        timeconst, dampratio = self.source_solref
-        stiffness = impedance / (dwidth * dwidth * timeconst * timeconst * dampratio * dampratio)
-        damping = impedance * 2.0 / (dwidth * timeconst)
-        return damping / (2.0 * math.sqrt(stiffness))
+        """Return the source homogeneous damping ratio, after validating residual."""
+        self.impedance(residual_m)
+        return self.source_solref[1]
 
     def to_mapping(self) -> dict[str, object]:
         return {
@@ -1071,8 +1074,17 @@ class IsaacSourceEqualityComplianceV1:
             'source_solimp_effective': list(self.source_solimp_effective),
             'mapping_algorithm': self.mapping_algorithm,
             'physx_natural_frequency_rule':
-                'sqrt(d(abs(follower_q-reference_q)))/(2*pi*dwidth*timeconst*dampratio)',
-            'physx_damping_ratio_rule': 'solref_dampratio*sqrt(d(residual))',
+                'd(abs(follower_q-reference_q))/(2*pi*dwidth*timeconst*dampratio)',
+            'physx_damping_ratio_rule': 'solref_dampratio',
+            'source_reference_acceleration': 'aref=-B*v-K0*d(r)*r; a1=(1-d(r))*a0+d(r)*aref',
+            'homogeneous_single_constraint_coefficients': {
+                'assumption': 'a0=0; one equality constraint; no effective-mass or other-constraint interaction',
+                'omega_squared': 'd(r)^2*K0',
+                'effective_damping': 'd(r)*B',
+                'natural_frequency_hz': 'd(r)/(2*pi*dwidth*timeconst*dampratio)',
+                'damping_ratio': 'dampratio',
+                'excluded_terms': '(1-d(r))*a0; effective mass; coupling to other constraints',
+            },
         }
 
 
@@ -1100,8 +1112,8 @@ class IsaacSourceTendonDriveReceiptV1:
     mimic_reference_joint: str = 'finger_joint1'
     mimic_gearing: float = 1.0
     mimic_offset_m: float = 0.0
-    mimic_natural_frequency_hz: float = 31.991347258556544
-    mimic_damping_ratio: float = 0.99498743710662
+    mimic_natural_frequency_hz: float = 31.830988618379067
+    mimic_damping_ratio: float = 1.0
     mimic_source_solref: tuple[float, float] = (0.005, 1.0)
     mimic_source_solimp: tuple[float, float, float] = (0.95, 0.99, 0.001)
     tendon_name: str = 'split'
@@ -1178,7 +1190,7 @@ class IsaacSourceTendonDriveReceiptV1:
                 float(self.actuator_length_bias), float(self.actuator_rate_bias),
                 tuple(self.actuator_control_range), tuple(self.actuator_force_range),
                 float(self.canonical_opening_range_m)) != (
-                'finger_joint2', 'finger_joint1', 1.0, 0.0, math.sqrt(0.99), (0.005, 1.0),
+                'finger_joint2', 'finger_joint1', 1.0, 0.0, 1.0, (0.005, 1.0),
                 (0.95, 0.99, 0.001),
                 'split', ('panda-main/finger_joint1', 'panda-main/finger_joint2'),
                 ('finger_joint1', 'finger_joint2'), (0.5, 0.5), 'actuator8',
@@ -1187,10 +1199,8 @@ class IsaacSourceTendonDriveReceiptV1:
         if (type(self.mimic_natural_frequency_hz) not in (int, float)
                 or isinstance(self.mimic_natural_frequency_hz, bool)
                 or not math.isclose(float(self.mimic_natural_frequency_hz),
-                                    math.sqrt(1.0 / (self.mimic_source_solimp[1]
-                                                     * self.mimic_source_solref[0] ** 2
-                                                     * self.mimic_source_solref[1] ** 2))
-                                    / (2.0 * math.pi),
+                                    1.0 / (2.0 * math.pi * self.mimic_source_solref[0]
+                                           * self.mimic_source_solref[1]),
                                     rel_tol=0.0, abs_tol=1e-12)):
             raise ValueError('DG03 mimic frequency must be derived from the exact MJCF solref/solimp')
         if any(names.index(name) in {row.native_dof_index for row in drives}
@@ -1459,10 +1469,8 @@ def compile_isaac_source_tendon_receipt_v1(
         int(source.task_artifact.timebase.control_substeps), writer_id,
         tuple(native_metadata.native_dof_names), native_metadata.native_position_limits,
         tuple(drives),
-        mimic_natural_frequency_hz=math.sqrt(
-            1.0 / (solimp[1] * solref[0] * solref[0] * solref[1] * solref[1])
-        ) / (2.0 * math.pi),
-        mimic_damping_ratio=solref[1] * math.sqrt(solimp[1]), mimic_source_solref=solref,
+        mimic_natural_frequency_hz=1.0 / (2.0 * math.pi * solref[0] * solref[1]),
+        mimic_damping_ratio=solref[1], mimic_source_solref=solref,
         mimic_source_solimp=solimp,
         equality_compliance=IsaacSourceEqualityComplianceV1(
             'isaac-source-equality-compliance-v1', 'finger_joint1', 'finger_joint2',

@@ -5,8 +5,10 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
+import struct
 
 import pytest
 
@@ -15,7 +17,7 @@ from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
 
 DELIVERY_MANIFEST = (
     "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
-    "f05_diagnostic04/window_001/isaac_usd_v3/delivery_manifest.json"
+    "f05_diagnostic04/window_002/isaac_usd_v4/delivery_manifest.json"
 )
 
 
@@ -40,6 +42,24 @@ def test_dg03_public_usd_float32_readback_matches_frozen_scene_values():
     )
     assert not _numeric_value_matches(9.810002, 9.81, abs_tol=1e-6)
     assert not _numeric_tuple_matches((1.0, 0.5, 0.900002), (1.0, 0.5, 0.9), abs_tol=1e-6)
+
+
+def test_dg03_native_consumer_accepts_only_declared_public_float_readback_error():
+    from task_env.runtime.sessions.native_io import _native_public_float_readback_matches
+
+    source_frequency = 31.830988618379067
+    usd_float_frequency = struct.unpack("f", struct.pack("f", source_frequency))[0]
+    assert abs(usd_float_frequency - source_frequency) < 1e-6
+    assert not math.isclose(usd_float_frequency, source_frequency, rel_tol=1e-10, abs_tol=1e-10)
+    assert _native_public_float_readback_matches(
+        usd_float_frequency, source_frequency, abs_tol=1e-6,
+    )
+    assert not _native_public_float_readback_matches(
+        usd_float_frequency + 2e-6, source_frequency, abs_tol=1e-6,
+    )
+    assert not _native_public_float_readback_matches(
+        True, source_frequency, abs_tol=1e-6,
+    )
 
 
 def test_dg03_scene_filter_guard_preserves_robot_source_filters():
@@ -130,6 +150,8 @@ def test_dg03_native_tendon_writer_rejects_noncanonical_identity_and_boolean_sca
 
         @staticmethod
         def tendon_control(opening_m, force_limit_N):
+            if not 0.0 <= opening_m <= 0.08:
+                raise ValueError("opening outside the source canonical range")
             return (255.0 * opening_m / 0.08, force_limit_N)
 
     native_io = object.__new__(IsaacSimNativeRuntimeIOV1)
@@ -149,6 +171,16 @@ def test_dg03_native_tendon_writer_rejects_noncanonical_identity_and_boolean_sca
         with pytest.raises((TypeError, ValueError)):
             native_io.write_source_tendon_target(*args)
         assert native_io._source_tendon_target is None
+
+    midpoint_ack = native_io.write_source_tendon_target(
+        digest, digest, "actuator8", 127.5, 100.0,
+    )
+    assert midpoint_ack.control_value == 127.5
+    assert native_io._source_tendon_target["control_value"] == 127.5
+    with pytest.raises(ValueError):
+        native_io.write_source_tendon_target(
+            digest, digest, "actuator8", 255.0 + 1e-9, 100.0,
+        )
 
     malformed_ack = NativeSourceTendonWriteAckV1(
         "native-source-tendon-write-ack-v1", "", digest,
@@ -539,37 +571,50 @@ def test_f05_dg03_selected_reference_core_s1_two_episodes(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("residual", "expected_impedance"),
+    ("residual", "expected_impedance", "expected_frequency_hz"),
     [
-        (0.0, 0.95),
-        (0.00025, 0.955),
-        (0.0005, 0.97),
-        (0.00075, 0.985),
-        (0.001, 0.99),
-        (-0.0005, 0.97),
+        (0.0, 0.95, 30.544888068141525),
+        (0.00025, 0.955, 30.70565063692122),
+        (0.0005, 0.97, 31.187938343260296),
+        (0.00075, 0.985, 31.67022604959937),
+        (0.001, 0.99, 31.830988618379067),
+        (-0.0005, 0.97, 31.187938343260296),
+        (0.016, 0.99, 31.830988618379067),
     ],
 )
-def test_f05_dg03_mujoco_solimp_mapping_is_residual_sensitive(residual, expected_impedance):
-    """The source compliance oracle follows the pinned MuJoCo 3.8.1 sigmoid."""
+def test_f05_dg03_mujoco_solimp_mapping_matches_independent_homogeneous_oracle(
+    residual, expected_impedance, expected_frequency_hz,
+):
+    """Pinned-source equation algebra independently oracles the homogeneous map.
+
+    MuJoCo 3.8.1 uses aref=-B*v-K0*d(r)*r followed by
+    a1=(1-d(r))*a0+d(r)*aref. With a0=0 and one isolated equality,
+    k_eff=d(r)^2*K0 and b_eff=d(r)*B. The fixed numeric frequency points
+    below were evaluated from that derivation, not from the production helper.
+    """
     from task_env.runtime.sessions.leaf_control import IsaacSourceEqualityComplianceV1
 
     mapping = IsaacSourceEqualityComplianceV1(
         "isaac-source-equality-compliance-v1", "finger_joint1", "finger_joint2",
         (0.005, 1.0), (0.95, 0.99, 0.001), (0.95, 0.99, 0.001, 0.5, 2.0),
-        'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3',
+        'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous',
     )
     assert mapping.impedance(residual) == pytest.approx(expected_impedance, abs=1e-12)
-    expected_frequency = (
-        expected_impedance / (0.99 * 0.99 * 0.005 * 0.005)
-    ) ** 0.5 / (2.0 * 3.141592653589793)
-    assert mapping.natural_frequency_hz(residual) == pytest.approx(expected_frequency, abs=1e-12)
-    assert mapping.damping_ratio_for_residual(residual) == pytest.approx(
-        expected_impedance ** 0.5, abs=1e-12,
-    )
-    if residual == 0.0:
-        assert mapping.natural_frequency_hz(residual) != pytest.approx(
-            1.0 / (2.0 * 3.141592653589793 * 0.005), abs=1e-6,
-        )
+    tau, zeta, dwidth = 0.005, 1.0, 0.99
+    source_b = 2.0 / (dwidth * tau)
+    source_k0 = 1.0 / (dwidth**2 * tau**2 * zeta**2)
+    effective_k = expected_impedance**2 * source_k0
+    effective_b = expected_impedance * source_b
+    independent_frequency = effective_k**0.5 / (2.0 * 3.141592653589793)
+    independent_damping_ratio = effective_b / (2.0 * effective_k**0.5)
+    assert independent_frequency == pytest.approx(expected_frequency_hz, abs=1e-12)
+    assert independent_damping_ratio == pytest.approx(1.0, abs=1e-12)
+    assert mapping.natural_frequency_hz(residual) == pytest.approx(expected_frequency_hz, abs=1e-12)
+    assert mapping.damping_ratio_for_residual(residual) == pytest.approx(1.0, abs=1e-12)
+    record = mapping.to_mapping()
+    assert record["mapping_algorithm"] == 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous'
+    assert record["source_reference_acceleration"] == "aref=-B*v-K0*d(r)*r; a1=(1-d(r))*a0+d(r)*aref"
+    assert "(1-d(r))*a0" in record["homogeneous_single_constraint_coefficients"]["excluded_terms"]
 
 
 def test_f05_dg03_native_route_fails_closed_before_isaac_app(monkeypatch):

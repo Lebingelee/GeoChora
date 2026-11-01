@@ -31,6 +31,16 @@ def _finite_tuple(value, width: int, label: str) -> tuple[float, ...]:
     return tuple(float(item) for item in value)
 
 
+def _native_public_float_readback_matches(
+    actual: object, expected: float, *, abs_tol: float, rel_tol: float = 0.0,
+) -> bool:
+    """Compare public float-backed API readbacks at their declared precision."""
+    if (type(actual) not in (int, float) or isinstance(actual, bool)
+            or not math.isfinite(float(actual))):
+        return False
+    return math.isclose(float(actual), float(expected), rel_tol=rel_tol, abs_tol=abs_tol)
+
+
 def _is_sha256_identity(value: object) -> bool:
     return (type(value) is str and len(value) == 64
             and all(char in '0123456789abcdef' for char in value))
@@ -674,28 +684,65 @@ class UsdCoreRuntimeSession(_SessionValues):
         compliance = receipt.equality_compliance
         if type(compliance) is not IsaacSourceEqualityComplianceV1:
             raise TypeError('DG03 receipt lacks the exact source-bound equality compliance mapping')
+        if compliance.mapping_algorithm != 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v4-homogeneous':
+            raise ValueError('DG03 typed tendon application requires the corrected v4 homogeneous source mapping')
         expected_impedance = compliance.impedance(equality_residual)
         expected_frequency = compliance.natural_frequency_hz(equality_residual)
         expected_damping_ratio = compliance.damping_ratio_for_residual(equality_residual)
         def agrees(actual, expected):
-            return math.isclose(float(actual), float(expected), rel_tol=1e-10, abs_tol=1e-10)
+            return _native_public_float_readback_matches(
+                actual, expected, rel_tol=1e-10, abs_tol=1e-10,
+            )
 
-        if (not agrees(application.get('tendon_length_m'), expected_length)
-                or not agrees(application.get('tendon_rate_m_s'), expected_rate)
-                or not agrees(application.get('unclipped_scalar_force_N'), expected_raw)
-                or not agrees(application.get('scalar_force_N'), expected_force)
-                or any(not agrees(actual, expected)
-                       for actual, expected in zip(efforts, expected_efforts, strict=True))
-                or any(not agrees(actual, expected)
-                       for actual, expected in zip(applied_efforts, expected_efforts, strict=True))
-                or not agrees(application.get('source_equality_residual_m'), equality_residual)
-                or not agrees(application.get('source_equality_impedance'), expected_impedance)
-                or not agrees(application.get('source_mimic_natural_frequency_hz'), expected_frequency)
-                or not agrees(application.get('public_mimic_frequency_readback_hz'), expected_frequency)
-                or not agrees(application.get('source_mimic_damping_ratio'), expected_damping_ratio)
-                or not agrees(application.get('public_mimic_damping_ratio_readback'),
-                              expected_damping_ratio)):
-            raise ValueError('DG03 substep tendon length/rate, source force law, clamp or J-transpose effort differs')
+        source_checks = {
+            'tendon_length_m': (application.get('tendon_length_m'), expected_length),
+            'tendon_rate_m_s': (application.get('tendon_rate_m_s'), expected_rate),
+            'unclipped_scalar_force_N': (application.get('unclipped_scalar_force_N'), expected_raw),
+            'scalar_force_N': (application.get('scalar_force_N'), expected_force),
+            'source_equality_residual_m': (
+                application.get('source_equality_residual_m'), equality_residual,
+            ),
+            'source_equality_impedance': (
+                application.get('source_equality_impedance'), expected_impedance,
+            ),
+            'source_mimic_natural_frequency_hz': (
+                application.get('source_mimic_natural_frequency_hz'), expected_frequency,
+            ),
+            'source_mimic_damping_ratio': (
+                application.get('source_mimic_damping_ratio'), expected_damping_ratio,
+            ),
+        }
+        mismatches = {
+            name: {'actual': actual, 'expected': expected}
+            for name, (actual, expected) in source_checks.items()
+            if not agrees(actual, expected)
+        }
+        for index, (actual, expected) in enumerate(zip(efforts, expected_efforts, strict=True)):
+            if not agrees(actual, expected):
+                mismatches[f'dof_efforts_N[{index}]'] = {'actual': actual, 'expected': expected}
+        for index, (actual, expected) in enumerate(zip(applied_efforts, expected_efforts, strict=True)):
+            # Articulation tensor readback is float-backed; match the producer's public
+            # getter tolerance while keeping source-side J^T arithmetic at 1e-10.
+            if not _native_public_float_readback_matches(
+                actual, expected, rel_tol=1e-7, abs_tol=1e-7,
+            ):
+                mismatches[f'public_applied_efforts_N[{index}]'] = {
+                    'actual': actual, 'expected': expected,
+                }
+        for name, actual, expected in (
+            ('public_mimic_frequency_readback_hz',
+             application.get('public_mimic_frequency_readback_hz'), expected_frequency),
+            ('public_mimic_damping_ratio_readback',
+             application.get('public_mimic_damping_ratio_readback'), expected_damping_ratio),
+        ):
+            # PhysX mimic attrs are USD `custom float` values, whose public readback
+            # uses float32 precision. Match the native writer's existing 1e-6 check.
+            if not _native_public_float_readback_matches(
+                actual, expected, rel_tol=0.0, abs_tol=1e-6,
+            ):
+                mismatches[name] = {'actual': actual, 'expected': expected}
+        if mismatches:
+            raise ValueError(f'DG03 source tendon application differs from source/API tolerances: {mismatches!r}')
         expected_effort_api = (
             'Articulation.set_dof_efforts'
             if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
