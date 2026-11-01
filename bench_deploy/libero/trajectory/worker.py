@@ -868,24 +868,9 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     """Run one task-owned Solution through the same SelectedReferenceEnv."""
     solution = solution_factory(output_dir)
     solution_schema = getattr(solution, "solution_schema_version", None)
-    if solution_schema == "libero-bowl-to-plate-solution-v4":
-        version_suffix = "v4"
-    elif solution_schema == "libero-bowl-to-plate-solution-v5":
-        version_suffix = "v5"
-    elif solution_schema == "libero-bowl-to-plate-solution-v6":
-        version_suffix = "v6"
-    elif solution_schema == "libero-bowl-to-plate-solution-v7":
-        version_suffix = "v7"
-    elif solution_schema == "libero-bowl-to-plate-solution-v8":
-        version_suffix = "v8"
-    elif solution_schema == "libero-bowl-to-plate-solution-v3":
-        version_suffix = "v3"
-    elif solution_schema == "libero-bowl-to-plate-solution-v2":
-        version_suffix = "v2"
-    elif solution_schema == "libero-bowl-to-plate-solution-v1":
-        version_suffix = "v1"
-    else:
+    if solution_schema != "libero-bowl-to-plate-solution-v8":
         raise ValueError("task Solution factory returned an unsupported frozen schema version")
+    version_suffix = "v8"
     if type(getattr(solution, "identity", None)) is not str or len(solution.identity) != 64:
         raise TypeError("task Solution factory must return a versioned 64-hex identity")
     reset_observation, reset_info = env.reset_for_solution(

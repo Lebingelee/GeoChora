@@ -35,10 +35,6 @@ from bench_deploy.libero.controllers.osc import (
 from bench_deploy.libero.artifacts.contracts import TASK_1
 
 
-SOLUTION_SCHEMA = "libero-bowl-to-plate-solution-v1"
-SOLUTION_SCHEMA_V2 = "libero-bowl-to-plate-solution-v2"
-SOLUTION_SCHEMA_V3 = "libero-bowl-to-plate-solution-v3"
-SOLUTION_SCHEMA_V4 = "libero-bowl-to-plate-solution-v4"
 SOLUTION_SCHEMA_V5 = "libero-bowl-to-plate-solution-v5"
 SOLUTION_SCHEMA_V6 = "libero-bowl-to-plate-solution-v6"
 SOLUTION_SCHEMA_V7 = "libero-bowl-to-plate-solution-v7"
