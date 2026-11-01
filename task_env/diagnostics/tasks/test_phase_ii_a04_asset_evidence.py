@@ -32,8 +32,11 @@ from task_env.artifacts import (
 from task_env.environment import AssetManifest, TaskCompositionSpec
 from task_env.objects.nut_assembly import SquarePegObject
 from task_env.registry import ComponentRegistry, make_agent, make_object, make_scene
-from task_env.robots.panda import PANDA_ASSET_ROOT, PandaAgent
-from task_env.utils.rotation import matrix_to_quat_wxyz
+from task_env.robots.panda import (
+    PANDA_ASSET_ROOT,
+    PandaAgent,
+    _panda_scene_from_import as _build_panda_scene_from_import,
+)
 
 
 MENAGERIE_REVISION = "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
@@ -168,172 +171,13 @@ def _core_disposition(semantic: str, source_path: str, closure_paths: set[str]) 
     return "UNSUPPORTED"
 
 
-def _pose_from_transform(values) -> PoseWorld:
-    matrix = np.asarray(values, dtype=np.float64).reshape(4, 4)
-    quaternion = matrix_to_quat_wxyz(matrix[:3, :3])
-    return PoseWorld(
-        tuple(float(value) for value in matrix[:3, 3]),
-        tuple(float(value) for value in quaternion),
-    )
-
-
 def _panda_scene_from_import(imported, manifest) -> SceneDefinition:
-    entity_id = PANDA_ENTITY_ID
-    asset = _asset_definition_from_manifest(manifest)
-    bodies = {body.body_id: body for body in imported.ir.bodies}
-    bodies_by_frame = {body.frame_id: body for body in imported.ir.bodies}
-    frames_by_id = {frame.node_id: frame for frame in imported.ir.frames}
-    frame_definitions = tuple(
-        FrameDefinition(
-            schema_version="frame-definition-v1",
-            entity_id=entity_id,
-            frame_id=body.name,
-            frame_kind="runtime",
-            parent=None,
-            pose_parent=None,
-        )
-        for body in imported.ir.bodies
-    )
-
-    coordinate_layout = {
-        "hinge": ("revolute", "radian", "radian_per_second", 1, 1),
-        "slide": ("prismatic", "meter", "meter_per_second", 1, 1),
-        "fixed": ("fixed", "none", "none", 0, 0),
-    }
-    joints = []
-    source_joint_names = set()
-    joint_child_frames = set()
-    for imported_joint in imported.ir.joints:
-        source_name = imported_joint.dynamics.get("source_name")
-        if not source_name:
-            raise AssertionError(f"joint lacks source name: {imported_joint.joint_id}")
-        if imported_joint.body_a is None or imported_joint.body_a not in bodies:
-            raise AssertionError(f"Panda joint has no canonical parent body: {source_name}")
-        if imported_joint.body_b not in bodies:
-            raise AssertionError(f"Panda joint has no canonical child body: {source_name}")
-        parent = bodies[imported_joint.body_a]
-        child = bodies[imported_joint.body_b]
-        kind, position, velocity, position_size, velocity_size = coordinate_layout[
-            imported_joint.type
-        ]
-        joints.append(
-            JointDefinition(
-                schema_version="joint-definition-v1",
-                joint_id=source_name,
-                parent_frame=FrameReference(entity_id, parent.name),
-                child_frame=FrameReference(entity_id, child.name),
-                pose_parent_from_joint=_pose_from_transform(imported_joint.frame_a),
-                pose_child_from_joint=_pose_from_transform(imported_joint.frame_b),
-                kind=kind,
-                axis=(
-                    tuple(float(value) for value in imported_joint.axis)
-                    if kind in {"revolute", "prismatic"}
-                    else None
-                ),
-                position_representation=position,
-                velocity_representation=velocity,
-                position_size=position_size,
-                velocity_size=velocity_size,
-            )
-        )
-        source_joint_names.add(source_name)
-        joint_child_frames.add(child.frame_id)
-
-    # GeoPhys correctly preserves the fixed hand body as a frame, not a
-    # synthetic source joint. The canonical articulation needs that fixed edge
-    # so its two finger joints remain connected to the Panda root.
-    root_body = next(body for body in imported.ir.bodies if body.name == "link0")
-    for body in imported.ir.bodies:
-        if body is root_body or body.frame_id in joint_child_frames:
-            continue
-        source_frame = frames_by_id[body.frame_id]
-        parent_body = bodies_by_frame.get(source_frame.parent_id)
-        if parent_body is None:
-            raise AssertionError(f"unmapped fixed Panda frame: {body.name}")
-        fixed_id = f"{body.name}_fixed_mount"
-        joints.append(
-            JointDefinition(
-                schema_version="joint-definition-v1",
-                joint_id=fixed_id,
-                parent_frame=FrameReference(entity_id, parent_body.name),
-                child_frame=FrameReference(entity_id, body.name),
-                pose_parent_from_joint=_pose_from_transform(source_frame.local_transform),
-                pose_child_from_joint=PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0)),
-                kind="fixed",
-                axis=None,
-                position_representation="none",
-                velocity_representation="none",
-                position_size=0,
-                velocity_size=0,
-            )
-        )
-    articulation = ArticulationDefinition(
-        schema_version="articulation-definition-v1",
-        entity_id=entity_id,
-        root_frame_id="link0",
-        link_frame_ids=tuple(body.name for body in imported.ir.bodies),
-        joints=tuple(joints),
-    )
-    actuator_names = tuple(
-        sorted(str(actuator.parameters.get("source_name")) for actuator in imported.ir.actuators)
-    )
-    actuator_resources = tuple(
-        ActuatorResourceDefinition(
-            schema_version="actuator-resource-v1",
-            entity_id=entity_id,
-            actuator_id=name,
-        )
-        for name in actuator_names
-    )
-    actuator_references = tuple(ActuatorReference(entity_id, name) for name in actuator_names)
-    scene = SceneDefinition(
-        schema_version="scene-definition-v3",
+    return _build_panda_scene_from_import(
+        imported,
+        manifest,
+        entity_id=PANDA_ENTITY_ID,
         scene_id="a04-panda-import",
-        assets=(asset,),
-        entities=(
-            EntityInstance(
-                schema_version="entity-instance-v1",
-                entity_id=entity_id,
-                asset_id=asset.asset_id,
-                asset_version=asset.asset_version,
-            ),
-        ),
-        frames=frame_definitions,
-        articulations=(articulation,),
-        robots=(
-            RobotInstance(
-                schema_version="robot-instance-v1",
-                entity_id=entity_id,
-                articulation_roots=(FrameReference(entity_id, "link0"),),
-            ),
-        ),
-        actuator_resources=actuator_resources,
-        control_groups=(
-            ControlGroup(
-                schema_version="control-group-v1",
-                entity_id=entity_id,
-                group_id="arm",
-                actuator_refs=tuple(
-                    ActuatorReference(entity_id, f"actuator{index}")
-                    for index in range(1, 8)
-                ),
-            ),
-            ControlGroup(
-                schema_version="control-group-v1",
-                entity_id=entity_id,
-                group_id="gripper",
-                actuator_refs=(ActuatorReference(entity_id, "actuator8"),),
-            ),
-        ),
     )
-    scene.validate()
-    scene_joint_ids = {joint.joint_id for joint in scene.articulations[0].joints}
-    assert source_joint_names <= scene_joint_ids
-    for reference in actuator_references:
-        assert scene.resolve_actuator(reference) == ActuatorResourceDefinition(
-            "actuator-resource-v1", entity_id, reference.actuator_id
-        )
-    return scene
 
 
 def test_asset_manifest_additions_preserve_legacy_construction_and_normalize_generator_values():

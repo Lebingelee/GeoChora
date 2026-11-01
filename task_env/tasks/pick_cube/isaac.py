@@ -7,8 +7,7 @@ Core RuntimeSession owners.
 
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 from pathlib import Path
@@ -22,7 +21,16 @@ from ...artifacts.execution import EpisodeResetPlanV1
 from ...environment.task_source import TaskSourceV1
 from ...artifacts import TaskArtifactV1
 
-from ...artifacts import AssetDefinition, FrameDefinition, FrameReference, SceneDefinition
+from ...artifacts import (
+    ArticulationDefinition,
+    AssetDefinition,
+    EntityInstance,
+    FrameDefinition,
+    FrameReference,
+    JointDefinition,
+    PoseWorld,
+    SceneDefinition,
+)
 from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1
 
 
@@ -36,90 +44,83 @@ ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
 
 
 def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
-    """Compose the existing Panda structure with the actual PickCube desktop.
+    """Compose the Panda source with task-owned PickCube entities and recipe."""
+    from ...robots.panda import PandaAgent
 
-    The existing canonical Scene builder owns the detailed Panda frames,
-    joint order, floating-body graph, and TCP transform. The F06 projection
-    changes the Panda/cube/support identities and binds the task-owned desktop; its
-    USD recipe is generated separately and does not reuse F05 physical values.
-    """
-    from ..position_candidate.source import _f05_dg01_scene
+    scene_id = str(task_config["recipe"]["scene_uid"])
+    panda_scene = PandaAgent()._scene_definition(entity_id="panda-v1", scene_id=scene_id)
+    source_asset = panda_scene.assets[0]
+    if not source_asset.source_content_sha256:
+        raise ValueError("Panda importer must provide the consumed source closure digest")
 
-    base = _f05_dg01_scene().to_mapping()
-    raw = deepcopy(base)
-
-    def remap(value):
-        if isinstance(value, dict):
-            return {key: remap(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [remap(item) for item in value]
-        if isinstance(value, str):
-            return (value.replace("panda-main", "panda-v1")
-                    .replace("free-cube", "cube-v1")
-                    .replace("f05-dg01-free-cube-v1", "pick-cube-cube-v1")
-                    .replace("f05-dg01-support-v1", "pick-cube-tabletop-v1")
-                    .replace("support", "tabletop-v1"))
-        return value
-
-    raw = remap(raw)
-    raw["scene_id"] = str(task_config["recipe"]["scene_uid"])
-    raw["assets"] = [AssetDefinition(
-        "asset-definition-v1",
-        "f05-dg03-menagerie-panda-source-preserving-isaac-usd",
-        "f05-dg03-isaac-usd-v4",
-        "mujoco-menagerie://franka_emika_panda/panda.xml",
-        "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
-        "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a",
-        "bsd-3-clause",
-    ).to_mapping()] + [
-        AssetDefinition(
-            "asset-definition-v1", "pick-cube-cube-v1", "pick-cube-recipe-v1",
-            "geochora-task-scene://pick-cube-v1/cube", SCENE_RECIPE_ID,
-            hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        ).to_mapping(),
-        AssetDefinition(
-            "asset-definition-v1", "pick-cube-tabletop-v1", "pick-cube-recipe-v1",
-            "geochora-task-scene://pick-cube-v1/tabletop", SCENE_RECIPE_ID,
-            hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        ).to_mapping(),
-    ]
-    for entity in raw["entities"]:
-        if entity["entity_id"] == "panda-v1":
-            entity.update(
-                asset_id="f05-dg03-menagerie-panda-source-preserving-isaac-usd",
-                asset_version="f05-dg03-isaac-usd-v4",
-            )
-        elif entity["entity_id"] == "cube-v1":
-            entity.update(asset_id="pick-cube-cube-v1", asset_version="pick-cube-recipe-v1")
-        elif entity["entity_id"] == "tabletop-v1":
-            entity.update(
-                asset_id="pick-cube-tabletop-v1",
-                asset_version="pick-cube-recipe-v1",
-            )
-    raw["entities"] = [
-        entity for entity in raw["entities"]
-        if entity["entity_id"] in {"panda-v1", "cube-v1", "tabletop-v1"}
-    ]
-    for frame in raw["frames"]:
-        if frame["entity_id"] == "tabletop-v1":
-            frame["frame_id"] = "top"
-        elif frame["entity_id"] == "cube-v1" and frame["frame_id"] == "free_cube":
-            frame["frame_id"] = "cube"
-    raw["frames"].append(FrameDefinition(
-        "frame-definition-v1", "panda-v1", "ee", "runtime", None, None,
-    ).to_mapping())
-    for articulation in raw["articulations"]:
-        if articulation["entity_id"] == "cube-v1":
-            articulation["root_frame_id"] = "world"
-            articulation["link_frame_ids"] = [
-                "cube" if value == "free_cube" else value
-                for value in articulation["link_frame_ids"]
-            ]
-            for joint in articulation["joints"]:
-                for field in ("parent_frame", "child_frame"):
-                    if joint[field]["entity_id"] == "cube-v1" and joint[field]["frame_id"] == "free_cube":
-                        joint[field]["frame_id"] = "cube"
-    return SceneDefinition.from_mapping(raw)
+    panda_asset = AssetDefinition(
+        schema_version="asset-definition-v1",
+        asset_id="f05-dg03-menagerie-panda-source-preserving-isaac-usd",
+        asset_version="f05-dg03-isaac-usd-v4",
+        source_reference=source_asset.source_reference,
+        source_revision=source_asset.source_revision,
+        source_content_sha256=source_asset.source_content_sha256,
+        license_id="bsd-3-clause",
+    )
+    panda_entity = replace(
+        panda_scene.entities[0],
+        asset_id=panda_asset.asset_id,
+        asset_version=panda_asset.asset_version,
+    )
+    recipe_digest = hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
+    cube_asset = AssetDefinition(
+        "asset-definition-v1", "pick-cube-cube-v1", "pick-cube-recipe-v1",
+        "geochora-task-scene://pick-cube-v1/cube", SCENE_RECIPE_ID, recipe_digest,
+    )
+    tabletop_asset = AssetDefinition(
+        "asset-definition-v1", "pick-cube-tabletop-v1", "pick-cube-recipe-v1",
+        "geochora-task-scene://pick-cube-v1/tabletop", SCENE_RECIPE_ID, recipe_digest,
+    )
+    cube = EntityInstance(
+        "entity-instance-v1", "cube-v1", cube_asset.asset_id, cube_asset.asset_version,
+    )
+    tabletop = EntityInstance(
+        "entity-instance-v1", "tabletop-v1", tabletop_asset.asset_id,
+        tabletop_asset.asset_version,
+    )
+    identity_pose = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+    cube_articulation = ArticulationDefinition(
+        "articulation-definition-v1",
+        "cube-v1",
+        "world",
+        ("world", "cube"),
+        (JointDefinition(
+            "joint-definition-v1",
+            "cube_freejoint",
+            FrameReference("cube-v1", "world"),
+            FrameReference("cube-v1", "cube"),
+            identity_pose,
+            identity_pose,
+            "floating",
+            None,
+            "xyz_meter_quaternion_wxyz",
+            "linear_xyz_meter_per_second_angular_xyz_radian_per_second",
+            7,
+            6,
+        ),),
+    )
+    return SceneDefinition(
+        schema_version="scene-definition-v3",
+        scene_id=scene_id,
+        assets=(panda_asset, cube_asset, tabletop_asset),
+        entities=(panda_entity, cube, tabletop),
+        frames=(
+            *panda_scene.frames,
+            FrameDefinition("frame-definition-v1", "panda-v1", "ee", "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "cube-v1", "world", "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "cube-v1", "cube", "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "tabletop-v1", "top", "runtime", None, None),
+        ),
+        articulations=(*panda_scene.articulations, cube_articulation),
+        robots=panda_scene.robots,
+        actuator_resources=panda_scene.actuator_resources,
+        control_groups=panda_scene.control_groups,
+    )
 
 
 def _canonical_task_recipe(task_config: dict) -> bytes:

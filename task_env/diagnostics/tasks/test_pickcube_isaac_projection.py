@@ -18,6 +18,18 @@ def test_pickcube_isaac_projection_preserves_task_semantics_and_binds_runtime_fr
     assert {entity.entity_id for entity in scene.entities} == {
         "panda-v1", "cube-v1", "tabletop-v1",
     }
+    assets = {asset.asset_id: asset for asset in scene.assets}
+    panda_asset = assets["f05-dg03-menagerie-panda-source-preserving-isaac-usd"]
+    assert panda_asset.asset_version == "f05-dg03-isaac-usd-v4"
+    assert panda_asset.source_reference == "mujoco-menagerie://franka_emika_panda/panda.xml"
+    assert panda_asset.source_revision == "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+    assert panda_asset.source_content_sha256 == (
+        "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a"
+    )
+    assert assets["pick-cube-cube-v1"].source_content_sha256
+    assert assets["pick-cube-tabletop-v1"].source_content_sha256 == (
+        assets["pick-cube-cube-v1"].source_content_sha256
+    )
     assert artifact.legacy_frame_bindings["panda-v1/base"].frame_id == "link0"
     assert artifact.legacy_frame_bindings["panda-v1/ee"].frame_id == "ee"
     assert artifact.legacy_frame_bindings["cube-v1"].frame_id == "cube"
@@ -36,6 +48,16 @@ def test_pickcube_isaac_projection_preserves_task_semantics_and_binds_runtime_fr
     ]
     assert len(floating) == 1
     assert floating[0].joint_id == "cube_freejoint"
+    panda_joints = {
+        joint.joint_id
+        for articulation in scene.articulations
+        if articulation.entity_id == "panda-v1"
+        for joint in articulation.joints
+    }
+    assert {
+        *(f"joint{index}" for index in range(1, 8)),
+        "finger_joint1", "finger_joint2",
+    } <= panda_joints
     assert len(artifact.legacy_joint_bindings) == 9
     artifact.validate_scene(scene)
 
