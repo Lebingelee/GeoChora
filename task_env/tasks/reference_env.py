@@ -2696,13 +2696,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f05_input = self.value.get('f05_position_input')
         f05_native_input = self.value.get('f05_native_position_input')
         f05_dg02_input = self.value.get('f05_dg02_geophys_input')
+        f05_dg04_input = self.value.get('f05_dg04_isaac_native_input')
         f05_native_route = f05_native_input is not None
         f05_dg02_route = f05_dg02_input is not None
-        f05_native_core_route = f05_native_route or f05_dg02_route
+        f05_dg04_route = f05_dg04_input is not None
+        f05_native_core_route = f05_native_route or f05_dg02_route or f05_dg04_route
         f05_route = f05_input is not None or f05_native_core_route
+        f05_host_model_route = f05_route and not f05_dg04_route
         if f03_input is not None or f04_input is not None or f05_route:
             f04_route = f04_input is not None
             versioned_input = (
+                f05_dg04_input if f05_dg04_route else
                 f05_dg02_input if f05_dg02_route else
                 f05_native_input if f05_native_route else
                 f05_input if f05_route else f04_input if f04_route else f03_input
@@ -2737,6 +2741,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             profile = {
                 'schema_version': (
                     'f04-isaac-core-position-recording-profile-v1' if f04_native else
+                    'f05-dg04-isaac-native-core-position-profile-v1' if f05_dg04_route else
                     'f05-dg02-geophys-usd-core-position-native-profile-v1' if f05_dg02_route else
                     'f05-geophys-core-position-native-profile-v1' if f05_native else
                     'f04-core-position-synthetic-io-s1-profile-v1' if f04_route else
@@ -2745,6 +2750,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ),
                 'profile_id': (
                     'f04-isaac-panda-position-native-v1' if f04_native else
+                    'f05-dg04-isaac-native-mimic-v1' if f05_dg04_route else
                     'geophys-usd-position-f05-dg02-core-v1' if f05_dg02_route else
                     'geophys-usd-position-f05-native-v1' if f05_native else
                     'f04-local-source-synthetic-io-s1-v1' if f04_route else
@@ -2806,7 +2812,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'actual_provider_build_identity': versioned_input.host_model_producer_identity.actual_provider_build_identity,
                     'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256,
                     'host_model_producer_identity': versioned_input.host_model_producer_identity.to_mapping(),
-                } if f05_route else {}),
+                } if f05_host_model_route else {}),
                 'timebase': {
                     'physics_dt_s': self.artifact.timebase.physics_dt,
                     'control_substeps': self.artifact.timebase.control_substeps,
@@ -2819,8 +2825,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'controller_identity_sha256': self.controller.identity,
                 'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
                 'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
-                'native_position_drive_receipt': asdict(drive_receipt),
-                **({'public_model_identity_sha256': drive_receipt.public_model_identity_sha256} if f05_route else {}),
+                'native_position_drive_receipt': (
+                    drive_receipt.to_mapping() if f05_dg04_route else asdict(drive_receipt)
+                ),
+                **({'public_model_identity_sha256': drive_receipt.public_model_identity_sha256}
+                   if f05_host_model_route else {}),
                 'native_runtime_io_metadata': native_metadata.to_mapping(),
                 **({'native_public_bootstrap_receipt': bootstrap} if f04_native or f05_native else {}),
                 'native_source_mappings': {
@@ -2836,6 +2845,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'recording_scope': (
                     'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
                     if f04_native else
+                    'F05 DG04 source-bound Menagerie USD / Isaac 6.2.0.0 GPU PhysX native-mimic Core Position diagnostic'
+                    if f05_dg04_route and f05_native else
+                    'F05 DG04 synthetic lowest NativeRuntimeIO Core Position S1; no native physics admission'
+                    if f05_dg04_route else
                     'F05 DG02 source-preserving Menagerie USD / GeoPhys CPU Core Position cell'
                     if f05_dg02_route else
                     'F05 frozen Menagerie USD / GeoPhys CPU native Core Position cell'
@@ -2849,6 +2862,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'env_metadata': {
                     'env_name': (
                         'SelectedReferenceEnv.F04IsaacPandaPosition' if f04_native else
+                        'SelectedReferenceEnv.F05Dg04IsaacNativePosition' if f05_dg04_route else
                         'SelectedReferenceEnv.F05Dg02GeoPhysUsdCorePosition' if f05_dg02_route else
                         'SelectedReferenceEnv.F05MenagerieGeoPhysCpuNativePosition' if f05_native else
                         'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
@@ -2875,7 +2889,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'universal_action_schema': {
                     'version': ('f04-isaac-core-position-action-v1'
                                 if f04_route else 'f05-dg02-geophys-usd-core-position-action-v1'
-                                if f05_dg02_route else 'f05-geophys-native-position-action-v1'
+                                if f05_dg02_route else 'f05-dg04-isaac-native-mimic-position-action-v1'
+                                if f05_dg04_route else 'f05-geophys-native-position-action-v1'
                                 if f05_native else 'f03-core-call-chain-position-action-v1'),
                     'dimension': len(action_components), 'components': action_components,
                 },
@@ -2896,7 +2911,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'controller_identity_sha256': self.controller.identity,
                     'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
                     **({'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256}
-                       if f05_route else {}),
+                       if f05_host_model_route else {}),
                 },
             }
 

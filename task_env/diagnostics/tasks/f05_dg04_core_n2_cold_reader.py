@@ -97,6 +97,29 @@ def _bound_errors(bundle: dict) -> list[dict]:
                 zip(bundle["episodes"], worker["episodes"], strict=True), 1):
             env_meta = episode.get("metadata", {}).get("env_meta", {})
             reference_profile = env_meta.get("reference_profile", {}) if isinstance(env_meta, dict) else {}
+            environment = env_meta.get("environment", {}) if isinstance(env_meta, dict) else {}
+            _check(environment.get("name") == "SelectedReferenceEnv.F05Dg04IsaacNativePosition"
+                   and reference_profile.get("schema_version") == "f05-dg04-isaac-native-core-position-profile-v1"
+                   and reference_profile.get("profile_id") == "f05-dg04-isaac-native-mimic-v1",
+                   "h5_profile", f"episode {episode_index} H5 does not identify the DG04 native Core route")
+            _check(reference_profile.get("provenance_kind") == "native_runtime"
+                   and reference_profile.get("runtime_admitted") is True,
+                   "h5_profile", f"episode {episode_index} H5 profile is not native-runtime admitted")
+            profile_identity_fields = (
+                "task_source_identity_sha256", "task_artifact_identity_sha256", "scene_identity_sha256",
+                "source_id", "source_closure_sha256", "execution_identity_sha256",
+                "reset_plan_identity_sha256", "controller_identity_sha256",
+                "control_binding_plan_identity_sha256",
+            )
+            _check(all(reference_profile.get(field) == plan["candidate"].get(field)
+                       for field in profile_identity_fields)
+                   and reference_profile.get("reset_sample_id") == plan["candidate"]["reset_sample_id"],
+                   "h5_profile", f"episode {episode_index} DG04 profile identities differ from the frozen candidate")
+            drive_receipt = reference_profile.get("native_position_drive_receipt", {})
+            _check(isinstance(drive_receipt, dict)
+                   and drive_receipt.get("identity_sha256")
+                   == reference_profile.get("native_position_drive_receipt_identity_sha256"),
+                   "h5_profile", f"episode {episode_index} DG04 drive receipt is missing or detached")
             bootstrap = reference_profile.get("native_public_bootstrap_receipt", {})
             steps = bootstrap.get("physics_steps") if isinstance(bootstrap, dict) else None
             bootstrap_dt = bootstrap.get("physics_dt_s") if isinstance(bootstrap, dict) else None

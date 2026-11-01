@@ -276,6 +276,17 @@ def test_f05_dg04_selected_reference_core_s1_two_episodes(tmp_path):
                 loaded = load_structured_control_records_h5(path)
                 assert result["transition_count"] == loaded["transition_count"] == 8
                 assert result["observation_count"] == loaded["observation_count"] == 9
+                env_meta = loaded["env_meta"]
+                profile = env_meta["reference_profile"]
+                assert env_meta["environment"]["name"] == "SelectedReferenceEnv.F05Dg04IsaacNativePosition"
+                assert profile["schema_version"] == "f05-dg04-isaac-native-core-position-profile-v1"
+                assert profile["profile_id"] == "f05-dg04-isaac-native-mimic-v1"
+                assert profile["provenance_kind"] == "synthetic_fixture"
+                assert profile["runtime_admitted"] is False
+                assert profile["native_position_drive_receipt"]["identity_sha256"] == profile[
+                    "native_position_drive_receipt_identity_sha256"
+                ]
+                assert "native_public_bootstrap_receipt" not in profile
                 io = created[-1]
                 assert io.reset_count == 1
                 assert io.position_write_count == 8
