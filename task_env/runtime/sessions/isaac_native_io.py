@@ -1883,12 +1883,31 @@ class IsaacSimNativeRuntimeIOV1:
                                   label='DG04 post-step DOF velocity')[0]
                 reference_index = self._dof_index['finger_joint1']
                 follower_index = self._dof_index['finger_joint2']
-                applied_effort = _tensor_rows(
-                    self._articulation.get_dof_projected_joint_forces(
-                        dof_indices=[reference_index],
-                    ),
-                    width=1, label='DG04 public projected active leader effort readback',
-                )[0][0]
+                if self._f06_pickcube:
+                    # F06's 5 N contract bounds the leader drive's actuator
+                    # output. Projected joint force also includes forces
+                    # arriving through the joint and is retained separately
+                    # as a physical observation.
+                    applied_effort = _tensor_rows(
+                        self._articulation.get_dof_efforts(
+                            dof_indices=[reference_index],
+                        ),
+                        width=1, label='F06 public leader actuation-effort readback',
+                    )[0][0]
+                    projected_joint_force = _tensor_rows(
+                        self._articulation.get_dof_projected_joint_forces(
+                            dof_indices=[reference_index],
+                        ),
+                        width=1, label='F06 public projected active leader-force readback',
+                    )[0][0]
+                else:
+                    applied_effort = _tensor_rows(
+                        self._articulation.get_dof_projected_joint_forces(
+                            dof_indices=[reference_index],
+                        ),
+                        width=1, label='DG04 public projected active leader effort readback',
+                    )[0][0]
+                    projected_joint_force = None
                 reference_position = float(q[reference_index])
                 follower_position = float(q[follower_index])
                 reference_velocity = float(qd[reference_index])
@@ -1913,11 +1932,25 @@ class IsaacSimNativeRuntimeIOV1:
                     'reference_target_m': float(target['reference_target_m']),
                     'reference_effort_N': float(applied_effort),
                     'maximum_effort_N': 5.0 if self._f06_pickcube else 100.0,
-                    'public_effort_api': 'Articulation.get_dof_projected_joint_forces',
-                    'effort_measurement_semantics': 'projected_active_joint_force',
+                    'public_effort_api': (
+                        'Articulation.get_dof_efforts' if self._f06_pickcube
+                        else 'Articulation.get_dof_projected_joint_forces'
+                    ),
+                    'effort_measurement_semantics': (
+                        'actuation_force' if self._f06_pickcube
+                        else 'projected_active_joint_force'
+                    ),
                     'native_mimic_api': 'PhysxMimicJointAPI:transX',
                     'native_drive_api': 'PhysicsDriveAPI:linear',
                 }
+                if self._f06_pickcube:
+                    native_adaptation_application.update({
+                        'projected_joint_force_N': float(projected_joint_force),
+                        'public_projected_joint_force_api': (
+                            'Articulation.get_dof_projected_joint_forces'
+                        ),
+                        'projected_force_measurement_semantics': 'projected_active_joint_force',
+                    })
                 if self._dg04_native:
                     native_adaptation_application['public_contact_witness'] = (
                         self._read_dg03_contact_witness()

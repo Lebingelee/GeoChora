@@ -296,8 +296,11 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
         'reference_target_m': 0.02,
         'reference_effort_N': 0.25,
         'maximum_effort_N': 5.0,
-        'public_effort_api': 'Articulation.get_dof_projected_joint_forces',
-        'effort_measurement_semantics': 'projected_active_joint_force',
+        'public_effort_api': 'Articulation.get_dof_efforts',
+        'effort_measurement_semantics': 'actuation_force',
+        'projected_joint_force_N': 6.40239954,
+        'public_projected_joint_force_api': 'Articulation.get_dof_projected_joint_forces',
+        'projected_force_measurement_semantics': 'projected_active_joint_force',
         'native_mimic_api': 'PhysxMimicJointAPI:transX',
         'native_drive_api': 'PhysicsDriveAPI:linear',
     }
@@ -305,6 +308,14 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
     NativeAdvanceReceiptV1(
         'native-advance-receipt-v1', 1, 1, 0.002,
         native_adaptation_application=application,
+    ).validate(1, 0.002)
+
+    # Projected physical force may exceed the actuator's 5 N cap; it must
+    # remain visible without being misclassified as actuator output.
+    projected_force_above_limit = dict(application, projected_joint_force_N=6.40239954)
+    NativeAdvanceReceiptV1(
+        'native-advance-receipt-v1', 1, 1, 0.002,
+        native_adaptation_application=projected_force_above_limit,
     ).validate(1, 0.002)
 
     wrong_declared_limit = dict(application, maximum_effort_N=100.0)
@@ -333,4 +344,18 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
         NativeAdvanceReceiptV1(
             'native-advance-receipt-v1', 1, 1, 0.002,
             native_adaptation_application=wrong_profile,
+        ).validate(1, 0.002)
+
+    wrong_effort_api = dict(application, public_effort_api='Articulation.get_dof_projected_joint_forces')
+    with pytest.raises(ValueError, match='receipt is incomplete or malformed'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=wrong_effort_api,
+        ).validate(1, 0.002)
+
+    non_finite_projection = dict(application, projected_joint_force_N=float('nan'))
+    with pytest.raises(ValueError, match='receipt is incomplete or malformed'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=non_finite_projection,
         ).validate(1, 0.002)

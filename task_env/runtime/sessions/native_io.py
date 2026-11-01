@@ -379,12 +379,14 @@ class NativeAdvanceReceiptV1:
                     or application.get('reference_joint') != 'finger_joint1'
                     or application.get('follower_joint') != 'finger_joint2'
                     or application.get('public_effort_api') != (
-                        'Articulation.get_dof_projected_joint_forces'
+                        ('Articulation.get_dof_efforts' if is_f06_pickcube
+                         else 'Articulation.get_dof_projected_joint_forces')
                         if application.get('provenance_kind') == 'native_runtime'
                         else 'synthetic-no-physics'
                     )
                     or application.get('effort_measurement_semantics') != (
-                        'projected_active_joint_force'
+                        ('actuation_force' if is_f06_pickcube
+                         else 'projected_active_joint_force')
                         if application.get('provenance_kind') == 'native_runtime'
                         else 'synthetic-no-physics'
                     )
@@ -396,6 +398,17 @@ class NativeAdvanceReceiptV1:
                            or isinstance(application.get(key), bool)
                            or not math.isfinite(float(application[key]))
                            for key in numeric_fields)
+                    or (is_f06_pickcube
+                        and application.get('provenance_kind') == 'native_runtime'
+                        and (
+                            application.get('public_projected_joint_force_api')
+                            != 'Articulation.get_dof_projected_joint_forces'
+                            or application.get('projected_force_measurement_semantics')
+                            != 'projected_active_joint_force'
+                            or type(application.get('projected_joint_force_N')) not in (int, float)
+                            or isinstance(application.get('projected_joint_force_N'), bool)
+                            or not math.isfinite(float(application['projected_joint_force_N']))
+                        ))
                     or (is_f06_pickcube and 'public_contact_witness' in application)
                     or (not is_f06_pickcube and (
                         not isinstance(application.get('public_contact_witness'), Mapping)
