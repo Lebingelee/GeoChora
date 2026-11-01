@@ -73,6 +73,15 @@ def _identity_motion_config(config):
     }
 
 
+def _source_identity_fields(source_xml_sha256, source_closure_digest, arm_resolver_identity):
+    return {
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "arm_resolver_identity": arm_resolver_identity,
+    }
+
+
 def _solution_identity_v5(
     source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
     config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
@@ -94,9 +103,9 @@ def _solution_identity_v5(
     )
     return digest({
         "schema_version": SOLUTION_SCHEMA_V5,
-        "task_uid": TASK_1,
-        "source_xml_sha256": source_xml_sha256,
-        "source_closure_digest": source_closure_digest,
+        **_source_identity_fields(
+            source_xml_sha256, source_closure_digest, arm_resolver_identity,
+        ),
         "tcp_id": TCP_ID,
         "action_schema_id": POSE_ACTION_SCHEMA_V1,
         "action_semantics": {
@@ -122,7 +131,6 @@ def _solution_identity_v5(
             },
         },
         "arm_resolution_owner": "CanonicalPandaController.resolve_world_pose_target_iterative_v1",
-        "arm_resolver_identity": arm_resolver_identity,
         "mixed_controller": osc.identity_mapping(),
         "grasp": {
             "strategy": "insert_narrow_fingers_below_rim_then_hold_contact_aperture_v2",
@@ -185,10 +193,9 @@ def _solution_identity_v6_v7(
     )
     payload = {
         "schema_version": SOLUTION_SCHEMA_V6 if version == 6 else SOLUTION_SCHEMA_V7,
-        "task_uid": TASK_1,
-        "source_xml_sha256": source_xml_sha256,
-        "source_closure_digest": source_closure_digest,
-        "arm_resolver_identity": arm_resolver_identity,
+        **_source_identity_fields(
+            source_xml_sha256, source_closure_digest, arm_resolver_identity,
+        ),
         "parent_profile_identity": parent,
         "grasp_frame": {
             "reference": "public_bowl_and_plate_body_pose_world_wxyz_live_until_grasp_v1",
@@ -223,10 +230,9 @@ def solution_identity_v8(
     )
     return digest({
         "schema_version": SOLUTION_SCHEMA_V8,
-        "task_uid": TASK_1,
-        "source_xml_sha256": source_xml_sha256,
-        "source_closure_digest": source_closure_digest,
-        "arm_resolver_identity": arm_resolver_identity,
+        **_source_identity_fields(
+            source_xml_sha256, source_closure_digest, arm_resolver_identity,
+        ),
         "parent_profile_identity": _solution_identity_v6_v7(
             7,
             source_xml_sha256, source_closure_digest,
@@ -244,15 +250,7 @@ def solution_identity_v8(
             "dataset_file_sha256": _DEMO_DATASET_SHA256,
             "observation_state_alignment": "source_tcp_fk_state_row_not_one_row_lagged_obs_v1",
         },
-        "opening_m": {
-            "approach": 0.042,
-            "descend": _DEMO_FRAME50_JAW_OPENING_M,
-            "grasp": _DEMO_FRAME51_JAW_OPENING_M,
-            "lift": _DEMO_FRAME51_JAW_OPENING_M,
-            "carry": _DEMO_FRAME51_JAW_OPENING_M,
-            "place": _DEMO_FRAME51_JAW_OPENING_M,
-            "release": 0.042,
-        },
+        "opening_m": _OPENING_BY_STAGE_V8,
         "contact_policy": "require_bilateral_public_finger_bowl_contacts_for_two_boundaries_before_lift_v2",
         "planner": _pose_planner_identity(selected_planner),
         "motion_config": _identity_motion_config(selected_config),
@@ -359,7 +357,7 @@ def _state_vector(observation: Mapping[str, object]) -> tuple[np.ndarray, np.nda
         raise ValueError("public LIBERO observation is missing state fields") from exc
     if joints.shape != (9,) or not np.isfinite(joints).all():
         raise ValueError("public LIBERO joint_position must contain seven arm and two finger values")
-    return joints[:7].copy(), _tcp_pose(observation)
+    return joints.copy(), _tcp_pose(observation)
 
 
 def _boundary_identity(info: Mapping[str, object]) -> tuple[str, str, str, str, str, int, float]:
@@ -418,13 +416,8 @@ class LiberoPickPlaceSolutionV8:
                  *, arm_resolver_identity: str,
                  config: LiberoPickPlaceSolutionConfigV1 | None = None,
                  planner_config: CartesianPosePlannerConfig | None = None):
-        planner_config = planner_config or CartesianPosePlannerConfig(
-            max_translation_per_step=0.0025,
-            max_translation_acceleration_per_step=0.001,
-            max_rotation_per_step=0.04,
-            max_rotation_acceleration_per_step=0.02,
-            settle_steps=0,
-            max_steps=200,
+        config, planner_config = _identity_inputs(
+            config, planner_config, _V678_IDENTITY_PLANNER_DEFAULTS,
         )
         raw = source_xml.encode("utf-8") if isinstance(source_xml, str) else bytes(source_xml)
         if not raw:
@@ -433,12 +426,11 @@ class LiberoPickPlaceSolutionV8:
         self.tcp_profile = derive_panda_tcp_profile_v2(
             raw, tcp_id=TCP_ID, hand_frame_id=HAND_FRAME_ID, site_name=SITE_NAME,
         )
-        self.kinematics = PandaKinematics(
+        PandaKinematics(
             raw, tcp_profile=self.tcp_profile, native_prefix="robot0_",
             base_body_id=BASE_BODY_ID,
         )
-        self.config = config or LiberoPickPlaceSolutionConfigV1()
-        self.config.validate()
+        self.config = config
         if (type(source_closure_digest) is not str or len(source_closure_digest) != 64
                 or any(character not in "0123456789abcdef" for character in source_closure_digest)):
             raise ValueError("LIBERO Solution requires a lowercase source closure SHA-256")
@@ -463,7 +455,7 @@ class LiberoPickPlaceSolutionV8:
         self._episode_identity = self._last_boundary_step = None
         self._pending_action = False
         self._stage_steps = self._actions = 0
-        self._initial_bowl = self._plate = self._last_observation = None
+        self._initial_bowl = None
         self._bowl_reference_pose = self._plate_reference_pose = None
         self._last_action_receipt = None
         self._grasp_quaternion_wxyz = self._pose_plan = self._pose_plan_stage = None
@@ -503,11 +495,9 @@ class LiberoPickPlaceSolutionV8:
         self._bowl_reference_pose = _body_pose(observation, "bowl_body_pose")
         self._plate_reference_pose = _body_pose(observation, "plate_body_pose")
         self._initial_bowl = self._bowl_reference_pose[:3].copy()
-        self._plate = self._plate_reference_pose[:3].copy()
         _, current_pose = _state_vector(observation)
         self._grasp_quaternion_wxyz = current_pose[3:7].copy()
         self.stage = "approach"
-        self._last_observation = observation
 
     def _validate_boundary(self, observation, info: Mapping[str, object], *, next_step: bool) -> tuple[np.ndarray, np.ndarray]:
         if self._episode_identity is None or self._last_boundary_step is None:
@@ -592,11 +582,7 @@ class LiberoPickPlaceSolutionV8:
         if (self._pose_plan is None or self._pose_plan_stage != self.stage
                 or self._pose_plan_index >= len(self._pose_plan)):
             if self.stage in {"grasp", "release"}:
-                finger_positions = np.asarray(
-                    observation["state"].get("joint_position"), dtype=np.float64,
-                )
-                if finger_positions.shape != (9,) or not np.isfinite(finger_positions).all():
-                    raise ValueError("LIBERO Solution requires public signed finger positions")
+                finger_positions = joints
                 actual_opening = float(finger_positions[7] - finger_positions[8])
                 current_gripper = float(np.clip(actual_opening / 0.04 - 1.0, -1.0, 1.0))
                 steps = (max(4, self.config.grasp_dwell_steps) if self.stage == "grasp"
@@ -672,7 +658,6 @@ class LiberoPickPlaceSolutionV8:
         self._pending_action = False
         identity = _boundary_identity(info)
         self._last_boundary_step = identity[5]
-        self._last_observation = observation
         self._stage_steps += 1
         bilateral, contact_counts, contact_status = self._bilateral_finger_contact(info)
         planned_pose = np.asarray(
@@ -682,7 +667,7 @@ class LiberoPickPlaceSolutionV8:
         tracking_position_error = float(np.linalg.norm(planned_pose[:3] - current_pose[:3]))
         tracking_orientation_error = float(quat_angle_wxyz(planned_pose[3:7], current_pose[3:7]))
         planned_action = np.asarray((self._last_action_receipt or {}).get("action", ()), dtype=np.float64)
-        finger_positions = np.asarray(observation["state"].get("joint_position"), dtype=np.float64)
+        finger_positions = joints
         if planned_action.shape != (8,) or finger_positions.shape != (9,):
             raise ValueError("LIBERO Solution lost its planned action or signed gripper feedback")
         actual_opening = float(finger_positions[7] - finger_positions[8])
@@ -856,7 +841,6 @@ class LiberoPickPlaceSolutionV8:
             self._bowl_reference_pose = current_bowl
             self._plate_reference_pose = current_plate
             self._initial_bowl = current_bowl[:3].copy()
-            self._plate = current_plate[:3].copy()
             self._pose_plan = None
             self._pose_plan_index = 0
             self._pose_plan_stage = None

@@ -172,11 +172,6 @@ def _normalize_libero_robosuite_model_xml_v3(source_xml: bytes) -> tuple[bytes, 
                 raise ValueError(
                     f"LIBERO compile-first profile requires {body_name}.{field_name} at its authored origin"
                 )
-            values[field_name] = {
-                "action": "preserved_at_compile_origin",
-                "xml_value": actual,
-                "post_compile_world_value": [float(value) for value in expected_values],
-            }
             expected = " ".join(format(value, ".17g") for value in expected_values)
             if actual is None:
                 body.set(field_name, expected)

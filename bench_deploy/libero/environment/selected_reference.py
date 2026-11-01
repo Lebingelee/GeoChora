@@ -34,7 +34,7 @@ from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReference
 
 from bench_deploy.libero.controllers.osc import LiberoMixedControllerV6, LiberoMixedControllerV7
 from bench_deploy.libero.tasks.predicates import (
-    PILOT_TASK_UID, evaluate_on_bowl_plate_v1, evaluate_open_middle_drawer_v1,
+    evaluate_on_bowl_plate_v1, evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1, observe_selected_reference_v1,
     observe_task23_reference_v1,
 )
@@ -143,6 +143,13 @@ def _compiled_physics_fingerprint_diff_v1(actual, expected):
     return result
 
 
+def _libero_entity(name, kind, asset, *, frames=(), joints=(), source='source-authored-mesh'):
+    return EntityDefinition(
+        name, kind, f'asset:libero-{asset}-v1', frames, joints, source,
+        'source-authored-collision', {},
+    )
+
+
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
 SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[3] / 'asset/benchmarks/libero/source_manifest.json'
@@ -154,9 +161,6 @@ INIT_RELATIVE_PATH = (
     'upstream/libero/libero/libero/init_files/libero_spatial/'
     'pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.pruned_init'
 )
-TASK_ID = PILOT_TASK_UID
-
-
 @dataclass(frozen=True)
 class _TaskProfile:
     semantic_id: str
@@ -165,6 +169,7 @@ class _TaskProfile:
     success_rule: str
     static_instances: tuple[str, ...]
     observer: Callable
+    evaluator: Callable
     object_poses: tuple[tuple[str, str], ...] | None = None
 
     @property
@@ -180,6 +185,9 @@ _TASK_PROFILES = {
         'libero_on_bowl_plate_geom_contact_and_xy_lt_0_03m_v1',
         (),
         observe_selected_reference_v1,
+        lambda evidence: evaluate_on_bowl_plate_v1(
+            evidence, expected_source_manifest_sha256=PILOT_SOURCE_MANIFEST_SHA256,
+        ),
         (('akita_black_bowl_1', 'bowl'), ('plate_1', 'plate')),
     ),
     TASK_2: _TaskProfile(
@@ -189,6 +197,9 @@ _TASK_PROFILES = {
         'libero_open_middle_drawer_joint_position_lt_minus_0_14m_v1',
         ('wine_rack_1',),
         observe_task23_reference_v1,
+        lambda evidence: evaluate_open_middle_drawer_v1(
+            evidence, expected_boundary=getattr(evidence, 'boundary', None),
+        ),
     ),
     TASK_3: _TaskProfile(
         'libero_plate_front_of_stove_source_predicate_v1',
@@ -197,6 +208,9 @@ _TASK_PROFILES = {
         'libero_site_object_under_plate_and_stove_front_v1',
         ('wine_rack_1',),
         observe_task23_reference_v1,
+        lambda evidence: evaluate_stove_front_region_v1(
+            evidence, expected_boundary=getattr(evidence, 'boundary', None),
+        ),
     ),
 }
 
@@ -332,6 +346,27 @@ def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TA
     }
 
 
+def _mapping_differences(
+    actual, expected, *, exclude=(), keys=None, sequence_values=False,
+    missing_is_difference=True,
+):
+    compared = set(expected) if keys is None else set(keys)
+    if keys is None:
+        compared |= set(actual)
+    differences = {}
+    for key in sorted(compared - set(exclude)):
+        actual_value, expected_value = actual.get(key), expected.get(key)
+        equal = (
+            tuple(actual_value) == tuple(expected_value)
+            if sequence_values and isinstance(expected_value, list)
+            else actual_value == expected_value
+        )
+        if ((missing_is_difference and (key not in actual or key not in expected))
+                or not equal):
+            differences[key] = {'actual': actual_value, 'expected': expected_value}
+    return differences
+
+
 def _artifact(init_bytes: bytes, *, execution_profile: str,
               provider: str = 'mujoco', task_uid: str = TASK_1) -> TaskArtifact:
     solution_profile = execution_profile == 'v8'
@@ -350,33 +385,24 @@ def _artifact(init_bytes: bytes, *, execution_profile: str,
         'wooden_cabinet_1.bottom_level', 'flat_stove_1.button',
     )
     shared_entities = [
-        EntityDefinition(
-            'panda-v1', 'embodiment', 'asset:libero-mounted-panda-v1',
-            ('panda-v1/ee',), joints[:9], 'pinned_mounted_panda_mjcf',
-            'source-authored-collision', {},
+        _libero_entity(
+            'panda-v1', 'embodiment', 'mounted-panda', frames=('panda-v1/ee',),
+            joints=joints[:9], source='pinned_mounted_panda_mjcf',
         ),
-        EntityDefinition('main_table', 'scene', 'asset:libero-tabletop-v1', (), (),
-                         'source-authored-tabletop', 'source-authored-collision', {}),
+        _libero_entity('main_table', 'scene', 'tabletop', source='source-authored-tabletop'),
     ]
     for instance in contract.movable_instances:
-        asset_slug = instance.rsplit('_', 1)[0]
-        shared_entities.append(EntityDefinition(
-            instance, 'movable', f'asset:libero-{asset_slug}-v1', (), (),
-            'source-authored-mesh', 'source-authored-collision', {},
-        ))
+        shared_entities.append(_libero_entity(instance, 'movable', instance.rsplit('_', 1)[0]))
     shared_entities.extend((
-        EntityDefinition('wooden_cabinet_1', 'static', 'asset:libero-wooden-cabinet-v1', (),
-                         joints[9:12], 'source-authored-articulated-fixture',
-                         'source-authored-collision', {}),
-        EntityDefinition('flat_stove_1', 'static', 'asset:libero-flat-stove-v1', (),
-                         (joints[12],), 'source-authored-articulated-fixture',
-                         'source-authored-collision', {}),
+        _libero_entity('wooden_cabinet_1', 'static', 'wooden-cabinet',
+                       joints=joints[9:12], source='source-authored-articulated-fixture'),
+        _libero_entity('flat_stove_1', 'static', 'flat-stove',
+                       joints=(joints[12],), source='source-authored-articulated-fixture'),
     ))
     for instance in profile.static_instances:
         asset_slug = instance.rsplit('_', 1)[0].replace('_', '-')
-        shared_entities.append(EntityDefinition(
-            instance, 'static', f'asset:libero-{asset_slug}-v1', (), (),
-            'source-authored-static-fixture', 'source-authored-collision', {},
+        shared_entities.append(_libero_entity(
+            instance, 'static', asset_slug, source='source-authored-static-fixture',
         ))
     entities = tuple(shared_entities)
     from task_env.runtime.sessions.api import CAPABILITIES
@@ -727,8 +753,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
         'source_manifest_sha256': source_manifest_sha256,
-        'source_revision': 'LIBERO:8f1084e3132a39270c3a13ebe37270a43ece2a01;'
-                           'robosuite:fbee5844ff5632f5b5698e204ec5357ca50be0df',
         'source_sha256': {
             'composed_candidate_xml': expected_xml_sha,
             'runtime_model_xml': runtime_model_xml_sha,
@@ -769,10 +793,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         'provider_import_projection': importer_projection,
         'solution_profile': bool(solution_profile),
         'resolved_configuration': asdict(config),
-        'reset_realizations': {},
         'init_bytes': init_bytes,
         'source_manifest': source_manifest,
-        'install_root': install_root,
     }
 
 
@@ -1054,17 +1076,27 @@ def build_libero_selected_candidate(
         return reset_sample
 
     def evaluate(evidence, _semantics):
-        if task_uid == TASK_1:
-            return evaluate_on_bowl_plate_v1(
-                evidence, expected_source_manifest_sha256=PILOT_SOURCE_MANIFEST_SHA256,
-            )
-        if task_uid == TASK_2:
-            return evaluate_open_middle_drawer_v1(
-                evidence, expected_boundary=getattr(evidence, 'boundary', None),
-            )
-        return evaluate_stove_front_region_v1(
-            evidence, expected_boundary=getattr(evidence, 'boundary', None),
-        )
+        return profile.evaluator(evidence)
+
+    def target_identity_kwargs(env, state_revision):
+        source = env.value['source']
+        return {
+            'task_artifact_hash': env.artifact.identity_hash,
+            'source_id': source.scene_source.source_id,
+            'source_closure_digest': source.source_closure_digest,
+            'provider_materialization_id': env.session.provider_materialization_id,
+            'episode_id': env.session.episode_id,
+            'reset_sample_id': env.sample.sample_id,
+            'state_revision': state_revision,
+        }
+
+    def panda_gripper_receipt(context, substep_index):
+        return {
+            'profile_id': context['profile_id'],
+            'substep_index': substep_index,
+            'current_action': context['action_trace_after_substeps'][substep_index],
+            'aggregate_opening_m': context['opening_trace_m'][substep_index],
+        }
 
     def prepare_mixed_control(env, action, state):
         values = np.asarray(action, dtype=np.float64)
@@ -1195,29 +1227,15 @@ def build_libero_selected_candidate(
             'arm_servo_position_rad': list(ordered_servo),
             **canonical_gripper_fields,
         }
-        target_kwargs = {
-            'task_artifact_hash': env.artifact.identity_hash,
-            'source_id': source.scene_source.source_id,
-            'source_closure_digest': source.source_closure_digest,
-            'provider_materialization_id': env.session.provider_materialization_id,
-            'episode_id': env.session.episode_id,
-            'reset_sample_id': env.sample.sample_id,
-            'state_revision': env.session.state_revision,
-        }
         target = env.controller.compute_pose_target(
-            arm_resolution, aggregate_opening_m, state, **target_kwargs,
+            arm_resolution, aggregate_opening_m, state,
+            **target_identity_kwargs(env, env.session.state_revision),
         )
         canonical_action['controller_receipt'] = env.controller.last_control_receipt
         if panda_gripper_delta_replay:
-            first_action = panda_gripper_context['action_trace_after_substeps'][0]
             canonical_action['controller_receipt'] = {
                 **dict(canonical_action['controller_receipt']),
-                'panda_gripper_action_v1': {
-                    'profile_id': panda_gripper_context['profile_id'],
-                    'substep_index': 0,
-                    'current_action': first_action,
-                    'aggregate_opening_m': aggregate_opening_m,
-                }
+                'panda_gripper_action_v1': panda_gripper_receipt(panda_gripper_context, 0),
             }
         prepared = {
             'action_values': values_tuple,
@@ -1251,48 +1269,31 @@ def build_libero_selected_candidate(
         return prepared
 
     def prepare_mixed_control_substep(env, prepared, state, substep_index,
-                                      substep_count, state_revision):
+                                      _substep_count, state_revision):
         """Recompute task OSC from each fresh native state and the same pose goal."""
-        if (type(substep_index) is not int or type(substep_count) is not int
-                or not 0 <= substep_index < substep_count
-                or substep_count != env.artifact.timebase.control_substeps
-                or type(state_revision) is not int or state_revision < 0):
-            raise ValueError('physics-rate OSC callback received an invalid substep boundary')
         context = prepared.get('substep_context')
         if not isinstance(context, Mapping):
             raise TypeError('physics-rate OSC callback requires its typed outer pose-resolution context')
         panda_gripper_context = context.get('panda_gripper_delta_replay')
         if panda_gripper_context is not None:
-            current_action = panda_gripper_context['action_trace_after_substeps'][substep_index]
             opening_m = panda_gripper_context['opening_trace_m'][substep_index]
         else:
-            current_action = None
             opening_m = context['aggregate_opening_m']
         if substep_index == 0:
             target = prepared['target']
             receipt = prepared['writer_control']['canonical_action'].get('controller_receipt')
         else:
-            source = env.value['source']
             target = env.controller.compute_pose_target(
                 context['arm_resolution'], opening_m, state,
-                task_artifact_hash=env.artifact.identity_hash,
-                source_id=source.scene_source.source_id,
-                source_closure_digest=source.source_closure_digest,
-                provider_materialization_id=env.session.provider_materialization_id,
-                episode_id=env.session.episode_id,
-                reset_sample_id=env.sample.sample_id,
-                state_revision=state_revision,
+                **target_identity_kwargs(env, state_revision),
             )
             receipt = env.controller.last_control_receipt
         if panda_gripper_context is not None:
             receipt = {
                 **dict(receipt),
-                'panda_gripper_action_v1': {
-                    'profile_id': panda_gripper_context['profile_id'],
-                    'substep_index': substep_index,
-                    'current_action': current_action,
-                    'aggregate_opening_m': opening_m,
-                },
+                'panda_gripper_action_v1': panda_gripper_receipt(
+                    panda_gripper_context, substep_index,
+                ),
             }
         if not isinstance(receipt, Mapping):
             raise TypeError('physics-rate OSC callback omitted its recomputation receipt')
@@ -1459,14 +1460,13 @@ def build_libero_selected_candidate(
                 raise ValueError("compiled MuJoCo options receipt or expected profile is incomplete")
             for section, actual_section, expected_section in zip(
                     ("mujoco_runtime", "options", "model_sizes"), actual, expected, strict=True):
-                for key, expected_value in expected_section.items():
-                    measured = actual_section.get(key)
-                    equal = (
-                        tuple(measured) == tuple(expected_value)
-                        if isinstance(expected_value, list) else measured == expected_value
+                differences = _mapping_differences(
+                    actual_section, expected_section, keys=expected_section, sequence_values=True,
+                )
+                if differences:
+                    raise ValueError(
+                        f"compiled MuJoCo {section} differs from the pinned official model: {differences}"
                     )
-                    if not equal:
-                        raise ValueError(f"compiled MuJoCo {section}.{key} differs from the pinned official model")
             options = compiled_options["options"]
             if (options.get("integrator_name") != "euler"
                     or options.get("solver_name") != "newton"
@@ -1516,15 +1516,10 @@ def build_libero_selected_candidate(
                 actual_arrays, expected_arrays)):
             raise ValueError('post-reset LIBERO model fingerprint omitted dimensions, names or arrays')
 
-        physical_dimensions_actual = {
-            key: val for key, val in actual_dimensions.items()
-            if key not in bookkeeping_dimensions
-        }
-        physical_dimensions_expected = {
-            key: val for key, val in expected_dimensions.items()
-            if key not in bookkeeping_dimensions
-        }
-        if physical_dimensions_actual != physical_dimensions_expected:
+        physical_dimension_differences = _mapping_differences(
+            actual_dimensions, expected_dimensions, exclude=bookkeeping_dimensions,
+        )
+        if physical_dimension_differences:
             raise ValueError('post-reset LIBERO physical model dimensions differ from the official compile')
         if actual_names != expected_names:
             raise ValueError(
@@ -1532,11 +1527,9 @@ def build_libero_selected_candidate(
                 + json.dumps(_compiled_physics_fingerprint_diff_v1(actual, expected),
                              sort_keys=True, separators=(',', ':'))
             )
-        physical_array_differences = {
-            key: {'actual': actual_arrays.get(key), 'expected': expected_arrays.get(key)}
-            for key in sorted(set(actual_arrays) | set(expected_arrays))
-            if key not in render_only_arrays and actual_arrays.get(key) != expected_arrays.get(key)
-        }
+        physical_array_differences = _mapping_differences(
+            actual_arrays, expected_arrays, exclude=render_only_arrays,
+        )
         if physical_array_differences:
             reset_readback = getattr(session, 'reset_readback_v1', None)
             fixture_readback = (
@@ -1563,16 +1556,14 @@ def build_libero_selected_candidate(
             'compiled_model_physics_fingerprint_v1': actual,
             'official_compiled_model_binary_sha256': expected.get('compiled_model_binary_sha256'),
             'candidate_compiled_model_binary_sha256': actual.get('compiled_model_binary_sha256'),
-            'bookkeeping_dimension_differences': {
-                key: {'actual': actual_dimensions.get(key), 'expected': expected_dimensions.get(key)}
-                for key in sorted(bookkeeping_dimensions)
-                if actual_dimensions.get(key) != expected_dimensions.get(key)
-            },
-            'render_only_array_differences': {
-                key: {'actual': actual_arrays.get(key), 'expected': expected_arrays.get(key)}
-                for key in sorted(render_only_arrays)
-                if actual_arrays.get(key) != expected_arrays.get(key)
-            },
+            'bookkeeping_dimension_differences': _mapping_differences(
+                actual_dimensions, expected_dimensions, keys=bookkeeping_dimensions,
+                missing_is_difference=False,
+            ),
+            'render_only_array_differences': _mapping_differences(
+                actual_arrays, expected_arrays, keys=render_only_arrays,
+                missing_is_difference=False,
+            ),
             'physical_dimensions_equal': True,
             'object_names_and_order_equal': True,
             'physical_array_fields_equal': True,

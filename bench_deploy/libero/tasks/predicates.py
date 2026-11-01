@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 import math
 from typing import Any
 
@@ -239,16 +238,7 @@ def evaluate_on_bowl_plate_v1(
 
 def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_fields):
     source = env.value['source']
-    identity = {
-        'source_id': source.scene_source.source_id,
-        'source_closure_digest': source.source_closure_digest,
-        'provider_materialization_id': env.session.provider_materialization_id,
-        'episode_id': env.session.episode_id,
-        'reset_sample_id': env.sample.sample_id,
-        'control_step': int(state.control_step),
-        'state_revision': int(env.session.state_revision),
-        'simulation_time_s': float(state.simulation_time),
-    }
+    identity = _predicate_boundary_fields(env, state)
     boundary_sha = digest(identity)
     ee = state.pose_world['panda-v1/ee']
     observation = {
@@ -284,20 +274,26 @@ def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_
     )
 
 
+def _predicate_boundary_fields(env, state):
+    source = env.value['source']
+    return {
+        'source_id': source.scene_source.source_id,
+        'source_closure_digest': source.source_closure_digest,
+        'provider_materialization_id': env.session.provider_materialization_id,
+        'episode_id': env.session.episode_id,
+        'reset_sample_id': env.sample.sample_id,
+        'control_step': int(state.control_step),
+        'state_revision': int(env.session.state_revision),
+        'simulation_time_s': float(state.simulation_time),
+    }
+
+
 def observe_task23_reference_v1(env, state):
     """Observe task2/3 through the same public state and boundary projection."""
-    source, task_uid = env.value['source'], env.artifact.task_id
+    task_uid = env.artifact.task_id
     boundary = LiberoPredicateBoundaryV1(
-        task_uid=task_uid,
-        source_manifest_sha256=env.value['source_manifest_sha256'],
-        source_id=source.scene_source.source_id,
-        source_closure_digest=source.source_closure_digest,
-        provider_materialization_id=env.session.provider_materialization_id,
-        episode_id=env.session.episode_id,
-        reset_sample_id=env.sample.sample_id,
-        control_step=int(state.control_step),
-        state_revision=int(env.session.state_revision),
-        simulation_time_s=float(state.simulation_time),
+        task_uid=task_uid, source_manifest_sha256=env.value['source_manifest_sha256'],
+        **_predicate_boundary_fields(env, state),
     )
     evidence = (
         OpenMiddleDrawerEvidenceV1(

@@ -31,7 +31,6 @@ class _SourceOSCController:
         self.gravity_bias_model = None
         self.source_xml_sha256 = None
         self.source_closure_digest = None
-        self._last_boundary = None
         if gravity_bias_model is not None:
             self.set_source_gravity_model(
                 gravity_bias_model,
@@ -79,7 +78,6 @@ class _SourceOSCController:
     def reset(self, state):
         if set(_JOINTS) - set(state.joint_position) or set(_JOINTS) - set(state.joint_velocity):
             raise ValueError('LIBERO controller reset state omits named Panda arm feedback')
-        self._last_boundary = (int(state.control_step), float(state.simulation_time))
 
     def close_resources(self):
         model = self.gravity_bias_model

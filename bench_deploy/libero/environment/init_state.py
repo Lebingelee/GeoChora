@@ -29,7 +29,6 @@ from bench_deploy.libero.objects.layout import (
 INIT_SHA256 = "cbbc73792ce546c9bec181fd328a411d3183074840b282671dee481511381d0a"
 ROWS = 50
 WIDTH = 92
-ROW_BYTES = WIDTH * 8
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024
 PILOT_SOURCE_MANIFEST_SHA256 = "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
 PILOT_BDDL_SHA256 = "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b"
@@ -455,10 +454,14 @@ def sample_libero_normal_reset_v1(
     placed: dict[str, dict[str, Any]] = {}
     asset_properties: dict[str, dict[str, Any]] = {}
     draw_rows = []
-    for object_name, region_name, source_path in PILOT_MOVABLES:
-        properties = asset_properties.setdefault(
+
+    def placement_properties(source_path):
+        return asset_properties.setdefault(
             source_path, _object_placement_properties(install_root, source_manifest, source_path),
         )
+
+    for object_name, region_name, source_path in PILOT_MOVABLES:
+        properties = placement_properties(source_path)
         region = regions[region_name]
         selected = None
         for attempt in range(5000):
@@ -511,9 +514,7 @@ def sample_libero_normal_reset_v1(
 
     fixture_poses = {}
     for fixture_name, region_name, source_path in PILOT_FIXTURES:
-        properties = asset_properties.setdefault(
-            source_path, _object_placement_properties(install_root, source_manifest, source_path),
-        )
+        properties = placement_properties(source_path)
         region = regions[region_name]
         range_index = int(rng.randint(len(region["ranges"])))
         x0, y0, x1, y1 = region["ranges"][range_index]
@@ -539,11 +540,7 @@ def sample_libero_normal_reset_v1(
     qpos_names, qvel_names = layout["qpos_names"], layout["qvel_names"]
     qpos_by_name = dict(zip(qpos_names, row[layout["qpos_slice"][0]:layout["qpos_slice"][1]], strict=True))
     qvel_by_name = dict(zip(qvel_names, row[layout["qvel_slice"][0]:layout["qvel_slice"][1]], strict=True))
-    joint_names = (
-        *(f"joint{index}" for index in range(1, 8)), "finger_joint1", "finger_joint2",
-        "wooden_cabinet_1.top_level", "wooden_cabinet_1.middle_level",
-        "wooden_cabinet_1.bottom_level", "flat_stove_1.button",
-    )
+    joint_names = tuple(name for name in qpos_names if ".free[" not in name)
     object_names = tuple(name for name, _, _ in PILOT_MOVABLES)
     joint_position = {name: float(qpos_by_name[name]) for name in joint_names}
     joint_velocity = {name: float(qvel_by_name[name]) for name in joint_names}

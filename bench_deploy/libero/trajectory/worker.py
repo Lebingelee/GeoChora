@@ -70,14 +70,14 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
     h5_path = output_dir / "trajectory.h5"
     try:
         if solution_factory is None:
-            observation, reset_info = env.reset(
+            _, reset_info = env.reset(
                 seed=seed, options=_reset_options(row_index, reset_options),
             )
         else:
             solution = solution_factory(output_dir)
             if getattr(solution, "solution_schema_version", None) != "libero-bowl-to-plate-solution-v8":
                 raise ValueError("optional Solution factory must return the frozen V8 policy")
-            observation, reset_info = env.reset_for_solution(
+            _, reset_info = env.reset_for_solution(
                 solution, seed=seed, options=_reset_options(row_index, reset_options),
             )
         env.start_recording(h5_path)
@@ -87,14 +87,14 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
         step_limit = len(actions) if actions is not None else maximum_steps
         for index in range(step_limit):
             if actions is None:
-                next_observation, reward, terminated, truncated, info = env.step_with_solution(solution)
+                _, _, terminated, truncated, info = env.step_with_solution(solution)
                 action = info.get("external_action")
                 if action is None:
                     raise ValueError("V8 public step omitted its typed external action")
                 values = np.asarray(action, dtype=np.float64).reshape(-1).tolist()
             else:
                 values = actions[index]
-                next_observation, reward, terminated, truncated, info = env.step(np.asarray(values))
+                _, _, terminated, truncated, info = env.step(np.asarray(values))
             trace.append({
                 "index": index,
                 "action": values,
@@ -102,7 +102,7 @@ def run_libero_replay(env, *, output_dir: Path, action_sequence: Sequence[Any] |
                 "simulation_time_s": float(info.get("simulation_time_s", float("nan"))),
                 "terminated": bool(terminated), "truncated": bool(truncated),
             })
-            observation, final_info = next_observation, dict(info)
+            final_info = dict(info)
             if terminated or truncated or (solution is not None and (solution.done or solution.failed)):
                 break
         if not trace:
