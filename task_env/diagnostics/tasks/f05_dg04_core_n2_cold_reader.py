@@ -90,6 +90,9 @@ def _bound_errors(bundle: dict) -> list[dict]:
            "runtime_identity", "worker did not report app-start bootstrap steps separately")
     _check(worker.get("candidate_build_physics_steps") == 0,
            "reset_bootstrap", "source-bound candidate construction advanced native physics")
+    _check(worker.get("public_manager_counter_scope")
+           == "per_provider_materialization; aggregate sums episode-local deltas",
+           "reset_bootstrap", "worker did not identify the public counter's per-materialization scope")
     bootstrap_receipt_total = int(worker.get("bootstrap_steps_at_app_open", -1))
     episode_bootstrap_steps = []
     if len(bundle["episodes"]) == 2 and len(worker.get("episodes", [])) == 2:
@@ -127,7 +130,30 @@ def _bound_errors(bundle: dict) -> list[dict]:
             bootstrap_step_before = bootstrap.get("step_index_before") if isinstance(bootstrap, dict) else None
             bootstrap_step_after = bootstrap.get("step_index_after") if isinstance(bootstrap, dict) else None
             reset_delta = producer_episode.get("reset_manager_physics_steps_delta")
+            reset_raw_delta = producer_episode.get("reset_manager_physics_steps_raw_delta")
+            reset_before = producer_episode.get("reset_manager_physics_steps_before")
+            reset_after = producer_episode.get("reset_manager_physics_steps_after")
+            reset_rebased = producer_episode.get("reset_manager_counter_rebased")
             reset_outside_bootstrap = producer_episode.get("reset_physics_steps_outside_bootstrap")
+            producer_materialization_id = producer_episode.get("provider_materialization_id")
+            witness_rows = episode.get("witness", {}).get("rows", [])
+            first_boundary = (
+                _view_from_witness(witness_rows[0]).get("boundary", {}) if witness_rows else {}
+            )
+            h5_materialization_id = first_boundary.get("provider_materialization_id")
+            previous_materialization_id = (
+                worker["episodes"][episode_index - 2].get("provider_materialization_id")
+                if episode_index > 1 else None
+            )
+            materialization_changed = (
+                previous_materialization_id is not None
+                and producer_materialization_id != previous_materialization_id
+            )
+            episode_manager_delta = producer_episode.get("manager_physics_steps_delta_including_bootstrap")
+            episode_formal_manager_delta = producer_episode.get("formal_physics_steps_public_manager_delta")
+            expected_episode_formal_steps = int(plan["oracle"]["control_intervals_per_episode"]) * int(
+                plan["oracle"]["control_substeps"]
+            )
             valid_steps = type(steps) is int and 0 <= steps <= int(
                 plan["limits"]["bootstrap_steps_per_materialization_max"]
             )
@@ -149,8 +175,19 @@ def _bound_errors(bundle: dict) -> list[dict]:
                    and valid_steps and valid_time,
                    "reset_bootstrap", f"episode {episode_index} H5 public bootstrap receipt is missing or invalid")
             _check(type(reset_delta) is int and valid_steps and reset_delta == steps
-                   and reset_outside_bootstrap == 0,
-                   "reset_bootstrap", f"episode {episode_index} reset manager delta is not explained solely by its persisted bootstrap receipt")
+                   and reset_outside_bootstrap == 0
+                   and type(reset_before) is int and type(reset_after) is int
+                   and type(reset_raw_delta) is int and reset_raw_delta == reset_after - reset_before
+                   and reset_rebased == (reset_raw_delta < 0)
+                   and reset_after == bootstrap_step_after
+                   and reset_after - bootstrap_step_before == steps,
+                   "reset_bootstrap", f"episode {episode_index} reset manager delta is not explained by its materialization bootstrap receipt")
+            _check(producer_materialization_id == h5_materialization_id
+                   and (reset_raw_delta >= 0 or materialization_changed),
+                   "reset_bootstrap", f"episode {episode_index} counter rebase is not bound to a new H5 materialization identity")
+            _check(episode_manager_delta == expected_episode_formal_steps + steps
+                   and episode_formal_manager_delta == expected_episode_formal_steps,
+                   "reset_bootstrap", f"episode {episode_index} public manager total does not reconcile within its materialization")
             _check(producer_episode.get("bootstrap_physics_steps") == steps
                    and producer_episode.get("bootstrap_receipt_identity_sha256") == bootstrap_identity,
                    "reset_bootstrap", f"episode {episode_index} producer bootstrap facts differ from cold H5 metadata")
@@ -289,20 +326,22 @@ def _bound_errors(bundle: dict) -> list[dict]:
             digest = hashlib.sha256(encoded).digest()
             _check(bytes(arrays["boundary_digest"][boundary_index].tolist()) == digest,
                    "boundary_digest", f"episode {episode_index} H5 boundary digest differs at {boundary_index}")
-        if boundary_index == 0:
-            episode_id, reset_id = boundary.get("episode_id"), boundary.get("reset_sample_id")
-            reset_sample_ids.append(reset_id)
-            _check(boundary.get("control_step") == 0 and clock.get("sample_index") == 0
-                   and float(clock.get("simulation_time_s", math.nan)) == 0.0
-                   and reset_id == producer_episode.get("reset_sample_id"),
-                   "reset_identity", f"episode {episode_index} does not start from the producer's reset identity")
-            reset_cube = _frame(view, "free-cube", "free_cube")
-            if reset_cube is not None:
-                reset_z = float(reset_cube["position"][2])
-                raw_at_reset = bool(reset_metrics.get("raw_lift_height_predicate"))
-                _check(abs(float(reset_metrics.get("free_cube_center_z_m", math.nan)) - reset_z) <= 2e-7
-                       and raw_at_reset == (reset_z >= float(reset_metrics.get("lift_threshold_z_m", math.nan))),
-                       "raw_task_reset_witness", f"episode {episode_index} reset raw predicate differs from typed cube height")
+            _check(boundary.get("provider_materialization_id") == producer_episode.get("provider_materialization_id"),
+                   "episode_identity", f"episode {episode_index} materialization identity differs at boundary {boundary_index}")
+            if boundary_index == 0:
+                episode_id, reset_id = boundary.get("episode_id"), boundary.get("reset_sample_id")
+                reset_sample_ids.append(reset_id)
+                _check(boundary.get("control_step") == 0 and clock.get("sample_index") == 0
+                       and float(clock.get("simulation_time_s", math.nan)) == 0.0
+                       and reset_id == producer_episode.get("reset_sample_id"),
+                       "reset_identity", f"episode {episode_index} does not start from the producer's reset identity")
+                reset_cube = _frame(view, "free-cube", "free_cube")
+                if reset_cube is not None:
+                    reset_z = float(reset_cube["position"][2])
+                    raw_at_reset = bool(reset_metrics.get("raw_lift_height_predicate"))
+                    _check(abs(float(reset_metrics.get("free_cube_center_z_m", math.nan)) - reset_z) <= 2e-7
+                           and raw_at_reset == (reset_z >= float(reset_metrics.get("lift_threshold_z_m", math.nan))),
+                           "raw_task_reset_witness", f"episode {episode_index} reset raw predicate differs from typed cube height")
             run_episode_ids.append(boundary.get("episode_id"))
             joints = _joint_rows(view, "panda-main")
             _check(set(joints) == set(expected_order), "joint_order", f"episode {episode_index} named joint set differs")

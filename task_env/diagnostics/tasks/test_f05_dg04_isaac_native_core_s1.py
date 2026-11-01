@@ -324,3 +324,35 @@ def test_f05_dg04_selected_reference_core_s1_two_episodes(tmp_path):
     (evidence_root / "summary.json").write_text(
         json.dumps(report, sort_keys=True, indent=2) + "\n", encoding="utf-8",
     )
+
+
+def test_f05_dg04_core_n2_public_counter_rebase_is_materialization_scoped():
+    from task_env.diagnostics.tasks.f05_dg04_core_n2_probe import (
+        _materialization_reset_counter_evidence,
+    )
+
+    bootstrap = {
+        "physics_steps": 18,
+        "step_index_before": 0,
+        "step_index_after": 18,
+    }
+    rebased = _materialization_reset_counter_evidence(
+        before=1518,
+        after=18,
+        bootstrap_receipt=bootstrap,
+        previous_materialization_id="materialization-1",
+        current_materialization_id="materialization-2",
+    )
+    assert rebased["reset_manager_physics_steps_raw_delta"] == -1500
+    assert rebased["reset_manager_physics_steps_delta"] == 18
+    assert rebased["reset_manager_counter_rebased"] is True
+    assert rebased["reset_physics_steps_outside_bootstrap"] == 0
+
+    with pytest.raises(RuntimeError, match="within one Core materialization"):
+        _materialization_reset_counter_evidence(
+            before=1518,
+            after=18,
+            bootstrap_receipt=bootstrap,
+            previous_materialization_id="materialization-1",
+            current_materialization_id="materialization-1",
+        )

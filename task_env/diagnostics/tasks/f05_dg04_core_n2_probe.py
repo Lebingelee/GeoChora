@@ -113,6 +113,56 @@ def _counter_update(path: Path, plan: dict, *, completed: bool) -> None:
     _atomic_json(path, counter)
 
 
+def _materialization_reset_counter_evidence(
+    *, before: int, after: int, bootstrap_receipt: dict,
+    previous_materialization_id: str | None, current_materialization_id: str,
+) -> dict:
+    """Reconcile reset counters within the provider materialization they describe.
+
+    SelectedReferenceEnv reconstructs its RuntimeSession on reset. Isaac's public
+    SimulationManager counter is local to that materialization, so a new session
+    can legitimately restart the counter while the SelectedReferenceEnv instance
+    itself remains the same.
+    """
+    if (type(before) is not int or before < 0 or type(after) is not int or after < 0
+            or not isinstance(current_materialization_id, str) or not current_materialization_id):
+        raise ValueError("DG04 reset counter evidence requires nonnegative public counters and a materialization identity")
+    step_before = bootstrap_receipt.get("step_index_before")
+    step_after = bootstrap_receipt.get("step_index_after")
+    bootstrap_steps = bootstrap_receipt.get("physics_steps")
+    if (type(step_before) is not int or type(step_after) is not int
+            or type(bootstrap_steps) is not int or bootstrap_steps < 0
+            or step_after - step_before != bootstrap_steps):
+        raise ValueError("DG04 reset counter evidence has an invalid persisted bootstrap interval")
+    local_delta = after - step_before
+    if after != step_after or local_delta != bootstrap_steps:
+        raise RuntimeError(
+            "DG04 Core reset manager counter does not end at its persisted materialization bootstrap receipt: "
+            f"after={after}, bootstrap_before={step_before}, bootstrap_after={step_after}, "
+            f"bootstrap_steps={bootstrap_steps}"
+        )
+    raw_delta = after - before
+    counter_rebased = raw_delta < 0
+    same_materialization = (
+        previous_materialization_id is not None
+        and previous_materialization_id == current_materialization_id
+    )
+    if counter_rebased and same_materialization:
+        raise RuntimeError("DG04 public Isaac physics counter moved backwards within one Core materialization")
+    if not counter_rebased and same_materialization and raw_delta != bootstrap_steps:
+        raise RuntimeError(
+            "DG04 same-materialization Core reset delta differs from its bootstrap receipt: "
+            f"reset_delta={raw_delta}, bootstrap={bootstrap_steps}"
+        )
+    return {
+        "reset_manager_physics_steps_raw_delta": raw_delta,
+        "reset_manager_physics_steps_delta": local_delta,
+        "reset_manager_counter_rebased": counter_rebased,
+        "reset_manager_counter_scope": "per_provider_materialization",
+        "reset_physics_steps_outside_bootstrap": local_delta - bootstrap_steps,
+    }
+
+
 def _candidate_identity(candidate, input_v1) -> dict:
     env = candidate.env
     return {
@@ -137,7 +187,10 @@ def _candidate_identity(candidate, input_v1) -> dict:
     }
 
 
-def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> dict:
+def _run_episode(
+    env, *, plan: dict, episode_index: int, counter_path: Path,
+    previous_materialization_id: str | None,
+) -> dict:
     from task_env.diagnostics.tasks.f05_dg02_core_n2_probe import (
         _finite, _pose as _pose_mapping, _record_state, _request, _target_pose,
     )
@@ -147,14 +200,14 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
     app_steps_before_reset = int(SimulationManager.get_num_physics_steps())
     obs, info = env.reset()
     app_steps_after_reset = int(SimulationManager.get_num_physics_steps())
-    reset_manager_steps_delta = app_steps_after_reset - app_steps_before_reset
-    if reset_manager_steps_delta < 0:
-        raise RuntimeError("DG04 public Isaac physics counter moved backwards during Core reset")
     if env.state.control_step != 0 or abs(float(env.state.simulation_time)) > 1e-12:
         raise ValueError("DG04 Core N2 reset did not start at boundary/time zero")
     if info.get("source_closure_digest") != env.value["source"].source_closure_digest:
         raise ValueError("DG04 reset source closure differs from the actual RuntimeSource")
     initial = _record_state(env)
+    current_materialization_id = initial["boundary"].get("provider_materialization_id")
+    if not isinstance(current_materialization_id, str) or not current_materialization_id:
+        raise ValueError("DG04 reset boundary omitted its provider materialization identity")
     if int(env.sample.task_seed) != int(plan["candidate"]["task_seed"]):
         raise ValueError("DG04 reset task seed differs from the frozen candidate")
 
@@ -266,27 +319,41 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
             or abs(float(bootstrap_time) - bootstrap_steps * float(bootstrap_dt)) > 1e-8
             or bootstrap_step_after - bootstrap_step_before != bootstrap_steps):
         raise ValueError("DG04 H5 public NativeIO bootstrap receipt is invalid or exceeds its frozen bound")
-    reset_steps_outside_bootstrap = reset_manager_steps_delta - bootstrap_steps
-    if reset_steps_outside_bootstrap != 0:
-        raise ValueError(
-            "DG04 Core reset manager delta differs from the separately measured NativeIO bootstrap: "
-            f"reset_delta={reset_manager_steps_delta}, bootstrap={bootstrap_steps}"
-        )
+    reset_counter = _materialization_reset_counter_evidence(
+        before=app_steps_before_reset,
+        after=app_steps_after_reset,
+        bootstrap_receipt=bootstrap_receipt,
+        previous_materialization_id=previous_materialization_id,
+        current_materialization_id=current_materialization_id,
+    )
     bootstrap_receipt_identity = hashlib.sha256(json.dumps(
         bootstrap_receipt, sort_keys=True, separators=(",", ":"), allow_nan=False,
     ).encode("utf-8")).hexdigest()
+    manager_steps_after_episode = int(SimulationManager.get_num_physics_steps())
+    manager_delta_including_bootstrap = manager_steps_after_episode - bootstrap_step_before
+    formal_manager_delta = manager_steps_after_episode - bootstrap_step_after
+    expected_formal_episode_steps = interval_count * int(plan["oracle"]["control_substeps"])
+    if (manager_delta_including_bootstrap < 0 or formal_manager_delta != expected_formal_episode_steps
+            or manager_delta_including_bootstrap != expected_formal_episode_steps + bootstrap_steps):
+        raise RuntimeError(
+            "DG04 per-materialization public manager total differs from its formal intervals/bootstrap: "
+            f"manager_delta={manager_delta_including_bootstrap}, formal_delta={formal_manager_delta}, "
+            f"bootstrap={bootstrap_steps}, expected_formal={expected_formal_episode_steps}"
+        )
     return {
         "episode_index": episode_index,
         "run_instance_id": run_instance_id,
+        "provider_materialization_id": current_materialization_id,
         "reset": initial,
         "reset_sample_id": env.sample.sample_id,
         "reset_manager_physics_steps_before": app_steps_before_reset,
         "reset_manager_physics_steps_after": app_steps_after_reset,
-        "reset_manager_physics_steps_delta": reset_manager_steps_delta,
-        "reset_physics_steps_outside_bootstrap": reset_steps_outside_bootstrap,
+        **reset_counter,
         "bootstrap_physics_steps": bootstrap_steps,
         "bootstrap_physics_time_s": float(bootstrap_time),
         "bootstrap_receipt_identity_sha256": bootstrap_receipt_identity,
+        "manager_physics_steps_delta_including_bootstrap": manager_delta_including_bootstrap,
+        "formal_physics_steps_public_manager_delta": formal_manager_delta,
         "task_seed": int(env.sample.task_seed),
         "provider": env.provider,
         "backend": env.backend,
@@ -368,8 +435,12 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     physics_after_formal = None
     try:
         for episode_index in range(1, 3):
+            previous_materialization_id = (
+                episodes[-1]["provider_materialization_id"] if episodes else None
+            )
             episodes.append(_run_episode(
                 env, plan=plan, episode_index=episode_index, counter_path=counter_path,
+                previous_materialization_id=previous_materialization_id,
             ))
         if len({row["run_instance_id"] for row in episodes}) != 1:
             raise ValueError("DG04 formal episodes did not reuse one SelectedReferenceEnv instance")
@@ -395,11 +466,12 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     episode_bootstrap_total = sum(episode_bootstrap_steps)
     bootstrap_steps_charged = int(bootstrap_steps_after_app_open) + episode_bootstrap_total
     manager_delta_including_episode_bootstrap = (
-        None if physics_after_formal is None else physics_after_formal - physics_before
+        sum(int(row["manager_physics_steps_delta_including_bootstrap"]) for row in episodes)
+        if episodes else None
     )
     formal_manager_delta = (
-        None if manager_delta_including_episode_bootstrap is None
-        else manager_delta_including_episode_bootstrap - episode_bootstrap_total
+        sum(int(row["formal_physics_steps_public_manager_delta"]) for row in episodes)
+        if episodes else None
     )
     if bootstrap_steps_charged > int(plan["limits"]["bootstrap_physics_steps_reserved"]):
         if primary_error is None:
@@ -426,6 +498,12 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         "candidate_build_physics_steps": candidate_build_physics_steps,
         "episode_bootstrap_physics_steps": episode_bootstrap_steps,
         "bootstrap_steps_charged": bootstrap_steps_charged,
+        "public_manager_counter_scope": "per_provider_materialization; aggregate sums episode-local deltas",
+        "global_manager_counter_physics_steps_before_formal": physics_before,
+        "global_manager_counter_physics_steps_after_formal": physics_after_formal,
+        "global_manager_counter_physics_steps_raw_delta": (
+            None if physics_after_formal is None else physics_after_formal - physics_before
+        ),
         "manager_physics_steps_delta_including_episode_bootstrap": manager_delta_including_episode_bootstrap,
         "formal_physics_steps_public_manager_delta": formal_manager_delta if primary_error is None else None,
         "physics_steps_attempted": counter.get("attempted_physics_steps"),
