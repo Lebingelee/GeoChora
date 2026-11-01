@@ -145,35 +145,6 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
         "stderr_path": str(log_paths["stderr"][0]),
     }
 
-def _validate_source_gravity_action(control_plan: Mapping[str, Any], diagnostics: Mapping[str, Any],
-                                   public_action: np.ndarray,
-                                   expected_controller: Mapping[str, Any]) -> None:
-    """Recompute the v2 position-target compensation from the bound controller gains."""
-    if dict(control_plan) != dict(expected_controller):
-        raise ValueError("task Solution controller identity/profile differs from its frozen v2 profile")
-    try:
-        kp = np.asarray(control_plan.get("kp_Nm_per_rad"), dtype=np.float64)
-        bias = np.asarray(diagnostics.get("gravity_bias_Nm"), dtype=np.float64)
-        offset = np.asarray(diagnostics.get("gravity_target_offset_rad"), dtype=np.float64)
-        planner_target = np.asarray(diagnostics.get("planner_joint_target_rad"), dtype=np.float64)
-        compensated_target = np.asarray(
-            diagnostics.get("gravity_compensated_joint_target_rad"), dtype=np.float64,
-        )
-    except (TypeError, ValueError) as exc:
-        raise ValueError("task Solution gravity compensation fields are malformed") from exc
-    if (any(value.shape != (7,) or not np.isfinite(value).all()
-            for value in (kp, bias, offset, planner_target, compensated_target))
-            or (kp <= 0.0).any()
-            or public_action.shape != (8,) or not np.isfinite(public_action).all()
-            or diagnostics.get("gravity_compensation_profile_id") != "libero-source-mjcf-gravity-bias-v1"):
-        raise ValueError("task Solution gravity compensation fields have invalid shape, values, or profile")
-    if (not np.allclose(offset, bias / kp, rtol=0.0, atol=1e-10)
-            or not np.allclose(compensated_target, planner_target + offset,
-                               rtol=0.0, atol=1e-10)
-            or not np.allclose(public_action[:7], compensated_target,
-                               rtol=0.0, atol=1e-6)):
-        raise ValueError("task Solution action does not preserve the source gravity compensation formula")
-
 def _equivalent_wxyz_quaternions(left: Any, right: Any, *, tolerance: float = 1e-7) -> bool:
     """Compare unit quaternions by orientation, allowing the equivalent q/-q signs."""
     try:

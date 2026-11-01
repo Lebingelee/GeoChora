@@ -39,3 +39,27 @@ cadence but recomputes torque per physics substep. The maintainer approved
 removing the unused V1 export and private fallback. The V2 config and active
 controllers remain unchanged. The removed V1 code is recoverable from input
 commit `65891af449918e7162c78dec7c01a3bc0b7eecd0`.
+
+## Legacy position-target gravity validator
+
+The private `_validate_source_gravity_action` helper in `trajectory/reader.py`
+and its test-only caller were removed after the schema audit. The helper
+validated a V2 joint-position action with `gravity_compensated_joint_target_rad`;
+there was no worker or reader call site. The active V8 path applies source
+gravity inside the mixed OSC controller, and the independent reader rejects
+non-null episode-level `gravity_compensation`, so this old action rewrite was
+not part of the current receipt contract. The active source-gravity model and
+its closure/ownership tests remain. The removed helper and its negative test
+are recoverable from input commit
+`65891af449918e7162c78dec7c01a3bc0b7eecd0`.
+
+## Retired private Solution V4 selector
+
+`build_libero_selected_candidate(_solution_profile=True)` selected the old
+`solution-v4` Artifact name together with the pre-V8 V6 controller and looser
+resolver profile. No current package caller or test passed `True`; the CLI
+uses the default D01 profile and `build_libero_solution_candidate()` passes
+`'v8'`. The maintainer approved retiring the private V4 selector. The factory
+now accepts only its D01 default or the final V8 profile, and the removed
+branch is recoverable from input commit
+`65891af449918e7162c78dec7c01a3bc0b7eecd0`.

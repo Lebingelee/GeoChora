@@ -359,7 +359,6 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
               provider: str = 'mujoco', task_uid: str = TASK_1,
               upstream_pose_replay: bool = False) -> TaskArtifact:
     solution_v8 = solution_profile == 'v8'
-    solution_profile_name = 'v8' if solution_v8 else 'v4'
     solution_profile = bool(solution_profile)
     pose_action_profile = bool(solution_profile or upstream_pose_replay)
     contract = task_source_contract_v1(task_uid)
@@ -417,9 +416,9 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
         'task-artifact-v0',
         (ARTIFACT_ID if task_uid == TASK_1 else f'libero/{task_uid.rsplit("/", 1)[-1]}/mixed-v1')
         if not solution_profile else
-        (ARTIFACT_ID + f'/solution-{solution_profile_name}' if task_uid == TASK_1 else
-         f'libero/{task_uid.rsplit("/", 1)[-1]}/solution-{solution_profile_name}'),
-        task_uid, 'diagnostic-v1' if not solution_profile else f'diagnostic-solution-{solution_profile_name}',
+        (ARTIFACT_ID + '/solution-v8' if task_uid == TASK_1 else
+         f'libero/{task_uid.rsplit("/", 1)[-1]}/solution-v8'),
+        task_uid, 'diagnostic-v1' if not solution_profile else 'diagnostic-solution-v8',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
             ActionIntent(
@@ -896,8 +895,9 @@ def build_libero_selected_candidate(
     solution wrapper below selects the separately versioned full Solution
     profile and its bounded horizon.
     """
-    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v8'):
-        raise TypeError('internal LIBERO Solution profile selector must be bool or final v8')
+    if (_solution_profile is not False
+            and not (type(_solution_profile) is str and _solution_profile == 'v8')):
+        raise TypeError('internal LIBERO Solution profile selector must be false or final v8')
     contract = task_source_contract_v1(task_uid)
     if type(_upstream_pose_replay) is not bool:
         raise TypeError('upstream pose replay selector must be bool')

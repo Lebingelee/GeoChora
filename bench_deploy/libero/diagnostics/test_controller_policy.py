@@ -5,6 +5,7 @@ import json
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from bench_deploy.libero.controllers.osc import (
     LiberoMixedControllerV6,
@@ -137,3 +138,10 @@ def test_task_local_limit_monitor_allowance_is_scoped_to_approved_a_replay():
     assert all(task2[f"joint{i}"] == task3[f"joint{i}"] == 4.0e-3 for i in range(1, 8))
     assert _a_upstream_pose_replay_joint_limit_tolerances("geophys", TASK_3, True) == {}
     assert _a_upstream_pose_replay_joint_limit_tolerances("mujoco", TASK_3, False) == {}
+
+
+def test_selected_candidate_rejects_retired_v4_solution_selector():
+    from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
+
+    with pytest.raises(TypeError, match="false or final v8"):
+        build_libero_selected_candidate(_solution_profile=True)
