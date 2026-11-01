@@ -1,12 +1,21 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
+## R07 A123 closeout and F/R integration review (2026-11-01)
+
+The maintainer scope for this LIBERO package is the three A-stage task rows on MuJoCo and GeoPhys; high-precision tracking/Solution and Isaac/B/C are deferred. This supersedes the older R07 gate only for this bounded package; the historical F00–F07 plans and signed states below remain intact. The [A123 rework report](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md) records the repaired reset/controller/gripper semantics and complete task2/3 frozen-action replay on both providers. The maintainer accepted task2 GeoPhys's pre-target-contact difference as an exception scoped to the frozen A-stage source/controller/action sequence; Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. Asset file-specific terms/attribution also remain unresolved. No whole-R07 acceptance or F/R integration follows from this report.
+
+F/R was inspected read-only after execution. Camera was `codex/phase-ii-01-camera`; F was `develop-full` at `dade932e71835c48af4f6ba60d79c10c0ad0517f`; GeoPhys pins differed (`c6df840` camera candidate versus `a53a8cf` F). Six camera paths overlap F's committed path history: `task_env/artifacts/contracts.py`, `task_env/runtime/sessions/api.py`, `sessions/common.py`, `sessions/mujoco.py`, `sessions/source.py`, and `task_env/tasks/reference_env.py`. At the 2026-11-01T08:50:39Z read-only snapshot, F had 21 modified tracked paths and 5 untracked paths; its dirty `task_env/runtime/sessions/api.py` overlaps the A123 implementation commit. The exact names and byte hashes are preserved in `f_readonly_snapshot_20261101T085039Z.json` in the A123 evidence folder. Preserve them as concurrent inputs. These are semantic/ownership review hotspots, not verified merge conflicts. No F input was copied or staged, and no merge, rebase or cherry-pick was performed. Integration should first reconcile the current Runtime/source/controller owners and the GeoPhys pin, then select one route that preserves a single Core owner; do not create a parallel LIBERO Runtime or controller path. The A123 closeout does not authorize integration operations.
+
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../../../maintenance/20261101_r07_a123_sol_acceptance.md)。
+
 <a id="f05-successor-replan-20261030"></a>
 
 **2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
 
 v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按当前必需验收完成后即可进入 R00–R07 收尾，不等待可选 #4/#5。复用既有接受证据，完成现有 R07d/P99 和整合收尾；路线完成与发布授权分开。详见[收尾边界](09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)。
 
-2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+2026-10-30历史范围记录：[当时三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)保留其签署时点的 R07/P99 范围；对当前 A123 closeout，见[2026-11-01范围与未决项](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101)：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
 
 更新于 2026-10-28。状态：**F00 attempt002及有限复核修正获Sol `ACCEPTED_BOUNDED_F00`；下一步准备F01，尚未安装/启动**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
@@ -112,7 +121,7 @@ expert_failed 不直接等于 task infeasible；不得缩窄 reset 分布隐藏 
 
 F05 内部按 ready cell 顺序交付，不必为等待某 provider 阻塞其他已就绪行；
 但没有全部要求的 cell Evidence，就不能接受“三 provider 闭环”总出口。
-F06 的 ≥20-seed/Oracle/pending Judge 要求不回写为当前 R07c 的新增必需项；2026-10-30 的三任务 Solution 分层成功门来自维护者新决定，并非沿用旧“任务成功非必需”边界。见[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)。
+F06 的 ≥20-seed/Oracle/pending Judge 要求不回写为当前 R07c 的新增必需项；2026-10-30 的三任务 Solution 分层成功门来自维护者新决定，并非沿用旧“任务成功非必需”边界。见[历史三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)；当前A123范围见[2026-11-01 override](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101)。
 
 ### 原生资产与对应 Provider
 

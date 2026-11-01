@@ -1,6 +1,12 @@
 # LIBERO deployment recipe and current scope
 
-Current planning authority: [R07 three-task scope, completion gates and Harness integration](../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030). Required tasks are the original bowl-to-plate, middle-drawer and plate-to-stove-front tasks. All three must be deployable through configuration on MuJoCo, GeoPhys and Isaac Sim; required Solution success is MuJoCo 3/3, GeoPhys at least 1/3 and Isaac Sim at least 1/3. Remaining Solution successes are stretch goals. These are planned gates, not current implementation claims. The current implementation below remains a single-task diagnostic. Original tasks #4/#5 are optional v2.1.0 supplements. Once #1/#2/#3 meet the current required gates, enter R00-R07 route closeout without waiting for those optional tasks; see the [closeout boundary](../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout).
+## Current A-stage scope override (2026-11-01)
+
+The current package covers tasks 1/2/3 on MuJoCo and GeoPhys for bounded A-stage environment and upstream-control-flow replication. Task2/3 each completed their frozen upstream sequences on both providers after restoring the reference OSC profile and exact 0/80 mm PandaGripper v1 semantics; the task3 MuJoCo physical monitor allowance is 500 μm for this replay only. Task1's accepted evidence and contact-difference boundary remain reused and closed. The maintainer accepted task2 GeoPhys's pre-target-contact TCP difference (33.143 mm P95 / 37.916 mm max; orientation 229.074 / 259.412 mrad before first finger-to-cabinet contact) as a scoped exception for this frozen A-stage source/controller/action sequence. This does not establish general provider parity; Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. See the [A123 rework report](../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md).
+
+The source checkout, per-file paths and hashes for task2/3 wine_bottle and wine_rack assets are verified. Their specific license/attribution record remains unresolved; the root LIBERO manifest does not establish those terms. High-precision tracking and autonomous Solution success are optional follow-up; Isaac Sim and B/C are deferred. The older three-provider/Solution target in the next paragraph is a historical plan superseded for this bounded A-stage closeout.
+
+Historical 2026-10-30 plan: [R07 three-task scope, completion gates and Harness integration](../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030). At that time the planned gate required all three tasks on MuJoCo, GeoPhys and Isaac Sim plus Solution success. It is superseded for the current bounded A-stage closeout only; its historical meaning and the independent R00–R07/P99/release boundaries are preserved. Original tasks #4/#5 remain optional supplements.
 
 This is benchmark-specific deployment metadata, not a Core `TaskArtifact` or
 task registration. Its modules compose the actual task, robot, controller,
@@ -24,6 +30,9 @@ and writes a versioned recipe with a canonical SHA-256. It records the native
 MountedPanda actuator layout and 20 Hz OSC_POSE source control separately from
 the Core diagnostic controller. The Core route does not claim OSC_POSE
 equivalence.
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../docs/maintenance/20261101_r07_a123_sol_acceptance.md)。
+
 
 ## R07c D01 bounded diagnostic route
 

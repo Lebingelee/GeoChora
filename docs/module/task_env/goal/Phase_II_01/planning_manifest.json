@@ -2928,10 +2928,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
-    "07_Execution_Order_and_Acceptance.md": "6bf7780ad37c8458ca30485dee0a5577cfd3c2d1db9c74c7ba8a3628bbbe8ebf",
+    "07_Execution_Order_and_Acceptance.md": "317f42951cd3f7d30cf18d622c46338097b02ef7b36665652db42ba81a7a8108",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "4c396ef6b563e22a963c97bc3bed4424eb47f4a892bdc313871ebd3381c17495",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "8b5adb4f91d5c612e3419f42d556b69b8d022f1bd4c758c9fdda5dd92da784fd",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e45a571206e88e97407abac5bb912366fe701867cae39fa0d0f559f7a9e78ba6",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "bbb79d1f2559ebf9d026145572a73bd063f47a6ff62a73590de60b586c8a9b6d",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "858a1e91b37167a34da0d90b428b4451ca6788ffb8bf31fce765be3c98b5339f",
     "README.md": "eee457312f319bc4109b2e5a7976fef62a823fd012826438efc086536d7ac4d9",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "3127f18fc5aa25288f3efca7d8776ea875c923a2427ead7abc30148bfae0c073",
     "12_F05_F07_Execution_Playbook.md": "d2c525cf378632f823b803d14b797a5301c3e116caca99f16248b4ebb0e60cb8"
@@ -5723,6 +5723,73 @@
       "accepted_slice_count_delta": 0,
       "new_native_runs": 0,
       "release_authorized": false
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "R07_LIBERO_A123_CLOSEOUT_READY_FOR_SOL_REVIEW",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "e23b3aa6c781b4a2451ee9cc01cfec093b8f7ca6",
+      "implementation_head": "cce5fd4bbd99998f802e57c57b3715019776db2e",
+      "provider_branch": "codex/phase-ii-01-r05-provider",
+      "provider_input_head": "c6df840bef8d36b1150150167df08e29dc3f664c",
+      "provider_commit": "7d3d3d082ce871de1ddc5333505eaeebecf28246",
+      "required_tasks": [
+        "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+        "libero_goal/open_the_middle_drawer_of_the_cabinet",
+        "libero_goal/push_the_plate_to_the_front_of_the_stove"
+      ],
+      "required_providers": [
+        "mujoco",
+        "geophys"
+      ],
+      "geophys_reset_joint_angle_atol_rad": 2e-07,
+      "accepted_slices_unchanged": "18/22",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_closeout_20261101_001/report.md",
+      "result": "Task1 accepted evidence reused; task2/3 frozen MuJoCo replays and GeoPhys public build/reset/step/readback/close smoke runs completed. GeoPhys task2/3 were not full trajectory replays; contact/predicate limitations remain recorded.",
+      "status": "A123_BOUNDED_EVIDENCE_READY_FOR_SOL_REVIEW",
+      "sol_review": "PENDING",
+      "sol_acceptance_recorded": false,
+      "qualification_granted": false,
+      "formal_task_success_claimed": false
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "R07_LIBERO_A123_GEOPHYS_ACTION_REPLAY_SUPPLEMENT001",
+      "input_head": "cce5fd4bbd99998f802e57c57b3715019776db2e",
+      "provider_commit": "7d3d3d082ce871de1ddc5333505eaeebecf28246",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_closeout_20261101_001/report.md",
+      "snapshot": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_closeout_20261101_001/geophys_action_replay_supplement_001_snapshot.json",
+      "tasks": {
+        "libero_goal/open_the_middle_drawer_of_the_cabinet": {
+          "actions": 103,
+          "physics_steps": 2575,
+          "resets": 1,
+          "elapsed_seconds": 95.65738905601029,
+          "predicate": "available_false",
+          "contact_summary": "unavailable",
+          "drawer_qpos_delta_m": -0.10673489421606064
+        },
+        "libero_goal/push_the_plate_to_the_front_of_the_stove": {
+          "actions": 245,
+          "physics_steps": 6125,
+          "resets": 1,
+          "elapsed_seconds": 166.85454626500723,
+          "predicate": "unavailable_public_stove_front_site_state_unavailable",
+          "contact_summary": "unavailable",
+          "arm_resolver_nonconverged_actions": 158
+        }
+      },
+      "native_starts": 2,
+      "native_physics_steps": 8700,
+      "native_resets": 2,
+      "native_elapsed_seconds": 262.5119353210175,
+      "max_process_tree_rss_bytes": 2056921088,
+      "accepted_reset_joint_angle_tolerance_rad": 2e-07,
+      "status": "A123_GEOPHYS_ACTION_REPLAY_COMPLETE_PENDING_SOL_REVIEW",
+      "sol_review": "PENDING",
+      "sol_acceptance_recorded": false,
+      "task_success_claimed": false,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -7058,7 +7125,11 @@
       "current_status": "DIRECTION_RECORDED_REQUIRED_TASK_GATES_NOT_YET_COMPLETE",
       "route_completion_implies_whole_version_or_f_line_completion": false,
       "merge_push_tag_release_or_qualification_authorized": false
-    }
+    },
+    "status_at_signing": "MAINTAINER_APPROVED_CURRENT_SCOPE_NOT_ACCEPTANCE",
+    "current_applicability": "HISTORICAL_SCOPE_SUPERSEDED_FOR_A123_CLOSEOUT",
+    "superseded_for_scope": "r07_libero_a123_scope_override_20261101",
+    "historical_note": "The 2026-10-30 three-provider/Solution requirements retain their signed-time meaning and are not the current A123 closeout gates."
   },
   "r07_v210_required123_work_package_001": {
     "date": "2026-10-30",
@@ -7167,5 +7238,101 @@
       "new_source_facts": 0
     },
     "required123_nine_cell_scope_unchanged": true
+  },
+  "r07_libero_a123_scope_override_20261101": {
+    "date": "2026-11-01",
+    "status": "ACCEPTED_BOUNDED_R07_A123_TECHNICAL",
+    "scope_authority": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_libero_replication_closeout_20261101_001/scope_and_stabilization.md",
+    "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md",
+    "required_tasks": [
+      "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "libero_goal/open_the_middle_drawer_of_the_cabinet",
+      "libero_goal/push_the_plate_to_the_front_of_the_stove"
+    ],
+    "required_providers": [
+      "mujoco",
+      "geophys"
+    ],
+    "task1_evidence": "reused_maintainer_accepted_bounded_A; no rerun",
+    "task2_mujoco": "frozen_103_action_replay_complete",
+    "task2_geophys": "frozen_103_action_public_runtime_replay_complete; measured pre-target-contact difference accepted as scoped A-stage exception",
+    "task3_mujoco": "frozen_245_action_replay_complete",
+    "task3_geophys": "frozen_245_action_public_runtime_replay_complete",
+    "approved_geo_phys_reset_joint_angle_atol_rad": 2e-07,
+    "optional_followup": [
+      "high_precision_tracking",
+      "autonomous_solution_success"
+    ],
+    "deferred": [
+      "isaac_sim",
+      "B_stage",
+      "C_stage",
+      "run020"
+    ],
+    "qualification_granted": false,
+    "formal_task_success_claimed": false,
+    "sol_acceptance_recorded": true,
+    "history_preserved": true,
+    "geophys_action_replay_supplement": "103_and_245_actions_completed; contact_query_unavailable; task3_predicate_unavailable",
+    "source_terms_attribution": "UNRESOLVED_FILE_SPECIFIC_LICENSE_ATTRIBUTION; source checkout/path/bytes/hashes verified",
+    "accepted_bounded_variance_decision": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task2_geophys_precontact_exception_decision.json",
+    "sol_review": "ACCEPTED_TECHNICAL_ONLY",
+    "source_terms_gate_closed": false,
+    "sol_review_doc": "docs/maintenance/20261101_r07_a123_sol_acceptance.md"
+  },
+  "r07_libero_a123_review_rework_20261101": {
+    "date": "2026-11-01",
+    "kind": "R07_LIBERO_A123_REVIEW_REWORK",
+    "branch": "codex/phase-ii-01-camera",
+    "input_head": "cce5fd4bbd99998f802e57c57b3715019776db2e",
+    "implementation_commits": [
+      "22f6946a44b3aeda2412016bef4bee00454c98b9",
+      "d338b2b6aa5330fb888e068b7b5ee036aff45ee8",
+      "d6fe8e1bff52854e4b69fb79235f0ef0386cc83b"
+    ],
+    "final_code_head": "d6fe8e1bff52854e4b69fb79235f0ef0386cc83b",
+    "provider_commit": "7d3d3d082ce871de1ddc5333505eaeebecf28246",
+    "scope": "R1-R3 A123 rework only; task1 accepted contact-difference decision not reopened; B/C not started",
+    "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md",
+    "asset_source_status": "Source checkout, per-file path, byte size and hash verified for wine_bottle/wine_rack; file-specific license/attribution unresolved; no conclusion inferred",
+    "task1": "accepted evidence reused; v1 PandaGripper 0/80 mm endpoints and 2375-substep target trace exactly confirmed offline; no native task1 rerun",
+    "task1_gripper_trace_reuse_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task1_gripper_trace_reuse_receipt.json",
+    "task2": {
+      "mujoco": "103/103 actions; pre-target-contact TCP position P95/max 0.546/0.605 mm; orientation 3.841/4.030 mrad",
+      "geophys": "103/103 actions; before first upstream finger/cabinet contact action 82 TCP position P95/max 33.143/37.916 mm; orientation 229.074/259.412 mrad; direct GeoPhys-MuJoCo pre-contact gap 33.100/37.721 mm and 226.906/257.160 mrad P95/max; accepted as bounded exception for frozen A-stage source/controller/action sequence"
+    },
+    "task3": {
+      "mujoco": "245/245 actions; task3-only MuJoCo A monitor tolerance 500 um, user-approved",
+      "geophys": "245/245 actions; pre-target-contact TCP position P95/max 0.945/1.153 mm; orientation 1.174/1.303 mrad; direct GeoPhys-MuJoCo gap 0.671/0.827 mm and 1.664/2.718 mrad P95/max, within accepted A replay gates"
+    },
+    "reset_sample_v0": "provider-free Core reset regressions cover ResetSample v0 and V1 through actual GeoPhys reset(); v0 zero-velocity/no-fixture behavior and V1 source/closure validation plus fixture write/readback passed; GeoPhys public Runtime reset/step route passed",
+    "tests": "9 passed: targeted GeoPhys ResetSample v0/V1 reset regressions and LIBERO controller/gripper policy tests",
+    "targeted_validation_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/targeted_validation_v1_reset_20261101.json",
+    "replay_metrics": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task23_replay/replay_metrics.json",
+    "free_motion_comparison": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task23_replay/provider_free_motion_comparison.json",
+    "resource_ledger": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task23_replay/replay_resource_ledger.json",
+    "status": "ACCEPTED_BOUNDED_R07_A123_TECHNICAL",
+    "accepted_bounded_variance_decision": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task2_geophys_precontact_exception_decision.json",
+    "sol_review": "ACCEPTED_TECHNICAL_ONLY",
+    "sol_acceptance_recorded": true,
+    "qualification_granted": false,
+    "formal_task_success_claimed": false,
+    "source_terms_gate_closed": false,
+    "sol_review_doc": "docs/maintenance/20261101_r07_a123_sol_acceptance.md"
+  },
+  "r07_libero_a123_sol_acceptance_20261101": {
+    "status": "ACCEPTED_BOUNDED_R07_A123_TECHNICAL",
+    "code_head": "d6fe8e1bff52854e4b69fb79235f0ef0386cc83b",
+    "provider_pin": "7d3d3d082ce871de1ddc5333505eaeebecf28246",
+    "review_doc": "docs/maintenance/20261101_r07_a123_sol_acceptance.md",
+    "scope": "bounded A123 technical evidence only; task2 GeoPhys scoped exception",
+    "source_terms_gate_closed": false,
+    "source_terms_status": "UNRESOLVED_FILE_SPECIFIC_LICENSE_ATTRIBUTION",
+    "independent_tests": "9 passed in 0.38s; zero-native",
+    "task_success_claimed": false,
+    "qualification_granted": false,
+    "whole_r07_completed": false,
+    "merge_push_release_authorized": false,
+    "accepted_slice_count_delta": 0
   }
 }

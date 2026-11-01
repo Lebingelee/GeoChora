@@ -1,5 +1,11 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+## R07 A-stage scope override (2026-11-01; bounded technical acceptance; source terms open)
+
+The 2026-11-01 maintainer scope revision supersedes the 2026-10-30 required-Solution/provider-switching gates for this R07 closeout only. The required slice is A for tasks 1/2/3 on MuJoCo and GeoPhys: source/model and comparable reset, same-semantics upstream action replay on MuJoCo, and a public construction/reset/step/state-readback/close route on GeoPhys. High-precision tracking and autonomous Solution success are `OPTIONAL_FOLLOWUP`; Isaac Sim and B/C remain deferred. This does not close R00–R07, P99, Qualification, release, or other open slices.
+
+Task1's accepted frozen result and its contact-difference decision remain closed and are reused without rerunning. Tasks 2/3 each completed the full upstream sequence on both providers (103/103 and 245/245 actions). The maintainer accepted task2 GeoPhys's pre-target-contact deviation as a bounded exception for this frozen A-stage source/controller/action sequence: before the source's first robot-finger/cabinet contact at action 82, position P95/max is 33.143/37.916 mm and orientation 229.074/259.412 mrad against upstream; MuJoCo is 0.546/0.605 mm and 3.841/4.030 mrad. Direct same-action GeoPhys↔MuJoCo pre-contact difference is 33.100/37.721 mm and 226.906/257.160 mrad (P95/max), covered by that task2 exception. Task3 direct provider difference is 0.671/0.827 mm and 1.664/2.718 mrad (P95/max), within the previously accepted A replay gates. This is not general provider parity or contact-solver equivalence. Task3 GeoPhys pre-contact position P95/max is 0.945/1.153 mm and orientation 1.174/1.303 mrad against upstream. Rework evidence is complete with the task2 boundary decision recorded; Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. GeoPhys contact remains unavailable, task3's stove-front predicate remains unavailable, and no task-success claim is made. Authored camera definitions matched, but no rendered-frame/pixel comparison was run. See [the A123 rework report](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md) and its bounded [task2 decision receipt](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/task2_geophys_precontact_exception_decision.json).
+
 2026-10-30 R07窗口接续：window001由维护者在task1环境/空载诊断后停止；window002已在同一phase branch提交task1 pose/Controller/archive-reader返工并交回`R07_V210_WINDOW002_PARTIAL_PENDING_SOL_REVIEW`。三次MuJoCo CPU probe共3 starts、79,625实际physics steps、9 resets、9 H5；row0/1/2均未达到task success或Solution completion。最后探针在grasp后由公开bowl位移检查触发`bowl_not_lifted_after_public_grasp_feedback`。见[window002详细结果](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-v210-required123-window002)和 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/`。当前三任务/九格与分层成功边界保持；旧progress和失败记录不改签。
 
 <a id="f05-successor-replan-20261030"></a>
@@ -8,7 +14,7 @@
 
 v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按当前必需验收完成后即可进入 R00–R07 收尾，不等待可选 #4/#5。复用既有接受证据，完成现有 R07d/P99 和整合收尾；路线完成与发布授权分开。详见[收尾边界](09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)。
 
-2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+2026-10-30历史范围决定：[当时三任务范围记录](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)记录其签署时点的 R07/P99 范围；2026-11-01 A123 closeout以本页顶部新override为准：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前 A123 范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
 
 2026-10-30最新Sol决定：D01 attempt002为[ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)，限固定LIBERO spatial/MuJoCo3.8.1 CPU/诊断控制与原native004交集；143项受影响S1和更严格离线reader通过，Sol零新增native。后继评估D02/D03迁移及D04集成，不提前改BaseTaskEnv alias或覆盖F线；五任务/18/22/P99/Qualification不变。下文待审标签保留历史签署含义。
 
@@ -28,6 +34,9 @@ v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按�
 2026-10-29 R05a attempt001：输入为 camera 分支 `43253c83bb89aae9e88b185718e81daf94bfbf77`；复核当前 GeoPhys Reader/host-I/O、Core boundary/session/admission、NutAssembly cadence/Guard/Recorder callers 与受保护 C05c 原件。provider-free `test_c05c_geophys_gripper_cadence.py` 4/4 通过（1.14 s，峰值 RSS 66,332 KiB）；新 native=0、共享 native 锁未取。合同候选确认 a53 已实现 typed sample freshness/phase，但 generic source/unit/references 需限缩到精确 Panda 固定 tendon mapping；Core force-cap 仍读写 Provider 私有 field 且重复递增 configuration revision，normal CPU/CUDA force admission 尚未建立。报告、矩阵、复用证据、预算和 R05b/c 计划在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/`；状态 pending Sol review，不改变 14/22 accepted count、DAG、Required Envelope、P99 或 Qualification。
 
 <a id="r03c-checkpoint-recovery"></a>
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../../../maintenance/20261101_r07_a123_sol_acceptance.md)。
+
 
 ## R03c attempt004 结果与检查点恢复合同
 

@@ -1,10 +1,23 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
+## Current A-stage scope override: three tasks × two providers (2026-11-01)
+
+<a id="r07-current-a123-scope-20261101"></a>
+
+The maintainer's 2026-11-01 revision scopes this closeout to A-stage environment and upstream-control-flow replication for original tasks 1/2/3 on MuJoCo and GeoPhys. It supersedes the 2026-10-30 required Solution/provider-switching gates below for this closeout. Task1's accepted result and contact-difference closure remain reused and closed; high-precision tracking and autonomous Solution success are optional follow-up, while Isaac Sim and B/C are deferred. Do not start run020.
+
+The original source sequence was fully replayed for task2 (103 actions) and task3 (245 actions) on both providers after the reference-controller and gripper mapping repairs. MuJoCo remains close to upstream before the first robot-finger/task-target contact. Task2 GeoPhys differs before upstream action 82's first finger-to-cabinet contact: TCP position difference is 33.143 mm P95 / 37.916 mm max and orientation 229.074 / 259.412 mrad; the same MuJoCo replay is 0.546 / 0.605 mm and 3.841 / 4.030 mrad. Direct same-action GeoPhys↔MuJoCo pre-contact difference is 33.100/37.721 mm and 226.906/257.160 mrad (P95/max); the maintainer accepted this exact task2 variance as a bounded exception for the frozen A-stage source/controller/action sequence. For task3, the direct provider gap is 0.671/0.827 mm and 1.664/2.718 mrad (P95/max), within the previously accepted A replay gates. These are pre-target-contact trajectory differences, not contact-solver divergence or optional high-precision tracking results. The task2 exception does not establish general provider parity. Task3's pre-contact GeoPhys-to-upstream position P95/max is 0.945/1.153 mm and orientation 1.174/1.303 mrad. Full metrics, resource receipts and the scoped decision are in the [A123 rework report](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md).
+
+The task2/3 wine_bottle and wine_rack source checkout, paths, sizes and file hashes are verified against the frozen closure; file-specific terms and attribution remain unresolved, with no legal conclusion inferred. GeoPhys contact-pair summaries remain unavailable and task3's stove-front predicate is unavailable. The task2 variance boundary decision is recorded, while Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. No task-success or Qualification claim follows. Current status is `ACCEPTED_BOUNDED_R07_A123_TECHNICAL`. This override does not complete the broader R00–R07/P99 plan or authorize a release.
+
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../../../maintenance/20261101_r07_a123_sol_acceptance.md)。
+
 <a id="r07-current-scope-20261030"></a>
 
 ## 当前范围决定：三个任务、部署切换与分层成功验收（2026-10-30）
 
-维护者在本诊断对话明确批准保留原任务 #1/#2/#3，并纠正“三任务×三后端都必须 Solution 成功”的建议。**本节是当前 R07 范围真源，覆盖下文历史“五任务 required”及“任务/Expert 成功非必需”的表述；旧报告、attempt、收据与原始审计不追溯修改。** 维护者随后明确：原 #4 叠碗、#5 炉子与摩卡壶列为 **v2.1.0 可选补充任务**，状态 OPTIONAL_V2_1_0_SUPPLEMENT_NOT_STARTED；其未启动、未实施或未成功均不阻塞当前 R07/P99 或 v2.1.0 的 R00–R07 路线收尾，也不自动顺延为下一版本必需项。该可选身份替代本次对话先前的延期归类，不表示已通过或已授权执行。
+本节保留2026-10-30签署时点的范围决定。2026-11-01的A123范围覆盖本节对当前closeout的适用；参见[最新A123范围与未决项](#r07-current-a123-scope-20261101)。历史报告、attempt、收据与原始审计不追溯修改。维护者当时批准保留原任务 #1/#2/#3，并纠正“三任务×三后端都必须 Solution 成功”的建议。维护者随后明确：原 #4 叠碗、#5 炉子与摩卡壶列为 **v2.1.0 可选补充任务**，状态 OPTIONAL_V2_1_0_SUPPLEMENT_NOT_STARTED；其未启动、未实施或未成功均不阻塞当前 R07/P99 或 v2.1.0 的 R00–R07 路线收尾，也不自动顺延为下一版本必需项。该可选身份替代本次对话先前的延期归类，不表示已通过或已授权执行。
 
 | 保留编号 | Suite / 精确任务名 | 必须保留的任务成功语义 |
 | --- | --- | --- |

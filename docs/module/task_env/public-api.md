@@ -787,9 +787,9 @@ controller qualification. The attempt002 result is
 this frozen source/task/controller/seed/reset/provider intersection. Attempt001
 and ordinary pilot history retain their original signed-time dispositions.
 This entry does not grant a general LIBERO Provider route, task success,
-current-scope R07 completion, P99, or Qualification. The planned three-task
-provider-switching/Solution gates are defined in the
-[current scope decision](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030);
+current-scope R07 completion, P99, or Qualification. The 2026-10-30 three-task provider-switching/Solution plan remains a historical
+record, superseded for the A123 closeout by the
+[2026-11-01 scope](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101);
 this documentation change does not widen the admitted API. See the
 [R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
 
@@ -800,7 +800,43 @@ preflight negatives; 143 affected provider-free checks and original-H5 replay
 passed. Native execution remains bound to `47d38ac4`; the review fixes in
 `d0c89b57` were not rerun natively. See the [Sol decision](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).
 
+## LIBERO A123 task-local route (2026-11-01; bounded technical acceptance; source terms open)
+
+The bounded A-stage closeout extends the internal `bench_deploy.libero` selected
+candidate path to original LIBERO tasks 1/2/3 through the existing
+`SelectedReferenceEnv → RuntimeSession → provider` owners. It is not a new stable
+Core API, generic `make_env()` registration, or general provider admission. The
+required evidence is task-specific: MuJoCo source/model/reset and same-cadence
+upstream action replay; GeoPhys public construction, reset, meaningful step,
+state readback and close. High-precision tracking and autonomous Solution
+success are optional follow-up; Isaac Sim and B/C are deferred for this scope.
+The [A123 rework report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md) records the exact evidence and bounded decision.
+
+The Core GeoPhys reset path now preserves legacy `ResetSample-v0` behavior:
+absent joint/free-body velocities use the v0 zero-velocity policy and absent
+fixture poses produce no fixture transform writes. Explicit V1 velocity and
+fixture fields remain validated and applied. Task2 GeoPhys nevertheless differs
+from upstream before action 82's first finger-to-cabinet contact (TCP position
+33.143 mm P95 / 37.916 mm maximum; orientation 229.074 / 259.412 mrad), while
+MuJoCo tracks the same source replay within 0.605 mm and 4.030 mrad maximum.
+The maintainer accepted this measured task2 difference as a scoped exception
+for the frozen A-stage source/controller/action sequence. Sol has accepted the bounded A123 technical intersection; file-specific
+license/attribution remains unresolved. This is not task success, provider qualification,
+general provider parity or a general support claim.
+
+Compiled MuJoCo physics arrays/dimensions and authored camera definitions are
+compared to the pinned source; rendered-frame or pixel equivalence is not
+claimed. GeoPhys's public `read_contact_summary_v2` method may return a typed
+`unavailable` result when pair queries are unsupported. A task predicate may
+also be unavailable. Preserve those statuses and do not infer task success from
+the route's completion or close receipt. The wine_bottle/wine_rack source and
+file hashes are verified, but file-specific terms and attribution remain
+unresolved; no license conclusion is inferred.
+
 <a id="f05-successor-design-only"></a>
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../maintenance/20261101_r07_a123_sol_acceptance.md)。
+
 
 ## F05后继：同源多表示规划（2026-10-30；尚无新增API）
 
