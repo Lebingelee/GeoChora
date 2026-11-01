@@ -18,10 +18,11 @@ from bench_deploy.libero.source_gravity import (
 from bench_deploy.libero.selected_candidate import (
     PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
     PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
+    _a_upstream_pose_replay_joint_limit_tolerances,
     _make_candidate_controller,
     _panda_gripper_aggregate_opening_m,
 )
-from bench_deploy.libero.task_contracts import TASK_3
+from bench_deploy.libero.task_contracts import TASK_2, TASK_3
 
 
 def _assert_identity_hash(controller):
@@ -142,3 +143,13 @@ def test_panda_gripper_replay_v1_preserves_exact_endpoints_and_v2_is_opt_in():
     assert _panda_gripper_aggregate_opening_m(
         1.0, PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
     ) == 0.0795
+
+
+def test_task_local_limit_monitor_allowance_is_scoped_to_approved_a_replay():
+    task2 = _a_upstream_pose_replay_joint_limit_tolerances("mujoco", TASK_2, True)
+    task3 = _a_upstream_pose_replay_joint_limit_tolerances("mujoco", TASK_3, True)
+    assert task2["finger_joint1"] == task2["finger_joint2"] == 50.0e-6
+    assert task3["finger_joint1"] == task3["finger_joint2"] == 500.0e-6
+    assert all(task2[f"joint{i}"] == task3[f"joint{i}"] == 4.0e-3 for i in range(1, 8))
+    assert _a_upstream_pose_replay_joint_limit_tolerances("geophys", TASK_3, True) == {}
+    assert _a_upstream_pose_replay_joint_limit_tolerances("mujoco", TASK_3, False) == {}

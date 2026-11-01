@@ -71,6 +71,25 @@ def _is_panda_gripper_delta_profile(profile_id) -> bool:
     return profile_id in PANDA_GRIPPER_DELTA_PROFILE_IDS
 
 
+def _a_upstream_pose_replay_joint_limit_tolerances(
+    provider: str, task_uid: str, upstream_pose_replay: bool,
+) -> dict[str, float]:
+    """Return the bounded physical-monitor allowances for task2/3 A replay."""
+    if type(upstream_pose_replay) is not bool:
+        raise TypeError('upstream pose replay selector must be bool')
+    if not upstream_pose_replay or provider != 'mujoco' or task_uid not in {TASK_2, TASK_3}:
+        return {}
+    finger_tolerance = 500.0e-6 if task_uid == TASK_3 else 50.0e-6
+    return {
+        **{f'joint{i}': 4.0e-3 for i in range(1, 8)},
+        'finger_joint1': finger_tolerance,
+        'finger_joint2': finger_tolerance,
+        'wooden_cabinet_1.top_level': 50.0e-6,
+        'wooden_cabinet_1.middle_level': 50.0e-6,
+        'wooden_cabinet_1.bottom_level': 50.0e-6,
+    }
+
+
 def _controller_hold_policy(controller):
     operational = getattr(controller, 'operational_config', None)
     if operational is not None:
@@ -791,16 +810,9 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         contact_geom_groups=(contact_geom_groups if provider == 'mujoco' else {}),
         mixed_actuator_plan=mixed_plan,
         task_local_joint_limit_tolerance_overrides=(
-            {
-                **{f'joint{i}': 4.0e-3 for i in range(1, 8)},
-                'finger_joint1': 50.0e-6,
-                'finger_joint2': 50.0e-6,
-                'wooden_cabinet_1.top_level': 50.0e-6,
-                'wooden_cabinet_1.middle_level': 50.0e-6,
-                'wooden_cabinet_1.bottom_level': 50.0e-6,
-            }
-            if provider == 'mujoco' and upstream_pose_replay and task_uid in {TASK_2, TASK_3}
-            else {}
+            _a_upstream_pose_replay_joint_limit_tolerances(
+                provider, task_uid, upstream_pose_replay,
+            )
         ),
     )
     controller.plan_identity_hash = mixed_plan.identity_hash
