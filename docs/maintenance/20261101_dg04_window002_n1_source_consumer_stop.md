@@ -27,3 +27,8 @@ Keep production admission fail-closed. Sol review is needed to authorize a suppo
 ## Budget and scope
 
 Window002 N1 used **257/1,400 steps** and **453.017245377s/500s**, leaving **1,143 steps / 46.982754623s**. The full formal N2 reserve remains unused at **6,400 steps / 2,400s**. No formal N2, new F05 three-route matrix, F06 or F07 work was started. This stop is due to the failed source-consumer gate and the insufficient remaining wall for another complete App lifecycle, not an exhausted total budget.
+
+
+## Additional installed-surface check
+
+The shipped Isaac 6.2 `MimicJointDemo.py` only authors the reference relationship, gearing and offset before playback; it does not demonstrate runtime natural-frequency/damping updates. The generated `omni.physx` Python stub has no mimic setter/getter, and the installation's top-level `include` tree contains no headers for a local bridge. This narrows the current installation's options without proving another vendor-supported extension route is absent. Details and source hashes: `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_002/installed_api_surface_followup.md`. No SDK was installed/downloaded.
