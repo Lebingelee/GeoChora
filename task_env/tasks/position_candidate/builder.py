@@ -885,6 +885,23 @@ class F05Dg01MujocoCandidateInputV1:
             raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
 
 
+def _versioned_position_candidate_kind(input_v1):
+    if input_v1 is None:
+        return None
+    kinds = {
+        F04PositionCandidateInputV1: 'f04',
+        F05PositionCandidateInputV1: 'f05',
+        F05NativePositionCandidateInputV1: 'f05_native',
+        F05Dg01MujocoCandidateInputV1: 'dg01_mujoco',
+        F05Dg02GeoPhysUsdCandidateInputV1: 'dg02_geophys',
+        F05Dg04IsaacNativeCandidateInputV1: 'dg04_isaac_native',
+    }
+    try:
+        return kinds[type(input_v1)]
+    except KeyError as error:
+        raise TypeError('versioned Position value requires an exact supported candidate input') from error
+
+
 def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
@@ -960,18 +977,11 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
             'reset_plan': input_v1.reset_plan,
             'controller_binding_plan': plan,
             'execution_spec_v1': input_v1.execution,
+            'versioned_position_input': input_v1,
             'session_admission_input': input_v1 if type(input_v1) in (
                 F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
                 F05Dg04IsaacNativeCandidateInputV1, F05Dg01MujocoCandidateInputV1,
             ) else None,
-            'f04_position_input': input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
-            'f05_position_input': input_v1 if type(input_v1) in (
-                F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
-            ) else None,
-            'f05_native_position_input': input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
-            'f05_dg02_geophys_input': input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
-            'f05_dg04_isaac_native_input': input_v1 if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1 else None,
-            'f05_dg01_mujoco_input': input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
                 'artifact': artifact.identity_hash,
@@ -1067,12 +1077,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         source=source, controller_binding_plan=plan,
         execution=input_v1.execution,
         native_drive_receipt=native_drive_receipt,
-        f04_position_input=input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
-        f05_position_input=input_v1 if type(input_v1) is F05PositionCandidateInputV1 else None,
-        f05_native_position_input=input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
-        f05_dg02_geophys_input=input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
-        f05_dg04_isaac_native_input=input_v1 if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1 else None,
-        f05_dg01_mujoco_input=input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
+        versioned_position_input=input_v1,
     )
 
 

@@ -31,6 +31,13 @@ _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
 
 
+def _versioned_position_input_kind(input_v1):
+    if input_v1 is None:
+        return None
+    from .position_candidate.builder import _versioned_position_candidate_kind
+    return _versioned_position_candidate_kind(input_v1)
+
+
 def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
                                        physics_dt_s, native_steps):
     """Bound binary clock drift from native increments plus boundary subtraction."""
@@ -1148,8 +1155,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
             'simulation_time_s': float(state.simulation_time)}
         if getattr(self, 'position_profile', False):
-            if (self.value.get('f05_dg01_mujoco_input') is not None
-                    or self.value.get('f05_dg02_geophys_input') is not None):
+            position_input_kind = _versioned_position_input_kind(
+                self.value.get('versioned_position_input'),
+            )
+            if position_input_kind in ('dg01_mujoco', 'dg02_geophys'):
                 info.update({
                     'task_success_semantics': 'raw_predicate_only',
                     'raw_task_predicate': bool(evaluation.success),
@@ -1161,11 +1170,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-            if (self.value.get('f04_position_input') is not None
-                    or self.value.get('f05_position_input') is not None
-                    or self.value.get('f05_dg02_geophys_input') is not None
-                    or self.value.get('f05_dg04_isaac_native_input') is not None
-                    or self.value.get('f05_dg01_mujoco_input') is not None):
+            if position_input_kind in (
+                'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native', 'dg01_mujoco',
+            ):
                 # Versioned USD state-only routes expose the Core-owned typed
                 # publication used by observations and Position control.
                 info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
@@ -1749,7 +1756,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     terminated=bool(terminated),
                     truncated=not bool(terminated),
                     bootstrap_allowed=not bool(terminated),
-                    **({'task_success': None} if self.value.get('f05_dg01_mujoco_input') is not None else {}),
+                    **({'task_success': None} if _versioned_position_input_kind(
+                        self.value.get('versioned_position_input'),
+                    ) == 'dg01_mujoco' else {}),
                 )
                 self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -2254,7 +2263,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 })
             details['pending_controller_switch_application'] = switch_application
         details.update(dict(payload or {}))
-        if self.value.get('f05_dg01_mujoco_input') is not None:
+        if _versioned_position_input_kind(
+            self.value.get('versioned_position_input'),
+        ) == 'dg01_mujoco':
             evaluation = self._published_position_evaluation
             metrics = {} if evaluation is None else dict(evaluation.metrics)
             details['task_predicate_v1'] = {
@@ -2308,7 +2319,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._position_episode_end = self._make_position_episode_end(
                 'execution_fault', terminated=False, truncated=True,
                 bootstrap_allowed=False,
-                task_success=(None if self.value.get('f05_dg01_mujoco_input') is not None
+                task_success=(None if _versioned_position_input_kind(
+                    self.value.get('versioned_position_input'),
+                ) == 'dg01_mujoco'
                               else _INFER_POSITION_TASK_SUCCESS),
                 payload={
                     'requested_reason': reason,
@@ -2325,7 +2338,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 terminated=False,
                 truncated=True,
                 bootstrap_allowed=True,
-                **({'task_success': None} if self.value.get('f05_dg01_mujoco_input') is not None else {}),
+                **({'task_success': None} if _versioned_position_input_kind(
+                    self.value.get('versioned_position_input'),
+                ) == 'dg01_mujoco' else {}),
                 payload={'requested_reason': reason},
             )
         self._stopped = True
@@ -2567,10 +2582,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 # observation. Generic H5 v3 consumes this only for the
                 # bounded versioned typed-state witness extension.
                 'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-            } if (self.value.get('f05_position_input') is not None
-                  or self.value.get('f05_dg02_geophys_input') is not None
-                  or self.value.get('f05_dg04_isaac_native_input') is not None
-                  or self.value.get('f05_dg01_mujoco_input') is not None) else {}),
+            } if _versioned_position_input_kind(
+                self.value.get('versioned_position_input'),
+            ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native', 'dg01_mujoco') else {}),
             **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
             } if self.camera_observation_config is not None else {}),
@@ -2693,7 +2707,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _position_record_metadata(self):
         from dataclasses import asdict
 
-        dg01_input = self.value.get('f05_dg01_mujoco_input')
+        versioned_position_input = self.value.get('versioned_position_input')
+        versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+        dg01_input = versioned_position_input if versioned_input_kind == 'dg01_mujoco' else None
         if dg01_input is not None:
             from ..runtime.sessions.source import lower_mujoco_scene_source
             from ..runtime.sessions.provenance import provider_build_identity
@@ -2841,11 +2857,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             }
 
         f03_input = self.value.get('f03_position_input')
-        f04_input = self.value.get('f04_position_input')
-        f05_input = self.value.get('f05_position_input')
-        f05_native_input = self.value.get('f05_native_position_input')
-        f05_dg02_input = self.value.get('f05_dg02_geophys_input')
-        f05_dg04_input = self.value.get('f05_dg04_isaac_native_input')
+        versioned_position_input = self.value.get('versioned_position_input')
+        versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+        f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
+        f05_input = versioned_position_input if versioned_input_kind in ('f05', 'f05_native') else None
+        f05_native_input = versioned_position_input if versioned_input_kind == 'f05_native' else None
+        f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
+        f05_dg04_input = versioned_position_input if versioned_input_kind == 'dg04_isaac_native' else None
         f05_native_route = f05_native_input is not None
         f05_dg02_route = f05_dg02_input is not None
         f05_dg04_route = f05_dg04_input is not None
@@ -3316,9 +3334,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
         f03_input = self.value.get('f03_position_input')
-        f04_input = self.value.get('f04_position_input')
-        f05_input = self.value.get('f05_position_input')
-        f05_dg01_input = self.value.get('f05_dg01_mujoco_input')
+        versioned_position_input = self.value.get('versioned_position_input')
+        versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+        f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
+        f05_input = versioned_position_input if versioned_input_kind in ('f05', 'f05_native') else None
+        f05_dg01_input = versioned_position_input if versioned_input_kind == 'dg01_mujoco' else None
         if f05_dg01_input is not None:
             write_receipt = getattr(self.session, '_last_dg01_position_application', None)
             advances = tuple(getattr(self.session, '_last_dg01_interval_advances', ()))
@@ -3351,10 +3371,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['mujoco_position_write_receipt_v1'] = dict(write_receipt)
             applied_payload['mujoco_interval_advance_receipts_v1'] = [dict(item) for item in advances]
             applied_payload['mujoco_interval_advance_attempts'] = int(advance_attempts)
-        f05_dg02_input = self.value.get('f05_dg02_geophys_input')
+        f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
         if (f03_input is not None or f04_input is not None or f05_input is not None
                 or f05_dg02_input is not None
-                or self.value.get('f05_dg04_isaac_native_input') is not None
+                or versioned_input_kind == 'dg04_isaac_native'
                 or self.value.get('f06_pickcube_isaac_input') is not None):
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())
@@ -3365,7 +3385,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
             if (f04_input is not None or f05_input is not None or f05_dg02_input is not None
-                    or self.value.get('f05_dg04_isaac_native_input') is not None
+                    or versioned_input_kind == 'dg04_isaac_native'
                     or self.value.get('f06_pickcube_isaac_input') is not None):
                 native_io = getattr(self.session, '_native_io', None)
                 provenance = getattr(native_io, 'execution_provenance_kind', None)
