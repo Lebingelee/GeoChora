@@ -93,3 +93,98 @@ def test_position_reset_uses_artifact_frame_alias_for_single_segment_semantics()
         'panda-v1/ee': FrameReference('panda-v1', 'ee'),
         'cube-v1': FrameReference('cube-v1', 'cube'),
     }
+
+
+def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
+    from task_env.runtime.sessions.control import ControlBindingPlanV1
+    from task_env.runtime.sessions.api import F06_PICKCUBE_ISAAC_PROFILE
+    from task_env.tasks.reference_env import SelectedReferenceEnv
+
+    @dataclass(frozen=True)
+    class Artifact:
+        identity_hash: str
+
+    initial_artifact = Artifact('a' * 64)
+    rebuilt_artifact = Artifact('a' * 64)
+    assert rebuilt_artifact == initial_artifact
+    assert rebuilt_artifact is not initial_artifact
+
+    reset_plan = SimpleNamespace(reset_sample=SimpleNamespace(task_seed=31))
+    execution = ExecutionSpecV1(
+        schema_version='execution-spec-v1',
+        physics_provider='isaacsim',
+        physics_backend='cuda',
+        physics_profile=F06_PICKCUBE_ISAAC_PROFILE,
+        provider_seed=31,
+        determinism_mode='best_effort',
+        render_default=RendererSelectionV1(
+            'renderer-selection-v1', 'none', 'none', 'none',
+        ),
+        physics_device='cuda:0',
+    )
+    runtime_input = SimpleNamespace(artifact=rebuilt_artifact, reset_plan=reset_plan)
+    source = SimpleNamespace(
+        scene_definition=SimpleNamespace(articulations=()),
+        free_joints={}, bodies={}, frames={},
+    )
+    plan = ControlBindingPlanV1(
+        'control-binding-plan-v1', 'b' * 64, (), (),
+    )
+    rebuilt_value = {
+        'artifact': rebuilt_artifact,
+        'source': source,
+        'reset_plan': reset_plan,
+        'execution_spec_v1': execution,
+        'f06_pickcube_isaac_input': runtime_input,
+        'controller_binding_plan': plan,
+        'solution': None,
+    }
+
+    env = object.__new__(SelectedReferenceEnv)
+    env._closed = False
+    env._stopped = False
+    env.position_profile = True
+    env.leaf_position_profile = False
+    env.fixed_attachment_leaf_position_profile = False
+    env.position_profiles = (object(),)
+    env.position_plan = plan
+    env.provider, env.backend, env.horizon = 'isaacsim', 'cuda', 1000
+    env.artifact = initial_artifact
+    env.value = {'artifact': initial_artifact, 'reset_plan': reset_plan}
+    env.binding = SimpleNamespace(
+        reset_seed=lambda seed: seed,
+        build_seeded=lambda *_args: rebuilt_value,
+    )
+    env._diagnostic_profile = None
+    env._position_episode_end = None
+    env.session = None
+    env.recorder = None
+    env._declared_execution_spec_v1 = execution
+    env._close_camera_consumer = lambda: None
+    env._bind_selected_controller = lambda _value: None
+    env._latch_fault = lambda _phase, _error: None
+
+    class StopAtMaterialization(Exception):
+        pass
+
+    observed = {}
+
+    def capture_materialization(artifact, *_args, **_kwargs):
+        observed['artifact'] = artifact
+        raise StopAtMaterialization
+
+    with patch('task_env.tasks.reference_env.materialize_control', capture_materialization):
+        try:
+            env.reset(seed=31)
+        except StopAtMaterialization:
+            pass
+        else:
+            raise AssertionError('the reset did not reach the materialization boundary')
+
+    assert observed['artifact'] is rebuilt_artifact
+    assert observed['artifact'] is runtime_input.artifact

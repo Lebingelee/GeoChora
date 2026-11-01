@@ -90,6 +90,20 @@ def _position_frame_bindings_from_artifact(artifact, source):
     return bindings
 
 
+def _artifact_for_reset(current_artifact, rebuilt_value):
+    """Keep the reset Artifact identity bound to a versioned runtime input."""
+    rebuilt_artifact = rebuilt_value['artifact']
+    if rebuilt_artifact != current_artifact:
+        raise ValueError('selected Artifact changed between construction and reset')
+    f06_input = rebuilt_value.get('f06_pickcube_isaac_input')
+    if f06_input is None:
+        return current_artifact
+    exact_artifact = f06_input.artifact
+    if rebuilt_artifact is not exact_artifact:
+        raise ValueError('F06 reset Artifact is not identical to its exact RuntimeInput artifact')
+    return exact_artifact
+
+
 def _no_reset_kwargs(env):
     return {}
 
@@ -634,8 +648,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     )
                 else:
                     self.value = self.binding.build(self.provider)
-            if self.value['artifact'] != self.artifact:
-                raise ValueError('selected Artifact changed between construction and reset')
+            self.artifact = _artifact_for_reset(self.artifact, self.value)
             if external_solution is not None:
                 self.binding.validate_external_solution(self.value, external_solution)
             phase = 'reset_seed'
