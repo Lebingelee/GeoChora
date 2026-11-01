@@ -588,20 +588,13 @@ class _PoseSolutionLifecycle(_SolutionLifecycle):
     def __init__(self, source_xml: bytes | str,
                  source_closure_digest: str,
                  config: LiberoPickPlaceSolutionConfigV1 | None = None,
-                 planner_config: CartesianPosePlannerConfig | None = None):
+                 *, planner_config: CartesianPosePlannerConfig):
         super().__init__(source_xml, config=config)
         self.source_closure_digest = source_closure_digest
         if (type(source_closure_digest) is not str or len(source_closure_digest) != 64
                 or any(character not in "0123456789abcdef" for character in source_closure_digest)):
             raise ValueError("LIBERO Solution v3 requires a lowercase source closure SHA-256")
-        self.planner_config = planner_config or CartesianPosePlannerConfig(
-            max_translation_per_step=0.012,
-            max_translation_acceleration_per_step=0.004,
-            max_rotation_per_step=0.08,
-            max_rotation_acceleration_per_step=0.04,
-            settle_steps=0,
-            max_steps=200,
-        )
+        self.planner_config = planner_config
         self.pose_planner = CartesianPosePlanner(self.planner_config)
         self.identity = None
         self._grasp_quaternion_wxyz = None
@@ -628,18 +621,10 @@ class _BilateralPoseSolution(_PoseSolutionLifecycle):
 
     def __init__(self, source_xml: bytes | str, source_closure_digest: str,
                  config: LiberoPickPlaceSolutionConfigV1 | None = None,
-                 planner_config: CartesianPosePlannerConfig | None = None):
-        selected_planner = planner_config or CartesianPosePlannerConfig(
-            max_translation_per_step=0.0055,
-            max_translation_acceleration_per_step=0.002,
-            max_rotation_per_step=0.08,
-            max_rotation_acceleration_per_step=0.04,
-            settle_steps=0,
-            max_steps=200,
-        )
+                 *, planner_config: CartesianPosePlannerConfig):
         super().__init__(
             source_xml, source_closure_digest, config=config,
-            planner_config=selected_planner,
+            planner_config=planner_config,
         )
         self.identity = None
         self._grasp_contact_streak = 0
