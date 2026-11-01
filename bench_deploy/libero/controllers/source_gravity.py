@@ -217,12 +217,24 @@ class MujocoSourceGravityBiasV1:
             "mj_step_call_count": self.mj_step_calls,
         }
 
-    def identity_mapping(self) -> dict[str, object]:
-        identity = {
+    def _source_identity_fields(self) -> dict[str, object]:
+        fields = {
             "profile_id": self.profile_id,
             "model_identity_sha256": self.model_identity_sha256,
             "source_xml_sha256": self.source_xml_sha256,
             "source_closure_digest": self.source_closure_digest,
+        }
+        if self.model_profile_id is not None:
+            fields.update({
+                "raw_source_xml_sha256": self.raw_source_xml_sha256,
+                "model_profile_id": self.model_profile_id,
+                "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
+            })
+        return fields
+
+    def identity_mapping(self) -> dict[str, object]:
+        identity = {
+            **self._source_identity_fields(),
             "composition_plan_sha256": self.composition_plan_sha256,
             "model_dimensions": dict(self.model_dimensions),
             "runtime_identity": dict(self.runtime_identity),
@@ -242,12 +254,6 @@ class MujocoSourceGravityBiasV1:
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": self.mj_step_calls,
         }
-        if self.model_profile_id is not None:
-            identity.update({
-                "raw_source_xml_sha256": self.raw_source_xml_sha256,
-                "model_profile_id": self.model_profile_id,
-                "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
-            })
         return identity
 
     def close(self) -> dict[str, object]:
@@ -259,10 +265,7 @@ class MujocoSourceGravityBiasV1:
         self.closed = True
         receipt = {
             "schema_version": "libero-source-gravity-model-close-v1",
-            "profile_id": self.profile_id,
-            "model_identity_sha256": self.model_identity_sha256,
-            "source_xml_sha256": self.source_xml_sha256,
-            "source_closure_digest": self.source_closure_digest,
+            **self._source_identity_fields(),
             "model_created": True,
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": self.mj_step_calls,
@@ -270,12 +273,6 @@ class MujocoSourceGravityBiasV1:
             "model_released": self._model is None,
             "data_released": self._data is None,
         }
-        if self.model_profile_id is not None:
-            receipt.update({
-                "raw_source_xml_sha256": self.raw_source_xml_sha256,
-                "model_profile_id": self.model_profile_id,
-                "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
-            })
         self.close_receipt = receipt
         return receipt
 
