@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。维护者已改用无累计额度、同门连续两次失败先询问的规则，并裁定优先研究受支持的Isaac/PhysX公开桥接再实施；window003按新规则准备，正式N2未启动。**
+> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。window003已完成公开桥接静态调查；当前安装未发现同一Isaac Sim App的受支持mimic setter桥接。正式N2未启动；等待维护者确认同App公开C++ API或重新冻结provider范围。累计额度规则与两次失败提问规则按16.3执行。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -262,3 +262,15 @@ window002输出HEAD `1d71aeab84a6fa576265e0cba33b886b9d83326f`，Sol复核为`F0
 具体提问规则：同一稳定gate连续两次实际验证失败后，必须停止该门后续native，交根因/观测/阈值/已试方案与明确选项并等待维护者或网页GPT裁定；不能靠新window/commit/压缩清零。用户明确选择新方案后，以有引用的decision epoch推进且保留原失败史。重复报告旧失败的自动turn不算新验证，未到达物理门的接口错误单列相应门，避免用不同traceback绕过规则。当前attempt004/005已触发提问，维护者答复为优先查明受支持的Isaac/PhysX公开桥接路径，再实施验证；Luna不重复询问同一决定，不原样重跑旧Set/Get路线。
 
 新包`sol_f05_diagnostic04_003/`，ID `F05_DIAGNOSTIC04_WINDOW003_NO_AGGREGATE_QUOTA_ASK_ON_REPEATED_GATE_FAILURE`，实际输入HEAD由本次review/docs提交后的snapshot冻结。先同版公开bridge研究→原owner实现/S1及有缺陷敏感性的live判别→required门通过后正式N2/冷读→新F05三路线联合收口。若需要额外SDK/依赖安装下载或新语义裁定，先形成具体方案再询问；不放宽原禁止私有solver访问和重复Runtime的边界。F06只入口，F07/Qualification不执行。复核与授权转述记录位于ignored `sol_review_f05_diagnostic04_002/`及新冻结包。
+
+<a id="f05-diagnostic04-window003-public-bridge-research"></a>
+
+### 16.4 window003公开桥接调查结果（2026-11-01；等待同App API/范围裁定）
+
+window003输入`develop-full@04278d9376901b9d2b01e3131c0891f64afe82d9`及只读GeoPhys候选`a9e4c4850bd225f5929e74831ac282b18ff517ce`通过冻结包哈希核验；Core tracked tree干净，原有无关untracked文档未改。完整结果、API指纹、官方链接、问题和窗口账本见ignored [window003公开桥接调查收据](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/public_bridge_research.md)。
+
+在冻结安装Isaac Sim 6.2 / `omni.physx-110.4.4`中，公开Python stub `_physx.pyi`（SHA-256 `d5a6c56a0bf929917d1876fadb4127d4232b58d8b65e7aaefc856a4f6b0ca1f0`）未声明mimic、natural-frequency、damping-ratio setter或PhysX对象指针入口；列出的`PhysX`/`IPhysxSimulation`公开方法中也没有对应对象桥。该结果与已复核的 shipped demo 和window002 live反例相符，但只界定本机已检查的表面，不断言Isaac所有版本或所有公开扩展路径都不存在。
+
+NVIDIA [PhysX公开C++ API](https://nvidia-omniverse.github.io/PhysX/physx/5.6.0/_api_build/classPxArticulationMimicJoint.html)确实提供`PxArticulationMimicJoint::setNaturalFrequency`和`setDampingRatio`，并说明新值用于下一仿真步。[OVPhysX公开C/C++互操作](https://nvidia-omniverse.github.io/PhysX/ovphysx/latest/tutorials/physx_interop.html)也提供借用PhysX对象指针及同构建匹配头文件；但[OVPhysX官方说明](https://github.com/NVIDIA-Omniverse/PhysX/blob/main/ovphysx/README.md)将其界定为不依赖Omniverse Kit的独立运行库，概览标明其自带静态PhysX runtime，而[开发指南](https://nvidia-omniverse.github.io/PhysX/ovphysx/0.6.4/developer_guide.html)说明原始指针互操作只在C/C++暴露、Python绑定不提供。因此OVPhysX不能充当当前Isaac Sim App内同一个PhysX对象的桥；移到OVPhysX会成为另一provider/runtime范围，不能记作DG03 Isaac cell通过。
+
+结论为`KIT_SAME_INSTANCE_PUBLIC_MIMIC_BRIDGE_NOT_IDENTIFIED`，不是证明bridge不存在，也不是新的物理门失败。DG03生产准入继续fail closed；同一物理响应门累计实际失败仍为2次，新epoch失败0次。本窗口未启动Isaac/Kit、没有native启动/physics step、没有software tests；N2的6,400步/2,400秒保留事实不变，也不作为本policy下的新N1余额门。下一步需维护者给出/确认当前Isaac Sim 6.2/Kit 110.4同App公开C++取对象API及匹配SDK接口，或明确批准将诊断改为独立OVPhysX provider并另冻验收；在此之前不写第二Runtime、不下载/安装SDK、不启动同门native。F06仍仅准备入口，F07和Qualification未启动。
