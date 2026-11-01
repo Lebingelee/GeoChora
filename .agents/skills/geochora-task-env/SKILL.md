@@ -9,6 +9,35 @@ Read repository `AGENTS.md` and [module README](../../../docs/module/task_env/RE
 `task_env/` is the sole Core owner; use its public APIs. No historical chat context is required.
 For the source/contract/test map read [routes](references/routes.md) when implementing a workflow or diagnosing a gap.
 
+## Source-bound absolute pose control
+
+For a task that needs an absolute world pose, reuse the advanced
+`CanonicalPandaController.resolve_world_pose_target_iterative_v1()` owner and
+its typed `CanonicalArmResolutionV1`; keep task stage/goal semantics in the
+Task Artifact or task-local binding. Check `diagnostics.converged` before
+dispatch. This remains a provider-free bounded composition of the existing
+arm resolver and does not admit a task/provider/backend. The optional
+`MixedActuatorSubstepSession` hook in `task_env.runtime.sessions.api` is an
+internal implementation extension, not a requirement on `RuntimeSession` and
+not a provider capability. A selected LIBERO task-Solution path remains
+separate task-local evidence; a successful resolver result alone is not native
+trajectory or task-success evidence. See the matching boundary in
+[Public API](../../../docs/module/task_env/public-api.md#source-bound-absolute-pose-control).
+
+## Optional compiled-model audit readbacks
+
+Use `CompiledModelOptionsReadbackV1` only when a source-bound audit needs the
+effective compiled-model options, and
+`CompiledModelPhysicsFingerprintReadbackV1` when comparing physical model
+inventory and numeric arrays. These are separate optional diagnostic protocols
+in `task_env.runtime.sessions.api`, not requirements on every RuntimeSession
+or provider. Validate source ID, closure digest, and canonical XML identity
+before comparing receipts; serialized MJB byte differences alone do not prove
+physical model differences. A task-owned `post_reset_session_validator` may
+check post-reset model transforms before first physics integration. That hook
+does not alter generic provider admission or establish trajectory equivalence.
+See the [compiled-model readback contract](../../../docs/module/task_env/public-api.md#compiled-model-readback).
+
 ## Static Logical Assembly values
 
 R01a exposes `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`,
@@ -630,9 +659,19 @@ the next single-process implementation/validation package. No R03b/Qualification
   state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
   Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
   the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
-  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
-  Do not treat this S1 as R04b/c completion, camera qualification, or P99 gate completion. See
-  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
+  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Sol accepted R04b attempt002 as
+  `ACCEPTED_BOUNDED_S2` on 2026-10-28 for GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × this single Panda Position candidate:
+  two resets, 24 public steps, dual D04 cameras and an independent offline reader. This does not establish a broader
+  provider/camera intersection or Qualification. R04c attempt001 then exercised same-Env camera recording on this
+  candidate: start the existing recording at reset, take 12 public steps, call `stop("external_stop")` and
+  `finish_recording("external_stop")`, then repeat on the same Env after the prior file is finalized. Its two
+  Generic H5 v3 episodes each contain 12 transitions/13 observations and passed separate public semantic and raw
+  prewrite-witness readers, plus 22 native-derived H5 tamper rejections. The observed end outcome is
+  `terminated=false`, `truncated=true`, `task_success=false` for the bounded external stop; it is not horizon
+  completion or task success. Sol accepted R04c on 2026-10-29 as `ACCEPTED_BOUNDED_S3`, limited to the frozen
+  GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × single Panda Position × seed31 × 2 ms × 5 × dual-D04-camera intersection.
+  It does not add generic provider/camera support or Qualification. See
+  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for the evidence and limits.
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
@@ -1494,3 +1533,220 @@ and the [historical PARTIAL snapshot](../../../docs/maintenance/20261101_f06_pic
 **TaskEnv Skill refresh receipt — F cleanup F05 input retirement (2026-11-02):** source scope was `develop-full@49f5f090` plus the current F05 cleanup diff. The current construction owner accepts `F05NativePositionCandidateInputV1`; the old `F05PositionCandidateInputV1`, synthetic S1 ContextVar/admission branch, fixture Native-I/O protocol bundle and S1-only reader are retired. The existing versioned Position builder, `SelectedReferenceEnv`, `UsdCoreRuntimeSession`, public GeoPhys USD importer/native adapter and Generic H5 v3 remain the owners. Public affine-drive numeric coverage now builds the native candidate, reimports the public model and checks the receipt consumer independently. F04/C02b/DG02/DG04/PickCube routes remain distinct. Drift was the Skill's prior attempt001 synthetic-S1 narrative appearing adjacent to current-route guidance; historical evidence was preserved and labeled historical in the canonical API/README. Targeted validation: GeoPhys adapter/oracle 10 passed; F04/C02b/DG02/DG04/PickCube group 60 passed/6 skipped; changed Python owners compiled. Module Skill checker, cold-start walkthrough and native physics were not run in this refresh; no capability or Qualification claim follows, and API-sensitive Sol review remains required.
 
 **TaskEnv Skill refresh receipt — F06 USD rebuild bootstrap (2026-11-02):** source scope is `develop-full@0079d691` plus the G2 bootstrap commit `4526360f`. The generator defers TaskEnv imports until after CLI parsing and uses the shared filtered site-packages overlay for a matching Core Python; Isaac `pxr` remains first and `SimulationApp` is not launched. Real rebuild evidence: `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f_cleanup_001/isaac_usd_source_rebuild_smoke_20261102/delivery_manifest.json`, SHA-256 `3c89a7b7481094736e2c099aed41142567d4a24ea74fc0881c12a0269d9cb2d1`; local closure/scene validation passed, nine dependency layers resolved, `source_verified=false`, and no physics advanced. Focused Harness tests passed (20), changed Python owners compiled, the module Skill checker and both Skill quick validators passed. No runtime admission, solution, or Qualification claim follows.
+
+## R06b compatibility boundary (2026-10-29)
+
+`LeafMaterializationReceiptV1` maps by semantic Joint/Actuator references; do
+not infer qpos addresses, dof addresses or ctrl slots from tuple order. qpos
+and dof use their separate native dimensions (`nq` and `nv`); an `nq != nv`
+fixture is synthetic evidence only. The fixed Panda Arm+Hand path pins exact
+source bytes. `ArticulationDefinition.joints` v1 is canonicalized by
+`joint_id`; source traversal and provider-native body/joint/actuator order are
+separate values validated by the exact source recipe and named receipt.
+
+R06b attempt001 documented a source/Scene mismatch rejection, not a successful
+reorder. Attempt002 then implemented the derived recipe but stopped after E1
+when a nested materialization counter prevented E2 from reaching the owner;
+these are preserved historical results in the [R06 record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md).
+
+R06b attempt003 restored canonical joint normalization, exercised the existing
+worker and independent reader with a provider-free S1, and completed one
+bounded same-worker E1/E2 MuJoCo 3.8.1 CPU run. The 249-case S1 includes worker,
+supervisor, finalizer, raw-reader and strict H5 regressions; it is not physical
+evidence. The native run produced 64/65 H5s for each case and the independent
+reader joined the recomputed contract digest, exact case IDs, worker file
+hash/size, receipt, materialization ID, per-case counters and native named
+order/slots. Sol accepted run002 on 2026-10-29 as
+`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`; run001 remains a retained reader failure. It covers only the
+frozen Panda Arm+Hand and one `r06b-order-v1` recipe; it does not grant general
+source/provider compatibility, task success or Qualification. At the time of
+that R06b review, historical raw/phase disposition remained
+`BLOCKED_MISSING_RAW_OR_PHASE_DECISION` and R05 was still waiting on its formal
+Provider contract; R06c/P99 was not closed.
+See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-sol-acceptance) and [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).
+
+## R05b bounded native-feedback route (2026-10-29)
+
+The selected NutAssembly task has an explicit advanced normal-profile entry:
+
+```python
+from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+env = NutAssemblyReferenceEnv.for_native_feedback_profile(
+    backend="cpu", gripper_control_hz=500, horizon=6000,
+)
+try:
+    observation, info = env.reset(seed=19)
+finally:
+    env.close()
+```
+
+Use `backend="cpu"` or `"cuda"` and `gripper_control_hz=100` or `500` (default
+500). This route uses the normal Core admission path and
+`nutassembly-native-feedback-v1`; it does not use the historical C05c
+diagnostic constructor or expand the generic Provider manifest. Admission
+requires the exact NutAssembly Square nominal-v1 Artifact, trusted 69-file
+canonical/importer closure, GeoPhys build and import origin, semantic joint/body/
+actuator mapping, backend configuration, strict scalar profile, implicitfast,
+2 ms × 5 timebase, and the selected R3 Controller/Solution/law with 10 N cap.
+Changed source bytes, mappings, build, profile or control configuration fail
+closed. The immutable execution-source receipt keeps the v0 `RuntimeSource`
+ABI unchanged.
+
+Sol's review of attempt001 requested four repairs: initialize profile lifecycle
+state on every selected-reference constructor route, reject modified assets even
+when a new receipt is computed, validate actuator IDs before int32 narrowing,
+and exercise the connected worker/finalizer/reader path in S1. Attempt002
+implemented these fixes on Core commit `1193f2f` and passed 19 focused
+provider-free tests. Fresh GeoPhys CPU and CUDA runs at 500 Hz each completed
+one reset, two outer intervals and ten native steps; both the production
+semantic reader and independent raw H5 reader passed. Sol accepted attempt002
+as `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2` after independently
+rerunning 19 focused S1 cases and reading both original H5s. This bounded result
+does not close R05c, full-task or Qualification gates. The S1 synthetic-IO path proves Core wiring
+and reader lifecycle, not physics. The bounded native runs do not establish
+task/Expert completion, Guard dwell, native 100 Hz law, the full CPU/CUDA ×
+100/500 Hz campaign, real-time or device-resident control, general Provider
+support, P99, or Formal Qualification. Historical missing raw/phase
+disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`. At the time of the
+R05b review R05c had not started; R05c attempt001 has since completed its four
+normal-profile cells and is pending Sol review. See the [R05 attempt002 record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
+
+## R05 normal native feedback evidence boundary
+
+The exact NutAssembly normal-profile route has bounded R05b short S2 and R05c full-task four-cell S2/S3 evidence for GeoPhys `c6df840`, CPU/CUDA, gripper law 100/500 Hz, and the pinned source closure. Sol accepted R05c attempt001 as `ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3` after independently reading all four original full H5s and rerunning the current 26-case focused S1 set. Original Luna 25-case logs remain historical. R05 exact required envelope is complete; R06c is now accepted for bounded required-evidence aggregation after maintainer-directed historical scope/index reconciliation; see the current R06 section below. These receipts do not establish general Provider support, P99, real-time 2 ms behavior, or Formal Qualification. Use the [TaskEnv routes](references/routes.md) and [R05 execution record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md) for exact boundaries.
+
+
+## Historical R07 scope and Harness boundary (2026-10-30; superseded for A123)
+
+The required123 window001 was manually interrupted at clean a6efc3e7; source/environment and unloaded tracking are bounded evidence only. Window002 added `CanonicalArmTargetV1` in `task_env.controllers.canonical.contracts` and `CanonicalPandaController.resolve_world_pose_target_v1` in `.controller` on Core commit `5a3e6b26`, used by task1's existing Planner/Controller path; task code imports the typed value from its owner module. Commit `31569da9` rebases approach/descent on the live public bowl pose. Three MuJoCo rows still failed the lift predicate after grasp, so this candidate does not establish task success or a task/provider capability. See the [pause review](../../../docs/maintenance/20261030_r07_v210_window001_pause_sol_review.md), [window002 result](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-v210-required123-window002), and its local output under `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/`. For follow-up work, inspect source-derived bowl contact geometry and prove lift from public pose/finger feedback; do not replace it with task-local DLS, a reset-height target, or a passed status based only on stage entry.
+
+Historical R07 scope at the [2026-10-30 decision](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030) required three providers and layered Solution success. The 2026-11-01 A123 scope below supersedes it for this closeout only; read the [current scope record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101) before planning. The older goals, reports and acceptances retain their signed-time meaning.
+
+Keep bench_deploy task/source/reset/predicate/Solution ownership and compose the existing task_env/script/agent Harness with the same Core route and identities. Current pick-lift-v0 is synthetic, not a LIBERO On/Open template. R07c closure does not require F06/Harness 20-seed acceptance; an actual Harness claim still needs its full declared-intersection checks, 20 distinct solved seeds, Oracle, ledger and pending Judge package. Preserve current completion_facts lifecycle/cleanup validation when integrating develop-harness. The change is a planned scope/ownership contract only, with no new runtime admission, CLI or native result. After the three required tasks meet their gates, proceed to the [v2.1.0 R00-R07 route closeout](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout), retaining existing R07d/P99 requirements and separate release authorization; do not wait for optional tasks.
+
+## R06c scope reconciliation and R07 pilot routing (2026-10-29)
+
+R06c required-evidence aggregation is ACCEPTED_BOUNDED after attempt002 technical review and maintainer-directed scope correction. Published canonical outer-v0 H5 originals are present in v1.1 L2 with exact historical hashes; do not repeat the old blanket missing-original claim. Generic/execution-v1 true historical rollout bytes remain unproven and the eb870 JSON overwrite remains a historical provenance limitation; retain existing readers and the accepted Phase II deferral. No reader retirement, new native replay or Qualification follows. Historical blocked receipts above retain their signing-time meaning.
+
+Use the [current R06 scope/index record](../../../docs/module/task_env/goal/Phase_II_01/r06c_scope_reconciliation.json) and [R07 pilot implementation plan](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-pilot-attempt001-plan). Luna2's next pilot is source/install verification and a benchmark recipe under asset/benchmarks and bench_deploy; these are planned delivery roots, not a second public Runtime or an admitted benchmark task. The original five-task R07/P99 envelope remains unmet. Luna1 owns F00–F07 separately.
+
+
+## R07b pilot source delivery boundary (2026-10-29)
+
+`asset/benchmarks/libero/tools/source_bundle.py` now implements the single bowl-to-plate pilot's source manifest, local install, independent verify and metadata recipe CLI. `bench_deploy/libero/` owns the task-specific recipe and original-owner gap plan. Sol accepted source/recipe S1 only; no Core task UID/native route, reset, step, On semantics equivalence, H5 execution or Qualification is admitted by this delivery. Use the [source CLI guide](../../../asset/benchmarks/libero/README.md) and [recipe guide](../../../bench_deploy/libero/README.md). Preserve mixed torque/finger actuator sources and unavailable contact/init state. Original R07 requires repeated resets, meaningful public motion and native semantics/readback, not full task/Expert success or a universal collision planner.
+
+Cost protocol v2.1 returned INVALID because its fixed historical baseline is not an ancestor of camera's execution input; asset/benchmarks Python code also needs correct LOC attribution. Preserve that result; source installation success is not valid measured Agent cost. Reconcile the future cross-branch protocol before admitting a cost claim.
+
+## R07c single-task candidate boundary (2026-10-29)
+
+The R07c provider-free candidate work does **not** create an admitted LIBERO
+`make_env()` route. Attempt001 bound fixed source bytes and semantic names but
+did not emit merged MJCF. Attempt002 now emits deterministic static MJCF and
+connects an internal candidate to the existing `BaseTaskEnv` source/compiler,
+lifecycle and v3 recording owners for provider-free S1. This remains internal:
+it does not register a public UID, prove native compilation, or admit a
+provider. The `.pruned_init` reset mapping, upstream BDDL/site/runtime
+placement, compiled IDs and native semantics remain unresolved.
+
+For `SnapshotRequest.contact_summary`, `GeoPhysRuntimeBoundary` optionally
+calls a peer's public `read_contact_summary()` and requires a typed
+`ContactSummary`; an absent method returns unavailable. The current GeoPhys
+peer still has no pair query. Missing contact evidence must not be mapped to
+`False`, and this optional hook does not grant provider or benchmark support.
+
+`bench_deploy.libero.task.LiberoPilotControlHookV1` and the former mounted-
+Panda mixed adapter were internal candidate hooks, not stable public imports
+or a supported provider profile. Their synthetic tests preserved seven torque
+arm slots, signed two-finger position slots, explicit unqualified gains and
+the source-declared 20 Hz / 2 ms × 25 timebase only. Attempt002 exercised the
+existing v3 recorder, finalizer and report consumer with synthetic IO; this
+did not establish a physical trajectory, native stability, task-semantic
+equivalence, P99 or Qualification. See the [R07c attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-execution-result-2026-10-29)
+for remaining historical owner gates and evidence limits. D01's replacement
+route and current S1/native status are recorded below.
+
+## R07c D01 diagnostic route (2026-10-30)
+
+Current Sol disposition: `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3` for native004
+at `47d38ac4`. Core contains no D01 LIBERO identity/layout/schema dispatch.
+Review fixes at `d0c89b57` reject unsupported-provider v1 reset before mutation,
+incomplete seven-counter MuJoCo warning evidence, and offset/anti-damped
+position-drive laws. Eight added negatives plus affected regression total
+143 passing S1 checks; the stricter reader passed the original three H5s.
+These review changes were not run natively; the native/source/control facts
+remain at their frozen implementation. The [Sol review](../../../docs/maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)
+records this distinction. Older pending-review wording below describes the
+Luna handoff, not the current decision. Five-task R07c, legacy caller migration,
+compatibility alias consolidation, integration and Qualification remain separate.
+
+The D01 diagnostic uses the existing
+`bench_deploy.libero.environment.selected_reference.build_libero_selected_candidate()` →
+`SelectedReferenceEnv` → `RuntimeSession.materialize()` → MuJoCo session path.
+The selected task binding and its source/reset/controller/evaluation remain
+internal and fixed to the spatial bowl-to-plate source, MuJoCo CPU, and pinned
+LIBERO/robosuite inputs. It is not a `make_env()` UID or a general Provider
+capability.
+
+Core owns the selected lifecycle, generic source-bound `MixedActuatorPlanV1`
+admission, named mixed target/Ack contract, reset/readback, contact freshness,
+typed observations, and existing Generic H5 v3 recording. The Core route does
+not branch on LIBERO identity, fixed layout names, or task-specific channel
+count. `bench_deploy/libero/` owns task source semantics, sampler, planner, On
+oracle, and explicit unqualified joint-space PD gains. The bounded attempt002
+controller maps seven named torque actuators and two signed finger position
+actuators at 20 Hz, holding torques over 25 × 2 ms steps, with `Kp=100`,
+`Kd=20`, and a 16 mm aggregate opening target. These gains are not equivalent
+to upstream OSC_POSE. The deterministic reset realization is source-derived
+and restores a complete named `.pruned_init` row; historical per-row fixture
+parity is not claimed.
+
+The following runtime entry materializes MuJoCo; it is not a provider-free
+smoke. The bounded native attempt required its frozen launcher and shared
+lock. The S1 harness installs only bottom public model/data primitives before
+using the same construction/admission/lifecycle/recorder/reader path:
+
+```python
+from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
+
+env = build_libero_selected_candidate(horizon=64)
+try:
+    observation, info = env.reset(seed=19, options={"init_row_index": 0})
+    action = [float(x) for x in observation["state"]["joint_position"][:7]] + [0.04]
+    observation, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+Attempt002's final provider-free same-route S1 passed 19 focused cases in
+`task_env/diagnostics/tasks/test_r07c_libero_core_env_s1.py`, including the
+non-LIBERO different-name/channel-count fixture and contact/reset/monitor/
+reader-failure cases. It used the geochora Python 3.12 interpreter with plugin
+autoload disabled and explicit camera Core/GeoPhys `PYTHONPATH`. The locked
+MuJoCo 3.8.1/API3008001 CPU run004 produced three 64-transition/65-observation
+H5 episodes, 4,800 native steps and five resets. Its per-step monitor covered
+13 limited scalar joints with zero excursion and zero warning counts. The
+independent provider-free reader verified the H5s and parent lock/exit receipt;
+five actual-run tamper copies were rejected.
+
+Current disposition is
+`R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, limited to
+the frozen source/task/controller/seed/reset/MuJoCo CPU intersection. The
+worker episodes are not task success or Expert completion. This does not
+promote the route to general task registration, five-task R07c, P99, Human
+Judge, or Qualification. Attempt001's
+`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED` is preserved as its signed
+historical review. See the
+[attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+
+## F05 successor planning route (2026-10-30; no new API or execution)
+
+For future F05 work, first read the [source-family recovery plan](../../../docs/module/task_env/goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md), [playbook](../../../docs/module/task_env/goal/Phase_II_01/12_F05_F07_Execution_Playbook.md) and [current handoff](../../../docs/module/task_env/goal/Phase_II_01/08_Codex_Phase_II_01_Planning_Prompt.md). The planning direction is same physical source with explicit MJCF/USD representations, using existing owners. It is not general format support, source equivalence or a new Runtime/Scene IR. Original F05 three ordinary attempts and partial result remain historical; the same-USD gate is deferred in the successor plan, not passed. A new exact Scope Decision/package and budgets must precede implementation/native. Inventory source equality/tendon/drive differences before reusing old Panda evidence; verify environment, unloaded tracking and task gates separately. F06 retains real-task/20-seed/Oracle/pending-Judge requirements; R07 is independent. This Skill change routes planning only: no software/native validation or independent cold-start run is claimed. F-line owner is develop-full; other-branch copies do not confer its implementation or capability.
+
+## R07 LIBERO A123 current scope override (2026-11-01; bounded technical acceptance; source terms open)
+
+The [2026-11-01 A123 scope and report](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101) supersede older three-provider/Solution R07 gates for this bounded closeout. Required evidence is tasks 1/2/3 × MuJoCo/GeoPhys for A-stage environment and upstream-control-flow replication. On MuJoCo, compare pinned source/model/reset and replay the frozen same-semantics sequence. On GeoPhys, use the existing `SelectedReferenceEnv → RuntimeSession → provider` path through public construction, reset, meaningful step, state readback and close. Keep task-specific behavior in `bench_deploy.libero`; do not add a generic LIBERO Core UID or read provider-private solver/renderer state.
+
+Task2/3 now replay all source actions on both providers after restoring the upstream reference OSC route and exact PandaGripper v1 endpoints. Task2 GeoPhys has a pre-target-contact difference (before first upstream finger/cabinet contact at action 82): TCP position 33.143 mm P95 / 37.916 mm max and orientation 229.074 / 259.412 mrad; task2 MuJoCo is 0.546 / 0.605 mm and 3.841 / 4.030 mrad. The maintainer accepted this exact task2 GeoPhys difference as a scoped exception for the frozen A-stage source/controller/action sequence. This is not contact-solver divergence or general provider parity; Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. Task1's previously accepted contact-difference result stays closed and is reused. Preserve exact task/provider/source/build scope, accepted GeoPhys reset angle tolerance (`2e-7 rad`), raw range excursions and unavailable contact/predicate statuses. Source-authored camera equality does not establish rendered-frame/pixel equivalence. The task2/3 wine_bottle/wine_rack source paths and hashes are verified, while file-specific terms/attribution remain unresolved. No task success, Qualification, R00–R07/P99 completion or release authorization is established.
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../../docs/maintenance/20261101_r07_a123_sol_acceptance.md)。

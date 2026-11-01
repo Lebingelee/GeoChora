@@ -170,6 +170,9 @@ ProductionCanonicalPandaController 从 Geochora-owned source chain 计算 FK/Jac
 gripper profile authority 为 resolved source.config.robot.gripper，identity 包含全部字段。
 它在 reset 后每 measured control boundary compute 一次，拥有 commanded opening、rate limit、
 force activation/initialization/deadband state；不是旧 stateless controller 的隐式 alias。
+Advanced stateless callers may use `CanonicalPandaController.resolve_world_pose_target_v1` to resolve a typed
+world pose through the same shared arm calculation and receive a source/controller-bound `CanonicalArmTargetV1`;
+this helper performs no Provider step and does not itself establish task or backend support.
 CanonicalControlFeedback 的 opening、step/time 要与同一 state 对齐；非负 closing-force 为完成的
 native actuation interval measurement，sign/index 转换留 adapter；不宣称通用 force-sensor 支持。任务实际 observation_space/schema 和 metadata
 决定 state/privileged_state/camera 内容，不固定所有任务为 Panda 八维。通用 SB3 flatten 在 learner 边界。
@@ -309,3 +312,62 @@ friction、damping、gain/compliance 可能需近似映射；iteration/stabiliza
 C1 open-loop 固定 Artifact/ResetSample/control stream/timebase；C2 closed-loop expert 固定
 Artifact/sample/algorithm/config 但读取 live state；两者独立 gate，contact-rich 长时轨迹不要求逐点相等。
 不同 replay 语义及未测试交集见[qualification](qualification.md)和[recording](recording-and-learning.md)。
+
+## R07c D01 selected mixed-control diagnostic (2026-10-30)
+
+The fixed LIBERO spatial pilot enters through its internal task binding and the
+existing `SelectedReferenceEnv` / `RuntimeSession.materialize()` / MuJoCo
+session owners. Core admission consumes generic source-bound
+`MixedActuatorPlanV1` channel declarations and verifies them against compiled
+actuator metadata; no LIBERO task, layout, or fixed channel-count whitelist is
+used in the shared Core path. The task-owned controller maps seven named
+torque motors and two signed finger position actuators. Attempt002's bounded
+run used absolute seven-joint targets, explicit unqualified `Kp=100 Nm/rad`,
+`Kd=20 Nm·s/rad`, a 16 mm aggregate opening target, 20 Hz outer control, and a
+zero-order hold over 25 × 2 ms native steps. Source actuator limits are checked
+against the compiled model. This is not the upstream OSC_POSE controller and
+provides no normal `make_env()` route or general Provider admission.
+
+Reset uses a pinned-source-derived deterministic tabletop/fixture realization,
+then restores one complete named `.pruned_init` row including source time and
+nonzero joint velocity through the existing session owner. The current fixture
+sample is recorded; exact historical per-row fixture parity is not claimed.
+Versioned public readback binds named robot/object/fixture state, compiled
+layout and entity-pair contact coverage/freshness. The task-owned On predicate
+requires current positive bowl/plate contact, bowl height at least the plate,
+and XY distance below 0.03 m; missing or stale contact remains unavailable.
+An optional `CompiledModelOptionsReadbackV1` receipt now reports the effective
+MuJoCo `mjModel.opt` values, model capacities, loaded MuJoCo/API version, and
+SHA-256 of the exact compiled MJB model bytes, bound to the compiled source
+identity. It is exposed in reset info as
+`compiled_model_options_v1` when the adapter supports it; the base
+`RuntimeSession` protocol does not require it. This is diagnostic model
+configuration evidence and does not prove dynamic trajectory agreement.
+The separate optional `CompiledModelPhysicsFingerprintReadbackV1` reports
+source-bound object-name/dimension inventory and hashes for numeric body,
+joint, dof, geom, site, actuator, tendon, constraint, mesh, height-field, flex,
+and wrap arrays. It is intended for explicit model audits; ordinary reset info
+does not attach this larger fingerprint automatically. MJB byte identity may
+also differ because serialized metadata differs, so compare this fingerprint
+before concluding that physical arrays differ.
+
+Attempt002's final provider-free same-route S1 passed 19 focused cases. Its
+locked MuJoCo 3.8.1/API3008001 CPU run completed three 64-transition episodes
+(4,800 `mj_step`, five resets); per-step monitoring covered 13 limited scalar
+joints, found no excursion, and recorded zero warnings. The independent
+provider-free reader verified all H5 v3 observations and the parent exit/lock
+receipt; actual-run tamper copies reached and failed the intended semantic
+gates. Result: `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`
+under the
+[execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+This bounded result does not establish the original five-task R07 goal, P99,
+Formal Qualification, task success, or a general LIBERO Provider route.
+
+Sol subsequently accepted this exact native004 intersection as
+`ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`. Review repairs reject v1 reset at
+unsupported legacy providers before episode mutation, incomplete pinned
+MuJoCo warning vectors (seven counters), and position servos with a bias
+offset or anti-damping. The source-fixed native facts remain at `47d38ac4`;
+the rejection-only review changes at `d0c89b57` passed 143 affected S1 checks
+and the stricter reader against the original H5s, with zero new native runs.
+See the [Sol review](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).

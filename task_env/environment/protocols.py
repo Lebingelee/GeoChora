@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any, ClassVar, Protocol
 
 import numpy as np
@@ -88,7 +89,12 @@ class TaskEnvironmentComponent(ABC):
 class RuntimeBoundary(Protocol):
     """TaskEnv 与 GeoPhys runtime 之间唯一允许的物理边界。"""
 
-    def apply_reset_state(self, state: EpisodePhysicsState) -> None: ...
+    def apply_reset_state(
+        self,
+        state: EpisodePhysicsState,
+        *,
+        static_world_child_poses: Mapping[int, tuple[np.ndarray, np.ndarray]] | None = None,
+    ) -> None: ...
 
     def apply_control(self, command: ControlCommand) -> AppliedControl: ...
 

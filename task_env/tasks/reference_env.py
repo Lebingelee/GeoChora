@@ -6,6 +6,7 @@ mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
 from dataclasses import dataclass
 from collections import OrderedDict
+from collections.abc import Mapping
 from pathlib import Path
 import hashlib
 import json
@@ -21,7 +22,7 @@ from ..controllers.canonical.contracts import RequestedAction, digest
 from ..environment.protocols import TaskEnvironmentComponent
 from ..environment.types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
 from ..planners.completion import ExpertExecutionInfo
-from ..runtime.sessions.api import PROFILE
+from ..runtime.sessions.api import PROFILE, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 
 METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1',
@@ -131,6 +132,16 @@ class ReferenceTaskBinding:
     runtime_episode_identity: bool = False
     build_gripper_cadence_diagnostic: Callable | None = None
     build_seeded: Callable | None = None
+    build_native_feedback_profile: Callable | None = None
+    build_mixed_control_profile: Callable | None = None
+    reset_sample_with_options: Callable | None = None
+    prepare_mixed_control: Callable | None = None
+    prepare_mixed_control_substep: Callable | None = None
+    observe_mixed_control: Callable | None = None
+    mixed_record_metadata: Callable | None = None
+    pre_reset_session_validator: Callable | None = None
+    post_reset_session_validator: Callable | None = None
+    close_task_resources: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -143,8 +154,25 @@ class ReferenceTaskBinding:
             raise ValueError('external Solution construction and validation must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
+        if self.close_task_resources is not None and not callable(self.close_task_resources):
+            raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
+        mixed_hooks = (
+            self.build_mixed_control_profile, self.reset_sample_with_options,
+            self.prepare_mixed_control, self.observe_mixed_control,
+            self.mixed_record_metadata, self.pre_reset_session_validator,
+        )
+        if any(value is not None for value in mixed_hooks) and any(
+            not callable(value) for value in mixed_hooks
+        ):
+            raise ValueError('mixed-control binding requires its complete task-owned hook set')
+        if (self.prepare_mixed_control_substep is not None
+                and not callable(self.prepare_mixed_control_substep)):
+            raise ValueError('mixed-control substep preparation hook must be callable when supplied')
+        if (self.post_reset_session_validator is not None
+                and not callable(self.post_reset_session_validator)):
+            raise ValueError('post-reset session validator must be callable when supplied')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -230,9 +258,38 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('leaf candidate attachment opt-in was not preserved by the selected environment')
         return env
 
+    @classmethod
+    def from_mixed_control_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=6000):
+        """Construct a typed source-bound mixed-control candidate through the existing route."""
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('mixed-control candidate requires the existing ReferenceTaskBinding owner')
+        if provider not in {'mujoco', 'geophys'} or backend != 'cpu':
+            raise ValueError('mixed-control candidate currently admits MuJoCo or GeoPhys CPU')
+        if (binding.build_mixed_control_profile is None
+                or binding.reset_sample_with_options is None
+                or binding.prepare_mixed_control is None
+                or binding.observe_mixed_control is None
+                or binding.mixed_record_metadata is None):
+            raise TypeError('binding does not own the complete mixed-control lifecycle hooks')
+        candidate_type = cls
+        if not hasattr(cls, 'uid'):
+            candidate_type = type(
+                'MixedControlSelectedReferenceEnv', (cls,),
+                {'uid': 'selected-reference-mixed-control-v1'},
+            )
+        env = candidate_type(
+            provider=provider, backend=backend, horizon=horizon,
+            _binding=binding, _mixed_control_candidate=True,
+        )
+        if not getattr(env, 'mixed_control_profile', False):
+            env.close()
+            raise TypeError('candidate did not construct its typed mixed-control profile')
+        return env
+
     def _bind_selected_controller(self, value):
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
 
+        self.mixed_control_profile = False
         leaf_plan = value.get('leaf_plan')
         if leaf_plan is not None:
             from ..controllers.canonical.leaf_plan import EffectiveLeafPlanV1
@@ -250,6 +307,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.leaf_plan = None
 
         raw = value['controller']
+        if value.get('selected_controller_kind') == 'mixed_actuator_v1':
+            source = value.get('source')
+            plan = getattr(source, 'mixed_actuator_plan', None)
+            if (self.binding is None
+                    or self.binding.build_mixed_control_profile is None
+                    or plan is None
+                    or not callable(getattr(raw, 'compute_target', None))
+                    or not callable(getattr(raw, 'identity_mapping', None))
+                    or type(getattr(raw, 'identity', None)) is not str
+                    or getattr(plan, 'controller_identity', None) != raw.identity):
+                raise TypeError('mixed-control route requires a controller bound to its typed source plan')
+            self.mixed_control_profile = True
+            self.position_profiles = ()
+            self.position_profile = False
+            self.controller = raw
+            return
         profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
         if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
             if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
@@ -271,9 +344,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
                  _binding=None, _diagnostic_gripper_control_hz=None,
+                 _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
-                 _execution_spec_v1=None):
+                 _execution_spec_v1=None, _mixed_control_candidate=False):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if camera_observation_config is not None:
@@ -293,6 +367,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('leaf Position candidate admits MuJoCo CPU only')
         if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
             raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
+        if _mixed_control_candidate and (
+            (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
+            or self.binding.build_mixed_control_profile is None
+        ):
+            raise ValueError('mixed-control candidate requires its scalar CPU task binding')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
         if _execution_spec_v1 is not None:
@@ -319,16 +398,25 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if execution_route not in allowed_versioned_routes:
                 raise ValueError('versioned Position construction has an unsupported provider execution route')
         self._declared_execution_spec_v1 = _execution_spec_v1
-        if _diagnostic_gripper_control_hz is None:
+        if sum((bool(_mixed_control_candidate), _diagnostic_gripper_control_hz is not None,
+                _native_feedback_gripper_control_hz is not None)) > 1:
+            raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
+        self._diagnostic_profile = None
+        self._diagnostic_gripper_control_hz = None
+        self._native_feedback_profile = None
+        self._native_feedback_gripper_control_hz = None
+        self._mixed_control_candidate = bool(_mixed_control_candidate)
+        if _mixed_control_candidate:
+            build_value = lambda: self.binding.build_mixed_control_profile(provider, backend)
+        elif _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
             if (_execution_spec_v1 is None
                     and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
-            self._diagnostic_profile = None
             if self.binding.build_seeded is not None:
                 build_value = lambda: self.binding.build_seeded(provider, backend, 31, horizon)
             else:
                 build_value = lambda: self.binding.build(provider)
-        else:
+        elif _diagnostic_gripper_control_hz is not None:
             if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
                     or type(_diagnostic_gripper_control_hz) is not int
                     or _diagnostic_gripper_control_hz not in {100, 500}
@@ -341,6 +429,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._diagnostic_gripper_control_hz = _diagnostic_gripper_control_hz
             build_value = lambda: self.binding.build_gripper_cadence_diagnostic(
                 provider, backend, _diagnostic_gripper_control_hz, True,
+            )
+            self._native_feedback_profile = None
+        else:
+            if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
+                    or type(_native_feedback_gripper_control_hz) is not int
+                    or _native_feedback_gripper_control_hz not in {100, 500}
+                    or self.binding.build_native_feedback_profile is None):
+                raise ValueError(
+                    'normal native-feedback profile requires the opted-in GeoPhys NutAssembly binding, '
+                    'CPU/CUDA, and 100/500 Hz'
+                )
+            self._native_feedback_profile = 'nutassembly-native-feedback-v1'
+            self._native_feedback_gripper_control_hz = _native_feedback_gripper_control_hz
+            self._diagnostic_profile = None
+            build_value = lambda: self.binding.build_native_feedback_profile(
+                provider, backend, _native_feedback_gripper_control_hz, True,
             )
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
@@ -356,6 +460,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
+        self._mixed_initial_value_pending = bool(_mixed_control_candidate)
         self.dual_entity_position = len(self.position_profiles) == 2
         if camera_observation_config is not None and not self.position_profile:
             raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
@@ -366,7 +471,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
-        self.action_space = Box(-np.inf, np.inf, (8,), dtype=np.float64)
+        self.supports_structured_control_recording = bool(_mixed_control_candidate)
+        if _mixed_control_candidate:
+            action_schema = self.value.get('action_schema')
+            if not isinstance(action_schema, Mapping):
+                raise TypeError('mixed-control task binding must supply its typed action schema')
+            self.metadata['action_schema'] = dict(action_schema)
+            self.action_space = self.value.get('action_space')
+            self.observation_space = self.value.get('observation_space')
+            if self.action_space is None or self.observation_space is None:
+                raise TypeError('mixed-control task binding must supply task-owned spaces')
+        else:
+            self.action_space = Box(-np.inf, np.inf, (8,), dtype=np.float64)
         keys = [key for _, key in self.binding.object_poses]
         state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
         if self.position_profile:
@@ -458,7 +574,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'same_boundary_as_observation': True,
                 },
             }
-        self.observation_space = Dict(observation_spaces)
+        if not _mixed_control_candidate:
+            self.observation_space = Dict(observation_spaces)
         self.session = None
         self._external_solution_owner = None
         self._active_native_interval_receipt = None
@@ -466,6 +583,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = None
         self._stopped = True
         self._position_episode_end = None
+        self._mixed_episode_end = None
+        self._mixed_close_receipt = None
+        self._mixed_reset_context = None
+        self._mixed_record_metadata = None
+        self._mixed_reset_plan = None
+        self._compiled_layout_pre_reset = None
+        self._compiled_layout_post_reset = None
         self._published_position_state = None
         self._published_position_typed_state = None
         self._published_position_obs = None
@@ -481,6 +605,19 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         """Return the latched selected-route execution fault, if any."""
 
         return self._execution_fault
+
+    def get_runtime_progress_receipt(self):
+        if not getattr(self, 'mixed_control_profile', False) or self.session is None:
+            raise StageUnavailableError('mixed runtime progress is unavailable on this selected route')
+        return self.session.runtime_progress_receipt
+
+    @property
+    def close_receipt(self):
+        if not getattr(self, 'mixed_control_profile', False):
+            raise StageUnavailableError('mixed-control close evidence is unavailable on this selected route')
+        if self._mixed_close_receipt is None:
+            raise RuntimeError('mixed-control selected environment close has not completed')
+        return dict(self._mixed_close_receipt)
 
     def _latch_fault(
         self,
@@ -575,10 +712,35 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         if self._closed:
             raise RuntimeError('environment is closed')
-        if options:
+        mixed_reset_plan = None
+        if self._mixed_control_candidate:
+            if options is None:
+                options = {}
+            if not isinstance(options, Mapping) or any(type(key) is not str for key in options):
+                raise TypeError('mixed-control reset options must be a string-keyed mapping')
+            if 'reset_plan_v1' in options:
+                from ..artifacts import ResetPlanV1
+                mixed_reset_plan = options['reset_plan_v1']
+                if type(mixed_reset_plan) is not ResetPlanV1:
+                    raise TypeError('mixed-control reset_plan_v1 must be the public ResetPlanV1 contract')
+                mixed_reset_plan.validate()
+                sample = mixed_reset_plan.reset_sample
+                if (sample.task_artifact_hash != self.artifact.identity_hash
+                        or sample.source_id != self.value['source'].scene_source.source_id
+                        or sample.source_closure_digest != self.value['source'].source_closure_digest):
+                    raise ValueError('ResetPlanV1 Artifact/source identity differs from this selected candidate')
+                if seed is _RESET_SEED_UNSET:
+                    seed = sample.task_seed
+                elif type(seed) is not int or seed != sample.task_seed:
+                    raise ValueError('ResetPlanV1 seed differs from reset seed')
+        elif options:
             raise ValueError('selected reference reset options are not supported')
         if seed is _RESET_SEED_UNSET:
-            if getattr(self, 'position_profile', False):
+            if self._mixed_control_candidate and mixed_reset_plan is not None:
+                seed = mixed_reset_plan.reset_sample.task_seed
+            elif self._mixed_control_candidate and self.session is not None:
+                seed = self.sample.task_seed
+            elif getattr(self, 'position_profile', False):
                 seed = self.value['reset_plan'].reset_sample.task_seed
             else:
                 seed = 19
@@ -593,6 +755,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if (self.binding.build_seeded is None
                     and seed != reset_plan.reset_sample.task_seed):
                 raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
+        mixed_reset_sample = None
+        if self._mixed_control_candidate:
+            seed = self.binding.reset_seed(seed)
+            mixed_reset_sample = self.binding.reset_sample_with_options(
+                self.artifact, seed, options, self.value['source'],
+            )
+            from ..artifacts import ResetSampleV1
+            if type(mixed_reset_sample) is not ResetSampleV1:
+                raise TypeError('mixed-control reset binding must return ResetSampleV1')
+            if (mixed_reset_sample.task_artifact_hash != self.artifact.identity_hash
+                    or mixed_reset_sample.source_id != self.value['source'].scene_source.source_id
+                    or mixed_reset_sample.source_closure_digest != self.value['source'].source_closure_digest
+                    or mixed_reset_sample.task_seed != seed):
+                raise ValueError('mixed-control reset sample differs from its selected source or seed')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         previous_episode_end = self._position_episode_end
@@ -610,8 +786,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_info = None
             self._published_position_evaluation = None
             self.last_position_transition = None
+        if self._mixed_control_candidate:
+            # Publish a candidate reset plan only after the replacement begins.
+            self._mixed_reset_plan = mixed_reset_plan
         self._stopped = True
         previous_session, self.session = self.session, None
+        previous_value = self.value
         previous_session_close_attempted = False
         phase = 'camera_reset_close'
         try:
@@ -620,11 +800,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if previous_session is not None:
                 previous_session_close_attempted = True
                 previous_session.close()
+                if self._mixed_control_candidate:
+                    self._mixed_close_receipt = previous_session.close_receipt
+            previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
-            if self._diagnostic_profile is not None:
+            if self._mixed_control_candidate and self._mixed_initial_value_pending:
+                self._mixed_initial_value_pending = False
+            elif self._mixed_control_candidate:
+                self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
+            elif self._diagnostic_profile is not None:
                 self.value = self.binding.build_gripper_cadence_diagnostic(
                     self.provider, self.backend, self._diagnostic_gripper_control_hz,
+                    external_solution is None,
+                )
+            elif self._native_feedback_profile is not None:
+                self.value = self.binding.build_native_feedback_profile(
+                    self.provider, self.backend, self._native_feedback_gripper_control_hz,
                     external_solution is None,
                 )
             else:
@@ -636,7 +828,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     )
                 else:
                     self.value = self.binding.build(self.provider)
-            self.artifact = _artifact_for_reset(self.artifact, self.value)
+            replacement_receipt = getattr(
+                self.value.get('source'), 'execution_source_receipt', None,
+            )
+            if previous_receipt is not None and previous_receipt is not replacement_receipt:
+                previous_receipt.close()
+            if self._mixed_control_candidate or self._native_feedback_profile is not None:
+                if self.value['artifact'] != self.artifact:
+                    raise ValueError('selected Artifact changed between construction and reset')
+            else:
+                self.artifact = _artifact_for_reset(self.artifact, self.value)
             if external_solution is not None:
                 self.binding.validate_external_solution(self.value, external_solution)
             phase = 'reset_seed'
@@ -652,6 +853,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if reset_plan is None:
                     raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlanV1')
                 self.sample = reset_plan.reset_sample
+            elif self._mixed_control_candidate:
+                self.sample = mixed_reset_sample
+                self._selected_episode_id = uuid4().hex
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
                 self._selected_episode_id = uuid4().hex
@@ -749,18 +953,45 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         controller_profile=self.position_profiles,
                         session_admission_input=self.value.get('session_admission_input'),
                     )
+            elif self._mixed_control_candidate:
+                self.position_profile = False
+                self.session = materialize(
+                    self.artifact, self.execution, source=self.value['source'],
+                )
+                self.session.bind_mixed_controller(self.controller.identity)
+                if self.binding.pre_reset_session_validator is None:
+                    raise ValueError('mixed-control candidate requires compiled-layout validation before reset')
+                self._compiled_layout_pre_reset = self.binding.pre_reset_session_validator(
+                    self.session, self.value,
+                )
             else:
                 self.position_profile = False
                 self.session = materialize_control(self.artifact, self.execution,
                     source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08),
                     diagnostic_profile=(self._diagnostic_profile
-                                        if self.backend == 'cuda' else None))
+                                        if self.backend == 'cuda' else None),
+                    native_feedback_profile=self._native_feedback_profile,
+                    selected_controller=(self.controller
+                                         if self._native_feedback_profile is not None else None),
+                    selected_solution=(external_solution or self.solution
+                                       if self._native_feedback_profile is not None else None),
+                    native_feedback_gripper_control_hz=(
+                        self.value['resolved_configuration'].get('gripper_control_hz')
+                        if self._native_feedback_profile is not None else None
+                    ))
             phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 self.realized = self.session.reset_plan(reset_plan)
+            elif self._mixed_control_candidate and self._mixed_reset_plan is not None:
+                self.realized = self.session.reset_plan(self._mixed_reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
+            self._compiled_layout_post_reset = None
+            if self.binding.post_reset_session_validator is not None:
+                self._compiled_layout_post_reset = self.binding.post_reset_session_validator(
+                    self.session, self.value,
+                )
             if self.binding.runtime_episode_identity:
                 # Native task samples and the published Solution boundary
                 # must share the RuntimeSession's actual episode identity.
@@ -780,6 +1011,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     for profile in self.position_profiles:
                         profile.reset(self.typed_state, self.position_plan)
                 self.feedback = None
+            elif self.mixed_control_profile:
+                self.feedback = None
+                self.controller.reset(self.state)
             else:
                 phase = 'controller_feedback'
                 self.feedback = self.session.control_feedback(self.state)
@@ -787,7 +1021,49 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
-            if not self.position_profile:
+            if self.mixed_control_profile:
+                realization = self.value['reset_realizations'].get(self.sample.sample_id)
+                if not isinstance(realization, dict):
+                    raise ValueError('mixed-control reset sample has no matching source-derived realization receipt')
+                reset_readback = self.session.reset_readback_v1
+                reset_readback_mapping = (
+                    reset_readback.to_mapping()
+                    if callable(getattr(reset_readback, 'to_mapping', None))
+                    else dict(reset_readback)
+                )
+                self._mixed_reset_context = {
+                    'reset_sample_v1': self.sample.to_mapping(),
+                    'reset_realization_v1': realization,
+                    'reset_readback_v1': reset_readback_mapping,
+                }
+                self.info.update({
+                    **self._mixed_reset_context,
+                    'compiled_model_layout_v1': self.session.compiled_layout_receipt,
+                    'pre_reset_compiled_validation_v1': self._compiled_layout_pre_reset,
+                })
+                if self._compiled_layout_post_reset is not None:
+                    self.info['post_reset_compiled_validation_v1'] = self._compiled_layout_post_reset
+                compiled_model_options = getattr(
+                    self.session, 'compiled_model_options_receipt_v1', None,
+                )
+                if compiled_model_options is not None:
+                    self.info['compiled_model_options_v1'] = compiled_model_options
+                if self._mixed_reset_plan is not None:
+                    plan_receipt = {
+                        'reset_plan_v1': self._mixed_reset_plan.to_mapping(),
+                        'reset_plan_identity_sha256': self._mixed_reset_plan.identity_hash,
+                        'reset_plan_evidence_v1': self.session.reset_plan_evidence,
+                    }
+                    self._mixed_reset_context.update(plan_receipt)
+                    self.info.update(plan_receipt)
+                # Freeze task-owned metadata at the reset boundary. Later
+                # observations replace ``info``; record metadata must retain
+                # the source-derived realization/readback that opened this
+                # episode rather than re-reading a transition-only mapping.
+                self._mixed_record_metadata = dict(
+                    self.binding.mixed_record_metadata(self),
+                )
+            if not self.position_profile and not self.mixed_control_profile:
                 self._publish_execution_info(self.info)
             self._last_position_terminated = False
             self._last_position_truncated = False
@@ -807,7 +1083,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
             phase = 'arm_schedule_reset'
-            if all(callable(getattr(self.controller, name, None))
+            if self.mixed_control_profile:
+                self.arm_schedule = None
+            elif all(callable(getattr(self.controller, name, None))
                    for name in ('begin', 'target', 'applied')):
                 # The Controller itself owns acknowledged arm hold/ramp memory.
                 self.arm_schedule = self.controller
@@ -817,6 +1095,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._active_native_interval_receipt = None
             self._stopped, self._episode_mode = False, None
             self._position_episode_end = None
+            self._mixed_episode_end = None
             self._published_position_state = self.state
             self._published_position_typed_state = getattr(self, 'typed_state', None)
             self._published_position_obs = self.obs
@@ -1012,6 +1291,34 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.binding.validate_external_solution(self.value, solution)
 
     def observation(self, state):
+        if getattr(self, 'mixed_control_profile', False):
+            result = self.binding.observe_mixed_control(self, state)
+            if not isinstance(result, tuple) or len(result) != 3:
+                raise TypeError('mixed-control observation hook must return observation, info, evaluation')
+            obs, info, evaluation = result
+            from ..environment.types import TaskEvaluation
+            if not isinstance(obs, Mapping) or not isinstance(info, Mapping) or not isinstance(evaluation, TaskEvaluation):
+                raise TypeError('mixed-control observation hook returned untyped values')
+            contact = info.get('contact_summary_v2')
+            if contact is not None:
+                if not isinstance(contact, Mapping):
+                    raise TypeError('RuntimeSession contact summary must remain a mapping')
+                source = self.value['source']
+                expected = (
+                    source.scene_source.source_id, source.source_closure_digest,
+                    self.session.provider_materialization_id, self.session.episode_id,
+                    self.sample.sample_id, int(state.control_step),
+                    int(self.session.state_revision), float(state.simulation_time),
+                )
+                observed = (
+                    contact.get('source_id'), contact.get('source_closure_digest'),
+                    contact.get('provider_materialization_id'), contact.get('episode_id'),
+                    contact.get('reset_sample_id'), contact.get('control_step'),
+                    contact.get('state_revision'), contact.get('simulation_time_s'),
+                )
+                if observed != expected:
+                    raise ValueError('RuntimeSession contact summary is stale or belongs to another state revision')
+            return dict(obs), dict(info), evaluation
         if getattr(self, 'position_profile', False):
             if getattr(self, 'leaf_position_profile', False):
                 evaluation = self.binding.evaluate(state, self.artifact.semantics)
@@ -1181,6 +1488,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
+        if getattr(self, 'mixed_control_profile', False):
+            return self._step_mixed_control(action)
         from ..controllers.canonical.contracts import StructuredActionRequestV1
         if getattr(self, 'position_profile', False):
             if self._stopped or self.session is None:
@@ -1211,6 +1520,233 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = 'external'
         return self._step(action)
 
+    def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
+        """Run one task-prepared named command through the existing RuntimeSession."""
+        from ..controllers.canonical.contracts import (
+            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1, StructuredActionRequestV1,
+        )
+        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or mixed-control episode already stopped')
+        if self.state.control_step >= self.horizon:
+            self.stop('horizon_reached')
+            raise RuntimeError('selected mixed-control horizon is exhausted')
+        if (proposal is None) != (observer_solution is None):
+            raise ValueError('mixed Solution actions require both proposal and Solution owner')
+        if proposal is not None:
+            from ..planners.contracts import ExpertAction
+            if type(proposal) is not ExpertAction:
+                raise TypeError('mixed-control Solution must return the existing ExpertAction contract')
+            if self._external_solution_owner is None or observer_solution is not self._external_solution_owner:
+                raise ValueError('mixed-control Solution does not own the selected episode')
+            if not np.array_equal(np.asarray(action), proposal.action):
+                raise ValueError('mixed-control Solution proposal action was changed before preparation')
+        before = self.state
+        prepared = self.binding.prepare_mixed_control(self, action, before)
+        base_prepared_fields = {
+            'action_values', 'universal_action', 'request', 'target', 'writer_control',
+        }
+        stepwise = self.binding.prepare_mixed_control_substep is not None
+        expected_prepared_fields = base_prepared_fields | ({'substep_context'} if stepwise else set())
+        if not isinstance(prepared, Mapping) or set(prepared) != expected_prepared_fields:
+            raise TypeError('mixed-control preparation must return the exact typed preparation fields')
+        action_values = tuple(float(value) for value in prepared['action_values'])
+        universal_action = tuple(float(value) for value in prepared['universal_action'])
+        if (not action_values or len(action_values) != len(universal_action)
+                or any(not math.isfinite(value) for value in (*action_values, *universal_action))):
+            raise ValueError('mixed-control task preparation returned invalid action values')
+        request = prepared['request']
+        target = prepared['target']
+        writer_control = prepared['writer_control']
+        if type(request) is not StructuredActionRequestV1 or type(target) is not MixedActuatorCommandV1:
+            raise TypeError('mixed-control preparation must return a StructuredActionRequest and MixedActuatorCommand')
+        request.validate()
+        target.validate()
+        if not isinstance(writer_control, Mapping) or set(writer_control) != {
+            'writer_id', 'action_schema_id', 'components', 'groups',
+            'requested_action', 'canonical_action',
+        }:
+            raise TypeError('mixed-control task writer metadata has unknown or missing fields')
+        source = self.value['source']
+        if (target.plan_identity_hash != source.mixed_actuator_plan.identity_hash
+                or target.task_artifact_hash != self.artifact.identity_hash
+                or target.source_id != source.scene_source.source_id
+                or target.source_closure_digest != source.source_closure_digest
+                or target.provider_materialization_id != self.session.provider_materialization_id
+                or target.episode_id != self.session.episode_id
+                or target.reset_sample_id != self.sample.sample_id
+                or target.control_step != self.session.snapshot().control_step
+                or target.state_revision != self.session.state_revision
+                or target.simulation_time_s != before.simulation_time):
+            raise ValueError('mixed-control target differs from the live source boundary')
+        applied = None
+        applied_payload = None
+        stepwise_receipt = None
+        interval_attempted = False
+        interval_completed = False
+        phase = 'mixed_control_application'
+        try:
+            interval_attempted = True
+            if stepwise:
+                phase = 'mixed_physics_substep_interval'
+                stepwise_session = getattr(self.session, 'step_mixed_actuator_interval', None)
+                if not callable(stepwise_session):
+                    raise StageUnavailableError(
+                        'selected RuntimeSession does not support physics-rate mixed actuator control'
+                    )
+                controller_receipts = []
+
+                def make_substep_command(state, substep_index, substep_count, state_revision):
+                    control = self.binding.prepare_mixed_control_substep(
+                        self, prepared, state, substep_index, substep_count,
+                        state_revision,
+                    )
+                    if not isinstance(control, Mapping) or set(control) != {
+                        'target', 'controller_receipt',
+                    }:
+                        raise TypeError('mixed substep Controller hook returned unknown or missing fields')
+                    substep_target = control['target']
+                    if type(substep_target) is not MixedActuatorCommandV1:
+                        raise TypeError('mixed substep Controller hook must return MixedActuatorCommandV1')
+                    substep_target.validate()
+                    receipt = control['controller_receipt']
+                    if not isinstance(receipt, Mapping):
+                        raise TypeError('mixed substep Controller receipt must be a mapping')
+                    controller_receipts.append(dict(receipt))
+                    return substep_target
+
+                self.state, stepwise_receipt = stepwise_session(
+                    make_substep_command,
+                )
+                if (not isinstance(stepwise_receipt, Mapping)
+                        or not isinstance(stepwise_receipt.get('substeps'), list)
+                        or len(stepwise_receipt['substeps']) != self.artifact.timebase.control_substeps
+                        or len(controller_receipts) != self.artifact.timebase.control_substeps):
+                    raise ValueError('RuntimeSession stepwise receipt differs from the admitted substep count')
+                rows = []
+                for row, receipt in zip(stepwise_receipt['substeps'], controller_receipts, strict=True):
+                    rows.append({**dict(row), 'controller_receipt': receipt})
+                stepwise_receipt = {**dict(stepwise_receipt), 'substeps': rows}
+                first_row = rows[0]
+                applied_payload = first_row.get('applied')
+                if (not isinstance(applied_payload, Mapping)
+                        or first_row.get('target_identity_sha256') != target.identity_hash
+                        or first_row.get('target') != target.to_mapping()):
+                    raise ValueError('stepwise RuntimeSession first command differs from prepared outer target')
+                interval_completed = True
+            else:
+                applied = self.session.apply_mixed_actuator_command(target)
+                if type(applied) is not AppliedMixedActuatorCommandV1:
+                    raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
+                applied_payload = applied.to_mapping()
+                phase = 'mixed_physics_step'
+                self.state = self.session.step()
+                interval_completed = True
+            phase = 'mixed_observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info.update({
+                'provider': self.provider,
+                'external_action': action_values,
+                'universal_action': universal_action,
+                'mixed_actuator_command_v1': target.to_mapping(),
+                'applied_mixed_actuator_command_v1': applied_payload,
+            })
+            if stepwise_receipt is not None:
+                self.info['physics_rate_control_v1'] = stepwise_receipt
+            if proposal is not None:
+                phase = 'mixed_solution_observation'
+                extra = self.binding.observe_expert_kwargs(self, ())
+                if not isinstance(extra, Mapping):
+                    raise TypeError('mixed Solution observation kwargs must be a mapping')
+                observer_solution.observe(
+                    self.obs, float(self.evaluation.reward), bool(self.evaluation.failure),
+                    bool(self.state.control_step >= self.horizon), self.info, **dict(extra),
+                )
+                if hasattr(observer_solution, 'outcome_report'):
+                    report = observer_solution.outcome_report()
+                    if not isinstance(report, Mapping):
+                        raise TypeError('mixed Solution outcome_report() must return a mapping')
+                    self.info.update(dict(report))
+                self.info.update(
+                    selected_policy_execution_complete=bool(observer_solution.done),
+                    selected_policy_execution_failed=bool(observer_solution.failed),
+                    expert_failure_reason=getattr(observer_solution, 'failure_reason', None),
+                    selected_solution_action_v1={
+                        'solution_identity': getattr(observer_solution, 'identity', None),
+                        'stage': proposal.stage,
+                        'diagnostics': dict(proposal.diagnostics),
+                    },
+                )
+                if bool(observer_solution.done) and bool(observer_solution.failed):
+                    raise ValueError('mixed Solution cannot be complete and failed at one boundary')
+            transition = StructuredControlTransitionV1(
+                'structured-control-transition-v1', request, ({
+                    **dict(writer_control),
+                    'controller_target': {
+                        'schema_version': target.schema_version,
+                        'payload': target.to_mapping(),
+                        'identity_hash': target.identity_hash,
+                    },
+                    'applied_control': {
+                        'schema_version': applied_payload['schema_version'],
+                        'payload': dict(applied_payload),
+                        'target_hash': applied_payload['target_hash'],
+                    },
+                },),
+            )
+            if stepwise_receipt is not None:
+                writer_row = dict(transition.writer_controls[0])
+                canonical_action = dict(writer_row['canonical_action'])
+                canonical_action['physics_rate_control_v1'] = stepwise_receipt
+                writer_row['canonical_action'] = canonical_action
+                transition = StructuredControlTransitionV1(
+                    'structured-control-transition-v1', request, (writer_row,),
+                )
+            transition.validate()
+            terminated = bool(self.evaluation.failure) if proposal is not None else False
+            truncated = self.state.control_step >= self.horizon
+            if proposal is not None and observer_solution.done:
+                terminated = False
+                truncated = False
+            if proposal is not None and observer_solution.failed and not truncated:
+                terminated = True
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                phase = 'mixed_recorder_append'
+                self.recorder.append_transition(
+                    action_values, universal_action, self.obs, float(self.evaluation.reward),
+                    bool(self.evaluation.success), terminated, truncated, self.info,
+                    structured_control=transition,
+                )
+            self._episode_mode = 'external_solution' if proposal is not None else 'external'
+            if proposal is not None and observer_solution.done:
+                self.stop('solution_completed')
+                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
+            elif proposal is not None and observer_solution.failed and not truncated:
+                self.stop('solution_failed')
+                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
+            elif truncated:
+                self.stop('horizon_reached')
+                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+        except BaseException as error:
+            after = None
+            readback_error = None
+            if interval_attempted:
+                try:
+                    after = self.session.snapshot()
+                    self.state = after
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            self._latch_fault(
+                phase, error, before_state=before, after_state=after,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                transition_status='not_recorded', readback_error=readback_error,
+            )
+            raise
+
     def step_with_solution(self, solution):
         """Run one caller-owned Solution action through the selected lifecycle.
 
@@ -1234,13 +1770,32 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise RuntimeError('reset required or episode already stopped')
         if self._episode_mode in {'expert', 'external'}:
             raise RuntimeError('cannot mix external Solution and other selected execution modes')
+        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
+            raise RuntimeError('external Solution already stopped')
+        if getattr(self, 'mixed_control_profile', False):
+            try:
+                proposal = solution.act(self.obs, self.info)
+                from ..planners.contracts import ExpertAction
+                if type(proposal) is not ExpertAction:
+                    raise TypeError('mixed external Solution act() must return ExpertAction')
+            except BaseException as error:
+                self._latch_fault('mixed_external_solution_proposal', error, before_state=self.state)
+                if self.binding.abort_solution_on_runtime_error:
+                    try:
+                        solution.abort('runtime_error')
+                    except BaseException as abort_error:
+                        add_note = getattr(error, 'add_note', None)
+                        if callable(add_note):
+                            add_note(f'mixed external Solution abort also failed: {abort_error!r}')
+                raise
+            return self._step_mixed_control(
+                proposal.action, proposal=proposal, observer_solution=solution,
+            )
         try:
             self._require_published_execution_info()
         except BaseException as error:
             self._latch_fault('public_execution_readiness', error, before_state=self.state)
             raise
-        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
-            raise RuntimeError('external Solution already stopped')
         try:
             proposal = solution.act(self.obs, self.info)
             from ..planners.contracts import ExpertAction
@@ -2091,6 +2646,108 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def close(self):
         if self._closed:
             return
+        if getattr(self, 'mixed_control_profile', False):
+            first_error = None
+            try:
+                # A latched interval fault can leave the Recorder at the
+                # prior complete T/T+1 boundary. Do not synthesize a stop
+                # event or try to freeze that incomplete trajectory; retain
+                # the original fault and proceed with resource cleanup.
+                if (self.session is not None and self._mixed_episode_end is None
+                        and self._execution_fault is None):
+                    self.stop('environment_close')
+                if (self.recorder is not None and getattr(self.recorder, 'active', False)
+                        and self._execution_fault is None):
+                    reason = (self._mixed_episode_end.outcome.end_reason
+                              if self._mixed_episode_end is not None else 'environment_close')
+                    self.finish_recording(reason)
+            except BaseException as error:
+                first_error = error
+            session_was_materialized = self.session is not None
+            active_session, self.session = self.session, None
+            if active_session is not None:
+                try:
+                    active_session.close()
+                except BaseException as error:
+                    if first_error is None:
+                        first_error = error
+                    else:
+                        first_error.add_note(
+                            f'mixed-control session close also failed: {type(error).__name__}: {error}'
+                        )
+                self._mixed_close_receipt = getattr(active_session, 'close_receipt', None)
+                try:
+                    close_owner = getattr(active_session, 'close_runtime_owner', None)
+                    if callable(close_owner):
+                        close_owner()
+                except BaseException as error:
+                    if first_error is None:
+                        first_error = error
+                    else:
+                        first_error.add_note(
+                            f'mixed-control Runtime owner close also failed: {type(error).__name__}: {error}'
+                        )
+            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
+            try:
+                if receipt is not None:
+                    receipt.close()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'mixed-control source receipt cleanup also failed: {type(error).__name__}: {error}')
+            task_resource_receipt = None
+            task_resource_error = None
+            try:
+                if self.binding.close_task_resources is not None:
+                    task_resource_receipt = self.binding.close_task_resources()
+            except BaseException as error:
+                task_resource_error = error
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'mixed-control task resource cleanup also failed: {type(error).__name__}: {error}'
+                    )
+            if not session_was_materialized and self._mixed_close_receipt is None:
+                source = self.value.get('source')
+                fault = self._execution_fault
+                self._mixed_close_receipt = {
+                    'schema_version': 'mixed-control-selected-close-v1',
+                    # No RuntimeSession was published. The selected environment
+                    # and its receipt-owned source snapshot have still completed
+                    # their cleanup attempt; keep that distinct from a native
+                    # RuntimeSession close receipt.
+                    'session_closed': True,
+                    'session_materialized': False,
+                    'session_close_status': 'not_materialized',
+                    'environment_closed': True,
+                    'cleanup_completed': first_error is None,
+                    'cleanup_error': None if first_error is None else {
+                        'type': type(first_error).__name__, 'message': str(first_error),
+                    },
+                    'source_id': (
+                        None if source is None else source.scene_source.source_id
+                    ),
+                    'source_closure_digest': (
+                        None if source is None else source.source_closure_digest
+                    ),
+                    'execution_fault_phase': None if fault is None else fault.phase,
+                    'execution_fault_message': None if fault is None else fault.message,
+                }
+            if self._mixed_close_receipt is not None:
+                self._mixed_close_receipt = dict(self._mixed_close_receipt)
+                if task_resource_receipt is not None:
+                    self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
+                if task_resource_error is not None:
+                    self._mixed_close_receipt['task_resource_close_error'] = {
+                        'type': type(task_resource_error).__name__,
+                        'message': str(task_resource_error),
+                    }
+            self._closed, self._stopped = True, True
+            if first_error is not None:
+                raise first_error
+            return
         if not getattr(self, 'position_profile', False):
             first_error = None
             session, self.session = self.session, None
@@ -2107,12 +2764,35 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     if first_error is None:
                         first_error = error
                     else:
-                        add_note = getattr(first_error, 'add_note', None)
-                        if callable(add_note):
-                            add_note(
-                                'Runtime owner close after session close also failed: '
-                                f'{type(error).__name__}: {error}'
-                            )
+                        first_error.add_note(
+                            f'Runtime owner close after session close also failed: {type(error).__name__}: {error}'
+                        )
+            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
+            try:
+                if receipt is not None:
+                    receipt.close()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'execution source receipt cleanup also failed: {type(error).__name__}: {error}'
+                    )
+            task_resource_receipt = None
+            try:
+                if self.binding.close_task_resources is not None:
+                    task_resource_receipt = self.binding.close_task_resources()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'task resource cleanup also failed: {type(error).__name__}: {error}'
+                    )
+            if getattr(self, 'mixed_control_profile', False) and self._mixed_close_receipt is not None:
+                self._mixed_close_receipt = dict(self._mixed_close_receipt)
+                if task_resource_receipt is not None:
+                    self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
             self._closed, self._stopped = True, True
             if first_error is not None:
                 raise first_error
@@ -2256,6 +2936,76 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
         if self._closed:
             raise RuntimeError('cannot stop a closed selected environment')
+        if getattr(self, 'mixed_control_profile', False):
+            if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
+                raise ValueError('Stop reason must be a trimmed non-empty string')
+            if self._mixed_episode_end is not None:
+                return self._mixed_episode_end
+            if self.session is None or getattr(self, 'state', None) is None:
+                raise RuntimeError('mixed-control reset must complete before Stop')
+            from ..trajectory.canonical.episode import make_episode_end_v1
+            fault = self._execution_fault
+            solution = self._external_solution_owner
+            solution_done = bool(getattr(solution, 'done', False)) if solution is not None else None
+            solution_failed = bool(getattr(solution, 'failed', False)) if solution is not None else None
+            if reason == 'solution_completed' and solution_done is not True:
+                raise ValueError('solution_completed requires the active caller-owned Solution to be done')
+            if reason == 'solution_failed' and solution_failed is not True:
+                raise ValueError('solution_failed requires the active caller-owned Solution to be failed')
+            if fault is not None:
+                end_reason = 'execution_fault'
+                terminated, truncated, bootstrap_allowed = False, True, False
+            elif reason == 'solution_completed':
+                end_reason = 'solution_completed'
+                terminated, truncated, bootstrap_allowed = False, False, True
+            elif reason == 'solution_failed':
+                end_reason = 'solution_failed'
+                terminated, truncated, bootstrap_allowed = True, False, False
+            elif reason == 'horizon_reached':
+                end_reason = 'horizon_reached'
+                terminated, truncated, bootstrap_allowed = False, True, True
+            else:
+                end_reason = 'external_stop'
+                terminated, truncated, bootstrap_allowed = False, True, True
+            success = None if fault is not None else bool(self.evaluation.success)
+            event_sequence = 0
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                event_sequence = self.recorder.next_boundary_event_sequence(int(self.state.control_step))
+            payload = {
+                'requested_reason': reason,
+                'control_step': int(self.state.control_step),
+                'simulation_time_s': float(self.state.simulation_time),
+                'source_id': self.value['source'].scene_source.source_id,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+                'reset_sample_id': self.sample.sample_id,
+                'controller_identity': self.controller.identity,
+                'task_evaluation_success': success,
+            }
+            if solution is not None:
+                payload['solution_identity'] = getattr(solution, 'identity', None)
+                payload['solution_done'] = solution_done
+                payload['solution_failed'] = solution_failed
+                payload['solution_failure_reason'] = getattr(solution, 'failure_reason', None)
+            if fault is not None:
+                payload['fault'] = fault.to_mapping()
+            self._mixed_episode_end = make_episode_end_v1(
+                episode_id=self.session.episode_id,
+                final_boundary=int(self.state.control_step),
+                end_reason=end_reason,
+                terminated=terminated,
+                truncated=truncated,
+                bootstrap_allowed=bootstrap_allowed,
+                source='task_env.selected_reference.mixed_control_v1',
+                payload=payload,
+                event_sequence=event_sequence,
+                task_success=(None if fault is not None else success),
+                solution_completed=(
+                    None if solution is None else
+                    bool(solution_done and not solution_failed)
+                ),
+            )
+            self._stopped = True
+            return self._mixed_episode_end
         if not getattr(self, 'position_profile', False):
             raise StageUnavailableError(
                 'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
@@ -2319,8 +3069,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..runtime.sessions.provenance import provider_build_identity
         from ..runtime.sessions import common as session_common
         if (self.session is None or self.state.control_step != 0 or self.recorder is not None
-                or self._stopped or self._position_episode_end is not None):
+                or self._stopped or self._position_episode_end is not None
+                or self._mixed_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
+        if getattr(self, 'mixed_control_profile', False):
+            from ..recorders import RecorderConfig, TransitionRecorder
+
+            path = Path(path)
+            if path.suffix != '.h5':
+                path = path.with_name(path.name + '.h5')
+            if path.exists():
+                raise FileExistsError(path)
+            self.recorder = TransitionRecorder(RecorderConfig(
+                schema_version='v3', max_transitions=max(self.horizon, 1),
+            ))
+            self.recording_path = path
+            self.recorder.begin_episode(self.obs, dict(self.info), self.get_record_metadata())
+            return
         if getattr(self, 'position_profile', False):
             from ..recorders import RecorderConfig, TransitionRecorder
 
@@ -2353,7 +3118,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
             'resolved_configuration_json': json.dumps(config, sort_keys=True),
             'execution_configuration_json': json.dumps({'env_id': self.uid, 'provider': self.provider,
-                'backend': 'cpu', 'horizon': self.horizon}, sort_keys=True),
+                'backend': self.backend, 'horizon': self.horizon}, sort_keys=True),
         }
         if 'source_revision' in self.value:
             runtime_source = self.value['source']
@@ -2369,7 +3134,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if runtime_source.source_closure_digest is not None:
                 source_provenance['runtime_source_closure_digest'] = runtime_source.source_closure_digest
             source_provenance.update({f"source_sha256:{name}": value
-                for name, value in self.value.get('source_sha256', {}).items()})
+                                      for name, value in self.value.get('source_sha256', {}).items()})
+            source_receipt = getattr(runtime_source, 'execution_source_receipt', None)
+            if source_receipt is not None:
+                source_provenance['runtime_execution_source_receipt_json'] = json.dumps(
+                    source_receipt.to_mapping(), sort_keys=True,
+                )
         solution_identity = self._active_solution_identity()
         metadata = EpisodeMetadata('canonical-trajectory-metadata-v0', self.artifact.identity_hash,
             self.sample, self.realized, self.execution,
@@ -2439,6 +3209,38 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.info['task_metrics'])
 
     def finish_recording(self, reason):
+        if getattr(self, 'mixed_control_profile', False):
+            from ..recorders import load_structured_control_records_h5
+
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active mixed-control recording')
+            if self._mixed_episode_end is None:
+                self.stop(str(reason))
+            episode_end = self._mixed_episode_end
+            outcome = episode_end.outcome
+            allowed_reasons = {
+                outcome.end_reason,
+                str(episode_end.boundary_event.payload.get('requested_reason', '')),
+            }
+            if str(reason) not in allowed_reasons:
+                raise ValueError('mixed-control recording finalization reason disagrees with EpisodeOutcome')
+            if self.recorder.transition_count != outcome.final_boundary:
+                raise RuntimeError('mixed-control H5 T does not match the final complete control boundary')
+            trajectory = self.recorder.end_episode(
+                outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
+            )
+            output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
+            loaded = load_structured_control_records_h5(output)
+            if (loaded['transition_count'] != trajectory.transition_count
+                    or loaded['observation_count'] != len(trajectory.observations)
+                    or loaded['outcome'] != outcome):
+                raise ValueError('mixed-control Generic H5 v3 structured-control readback mismatch')
+            return {
+                'schema_id': 'task-env-h5', 'schema_version': 'v3',
+                'transition_count': loaded['transition_count'],
+                'observation_count': loaded['observation_count'],
+                'outcome': outcome.to_mapping(), 'path': str(output),
+            }
         if getattr(self, 'position_profile', False):
             from ..recorders import (
                 load_leaf_control_records_h5, load_structured_control_records_h5,
@@ -2650,6 +3452,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
             },
         }
+
+    def get_record_metadata(self):
+        """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
+        if not getattr(self, 'mixed_control_profile', False):
+            raise StageUnavailableError('selected reference recording metadata is unavailable on this route')
+        value = self._mixed_record_metadata
+        if value is None:
+            value = self.binding.mixed_record_metadata(self)
+        if not isinstance(value, Mapping):
+            raise TypeError('task recording metadata hook must return a mapping')
+        return dict(value)
 
     def _position_record_metadata(self):
         from dataclasses import asdict

@@ -37,6 +37,7 @@ from .fixed_attachment_candidate import build_fixed_attachment_candidate
 
 R03C_TASK_ID = "phase-ii-r03c-attached-leaf-position"
 R03C_TASK_VERSION = "candidate-v1"
+R06B_TASK_ID = "phase-ii-r06b-order-v1-attached-leaf-position"
 R03C_SEED = 31
 ARM_WRITER_ID = "panda-arm/arm-position-leaf"
 HAND_WRITER_ID = "panda-hand/hand-position-leaf"
@@ -166,24 +167,31 @@ def _bindings(candidate, provider_version, build_sha):
 
 def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
                                   hand_stiffness_N_per_m=50.0, provider="mujoco", horizon=64,
-                                  episode_id="E3", arm_active=True, hand_active=True):
+                                  episode_id="E3", arm_active=True, hand_active=True,
+                                  order_variant=False):
     if provider != "mujoco" or arm_gain not in (2.5, 3.0) or hand_stiffness_N_per_m != 50.0:
         raise ValueError("R03c admits MuJoCo CPU, Arm gain 2.5/3.0, and the fixed Hand50 section")
-    fixed = build_fixed_attachment_candidate()
+    if type(order_variant) is not bool:
+        raise TypeError("R06b source recipe selector must be a bool")
+    fixed = build_fixed_attachment_candidate(order_variant=order_variant)
     scene, assembly = fixed.scene, fixed.assembly
-    task_id, version = R03C_TASK_ID, R03C_TASK_VERSION
+    task_id = R06B_TASK_ID if order_variant else R03C_TASK_ID
+    version = R03C_TASK_VERSION
+    reset_id = "r06b-order-v1-fixed-reset" if order_variant else "r03c-fixed-reset"
     task_source = replace(
         fixed.task_source, task_id=task_id, version=version,
         initialization=TaskInitializationV1(
-            "r03c-fixed-reset", "frozen-authored-v0", "training",
+            reset_id, "frozen-authored-v0", "training",
             "zero_named_joint_and_entity_velocities",
             "arm_targets_at_initial_joints_gripper_open",
         ),
     )
     legacy = replace(
-        fixed.source_artifact, artifact_id="phase-ii-r03c-attached-leaf-v0",
+        fixed.source_artifact,
+        artifact_id=("phase-ii-r06b-order-v1-attached-leaf-v0" if order_variant
+                     else "phase-ii-r03c-attached-leaf-v0"),
         task_id=task_id, artifact_version=version,
-        initialization=replace(fixed.source_artifact.initialization, reset_validity="r03c-fixed-reset"),
+        initialization=replace(fixed.source_artifact.initialization, reset_validity=reset_id),
         semantics=replace(fixed.source_artifact.semantics,
                           evaluator="r03c_attached_leaf_oracle",
                           success_definition="fixed_attachment_motion_only"),
@@ -250,7 +258,8 @@ def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
                                         "episode_id": episode_id,
                                         "arm_active": bool(arm_active),
                                         "hand_active": bool(hand_active)},
-            "source_revision": "R03c-attached-entity-position-leaves-v1",
+            "source_revision": ("R06b-derived-order-attached-entity-position-leaves-v1"
+                                if order_variant else "R03c-attached-entity-position-leaves-v1"),
             "source_sha256": {"source_closure": source.source_closure_digest},
         }
 

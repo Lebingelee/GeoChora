@@ -31,6 +31,15 @@ F05 attempt003 的 Menagerie USD / GeoPhys candidate / CPU exact cell 已完成S
 
 F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001/002保持历史状态；attempt002与attempt003证据分别见[F04 attempt002](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)和[attempt003](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate)。
 
+The fixed LIBERO spatial bowl-to-plate diagnostic now reuses
+`SelectedReferenceEnv` and `RuntimeSession`; its internal constructor, exact
+route limits and current bounded evidence are documented in the
+[public API](public-api.md#r07c-d01-libero-diagnostic-entry-2026-10-30),
+[runtime/provider contracts](runtime-and-providers.md#r07c-d01-selected-mixed-control-diagnostic-2026-10-30),
+and [recording evidence](recording-and-learning.md#r07c-d01-same-route-h5-evidence-2026-10-30).
+It is not a registered `make_env()` task or a general LIBERO capability.
+
+
 ## 快速开始
 
 从仓库根目录执行。已发布环境记录为 Ubuntu 24.04.4/x86_64/Python 3.12.14；

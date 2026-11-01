@@ -72,8 +72,9 @@ class _GenesisSession(_SessionValues):
         self._entity.set_dofs_force_range([float(low)],[float(high)],[index])
 
     def reset(self,sample):
+        self._validate_sample(sample)
         self._begin_reset()
-        self._validate_sample(sample);self._scene.reset()
+        self._scene.reset()
         q=self._native_initial.clone()
         for semantic,value in sample.joint_position.items():q[self._joints[semantic].qs_idx_local]=value
         for semantic,requested in sample.poses_world.items():

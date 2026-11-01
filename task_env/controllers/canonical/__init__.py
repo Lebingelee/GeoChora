@@ -1,8 +1,19 @@
 """Advanced provider-free canonical manipulation control."""
-from .contracts import RequestedAction,CanonicalAction,CanonicalArmReferenceV1,GripperControlTarget,CanonicalControlTarget,AppliedCanonicalControl
+from .contracts import (RequestedAction, CanonicalAction, CanonicalArmReferenceV1,
+                        CanonicalArmTargetV1, CanonicalArmResolutionDiagnosticsV1,
+                        CanonicalArmResolutionV1, GripperControlTarget,
+                        CanonicalControlTarget, AppliedCanonicalControl,
+                        MixedActuatorTargetV1, AppliedMixedActuatorV1,
+                        MixedActuatorChannelV1, MixedActuatorPlanV1,
+                        MixedActuatorCommandV1, AppliedMixedActuatorCommandV1)
 from .controller import CanonicalPandaController
 from .kinematics import PandaKinematics
-__all__=['RequestedAction','CanonicalAction','CanonicalArmReferenceV1','GripperControlTarget','CanonicalControlTarget','AppliedCanonicalControl','CanonicalPandaController','PandaKinematics']
+__all__=['RequestedAction','CanonicalAction','CanonicalArmReferenceV1','CanonicalArmTargetV1',
+         'CanonicalArmResolutionDiagnosticsV1','CanonicalArmResolutionV1',
+         'GripperControlTarget','CanonicalControlTarget','AppliedCanonicalControl',
+         'MixedActuatorTargetV1','AppliedMixedActuatorV1','MixedActuatorChannelV1',
+         'MixedActuatorPlanV1','MixedActuatorCommandV1','AppliedMixedActuatorCommandV1',
+         'CanonicalPandaController','PandaKinematics']
 
 from .feedback import (
     CanonicalControlFeedback, CanonicalGripperFeedback,

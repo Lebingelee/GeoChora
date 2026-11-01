@@ -61,8 +61,7 @@ to the intended successful run; never combine partial runs into a fake pass.
    reassessment below is complete. Include the chosen repair, its validation
    and final substage disposition in one package.
 
-Ordinary substage work has at most **three attempts**. Count completed execution
-windows in the index, with their success, timebox or external-guidance handoff
+Ordinary substage work has at most **three attempts**. Count completed execution; each substage follows the three-attempt cap.windows in the index, with their success, timebox or external-guidance handoff
 reason; record repeat tests/native runs under that window. Do not reset the
 count through renamed packages, new threads/branches or preparation rounds.
 Recovery or maintainer-directed contract correction may continue the same

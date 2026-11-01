@@ -118,11 +118,14 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `TaskInitializationV1`, `resolve_role_binding`, `sample_episode_reset_plan` | `task_env.environment` | B02 原 route 使用 TaskArtifact v0；D01b 扩展为接受精确 Scene-bound TaskArtifact v1。两者仍产生既有 provider-facing `ResetSample-v0`，边界由 `UniformDimension` 持有 |
 | `RoleBindingV1`, `EpisodeResetPlanV1`, `ResetSample` | `task_env.artifacts.execution` | `EpisodeResetPlanV1` 仅包装 Role/Scene provenance 和现有 `ResetSample` v0；`to_provider_sample()` 原样返回同一 v0 对象，不改冻结 Artifact/sample schema |
 | `TaskEvaluationContextV1`, `TaskPredicateEvaluationV1`, `TaskPredicateResultV1`, `TemporalPredicateRuleV1`, `TaskLifecycleAdapter.evaluate_predicates`, `TaskLifecycleAdapter.commit_temporal_predicates` | `task_env.environment` | B03a 只读 predicate 与 B03b 显式 temporal commit；action/AppliedControl、声明 Timebase、实测 NativeIntervalEvidence、boundary/clock 均引用既有类型；step/observation 不自动调用。当前 temporal commit 限 scalar evaluation boundaries |
+| `ContactSummary`, `SnapshotRequest.contact_summary`, `RuntimeSnapshot.contact_summary` | `task_env.environment`; optional peer extension consumed by `task_env.runtime.GeoPhysRuntimeBoundary` | `ContactSummary.available({})` means the requested public pair query returned no contacts; `unavailable(reason)` is missing evidence and must not become `False`. Scalar `TaskStateView` carries the typed summary; vector state has no per-row contact publisher. If requested, the boundary calls an optional public peer `read_contact_summary()` and rejects a non-`ContactSummary` result; a peer without it remains unavailable. Current GeoPhys does not implement that peer method, so it reports `provider_contact_pair_query_not_implemented`. This extension does not admit generic object contact or benchmark task support |
 | `adapt_legacy_recipe_task_source` | `task_env.environment` | 只读兼容投影：从旧 `recipe`/`environment` mapping 提取 task identity、Scene 与固定 agent/object role；environment 仍由既有 `ResolvedEnvConfig` 路径解析，不改 TaskArtifact v0 |
 | `ExecutionSpecV1`, `RendererSelectionV1`, `CameraRendererOverrideV1`, `decode_execution_spec` | `task_env.artifacts` | D05a 的显式版本化静态选择；保留旧 `ExecutionSpec` 无版本映射，v1 不自动降为 v0，也不表示已 admission/materialization |
 | `CanonicalStateViewV1`, `CanonicalStatePublicationV1`, `TypedJointStateValue`, `TypedFrameStateValue`, `StateRequirements`, `NativeIntervalEvidence`, `StateViewLifetime` | `task_env.artifacts` | D02a contracts；D02b publication 原子绑定 boundary/lifetime。当前只有 GeoPhys/MuJoCo CPU `RuntimeSession.snapshot_v1()` 有界支持 scalar/free-base readback；不增加 contact manifest 能力或 H5 state format |
 | `CanonicalStateViewV2`, `CanonicalStatePublicationV2`, `TypedActuatorForceStateValue` | `task_env.artifacts` | Additive D02 typed raw-force publication: exact decoder version, signed value, explicit unit, source closure/materialization, Provider sample revisions/phase/native clock, episode/reset and evaluation-boundary identity. `snapshot_v2()` composes existing Joint/Frame projection with typed force; v0/v1 mappings and hashes remain unchanged. Required missing/invalid/wrong-unit/stale-identity/unsupported-phase values reject. Publication is bounded to the exact Scene-v3 Panda R1 candidate on GeoPhys `a53a8cf` CPU and MuJoCo 3.8.1 CPU with the admitted native binary digests; no generic actuator-force capability |
 | `ProductionCanonicalPandaController.source_artifact_hash`, `.source_xml_sha256`, `.tcp_profile_identity`, `.source_kinematics_identity`, `.expected_control_step` | `task_env.controllers.canonical.production` | Read-only actual-instance identity and evaluation-cursor view used by source-bound admission; adding these properties does not alter legacy R1 identity or compute/reset behavior |
+| `CanonicalArmTargetV1`, `CanonicalPandaController.resolve_world_pose_target_v1` | `task_env.controllers.canonical.contracts` / `.controller` | Advanced stateless absolute world-pose target resolver. Requires typed current `PoseWorld`, seven named-order joint positions and world position/quaternion-wxyz target; reuses the same arm calculation as the existing Controller path and returns source/controller-bound joint and servo targets. Import the value and controller from their owning modules; it does not step a Provider or admit a task/backend. |
+| `CanonicalArmResolutionV1`, `CanonicalArmResolutionDiagnosticsV1`, `CanonicalPandaController.resolve_world_pose_target_iterative_v1` | `task_env.controllers.canonical` | Advanced provider-free bounded composition of the existing absolute world-pose DLS resolver. It preserves the historical one-step entry point and returns its typed target plus iteration count and source-FK position/orientation residuals. The caller must check `diagnostics.converged` before dispatch; this API does not step a Provider, inspect provider state, or admit a task/backend. |
 | `ActuatorForceMeasurementV1`, `RuntimeSnapshot.actuator_force_measurement` | `task_env.environment` | Core Provider-adapter value contract for signed raw actuator-force provenance: source generation, sample/config/state revisions, native sample index/phase, validity, and selected-session episode/reset/evaluation boundary. Used by GeoPhys legacy force-aware and MuJoCo session-cache routes; wrapped by typed state v2 only for the exact admitted Scene-v3 R1 candidate. It does not grant generic actuator units or shared Provider capability |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `LogicalAssemblyV1`, `LogicalAssemblyScenePinV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
@@ -133,9 +136,10 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite Force-aware catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b adds a separate compiled Position leaf plan and synthetic-IO adapter path, but does not alter the catalog or admit a Provider |
 | `LeafProfileSectionV1`, `LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, `compile_effective_leaf_plan` | `task_env.controllers.canonical` | R02b advanced provider-free owner. Re-resolves current R01b/R01c inputs, requires complete Scene ControlGroup/ActuatorResource coverage, compiles exact immutable Arm/Hand Position sections, and derives `preset` / `partially_overridden` / `custom` from effective configuration differences. This is not a public factory or runtime admission |
 | `LeafMaterializationReceiptV1`, `LeafNativeJointMappingV1`, `LeafNativeActuatorMappingV1`, `LeafNativeFrameMappingV1`, `LeafNativeTendonMappingV1`, `prepare_leaf_command`, `preflight_leaf_control_interval`, `dispatch_leaf_control_interval` | `task_env.runtime.sessions` (advanced opt-in) | R02b provider-neutral typed boundary and production preflight/dispatch owners. R02b S1 consumes explicitly `synthetic_fixture` mappings only. R02c attempt004 verified MuJoCo 3.8.1 CPU identity and frozen source; E1 arm motion plus H5/tamper checks passed, while E2 hand motion failed its fixed oracle after 64 intervals. E1/E2 H5 files independently read as T=64/T+1=65; E3/E4 were not run. Slice S2/S3 remains incomplete and Provider admission is unverified. `LeafControlRuntime` extends the existing RuntimeSession owner, not a second runtime |
-| `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
+| `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；`ArticulationDefinition.joints` v1 canonical tuple按`joint_id`排序，语义查找不依赖tuple/source traversal位置，`link_frame_ids`独立规范化。R06b003恢复此旧规范化并将source/native traversal单独留在严格recipe与named receipt；一个Panda Arm+Hand/MuJoCo3.8.1 CPU双case order regression目前待Sol复核，不能外推为任意provider/source支持。它是静态Scene顺序合同，不执行FK或provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的既有路线仍按单Robot/已列精确准入处理；R03b另加显式 fixed-attachment-plan opt-in，只在准确Menagerie Panda Arm+Hand双source、Scene-v3/LogicalAssembly/closure identity、MuJoCo 3.8.1 CPU、2 ms × 5、ResetPlan及模型映射/拓扑门内执行，经Sol复核为ACCEPTED_BOUNDED_S1_S2。该attempt不是公共`make_env()`、Controller、Recorder/H5 S3或任意Attachment route。现有`materialize_control()`仍单独拥有Position与plan-bound R1 typed-force准入：GeoPhys clean revision `a53a8cfe...` CPU或实测MuJoCo 3.8.1 CPU build/source。`reset_plan()`校验Artifact/TaskSource/Scene identity并在measured-state tolerance gate前阻断snapshot/step；`snapshot_v1()`不发布actuator force，`snapshot_v2()`只在精确R1 routes发布required typed force。contact/native-interval不由此通用支持 |
+| `MixedActuatorSubstepSession`, `MujocoRuntimeSession.step_mixed_actuator_interval` | `task_env.runtime.sessions.api` / `.mujoco` (internal optional extension; not exported by the package facade) | A task-owned command factory may recompute a typed named mixed-actuator command from each fresh state within one outer control interval; the session returns one outer state transition and a per-physics-step target/ack/clock receipt. This extension is intentionally absent from the required `RuntimeSession` protocol and does not declare cross-provider capability. The current LIBERO v5 producer/reader path has provider-free fake-runtime integration evidence only; no native v5 trajectory or task success has been established. |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
 | `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/C_Development_Record.md#public-candidate)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
@@ -377,6 +381,26 @@ establish general Isaac admission, other source/build/device combinations, Human
 P99, Qualification or training-ready status. F04 attempt001–003 evidence is unchanged, including
 all five attempt003 `-11` exits; F05 has not started. See the [attempt004 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
 
+### Source-bound absolute pose control
+
+`CanonicalPandaController.resolve_world_pose_target_iterative_v1()` is an
+advanced, provider-free resolver. It composes the existing canonical arm DLS
+owner for a typed absolute world pose and returns `CanonicalArmResolutionV1`
+with bounded iteration and source-FK position/orientation residuals. Callers
+must check `diagnostics.converged`; the resolver does not step a Provider or
+admit a task/backend.
+
+`MixedActuatorSubstepSession` is an internal optional extension of the session
+owner, declared in `task_env.runtime.sessions.api` and implemented by the
+MuJoCo session. Its command factory can recompute a typed named
+`MixedActuatorCommandV1` from each fresh physics-step state while retaining one
+outer control transition. It is not part of the required `RuntimeSession`
+protocol, is not exported from `task_env.runtime.sessions`, and does not grant
+cross-provider support. The LIBERO v5 producer/reader path has fake-runtime
+integration evidence only; a native v5 trajectory and task success remain
+unverified.
+
+
 ### Static Logical Assembly value (R01a)
 
 ```python
@@ -610,9 +634,10 @@ provider-free S1 but was not run natively. No complete episode or real closed
 H5 was produced; R03c S2/S3 remain incomplete pending Sol review. This
 candidate is not registered as general `make_env()` support. See [the R03
 contract and attempt status](goal/Phase_II_01/03_R03_Physical_Attachment.md)
-and ignored [R03c report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md).
-The attempt report and raw logs are local ignored Evidence under
-`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
+and its machine Evidence under the ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/`
+output. That directory preserves the evidence index and raw logs; there is no
+`report.md` at the formerly linked path.
 
 R02c attempt003 passed the actual MuJoCo package/runtime/API and binary identity
 checks, compiled the fixed full-Panda source, produced the 9/9/8 provider
@@ -835,6 +860,46 @@ progress 由现有 `TaskLifecycleAdapter` 持有，并在 `reset_task()` 清除�
 仍只为该 outer boundary 提供时间/来源证据，不把其内部 native samples 当作多次 task commit。当前为 scalar-only S1 contract，
 Temporal rule 不进入冻结 TaskArtifact v0，也不建立持续时间 Guard 或自动接入 observation/native callback。
 
+## R05b bounded NutAssembly native-feedback profile
+
+The selected NutAssembly task has an explicit advanced normal-profile entry:
+
+```python
+from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+env = NutAssemblyReferenceEnv.for_native_feedback_profile(
+    backend="cpu", gripper_control_hz=500, horizon=6000,
+)
+try:
+    observation, info = env.reset(seed=19)
+    # Continue through the existing public env.step / task Solution routes.
+finally:
+    env.close()
+```
+
+`backend` is `cpu` or `cuda`; `gripper_control_hz` is `100` or `500` (default
+`500`). This selection goes through the normal Core admission path and uses
+`nutassembly-native-feedback-v1`, not the historical C05c diagnostic
+constructor. Admission is limited to the exact NutAssembly Square nominal-v1
+Artifact, pinned canonical source and complete Importer closure, GeoPhys build,
+named arm-joint/open-actuator mapping, strict `p1_2_scalar_cpu_v0`,
+implicitfast, 2 ms × 5 native timebase, and no rendering. The versioned
+execution-source receipt binds the XML and the immutable bytes actually read
+by the Importer. The generic GeoPhys provider manifest remains conservative;
+other source/build/task intersections fail closed.
+
+R05b attempt001's CPU/CUDA short runs were reviewed by Sol and returned
+`CHANGES_REQUIRED_R05B` for default reset initialization, re-receipted source
+admission, pre-narrowing actuator-ID checks, and connected worker/reader S1.
+Attempt002 closed those four findings on Core commit `1193f2f` while reusing
+GeoPhys `c6df840`. The focused provider-free S1 passed 19 tests. Fresh CPU and
+CUDA runs with the 500 Hz law each completed one reset, two outer intervals and
+ten native steps; the production semantic reader and independent raw H5 reader
+both passed. The bounded attempt002 result is pending Sol review. These short
+runs do not establish task or Expert completion, Guard dwell, the full CPU/CUDA
+× 100/500 Hz campaign, real-time or device-resident control, general Provider
+support, P99, or Formal Qualification. See the [R05 attempt002 record](goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
+
 ## Parallel、退休和缺失路线
 
 `make_parallel_env` 要求显式 homogeneous registration。`execution="local"|"remote"`
@@ -1047,3 +1112,120 @@ The separate PickCube R3 cross-provider comparison remains `PARTIAL_REALIZED_STA
 ### F05 successor attempt002 continuation status (2026-11-01)
 
 DG03's current-HEAD source-bound synthetic S1 is recorded as `PASS_SYNTHETIC_CORE_S1_ONLY`; its provider-free direct-HDF5 cold read is `PASS_SYNTHETIC_H5_COLD_READ`. A separate Isaac 6.2 GPU PhysX positive mimic probe (78 steps) and full relation-ablation counterfactual (48 steps) are `PASS_DIAGNOSTIC_ONLY`. Neither probe constitutes the production Core route or a formal cell. The exact source equality `solimp`, fixed-tendon consumer, and source-to-PhysX drive/contact semantics remain unproven; formal DG03 N2 stays `BLOCKED_BY_FEATURE`. Sol reviewed this as a partial result and DG03 remains active for a newly frozen continuation. No general admission/API or Qualification claim follows. See the [continuation record](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-successor-attempt002-continuation-2026-11-01-partial-pending-sol).
+
+## R07c D01 LIBERO diagnostic entry (2026-10-30)
+
+The fixed spatial bowl-to-plate candidate is constructed by
+`bench_deploy.libero.environment.selected_reference.build_libero_selected_candidate()` and
+then executes through `SelectedReferenceEnv.from_libero_diagnostic_candidate()`
+and the existing `RuntimeSession` route. Example:
+
+```python
+from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
+
+env = build_libero_selected_candidate(horizon=64)
+try:
+    observation, info = env.reset(seed=19, options={"init_row_index": 0})
+    action = [float(value) for value in observation["state"]["joint_position"][:7]] + [0.04]
+    observation, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+This is an internal, source-fixed diagnostic constructor; it is not registered
+in `make_env()` and accepts only the pinned LIBERO spatial candidate on MuJoCo
+CPU. Its task binding owns LIBERO source/reset/controller/evaluation semantics;
+the shared Core route consumes the generic, source-bound
+`MixedActuatorPlanV1` and named mixed commands through the existing selected
+environment, runtime session, provider adapter, and H5 v3 recorder. The Core
+
+### Compiled-model readback
+
+The optional advanced `CompiledModelOptionsReadbackV1` interface is separate
+from the required `RuntimeSession` protocol. Where an adapter can bind
+effective settings to the compiled model and immutable source receipt, reset
+info may include `compiled_model_options_v1`. The MuJoCo mixed-actuator CPU
+session reports MuJoCo/API identity, `mjModel.opt` solver/integrator/contact
+settings, contact/joint capacity limits, and SHA-256 of the compiled MJB model
+bytes. Consumers should validate the receipt's source identity before
+comparing it. Other providers may omit this readback.
+
+The separate optional advanced `CompiledModelPhysicsFingerprintReadbackV1`
+interface provides source-bound object-name/dimension inventory plus hashes
+for numeric physical-model arrays, without returning provider-owned model
+objects or making the protocol required of other providers. Compare this
+fingerprint alongside the MJB hash: serialized MJB bytes can differ because of
+metadata while the physical-model arrays still match. Neither readback alone
+establishes task success or cross-provider physics equivalence.
+
+The deterministic fixture realization is derived from pinned task source and
+recorded with the complete named `.pruned_init` row restore; it does not claim
+historical fixture-to-row parity. Attempt002's final provider-free same-route
+S1 passed 19 focused cases. Locked MuJoCo 3.8.1/API3008001 CPU run004 completed
+three 64-transition episodes with 4,800 native steps, five resets, two
+contact endpoints, and three H5 v3 files. The independent provider-free reader
+verified 192 transitions, 195 observations, physical monitor receipts, and
+parent exit/lock release; five tampered copies of the actual native bundle were
+rejected. All 13 limited scalar joints stayed within source bounds, warning
+counters remained zero, and the bounded motion gates passed. The controller
+uses explicit unqualified joint-space PD gains `Kp=100`, `Kd=20` and a 16 mm
+aggregate opening target; this is not upstream OSC_POSE equivalence or a
+controller qualification. The attempt002 result is
+`R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, limited to
+this frozen source/task/controller/seed/reset/provider intersection. Attempt001
+and ordinary pilot history retain their original signed-time dispositions.
+This entry does not grant a general LIBERO Provider route, task success,
+current-scope R07 completion, P99, or Qualification. The 2026-10-30 three-task provider-switching/Solution plan remains a historical
+record, superseded for the A123 closeout by the
+[2026-11-01 scope](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-a123-scope-20261101);
+this documentation change does not widen the admitted API. See the
+[R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+
+Current Sol disposition is `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3` for exactly
+that frozen native004 intersection. Review added strict unsupported-provider
+reset and incomplete-warning-vector rejection, plus position-drive-law
+preflight negatives; 143 affected provider-free checks and original-H5 replay
+passed. Native execution remains bound to `47d38ac4`; the review fixes in
+`d0c89b57` were not rerun natively. See the [Sol decision](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).
+
+## LIBERO A123 task-local route (2026-11-01; bounded technical acceptance; source terms open)
+
+The bounded A-stage closeout extends the internal `bench_deploy.libero` selected
+candidate path to original LIBERO tasks 1/2/3 through the existing
+`SelectedReferenceEnv → RuntimeSession → provider` owners. It is not a new stable
+Core API, generic `make_env()` registration, or general provider admission. The
+required evidence is task-specific: MuJoCo source/model/reset and same-cadence
+upstream action replay; GeoPhys public construction, reset, meaningful step,
+state readback and close. High-precision tracking and autonomous Solution
+success are optional follow-up; Isaac Sim and B/C are deferred for this scope.
+The [A123 rework report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md) records the exact evidence and bounded decision.
+
+The Core GeoPhys reset path now preserves legacy `ResetSample-v0` behavior:
+absent joint/free-body velocities use the v0 zero-velocity policy and absent
+fixture poses produce no fixture transform writes. Explicit V1 velocity and
+fixture fields remain validated and applied. Task2 GeoPhys nevertheless differs
+from upstream before action 82's first finger-to-cabinet contact (TCP position
+33.143 mm P95 / 37.916 mm maximum; orientation 229.074 / 259.412 mrad), while
+MuJoCo tracks the same source replay within 0.605 mm and 4.030 mrad maximum.
+The maintainer accepted this measured task2 difference as a scoped exception
+for the frozen A-stage source/controller/action sequence. Sol has accepted the bounded A123 technical intersection; file-specific
+license/attribution remains unresolved. This is not task success, provider qualification,
+general provider parity or a general support claim.
+
+Compiled MuJoCo physics arrays/dimensions and authored camera definitions are
+compared to the pinned source; rendered-frame or pixel equivalence is not
+claimed. GeoPhys's public `read_contact_summary_v2` method may return a typed
+`unavailable` result when pair queries are unsupported. A task predicate may
+also be unavailable. Preserve those statuses and do not infer task success from
+the route's completion or close receipt. The wine_bottle/wine_rack source and
+file hashes are verified, but file-specific terms and attribution remain
+unresolved; no license conclusion is inferred.
+
+<a id="f05-successor-design-only"></a>
+
+Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../maintenance/20261101_r07_a123_sol_acceptance.md)。
+
+
+## F05后继：同源多表示规划（2026-10-30；尚无新增API）
+
+后继路线见[11](goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)与[12](goal/Phase_II_01/12_F05_F07_Execution_Playbook.md)：按同一物理来源的可追溯表示选择provider，保留精确representation/recipe/build身份，复用既有Core owner。Semantic feature inventory是候选审核报告，不是新公共Scene IR或已实现通用loader；本轮没有扩展当前USD loader、MJCF source或公共构造签名。原同USD门和旧F05 partial不回填PASS，不能把文档中的MJCF/MuJoCo successor cell当作已接收API。各分支已有实现仍依其本地源码和bounded evidence判断。

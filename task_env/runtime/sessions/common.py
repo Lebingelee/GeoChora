@@ -25,7 +25,9 @@ from ...artifacts import (
     UnavailableStateValue,
     project_canonical_state_v0,
 )
-from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState
+from ...artifacts.execution import (
+    EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSampleV1,
+)
 from ...controllers.canonical.contracts import digest
 
 
@@ -191,6 +193,12 @@ class _SessionValues:
         return self._provider_materialization_id
 
     @property
+    def state_revision(self):
+        """Current RuntimeSession publication revision for freshness checks."""
+        self._require_open()
+        return int(self._state_revision)
+
+    @property
     def episode_id(self):
         """Provider-owned identity for the latest successfully reset episode."""
         self._require_reset()
@@ -218,9 +226,56 @@ class _SessionValues:
         if hasattr(self, '_position_applied_boundary_ids'):
             self._position_applied_boundary_ids.clear()
 
-    def reset_plan(self, plan: EpisodeResetPlanV1) -> RealizedInitialState:
-        """Reset from a Core plan and open rollout only after Scene/readback checks."""
+    def reset_plan(self, plan: EpisodeResetPlanV1 | ResetPlanV1) -> RealizedInitialState:
+        """Reset from a public Core plan and open rollout after its readback gate."""
         self._require_open()
+        if isinstance(plan, ResetPlanV1):
+            if self._provider != 'mujoco':
+                raise ValueError('source-bound ResetPlanV1 is currently admitted for MuJoCo mixed sessions only')
+            plan.validate()
+            if getattr(self._source, 'mixed_actuator_plan', None) is None:
+                raise ValueError('source-bound ResetPlanV1 requires an admitted typed source profile')
+            sample = plan.reset_sample
+            if (sample.task_artifact_hash != self._artifact.identity_hash
+                    or sample.source_id != self._source.scene_source.source_id
+                    or sample.source_closure_digest != self._source.source_closure_digest):
+                raise ValueError('ResetPlanV1 Artifact/source/closure differs from RuntimeSource')
+            # Complete schema and identity checks before changing the active
+            # session gate or invoking a provider reset implementation.
+            if sample.schema_version != 'reset-sample-v1':
+                raise ValueError('ResetPlanV1 requires ResetSampleV1')
+            if getattr(self._source, 'mixed_actuator_plan', None) is not None:
+                preflight = getattr(self, '_preflight_reset_plan_sample', None)
+                if not callable(preflight):
+                    raise RuntimeError('mixed actuator RuntimeSession lacks pre-mutation reset preflight')
+                preflight(sample)
+            self._reset_plan_gate_required = True
+            self._reset_plan_gate_open = False
+            self._reset_plan_evidence = None
+            realized = self.reset(plan.to_provider_sample())
+            self._reset_plan_gate_required = True
+            self._reset_plan_gate_open = True
+            try:
+                plan.validate_realization_identity(realized)
+                readback = self.reset_readback_v1
+                if (readback.reset_sample_id != sample.sample_id
+                        or readback.source_id != sample.source_id
+                        or readback.source_closure_digest != sample.source_closure_digest):
+                    raise ValueError('ResetPlanV1 measured readback identity differs from its sample')
+                self._reset_plan_evidence = {
+                    'schema_version': 'reset-plan-evidence-v1',
+                    'reset_plan_identity_sha256': plan.identity_hash,
+                    'purpose': plan.purpose,
+                    'reset_sample_id': sample.sample_id,
+                    'source_id': sample.source_id,
+                    'source_closure_digest': sample.source_closure_digest,
+                    'readback': readback.to_mapping(),
+                }
+                self._reset_plan_gate_open = True
+            except BaseException:
+                self._reset_plan_gate_open = False
+                raise
+            return realized
         if not isinstance(plan, EpisodeResetPlanV1):
             raise TypeError('reset_plan requires EpisodeResetPlanV1')
         plan.validate()
@@ -269,10 +324,29 @@ class _SessionValues:
 
     def _validate_sample(self, sample):
         self._require_open()
+        if isinstance(sample, ResetSampleV1) and (
+                self._provider not in {'mujoco', 'geophys'}
+                or getattr(self._source, 'mixed_actuator_plan', None) is None):
+            raise TypeError('ResetSampleV1 requires an admitted mixed actuator session before reset')
+        if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
+            raise TypeError('RuntimeSession reset requires an admitted reset sample schema')
         if sample.task_artifact_hash != self._artifact.identity_hash:
             raise ValueError('reset sample/Artifact mismatch')
         if set(sample.joint_position) != set(self._source.joints) or set(sample.poses_world) != set(self._source.free_joints):
             raise ValueError('reset semantic bindings mismatch')
+        if isinstance(sample, ResetSampleV1):
+            sample.validate()
+            if (sample.source_id != self._source.scene_source.source_id
+                    or sample.source_closure_digest != self._source.source_closure_digest):
+                raise ValueError('ResetSampleV1 source/closure identity mismatch')
+            if set(sample.fixture_pose_world) != set(self._source.fixture_bodies):
+                raise ValueError('ResetSampleV1 fixture-root bindings mismatch')
+            if set(sample.free_joint_velocity) != set(self._source.free_joints):
+                raise ValueError('ResetSampleV1 free-joint velocity bindings mismatch')
+            if set(sample.joint_velocity) != set(self._source.joints):
+                raise ValueError('ResetSampleV1 named joint velocity bindings mismatch')
+        elif getattr(sample, 'schema_version', None) != 'reset-sample-v0':
+            raise TypeError('RuntimeSession reset requires ResetSample v0 or admitted ResetSampleV1')
         if sample.settle_steps != 0:
             raise ValueError('nonzero settle steps unsupported in P1.2')
 

@@ -26,7 +26,7 @@ def build_native_input(family='menagerie-panda'):
 
     accepted = build_candidate(family)
     old_source = accepted.runtime_source
-    target_build_identity = 'geophys-a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
+    target_build_identity = 'geophys-67da1165149486d3ae3e779c13ce31af49e17d50'
     execution = replace(
         accepted.execution,
         physics_provider='geophys', physics_backend='cpu',

@@ -1,0 +1,82 @@
+{
+  "schema_version": "libero-pilot-owner-gap-matrix-v1",
+  "task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+  "implementation_status": "R07C_DIAG_D01_PROVIDER_FREE_S1_PASS_NATIVE_PENDING_SOL_REVIEW",
+  "implementation_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/report.md",
+  "s1_command_run": "run081",
+  "s1_tests_passed": 125,
+  "core_native_admission_ready": false,
+  "gaps": [
+    {
+      "id": "mounted-panda-mixed-actuator-contract",
+      "owner_symbols": [
+        "task_env/controllers/absolute_joint.py::AbsoluteJointPositionActionAdapter",
+        "task_env/runtime/sessions/api.py::RuntimeSession; task_env/runtime/sessions/control.py::materialize_control",
+        "task_env/controllers/joint_position.py::JointPositionServoBackend"
+      ],
+      "current_input_output": "D01 implements a source-bound mixed target and acknowledgement through SelectedReferenceEnv and RuntimeSession: seven named torque motors plus two signed finger position actuators, typed identities, 20 Hz outer control and 25 held 2 ms substeps. Provider-free dispatch, partial-write faulting and compiled transmission/range checks pass S1. Native slot/layout and motion remain pending.",
+      "necessary_extension": "Keep the route fixed to this compiled source and verify the three-row native motion, actuator acknowledgement and source limits. Do not replace torque motors with position actuators, claim OSC_POSE equivalence, or widen generic admission.",
+      "s1_oracle": "Provider-free codec/contract negatives reject reordered slots, wrong actuator type, inverted finger signs, wrong units, and a false 20 Hz to 100 Hz equivalence.",
+      "native_oracle": "One selected public Env reset and action through the exact seven-motor/two-finger map; receipt reports each applied slot and source identity."
+    },
+    {
+      "id": "typed-init-and-free-body-reset",
+      "owner_symbols": [
+        "task_env/environment/task_source.py::TaskSourceV1",
+        "task_env/assembly/source.py::TaskSceneSource",
+        "task_env/runtime/sessions/source.py::ExecutionSourceReceiptV1"
+      ],
+      "current_input_output": "D01 adds a versioned non-executing decoder for the pinned [50,92] .pruned_init, a deterministic source-derived tabletop/fixture placement receipt, complete row restore, and public reset readback. Provider-free identity, non-zero time/velocity, sampler and tamper gates pass S1. Native row/layout/readback remains pending.",
+      "necessary_extension": "Verify each frozen row's complete qpos/qvel/time and fixture realization through the same public RuntimeSession reset. Do not claim historical per-row fixture parity or execute pickle constructors.",
+      "s1_oracle": "Reject wrong init SHA, wrong entry ordering, unsupported schema, missing object/frame, and altered task source receipt before materialization.",
+      "native_oracle": "After authorized decode, reset one public Env and compare every declared object pose/joint state to the pinned source initialization oracle without private Provider reads."
+    },
+    {
+      "id": "object-frame-reference-mapping",
+      "owner_symbols": [
+        "task_env/assembly/references.py::resolve_task_references",
+        "task_env/assembly/source.py::TaskSceneSource"
+      ],
+      "current_input_output": "D01 binds the exact named source bodies, one Panda end-effector site, 18 compiled joints and nine actuator slots through the existing RuntimeSource and MuJoCo layout owner. The S1 worker independently checks the compiled receipt against the source row mapping; native compiled IDs and pose readback remain pending.",
+      "necessary_extension": "Retain the exact fixed mapping and compare compiled body/site/joint/actuator/geom inventory and public poses in the locked native run; reject mismatched names before reset.",
+      "s1_oracle": "Reference resolution rejects missing, duplicate, wrong-frame, or wrong-task source names and retains the exact source receipt.",
+      "native_oracle": "Read bowl, plate, and eef references from the public typed observation on reset and after a bounded action; compare identity and frame transforms to the native source."
+    },
+    {
+      "id": "contact-backed-on-evaluator",
+      "owner_symbols": [
+        "task_env/environment/task_definition.py::TaskDefinitionBase.evaluate_predicates",
+        "task_env/environment/task_source.py"
+      ],
+      "current_input_output": "D01 adds versioned entity-pair contact coverage/freshness receipts and routes the pinned On(bowl, plate) rule through public state. S1 exercises separated/positive ResetPlan endpoints and rejects unavailable or stale contact. Real native contact counts and the same-boundary On comparison remain pending.",
+      "necessary_extension": "Verify real compiled geom groups, contact counts, public poses and independent source-oracle agreement in the authorized native endpoint resets; unavailable evidence must remain unavailable.",
+      "s1_oracle": "True requires all source conditions; false requires available negative evidence; absent contact or pose evidence returns unavailable and cannot become false or success.",
+      "native_oracle": "Compare public Core predicate inputs and result against the pinned LIBERO predicate for separated, touching, elevated, and XY-threshold boundary cases."
+    },
+    {
+      "id": "planner-and-clock-equivalence",
+      "owner_symbols": [
+        "task_env/planners/cartesian.py",
+        "task_env/planners/joint.py",
+        "task_env/runtime/sessions/control.py"
+      ],
+      "current_input_output": "D01 freezes 20 Hz public joint targets, 2 ms physics and 25 substeps with explicit 20 Hz torque zero-order hold. It reuses task_env.planners.joint and an explicitly unqualified bounded PD controller; neither is represented as upstream OSC_POSE. S1 verifies action ordering/ranges; native motion/safety gates remain pending.",
+      "necessary_extension": "Verify the frozen planner-to-target-to-Ack path, arm/finger motion, hard limits and warning/fault behavior in the native run. No IK, collision avoidance, task completion, or controller equivalence claim is made.",
+      "s1_oracle": "Contradictory native/Core rates, unverified physics timestep, unsupported drive, or missing IK/collision oracle are rejected or remain unavailable.",
+      "native_oracle": "A bounded public action reports requested/applied action clocks and repeat count; compare to one native control interval and inspect planned path/contacts without silently resampling."
+    },
+    {
+      "id": "same-env-recording-and-readback",
+      "owner_symbols": [
+        "task_env recording/TransitionRecorder",
+        "task_env versioned semantic H5 reader",
+        "task_env/runtime/sessions/control.py"
+      ],
+      "current_input_output": "D01's provider-free S1 runs the real SelectedReferenceEnv/RuntimeSession/Generic H5 v3 worker chain for three rows and two ResetPlan endpoints, then independently reads every synthetic H5 and exercises parent exit/lock, tamper and partial-bundle rejection. Native same-run recording/readback remains pending.",
+      "necessary_extension": "Run and independently verify the three closed native H5 files from one bounded worker result, then bind them to the parent process exit and shared-lock release receipt.",
+      "s1_oracle": "The planned receipt/schema rejects missing identity, stale state, clock gaps, and unavailable semantic fields before H5 publication.",
+      "native_oracle": "One bounded episode in one public Env writes and closes H5; a separate process reads the same file and matches every action/ack/state/clock/source identity."
+    }
+  ],
+  "scope_limit": "This is one fixed diagnostic implementation with provider-free S1 only until the authorized D01 native gates complete and Sol reviews the result. It does not enable normal make_env admission, other LIBERO tasks/backends, the original five-task R07 goal, P99, Human Judge, or Qualification."
+}

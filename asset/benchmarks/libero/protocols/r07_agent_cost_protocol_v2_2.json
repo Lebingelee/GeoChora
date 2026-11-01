@@ -1,0 +1,59 @@
+{
+  "schema_version": "r07-agent-cost-protocol-continuation-v1",
+  "protocol_id": "geochora-r07-agent-cost",
+  "version": "2.2.0",
+  "status": "CANDIDATE_CONTINUATION_PENDING_SOL_TECHNICAL_REVIEW",
+  "scope": "Continue R07 cost lineage on a diverged phase branch without rewriting or upgrading historical v2/v2.1 results.",
+  "extends": {
+    "prior_protocol_id": "geochora-r07-agent-cost",
+    "prior_version": "2.1.0",
+    "prior_schema": "r07-agent-cost-protocol-v2.1",
+    "prior_protocol_sha256": "a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e",
+    "historical_measurement_reference_commit": "0309d73bb5b60f9989907c3eede8c0cd2893f29f",
+    "historical_baseline_role": "reference_only_when_not_an_ancestor_of_the_current_execution"
+  },
+  "lineage": {
+    "current_session_start_commit_required": true,
+    "current_session_final_commit_required": true,
+    "start_must_be_ancestor_of_final": true,
+    "historical_reference_may_be_diverged": true,
+    "record_actual_common_ancestor": true,
+    "never_merge_rebase_cherry_pick_or_rewrite_to_force_ancestry": true,
+    "cross_branch_inheritance": "Count only identities and amounts supported by byte-bound ledgers. Missing historical tokens, time, fees, or inherited cost remain null with a field-specific reason and keep cumulative cost incomplete."
+  },
+  "preservation": {
+    "prior_result_policy": "Retain prior v2/v2.1 inputs, tools, readers, results and issues byte-for-byte; a new reader may classify their original status but cannot upgrade it.",
+    "invalid_policy": "A historical INVALID remains INVALID with its original issue codes and reasons.",
+    "no_estimation": "Never infer tokens or fees from logs, elapsed time, model names, or usage-limit displays."
+  },
+  "time_usage_money": {
+    "unknown": "Every missing field is null with a specific reason; null is not zero.",
+    "time": ["session_wall_seconds", "active_development_seconds", "install_seconds", "test_seconds", "debug_seconds", "waiting_seconds", "human_assistance_seconds"],
+    "usage": ["input_tokens", "output_tokens", "cached_input_tokens", "input_includes_cached"],
+    "money": ["amount", "currency", "billing_source_path", "billing_source_sha256"],
+    "intervals": "Record only directly instrumented monotonic intervals; do not infer active time from gaps."
+  },
+  "code_delta": {
+    "baseline": "The exact current session start commit, not the diverged historical measurement reference.",
+    "path_class_order": [
+      "tests first",
+      "docs second",
+      "asset/benchmarks/**/*.py as benchmark code before the broad asset/data rule",
+      "bench_deploy/**/*.py as benchmark code",
+      "remaining model, manifest and asset data as data"
+    ],
+    "effective_loc": "Reuse the prior v2 token/AST fingerprint implementation on exact source snapshots and correct only its path-classification ordering in the v2.2 adapter. Preserve literal token spelling; count ambiguous reuse conservatively."
+  },
+  "result_statuses": [
+    "STRUCTURALLY_VALID_PARTIAL",
+    "STRUCTURALLY_VALID_MEASURED",
+    "INCOMPLETE",
+    "INVALID"
+  ],
+  "gates": {
+    "structural_pass": "Confirms commit ancestry, byte identities, schemas, explicit unknowns, prior-result preservation, and LOC source snapshots only.",
+    "measured_complete": "Requires all required time, token, billing, inherited-cost and source evidence fields to be present and independently verified.",
+    "deployment_ready": false,
+    "sol_review": "Required before this continuation protocol is used to make a cumulative R07 cost claim."
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "phase-ii-01-r06c-scope-reconciliation-v1",
+  "date": "2026-10-29",
+  "kind": "MAINTAINER_DIRECTED_DOCUMENTATION_AND_SCOPE_RECONCILIATION",
+  "authority": {
+    "current_request": "请你根据目前的现状调整之前的docs文件，然后我们需要准备下一步的prompt",
+    "prior_clarification": "B04a选择已接受实现继续后续工作；复核既有延期决定及旧develop证据",
+    "original_scope_decision": {
+      "path": "docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml",
+      "sha256": "628a234e02f0b73b3284230c869329c4b04e8498214f4db316b363f91be5a360"
+    },
+    "new_reader_retirement_or_unknown_bytes_compatibility_approval": false
+  },
+  "decision": "INHERIT_ACCEPTED_PHASE_II_LIMITATIONS_AND_CORRECT_EVIDENCE_INDEX",
+  "R06c_status": "ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION",
+  "accepted_slice_count": 18,
+  "total_slices": 22,
+  "technical_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06c_002/sol_review.md",
+  "reassessment": "workspace/maintenance/r06c_historical_raw_recovery_20261029_001/reassessment.md",
+  "items": [
+    {
+      "id": "b04a_canonical_trajectory_outer_v0_h5",
+      "current_raw_status": "PUBLISHED_ORIGINALS_PRESENT_HASH_VERIFIED",
+      "historical_b04a_missing_claim": "SUPERSEDED_FOR_THESE_IDENTIFIED_PUBLISHED_FILES",
+      "files": [
+        {
+          "path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+          "sha256": "e22bcadbb142c81f2bdd8f12a432b82b22cef0c25ddeba8cec29f764bca87ae8"
+        },
+        {
+          "path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+          "sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108"
+        },
+        {
+          "path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+          "sha256": "579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"
+        }
+      ],
+      "current_native_replay": "NOT_RUN",
+      "current_reader_semantic_rerun": "NOT_RUN; historical P00 same-byte readback reused; no all-files compatibility claim"
+    },
+    {
+      "id": "b04a_geophys_transition_h5_v1",
+      "current_raw_status": "OLD_SYNTHETIC_FIXTURE_PRESENT; HISTORICAL_ROLLOUT_ORIGINAL_UNIDENTIFIED",
+      "decision": "INHERIT_ACCEPTED_DEFERRED; RETAIN_READER_WRITER_INSPECTOR",
+      "historical_byte_compatibility": "NOT_PROVEN"
+    },
+    {
+      "id": "b04a_canonical_execution_v1_h5",
+      "current_raw_status": "OLD_SYNTHETIC_FIXTURE_PRESENT; HISTORICAL_ROLLOUT_ORIGINAL_UNIDENTIFIED",
+      "decision": "INHERIT_ACCEPTED_DEFERRED; RETAIN_LEGACY_READER",
+      "historical_byte_compatibility": "NOT_PROVEN"
+    },
+    {
+      "id": "c02b_eb870_typed_force_s2_probe_json",
+      "current_raw_status": "MISSING_RAW_EVIDENCE; HISTORICAL_DEFAULT_OUTPUT_OVERWRITE",
+      "decision": "INHERIT_ACCEPTED_HISTORICAL_PROVENANCE_LIMITATION",
+      "replacement_or_reconstruction": "NOT_CLAIMED"
+    }
+  ],
+  "gate_policy": {
+    "unidentified_unchanged_legacy_goldens": "RETAIN_LIMITATION_NOT_A_NEW_BLANKET_R06C_BLOCKER",
+    "affected_reader_regression_or_changed_contract": "MUST_REOPEN_PRECISE_AFFECTED_GATE",
+    "reader_retirement": "REQUIRES_SEPARATE_APPROVAL",
+    "R07_five_task_required_envelope_changed": false,
+    "P99": "BLOCKED_DEPENDS_ON_R07D_AND_REMAINING_REQUIRED_GATES",
+    "qualification": "NOT_GRANTED",
+    "original_r06c_001_002_decisions_and_validators": "IMMUTABLE_SIGNING_TIME_RECORDS; DO_NOT_REWRITE_TO_NEW_POLICY"
+  }
+}

@@ -558,6 +558,9 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._robot is not None
                 and self.config.robot.gripper.kind == "experimental_rate_limited"
             ),
+            contact_summary=bool(
+                getattr(self._task_definition, "requires_contact_summary", False)
+            ),
             simulation_time=True,
         )
 

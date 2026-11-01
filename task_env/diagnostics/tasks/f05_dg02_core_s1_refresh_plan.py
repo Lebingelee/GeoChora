@@ -19,7 +19,7 @@ LOCK = MAINT / "shared_native_execution.lock"
 PREVIOUS_PLAN = WINDOW / "core_s1_002.plan.json"
 LEDGER = WINDOW / "run_ledger.json"
 BASE_PROGRESS = WINDOW.parent / "window_001/goal_progress.json"
-PROVIDER_COMMIT = "a9e4c4850bd225f5929e74831ac282b18ff517ce"
+PROVIDER_COMMIT = "67da1165149486d3ae3e779c13ce31af49e17d50"
 
 
 def _sha(path: Path) -> str:

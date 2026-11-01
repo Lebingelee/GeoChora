@@ -55,17 +55,24 @@ def _candidate(monkeypatch, **kwargs):
 
 def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c'):
     plan = candidate.attachment_plan
+    order_variant = plan.parent_asset_version == 'menagerie-b846dd12-r06b-order-v1'
     bindings = {ref.joint_id: (entry.binding, limits)
                 for entry in candidate.plan.leaves
                 for ref, limits in zip(entry.binding.joint_order, entry.binding.joint_position_limits, strict=True)}
-    body_names = ['world', *plan.native_body_names.values()]
+    body_items = list(plan.native_body_names.items())
+    joint_items = list(plan.native_joint_names.items())
+    actuator_items = list(plan.native_actuator_names.items())
+    if order_variant:
+        joint_items[-2:] = reversed(joint_items[-2:])
+        actuator_items[:7] = reversed(actuator_items[:7])
+    body_names = ['world', *(native for _, native in body_items)]
     body_ids = {name: index for index, name in enumerate(body_names)}
     parent_names = {'link0': 'world', **{f'link{i}': f'link{i-1}' for i in range(1, 8)},
                     'attachment': 'link7', 'probe_hand_hand': 'attachment',
                     'probe_hand_left_finger': 'probe_hand_hand',
                     'probe_hand_right_finger': 'probe_hand_hand'}
     joints = {}
-    for index, (canonical, native) in enumerate(plan.native_joint_names.items()):
+    for index, (canonical, native) in enumerate(joint_items):
         entity, local = canonical.split('/')
         binding, limits = bindings[local]
         joint = next(joint for articulation in candidate.scene.articulations
@@ -78,7 +85,7 @@ def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c
             'body_id': body_ids[plan.native_body_names[f'{entity}/{joint.child_frame.frame_id}']],
         }
     actuators = {}
-    for index, (canonical, native) in enumerate(plan.native_actuator_names.items()):
+    for index, (canonical, native) in enumerate(actuator_items):
         hand = canonical.startswith('panda-hand/')
         target = 'probe_hand_split' if hand else native.replace('actuator', 'joint')
         actuators[canonical] = {
@@ -90,7 +97,7 @@ def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c
     bodies = {canonical: {
         'native_name': native, 'body_id': index + 1,
         'parent_body_id': body_ids[parent_names[native]], 'parent_native_name': parent_names[native],
-    } for index, (canonical, native) in enumerate(plan.native_body_names.items())}
+    } for index, (canonical, native) in enumerate(body_items)}
     tendons = {canonical: {'native_name': native, 'tendon_id': 0, 'wraps': [
         {'wrap_type': 1, 'joint_native_name': 'probe_hand_finger_joint1', 'coefficient': 0.5},
         {'wrap_type': 1, 'joint_native_name': 'probe_hand_finger_joint2', 'coefficient': 0.5},
@@ -119,8 +126,8 @@ def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c
                        'nsite': 1, 'nmesh': 67, 'ngeom': 81, 'neq': 1,
                        'ntendon': 1, 'nexclude': 3},
         'native_body_order': body_names,
-        'native_joint_order': list(plan.native_joint_names.values()),
-        'native_actuator_order': list(plan.native_actuator_names.values()),
+        'native_joint_order': [native for _, native in joint_items],
+        'native_actuator_order': [native for _, native in actuator_items],
         'native_body_mappings': bodies, 'native_site_mappings': {},
         'native_joint_mappings': joints, 'native_actuator_mappings': actuators,
         'native_tendon_mappings': tendons,
@@ -148,25 +155,32 @@ def _synthetic_io(candidate):
         for ref, limits in zip(entry.binding.joint_order, entry.binding.joint_position_limits, strict=True):
             native = ref.joint_id if ref.entity_id == 'panda-arm' else 'probe_hand_' + ref.joint_id
             native_joint_by_ref[ref] = native
+            canonical = f'{ref.entity_id}/{ref.joint_id}'
+            native_row = attachment['native_joint_mappings'][canonical]
             joint_rows.append(LeafNativeJointMappingV1(
-                'leaf-native-joint-mapping-v1', ref, native, joint_id, joint_id, joint_id,
+                'leaf-native-joint-mapping-v1', ref, native, native_row['joint_id'],
+                native_row['qpos_address'], native_row['dof_address'],
                 entry.binding.joint_position_unit,
             ))
             joint_id += 1
         for pair in entry.binding.joint_actuator_bindings:
-            slot = len(actuator_rows)
+            canonical = f'{pair.actuator.entity_id}/{pair.actuator.actuator_id}'
+            native_row = attachment['native_actuator_mappings'][canonical]
+            slot = native_row['ctrl_slot']
             actuator_rows.append(LeafNativeActuatorMappingV1(
-                'leaf-native-actuator-mapping-v1', pair.actuator, pair.actuator.actuator_id,
-                slot, slot, tuple(attachment['native_actuator_mappings'][
-                    f'{pair.actuator.entity_id}/{pair.actuator.actuator_id}'
-                ]['ctrl_range']), 'radian', 'joint', native_joint_by_ref[pair.joint],
+                'leaf-native-actuator-mapping-v1', pair.actuator, native_row['native_name'],
+                native_row['actuator_id'], slot, tuple(native_row['ctrl_range']),
+                'radian', 'joint', native_joint_by_ref[pair.joint],
             ))
         if entry.binding.profile_kind == 'hand_position':
             ref = entry.binding.actuator_order[0]
-            slot = len(actuator_rows)
+            canonical = f'{ref.entity_id}/{ref.actuator_id}'
+            native_row = attachment['native_actuator_mappings'][canonical]
+            slot = native_row['ctrl_slot']
             actuator_rows.append(LeafNativeActuatorMappingV1(
-                'leaf-native-actuator-mapping-v1', ref, 'probe_hand_actuator8',
-                slot, slot, (0.0, 255.0), 'native_ctrl', 'tendon', 'probe_hand_split',
+                'leaf-native-actuator-mapping-v1', ref, native_row['native_name'],
+                native_row['actuator_id'], slot, tuple(native_row['ctrl_range']),
+                'native_ctrl', 'tendon', 'probe_hand_split',
             ))
         frame_rows.append(LeafNativeFrameMappingV1(
             'leaf-native-frame-mapping-v1', entry.binding.tcp_frame,
@@ -442,6 +456,7 @@ def _session_with_synthetic_native_io(candidate):
     session = object.__new__(_MuJoCoSession)
     session._initialize_values(candidate.artifact, candidate.source, 'mujoco')
     receipt = _fixed_receipt(candidate, session.provider_materialization_id)
+    attachment = receipt
     joint_rows = sorted(receipt['native_joint_mappings'].values(), key=lambda row: row['joint_id'])
     actuator_rows = sorted(receipt['native_actuator_mappings'].values(), key=lambda row: row['actuator_id'])
     names = {
@@ -449,6 +464,16 @@ def _session_with_synthetic_native_io(candidate):
         'actuator': [row['native_name'] for row in actuator_rows],
         'body': receipt['native_body_order'], 'tendon': ['probe_hand_split'],
     }
+    joint_ids = {row['native_name']: row['joint_id'] for row in joint_rows}
+    actuator_trnid = []
+    actuator_trntype = []
+    for row in actuator_rows:
+        if row['transmission_type'] == 3:
+            actuator_trnid.append([0, -1])
+            actuator_trntype.append(3)
+        else:
+            actuator_trnid.append([joint_ids[row['target_native_name']], -1])
+            actuator_trntype.append(0)
     model = SimpleNamespace(
         nq=9, nv=9, nu=8, njnt=9, nbody=13, neq=1, ntendon=1,
         jnt_type=np.asarray([row['type'] for row in joint_rows]),
@@ -457,17 +482,22 @@ def _session_with_synthetic_native_io(candidate):
         jnt_qposadr=np.arange(9), jnt_dofadr=np.arange(9),
         actuator_ctrlrange=np.asarray([row['ctrl_range'] for row in actuator_rows]),
         actuator_ctrllimited=np.ones(8, dtype=bool),
-        actuator_trnid=np.asarray([[i, -1] for i in range(7)] + [[0, -1]]),
-        actuator_trntype=np.asarray([0]*7 + [3]),
+        actuator_trnid=np.asarray(actuator_trnid),
+        actuator_trntype=np.asarray(actuator_trntype),
         tendon_num=np.asarray([2]), tendon_adr=np.asarray([0]),
-        wrap_type=np.asarray([1, 1]), wrap_objid=np.asarray([7, 8]), wrap_prm=np.asarray([0.5, 0.5]),
-        eq_type=np.asarray([2]), eq_obj1id=np.asarray([7]), eq_obj2id=np.asarray([8]),
+        wrap_type=np.asarray([1, 1]),
+        wrap_objid=np.asarray([joint_ids['probe_hand_finger_joint1'],
+                               joint_ids['probe_hand_finger_joint2']]),
+        wrap_prm=np.asarray([0.5, 0.5]),
+        eq_type=np.asarray([2]),
+        eq_obj1id=np.asarray([joint_ids['probe_hand_finger_joint1']]),
+        eq_obj2id=np.asarray([joint_ids['probe_hand_finger_joint2']]),
         opt=SimpleNamespace(timestep=0.002),
     )
     data = SimpleNamespace(qpos=np.zeros(9), qvel=np.zeros(9), act=np.zeros(0),
         ctrl=np.zeros(8), time=0.0, xpos=np.zeros((13,3)),
         xquat=np.tile((1.,0.,0.,0.), (13,1)),
-        site_xpos=np.zeros((1,3)), site_xmat=np.eye(3).reshape(1,9))
+        site_xpos=np.zeros((1,3)), site_xmat=np.eye(3).reshape(1,9), warning=[])
 
     def name2id(_model, kind, name):
         return names[kind].index(name) if name in names[kind] else -1
@@ -476,10 +506,60 @@ def _session_with_synthetic_native_io(candidate):
         values.qpos[:]=0; values.qvel[:]=0; values.ctrl[:]=0; values.time=0.0
 
     def step(_model, values):
-        values.time += 0.002  # IO stand-in advances clock only, no physics.
+        # Deterministic mock IO follows named Actuator slots and emits enough
+        # distinguishable state to exercise the unchanged strict H5 reader.
+        # It is deliberately not a dynamics simulation or native evidence.
+        for actuator in actuator_rows:
+            if actuator['transmission_type'] == 0:
+                joint_id = joint_ids[actuator['target_native_name']]
+                values.qpos[joint_id] = values.ctrl[actuator['ctrl_slot']]
+        hand_actuator = attachment['native_actuator_mappings']['panda-hand/actuator8']
+        opening = min(0.08, max(0.0, float(values.ctrl[hand_actuator['ctrl_slot']]) / 255.0 * 0.08))
+        values.qpos[joint_ids['probe_hand_finger_joint1']] = opening / 2.0
+        values.qpos[joint_ids['probe_hand_finger_joint2']] = opening / 2.0
+        values.time += 0.002
+        interval = min(64, int(round(values.time / 0.01)))
+        if interval <= 16:
+            joint1 = 0.1 * interval / 16.0
+        elif interval <= 32:
+            joint1 = 0.1
+        elif interval <= 48:
+            joint1 = 0.1 * (48 - interval) / 16.0
+        else:
+            joint1 = ARM_HOME[0]
+        values.qpos[joint_ids['joint1']] = joint1
+        for index, value in enumerate(ARM_HOME[1:], start=2):
+            values.qpos[joint_ids[f'joint{index}']] = value
+        update_forward(_model, values)
+
+    transform = candidate.attachment_plan.parent_site_from_child_root
+    hand_body_id = attachment['native_body_mappings']['panda-hand/hand']['body_id']
+    site_id = 0
+    joint1_id = joint_ids['joint1']
+
+    def update_forward(_model, values):
+        theta = float(values.qpos[joint1_id])
+        cosine, sine = np.cos(theta), np.sin(theta)
+        rotation = np.asarray(((cosine, -sine, 0.0), (sine, cosine, 0.0), (0.0, 0.0, 1.0)))
+        values.site_xmat[site_id] = rotation.reshape(9)
+        translation = np.asarray(transform.position, dtype=float)
+        values.xpos[hand_body_id] = values.site_xpos[site_id] + rotation @ translation
+        parent_quaternion = (float(np.cos(theta / 2.0)), 0.0, 0.0, float(np.sin(theta / 2.0)))
+        child_quaternion = transform.quaternion_wxyz
+        w1, x1, y1, z1 = parent_quaternion
+        w2, x2, y2, z2 = child_quaternion
+        values.xquat[hand_body_id] = (
+            w1*w2 - x1*x2 - y1*y2 - z1*z2,
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2,
+        )
 
     def quaternion(output, matrix):
-        output[:] = (1.,0.,0.,0.)
+        matrix = np.asarray(matrix).reshape(3, 3)
+        cosine = np.sqrt(max(0.0, 1.0 + np.trace(matrix))) / 2.0
+        output[:] = (cosine, 0.0, 0.0,
+                     np.copysign(np.sqrt(max(0.0, 1.0 - cosine*cosine)), matrix[1, 0]))
 
     session._model, session._data = model, data
     session._mj = SimpleNamespace(
@@ -488,7 +568,7 @@ def _session_with_synthetic_native_io(candidate):
         mjtTrn=SimpleNamespace(mjTRN_JOINT=0, mjTRN_TENDON=3),
         mjtEq=SimpleNamespace(mjEQ_JOINT=2),
         mj_name2id=name2id, mj_id2name=lambda _m, kind, index: names[kind][index],
-        mj_resetData=reset, mj_forward=lambda *_: None, mj_step=step, mju_mat2Quat=quaternion,
+        mj_resetData=reset, mj_forward=update_forward, mj_step=step, mju_mat2Quat=quaternion,
     )
     session._fixed_attachment_receipt=receipt
     session._fixed_attachment_close_receipt=None
@@ -628,13 +708,15 @@ def test_fresh_freeze_and_real_runner_preflight_validate_reserved_ledger_without
         return original_import(name,*args,**kwargs)
     monkeypatch.setattr(builtins,'__import__',block)
     root=r03c_freeze.ROOT
-    snapshot=json.loads(r03c_freeze.SNAPSHOT.read_text())
-    snapshot['protected_sha256']={
+    # Keep this provider-free fixture self-contained in a fresh checkout; the
+    # historical attempt's ignored workspace snapshot is not a repository input.
+    snapshot={'protected_sha256':{
         relative: hashlib.sha256((root/relative).read_bytes()).hexdigest()
-        for relative in snapshot['protected_sha256']
-    }
+        for relative in r03c_freeze.SOURCES
+    }}
     prompt=tmp_path/'prompt.md'; prompt.write_text('Synthetic S1 gate fixture; not native execution authorization.\n')
     snapshot.update(core_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
+                    branch=subprocess.check_output(['git','branch','--show-current'],cwd=root,text=True).strip(),
                     prompt=str(prompt),native_window={'max_starts':1,'consumed':False})
     snapshot_path=tmp_path/'snapshot.json'; snapshot_path.write_text(json.dumps(snapshot))
     output=tmp_path/'fresh-package'
@@ -807,8 +889,8 @@ def _observation(candidate, index, boundary_id):
     }
 
 
-def _write_attached_recording(monkeypatch, tmp_path):
-    candidate = _candidate(monkeypatch, episode_id='E3')
+def _write_attached_recording(monkeypatch, tmp_path, episode_id='E3'):
+    candidate = _candidate(monkeypatch, episode_id=episode_id)
     receipt, publication, attachment = _synthetic_io(candidate)
     runtime = _SyntheticRuntime(candidate, receipt, publication, attachment)
     env = candidate.env

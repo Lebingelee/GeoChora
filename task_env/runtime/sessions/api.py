@@ -1,5 +1,5 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import replace
@@ -17,11 +17,13 @@ from ...artifacts import (
 from ...artifacts.contracts import UsdAssetDeliveryLocalV1
 from ...assembly.usd_delivery import variant_selection_hash
 from ...artifacts.execution import (
-    EpisodeResetPlanV1, RealizedInitialState, ResetSample, legacy_execution_projection,
+    EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSample,
+    legacy_execution_projection,
 )
 from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, NativeControlFeedbackSampleV1,
 )
+from ...controllers.canonical.contracts import MixedActuatorCommandV1
 from .source import RuntimeSource, UsdRuntimeSourceV1
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
@@ -95,6 +97,8 @@ def _f05_dg04_s1_native_io_context(input_v1, factory):
 
 def _current_f05_dg04_s1_native_io_context():
     return _F05_DG04_S1_NATIVE_IO_CONTEXT.get()
+_GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
+_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
 
 
 class RuntimeSession(Protocol):
@@ -102,8 +106,10 @@ class RuntimeSession(Protocol):
     def provider_materialization_id(self) -> str: ...
     @property
     def episode_id(self) -> str: ...
+    @property
+    def state_revision(self) -> int: ...
     def reset(self, sample: ResetSample) -> RealizedInitialState: ...
-    def reset_plan(self, plan: EpisodeResetPlanV1) -> RealizedInitialState: ...
+    def reset_plan(self, plan: EpisodeResetPlanV1 | ResetPlanV1) -> RealizedInitialState: ...
     def snapshot(self) -> CanonicalStateView: ...
     def snapshot_v1(
         self,
@@ -126,6 +132,38 @@ class RuntimeSession(Protocol):
     ) -> NativeControlFeedbackSampleV1: ...
     def step(self) -> CanonicalStateView: ...
     def close(self) -> None: ...
+
+
+class CompiledModelOptionsReadbackV1(Protocol):
+    """Optional provider-bound readback of effective compiled model settings.
+
+    This diagnostic interface is separate from ``RuntimeSession`` so a
+    provider does not claim model-option readback unless its adapter can bind
+    the values to the exact compiled model and source receipt.
+    """
+
+    @property
+    def compiled_model_options_receipt_v1(self) -> Mapping[str, object]: ...
+
+
+class CompiledModelPhysicsFingerprintReadbackV1(Protocol):
+    """Optional source-bound hashes of compiled physical-model arrays.
+
+    This diagnostic is separate from ``RuntimeSession`` and returns only
+    versioned inventory plus hashes, not provider-owned model objects.
+    """
+
+    @property
+    def compiled_model_physics_fingerprint_v1(self) -> Mapping[str, object]: ...
+
+
+class MixedActuatorSubstepSession(Protocol):
+    """Optional profile capability for state-bound commands at every physics step."""
+
+    def step_mixed_actuator_interval(
+        self,
+        command_factory: Callable[[CanonicalStateView, int, int, int], MixedActuatorCommandV1],
+    ) -> tuple[CanonicalStateView, Mapping[str, object]]: ...
 
 
 def provider_manifest(provider: str) -> ProviderCapabilityManifest:
@@ -495,10 +533,210 @@ def _close_failed_native_materialization(
             )
 
 
-def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
+def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
+    """Admit one exact normal NutAssembly GeoPhys force-feedback profile."""
+    from dataclasses import replace
+    import hashlib
+    import json
+    from pathlib import Path
+    from dataclasses import asdict
+    from ...assembly.assets import _source_closure_digest, _source_closure_manifest
+    from ...controllers.canonical.contracts import digest
+
+    if profile_id != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE:
+        raise ValueError('unknown normal native-feedback admission profile')
+    if not isinstance(artifact, TaskArtifact):
+        raise ValueError('R05b native feedback requires the frozen NutAssembly TaskArtifact v0')
+    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
+            or artifact.task_id != 'nut-assembly-square-v1'
+            or artifact.identity_hash != '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
+            or artifact.timebase.physics_dt != 0.002
+            or artifact.timebase.control_dt != 0.01
+            or artifact.timebase.control_substeps != 5
+            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
+        raise ValueError('R05b admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
+    if (execution.physics_provider != 'geophys' or execution.backend not in {'cpu', 'cuda'}
+            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
+            or execution.determinism_mode != 'strict'):
+        raise ValueError('R05b admission requires strict GeoPhys CPU/CUDA scalar execution without rendering')
+    receipt = getattr(source, 'execution_source_receipt', None)
+    if receipt is None:
+        raise ValueError('R05b admission requires the versioned immutable execution source receipt')
+    receipt.validate_snapshot()
+    trusted_path = (
+        Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
+        / 'r05b_trusted_execution_source_manifest.json'
+    )
+    trusted = json.loads(trusted_path.read_text(encoding='utf-8'))
+    if trusted.get('schema_version') != 'r05b-trusted-execution-source-manifest-v1':
+        raise ValueError('R05b trusted source manifest has an unsupported schema')
+    actual_files = list(_source_closure_manifest(receipt.closure_files))
+    if (actual_files != trusted['files']
+            or receipt.source_closure_digest != trusted['source_closure_digest']
+            or _source_closure_digest(receipt.closure_files) != trusted['source_closure_digest']):
+        raise ValueError('R05b source receipt differs from the trusted full source closure')
+    canonical_bytes = receipt.closure_files.get('canonical-source.xml')
+    importer_bytes = receipt.importer_xml
+    expected_importer_bytes = receipt.closure_files.get('scene.xml')
+    if (not isinstance(canonical_bytes, bytes)
+            or hashlib.sha256(canonical_bytes).hexdigest() != trusted['canonical_xml_sha256']
+            or not isinstance(expected_importer_bytes, bytes)
+            or importer_bytes != expected_importer_bytes
+            or hashlib.sha256(importer_bytes).hexdigest() != trusted['importer_xml_sha256']
+            or source.scene_source.xml.encode('utf-8') != canonical_bytes
+            or Path(source.scene_source.base_dir).resolve() != Path(receipt.snapshot_root).resolve()):
+        raise ValueError('R05b canonical/importer source bytes differ from the trusted snapshot')
+    expected_joints = {
+        **{f'panda-v1/joint{index}': f'joint{index}' for index in range(1, 8)},
+        'panda-v1/finger_joint1': 'finger_joint1',
+        'panda-v1/finger_joint2': 'finger_joint2',
+    }
+    expected_bodies = {
+        'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
+        'round-peg-v1': 'peg2', 'panda-v1/base': 'link0',
+    }
+    if (receipt.source_id != trusted['source_id']
+            or source.joints != expected_joints
+            or source.bodies != expected_bodies
+            or source.frames != {'panda-v1/ee': 'nutassembly_ee_site'}
+            or source.free_joints != {'square-nut-v1': 'SquareNut_joint'}
+            or source.joint_targets != {
+                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
+            }
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('R05b source semantic and actuator mappings differ from the exact allowlist')
+    expected_config_digest = {
+        'cpu': '64e9a4d05abe80c20141a16aa1abf1a3de366ac6e75e2740b6d7313839e537d1',
+        'cuda': '52e2e14a51492a8e534ee0ba88cc7ec9597d6a31816eaba89f1a7a3094baece9',
+    }[execution.backend]
+    if digest(asdict(source.config)) != expected_config_digest:
+        raise ValueError('R05b source configuration differs from exact allowlist')
+    if (source.task_artifact_hash != artifact.identity_hash
+            or source.scene_source.source_id !=
+            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
+            or receipt.canonical_xml_sha256 !=
+            '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
+            or receipt.canonical_xml_sha256 != trusted['canonical_xml_sha256']
+            or source.config.runtime.backend != execution.backend
+            or source.config.runtime.physics_dt != 0.002
+            or source.config.runtime.control_substeps != 5
+            or source.config.runtime.integrator != 'implicitfast'
+            or source.config.render.camera_obs
+            or len(source.joint_targets) != 7
+            or dict(source.joint_targets) != {
+                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
+            }
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('R05b source/receipt/controller actuator mapping differs from the exact allowlist')
+    build = provider_build_identity('geophys')
+    expected_origin = (Path(__file__).resolve().parents[3] / 'GeoPhys/src/geophys/__init__.py').resolve()
+    if (build['repository_revision'] != _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
+            or build['dirty_build_sha256'] is not None
+            or Path(build['import_origin']).resolve() != expected_origin):
+        raise ValueError('R05b admission requires the clean committed GeoPhys build from this worktree')
+    cpu_manifest = provider_manifest('geophys')
+    evidence = (
+        f'{_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE}/artifact={artifact.identity_hash}/'
+        f'canonical_xml={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}/'
+        f'provider={build["repository_revision"]}/origin={hashlib.sha256(expected_origin.read_bytes()).hexdigest()}/'
+        f'backend={execution.backend}'
+    )
+    return replace(
+        cpu_manifest,
+        adapter_version='task-env-r05b-geophys-native-feedback-v1',
+        backend=execution.backend,
+        capabilities=tuple(cpu_manifest.capabilities) + (
+            CapabilityClaim('actuator_force_query', 'tested', evidence),
+        ),
+        evidence_reference=evidence,
+    )
+
+
+def _mixed_actuator_manifest(artifact, execution, source):
+    """Admit the bounded, typed source-bound mixed actuator route."""
+    from dataclasses import replace
+    import hashlib
+    from pathlib import Path
+    from ...controllers.canonical.contracts import MixedActuatorPlanV1
+
+    plan = getattr(source, 'mixed_actuator_plan', None)
+    if type(plan) is not MixedActuatorPlanV1:
+        raise ValueError('mixed actuator admission requires its typed source-bound plan')
+    plan.validate()
+    if not isinstance(artifact, TaskArtifact):
+        raise ValueError('mixed actuator admission requires TaskArtifact v0')
+    if (execution.physics_provider, execution.backend, execution.render_provider,
+            execution.physics_profile, execution.determinism_mode) not in {
+            ('mujoco', 'cpu', 'none', PROFILE, 'strict'),
+            ('geophys', 'cpu', 'none', PROFILE, 'strict'),
+    }:
+        raise ValueError('mixed actuator admission requires strict scalar CPU state-only execution')
+    if (plan.task_artifact_hash != artifact.identity_hash
+            or plan.source_id != source.scene_source.source_id
+            or plan.source_closure_digest != source.source_closure_digest):
+        raise ValueError('mixed actuator plan differs from its Artifact or RuntimeSource identity')
+    if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
+            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+            or source.config.runtime.backend != 'cpu'
+            or source.config.runtime.integrator not in ('implicitfast', 'euler')
+            or source.config.render.camera_obs):
+        raise ValueError(
+            'mixed actuator source requires the supported strict scalar CPU envelope '
+            'with an implicitfast or euler integrator'
+        )
+    receipt = getattr(source, 'execution_source_receipt', None)
+    if (receipt is None or source.scene_definition is not None
+            or source.scene_source.source_id != receipt.source_id
+            or source.scene_source.base_dir is None
+            or source.source_closure_digest != receipt.source_closure_digest
+            or source.scene_source.xml.encode('utf-8') != receipt.closure_files.get('canonical-source.xml')
+            or Path(source.scene_source.base_dir).resolve() != receipt.snapshot_root):
+        raise ValueError('mixed actuator admission requires its immutable canonical/importer source receipt')
+    receipt.validate_snapshot()
+    if (hashlib.sha256(receipt.importer_xml).hexdigest() != receipt.importer_xml_sha256
+            or receipt.closure_files.get('scene.xml') != receipt.importer_xml):
+        raise ValueError('mixed actuator source receipt does not bind its importer XML bytes')
+    if source.task_artifact_hash != artifact.identity_hash:
+        raise ValueError('mixed actuator RuntimeSource differs from the exact Artifact')
+    if not source.torque_actuators or not source.position_actuators:
+        raise ValueError('supported mixed actuator profile requires torque and position channels')
+    if not set(source.contact_geom_groups) <= set(source.bodies) | set(source.fixture_bodies):
+        raise ValueError('contact geom groups must bind named source bodies or fixtures')
+    evidence = (
+        f'mixed-actuator-plan={plan.identity_hash}/artifact={artifact.identity_hash}/'
+        f'source={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}'
+    )
+    provider = execution.physics_provider
+    base = provider_manifest(provider)
+    claims = tuple(base.capabilities)
+    unsupported = base.known_unsupported
+    if provider == 'geophys':
+        if not any(channel.drive_mode == 'joint_torque' for channel in plan.channels):
+            raise ValueError('GeoPhys mixed actuator admission requires a named torque channel')
+        claims += (CapabilityClaim(
+            'joint_torque_actuation', 'tested',
+            f'{evidence}/provider_adapter=task_env.runtime.sessions.geophys',
+        ),)
+        unsupported = tuple(item for item in unsupported if item != 'joint_torque_actuation')
+    if source.contact_geom_groups:
+        if provider == 'geophys':
+            raise ValueError('GeoPhys mixed actuator admission does not claim geom-pair contact queries')
+        claims += (CapabilityClaim('contact_detection', 'tested', evidence),)
+        unsupported = tuple(item for item in unsupported if item != 'contact_detection')
+    return replace(
+        base, adapter_version=(
+            'task-env-mixed-actuator-source-v1' if provider == 'mujoco'
+            else 'task-env-geophys-mixed-actuator-source-v1'
+        ),
+        capabilities=claims, known_unsupported=unsupported, evidence_reference=evidence,
+    )
+
+
+def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *,
+                source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _session_admission_input=None) -> RuntimeSession:
+                _session_admission_input=None, _native_feedback_profile=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
@@ -718,20 +956,37 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
         return session
     execution = legacy_execution_projection(execution)
-    actual = (provider_manifest(execution.physics_provider) if _diagnostic_profile is None
-              else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile))
+    active_profiles = tuple(profile for profile in (
+        _diagnostic_profile, _native_feedback_profile,
+    ) if profile is not None)
+    if len(active_profiles) > 1 or (active_profiles and source.mixed_actuator_plan is not None):
+        raise ValueError('RuntimeSession process-local admissions are mutually exclusive')
+    if _diagnostic_profile is not None:
+        actual = _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
+    elif _native_feedback_profile is not None:
+        actual = _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
+    elif source.mixed_actuator_plan is not None:
+        actual = _mixed_actuator_manifest(artifact, execution, source)
+    else:
+        actual = provider_manifest(execution.physics_provider)
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
-        if _diagnostic_profile is not None:
-            raise ValueError('diagnostic admission cannot be combined with a caller-supplied manifest')
+        if active_profiles or source.mixed_actuator_plan is not None:
+            raise ValueError('bounded process-local admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
+    if _native_feedback_profile is not None:
+        from ...artifacts import RequiredCapabilitySet
+        admit_capabilities(RequiredCapabilitySet(('actuator_force_query',)), actual, execution)
+    if source.mixed_actuator_plan is not None and source.contact_geom_groups:
+        from ...artifacts import RequiredCapabilitySet
+        admit_capabilities(RequiredCapabilitySet(('contact_detection',)), actual, execution)
     if execution.render_provider != 'none':
         raise ValueError('P1.2 rendering is unsupported')
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
-        or source.config.runtime.control_substeps != artifact.timebase.control_substeps
-        or source.config.runtime.backend != execution.backend
-        or source.config.render.camera_obs):
+            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+            or source.config.runtime.backend != execution.backend
+            or source.config.render.camera_obs):
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
@@ -753,7 +1008,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
-    session = _materialize_admitted(artifact, execution, source)
+    session = _materialize_admitted(artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan)
     if type(declared_execution) is ExecutionSpecV1:
         # Keep the exact V1 declaration alongside the legacy-compatible adapter
         # view. It remains provenance; it is never reconstructed from defaults.
@@ -829,7 +1084,9 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     """Preflight the one fixed Panda Arm+Hand plan before native import/compile."""
     from ...artifacts import FixedAttachmentPlanV1, LogicalAssemblyV1
     from ...assembly.fixed_attachment import (
-        lower_fixed_attachment_sources, validate_fixed_attachment_scene,
+        R06B_ORDER_ASSET_VERSION, R06B_ORDER_RECIPE_ID, R06B_ORDER_SOURCE_SHA256,
+        fixed_attachment_source_recipe, lower_fixed_attachment_sources,
+        validate_fixed_attachment_scene,
     )
 
     plan = source.fixed_attachment_plan
@@ -848,6 +1105,29 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
         raise ValueError('fixed Attachment materialization requires a pinned canonical Scene-v3')
     artifact.validate_scene(scene)
     validate_fixed_attachment_scene(plan, source.fixed_attachment_assembly, scene)
+    sources = source.fixed_attachment_sources
+    if set(sources) != {'panda-arm', 'panda-hand'}:
+        raise ValueError('fixed Attachment source pair differs from the exact two-Entity recipe')
+    recipe = fixed_attachment_source_recipe(
+        sources['panda-arm'].xml, sources['panda-hand'].xml,
+    )
+    expected_asset_version = (R06B_ORDER_ASSET_VERSION if recipe == R06B_ORDER_RECIPE_ID
+                              else 'menagerie-b846dd12')
+    expected_source_hashes = (
+        (R06B_ORDER_SOURCE_SHA256['panda-arm'], R06B_ORDER_SOURCE_SHA256['panda-hand'])
+        if recipe == R06B_ORDER_RECIPE_ID else (
+            'e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071',
+            'd2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a',
+        )
+    )
+    expected_scene_id = ('phase-ii-r06b-order-v1-fixed-attachment'
+                         if recipe == R06B_ORDER_RECIPE_ID else 'phase-ii-r03b-fixed-attachment')
+    expected_assembly_revision = (R06B_ORDER_RECIPE_ID if recipe == R06B_ORDER_RECIPE_ID
+                                  else 'r03b-001')
+    expected_task_ids = ({'phase-ii-r06b-order-v1-fixed-arm-hand',
+                          'phase-ii-r06b-order-v1-attached-leaf-position'}
+                         if recipe == R06B_ORDER_RECIPE_ID else
+                         {'phase-ii-r03b-fixed-arm-hand', 'phase-ii-r03c-attached-leaf-position'})
     if (
         plan.parent_entity_id, plan.child_entity_id,
         plan.parent_asset_id, plan.parent_asset_version,
@@ -857,17 +1137,20 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
         plan.child_mount_body_name, plan.namespace_prefix,
         plan.parent_mount.frame_id, plan.child_mount.frame_id,
         plan.parent_root.frame_id, plan.child_root.frame_id,
-        plan.reset_hand_opening_m,
+        plan.reset_hand_opening_m, plan.assembly_revision,
+        scene.scene_id,
     ) != (
-        'panda-arm', 'panda-hand', 'panda-arm-nohand', 'menagerie-b846dd12',
-        'panda-hand', 'menagerie-b846dd12',
-        'e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071',
-        'd2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a',
+        'panda-arm', 'panda-hand', 'panda-arm-nohand', expected_asset_version,
+        'panda-hand', expected_asset_version,
+        *expected_source_hashes,
         'a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9',
         'attachment_site', 'probe_hand_hand', 'probe_hand_',
         'attachment_site', 'hand', 'link0', 'hand', 0.076,
+        expected_assembly_revision, expected_scene_id,
     ):
         raise ValueError('fixed Attachment source pair differs from the accepted R03a source recipe')
+    if artifact.task_id not in expected_task_ids:
+        raise ValueError('fixed Attachment TaskArtifact identity differs from its exact source recipe')
     if (
         plan.parent_site_from_child_root.position,
         plan.parent_site_from_child_root.quaternion_wxyz,
@@ -881,9 +1164,17 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if plan.collision_policy != 'source_preserved' or plan.extra_cross_entity_overrides:
         raise ValueError('fixed Attachment collision admission must preserve source filters and exclusions')
     assets = {(asset.asset_id, asset.asset_version): asset for asset in scene.assets}
-    for asset_id, asset_version, source_reference in (
-        (plan.parent_asset_id, plan.parent_asset_version, 'menagerie:franka_emika_panda/panda_nohand.xml'),
-        (plan.child_asset_id, plan.child_asset_version, 'menagerie:franka_emika_panda/hand.xml'),
+    from ...assembly.fixed_attachment import R06B_ORDER_SOURCE_REFERENCES
+    source_references = (
+        (R06B_ORDER_SOURCE_REFERENCES['panda-arm'], R06B_ORDER_SOURCE_REFERENCES['panda-hand'])
+        if recipe == R06B_ORDER_RECIPE_ID else (
+            'menagerie:franka_emika_panda/panda_nohand.xml',
+            'menagerie:franka_emika_panda/hand.xml',
+        )
+    )
+    for (asset_id, asset_version, source_reference) in zip(
+        (plan.parent_asset_id, plan.child_asset_id),
+        (plan.parent_asset_version, plan.child_asset_version), source_references, strict=True,
     ):
         asset = assets[(asset_id, asset_version)]
         if (asset.source_reference, asset.source_revision, asset.license_id) != (
@@ -921,13 +1212,13 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
-def _materialize_admitted(artifact, execution, source):
+def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         return _GeoPhysSession(artifact, source)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
-        return _MuJoCoSession(artifact, source)
+        return _MuJoCoSession(artifact, source, mixed_actuator_plan=mixed_actuator_plan)
     if execution.physics_provider == 'sapien':
         from .sapien import _SapienSession
         return _SapienSession(artifact, source)

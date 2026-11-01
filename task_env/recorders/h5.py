@@ -285,6 +285,14 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         "conversion_capabilities": raw.get("conversion_capabilities", {}),
         "trajectory": {"observation_count_semantics": "T+1", "transition_count_semantics": "T"},
     }
+    task_context = metadata.get("task_context")
+    if task_context is not None:
+        if not isinstance(task_context, Mapping):
+            raise ValueError("record metadata task_context must be a mapping")
+        # Optional owner-supplied, versioned context is carried verbatim so
+        # independent readers can bind a deployment-specific reset/source
+        # identity without changing the generic H5 v3 trajectory ABI.
+        result["task_context"] = dict(task_context)
     return result
 
 
@@ -376,6 +384,27 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         "source": "structured_controls_v1_json",
         "automatic_flattening": False,
     })
+    task_context = trajectory.record_metadata.get("task_context")
+    if task_context is not None:
+        if not isinstance(task_context, Mapping):
+            raise ValueError("record metadata task_context must be a mapping")
+        _json_dataset(meta, "task_context_json", dict(task_context))
+    boundary_contexts = [
+        trajectory.reset_info.get("boundary_context_v1"),
+        *(info.get("boundary_context_v1") for info in trajectory.infos),
+    ]
+    if any(value is not None for value in boundary_contexts):
+        if any(not isinstance(value, Mapping) for value in boundary_contexts):
+            raise ValueError("versioned boundary context must be present at every T/T+1 boundary")
+        versions = [value.get("schema_version") for value in boundary_contexts]
+        if (any(type(version) is not str or not version.strip() for version in versions)
+                or len(set(versions)) != 1
+                or any(not isinstance(value, Mapping) for value in boundary_contexts)):
+            raise ValueError("boundary context requires one stable owner schema across T/T+1")
+        # Validate JSON compatibility here, while leaving semantic fields to
+        # their task owner and independent reader.
+        json.dumps(boundary_contexts, sort_keys=True, allow_nan=False)
+        _json_dataset(meta, "boundary_context_v1_json", [dict(value) for value in boundary_contexts])
     camera_extension = _camera_observation_extension(trajectory)
     if camera_extension is not None:
         contract, boundaries, recording_binding = camera_extension
@@ -982,12 +1011,24 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         events_raw = json.loads(_read_text(root, "meta/boundary_events_v1_json"))
         outcome_raw = json.loads(_read_text(root, "meta/episode_outcome_v1_json"))
         training_projection = json.loads(_read_text(root, "meta/training_projection_v1_json"))
+        boundary_contexts = (
+            json.loads(_read_text(root, "meta/boundary_context_v1_json"))
+            if "meta/boundary_context_v1_json" in root else None
+        )
         env_meta = load_metadata(_read_text(root, "meta/env_meta"))
         transition_count = int(root.attrs["transition_count"])
         observation_count = int(root.attrs["observation_count"])
         stop_reason = str(root.attrs.get("stop_reason", ""))
     if observation_count != transition_count + 1 or len(controls_raw) != transition_count:
         raise ValueError("task-env-h5/v3 T/T+1 or structured control count mismatch")
+    if boundary_contexts is not None:
+        if (not isinstance(boundary_contexts, list) or len(boundary_contexts) != observation_count
+                or any(not isinstance(item, Mapping) for item in boundary_contexts)):
+            raise ValueError("task-env-h5/v3 boundary context must cover every T/T+1 observation")
+        versions = [item.get("schema_version") for item in boundary_contexts]
+        if (any(type(version) is not str or not version.strip() for version in versions)
+                or len(set(versions)) != 1):
+            raise ValueError("task-env-h5/v3 boundary context has an unsupported owner schema")
     if transition_count and any(item is None for item in controls_raw):
         raise ValueError("task-env-h5/v3 has an unrecorded structured control transition")
     controls = tuple(
@@ -1003,6 +1044,7 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         "schema_id": "task-env-h5", "schema_version": "v3",
         "transition_count": transition_count, "observation_count": observation_count,
         "env_meta": env_meta, "structured_controls": controls,
+        "boundary_contexts": boundary_contexts,
         "boundary_events": events, "outcome": outcome,
         "training_projection": training_projection,
     }

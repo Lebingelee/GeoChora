@@ -1,4 +1,4 @@
-# Phase II-01 修订规划交付包
+# Phase II-01 当前入口
 
 > **当前F线入口（2026-11-01）**：新F05原生适配三路线主线已由Sol有界接收（DG04证据Core `fb4c3836`、文档HEAD `740a74a9`），旧F05 PARTIAL、严格DG03及R3未决保留。F06按维护者新裁定组织[PickCube × Harness × 三主要后端example](14_F06_PickCube_Harness_Multi_Backend_Goal.md)，每后端3 seed、任务成功与runtime有效性分开；包已准备待人工转述，尚未执行。下方日期较早的状态为历史。
 
@@ -17,85 +17,53 @@
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
 以下 2026-10-23 记录及历史外部参考保留签署时点含义，不代表所有切片至今未启动。
 
-2026-10-23规划快照：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b），本地259f27f完成规划复核。该签署时点维护者随后单独授权P00基线核查和工作包准备；当前逐slice执行状态见 [07](07_Execution_Order_and_Acceptance.md) 与 [manifest](planning_manifest.json)。总体定位见 [00](00_Phase_II_01_Blueprint.md)，原规划检查保留在 [validation receipt](validation_receipt.json)，P00核查另记manifest的 `P00_audit` 与 `revision_history`。
+Phase II-01 同时记录 R 路线的 Core 工作与 F 路线的多资产后继计划。两条路线的 owner、状态和证据相互独立；本页只负责当前导航，不改写历史接受、冻结输入或发布决定。
+
+
+## 当前状态
+
+截至 2026-11-01，R 路线的 LIBERO A123 技术交集为 `ACCEPTED_BOUNDED_R07_A123_TECHNICAL`：固定上游来源、task 1–3、MuJoCo/GeoPhys CPU、冻结 A 阶段环境和上游控制流程。它不表示整个 R00–R07/P99、任务成功、Qualification 或发布已完成。
+
+task2 GeoPhys 的接触前偏差按维护者接受的限定例外处理，仅对应这次冻结的来源、controller 和 action sequence。首次上游手指碰柜体发生在 action 82；其 TCP 对上游的位置 P95/最大值为 33.143/37.916 mm，姿态为 229.074/259.412 mrad。该决定不建立一般 provider parity。资产 `wine_bottle` 与 `wine_rack` 的具体文件许可和署名记录仍未解决；B/C、高精度控制器改进和自主 Solution 是可选后续，Isaac Sim 延期。
+
+完整状态与接受边界见 [07 执行与接受矩阵](07_Execution_Order_and_Acceptance.md) 和 [Sol A123 接受记录](../../../../maintenance/20261101_r07_a123_sol_acceptance.md)。原始 A123 返工报告保留于忽略跟踪的 [`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/`](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/)；接受决定不改写该报告或 raw evidence。
 
 ## 文档入口与责任
 
-| 文档 | 修订后的责任 |
+| 文档 | 当前用途 |
 | --- | --- |
-| [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
-| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
-| [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
-| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt004精确Panda/MuJoCo CPU public Env S2/S3已获Sol有界接收；不扩展通用Attachment/Provider或Qualification |
-| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
-| [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
-| [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
-| [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |
-| [08 审阅交接](08_Codex_Phase_II_01_Planning_Prompt.md) | 下一轮独立审阅/维护者审批指令 |
-| [R07部署/Agent成本](09_R07_Benchmark_Deployment_and_Agent_Cost.md) | 固定五LIBERO审计/部署与成本协议、RoboCasa feasibility；不隶属R06 |
-| [10 检查点后补丁](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) | USD/source、free-body/state/control、Isaac/GeoPhys、真实 Harness 的 owner/方法、F00–F07 与调用链门禁；原目标保留 |
-| [planning manifest](planning_manifest.json) | 机器可读DAG、source/probe出处与文档hash；非实施receipt |
+| [00 总蓝图](00_Phase_II_01_Blueprint.md) | Phase 基线、历史目标和 owner 总览 |
+| [07 执行与接受矩阵](07_Execution_Order_and_Acceptance.md) | R 阶段依赖、当前接受状态、范围与停止条件 |
+| [A123 Sol 接受记录](../../../../maintenance/20261101_r07_a123_sol_acceptance.md) | 最新有界技术决定、task2 例外和未决限制 |
+| [R 路线档案索引](../../../../archive/phase_ii_01_r_routes/README.md) | R01–R07 旧规划原文、路径映射与 SHA-256 |
+| [planning manifest](planning_manifest.json) | 冻结的机器可读计划；作为历史收据只读 |
+| [validation receipt](validation_receipt.json) | 原规划验证快照；不以本轮改写 |
+| [10 检查点恢复与 Harness 计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) | F 后继计划的输入、owner 与限制 |
+| [11 多资产 solver 恢复计划](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md) | F05–F07 的恢复范围 |
+| [12 F05–F07 执行手册](12_F05_F07_Execution_Playbook.md) | F 路线执行流程；F owner 状态由其 checkout 决定 |
 
-## 当前开发流程（维护者2026-10-25补充）
+R01–R06 和 R07 的详细旧规划已逐字节保存在 [`docs/archive/phase_ii_01_r_routes/`](../../../../archive/phase_ii_01_r_routes/README.md)。原文件路径保留短导航页及旧标题锚点。需要恢复历史实现时，以路线记录所列的固定 Git commit 和 hash 为准；活动源码不保留一套旧版本实现。
 
-本阶段预先规划**1个开发分支、0个新增worktree**，复用`codex/phase-ii-01-p00-20261023`承载多个子阶段/Goal，不按每份Prompt建分支。默认依[07执行顺序及Sol/Luna闭环](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)：Sol发单slice完整Prompt→Luna执行/验证/本地提交并交报告→Sol核diff/Evidence、记账后发下一包；失败则同分支单包返工。
+## 当前开发流程（维护者 2026-10-25 补充）
 
-每个有界产出与相关本地提交对应；audit-only的ignored原件由Sol以既有文档摘要/索引提交关联，raw logs/H5不追踪进Git。只有恢复或独立方案比较/整合等实际需要才评估额外branch/worktree。具体分支计划与步骤由07及manifest记录；这些流程要求已明确，不等于具体功能范围、Provider合同或Qualification批准，push/merge/tag/Release仍另行授权。
+沿用现有 phase branch 和逐包 Sol/Luna review 流程。每份实现报告关联输入/输出 HEAD、提交、检查和证据；Sol 独立检查 diff 与 Evidence 后再接受或派后继工作。讨论或本地整理不代表 merge；push、merge、tag 和 Release 按仓库治理要求另行授权。
 
 <a id="references"></a>
 
 ## 固定外部参考与采用原则
 
-访问日期统一为 2026-10-23；固定版本URL而非滚动latest/develop。Isaac Lab官方Release在2026-10-20发布v3.0.0，页面显示commit短ID e3f7d9f；本包不把未解析的完整commit编造为已核验。文档页面版本为v3.0.0，内容可在发布后维护，不冒称所有页面字节均来自Release commit。Isaac Sim参考独立固定6.1.0，不推定它与Lab3.0.0是本项目依赖组合。
+下列资料用于工程设计参考，不自动证明 GeoChora 对应 provider、资产或能力已支持。历史访问日期与完整讨论保留在 [00 总蓝图](00_Phase_II_01_Blueprint.md) 的固定来源记录和归档原文中。
 
-| 固定官方资料 | 使用范围与本项目的推论 |
+| 参考资料 | 使用边界 |
 | --- | --- |
-| [Isaac Lab v3.0.0 Release](https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0) | 多backend方向是参考；GeoChora能力仍只看自身source/Evidence，不迁移第三方支持声明 |
-| [v3.0.0 Backends and Presets / Factory Dispatch](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/concepts/backends_and_presets.html) | 显式配置选择、构造时lazy dispatch、physics/render独立准入；R02采用完整profile选择后校验的编译原则，复用本项目现有factory |
-| [v3.0.0 SceneDataBackend / SceneDataProvider API](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/api/lab/isaaclab.scene_data.html) | producer刷新native数据，consumer显式remap/lifetime；R01/R04/R06复用现有typed publication，不引入Warp数据ABI/第二state store |
-| [v3.0.0 Asset Preparation for Newton/MJWarp](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/how-to/prepare_asset_for_newton.html) | 分离common/solver-specific语义、核对root/inertia/contact/drive实际消费；R03必须逐项验证source，不把导入成功视作执行等价 |
-| [v3.0.0 Policy Interface Compatibility](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/how-to/transfer_policies_between_physx_and_newton.html) | 有序action/obs、时序/hold、reset/机制一致性要独立审计；R06加入mapping/coupling对照；本阶段不承诺policy transfer |
-| [Isaac Sim6.1.0 Robot Assembler](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html) | Mount Frame对齐、Fixed Joint、child Root Joint处置与Collision Filtering分开验证；R03用自身versioned intent与native lowering，不采用USD/Kit ABI |
-
-以上各项为工程设计推论，不是要求复刻外部架构或安装依赖。外部页面访问失败的探索URL不作为已读取支持来源；最终使用上表可定位版本页，SceneData API内容经官方搜索结果可读，完整页面抓取有间歇失败，未声称做过逐行源码审计。
-
-## Source / Provider / Controller 风险与影响矩阵
-
-| ID / 优先级 | source / owner / 范围 | 已知风险与状态 | 受影响后继 / stop或处理 |
-| --- | --- | --- | --- |
-| SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
-| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c004固定Panda/MuJoCo 3.8.1 CPU public Env/Recorder/reader S2/S3已获有界接收；更广provider/native mapping尚未接通 | 07记录精确接收边界；10后续方向保持独立，保留Force-aware拒绝与唯一writer保护 |
-| MAT-1 P0 | RuntimeSource/materialization/typed state | R03b已为精确Menagerie Panda Arm+Hand双source增加fixed-tree plan与Core S2；更广source/provider路径仍未建立 | R03b及R03c精确Panda/MuJoCo路径已获有界接收 |
-| ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
-| MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |
-| CAM-1 P1 | CameraSession→Observation→H5 | state-only与generic passthrough断点；identity/calibration/labels/缓存与峰值内存 | R04b/c/P99；strict reader/同边界/预算/fault/teardown |
-| FDB-1 P1 | GeoPhys public Reader/native sample | a53常规host500Hz未建立；CPU/CUDA同步成本/phase/freshness | R05b/c/P99；owner合同gate；不阻塞Position子链 |
-| HIST-1 P1 | B04a/eb870/Reader governance | 缺原bytes，历史兼容未证明，自动retire或延期不允许 | R06c/P99；恢复/退休/继续延期新决定，否则blocked |
-| VER-1 P1 | Scene/Artifact/H5/Profile/pin/UID | 静默改旧schema或把旧pin证据移到新source | 每slice/P99；独立version/受影响回归/原日志保留 |
-| DOC-1 P2 | 旧consolidation validator | 文档计数与全历史非文档scope已有失败 | 原样记录，不提高阈值；新文档link/anchor与本次docs-only另做精确校验 |
-
-## REVISE_PLAN 逐项修订对照
-
-“已修订”仅表示文档问题有对应文本；不表示实现/Provider批准或审阅结论自动变为ACCEPT_PLAN。
-
-| 前次审阅项 | 修订定位 | 文档处置 / 仍待决定 |
-| --- | --- | --- |
-| P0-1 GeoPhys source路线未成立 | R03事实表/策略、07第二Provider | MuJoCo CPU first-required候选；保留site-size拒绝，无新S2/S3；Provider策略未选择/未实施 |
-| P0-2 独立leaf执行合同缺失 | R02 Leaf表/预检、R03b/c | Arm-only/Hand-only Action/Target/Ack/Required State/TCP/资源；原算法复用，不能双完整Panda充证 |
-| P1-1 embedded子组件/Entity/hash歧义 | R01两类成员/非自指/mapping责任 | owning/ref-only分开、typed目标、深度与稳定路径；schema/API名字仍需P00设计审议 |
-| P1-2 early R03a滞后 | R03切片、07、manifest | R03a依赖P00；R01a/R05a/R04a/R06a可并列，18切片数不变 |
-| P1-3 Camera两条Observation与H5消费 | R04合同/资源、07 | public Env/strict metadata reader/calibration/labels/identity/T/T+1/fault明确；未实现 |
-| P1-4 正式Reader与required envelope | R05、07 | 保持CPU/CUDA×100/500Hz为建议required；owner先批准，不降格diagnostic，失败需scope change |
-| P1-5 恢复/退休不能自动消除延期 | R06原件与gate、07 | 保留B04a/eb870；新阶段恢复/退休/继续延期均需独立决定，未决blocked |
-| P2 版本引用状态 | 00、manifest | v2.0.0分支/Tag已另经授权推送并回读；无main promotion/Release；冻结PhaseII不回写 |
-| P2 dual builder依赖test helpers | 00/R03 publicS3边界 | 未来在现有task/source owner提取，不复制Runtime/Recorder；本轮不改代码 |
-| P2 每slice执行合同不足 | 07逐slice表/通用Gate、R01–R06 | 每slice有前置/owner/证据/Stop；具体run预算和tolerance要在授权P00/开工前冻结，不能伪造已实测 |
-| P2 外部引用滚动版本 | 本页固定参考表 | Lab3.0.0/Sim6.1.0；只借鉴原则 |
-| 本轮新增顺序与mechanism保护 | R06映射表、R02/R03 | permutation/逆映射、Equality/Tendon/真实actuator、policy interface分域，未实施 |
+| [Isaac Lab v3.0.0 Release](https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0) | 只作为多 backend 方向参考 |
+| [Isaac Lab v3.0.0 backend 与 preset 文档](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/concepts/backends_and_presets.html) | 配置选择和准入设计参考 |
+| [Isaac Lab v3.0.0 SceneData API](https://isaac-sim.github.io/IsaacLab/v3.0.0/source/api/lab/isaaclab.scene_data.html) | 数据 producer/consumer 生命周期参考 |
+| [Isaac Sim 6.1.0 Robot Assembler](https://docs.isaacsim.omniverse.nvidia.com/6.1.0/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html) | 装配意图与 native lowering 的边界参考 |
 
 <a id="provenance"></a>
 
-## 输入保全、验证与待批准项
+## Provenance 与保全
 
 原 ZIP、解压草案与前次审阅文件未覆盖；初版保全在 ignored `workspace/maintenance/phase_ii_01_plan_revision_20261023_001/`，其中 `prior_review/` 保存前次原始 probe 副本。首版 R07 审计在 `workspace/maintenance/phase_ii_01_r07_plan_revision_20261023_001/`；本轮复核与修订前 tar 在 `workspace/maintenance/phase_ii_01_r07_recheck_20261023_002/`。各文件 hash/逻辑 path 见 [manifest](planning_manifest.json)。前轮 source-bound 收据可从固定 `535ce2516e61ecd538d5ff6dccf7493a1cfe2cac` 恢复，不能把旧收据的“尚未提交”快照解释为本轮状态。未把这些本地原始探针作为可随Git获取的新运行Evidence；新clone如无原件，应标“indexed but raw unavailable”，不能凭摘要重做成功证明。
 
@@ -215,3 +183,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
 当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01/DG02已分别获有界Sol接收；DG03已有synthetic S1与N1诊断但仍partial、长期Goal active，后续窗口须按Sol复核后的HEAD与剩余语义缺口重新冻结。F06/F07未启动，旧F05partial及required物理语义不变。
+
+R 路线原文的文件名、字节数和 SHA-256 在 [档案索引](../../../../archive/phase_ii_01_r_routes/README.md)。`planning_manifest.json`、`validation_receipt.json`、F-owned 10–12 文档、冻结 release/tag 和忽略跟踪的 workspace evidence 均按原职责保留；本页和档案不把 unresolved 状态变成已接受能力，也不为历史计划补造执行结果。

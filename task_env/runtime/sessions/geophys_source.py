@@ -993,15 +993,16 @@ def compile_geophys_usd_source_actuation_receipt_v2(
 class GeoPhysSourceComposer:
     adapter_name = 'task_env_neutral_mjcf_bridge_v0'
 
-    def __init__(self, source, *, scene_definition=None, source_closure_digest=None):
+    def __init__(self, source, *, scene_definition=None, source_closure_digest=None,
+                 execution_source_receipt=None):
         from .source import UsdRuntimeSourceV1
-
         self._source = source
         self._usd_runtime_source = source if type(source) is UsdRuntimeSourceV1 else None
         self._snapshot_lease = None
         self._usd_mapping_report = None
         self._scene_definition = scene_definition
         self._source_closure_digest = source_closure_digest
+        self._execution_source_receipt = execution_source_receipt
         self._projected_xml = None
         if self._usd_runtime_source is not None:
             source.validate()
@@ -1038,6 +1039,18 @@ class GeoPhysSourceComposer:
                 ),
                 'task_env_verified_usd_snapshot_bridge_v1',
             )
+        receipt = self._execution_source_receipt
+        if receipt is not None:
+            receipt.validate_snapshot()
+            from scene import SceneSource
+            return (
+                SceneSource.mjcf_string(
+                    receipt.importer_xml.decode('utf-8'),
+                    base_dir=receipt.snapshot_root,
+                    label=receipt.source_id,
+                ),
+                'task_env_execution_source_receipt_v1',
+            )
         if self._scene_definition is None:
             return native_scene_source(self._source), self.adapter_name
         self._projected_xml = project_scene_definition_v3_to_mjcf(
@@ -1061,6 +1074,9 @@ class GeoPhysSourceComposer:
                 self._usd_runtime_source, imported_scene,
             )
             return imported_scene.build_rigid_scene_model(use_imported_meshes=True)
+        receipt = self._execution_source_receipt
+        if receipt is not None:
+            receipt.validate_imported_scene(imported_scene)
         if self._scene_definition is not None:
             if self._projected_xml is None:
                 raise RuntimeError('canonical Scene source must be built before model lowering')

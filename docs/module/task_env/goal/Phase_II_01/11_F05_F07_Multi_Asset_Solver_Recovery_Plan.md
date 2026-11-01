@@ -1,8 +1,11 @@
 # F05–F07 后继重规划：多格式资产、统一物理语义与多求解器闭环（规划方向已采纳；执行待冻结）
 
+> **状态**：`PLANNING_DIRECTION_ADOPTED / EXECUTION_CONTRACT_PENDING / NOT_DISPATCHED`。维护者于2026-10-30要求将网页审阅路线纳入当前文档，并在派包前完成跨分支同步。本轮只落地规划；不构成实施、native、安装、发布或Qualification授权。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004。
+
 > **当前裁定（2026-11-01）**：维护者批准以明确记录、版本固定的 Provider 原生物理适配推进新 F05；MuJoCo 特有柔顺定律及传力逐项等价另列研究。当前验收与执行边界以[13 第17节](13_F05_Early_Diagnostic_Three_Goals.md#f05-native-adaptation-scope-decision)为准。下文原 required 集、窗口状态和冻结门保留为历史，不能用于重新阻塞已经延期的研究项，也不能改写为 PASS。新路线尚未运行或接收。
 
 > **状态**：`PLANNING_DIRECTION_ADOPTED / ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED / NO_NATIVE`。规划与合同背景保留其签署时点；2026-10-30首个successor包已按维护者给出的冻结输入完成S0静态执行，tracked诊断与文档/本地提交已产出，Sol复核结果为PARTIAL、需补齐原包静态门；来源/原始字段采集事实有效，完整S0 PASS未接收。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004；本结果不授予S1 native或Qualification。
+
 >
 > 原网页稿SHA-256：`94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519`；仓库补充解释见[第9节](#repository-adoption)。F线规划owner为`develop-full`；其他分支同步本文不表示已经集成该分支的实现或native结果。
 
@@ -119,6 +122,8 @@ F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告
 5. **S0是前置语义门，不是固定准备轮**。只为影响实现选择的未知拆包；已知owner的实现、定向验证与收口可在一个完整successor窗口内安排。S0未通过时不进入依赖它的native。stage编号与S0/S1验证成本层级分开记录；attempt按完整窗口计，run/修复次数另记。
 6. **证据与运行预算**。复用旧证据仅限source/recipe/模型/控制/接口/任务/阈值等受影响输入未变且覆盖新门的交集。每Provider在完整包中冻结累计wall/steps/RAM/VRAM/磁盘/锁预算及允许修复重跑，不默认一次launch，也不要求每次已授权的包内重跑重新问许可。失败原件和每run的新代码/输入freeze保留。
 7. **跨分支与可恢复性**。F线owner为`develop-full`，`develop`只同步规划，camera/R07保持独立scope和writer。ignored r009/fixture、隔离GeoPhys候选及未集成gitlink是复现限制，先核可恢复交付与实际producer；不能用文档同步冒充实现合入。camera窗口未释放时只备补丁，不更改该worktree或HEAD。
+
+> Historical R-branch planning snapshot, superseded by the later F successor execution record: 本轮所有后继stage为PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择；本轮没有派包。
 
 2026-10-30早先规划同步阶段的签署状态为后继stage PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。该planning-only状态由后续首包执行记录（第10节）更新。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择。
 

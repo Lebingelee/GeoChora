@@ -154,8 +154,8 @@ class _SapienSession(_SessionValues):
         builder._geochora_expected_shapes=expected
 
     def reset(self,sample):
-        self._begin_reset()
         self._validate_sample(sample)
+        self._begin_reset()
         for a in self._articulations:
             a.set_qpos(np.zeros(a.dof));a.set_qvel(np.zeros(a.dof));a.set_qf(np.zeros(a.dof))
         for semantic,value in sample.joint_position.items():

@@ -817,17 +817,157 @@ class ActuatorForceMeasurementV1:
 
 @dataclass(frozen=True)
 class ContactSummary:
-    """任务层可消费的稳定接触摘要占位契约。"""
+    """Versioned entity-pair contact evidence for task semantics.
+
+    An empty available mapping means the queried pairs had no contacts. A
+    missing peer query is represented by ``unavailable`` and must not be
+    interpreted as an empty mapping.
+    """
 
     pair_counts: Mapping[str, int] = field(default_factory=dict)
+    status: str = "available"
+    reason: str | None = None
+    schema_version: str = "task-contact-summary-v1"
 
     def __post_init__(self) -> None:
+        if self.schema_version != "task-contact-summary-v1":
+            raise ValueError("unsupported ContactSummary schema")
+        if self.status not in {"available", "unavailable"}:
+            raise ValueError("ContactSummary status must be available or unavailable")
+        if self.status == "available" and self.reason is not None:
+            raise ValueError("available ContactSummary cannot carry a reason")
+        if self.status == "unavailable" and (
+            not isinstance(self.reason, str) or not self.reason.strip()
+        ):
+            raise ValueError("unavailable ContactSummary requires a reason")
+        frozen_counts = {}
+        for name, count in self.pair_counts.items():
+            if type(name) is not str or not name.strip() or name != name.strip():
+                raise ValueError("ContactSummary pair names must be stable nonempty tokens")
+            if isinstance(count, bool) or not isinstance(count, (int, np.integer)) or count < 0:
+                raise ValueError("ContactSummary counts must be nonnegative integers")
+            if name in frozen_counts:
+                raise ValueError("ContactSummary pair names must be unique")
+            frozen_counts[name] = int(count)
+        if self.status == "unavailable" and frozen_counts:
+            raise ValueError("unavailable ContactSummary cannot carry contact counts")
         object.__setattr__(
             self,
             "pair_counts",
-            MappingProxyType(
-                {str(name): int(count) for name, count in self.pair_counts.items()}
-            ),
+            MappingProxyType(frozen_counts),
+        )
+
+    @classmethod
+    def available(cls, pair_counts: Mapping[str, int]) -> "ContactSummary":
+        return cls(pair_counts=pair_counts)
+
+    @classmethod
+    def unavailable(cls, reason: str) -> "ContactSummary":
+        return cls(status="unavailable", reason=reason)
+
+
+@dataclass(frozen=True)
+class ContactSummaryV2:
+    """Current-boundary geom-group contact coverage and pair counts.
+
+    A zero count is meaningful only for a pair listed in ``covered_pairs``.
+    The receipt binds the query to one source, materialization, episode, reset,
+    and evaluation state revision. Native geom IDs never cross this contract.
+    """
+
+    source_id: str
+    source_closure_digest: str
+    provider_materialization_id: str
+    episode_id: str
+    reset_sample_id: str
+    control_step: int
+    state_revision: int
+    simulation_time_s: float
+    requested_pairs: tuple[tuple[str, str], ...]
+    covered_pairs: tuple[tuple[str, str], ...]
+    pair_counts: Mapping[str, int]
+    geom_groups: Mapping[str, tuple[str, ...]]
+    status: str = 'available'
+    reason: str | None = None
+    schema_version: str = 'task-contact-summary-v2'
+
+    def __post_init__(self):
+        import re
+
+        if self.schema_version != 'task-contact-summary-v2':
+            raise ValueError('unsupported ContactSummaryV2 schema')
+        for name in ('source_id', 'provider_materialization_id', 'episode_id', 'reset_sample_id'):
+            if type(getattr(self, name)) is not str or not getattr(self, name).strip():
+                raise ValueError(f'ContactSummaryV2 {name} must be nonempty')
+        if (type(self.source_closure_digest) is not str
+                or re.fullmatch(r'[0-9a-f]{64}', self.source_closure_digest) is None):
+            raise ValueError('ContactSummaryV2 closure identity must be SHA-256')
+        if (type(self.control_step) is not int or self.control_step < 0
+                or type(self.state_revision) is not int or self.state_revision < 0
+                or not math.isfinite(float(self.simulation_time_s))
+                or self.simulation_time_s < 0):
+            raise ValueError('ContactSummaryV2 boundary clock is invalid')
+        if self.status not in {'available', 'unavailable'}:
+            raise ValueError('ContactSummaryV2 status must be available or unavailable')
+        if self.status == 'available' and self.reason is not None:
+            raise ValueError('available ContactSummaryV2 cannot carry a reason')
+        if self.status == 'unavailable' and (type(self.reason) is not str or not self.reason.strip()):
+            raise ValueError('unavailable ContactSummaryV2 requires a reason')
+
+        def pairs(values, field_name):
+            result = tuple(tuple(pair) for pair in values)
+            if any(len(pair) != 2 or any(type(value) is not str or not value.strip() for value in pair)
+                   or pair[0] >= pair[1] for pair in result):
+                raise ValueError(f'{field_name} must use sorted, distinct, nonempty entity pairs')
+            if len(set(result)) != len(result):
+                raise ValueError(f'{field_name} contains duplicate entity pairs')
+            return result
+
+        requested = pairs(self.requested_pairs, 'requested_pairs')
+        covered = pairs(self.covered_pairs, 'covered_pairs')
+        if not set(covered) <= set(requested):
+            raise ValueError('covered contact pairs must be requested')
+        counts = dict(self.pair_counts)
+        expected_count_keys = {f'{left}/{right}' for left, right in covered}
+        if set(counts) != expected_count_keys:
+            raise ValueError('contact counts must exactly cover the published pair set')
+        if any(type(value) is not int or value < 0 for value in counts.values()):
+            raise ValueError('contact counts must be nonnegative integers')
+        groups = {entity: tuple(names) for entity, names in dict(self.geom_groups).items()}
+        if any(type(entity) is not str or not entity.strip() or not names
+               or any(type(name) is not str or not name.strip() for name in names)
+               or len(set(names)) != len(names) for entity, names in groups.items()):
+            raise ValueError('contact geom groups must contain unique nonempty source names')
+        if self.status == 'available' and covered != requested:
+            raise ValueError('available ContactSummaryV2 must cover every requested pair')
+        if self.status == 'unavailable' and counts:
+            raise ValueError('unavailable ContactSummaryV2 cannot carry contact counts')
+        object.__setattr__(self, 'simulation_time_s', float(self.simulation_time_s))
+        object.__setattr__(self, 'requested_pairs', requested)
+        object.__setattr__(self, 'covered_pairs', covered)
+        object.__setattr__(self, 'pair_counts', MappingProxyType(counts))
+        object.__setattr__(self, 'geom_groups', MappingProxyType(groups))
+
+    def pair_has_contact(self, left: str, right: str, *, control_step: int,
+                         state_revision: int, simulation_time_s: float) -> bool:
+        if (self.status != 'available' or (left, right) not in self.covered_pairs
+                or (left, right) not in self.requested_pairs):
+            raise StageUnavailableError('contact pair query is unavailable or uncovered')
+        if (self.control_step, self.state_revision, self.simulation_time_s) != (
+            control_step, state_revision, float(simulation_time_s),
+        ):
+            raise ValueError('contact summary belongs to a stale state boundary')
+        return self.pair_counts[f'{left}/{right}'] > 0
+
+    @classmethod
+    def unavailable(cls, *, source_id, source_closure_digest, provider_materialization_id,
+                   episode_id, reset_sample_id, control_step, state_revision,
+                   simulation_time_s, requested_pairs, reason):
+        return cls(
+            source_id, source_closure_digest, provider_materialization_id,
+            episode_id, reset_sample_id, control_step, state_revision,
+            simulation_time_s, tuple(requested_pairs), (), {}, {},
+            status='unavailable', reason=reason,
         )
 
 

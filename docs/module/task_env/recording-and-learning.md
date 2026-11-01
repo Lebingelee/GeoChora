@@ -94,3 +94,20 @@ render.single/camera historical CLIs 明确退休，替代的 Pendulum examples 
 
 有界示例与资源选项只维护在[examples README](../../../examples/README.md)；
 任务/Experiment/Evidence/Judge 操作复用[已有 Skill](../../../task_env/.agents/skills/task-env-experiment-evidence/SKILL.md)。
+
+## R07c D01 same-route H5 evidence (2026-10-30)
+
+The fixed LIBERO diagnostic candidate records through the existing Generic H5
+v3 `TransitionRecorder` and selected environment lifecycle. Attempt002 run004
+closed one H5 for each of source rows 0, 1, and 2. Each episode preserves 64
+transitions and 65 observations, typed requested/target/applied controls,
+reset/source identity, state and evaluation clocks, contact evidence, and an
+explicit episode outcome. The independent provider-free reader verified all
+three files (192 transitions, 195 observations), physical-monitor identity and
+coverage, worker/result digest, and parent exit/lock receipts. Five copied
+actual-run bundles were rejected for digest tampering, an interior measured
+limit excursion, warning count, missing warning counters, or compiled-model
+identity mismatch. The result is pending Sol review in the
+[R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+Synthetic S1 H5s prove wiring and rejection behavior only; even this bounded
+native H5 evidence does not establish task success, replay, or Qualification.

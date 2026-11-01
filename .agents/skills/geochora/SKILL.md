@@ -127,8 +127,7 @@ For a maintainer-authorized goal covering multiple substages, follow the
 [goal orchestration procedure](references/goal-orchestration.md): locate each
 substage's implementation details in its planning document, aim for research
 and implementation in attempt 1 and review/acceptance in attempt 2, and cap
-ordinary substage work at three execution windows. Each window may contain multiple
-repair and validation runs; count those runs separately from attempts. Before attempt 3, reassess the actual blockers,
+ordinary substage work at three execution windows. Each window may contain multiple; each ordinary substage follows the three-window cap.repair and validation runs; count those runs separately from attempts. Before attempt 3, reassess the actual blockers,
 research relevant open-source implementations and decide whether the original
 acceptance remains achievable. Track Luna through periodic read-only checks;
 prepare future work privately during report cleanup, then independently verify

@@ -54,3 +54,23 @@
 ### DG01接收后的当时派包点（2026-10-30；历史快照）
 
 DG01已由Sol独立接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`，含实际obs reader修复后的原H5冷读22类negative。该时点仅可转述`sol_f05_dg02_001/luna_goal_prompt.md`及其snapshot/manifest完整包；旧goal_02_baseline不可直接执行。DG02实施保真USD、GeoPhys既有约束/tendon/actuator消费者与9DOF/8actuator的精确Core路线，允许有界N0/N1先于完整生产readiness；N2仍须production/S1/plan冻结。完整scope/预算/保护及Sol决定见[13第8节](13_F05_Early_Diagnostic_Three_Goals.md)。当时Sol准备阶段未启动DG02 Goal/native，DG03等待DG02完成并复核；此状态后来由后续DG02与DG03记录取代。
+
+> Historical snapshot. The original bytes are preserved in the phase archive; current scope and disposition are in [the execution/acceptance matrix](07_Execution_Order_and_Acceptance.md) and [the current phase guide](README.md).
+
+[Open the exact archived original](<../../../../archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md>)
+
+## 先读当前入口
+
+Historical detail: [archived original](<../../../../archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md>). Use [07 acceptance](07_Execution_Order_and_Acceptance.md) for current status.
+
+## 本轮确定的规划方向
+
+Historical detail: [archived original](<../../../../archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md>). Use [07 acceptance](07_Execution_Order_and_Acceptance.md) for current status.
+
+## 生成实际工作包之前
+
+Historical detail: [archived original](<../../../../archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md>). Use [07 acceptance](07_Execution_Order_and_Acceptance.md) for current status.
+
+## 文档同步与历史
+
+Historical detail: [archived original](<../../../../archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md>). Use [07 acceptance](07_Execution_Order_and_Acceptance.md) for current status.

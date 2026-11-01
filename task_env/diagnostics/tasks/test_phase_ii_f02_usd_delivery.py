@@ -288,7 +288,7 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
 
     builds = {
         "isaacsim": "isaacsim-6.2.0.0",
-        "geophys": "geophys-a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+        "geophys": "geophys-67da1165149486d3ae3e779c13ce31af49e17d50",
         "mujoco": "mujoco-3.8.1-libsha256-8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592",
     }
     choices = {name: resolve_provider_representation(loaded, provider=name, provider_build_identity=build).to_mapping()

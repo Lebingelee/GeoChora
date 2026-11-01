@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from numbers import Integral, Real
+
 import numpy as np
 
 from ..environment import (
@@ -14,6 +17,7 @@ from ..environment import (
     RuntimeBoundary,
     RuntimeSnapshot,
     SnapshotRequest,
+    StageUnavailableError,
 )
 
 
@@ -55,6 +59,11 @@ class GeoPhysRuntimeBoundary:
         self._ctrl_range = np.asarray(ctrl_range, dtype=np.float32).copy()
         self._actuator_force_limit_overrides: dict[int, float] = {}
         self._simulation_time = 0.0
+        (self._static_world_child_body_ids,
+         self._baseline_static_world_child_positions,
+         self._baseline_static_world_child_orientations) = (
+            self._physics.read_static_world_child_body_poses()
+        )
         self._baseline = {
             name: np.asarray(value).copy()
             for name, value in self._physics.snapshot().items()
@@ -75,9 +84,32 @@ class GeoPhysRuntimeBoundary:
         state: EpisodePhysicsState,
         *,
         refresh_actuator_force: bool = False,
+        static_world_child_poses: Mapping[int, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> ActuatorForceMeasurementV1 | None:
         self._physics.restore(self._baseline)
         self._apply_actuator_force_limit_overrides()
+        if self._static_world_child_body_ids.size:
+            self._physics.write_static_world_child_body_poses(
+                self._static_world_child_body_ids,
+                self._baseline_static_world_child_positions,
+                self._baseline_static_world_child_orientations,
+            )
+        if static_world_child_poses:
+            if not isinstance(static_world_child_poses, Mapping):
+                raise TypeError("static world-child reset poses must be a mapping")
+            ids = tuple(static_world_child_poses)
+            if any(isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral)
+                   for value in ids):
+                raise TypeError("static world-child reset pose keys must be integer body ids")
+            positions = []
+            orientations = []
+            for body_id in ids:
+                pose_value = static_world_child_poses[body_id]
+                if not isinstance(pose_value, (tuple, list)) or len(pose_value) != 2:
+                    raise TypeError("static world-child reset pose must be (position, orientation)")
+                positions.append(pose_value[0])
+                orientations.append(pose_value[1])
+            self._physics.write_static_world_child_body_poses(ids, positions, orientations)
         if state.qpos.size:
             self._physics.write_qpos(state.qpos)
         if state.qvel.size:
@@ -121,34 +153,70 @@ class GeoPhysRuntimeBoundary:
         the boundary reapplies selected caps after every reset.
         """
 
+        if isinstance(limit_N, (bool, np.bool_)) or not isinstance(limit_N, Real):
+            raise TypeError('actuator force limit must be a real numeric scalar')
         limit = float(limit_N)
         if not np.isfinite(limit) or limit < 0.0:
             raise ValueError("actuator force limit must be finite and non-negative")
-        ids = np.asarray(actuator_ids, dtype=np.int32).reshape(-1)
+        if isinstance(actuator_ids, (str, bytes)):
+            raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
+        if isinstance(actuator_ids, np.ndarray):
+            if actuator_ids.ndim != 1 or actuator_ids.dtype.kind not in {'i', 'u'}:
+                raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
+            raw_values = tuple(actuator_ids.tolist())
+        else:
+            try:
+                raw_values = tuple(actuator_ids)
+            except TypeError as error:
+                raise TypeError(
+                    'actuator force-limit ids must be a one-dimensional integer sequence'
+                ) from error
+            if any(isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral)
+                   for value in raw_values):
+                raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
+        if not raw_values:
+            return
+        ids_as_python_ints = tuple(int(value) for value in raw_values)
+        if len(set(ids_as_python_ints)) != len(ids_as_python_ints):
+            raise ValueError('actuator force-limit ids must be unique')
         actuator_count = int(getattr(self._physics, "n_actuators", 0))
-        if ids.size and (int(ids.min()) < 0 or int(ids.max()) >= actuator_count):
+        int32 = np.iinfo(np.int32)
+        if any(value < 0 or value >= actuator_count or value > int32.max
+               for value in ids_as_python_ints):
             raise ValueError("actuator force-limit ids exceed the compiled actuator range")
+        # Only narrow after the original integer values have passed all range
+        # and uniqueness checks.  In particular, 2**32 must never alias slot 0.
+        ids = np.asarray(ids_as_python_ints, dtype=np.int32)
+        effective_limit = float(np.float32(limit))
+        if not np.isfinite(effective_limit):
+            raise ValueError('actuator force limit is not representable as float32')
+        if ids.size == 0:
+            return
+        if all(self._actuator_force_limit_overrides.get(int(i)) == effective_limit for i in ids):
+            return
+        previous = dict(self._actuator_force_limit_overrides)
         for actuator_id in ids:
-            self._actuator_force_limit_overrides[int(actuator_id)] = limit
-        self._apply_actuator_force_limit_overrides()
+            self._actuator_force_limit_overrides[int(actuator_id)] = effective_limit
+        try:
+            self._apply_actuator_force_limit_overrides()
+        except BaseException:
+            self._actuator_force_limit_overrides = previous
+            raise
 
     def _apply_actuator_force_limit_overrides(self) -> None:
         if not self._actuator_force_limit_overrides:
             return
-        if not hasattr(self._physics, "act_forcerange_field"):
-            raise StageUnavailableError("runtime physics has no actuator force-limit field")
-        ranges = np.asarray(self._physics.act_forcerange_field.to_numpy(), dtype=np.float32)
-        limited = np.asarray(self._physics.act_forcelimited_field.to_numpy(), dtype=np.int32)
-        for actuator_id, limit in self._actuator_force_limit_overrides.items():
-            ranges[actuator_id] = (-limit, limit)
-            limited[actuator_id] = 1
-        self._physics.act_forcerange_field.from_numpy(ranges)
-        self._physics.act_forcelimited_field.from_numpy(limited)
-        if self._force_observation_reader is not None:
-            self._force_observation_reader.invalidate_actuator_force_sample(
-                "actuator force-limit configuration changed",
-                configuration_changed=True,
+        writer = getattr(self._physics, "set_actuator_force_limits", None)
+        if not callable(writer):
+            raise StageUnavailableError(
+                "runtime physics has no public actuator force-limit setter"
             )
+        ids = np.asarray(sorted(self._actuator_force_limit_overrides), dtype=np.int32)
+        limits = np.asarray(
+            [self._actuator_force_limit_overrides[int(i)] for i in ids],
+            dtype=np.float32,
+        )
+        writer(ids, -limits, limits)
 
     def apply_control(self, command: ControlCommand) -> AppliedControl:
         requested = np.asarray(command.actuator_ctrl, dtype=np.float32)
@@ -209,6 +277,20 @@ class GeoPhysRuntimeBoundary:
         if request.site_jacobians and n_sites:
             site_jacp = self._physics.read_site_jacp()
             site_jacr = self._physics.read_site_jacr()
+        contact_summary = None
+        if request.contact_summary:
+            contact_reader = getattr(self._physics, "read_contact_summary", None)
+            if callable(contact_reader):
+                contact_summary = contact_reader()
+                from ..environment.types import ContactSummaryV2
+                if not isinstance(contact_summary, (ContactSummary, ContactSummaryV2)):
+                    raise TypeError(
+                        "public read_contact_summary() must return a versioned ContactSummary"
+                    )
+            else:
+                contact_summary = ContactSummary.unavailable(
+                    "provider_contact_pair_query_not_implemented"
+                )
         return RuntimeSnapshot(
             qpos=(
                 (
@@ -279,7 +361,7 @@ class GeoPhysRuntimeBoundary:
             ),
             site_jacp=site_jacp,
             site_jacr=site_jacr,
-            contact_summary=ContactSummary() if request.contact_summary else None,
+            contact_summary=contact_summary,
             simulation_time=(
                 self._simulation_time if request.simulation_time else None
             ),

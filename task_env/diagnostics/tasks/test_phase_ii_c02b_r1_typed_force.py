@@ -239,7 +239,7 @@ def test_c02b_r1_force_admission_is_exact_for_geophys_and_mujoco_builds(tmp_path
         claim for claim in geophys_manifest.capabilities if claim.name == "actuator_force_query"
     ]
     assert len(geophys_force_claims) == 1 and geophys_force_claims[0].status == "tested"
-    assert "geophys=git:a53a8cfed7c9d6464274b5c96fca601271dc4ee4" in geophys_force_claims[0].evidence_reference
+    assert "geophys=git:67da1165149486d3ae3e779c13ce31af49e17d50" in geophys_force_claims[0].evidence_reference
     assert f"plan={candidate.plan.identity_hash}" in geophys_force_claims[0].evidence_reference
 
     mujoco_execution = ExecutionSpec("mujoco", "p1_2_scalar_cpu_v0", "none", "cpu", 0, "strict")
@@ -447,7 +447,7 @@ def test_c02b_r1_geophys_cpu_plan_bound_publication_and_control_interval(tmp_pat
         assert session.snapshot().simulation_time == pytest.approx(0.01)
         assert candidate.controller.memory().to_mapping() == memory_before_reapply
         provider_build = control_sessions.provider_build_identity("geophys")
-        assert provider_build["repository_revision"] == "a53a8cfed7c9d6464274b5c96fca601271dc4ee4"
+        assert provider_build["repository_revision"] == "67da1165149486d3ae3e779c13ce31af49e17d50"
         assert provider_build["dirty_build_sha256"] is None
         evidence = {
             "schema": "c02b-r1-typed-force-probe-v1",

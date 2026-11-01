@@ -22,7 +22,7 @@ from ..artifacts.state import (
     StateBoundaryIdentity,
     StateSampleClock,
 )
-from .types import AppliedControl, RuntimeSnapshot, TaskEvaluation
+from .types import AppliedControl, ContactSummary, RuntimeSnapshot, TaskEvaluation
 
 
 @runtime_checkable
@@ -43,6 +43,7 @@ class TaskStateView(Protocol):
     body_xquat: np.ndarray | None
     site_xpos: np.ndarray | None
     site_xquat: np.ndarray | None
+    contact_summary: ContactSummary | None
 
     @property
     def batch_size(self) -> int:
@@ -481,6 +482,10 @@ class ScalarTaskStateView:
         return self._snapshot.site_xquat
 
     @property
+    def contact_summary(self) -> ContactSummary | None:
+        return self._snapshot.contact_summary
+
+    @property
     def batch_size(self) -> int:
         return 1
 
@@ -547,6 +552,12 @@ class BatchTaskStateView:
     @property
     def site_xquat(self) -> np.ndarray | None:
         return self._arrays.get("site_xquat")
+
+    @property
+    def contact_summary(self) -> ContactSummary | None:
+        # Homogeneous vector state currently stores numeric arrays only. A
+        # vector contact publisher must add a typed per-row contract first.
+        return None
 
     @property
     def batch_size(self) -> int:
