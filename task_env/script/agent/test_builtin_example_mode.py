@@ -120,3 +120,16 @@ def test_compiler_does_not_claim_isaac_before_exact_core_route_exists():
          patch.object(subprocess, 'check_output', return_value=''):
         with pytest.raises(ValueError, match='not yet admitted'):
             harness_compiler.compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+
+
+def test_worker_accepts_supervisor_created_output_dir_but_rejects_other_data(tmp_path):
+    from builtin_example_worker import _prepare_output_directory
+
+    output = tmp_path / 'seed_31'
+    output.mkdir()
+    (output / 'worker.stdout.log').touch()
+    (output / 'worker.stderr.log').touch()
+    assert _prepare_output_directory(output) == output.resolve()
+    (output / 'episode.h5').touch()
+    with pytest.raises(FileExistsError, match='already contains data'):
+        _prepare_output_directory(output)

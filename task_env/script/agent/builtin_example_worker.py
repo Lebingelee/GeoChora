@@ -42,12 +42,24 @@ def _numeric_check(trajectory):
     return {name: list(value.shape) for name, value in arrays(trajectory).items()}
 
 
+def _prepare_output_directory(output: Path):
+    output = output.resolve()
+    if output.exists():
+        unexpected = {path.name for path in output.iterdir()} - {
+            'worker.stdout.log', 'worker.stderr.log',
+        }
+        if unexpected:
+            raise FileExistsError(f'worker output directory already contains data: {sorted(unexpected)}')
+    else:
+        output.mkdir(parents=True, exist_ok=False)
+    return output
+
+
 def run_one(spec, catalog, scope, *, seed: int, output: Path):
     from examples._common import run_expert
     from task_env.trajectory.canonical.h5 import load as load_canonical
 
-    output = output.resolve()
-    output.mkdir(parents=True, exist_ok=False)
+    output = _prepare_output_directory(output)
     started = time.perf_counter()
     row = {
         'schema_version': 'harness-builtin-pickcube-example-run-v1',
