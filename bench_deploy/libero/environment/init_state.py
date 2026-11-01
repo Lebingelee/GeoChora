@@ -18,7 +18,12 @@ from typing import Any
 import xml.etree.ElementTree as ET
 import zipfile
 
-from .task_contracts import TASK_1, task_source_contract_v1
+from bench_deploy.libero.artifacts.contracts import TASK_1, task_source_contract_v1
+from bench_deploy.libero.objects.layout import (
+    PILOT_FIXTURES, PILOT_FIXTURE_Z_OFFSET_M, PILOT_MOVABLES,
+    PILOT_MOVABLE_OBJECT_CLASSES, PILOT_MOVABLE_Z_OFFSET_M,
+    PILOT_TABLE_TOP_Z_M,
+)
 
 
 INIT_SHA256 = "cbbc73792ce546c9bec181fd328a411d3183074840b282671dee481511381d0a"
@@ -31,33 +36,9 @@ PILOT_BDDL_SHA256 = "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660
 PILOT_RESET_SAMPLER_ID = "libero-bddl-normal-placement-v1"
 PILOT_RESET_SAMPLER_VERSION = "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v2"
 PILOT_PANDA_ARM_RESET_NOISE_DRAWS = 7
-PILOT_TABLE_TOP_Z_M = 0.90
-PILOT_MOVABLE_Z_OFFSET_M = 0.01
-PILOT_TABLE_FULL_THICKNESS_M = 0.05
-PILOT_FIXTURE_Z_OFFSET_M = PILOT_MOVABLE_Z_OFFSET_M - PILOT_TABLE_FULL_THICKNESS_M
 PILOT_INIT_ORDER = (
     "sample_object_properties", "mj_step1", "sample_fixtures_and_objects",
     "restore_selected_init_row", "mj_forward",
-)
-PILOT_MOVABLES = (
-    ("akita_black_bowl_1", "between_plate_ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/akita_black_bowl/akita_black_bowl.xml"),
-    ("akita_black_bowl_2", "next_to_ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/akita_black_bowl/akita_black_bowl.xml"),
-    ("plate_1", "plate_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/plate/plate.xml"),
-    ("cookies_1", "box_region", "upstream/libero/libero/libero/assets/stable_hope_objects/cookies/cookies.xml"),
-    ("glazed_rim_porcelain_ramekin_1", "ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/glazed_rim_porcelain_ramekin/glazed_rim_porcelain_ramekin.xml"),
-)
-PILOT_MOVABLE_OBJECT_CLASSES = {
-    "akita_black_bowl_1": "libero.libero.envs.objects.google_scanned_objects.AkitaBlackBowl",
-    "akita_black_bowl_2": "libero.libero.envs.objects.google_scanned_objects.AkitaBlackBowl",
-    "plate_1": "libero.libero.envs.objects.google_scanned_objects.Plate",
-    "cookies_1": "libero.libero.envs.objects.hope_objects.Cookies",
-    "glazed_rim_porcelain_ramekin_1": (
-        "libero.libero.envs.objects.google_scanned_objects.GlazedRimPorcelainRamekin"
-    ),
-}
-PILOT_FIXTURES = (
-    ("wooden_cabinet_1", "cabinet_region", "upstream/libero/libero/libero/assets/articulated_objects/wooden_cabinet.xml"),
-    ("flat_stove_1", "stove_region", "upstream/libero/libero/libero/assets/articulated_objects/flat_stove.xml"),
 )
 _MEMBERS = {"archive/data.pkl", "archive/version"}
 _GLOBAL_SYMBOLS = {
@@ -289,7 +270,7 @@ def _find_form(tree, head: str):
 
 
 def _task_regions_and_initial_state(install_root: Path, source_manifest: dict):
-    manifest_path = Path(__file__).resolve().parents[2] / "asset/benchmarks/libero/source_manifest.json"
+    manifest_path = Path(__file__).resolve().parents[3] / "asset/benchmarks/libero/source_manifest.json"
     manifest_bytes = manifest_path.read_bytes()
     if hashlib.sha256(manifest_bytes).hexdigest() != PILOT_SOURCE_MANIFEST_SHA256:
         raise ValueError("LIBERO source manifest differs from the frozen pilot identity")

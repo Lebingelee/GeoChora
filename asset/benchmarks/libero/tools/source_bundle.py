@@ -1278,7 +1278,7 @@ def compile_recipe(manifest_path: Path, target: Path, task_input_path: Path) -> 
     repository_root = Path(__file__).resolve().parents[4]
     if str(repository_root) not in sys.path:
         sys.path.insert(0, str(repository_root))
-    from bench_deploy.libero.recipe import compose_recipe
+    from bench_deploy.libero.artifacts.recipe import compose_recipe
     binding = {
         "source_manifest_id": manifest["manifest_id"],
         "source_manifest_sha256": independent["manifest_sha256"],
@@ -1350,7 +1350,8 @@ def main(argv: list[str] | None = None) -> int:
                 "recipe_id": result["recipe_id"],
                 "recipe_sha256": result["recipe_sha256"],
                 "task_uid": result["task"]["uid"],
-                "core_native_admission_ready": result["admission"]["core_native_admission_ready"],
+                "accepted_scope_status": result["accepted_scope"]["status"],
+                "qualification": result["accepted_scope"]["qualification"],
                 "output": str(Path(args.output)),
             }, sort_keys=True))
             return 0

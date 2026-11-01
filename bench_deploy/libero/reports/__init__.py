@@ -1,0 +1,1 @@
+"""LIBERO reports responsibilities."""

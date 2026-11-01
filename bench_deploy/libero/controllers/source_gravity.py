@@ -12,7 +12,7 @@ import numpy as np
 
 from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
 
-from .task_contracts import TASK_1, TASK_2, TASK_3
+from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
 
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
@@ -163,7 +163,7 @@ class MujocoSourceGravityBiasV1:
             ).encode("utf-8")
             if canonical_profile != model_profile_bytes:
                 raise ValueError("model profile receipt is not canonically serialized")
-            from .model_profile import (
+            from bench_deploy.libero.assembly.model_profile import (
                 ROBOT_MODEL_PROFILE_V3_ID,
                 normalize_libero_robosuite_model_xml_v2,
                 normalize_libero_robosuite_model_xml_v3,

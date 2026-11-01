@@ -32,22 +32,20 @@ from task_env.runtime.sessions.source import (
 from task_env.environment.types import ReferenceSpec, TaskEvaluation
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
-from .controller import (
-    LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
-    LiberoMixedControllerV4, LiberoMixedControllerV6,
-    LiberoMixedControllerV7,
+from bench_deploy.libero.controllers.osc import (
+    LiberoMixedControllerV1, LiberoMixedControllerV6, LiberoMixedControllerV7,
 )
-from .evaluation import (
+from bench_deploy.libero.tasks.predicates import (
     LiberoPredicateBoundaryV1, OpenMiddleDrawerEvidenceV1,
     PILOT_TASK_UID, evaluate_on_bowl_plate_v1, evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1, observe_selected_reference_v1,
 )
-from .init_state import (
+from bench_deploy.libero.environment.init_state import (
     INIT_SHA256, PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
     init_layout_v1, sample_libero_normal_reset_v1,
 )
-from .task_contracts import TASK_1, TASK_2, TASK_3, task_source_contract_v1
-from .model_profile import (
+from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3, task_source_contract_v1
+from bench_deploy.libero.assembly.model_profile import (
     normalize_libero_robosuite_model_xml_v2,
     normalize_libero_robosuite_model_xml_v3,
     validate_libero_official_source_plan_v1,
@@ -210,7 +208,7 @@ def _compiled_physics_fingerprint_diff_v1(actual, expected):
 
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
-SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[2] / 'asset/benchmarks/libero/source_manifest.json'
+SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[3] / 'asset/benchmarks/libero/source_manifest.json'
 DEFAULT_OUTPUT_ROOT = Path(
     '/home/lly/Program_Files/Geochora/workspace/maintenance/'
     'phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001'
@@ -360,12 +358,8 @@ def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TA
 def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
               provider: str = 'mujoco', task_uid: str = TASK_1,
               upstream_pose_replay: bool = False) -> TaskArtifact:
-    solution_v6 = solution_profile == 'v6'
-    solution_v7 = solution_profile == 'v7'
     solution_v8 = solution_profile == 'v8'
-    solution_profile_name = (
-        'v8' if solution_v8 else 'v7' if solution_v7 else 'v6' if solution_v6 else 'v4'
-    )
+    solution_profile_name = 'v8' if solution_v8 else 'v4'
     solution_profile = bool(solution_profile)
     pose_action_profile = bool(solution_profile or upstream_pose_replay)
     contract = task_source_contract_v1(task_uid)
@@ -476,10 +470,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         panda_gripper_delta_replay_profile_id: str | None = None,
                         official_nullspace_reference_joint_position_rad=None,
                         official_compiled_mujoco_profile_v1=None):
-    solution_v6 = solution_profile == 'v6'
-    solution_v7 = solution_profile == 'v7'
     solution_v8 = solution_profile == 'v8'
-    solution_rim_profile = solution_v6 or solution_v7 or solution_v8
+    solution_rim_profile = solution_v8
     solution_profile = bool(solution_profile)
     pose_action_profile = bool(solution_profile or upstream_pose_replay)
     contract = task_source_contract_v1(task_uid)
@@ -576,10 +568,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         ).encode('utf-8')
         source_manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
     artifact = _artifact(
-        init_bytes, solution_profile=(
-            'v8' if solution_v8 else 'v7' if solution_v7 else
-            'v6' if solution_v6 else solution_profile
-        ),
+        init_bytes, solution_profile='v8' if solution_v8 else solution_profile,
         provider=provider,
         task_uid=task_uid,
         upstream_pose_replay=upstream_pose_replay,
@@ -818,30 +807,12 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
     if solution_profile:
-        if solution_v8:
-            from .solution import solution_identity_v8
-            solution_identity = solution_identity_v8(
-                runtime_model_xml_sha, source_receipt.source_closure_digest,
-                arm_resolver_identity=arm_resolver_identity,
-            )
-        elif solution_v7:
-            from .solution import solution_identity_v7
-            solution_identity = solution_identity_v7(
-                runtime_model_xml_sha, source_receipt.source_closure_digest,
-                arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
-            )
-        elif solution_v6:
-            from .solution import solution_identity_v6
-            solution_identity = solution_identity_v6(
-                runtime_model_xml_sha, source_receipt.source_closure_digest,
-                arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
-            )
-        else:
-            from .solution import solution_identity_v5
-            solution_identity = solution_identity_v5(
-                runtime_model_xml_sha, source_receipt.source_closure_digest,
-                arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
-            )
+        from bench_deploy.libero.tasks.solution import solution_identity_v8
+
+        solution_identity = solution_identity_v8(
+            runtime_model_xml_sha, source_receipt.source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+        )
     reference_solution_identity = solution_identity
     if panda_gripper_delta_replay:
         # This opt-in profile replays frozen upstream actions directly; it is
@@ -925,8 +896,8 @@ def build_libero_selected_candidate(
     solution wrapper below selects the separately versioned full Solution
     profile and its bounded horizon.
     """
-    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v6', 'v7', 'v8'):
-        raise TypeError('internal LIBERO Solution profile selector must be bool or v6, v7, v8')
+    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v8'):
+        raise TypeError('internal LIBERO Solution profile selector must be bool or final v8')
     contract = task_source_contract_v1(task_uid)
     if type(_upstream_pose_replay) is not bool:
         raise TypeError('upstream pose replay selector must be bool')
@@ -1113,7 +1084,7 @@ def build_libero_selected_candidate(
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache[provider])
         value['controller'] = _make_candidate_controller(
-            solution_rim_profile=_solution_profile in ('v6', 'v7', 'v8'),
+            solution_rim_profile=_solution_profile == 'v8',
             solution_profile=bool(_solution_profile),
             upstream_pose_replay=_upstream_pose_replay,
             task_uid=task_uid,
@@ -1982,24 +1953,11 @@ def build_libero_selected_candidate(
         }
 
     def validate_external_solution(value, solution):
-        from .solution import (
-            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6,
-            LiberoPickPlaceSolutionV7, LiberoPickPlaceSolutionV8,
-            solution_identity_v5, solution_identity_v6, solution_identity_v7,
-            solution_identity_v8,
+        from bench_deploy.libero.tasks.solution import (
+            LiberoPickPlaceSolutionV8, solution_identity_v8,
         )
-
-        expected_type, expected_identity = (
-            (LiberoPickPlaceSolutionV8, solution_identity_v8)
-            if _solution_profile == 'v8' else
-            (LiberoPickPlaceSolutionV7, solution_identity_v7)
-            if _solution_profile == 'v7' else
-            (LiberoPickPlaceSolutionV6, solution_identity_v6)
-            if _solution_profile == 'v6' else
-            (LiberoPickPlaceSolutionV5, solution_identity_v5)
-        )
-        if not isinstance(solution, expected_type):
-            raise TypeError(f'LIBERO task #1 external lifecycle requires {expected_type.__name__}')
+        if not isinstance(solution, LiberoPickPlaceSolutionV8):
+            raise TypeError('LIBERO task #1 external lifecycle requires the final V8 Solution')
         expected_source = value['source_sha256']['runtime_model_xml']
         expected_closure = value['source_sha256']['source_closure_digest']
         expected_resolver_identity = value['arm_resolver_identity']
@@ -2009,7 +1967,7 @@ def build_libero_selected_candidate(
                 or solution.identity != value.get('solution_identity')
                 or solution.arm_resolver_identity
                    != expected_resolver_identity
-                or solution.identity != expected_identity(
+                or solution.identity != solution_identity_v8(
                     expected_source, expected_closure,
                     arm_resolver_identity=expected_resolver_identity,
                 )):
@@ -2073,39 +2031,22 @@ def build_libero_solution_candidate(
     init_path: Path | None = None,
     horizon: int = 1000,
     provider: str = 'mujoco',
-    solution_version: str = 'v5',
     gripper_action_profile: str | None = None,
-    official_controller_initial_joint_reference_rad=None,
-    official_compiled_mujoco_profile_v1=None,
 ):
-    """Construct the versioned task #1 Solution through existing Core owners."""
+    """Construct the latest optional demonstration-derived task #1 Solution."""
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
-    if solution_version not in {'v5', 'v6', 'v7', 'v8'}:
-        raise ValueError('LIBERO task Solution version must be v5, v6, v7 or v8')
     if gripper_action_profile is not None and not _is_panda_gripper_delta_profile(
         gripper_action_profile,
     ):
         raise ValueError('unsupported LIBERO task gripper action profile')
-    if (official_controller_initial_joint_reference_rad is not None
-            and (not _is_panda_gripper_delta_profile(gripper_action_profile)
-                 or solution_version != 'v5')):
-        raise ValueError('official robosuite nullspace reference is available only for the V5 PandaGripper replay profile')
-    if (official_compiled_mujoco_profile_v1 is not None
-            and (not _is_panda_gripper_delta_profile(gripper_action_profile)
-                 or solution_version != 'v5')):
-        raise ValueError('official compiled MuJoCo profile is available only for the V5 PandaGripper replay profile')
     return build_libero_selected_candidate(
         xml_path=xml_path, xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
         composition_plan_path=composition_plan_path, install_root=install_root,
         init_path=init_path, horizon=horizon, provider=provider,
-        _solution_profile=solution_version if solution_version in {'v6', 'v7', 'v8'} else True,
+        _solution_profile='v8',
         _panda_gripper_delta_replay=_is_panda_gripper_delta_profile(gripper_action_profile),
         _panda_gripper_delta_profile_id=gripper_action_profile,
-        _official_nullspace_reference_joint_position_rad=(
-            official_controller_initial_joint_reference_rad
-        ),
-        _official_compiled_mujoco_profile_v1=official_compiled_mujoco_profile_v1,
     )
 
 

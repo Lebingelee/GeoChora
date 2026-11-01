@@ -1,125 +1,110 @@
-# LIBERO deployment recipe and current scope
+# LIBERO benchmark deployment
 
-## Current A-stage scope override (2026-11-01)
+This package owns LIBERO source bindings, reset and object semantics, task
+controllers, optional task policy, and benchmark evidence checks. Runtime,
+Recorder, and generic lifecycle behavior remain owned by `task_env/`.
 
-The current package covers tasks 1/2/3 on MuJoCo and GeoPhys for bounded A-stage environment and upstream-control-flow replication. Task2/3 each completed their frozen upstream sequences on both providers after restoring the reference OSC profile and exact 0/80 mm PandaGripper v1 semantics; the task3 MuJoCo physical monitor allowance is 500 μm for this replay only. Task1's accepted evidence and contact-difference boundary remain reused and closed. The maintainer accepted task2 GeoPhys's pre-target-contact TCP difference (33.143 mm P95 / 37.916 mm max; orientation 229.074 / 259.412 mrad before first finger-to-cabinet contact) as a scoped exception for this frozen A-stage source/controller/action sequence. This does not establish general provider parity; Sol has accepted the bounded A123 technical intersection; file-specific license/attribution remains unresolved. See the [A123 rework report](../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md).
+## Current accepted boundary
 
-The source checkout, per-file paths and hashes for task2/3 wine_bottle and wine_rack assets are verified. Their specific license/attribution record remains unresolved; the root LIBERO manifest does not establish those terms. High-precision tracking and autonomous Solution success are optional follow-up; Isaac Sim and B/C are deferred. The older three-provider/Solution target in the next paragraph is a historical plan superseded for this bounded A-stage closeout.
+`ACCEPTED_BOUNDED_R07_A123_TECHNICAL` covers the frozen A-stage environment and
+upstream-control-flow evidence for tasks 1–3 on MuJoCo and GeoPhys CPU. The
+accepted A replay uses the final V6 OSC profile and PandaGripper v1 mapping;
+V7 rim control and V8 Solution remain opt-in. Task 2 GeoPhys has one accepted
+exception for this frozen replay: before its first finger-to-cabinet contact
+(action 82), its TCP differs from upstream by 33.143/37.916 mm position and
+229.074/259.412 mrad orientation (P95/maximum). This exception does not establish
+general provider parity. Task success and new Qualification are not
+established. File-specific license and attribution for the `wine_bottle` and
+`wine_rack` model files remain unresolved. High-precision tracking and
+autonomous Solution success remain optional; tasks B/C and Isaac Sim are
+deferred.
 
-Historical 2026-10-30 plan: [R07 three-task scope, completion gates and Harness integration](../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030). At that time the planned gate required all three tasks on MuJoCo, GeoPhys and Isaac Sim plus Solution success. It is superseded for the current bounded A-stage closeout only; its historical meaning and the independent R00–R07/P99/release boundaries are preserved. Original tasks #4/#5 remain optional supplements.
+The CLI's default `--run-worker` path is the bounded D01 joint-space diagnostic;
+it is not the accepted A replay route, and the CLI does not regenerate the
+frozen A action sequence. The A replay evidence remains in its acceptance
+record. The CLI's `--task-solution` path selects the optional V8 policy.
 
-This is benchmark-specific deployment metadata, not a Core `TaskArtifact` or
-task registration. Its modules compose the actual task, robot, controller,
-planner, observation, assembly, and evaluation sections. The fixed input binds
-the source manifest, BDDL and opaque selected init identity to the reviewed
-source pins.
+## Current route
 
-After installing and independently verifying the source bundle, compile the
-recipe with:
+1. `asset/benchmarks/libero/tools/source_bundle.py` verifies the pinned source
+   and writes the bounded task recipe.
+2. `environment.selected_reference.build_libero_selected_candidate()` composes the
+   TaskEnv `SelectedReferenceEnv` route and binds LIBERO source/reset semantics.
+3. `script/cli.py` runs the bounded worker or reads a closed result bundle.
+4. `trajectory/reader.py` validates task-specific result semantics on top of
+   the existing TaskEnv record/readback owners.
+
+No parallel Runtime or Recorder is maintained here. LIBERO asset names,
+source hashes, reset sampling, contact policy, and task thresholds remain
+task-owned.
+
+## Active versions and recovery
+
+The D01 CLI route uses `LiberoMixedControllerV1`; the accepted A reference
+profile is `LiberoMixedControllerV6`, and optional rim control is V7. The only
+active Solution class is optional `LiberoPickPlaceSolutionV8`; V5–V7 identity
+payload builders remain as internal dependencies because V8 binds their frozen
+parent hashes.
+`trajectory/reader.py` accepts the current D01 result schema and optional V8
+Solution schema. It does not dispatch historical worker or Solution versions.
+
+Retired implementations are recoverable from input HEAD
+`65891af449918e7162c78dec7c01a3bc0b7eecd0`; for example:
 
 ```sh
-python asset/benchmarks/libero/tools/source_bundle.py recipe \
+git show 65891af449918e7162c78dec7c01a3bc0b7eecd0:bench_deploy/libero/solution.py
+```
+
+The R-route documentation snapshots are byte-preserved under
+[`docs/archive/phase_ii_01_r_routes/`](../../docs/archive/phase_ii_01_r_routes/README.md)
+with source paths, byte counts, and SHA-256 values.
+
+## Build a recipe
+
+From the repository root, with the pinned LIBERO and robosuite source installed
+and verified:
+
+```sh
+PYTHONPATH=. python asset/benchmarks/libero/tools/source_bundle.py recipe \
   --manifest asset/benchmarks/libero/source_manifest.json \
   --target /local/audit/libero-pilot \
-  --task-input bench_deploy/libero/task_input.json \
+  --task-input bench_deploy/libero/artifacts/task_input.json \
   --output /local/audit/libero-pilot.recipe.json
 ```
 
-The CLI re-verifies the target, checks its receipt against the fixed task input,
-and writes a versioned recipe with a canonical SHA-256. It records the native
-MountedPanda actuator layout and 20 Hz OSC_POSE source control separately from
-the Core diagnostic controller. The Core route does not claim OSC_POSE
-equivalence.
+The recipe records the bounded A123 technical status and its remaining limits.
+Creating the recipe does not run native physics or produce new trajectory
+evidence.
 
-Sol 于2026-11-01记录 **`ACCEPTED_BOUNDED_R07_A123_TECHNICAL`**，仅接受上述固定交集的技术证据；文件级许可/署名未解决，不关闭来源门或整个R07。见[Sol接受决定](../../docs/maintenance/20261101_r07_a123_sol_acceptance.md)。
+## Run or read a bounded diagnostic
 
+Use the frozen run package, its resource limits, and the shared native lock.
+The normal entry point is:
 
-## R07c D01 bounded diagnostic route
+```sh
+PYTHONPATH=. python -m bench_deploy.libero.script.cli --help
+```
 
-`bench_deploy/libero/selected_candidate.py::build_libero_selected_candidate`
-constructs the one fixed spatial bowl-to-plate diagnostic through
-`SelectedReferenceEnv.from_mixed_control_candidate()`. The route uses the
-existing RuntimeSession, Controller, observation, `ContactSummaryV2`, Generic
-H5 v3 Recorder and independent reader owners. It is not registered as a
-`make_env()` UID and does not widen normal MuJoCo admission.
+The CLI default `--run-worker` route is the bounded D01 joint-space diagnostic;
+it does not regenerate the accepted A-stage replay. `--task-solution` selects
+the optional V8 demonstration-derived policy. The accepted A-stage reference
+profile and task 2 exception are recorded in
+[`20261101_r07_a123_sol_acceptance.md`](../../docs/maintenance/20261101_r07_a123_sol_acceptance.md).
+A short smoke or completed worker bundle is not task success, provider parity,
+or Qualification.
 
-The candidate pins the LIBERO `8f1084e3132a39270c3a13ebe37270a43ece2a01`
-and robosuite `fbee5844ff5632f5b5698e204ec5357ca50be0df` reset source. Its
-versioned reset receipt records the tabletop sampler, per-asset placement
-geometry, deterministic seed, fixture realization and subsequent complete
-`.pruned_init` row restore. This is a source-derived normal reset; it does not
-claim that the new deterministic fixture sample reproduces a historical
-per-row fixture realization. The upstream five dummy zero-action steps belong
-to policy evaluation and are not part of this deployment pilot.
+## Responsibilities
 
-The fixed controller sends seven named arm torques and two signed finger
-position targets. It updates at 20 Hz, holds each torque target across 25
-2 ms physics steps, and applies the source actuator ranges. The accepted
-R07c native004 evidence used its frozen diagnostic `Kp=100`, `Kd=20` and a
-16 mm aggregate finger target. R07 v2.1.0 task #1 profile v6 uses
-source-closure-bound static gravity feed-forward with `Kp=20` and `Kd=4`
-(joint2 `Kd=8`). V6 returns to the lower gains after v5's bounded unloaded
-tracking run met the 12 mm endpoint tolerance but showed repeated joint7
-torque saturation and position drift. The earlier v4/run010 task run stayed
-within source limits and had no MuJoCo warnings, but entered descend near the
-end of its 1000-step horizon. V6 remains unqualified pending the repeated
-unloaded tracking evidence. The 20 Hz loop, 2 ms x 25 hold, 2 mm/10 mrad
-motion caps, and source actuator limits remain unchanged. V4, v5, and v6 are
-separate versioned profiles, none equivalent to upstream OSC_POSE. Bind gains
-and targets to each frozen run configuration. The existing joint planner
-produces the bounded targets; neither it nor the benchmark worker calls
-`mj_step`.
+| Package | Responsibility |
+| --- | --- |
+| `artifacts/` | Task source contracts, recipe inputs, and source provenance |
+| `assembly/` | Pinned source verification and MJCF composition |
+| `controllers/` | Reference OSC, gripper mapping, and optional rim-control profile |
+| `environment/` | Candidate construction, public Runtime binding, and reset glue |
+| `objects/`, `robots/` | LIBERO object/fixture and mounted Panda semantics |
+| `observations/`, `planners/`, `tasks/` | Public state projection, planner configuration, predicates, optional Solution |
+| `trajectory/`, `diagnostics/`, `script/` | Task result validation, focused regression coverage, CLI/worker entry |
 
-Run the native worker only from the frozen D01 package using its bounded
-launcher and shared native lock. The separate readback command accepts both
-the worker result and the parent run record, and verifies the compiled MuJoCo
-identity/layout, all three H5 files, and parent exit/process-group/lock-release
-receipts. Provider-free S1 substitutes only MuJoCo public primitive/model/data
-IO; its synthetic records are not native evidence.
-
-D01 attempt002 has Sol acceptance `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`,
-limited to native004's exact single-task MuJoCo CPU source/control envelope.
-It records `task_success=false` and `solution_completed=null`; it does not pass
-the new Solution-success or provider-switching gates. See the
-[Sol review](../../docs/maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).
-The existing owner-gap/checklist JSON files remain signed diagnostic records,
-not authority for the revised scope or general admission.
-
-## R07 v2.1.0 window002 task-Solution result
-
-The focused implementation in Core commit `5a3e6b26` adds an explicit world-pose
-task action, persistent Cartesian planning, a shared canonical arm-target
-resolver, and a mixed Controller that keeps `qdesired` separate from source
-gravity torque feed-forward. Commit `31569da9` rebases approach/descent targets
-on the live public bowl pose and freezes that reference when grasp starts.
-These are internal candidate changes, not a registered `make_env()` route or a
-qualification claim.
-
-Three MuJoCo CPU probes on seed 19/rows 0, 1 and 2 were independently read.
-The first retained the stale reset bowl height; the follow-up tracked the
-settled pose but its 300-step horizon ended during descent. The 500-step probe
-reached grasp, then all three rows failed
-`bowl_not_lifted_after_public_grasp_feedback`; the bowl did not satisfy the
-public lift displacement predicate. No episode reached the original On
-predicate or Solution completion. The grasp position/orientation is therefore
-still unverified against the source bowl contact geometry. Preserve the failed
-rows and do not use these probes as task success or provider-switching evidence.
-The full local report and raw readback are under
-`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/`.
-
-## Task Harness integration boundary
-
-`bench_deploy` owns benchmark recipes, reset/semantic bindings and task-owned
-Solutions. The existing `task_env/script/agent/` Harness owns catalog/spec,
-construction checks, feasibility/ledger, Oracle and pending Judge packaging.
-It must consume the same recipe, Artifact/source/reset identities, completion
-facts and Core construction route. Extend those owners for LIBERO On/region/Open;
-the current synthetic `pick-lift-v0` template cannot represent these tasks.
-Do not duplicate Runtime/Recorder/factory or mark real LIBERO assets synthetic.
-
-R07c acceptance and Harness candidate acceptance are separate. Actual Harness
-claims retain its four reports, at least 20 distinct solved seeds, Oracle and
-pending Stage-1 package per declared task/provider intersection. A bounded R07c
-success episode cannot be relabeled as that campaign. The current-scope page
-also binds the inspected develop-harness snapshot and required lifecycle fixes;
-no branch merge or LIBERO Harness implementation is claimed here.
+Historical R00–R07 decisions and attempt details are indexed from
+`docs/module/task_env/goal/Phase_II_01/README.md`; fixed source commits remain
+the recovery route for retired implementations.

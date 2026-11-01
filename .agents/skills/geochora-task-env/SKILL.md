@@ -1122,7 +1122,7 @@ Luna handoff, not the current decision. Five-task R07c, legacy caller migration,
 compatibility alias consolidation, integration and Qualification remain separate.
 
 The D01 diagnostic uses the existing
-`bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` →
+`bench_deploy.libero.environment.selected_reference.build_libero_selected_candidate()` →
 `SelectedReferenceEnv` → `RuntimeSession.materialize()` → MuJoCo session path.
 The selected task binding and its source/reset/controller/evaluation remain
 internal and fixed to the spatial bowl-to-plate source, MuJoCo CPU, and pinned
@@ -1148,7 +1148,7 @@ lock. The S1 harness installs only bottom public model/data primitives before
 using the same construction/admission/lifecycle/recorder/reader path:
 
 ```python
-from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
+from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
 
 env = build_libero_selected_candidate(horizon=64)
 try:

@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from bench_deploy.libero import init_state
+from bench_deploy.libero.environment import init_state
 
 
 _INIT = Path(

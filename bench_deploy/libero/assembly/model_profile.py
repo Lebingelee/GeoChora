@@ -6,6 +6,8 @@ import json
 import math
 import xml.etree.ElementTree as ET
 
+from bench_deploy.libero.objects.layout import FIXTURE_WORLD_POSES, TABLE_REGION_SITES
+
 
 ROBOT_MODEL_PROFILE_ID = "libero-robosuite-panda-layout-seed19-v2"
 ROBOSUITE_REVISION = "fbee5844ff5632f5b5698e204ec5357ca50be0df"
@@ -27,30 +29,6 @@ _BASE_OPTION_DEFAULTS = {
     "integrator": "Euler",
 }
 _BASE_SIZE_DEFAULTS = {"nconmax": "5000", "njmax": "5000"}
-_FIXTURE_WORLD_POSES = {
-    "wooden_cabinet_1_main": {
-        "pos": (0.032160686061349086, -0.26769535926827864, 0.905),
-        "quat": (0.21813924162729167, 0.0, 0.0, 0.9759176559844944),
-    },
-    "flat_stove_1_main": {
-        "pos": (-0.4146303298573933, -0.13499687702793547, 0.905),
-        "quat": (1.0, 0.0, 0.0, 0.0),
-    },
-}
-_TABLE_REGION_SITES = {
-    "main_table_between_plate_ramekin_region": ((-0.05, 0.20, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_box_region": ((0.07, 0.03, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_cabinet_region": ((0.03, -0.27, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_next_to_box_region": ((0.13, -0.07, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_next_to_plate_region": ((0.01, 0.31, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_next_to_ramekin_region": ((-0.18, 0.32, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_plate_region": ((0.06, 0.20, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_ramekin_region": ((-0.20, 0.20, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_stove_region": ((-0.41, -0.14, 0.02), (0.01, 0.01, 0.007)),
-    "main_table_table_center": ((-0.075, 0.0, 0.02), (0.025, 0.01, 0.007)),
-    "main_table_table_front": ((0.20, 0.0, 0.02), (0.01, 0.01, 0.007)),
-}
-
 
 def validate_libero_official_source_plan_v1(
     plan_bytes: bytes, raw_source_xml_bytes: bytes,
@@ -182,7 +160,7 @@ def _normalize_libero_robosuite_model_xml(
     if worldbody is None:
         raise ValueError("LIBERO composed MJCF omitted the root worldbody")
     fixture_rows = {}
-    for body_name, pose in _FIXTURE_WORLD_POSES.items():
+    for body_name, pose in FIXTURE_WORLD_POSES.items():
         matches = [body for body in worldbody.iter("body") if body.get("name") == body_name]
         if len(matches) != 1:
             raise ValueError(f"pinned LIBERO scene requires exactly one {body_name}; found {len(matches)}")
@@ -234,7 +212,7 @@ def _normalize_libero_robosuite_model_xml(
     table_body = table_matches[0]
     table_body_name = table_body.get("name")
     region_sites = {}
-    for site_name, (position, size) in _TABLE_REGION_SITES.items():
+    for site_name, (position, size) in TABLE_REGION_SITES.items():
         matches = [site for site in root.iter("site") if site.get("name") == site_name]
         pos_text = " ".join(format(value, ".17g") for value in position)
         size_text = " ".join(format(value, ".17g") for value in size)

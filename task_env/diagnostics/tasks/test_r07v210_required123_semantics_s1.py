@@ -6,21 +6,20 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from bench_deploy.libero.evaluation import (
+from bench_deploy.libero.tasks.predicates import (
     LiberoPredicateBoundaryV1,
     OpenMiddleDrawerEvidenceV1,
     StoveFrontRegionEvidenceV1,
     evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1,
 )
-from bench_deploy.libero.controller import (
+from bench_deploy.libero.controllers.osc import (
     LiberoMixedControlConfigV1,
     LiberoMixedControllerV1,
 )
-from bench_deploy.libero.task_contracts import TASK_2, TASK_3
-from bench_deploy.libero.solution import (
-    LiberoPickPlaceSolutionConfigV1,
-    solution_identity_v1, solution_identity_v2, solution_identity_v4,
+from bench_deploy.libero.artifacts.contracts import TASK_2, TASK_3
+from bench_deploy.libero.tasks.solution import (
+    LiberoPickPlaceSolutionConfigV1, solution_identity_v8,
 )
 from task_env.controllers.canonical.kinematics import (
     PandaKinematics,
@@ -32,240 +31,28 @@ MANIFEST_SHA = "a" * 64
 CLOSURE_SHA = "b" * 64
 
 
-def test_task_one_solution_identity_binds_bounded_motion_rate():
+def test_task_one_solution_v8_identity_binds_source_resolver_and_motion_config():
     config = LiberoPickPlaceSolutionConfigV1()
-    assert config.max_cartesian_increment_m == pytest.approx(0.002)
-    assert config.max_joint_increment_rad == pytest.approx(0.01)
-    source_sha = "f" * 64
-    default_identity = solution_identity_v1(source_sha)
-    assert default_identity == solution_identity_v1(source_sha, config)
-    slower = replace(config, max_cartesian_increment_m=0.001)
-    assert solution_identity_v1(source_sha, slower) != default_identity
-
-
-def test_task_one_solution_v2_identity_binds_source_gravity_compensation():
-    config = LiberoPickPlaceSolutionConfigV1()
-    source_sha = "f" * 64
-    closure_sha = "e" * 64
-    identity = solution_identity_v2(source_sha, closure_sha)
-    assert identity == solution_identity_v2(source_sha, closure_sha, config)
-    assert solution_identity_v2(source_sha, "d" * 64) != identity
-    assert solution_identity_v2("a" * 64, closure_sha) != identity
-    slower = replace(config, max_cartesian_increment_m=0.001)
-    assert solution_identity_v2(source_sha, closure_sha, slower) != identity
-
-
-def test_task_one_solution_v3_identity_binds_world_pose_planner_and_frozen_v2_profiles():
-    from bench_deploy.libero.controller import legacy_v2_controller_identity_mapping
-    from bench_deploy.libero.solution import solution_identity_v2_frozen, solution_identity_v3
-    from task_env.planners.cartesian import CartesianPosePlannerConfig
-
-    source_sha, closure_sha = "f" * 64, "e" * 64
-    default = solution_identity_v3(source_sha, closure_sha)
-    assert solution_identity_v3("d" * 64, closure_sha) != default
-    assert solution_identity_v3(source_sha, "c" * 64) != default
-    slower = CartesianPosePlannerConfig(max_translation_per_step=0.006)
-    assert solution_identity_v3(source_sha, closure_sha, planner_config=slower) != default
-
-    frozen_controller = legacy_v2_controller_identity_mapping(
-        "libero-spatial-bowl-to-plate-joint-space-pd-v4",
+    values = dict(
+        source_xml_sha256="f" * 64,
+        source_closure_digest="e" * 64,
+        arm_resolver_identity="d" * 64,
     )
-    frozen = solution_identity_v2_frozen(source_sha, closure_sha, frozen_controller)
-    assert frozen == solution_identity_v2_frozen(source_sha, closure_sha, frozen_controller)
-    tampered_controller = {**frozen_controller, "kp_Nm_per_rad": [999.0] * 7}
-    with pytest.raises(ValueError, match="frozen version manifest"):
-        solution_identity_v2_frozen(source_sha, closure_sha, tampered_controller)
-    with pytest.raises(ValueError, match="allowlist"):
-        legacy_v2_controller_identity_mapping("unreviewed-profile")
-
-
-def test_task_one_solution_v4_identity_binds_osc_grasp_and_convergence_policy():
-    from bench_deploy.libero.controller import LiberoMixedControllerV3
-    from task_env.planners.cartesian import CartesianPosePlannerConfig
-
-    source_sha, closure_sha = "f" * 64, "e" * 64
-    default = solution_identity_v4(source_sha, closure_sha)
-    assert solution_identity_v4(source_sha, closure_sha) == default
-    assert solution_identity_v4("d" * 64, closure_sha) != default
-    assert solution_identity_v4(source_sha, "c" * 64) != default
-    slower = CartesianPosePlannerConfig(max_translation_per_step=0.006)
-    assert solution_identity_v4(source_sha, closure_sha, planner_config=slower) != default
-    resolver_identity = "d" * 64
-    from task_env.controllers.canonical import CanonicalPandaController
-    from bench_deploy.libero.controller import LiberoMixedControllerV3
-    controller = LiberoMixedControllerV3(arm_resolver_identity=resolver_identity)
-    assert controller.identity_mapping()["algorithm"] == (
-        "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1"
+    identity = solution_identity_v8(**values, config=config)
+    assert len(identity) == 64
+    assert identity == solution_identity_v8(**values, config=config)
+    assert identity != solution_identity_v8(
+        **{**values, "source_closure_digest": "c" * 64}, config=config,
     )
-    assert controller.identity_mapping()["qualification"] == "diagnostic_only_source_bound_20hz_OSC"
-
-
-def test_task_one_solution_v5_controller_freezes_reset_nullspace_reference_and_physics_rate_policy():
-    from types import SimpleNamespace
-
-    from bench_deploy.libero.controller import LiberoMixedControllerV4
-    from bench_deploy.libero.solution import solution_identity_v5
-
-    resolver_identity = "d" * 64
-    controller = LiberoMixedControllerV4(arm_resolver_identity=resolver_identity)
-    first = np.asarray((0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7), dtype=np.float64)
-    state = SimpleNamespace(
-        joint_position={f"joint{index + 1}": float(value) for index, value in enumerate(first)},
-        joint_velocity={f"joint{index + 1}": 0.0 for index in range(7)},
-        control_step=0, simulation_time=0.0,
+    assert identity != solution_identity_v8(
+        **{**values, "arm_resolver_identity": "b" * 64}, config=config,
     )
-    controller.reset(state)
-    reference, source = controller._nullspace_reference(first + 1.0, np.zeros(7))
-    assert source == "reset_initial_joint_v1"
-    assert reference == pytest.approx(first)
-    policy = controller.identity_mapping()
-    assert policy["schema_version"] == "libero-mixed-controller-identity-v4"
-    assert policy["hold_policy"] == "torque_recomputed_each_physics_substep_v1"
-    assert policy["nullspace_reference_policy"] == "initial_joint_position_captured_at_reset_v1"
-    assert policy["arm_resolver_identity"] == resolver_identity
-    assert solution_identity_v5(
-        "f" * 64, "e" * 64, arm_resolver_identity=resolver_identity,
-    ) != solution_identity_v5(
-        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
-    )
-    second = first - 0.25
-    reset_state = SimpleNamespace(
-        joint_position={f"joint{index + 1}": float(value) for index, value in enumerate(second)},
-        joint_velocity={f"joint{index + 1}": 0.0 for index in range(7)},
-        control_step=0, simulation_time=0.0,
-    )
-    controller.reset(reset_state)
-    reference, _ = controller._nullspace_reference(second + 2.0, np.zeros(7))
-    assert reference == pytest.approx(second)
-
-
-def test_task_one_solution_v5_holds_measured_contact_aperture_after_grasp():
-    from bench_deploy.libero.solution import (
-        LiberoPickPlaceSolutionV4,
-        LiberoPickPlaceSolutionV5,
-        solution_identity_v5,
-    )
-
-    legacy = object.__new__(LiberoPickPlaceSolutionV4)
-    current = object.__new__(LiberoPickPlaceSolutionV5)
-    for stage in ("lift", "carry", "place"):
-        legacy.stage = current.stage = stage
-        assert legacy._opening_for_stage() == pytest.approx(0.08)
-        assert current._opening_for_stage() == pytest.approx(0.055)
-    current.stage = "grasp"
-    assert current._opening_for_stage() == pytest.approx(0.08)
-    assert solution_identity_v5(
-        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    ) != solution_identity_v5(
-        "d" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    )
-
-
-def test_task_one_solution_v6_tracks_radial_demo_grasp_and_settled_plate_frame():
-    from bench_deploy.libero.solution import (
-        LiberoPickPlaceSolutionV6, solution_identity_v6,
-    )
-    from task_env.utils.rotation import rotate_vector_wxyz
-
-    solution = object.__new__(LiberoPickPlaceSolutionV6)
-    yaw_90 = np.asarray((np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)))
-    solution._bowl_reference_pose = np.asarray((0.5, 0.2, 0.1, *yaw_90))
-    solution._plate_reference_pose = np.asarray((0.7, 0.3, 0.9, 1.0, 0.0, 0.0, 0.0))
-    solution._plate = solution._plate_reference_pose[:3].copy()
-    solution._tcp_quaternion_in_bowl = np.asarray((1.0, 0.0, 0.0, 0.0))
-    offset = np.asarray((-0.04555440076829924, 0.002120461738427656, 0.03321187804063996))
-    offset_world = rotate_vector_wxyz(yaw_90, offset)
-
-    solution.stage = "approach"
-    approach_offset = offset.copy()
-    approach_offset[2] = 0.15
-    assert solution._target() == pytest.approx(
-        solution._bowl_reference_pose[:3] + rotate_vector_wxyz(yaw_90, approach_offset),
-    )
-    solution.stage = "descend"
-    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
-    solution.stage = "lift"
-    assert solution._target() == pytest.approx(
-        solution._bowl_reference_pose[:3] + offset_world + (0.0, 0.0, 0.20),
-    )
-    solution.stage = "carry"
-    assert solution._target() == pytest.approx(
-        np.asarray((0.7, 0.3, 0.3)) + offset_world,
-    )
-    solution.stage = "place"
-    assert solution._target() == pytest.approx(
-        np.asarray((0.7, 0.3, 0.985)) + offset_world,
-    )
-    solution.stage = "lift"
-    assert solution._opening_for_stage() == pytest.approx(0.008)
-    solution.stage = "grasp"
-    assert solution._opening_for_stage() == pytest.approx(0.010)
-
-    solution.stage = "approach"
-    solution._pose_plan = object()
-    bowl_now = np.asarray((0.51, 0.2, 0.09, *yaw_90))
-    plate_now = np.asarray((0.7, 0.3, 0.84, 1.0, 0.0, 0.0, 0.0))
-    observation = {"privileged_state": {
-        "bowl_body_pose": bowl_now[None, :],
-        "plate_body_pose": plate_now[None, :],
-    }}
-    assert solution._refresh_bowl_reference_from_public_pose(observation) is True
-    assert solution._bowl_reference_pose == pytest.approx(bowl_now)
-    assert solution._plate_reference_pose == pytest.approx(plate_now)
-    assert solution._pose_plan is None
-    solution.stage = "grasp"
-    assert solution._refresh_bowl_reference_from_public_pose(observation) is False
-    assert solution_identity_v6(
-        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    ) != solution_identity_v6(
-        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
-    )
-
-
-def test_task_one_solution_v7_targets_demonstrated_first_bilateral_contact_and_pinch():
-    from bench_deploy.libero.solution import (
-        LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
-        solution_identity_v6, solution_identity_v7,
-    )
-    from task_env.utils.rotation import rotate_vector_wxyz
-
-    solution = object.__new__(LiberoPickPlaceSolutionV7)
-    yaw_90 = np.asarray((np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)))
-    solution._bowl_reference_pose = np.asarray((0.5, 0.2, 0.1, *yaw_90))
-    solution._plate_reference_pose = np.asarray((0.7, 0.3, 0.9, 1.0, 0.0, 0.0, 0.0))
-    solution._tcp_quaternion_in_bowl = np.asarray((1.0, 0.0, 0.0, 0.0))
-    offset = np.asarray((-0.04490935541611755, 0.004212145868712052, 0.0312549937079468))
-    offset_world = rotate_vector_wxyz(yaw_90, offset)
-
-    solution.stage = "approach"
-    approach_offset = offset.copy()
-    approach_offset[2] = 0.15
-    assert solution._target() == pytest.approx(
-        solution._bowl_reference_pose[:3] + rotate_vector_wxyz(yaw_90, approach_offset),
-    )
-    solution.stage = "descend"
-    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
-    solution.stage = "grasp"
-    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
-    assert solution._opening_for_stage() == pytest.approx(0.008)
-    solution.stage = "lift"
-    assert solution._opening_for_stage() == pytest.approx(0.008)
-    assert solution.grasp_offset_source == "LIBERO task-0 reconstructed first-bilateral-contact median"
-    assert LiberoPickPlaceSolutionV6.grasp_offset_source != solution.grasp_offset_source
-    assert solution_identity_v7(
-        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    ) != solution_identity_v6(
-        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    )
-    assert solution_identity_v7(
-        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
-    ) != solution_identity_v7(
-        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
-    )
+    stricter_tolerance = replace(config, position_tolerance_m=0.010)
+    assert identity != solution_identity_v8(**values, config=stricter_tolerance)
 
 
 def test_independent_reader_reset_pose_match_uses_runtime_numeric_tolerance():
-    from bench_deploy.libero.core_candidate_worker import _pose_world_mapping_matches
+    from bench_deploy.libero.trajectory.worker import _pose_world_mapping_matches
 
     expected = {
         "fixture": {
@@ -298,22 +85,22 @@ def test_independent_reader_reset_pose_match_uses_runtime_numeric_tolerance():
     assert not _pose_world_mapping_matches({}, expected)
 
 
-def test_task_one_solution_v6_controller_bounds_velocity_feedforward():
-    from bench_deploy.libero.controller import LiberoMixedControllerV5
+def test_optional_rim_controller_bounds_velocity_feedforward():
+    from bench_deploy.libero.controllers.osc import LiberoMixedControllerV7
 
-    controller = LiberoMixedControllerV5(arm_resolver_identity="d" * 64)
+    controller = LiberoMixedControllerV7(arm_resolver_identity="d" * 64)
     clipped = controller._bound_vector(np.asarray((0.0, 0.0, 0.2)), 0.05)
     assert np.linalg.norm(clipped) == pytest.approx(0.05)
     assert clipped / np.linalg.norm(clipped) == pytest.approx((0.0, 0.0, 1.0))
     identity = controller.identity_mapping()
-    assert identity["schema_version"] == "libero-mixed-controller-identity-v5"
+    assert identity["schema_version"] == "libero-mixed-controller-identity-v7"
     assert identity["desired_twist_limits"] == {
         "linear_m_s": 0.05, "angular_rad_s": 0.5,
     }
 
 
-def test_task_one_v4_bilateral_contact_requires_fresh_covered_left_and_right_pairs():
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV4
+def test_solution_bilateral_contact_requires_fresh_covered_left_and_right_pairs():
+    from bench_deploy.libero.tasks.solution import LiberoPickPlaceSolutionV8
 
     boundary = {
         "source_id": "source-v1", "source_closure_digest": "a" * 64,
@@ -334,115 +121,17 @@ def test_task_one_v4_bilateral_contact_requires_fresh_covered_left_and_right_pai
         **boundary, "boundary_context_v1": dict(boundary),
         "contact_summary_v2": contact,
     }
-    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(info) == (
+    assert LiberoPickPlaceSolutionV8._bilateral_finger_contact(info) == (
         True, (1, 2), "available",
     )
     one_sided = {**contact, "pair_counts": {"/".join(left): 1, "/".join(right): 0}}
-    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(
+    assert LiberoPickPlaceSolutionV8._bilateral_finger_contact(
         {**info, "contact_summary_v2": one_sided},
     )[:2] == (False, (1, 0))
     stale = {**contact, "state_revision": 2}
-    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(
+    assert LiberoPickPlaceSolutionV8._bilateral_finger_contact(
         {**info, "contact_summary_v2": stale},
     )[2] == "contact_summary_stale_or_wrong_boundary"
-
-
-def test_task_one_v4_independent_reader_recomputes_source_osc_torque_and_gripper_mapping():
-    from types import SimpleNamespace
-
-    from bench_deploy.libero.controller import LiberoMixedControllerV3
-    from bench_deploy.libero.core_candidate_worker import (
-        _TASK1_COMPOSED_XML_SHA256, _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256,
-        _validate_v4_osc_receipt,
-    )
-
-    resolver_identity = "d" * 64
-    controller = LiberoMixedControllerV3(arm_resolver_identity=resolver_identity)
-    identity = controller.identity_mapping()
-    q = np.zeros(7)
-    mass = np.eye(7)
-    jacobian = np.zeros((6, 7))
-    jacobian[:3, :3] = np.eye(3)
-    jacobian[3:, 3:6] = np.eye(3)
-    bias = np.zeros(7)
-    target_position = np.asarray((0.01, 0.0, 0.0))
-    target_rotation = np.eye(3)
-    position_error = target_position.copy()
-    orientation_error = np.zeros(3)
-    ee_velocity = np.zeros(6)
-    task_torque = np.asarray((1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    null_torque = np.zeros(7)
-    raw_torque = task_torque.copy()
-    applied_torque = raw_torque.copy()
-    resolution_diagnostics = {
-        "schema_version": "canonical-arm-resolution-diagnostics-v1",
-        "method_id": "shared_canonical_dls_iterative_v1", "iteration_count": 1,
-        "max_iterations": 12,
-        "position_residual_m": 0.001, "orientation_residual_rad": 0.001,
-        "position_tolerance_m": 0.006, "orientation_tolerance_rad": 0.03,
-        "initial_position_gap_m": 0.001, "initial_orientation_gap_rad": 0.002,
-        "model_position_tolerance_m": 0.003, "model_orientation_tolerance_rad": 0.03,
-        "converged": True,
-    }
-    source_model_identity = "c" * 64
-    receipt = {
-        "schema_version": "libero-mixed-control-receipt-v3",
-        "controller_identity": controller.identity,
-        "algorithm": "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1",
-        "source_state_profile_id": identity["source_state_profile_id"],
-        "source_model_identity_sha256": source_model_identity,
-        "source_xml_sha256": _TASK1_COMPOSED_XML_SHA256,
-        "source_closure_digest": _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256,
-        "tcp_site_name": "gripper0_grip_site",
-        "canonical_arm_resolution": resolution_diagnostics,
-        "target_world_pose": {
-            "position_m": target_position.tolist(),
-            "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0],
-        },
-        "current_world_pose": {
-            "position_m": [0.0, 0.0, 0.0],
-            "rotation_matrix": target_rotation.tolist(),
-        },
-        "q_rad": q.tolist(), "qdot_rad_s": q.tolist(),
-        "mass_matrix_arm": mass.tolist(), "jacobian_world": jacobian.tolist(),
-        "bias_minus_passive_Nm": bias.tolist(),
-        "position_error_m": position_error.tolist(),
-        "orientation_error_rad_vector": orientation_error.tolist(),
-        "ee_velocity": ee_velocity.tolist(),
-        "desired_tcp_twist_world": [0.0] * 6,
-        "task_torque_Nm": task_torque.tolist(),
-        "nullspace_torque_Nm": null_torque.tolist(),
-        "raw_torque_Nm": raw_torque.tolist(), "applied_torque_Nm": applied_torque.tolist(),
-        "torque_clipped": [False] * 7,
-        "opening_m": 0.08, "hold_policy": "torque_zero_order_hold_per_outer_step_v1",
-    }
-    canonical_action = {
-        "schema_version": "libero-world-pose-canonical-v1",
-        "arm_target_schema_version": "canonical-arm-target-v1",
-        "arm_target_source_xml_sha256": _TASK1_COMPOSED_XML_SHA256,
-        "arm_target_controller_identity": resolver_identity,
-        "controller_identity": controller.identity,
-        "arm_resolution_diagnostics": resolution_diagnostics,
-        "qdesired_rad": q.tolist(), "controller_receipt": receipt,
-        "arm_joint_order": [f"panda-v1/joint{i}" for i in range(1, 8)],
-        "qdesired_joint_order": [f"joint{i}" for i in range(1, 8)],
-    }
-    target = SimpleNamespace(channel_values={
-        **{f"joint{i+1}": float(value) for i, value in enumerate(applied_torque)},
-        "finger_joint1": 0.04, "finger_joint2": -0.04,
-    })
-    action = np.asarray((*target_position, 1.0, 0.0, 0.0, 0.0, 1.0))
-    close = {"model_identity_sha256": source_model_identity}
-    _validate_v4_osc_receipt(
-        canonical_action, identity, target, action, np.zeros(9),
-        np.asarray((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)), close,
-    )
-    broken_target = SimpleNamespace(channel_values={**target.channel_values, "joint1": 2.0})
-    with pytest.raises(ValueError, match="independently recomputed OSC torque law"):
-        _validate_v4_osc_receipt(
-            canonical_action, identity, broken_target, action, np.zeros(9),
-            np.asarray((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)), close,
-        )
 
 
 def test_source_closure_archive_reads_only_manifest_members_and_rejects_tampering(tmp_path):
@@ -450,7 +139,7 @@ def test_source_closure_archive_reads_only_manifest_members_and_rejects_tamperin
     import io
     import tarfile
 
-    from bench_deploy.libero.source_gravity import read_source_closure_archive
+    from bench_deploy.libero.controllers.source_gravity import read_source_closure_archive
 
     payload = {"canonical-source.xml": b"<mujoco/>", "assets/mesh.bin": b"mesh-bytes"}
     manifest = [
@@ -498,7 +187,7 @@ def test_source_closure_archive_reads_only_manifest_members_and_rejects_tamperin
 
 
 def test_independent_reader_binds_gravity_formula_to_controller_gain_identity():
-    from bench_deploy.libero.core_candidate_worker import _validate_source_gravity_action
+    from bench_deploy.libero.trajectory.reader import _validate_source_gravity_action
 
     controller = LiberoMixedControllerV1()
     receipt = controller.identity_mapping()
@@ -533,7 +222,7 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
     import tarfile
     from types import SimpleNamespace
 
-    from bench_deploy.libero.source_gravity import MujocoSourceGravityBiasV1
+    from bench_deploy.libero.controllers.source_gravity import MujocoSourceGravityBiasV1
     from task_env.assembly.assets import _source_closure_digest
 
     xml = b'<mujoco><worldbody/></mujoco>'
@@ -811,7 +500,7 @@ def test_source_bound_panda_kinematics_includes_mount_and_nested_named_tcp():
     assert arm_a.schema_version == "canonical-arm-target-v1"  # frozen one-step route remains available
 
     from task_env.controllers.canonical.controller import absolute_joint_position_servo
-    from bench_deploy.libero.controller import LiberoMixedControllerV3
+    from bench_deploy.libero.controllers.osc import LiberoMixedControllerV6
 
     with pytest.raises(ValueError, match="canonical named Panda joint order"):
         replace(arm_a, arm_joint_order=tuple(reversed(arm_a.arm_joint_order))).validate()
@@ -835,13 +524,13 @@ def test_source_bound_panda_kinematics_includes_mount_and_nested_named_tcp():
         max_iterations=6, position_tolerance_m=1e-8,
         orientation_tolerance_rad=1e-8,
     )
-    matching_consumer = LiberoMixedControllerV3(
+    matching_consumer = LiberoMixedControllerV6(
         arm_resolver_identity=iterative_profile_identity,
     )
     assert matching_consumer.map_arm_target_to_control_order(
         iterative_multi.target,
     ) == pytest.approx(iterative_multi.target.joint_position_rad)
-    wrong_consumer = LiberoMixedControllerV3(arm_resolver_identity="a" * 64)
+    wrong_consumer = LiberoMixedControllerV6(arm_resolver_identity="a" * 64)
     with pytest.raises(ValueError, match="resolver identity or named joint order"):
         wrong_consumer.map_arm_target_to_control_order(iterative_multi.target)
     assert iterative_multi.diagnostics.iteration_count > 1

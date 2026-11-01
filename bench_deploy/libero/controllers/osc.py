@@ -14,7 +14,7 @@ from task_env.controllers.canonical.contracts import (
 )
 from task_env.utils.rotation import quat_wxyz_to_matrix, rotation_vector_error
 
-from .source_gravity import (
+from bench_deploy.libero.controllers.source_gravity import (
     SOURCE_OPERATIONAL_SPACE_PROFILE_V1, SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
 )
 
@@ -93,45 +93,26 @@ _LEGACY_V2_PROFILE_RECORDS = {
         'rationale': _GAIN_STABILITY_RATIONALE,
     },
 }
-
-
-def legacy_v2_controller_identity_mapping(profile_id: str) -> dict:
-    """Reconstruct only the frozen v2 controller identities emitted by v3-v6."""
-    if type(profile_id) is not str or profile_id not in _LEGACY_V2_PROFILE_RECORDS:
-        raise ValueError('legacy v2 Controller profile is not in the frozen v3-v6 allowlist')
-    row = _LEGACY_V2_PROFILE_RECORDS[profile_id]
-    kp, kd = tuple(row['kp']), tuple(row['kd'])
-    rationale = row['rationale']
-    material = {
-        'schema_version': 'libero-mixed-controller-identity-v1',
-        'profile_id': profile_id,
-        'kp_Nm_per_rad': kp,
-        'kd_Nm_s_per_rad': kd,
-        'limits': {
-            'arm_position_rad': _POSITION_LIMITS,
-            'arm_torque_Nm': _TORQUE_LIMITS,
-            'finger_position_m': {'finger_joint1': [0.0, 0.04],
-                                  'finger_joint2': [-0.04, 0.0]},
-        },
-        'hold_policy': 'joint_torque_zero_order_hold_per_outer_step_v1',
-        'gain_source': _GAIN_SOURCE,
-        'gain_stability_rationale': rationale,
-    }
-    identity = hashlib.sha256(json.dumps(
-        material, sort_keys=True, separators=(',', ':'), allow_nan=False,
-    ).encode()).hexdigest()
+def build_diagnostic_joint_pd_plan(task_input: dict) -> dict:
+    """Describe the retained D01 diagnostic action mapping from task input."""
+    native = task_input['native_reference']['controller']
+    config = LiberoMixedControlConfigV1()
+    config.validate()
     return {
-        'schema_version': 'libero-mixed-controller-identity-v1',
-        'profile_id': profile_id,
-        'identity_sha256': identity,
-        'kp_Nm_per_rad': list(kp),
-        'kd_Nm_s_per_rad': list(kd),
-        'torque_limits_Nm': dict(_TORQUE_LIMITS),
-        'position_limits_rad': {key: list(value) for key, value in _POSITION_LIMITS.items()},
-        'hold_policy': 'joint_torque_zero_order_hold_per_outer_step_v1',
-        'qualification': 'diagnostic_only_unqualified_gains',
+        'schema_version': 'libero-mixed-control-plan-v1',
+        'control_frequency_hz': 20,
+        'control_timestep_seconds': 0.05,
+        'physics_dt_s': 0.002,
+        'control_substeps': 25,
+        'control_mode': 'absolute_joint_target_to_seven_torque_motors_plus_two_signed_finger_position_actuators',
+        'hold_policy': config.hold_policy,
+        'kp_Nm_per_rad': list(config.kp_Nm_per_rad),
+        'kd_Nm_s_per_rad': list(config.kd_Nm_s_per_rad),
+        'gain_status': config.gain_status,
         'gain_source': _GAIN_SOURCE,
-        'gain_stability_rationale': rationale,
+        'gain_stability_rationale': _GAIN_STABILITY_RATIONALE,
+        'native_reference': native,
+        'core_equivalence': 'diagnostic joint-space profile; not OSC_POSE equivalence',
     }
 
 
@@ -238,144 +219,8 @@ class LiberoMixedControllerV1:
         }
 
 
-def build_controller(task_input: dict) -> dict:
-    native = task_input['native_reference']['controller']
-    config = LiberoMixedControlConfigV1()
-    config.validate()
-    return {
-        'schema_version': 'libero-mixed-control-plan-v1',
-        'control_frequency_hz': 20,
-        'control_timestep_seconds': 0.05,
-        'physics_dt_s': 0.002,
-        'control_substeps': 25,
-        'control_mode': 'absolute_joint_target_to_seven_torque_motors_plus_two_signed_finger_position_actuators',
-        'hold_policy': config.hold_policy,
-        'kp_Nm_per_rad': list(config.kp_Nm_per_rad),
-        'kd_Nm_s_per_rad': list(config.kd_Nm_s_per_rad),
-        'gain_status': config.gain_status,
-        'gain_source': _GAIN_SOURCE,
-        'gain_stability_rationale': _GAIN_STABILITY_RATIONALE,
-        'native_reference': native,
-        'core_equivalence': 'diagnostic joint-space profile; not OSC_POSE equivalence',
-    }
 
 
-class LiberoMixedControllerV2(LiberoMixedControllerV1):
-    """Versioned mixed controller with separate source gravity torque feed-forward."""
-
-    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-gravity-ff-v7'
-
-    def __init__(self, config: LiberoMixedControlConfigV1 | None = None,
-                 gravity_bias_model=None):
-        super().__init__(config)
-        self.gravity_bias_model = None
-        self.last_control_receipt = None
-        self.source_xml_sha256 = None
-        self.source_closure_digest = None
-        payload = super().identity_mapping()
-        payload.pop('identity_sha256', None)
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v2',
-            'profile_id': self.profile_id,
-            'torque_law': 'kp_times_qdesired_minus_q_minus_kd_times_qdot_plus_source_gravity_ff_v1',
-            'gravity_feedforward_profile_id': 'libero-source-mjcf-gravity-bias-v1',
-            'position_target_encoding': 'absolute_qdesired_only_v1',
-        })
-        self.identity = hashlib.sha256(json.dumps(
-            payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
-        ).encode()).hexdigest()
-        if gravity_bias_model is not None:
-            self.set_source_gravity_model(
-                gravity_bias_model,
-                source_xml_sha256=gravity_bias_model.source_xml_sha256,
-                source_closure_digest=gravity_bias_model.source_closure_digest,
-            )
-
-    def set_source_gravity_model(self, model, *, source_xml_sha256: str,
-                                 source_closure_digest: str):
-        if self.gravity_bias_model is not None:
-            raise RuntimeError('source gravity model may be attached only once')
-        if (getattr(model, 'profile_id', None) != 'libero-source-mjcf-gravity-bias-v1'
-                or not callable(getattr(model, 'gravity_torque', None))):
-            raise TypeError('mixed controller requires the versioned source MJCF gravity primitive')
-        if (getattr(model, 'source_xml_sha256', None) != source_xml_sha256
-                or getattr(model, 'source_closure_digest', None) != source_closure_digest
-                or type(source_xml_sha256) is not str or len(source_xml_sha256) != 64
-                or type(source_closure_digest) is not str or len(source_closure_digest) != 64):
-            raise ValueError('mixed controller source gravity model differs from its selected XML/closure')
-        self.gravity_bias_model = model
-        self.source_xml_sha256 = source_xml_sha256
-        self.source_closure_digest = source_closure_digest
-
-    def _compute_torques(self, positions, state):
-        model = self.gravity_bias_model
-        if model is None:
-            raise RuntimeError('v2 mixed Controller requires its source gravity model before stepping')
-        if (model.source_xml_sha256 != self.source_xml_sha256
-                or model.source_closure_digest != self.source_closure_digest):
-            raise ValueError('v2 mixed Controller source gravity identity changed after attachment')
-        q = np.asarray([float(state.joint_position[name]) for name in _JOINTS], dtype=np.float64)
-        qdot = np.asarray([float(state.joint_velocity[name]) for name in _JOINTS], dtype=np.float64)
-        qdesired = np.asarray(positions, dtype=np.float64)
-        bias = np.asarray(model.gravity_torque(q), dtype=np.float64)
-        if any(value.shape != (7,) or not np.isfinite(value).all()
-               for value in (q, qdot, qdesired, bias)):
-            raise ValueError('v2 mixed Controller requires finite seven-joint q, qdot, qdesired and gravity bias')
-        kp = np.asarray(self.config.kp_Nm_per_rad, dtype=np.float64)
-        kd = np.asarray(self.config.kd_Nm_s_per_rad, dtype=np.float64)
-        raw = kp * (qdesired - q) - kd * qdot + bias
-        applied = np.asarray([
-            np.clip(value, -_TORQUE_LIMITS[name], _TORQUE_LIMITS[name])
-            for name, value in zip(_JOINTS, raw, strict=True)
-        ], dtype=np.float64)
-        clipped = np.abs(raw - applied) > 1e-12
-        self.last_control_receipt = {
-            'schema_version': 'libero-mixed-control-receipt-v2',
-            'controller_identity': self.identity,
-            'gravity_profile_id': model.profile_id,
-            'gravity_model_identity_sha256': model.model_identity_sha256,
-            'source_xml_sha256': self.source_xml_sha256,
-            'source_closure_digest': self.source_closure_digest,
-            'qdesired_rad': qdesired.tolist(),
-            'q_rad': q.tolist(),
-            'qdot_rad_s': qdot.tolist(),
-            'gravity_feedforward_Nm': bias.tolist(),
-            'raw_torque_Nm': raw.tolist(),
-            'applied_torque_Nm': applied.tolist(),
-            'torque_clipped': clipped.tolist(),
-            'torque_clip_any': bool(clipped.any()),
-            'channel_order': list(_JOINTS),
-        }
-        return {name: float(value) for name, value in zip(_JOINTS, applied, strict=True)}
-
-    def identity_mapping(self):
-        payload = super().identity_mapping()
-        payload.pop('identity_sha256', None)
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v2',
-            'profile_id': self.profile_id,
-            'identity_sha256': self.identity,
-            'torque_law': 'kp_times_qdesired_minus_q_minus_kd_times_qdot_plus_source_gravity_ff_v1',
-            'gravity_feedforward_profile_id': 'libero-source-mjcf-gravity-bias-v1',
-            'position_target_encoding': 'absolute_qdesired_only_v1',
-        })
-        return payload
-
-    def close_resources(self):
-        model = self.gravity_bias_model
-        if model is None:
-            return {
-                'schema_version': 'libero-source-gravity-model-close-v1',
-                'profile_id': 'libero-source-mjcf-gravity-bias-v1',
-                'model_created': False, 'forward_call_count': 0,
-                'mj_step_call_count': 0, 'closed': True,
-                'model_released': True, 'data_released': True,
-            }
-        receipt = model.close()
-        self.gravity_bias_model = None
-        self.source_xml_sha256 = None
-        self.source_closure_digest = None
-        return receipt
 
 
 @dataclass(frozen=True)
@@ -402,16 +247,25 @@ class LiberoOperationalSpaceConfigV1:
             raise ValueError('unsupported LIBERO source OSC torque hold policy')
 
 
-class LiberoMixedControllerV3(LiberoMixedControllerV2):
-    """Task-local source-bound OSC_POSE using only public boundary feedback."""
+class _SourceOSCController:
+    """Shared source-bound OSC math and lifecycle for final task profiles."""
 
     profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-source-v1'
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV1 | None = None,
                  gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
-        # Keep the frozen V1 timebase validation and shared named channel map;
-        # OSC gains and control law are separately versioned below.
-        super().__init__(gravity_bias_model=gravity_bias_model)
+        self.config = LiberoMixedControlConfigV1()
+        self.config.validate()
+        self.gravity_bias_model = None
+        self.source_xml_sha256 = None
+        self.source_closure_digest = None
+        self._last_boundary = None
+        if gravity_bias_model is not None:
+            self.set_source_gravity_model(
+                gravity_bias_model,
+                source_xml_sha256=gravity_bias_model.source_xml_sha256,
+                source_closure_digest=gravity_bias_model.source_closure_digest,
+            )
         self.operational_config = operational_config or LiberoOperationalSpaceConfigV1()
         self.operational_config.validate()
         if (arm_resolver_identity is not None
@@ -455,10 +309,40 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
                                  source_closure_digest: str):
         if not callable(getattr(model, 'operational_space_state_v1', None)):
             raise TypeError('OSC Controller requires the source-bound operational-space state owner')
-        super().set_source_gravity_model(
-            model, source_xml_sha256=source_xml_sha256,
-            source_closure_digest=source_closure_digest,
-        )
+        if self.gravity_bias_model is not None:
+            raise RuntimeError('source gravity model may be attached only once')
+        if (getattr(model, 'profile_id', None) != 'libero-source-mjcf-gravity-bias-v1'
+                or not callable(getattr(model, 'gravity_torque', None))):
+            raise TypeError('mixed controller requires the versioned source MJCF gravity primitive')
+        if (getattr(model, 'source_xml_sha256', None) != source_xml_sha256
+                or getattr(model, 'source_closure_digest', None) != source_closure_digest
+                or type(source_xml_sha256) is not str or len(source_xml_sha256) != 64
+                or type(source_closure_digest) is not str or len(source_closure_digest) != 64):
+            raise ValueError('mixed controller source gravity model differs from its selected XML/closure')
+        self.gravity_bias_model = model
+        self.source_xml_sha256 = source_xml_sha256
+        self.source_closure_digest = source_closure_digest
+
+    def reset(self, state):
+        if set(_JOINTS) - set(state.joint_position) or set(_JOINTS) - set(state.joint_velocity):
+            raise ValueError('LIBERO controller reset state omits named Panda arm feedback')
+        self._last_boundary = (int(state.control_step), float(state.simulation_time))
+
+    def close_resources(self):
+        model = self.gravity_bias_model
+        if model is None:
+            return {
+                'schema_version': 'libero-source-gravity-model-close-v1',
+                'profile_id': 'libero-source-mjcf-gravity-bias-v1',
+                'model_created': False, 'forward_call_count': 0,
+                'mj_step_call_count': 0, 'closed': True,
+                'model_released': True, 'data_released': True,
+            }
+        receipt = model.close()
+        self.gravity_bias_model = None
+        self.source_xml_sha256 = None
+        self.source_closure_digest = None
+        return receipt
 
     def _source_operational_space_state(self, model, q, qdot):
         return model.operational_space_state_v1(q, qdot)
@@ -710,8 +594,8 @@ class LiberoOperationalSpaceConfigV2:
             raise ValueError('unsupported LIBERO physics-rate OSC recomputation policy')
 
 
-class LiberoMixedControllerV4(LiberoMixedControllerV3):
-    """Physics-rate OSC with the reset-captured robosuite nullspace reference."""
+class _PhysicsRateOSCController(_SourceOSCController):
+    """Physics-rate OSC base with reset-captured robosuite nullspace state."""
 
     profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-source-v2'
 
@@ -841,105 +725,7 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
         return payload
 
 
-class LiberoMixedControllerV5(LiberoMixedControllerV4):
-    """V4 OSC with bounded planner-velocity feed-forward per outer boundary."""
-
-    profile_id = 'libero-spatial-bowl-to-plate-osc-pose-velocity-feedforward-v1'
-
-    def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
-                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
-                 allow_unconverged_arm_resolution: bool = False):
-        super().__init__(
-            operational_config=operational_config,
-            gravity_bias_model=gravity_bias_model,
-            arm_resolver_identity=arm_resolver_identity,
-            allow_unconverged_arm_resolution=allow_unconverged_arm_resolution,
-        )
-        self._last_target_control_step = None
-        self._last_target_position = None
-        self._last_target_rotation = None
-        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
-        payload = self.identity_mapping()
-        payload.pop('identity_sha256', None)
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v5',
-            'profile_id': self.profile_id,
-            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
-            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
-            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
-            'hold_policy': self.operational_config.hold_policy,
-        })
-        self.identity = hashlib.sha256(json.dumps(
-            payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
-        ).encode()).hexdigest()
-
-    def reset(self, state):
-        super().reset(state)
-        self._last_target_control_step = None
-        self._last_target_position = None
-        self._last_target_rotation = None
-        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
-
-    @staticmethod
-    def _bound_vector(value, maximum):
-        magnitude = float(np.linalg.norm(value))
-        return value if magnitude <= maximum or magnitude == 0.0 else value * (maximum / magnitude)
-
-    def compute_pose_target(self, resolution, opening_m, state, **kwargs):
-        if not isinstance(resolution, CanonicalArmResolutionV1):
-            raise TypeError('velocity-feedforward OSC requires a typed canonical arm resolution')
-        target_pose = resolution.target.canonical_action.resolved_world_pose
-        if not isinstance(target_pose, PoseWorld):
-            raise TypeError('velocity-feedforward OSC requires an absolute world pose target')
-        step = int(state.control_step)
-        position = np.asarray(target_pose.position, dtype=np.float64)
-        rotation = quat_wxyz_to_matrix(np.asarray(target_pose.quaternion_wxyz, dtype=np.float64))
-        if self._last_target_control_step is None:
-            self._last_target_control_step = step
-            self._last_target_position = position.copy()
-            self._last_target_rotation = rotation.copy()
-        elif step > self._last_target_control_step:
-            elapsed = (step - self._last_target_control_step) / self.operational_config.control_frequency_hz
-            linear = self._bound_vector(
-                (position - self._last_target_position) / elapsed, 0.05,
-            )
-            angular = self._bound_vector(
-                rotation_vector_error(self._last_target_rotation, rotation) / elapsed, 0.5,
-            )
-            self._desired_tcp_twist_world = np.concatenate((linear, angular))
-            self._last_target_control_step = step
-            self._last_target_position = position.copy()
-            self._last_target_rotation = rotation.copy()
-        elif step < self._last_target_control_step:
-            raise ValueError('velocity-feedforward OSC observed a stale control boundary')
-        target = super().compute_pose_target(
-            resolution, opening_m, state,
-            desired_tcp_twist_world=self._desired_tcp_twist_world,
-            **kwargs,
-        )
-        self.last_control_receipt.update({
-            'schema_version': 'libero-mixed-control-receipt-v5',
-            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
-            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
-            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
-            'desired_tcp_twist_world': self._desired_tcp_twist_world.tolist(),
-        })
-        return target
-
-    def identity_mapping(self):
-        payload = super().identity_mapping()
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v5',
-            'profile_id': self.profile_id,
-            'identity_sha256': self.identity,
-            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
-            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
-            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
-        })
-        return payload
-
-
-class LiberoMixedControllerV6(LiberoMixedControllerV4):
+class LiberoMixedControllerV6(_PhysicsRateOSCController):
     """Robosuite-aligned OSC compensation using the source model's qfrc_bias."""
 
     profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-qfrc-bias-v1'
@@ -1018,7 +804,7 @@ class LiberoMixedControllerV6(LiberoMixedControllerV4):
         return payload
 
 
-class LiberoMixedControllerV7(LiberoMixedControllerV5):
+class LiberoMixedControllerV7(LiberoMixedControllerV6):
     """Rim-path OSC with planner twist feed-forward and robosuite qfrc_bias."""
 
     profile_id = 'libero-spatial-bowl-to-plate-osc-pose-velocity-feedforward-qfrc-bias-v1'
@@ -1033,43 +819,79 @@ class LiberoMixedControllerV7(LiberoMixedControllerV5):
             allow_unconverged_arm_resolution=allow_unconverged_arm_resolution,
         )
         self.profile_id = type(self).profile_id
+        self._last_target_control_step = None
+        self._last_target_position = None
+        self._last_target_rotation = None
+        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
         payload = self.identity_mapping()
         payload.pop('identity_sha256', None)
         self.identity = hashlib.sha256(json.dumps(
             payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
         ).encode()).hexdigest()
 
-    def _source_feedforward_torque(self, source_state):
-        return np.asarray(source_state['qfrc_bias_arm_Nm'], dtype=np.float64)
+    def reset(self, state):
+        super().reset(state)
+        self._last_target_control_step = None
+        self._last_target_position = None
+        self._last_target_rotation = None
+        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
 
-    def set_source_gravity_model(self, model, *, source_xml_sha256: str,
-                                 source_closure_digest: str):
-        if not callable(getattr(model, 'operational_space_state_v2', None)):
-            raise TypeError('qfrc_bias OSC Controller requires source operational-space state v2')
-        super().set_source_gravity_model(
-            model, source_xml_sha256=source_xml_sha256,
-            source_closure_digest=source_closure_digest,
+    @staticmethod
+    def _bound_vector(value, maximum):
+        magnitude = float(np.linalg.norm(value))
+        return value if magnitude <= maximum or magnitude == 0.0 else value * (maximum / magnitude)
+
+    def compute_pose_target(self, resolution, opening_m, state, **kwargs):
+        if not isinstance(resolution, CanonicalArmResolutionV1):
+            raise TypeError('velocity-feedforward OSC requires a typed canonical arm resolution')
+        target_pose = resolution.target.canonical_action.resolved_world_pose
+        if not isinstance(target_pose, PoseWorld):
+            raise TypeError('velocity-feedforward OSC requires an absolute world pose target')
+        step = int(state.control_step)
+        position = np.asarray(target_pose.position, dtype=np.float64)
+        rotation = quat_wxyz_to_matrix(np.asarray(target_pose.quaternion_wxyz, dtype=np.float64))
+        if self._last_target_control_step is None:
+            self._last_target_control_step = step
+            self._last_target_position = position.copy()
+            self._last_target_rotation = rotation.copy()
+        elif step > self._last_target_control_step:
+            elapsed = (step - self._last_target_control_step) / self.operational_config.control_frequency_hz
+            linear = self._bound_vector((position - self._last_target_position) / elapsed, 0.05)
+            angular = self._bound_vector(
+                rotation_vector_error(self._last_target_rotation, rotation) / elapsed, 0.5,
+            )
+            self._desired_tcp_twist_world = np.concatenate((linear, angular))
+            self._last_target_control_step = step
+            self._last_target_position = position.copy()
+            self._last_target_rotation = rotation.copy()
+        elif step < self._last_target_control_step:
+            raise ValueError('velocity-feedforward OSC observed a stale control boundary')
+        target = super().compute_pose_target(
+            resolution, opening_m, state,
+            desired_tcp_twist_world=self._desired_tcp_twist_world,
+            **kwargs,
         )
-
-    def _source_operational_space_state(self, model, q, qdot):
-        return model.operational_space_state_v2(q, qdot)
-
-    def _source_state_contract(self):
-        return ('libero-source-operational-space-state-v2', SOURCE_OPERATIONAL_SPACE_PROFILE_V2)
-
-    def compute_pose_target(self, *args, **kwargs):
-        target = super().compute_pose_target(*args, **kwargs)
         receipt = self.last_control_receipt
-        receipt['gravity_feedforward_Nm'] = receipt.pop('bias_minus_passive_Nm')
         receipt.update({
             'schema_version': 'libero-mixed-control-receipt-v7',
             'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_qfrc_bias_v1',
             'gravity_feedforward_source': 'qfrc_bias_arm_Nm',
+            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
+            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
+            'desired_tcp_twist_world': self._desired_tcp_twist_world.tolist(),
         })
         return target
 
     def identity_mapping(self):
-        payload = super().identity_mapping()
+        payload = _PhysicsRateOSCController.identity_mapping(self)
+        payload.update({
+            'schema_version': 'libero-mixed-controller-identity-v5',
+            'profile_id': self.profile_id,
+            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
+            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
+            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
+            'hold_policy': self.operational_config.hold_policy,
+        })
         payload.update({
             'schema_version': 'libero-mixed-controller-identity-v7',
             'profile_id': type(self).profile_id,
@@ -1083,9 +905,9 @@ class LiberoMixedControllerV7(LiberoMixedControllerV5):
         return payload
 
 
-__all__ = ['LiberoMixedControlConfigV1', 'LiberoMixedControllerV1',
-           'LiberoMixedControllerV2', 'LiberoMixedControllerV3', 'LiberoMixedControllerV4',
-           'LiberoMixedControllerV5', 'LiberoMixedControllerV6', 'LiberoMixedControllerV7',
-           'LiberoOperationalSpaceConfigV1', 'LiberoOperationalSpaceConfigV2',
-           'legacy_v2_controller_identity_mapping',
-           'build_controller']
+__all__ = [
+    'LiberoMixedControlConfigV1', 'LiberoMixedControllerV1',
+    'build_diagnostic_joint_pd_plan',
+    'LiberoMixedControllerV6', 'LiberoMixedControllerV7',
+    'LiberoOperationalSpaceConfigV1', 'LiberoOperationalSpaceConfigV2',
+]

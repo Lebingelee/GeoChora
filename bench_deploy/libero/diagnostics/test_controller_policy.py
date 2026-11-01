@@ -1,4 +1,4 @@
-"""Regression checks for versioned LIBERO OSC torque compensation policies."""
+"""Regression checks for the accepted reference and optional rim controller."""
 
 import hashlib
 import json
@@ -6,23 +6,22 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from bench_deploy.libero.controller import (
-    LiberoMixedControllerV4,
+from bench_deploy.libero.controllers.osc import (
     LiberoMixedControllerV6,
     LiberoMixedControllerV7,
 )
-from bench_deploy.libero.source_gravity import (
+from bench_deploy.libero.controllers.source_gravity import (
     SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
     SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
 )
-from bench_deploy.libero.selected_candidate import (
+from bench_deploy.libero.environment.selected_reference import (
     PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
     PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
     _a_upstream_pose_replay_joint_limit_tolerances,
     _make_candidate_controller,
     _panda_gripper_aggregate_opening_m,
 )
-from bench_deploy.libero.task_contracts import TASK_2, TASK_3
+from bench_deploy.libero.artifacts.contracts import TASK_2, TASK_3
 
 
 def _assert_identity_hash(controller):
@@ -32,18 +31,6 @@ def _assert_identity_hash(controller):
         material, sort_keys=True, separators=(",", ":"), allow_nan=False,
     ).encode()).hexdigest()
     assert mapping["identity_sha256"] == expected == controller.identity
-
-
-def test_frozen_v4_keeps_passive_adjusted_feedforward():
-    controller = LiberoMixedControllerV4()
-    passive_adjusted = np.arange(7, dtype=np.float64)
-    upstream_bias = passive_adjusted + 0.25
-
-    assert np.array_equal(controller._source_feedforward_torque({
-        "bias_minus_passive_arm_Nm": passive_adjusted,
-        "qfrc_bias_arm_Nm": upstream_bias,
-    }), passive_adjusted)
-    assert controller.identity_mapping()["schema_version"] == "libero-mixed-controller-identity-v4"
 
 
 def test_v6_uses_qfrc_bias_and_versions_the_source_and_controller_profiles():
@@ -89,9 +76,6 @@ def test_v6_official_reference_and_v7_rim_profiles_have_distinct_identities():
 
 def test_v1_and_v2_source_state_profiles_remain_separate():
     assert SOURCE_OPERATIONAL_SPACE_PROFILE_V1 != SOURCE_OPERATIONAL_SPACE_PROFILE_V2
-    assert LiberoMixedControllerV4()._source_state_contract() == (
-        "libero-source-operational-space-state-v1", SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
-    )
 
 
 def test_task23_upstream_replay_uses_reference_v6_osc_without_planner_twist():

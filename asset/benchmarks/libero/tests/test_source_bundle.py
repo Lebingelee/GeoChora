@@ -226,11 +226,15 @@ def test_real_recipe_cli_success(tmp_path: Path):
     assert recipe["task"]["uid"] == "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate"
     assert recipe["robot"]["native_reference"]["arm_actuator_types"] == ["motor"] * 7
     assert recipe["controller"]["control_frequency_hz"] == 20
-    assert recipe["controller"]["core_candidate_frequency_hz"] == 100
+    assert recipe["controller"]["core_equivalence"] == "diagnostic joint-space profile; not OSC_POSE equivalence"
+    assert recipe["controller"]["hold_policy"] == "joint_torque_zero_order_hold_per_outer_step_v1"
     assert recipe["observation"]["requested_core_candidate"] == "state-only"
     assert recipe["evaluation"]["unavailable_is_not_false"] is True
-    assert recipe["admission"]["core_native_admission_ready"] is False
-    assert recipe["recording"]["status"] == "NOT_RUN; no H5 produced"
+    assert recipe["accepted_scope"]["status"] == "ACCEPTED_BOUNDED_R07_A123_TECHNICAL"
+    assert recipe["accepted_scope"]["qualification"] is False
+    assert recipe["accepted_scope"]["task_success"] is False
+    assert recipe["limits"]["file_specific_asset_license_or_attribution"] == "unresolved"
+    assert recipe["recording"]["status"] == "recipe_only_no_new_recording_run"
 
 
 def test_matching_install_is_idempotent():

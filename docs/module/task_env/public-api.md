@@ -728,12 +728,12 @@ new provider admission, general Attachment support or Qualification.
 ## R07c D01 LIBERO diagnostic entry (2026-10-30)
 
 The fixed spatial bowl-to-plate candidate is constructed by
-`bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` and
+`bench_deploy.libero.environment.selected_reference.build_libero_selected_candidate()` and
 then executes through `SelectedReferenceEnv.from_libero_diagnostic_candidate()`
 and the existing `RuntimeSession` route. Example:
 
 ```python
-from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
+from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
 
 env = build_libero_selected_candidate(horizon=64)
 try:

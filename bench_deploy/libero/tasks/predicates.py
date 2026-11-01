@@ -17,7 +17,7 @@ from task_env.environment import (
 from task_env.environment.types import TaskEvaluation
 from task_env.controllers.canonical.contracts import digest
 
-from .task_contracts import TASK_1, TASK_2, TASK_3
+from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
 
 
 PILOT_TASK_UID = TASK_1

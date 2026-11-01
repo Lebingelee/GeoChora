@@ -1,0 +1,1 @@
+"""LIBERO artifacts responsibilities."""

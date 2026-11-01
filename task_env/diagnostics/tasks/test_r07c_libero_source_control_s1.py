@@ -7,11 +7,11 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from bench_deploy.libero.evaluation import (
+from bench_deploy.libero.tasks.predicates import (
     ON_THRESHOLD_M, PILOT_TASK_UID, OnBowlPlateEvidenceV1,
     evaluate_on_bowl_plate_v1,
 )
-from bench_deploy.libero.assembly import (
+from bench_deploy.libero.assembly.composition import (
     _merge_fragment_assets, _validate_composed_asset_names,
     build_source_composition_plan,
 )
@@ -214,7 +214,7 @@ def test_source_composition_plan_is_deterministic_and_rejects_changed_install_by
 
 
 def test_static_mjcf_composition_namespaces_instances_and_binds_exact_output_hash(tmp_path):
-    from bench_deploy.libero.assembly import build_source_composition_plan
+    from bench_deploy.libero.assembly.composition import build_source_composition_plan
 
     install = tmp_path / "install"
     table_geoms = (
