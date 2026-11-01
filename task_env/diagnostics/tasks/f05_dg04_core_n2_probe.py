@@ -22,7 +22,8 @@ CORE_SITE = Path("/home/lly/miniconda3/envs/geochora/lib/python3.12/site-package
 
 
 def _python_dependency_setup() -> None:
-    if Path(sys.executable).resolve() != (ISAAC_ROOT / "bin/python").resolve():
+    if (Path(sys.executable).resolve() != (ISAAC_ROOT / "bin/python").resolve()
+            or Path(sys.prefix).resolve() != ISAAC_ROOT.resolve()):
         raise RuntimeError("DG04 formal N2 must use the pinned Isaac Sim 6.2 interpreter")
     if os.environ.get("PYTHONPATH"):
         raise RuntimeError("DG04 formal N2 requires inherited PYTHONPATH to be unset")
@@ -276,7 +277,8 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         raise ValueError("DG04 N2 worker receipt path differs from frozen plan")
     if counter_path.resolve() != run_dir / "step_counter.json":
         raise ValueError("DG04 N2 counter path differs from frozen plan")
-    if Path(sys.executable).resolve() != (ISAAC_ROOT / "bin/python").resolve():
+    if (Path(sys.executable).resolve() != (ISAAC_ROOT / "bin/python").resolve()
+            or Path(sys.prefix).resolve() != ISAAC_ROOT.resolve()):
         raise RuntimeError("DG04 N2 must use the pinned Isaac Sim 6.2 interpreter")
     if os.environ.get("PYTHONPATH"):
         raise RuntimeError("DG04 N2 requires an unset inherited PYTHONPATH")

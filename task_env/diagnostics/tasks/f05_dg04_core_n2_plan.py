@@ -249,7 +249,9 @@ def build_plan(output_root: Path) -> tuple[dict, Path, Path, Path]:
         raise ValueError("frozen DG04 prompt hash changed")
 
     runtime = {
-        "python": str(ISAAC_PYTHON.resolve(strict=True)),
+        # Preserve the Isaac launcher symlink: resolving it launches the base
+        # geochora interpreter and drops Isaac's own site-packages from sys.path.
+        "python": str(ISAAC_PYTHON),
         "python_sha256": _sha(ISAAC_PYTHON),
         "isaac_root": str(ISAAC_ROOT.resolve(strict=True)),
         "isaac_version": "6.2.0.0",
