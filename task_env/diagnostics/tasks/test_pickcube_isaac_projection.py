@@ -70,3 +70,26 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         include_solution=False,
         controller_profile='r3_continuous_v1',
     )
+
+
+def test_position_reset_uses_artifact_frame_alias_for_single_segment_semantics():
+    from types import SimpleNamespace
+
+    from task_env.artifacts import FrameReference
+    from task_env.tasks.reference_env import _position_frame_bindings_from_artifact
+
+    artifact = SimpleNamespace(legacy_frame_bindings={
+        'panda-v1/base': FrameReference('panda-v1', 'link0'),
+        'panda-v1/ee': FrameReference('panda-v1', 'ee'),
+        'cube-v1': FrameReference('cube-v1', 'cube'),
+    })
+    source = SimpleNamespace(
+        bodies={'panda-v1/base': '/F06Scene/panda/link0', 'cube-v1': '/F06Scene/cube_v1'},
+        frames={'panda-v1/ee': '/F06Scene/panda/hand/ee'},
+    )
+
+    assert _position_frame_bindings_from_artifact(artifact, source) == {
+        'panda-v1/base': FrameReference('panda-v1', 'link0'),
+        'panda-v1/ee': FrameReference('panda-v1', 'ee'),
+        'cube-v1': FrameReference('cube-v1', 'cube'),
+    }

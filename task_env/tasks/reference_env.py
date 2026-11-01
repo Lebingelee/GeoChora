@@ -74,6 +74,22 @@ def _identity_seed(seed):
     return seed
 
 
+def _position_frame_bindings_from_artifact(artifact, source):
+    """Resolve source body/Frame names through their exact Artifact references."""
+    from ..artifacts import FrameReference
+
+    semantics = (*source.bodies, *source.frames)
+    if len(semantics) != len(set(semantics)):
+        raise ValueError('Position RuntimeSource body/Frame semantics must be unique')
+    bindings = {}
+    for semantic in semantics:
+        reference = artifact.legacy_frame_bindings.get(semantic)
+        if type(reference) is not FrameReference:
+            raise ValueError('Position RuntimeSource semantic lacks an exact Artifact FrameReference')
+        bindings[semantic] = reference
+    return bindings
+
+
 def _no_reset_kwargs(env):
     return {}
 
@@ -709,14 +725,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     if reset_frame_name in self.position_joint_bindings:
                         raise ValueError('free-body reset Joint binding overlaps a scalar binding')
                     self.position_joint_bindings[reset_frame_name] = candidates[0]
-                from ..artifacts import FrameReference
-                self.position_frame_bindings = {
-                    semantic: FrameReference(entity, frame)
-                    for semantic, (entity, frame) in {
-                        name: tuple(name.split('/', 1))
-                        for name in (*self.value['source'].bodies, *self.value['source'].frames)
-                    }.items()
-                }
+                self.position_frame_bindings = _position_frame_bindings_from_artifact(
+                    self.artifact, self.value['source'],
+                )
                 if self.leaf_position_profile:
                     control_binding = ('panda-hand/hand-position'
                                        if self.fixed_attachment_leaf_position_profile
