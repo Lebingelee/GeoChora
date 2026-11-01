@@ -7,35 +7,10 @@ import pytest
 
 from task_env.runtime.sessions.api import materialize
 from task_env.tasks.reference_env import SelectedReferenceEnv
-from task_env.tasks.position_candidate.builder import F04PositionCandidateInputV1
-from task_env.diagnostics.tasks.test_phase_ii_f03_attempt002_core_call_chain import (
-    _versioned_input,
-)
 
 
-def test_f04_input_rejects_unverified_synthetic_delivery_before_provider_import(tmp_path):
-    f03 = _versioned_input(tmp_path)
-    execution = replace(
-        f03.execution,
-        physics_profile='isaac-gpu-physx-f04-position-v1',
-    )
-    f04 = F04PositionCandidateInputV1(
-        'f04-position-candidate-input-v1', f03.task_source, f03.artifact,
-        f03.runtime_source, execution, f03.reset_plan,
-        f03.kinematics_source_xml, f03.kinematics_source_sha256,
-    )
-    with pytest.raises(ValueError, match='synthetic or unverified'):
-        f04.validate()
 
 
-def test_production_materialize_keeps_synthetic_usd_fail_closed(tmp_path):
-    f03 = _versioned_input(tmp_path)
-    execution = replace(
-        f03.execution,
-        physics_profile='isaac-gpu-physx-f04-position-v1',
-    )
-    with pytest.raises(ValueError, match='synthetic or unverified'):
-        materialize(f03.artifact, execution, source=f03.runtime_source)
 
 
 def test_environment_close_closes_session_then_process_runtime_owner_once():

@@ -200,7 +200,7 @@ class IsaacNamedPositionDriveV1:
 
 @dataclass(frozen=True)
 class IsaacNamedPositionDriveReceiptV1:
-    """Bound named-drive metadata for F03 synthetic S1 or F04 native runtime."""
+    """Bound named-drive metadata for an exact Isaac native runtime profile."""
 
     schema_version: str
     provenance_kind: str
@@ -1109,9 +1109,9 @@ def compile_isaac_named_position_drive_receipt_v1(
             or (execution.render_default.provider, execution.render_default.backend,
                 execution.render_default.profile, execution.render_default.device)
             != ('none', 'cpu', 'none', None)):
-        raise ValueError('F03 named drive receipt is state-only and does not admit rendering')
+        raise ValueError('Isaac named drive receipt is state-only and does not admit rendering')
     if execution.camera_overrides:
-        raise ValueError('F03 named drive receipt does not admit camera overrides')
+        raise ValueError('Isaac named drive receipt does not admit camera overrides')
     if type(native_dof_names) is not tuple or any(type(name) is not str or not name for name in native_dof_names):
         raise TypeError('public DOF metadata must be an immutable tuple of names')
     if len(native_dof_names) != 9 or len(set(native_dof_names)) != 9:

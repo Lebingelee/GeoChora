@@ -574,17 +574,15 @@ def materialize_control(
 
     declared_execution = execution
     from .api import (
-        _current_f03_s1_native_io_context, _current_f05_s1_native_io_context,
+        _current_f05_s1_native_io_context,
         _current_f05_dg03_s1_native_io_context,
     )
-    f03_scope = _current_f03_s1_native_io_context()
     f05_scope = _current_f05_s1_native_io_context()
     f05_dg03_s1_scope = _current_f05_dg03_s1_native_io_context()
-    f03_s1 = f03_scope is not None
     f05_s1 = f05_scope is not None
-    if sum(scope is not None for scope in (f03_scope, f05_scope, f05_dg03_s1_scope)) > 1:
-        raise ValueError('F03, F05 and DG03 synthetic admission scopes cannot overlap')
-    s1_scope = f03_scope if f03_s1 else f05_scope
+    if sum(scope is not None for scope in (f05_scope, f05_dg03_s1_scope)) > 1:
+        raise ValueError('F05 and DG03 synthetic admission scopes cannot overlap')
+    s1_scope = f05_scope
     synthetic_s1 = s1_scope is not None
     f04_native = False
     f05_native = f05_native_input is not None
@@ -623,22 +621,14 @@ def materialize_control(
             'none', declared_execution.physics_backend,
             declared_execution.provider_seed, declared_execution.determinism_mode,
         )
-        f03_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
-        manifest_provider = 'isaacsim' if f03_s1 else 'geophys'
-        manifest_version = '6.2.0.0' if f03_s1 else 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
-        manifest_adapter = (
-            'f03-private-synthetic-core-s1-v1' if f03_s1
-            else 'f05-private-geophys-usd-synthetic-s1-v1'
-        )
+        required_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
         actual_manifest = ProviderCapabilityManifest(
-            'provider-capability-v0', manifest_provider, manifest_version,
-            manifest_adapter, declared_execution.physics_backend,
+            'provider-capability-v0', 'geophys', 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4',
+            'f05-private-geophys-usd-synthetic-s1-v1', declared_execution.physics_backend,
             declared_execution.physics_profile, 'none', declared_execution.determinism_mode,
             tuple(CapabilityClaim(
-                capability, 'tested',
-                'f03-private-synthetic-core-conformance-only' if f03_s1
-                else 'f05-public-geophys-host-lowering-synthetic-s1-only',
-            ) for capability in f03_capabilities),
+                capability, 'tested', 'f05-public-geophys-host-lowering-synthetic-s1-only',
+            ) for capability in required_capabilities),
             ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
             'synthetic-S1-only; not runtime admission or provider qualification',
         )

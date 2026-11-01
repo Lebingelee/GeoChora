@@ -202,13 +202,14 @@ value. `task_env.runtime.sessions.source.UsdRuntimeSourceV1` binds that source t
 `TaskArtifactV1`, `SceneDefinition`, scalar/free Joint maps, body/frame maps and drive targets.
 These values are construction declarations; the USD session is not production-admitted.
 `make_env("panda-position-servo-candidate-v1", config={"versioned_input": input_v1})` is an
-explicit versioned-input opt-in that composes the existing TaskSource, Artifact, Scene, source,
+explicit versioned-input opt-in for exact F04/F05 contracts; the historical F03 synthetic input is
+retired. It composes the existing TaskSource, Artifact, Scene, source,
 reset plan, ExecutionSpecV1 and native-drive receipt. The old UID defaults remain unchanged.
-`SelectedReferenceEnv` keeps the exact ExecutionSpecV1 through reset/rebuild. Production
-`materialize()` rejects synthetic or unverified input and fails closed for Isaac because no Core
-Isaac `RuntimeSession` adapter is implemented. The test-only private S1 scope accepts only the
-exact synthetic fixture and substitutes the narrow native-I/O port; it is not a user config,
-provider manifest or production admission switch.
+`SelectedReferenceEnv` keeps the exact ExecutionSpecV1 through reset/rebuild. At the F03 stage,
+production `materialize()` rejected synthetic or unverified input and failed closed for Isaac;
+the private S1 scope then accepted only the exact synthetic fixture and substituted the narrow
+native-I/O port. That F03 scope is retired and never became a user config, provider manifest or
+production admission switch.
 
 The legacy `ExecutionSpec` codec and mappings remain unchanged. `legacy_execution_projection()`
 accepts an `ExecutionSpecV1` only when the existing adapter can preserve every declared choice;
@@ -249,6 +250,11 @@ were only an implementation candidate and no native route had been exercised. Th
 attempt002 result is recorded below. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
 [attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
 and historical [attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
+
+2026-11-01 F convergence retired `F03PositionCandidateInputV1`, its synthetic S1 ContextVar and
+the `F03CoreRuntimeSession` alias after its only protocol caller was removed. The bounded F03
+evidence above remains historical; it is not a current construction route or provider admission.
+The F04 official Panda route and F05/F06 adapter owners remain separate current work.
 
 <a id="f04-isaac-core-adapter-attempt001"></a>
 

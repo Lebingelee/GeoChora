@@ -525,9 +525,9 @@ class UsdCoreRuntimeSession(_SessionValues):
                  source: UsdRuntimeSourceV1, native_io: NativeRuntimeIOV1,
                  drive_receipt=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
-            raise TypeError('F03 Core RuntimeSession requires TaskArtifactV1 and ExecutionSpecV1')
+            raise TypeError('USD Core RuntimeSession requires TaskArtifactV1 and ExecutionSpecV1')
         if type(source) is not UsdRuntimeSourceV1:
-            raise TypeError('F03 Core RuntimeSession requires the exact UsdRuntimeSourceV1')
+            raise TypeError('USD Core RuntimeSession requires the exact UsdRuntimeSourceV1')
         from .leaf_control import (
             GeoPhysUsdPositionDriveReceiptV1,
             GeoPhysUsdSourceActuationReceiptV2,
@@ -546,8 +546,8 @@ class UsdCoreRuntimeSession(_SessionValues):
         # The low-level I/O owner, rather than source validation, determines
         # whether this execution crossed a real provider boundary. This lets
         # provider-free S1 replace only native I/O and keep its Recorder
-        # evidence explicitly synthetic. Older F03 ports do not declare the
-        # marker and retain their source-derived behavior.
+        # evidence explicitly synthetic. Unmarked legacy owners retain their
+        # source-derived behavior.
         execution_provenance = getattr(native_io, 'execution_provenance_kind', None)
         if execution_provenance is None:
             execution_provenance = (
@@ -1000,13 +1000,8 @@ class UsdCoreRuntimeSession(_SessionValues):
             close_owner()
 
 
-# Backward compatibility for F03 synthetic S1 tests; both names share one
-# lifecycle implementation and no second RuntimeSession owner is created.
-F03CoreRuntimeSession = UsdCoreRuntimeSession
-
-
 __all__ = [
-    'F03CoreRuntimeSession', 'UsdCoreRuntimeSession', 'NativeAdvanceReceiptV1', 'NativePositionWriteAckV1',
+    'UsdCoreRuntimeSession', 'NativeAdvanceReceiptV1', 'NativePositionWriteAckV1',
     'NativeResetWriteReceiptV1', 'NativeRuntimeIOV1', 'NativeRuntimeIOMetadataV1',
     'NativeRuntimeReadbackV1',
 ]

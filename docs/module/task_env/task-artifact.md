@@ -203,6 +203,11 @@ TransitionRecorder、Generic H5 v3 finalizer、独立reader与close均真实执�
 S2/S3或Qualification。定向Core/旧Position/P99/H5检查通过；一个伴随旧故障套件误跑真实CPU Pendulum步进，违反该包零
 physics限制，全部事实待Sol审阅，故不能无条件宣称包级PASS。见[attempt002结果](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)。
 
+2026-11-01 F cleanup retired the F03 synthetic input, S1 context and compatibility alias after
+their protocol-only caller was removed. The evidence above remains a historical bounded result;
+the F03 route is no longer a current construction API or provider-admission path. F04/F05 typed
+routes and the F06 PickCube path remain distinct.
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

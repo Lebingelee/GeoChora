@@ -133,71 +133,6 @@ def _f05_dg03_usd_source_bindings():
 
 
 @dataclass(frozen=True)
-class F03PositionCandidateInputV1:
-    """Explicit versioned construction input for the F03 Core call-chain route."""
-
-    schema_version: str
-    task_source: TaskSourceV1
-    artifact: TaskArtifactV1
-    runtime_source: UsdRuntimeSourceV1
-    execution: ExecutionSpecV1
-    reset_plan: EpisodeResetPlanV1
-    kinematics_source_xml: str
-    kinematics_source_sha256: str
-    native_drive_receipt: IsaacNamedPositionDriveReceiptV1
-
-    def validate(self):
-        if self.schema_version != 'f03-position-candidate-input-v1':
-            raise ValueError('unsupported F03 Position candidate input schema')
-        if (type(self.task_source) is not TaskSourceV1
-                or type(self.artifact) is not TaskArtifactV1
-                or type(self.runtime_source) is not UsdRuntimeSourceV1
-                or type(self.execution) is not ExecutionSpecV1
-                or type(self.reset_plan) is not EpisodeResetPlanV1
-                or type(self.native_drive_receipt) is not IsaacNamedPositionDriveReceiptV1):
-            raise TypeError('F03 Position input requires the exact versioned Core contracts')
-        self.runtime_source.validate()
-        self.artifact.validate()
-        self.execution.validate()
-        self.reset_plan.validate()
-        if (self.runtime_source.task_artifact.identity_hash != self.artifact.identity_hash
-                or self.runtime_source.scene_definition.identity_hash != self.artifact.scene_identity_hash
-                or self.runtime_source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
-                or self.runtime_source.scene_source.scene_identity_sha256 != self.runtime_source.scene_definition.identity_hash
-                or self.task_source.scene_ref != self.runtime_source.scene_definition.scene_id
-                or self.task_source.task_id != self.artifact.task_id
-                or self.task_source.version != self.artifact.artifact_version
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
-            raise ValueError('F03 Position input source/TaskSource/Artifact/reset identities disagree')
-        if (self.execution.physics_provider, self.execution.physics_backend,
-                self.execution.physics_device, self.execution.determinism_mode,
-                self.execution.provider_seed) != ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 0):
-            raise ValueError('F03 versioned Position candidate requires Isaac CUDA cuda:0 best_effort')
-        renderer = self.execution.render_default
-        if (renderer.provider, renderer.backend, renderer.profile, renderer.device,
-                self.execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
-            raise ValueError('F03 versioned Position candidate requires a no-renderer ExecutionSpecV1')
-        if not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str:
-            raise ValueError('F03 synthetic S1 requires an explicit nonempty static kinematics source')
-        actual_kinematics_hash = hashlib.sha256(self.kinematics_source_xml.encode('utf-8')).hexdigest()
-        if self.kinematics_source_sha256 != actual_kinematics_hash:
-            raise ValueError('F03 static kinematics source hash mismatch')
-        if (self.native_drive_receipt.scene_identity_sha256,
-                self.native_drive_receipt.source_closure_sha256,
-                self.native_drive_receipt.execution_identity_sha256,
-                self.native_drive_receipt.physics_profile,
-                self.native_drive_receipt.writer_id) != (
-                self.runtime_source.scene_definition.identity_hash,
-                self.runtime_source.source_closure_digest,
-                self.execution.identity_hash,
-                self.execution.physics_profile,
-                'panda-main/position-servo-v1'):
-            raise ValueError('F03 named drive receipt does not bind the full versioned source/execution/control input')
-
-
-@dataclass(frozen=True)
 class F04PositionCandidateInputV1:
     """Production construction input whose named receipt is deferred to native metadata."""
 
@@ -1016,18 +951,18 @@ class F05Dg01MujocoCandidateInputV1:
             raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg03IsaacUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg03IsaacUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
-    if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1,
+    if type(input_v1) not in (F04PositionCandidateInputV1,
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
                               F05Dg03IsaacUsdCandidateInputV1,
                               F05Dg04IsaacNativeCandidateInputV1,
                               F05Dg01MujocoCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02/DG03/DG04 input contract')
+        raise TypeError('versioned Position candidate requires an exact F04/F05/DG01/DG02/DG03/DG04 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
@@ -1087,7 +1022,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         )
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     if input_v1.reset_plan.reset_sample.task_seed < 0:
-        raise ValueError('F03 reset seed must be nonnegative')
+        raise ValueError('Position candidate reset seed must be nonnegative')
 
     def build(_provider):
         return {
@@ -1096,7 +1031,6 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             'reset_plan': input_v1.reset_plan,
             'controller_binding_plan': plan,
             'execution_spec_v1': input_v1.execution,
-            'f03_position_input': input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
             'f04_position_input': input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
             'f05_position_input': input_v1 if type(input_v1) in (
                 F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
@@ -1127,9 +1061,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                 'execution_identity_sha256': input_v1.execution.identity_hash,
                 'arm_tracking_method': arm_tracking_method,
             },
-            'source_revision': ('F03-versioned-usd-synthetic-s1-v1'
-                                if type(input_v1) is F03PositionCandidateInputV1
-                                else 'F04-versioned-usd-native-candidate-v1'
+            'source_revision': ('F04-versioned-usd-native-candidate-v1'
                                 if type(input_v1) is F04PositionCandidateInputV1
                                 else 'F05-versioned-geophys-usd-native-v1'
                                 if type(input_v1) is F05NativePositionCandidateInputV1
@@ -1152,7 +1084,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
 
     def fixed_seed(seed):
         if type(seed) is not int or seed != input_v1.reset_plan.reset_sample.task_seed:
-            raise ValueError('F03 reset seed must match its fixed EpisodeResetPlan')
+            raise ValueError('Position reset seed must match its fixed EpisodeResetPlan')
         return seed
 
     def evaluate(state, semantics):
@@ -1205,7 +1137,6 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         source=source, controller_binding_plan=plan,
         execution=input_v1.execution,
         native_drive_receipt=native_drive_receipt,
-        f03_position_input=input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
         f04_position_input=input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
         f05_position_input=input_v1 if type(input_v1) is F05PositionCandidateInputV1 else None,
         f05_native_position_input=input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
@@ -1393,7 +1324,7 @@ def build_f05_dg01_mujoco_candidate(workspace: Path | str, *, horizon: int = 300
 
 
 __all__ = [
-    'F03PositionCandidateInputV1', 'F04PositionCandidateInputV1',
+    'F04PositionCandidateInputV1',
     'F05PositionCandidateInputV1', 'F05NativePositionCandidateInputV1',
     'F05Dg01MujocoCandidateInputV1', 'F05_DG01_MUJOCO_PROFILE',
     'POSITION_CANDIDATE_SEED',
