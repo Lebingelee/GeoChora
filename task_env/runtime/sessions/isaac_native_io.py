@@ -49,6 +49,14 @@ def _numeric_tuple_matches(actual, expected, *, abs_tol: float) -> bool:
     )
 
 
+def _flush_public_physics_changes(simulation_interface: object) -> None:
+    """Require the public PhysX listener to process buffered USD edits before stepping."""
+    flush_changes = getattr(simulation_interface, "flush_changes", None)
+    if not callable(flush_changes):
+        raise RuntimeError("DG03 requires public IPhysxSimulation.flush_changes before stepping")
+    flush_changes()
+
+
 def _dg03_collision_filter_witness(stage, UsdPhysics) -> dict[str, list[dict[str, object]]]:
     """Preserve source-robot filters while detecting filters that touch F05Scene."""
     def in_task_scene(path: str) -> bool:
@@ -1359,6 +1367,15 @@ class IsaacSimNativeRuntimeIOV1:
                     'public_mimic_damping_ratio_readback': applied_damping_ratio,
                 }
                 self._sync()
+            if self._dg03:
+                from omni.physx import get_physx_simulation_interface
+
+                _flush_public_physics_changes(get_physx_simulation_interface())
+                if tendon_application is not None:
+                    tendon_application["public_physics_change_flush_api"] = (
+                        "omni.physx.get_physx_simulation_interface().flush_changes"
+                    )
+                    tendon_application["public_physics_change_flush_invoked"] = True
             self._manager.step(steps=1, update_fabric=False)
             self._sync()
             if self._dg03:

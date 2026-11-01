@@ -103,6 +103,26 @@ def test_paired_response_detector_rejects_changed_properties_when_physics_ignore
         _verify_paired_physics_response(_paired_response_receipts(physics_changes=False))
 
 
+def test_dg03_public_physics_change_flush_is_required_before_step():
+    from task_env.runtime.sessions.isaac_native_io import _flush_public_physics_changes
+
+    calls = []
+
+    class PublicSimulationInterface:
+        def flush_changes(self):
+            calls.append("flush_changes")
+
+    _flush_public_physics_changes(PublicSimulationInterface())
+    assert calls == ["flush_changes"]
+
+
+def test_dg03_public_physics_change_flush_fails_closed_when_unavailable():
+    from task_env.runtime.sessions.isaac_native_io import _flush_public_physics_changes
+
+    with pytest.raises(RuntimeError, match="IPhysxSimulation.flush_changes"):
+        _flush_public_physics_changes(object())
+
+
 def test_contact_diagnostic_reset_preserves_task_reset_and_authors_one_mm_overlap():
     from task_env.tasks.position_candidate.builder import build_f05_dg03_isaac_usd_candidate
     from task_env.diagnostics.tasks.f05_dg04_isaac_core_adapter_probe import DELIVERY_MANIFEST
