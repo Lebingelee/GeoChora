@@ -6,6 +6,7 @@ from task_env.objects.pick_cube import CUBE_HALF_SIZE
 from task_env.tasks.pick_cube.solution import (
     _ABOVE_CLEARANCE,
     _APPROACH_CLEARANCE,
+    _MEASURED_CLEARANCE_COMMAND_HEADROOM,
     PickCubePositionExecutionInfoV1,
     PickCubeReadinessConfig,
     PickCubeReadinessSolution,
@@ -103,6 +104,14 @@ def test_r3_readiness_holds_vertical_action_until_public_tcp_clearance_is_measur
     plan = solution._segments[0].plan
     vertical_gate = plan.measured_tcp_gates[0]
     assert vertical_gate.after_actions > 0
+    commanded_clearance = (
+        float(plan.actions[vertical_gate.after_actions - 1, 2])
+        - float(cube[2]) - CUBE_HALF_SIZE
+    )
+    assert commanded_clearance >= (
+        vertical_gate.minimum_height_above_cube_top_m
+        + _MEASURED_CLEARANCE_COMMAND_HEADROOM - 1e-5
+    )
 
     for step in range(1, vertical_gate.after_actions + 1):
         proposal = solution.act()

@@ -30,6 +30,10 @@ _ABOVE_CLEARANCE = 0.12
 # Keep the approach above the existing hover pose while traversing laterally.
 # The final hover/grasp poses and task geometry remain unchanged.
 _APPROACH_CLEARANCE = 0.10
+# R3 can settle several millimeters below an absolute-pose target.  Give the
+# planned high waypoint extra headroom so the measured clearance interlock is
+# reachable without relaxing its physical threshold.
+_MEASURED_CLEARANCE_COMMAND_HEADROOM = 0.020
 # Clearance is confirmed from the public measured EE pose before the preplanned
 # path is allowed to traverse over the cube or descend toward it.
 _MEASURED_CLEARANCE_TOLERANCE = 0.005
@@ -368,9 +372,19 @@ class PickCubeSolution:
         target[:3] = cube + np.array(
             [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32
         )
+        clearance_headroom = (
+            _MEASURED_CLEARANCE_COMMAND_HEADROOM
+            if getattr(
+                getattr(self, "readiness_config", None),
+                "measured_tcp_clearance_gate",
+                False,
+            )
+            else 0.0
+        )
         clear = start.copy()
         clear[2] = max(
-            float(start[2]), float(target[2]) + _APPROACH_CLEARANCE,
+            float(start[2]),
+            float(target[2]) + _APPROACH_CLEARANCE + clearance_headroom,
         )
         transit = clear.copy()
         transit[:2] = target[:2]
