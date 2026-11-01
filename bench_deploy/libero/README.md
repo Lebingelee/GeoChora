@@ -19,40 +19,60 @@ established. File-specific license and attribution for the `wine_bottle` and
 autonomous Solution success remain optional; tasks B/C and Isaac Sim are
 deferred.
 
-The CLI's default `--run-worker` path is the bounded D01 joint-space diagnostic;
-it is not the accepted A replay route, and the CLI does not regenerate the
-frozen A action sequence. The A replay evidence remains in its acceptance
-record. The CLI's `--task-solution` path selects the optional V8 policy.
+The CLI runs an explicitly selected frozen action sequence for task1, task2,
+or task3 on MuJoCo or GeoPhys. Task2/3 also require the accepted source reset
+sample. The optional V8 policy uses the same runner and result format; it is
+not selected by default.
 
 ## Current route
 
-1. `asset/benchmarks/libero/tools/source_bundle.py` verifies the pinned source
-   and writes the bounded task recipe.
-2. `environment.selected_reference.build_libero_selected_candidate()` composes the
-   TaskEnv `SelectedReferenceEnv` route and binds LIBERO source/reset semantics.
-3. `script/cli.py` runs the bounded worker or reads a closed result bundle.
-4. `trajectory/reader.py` validates task-specific result semantics on top of
+1. The pinned upstream LIBERO `ControlEnv` and robosuite model owners build the
+   source MJCF during source preparation; the input plan records its task,
+   source revisions, model hash, and asset closure. This package does not
+   reconstruct the MJCF from fragments.
+2. `asset/benchmarks/libero/tools/source_bundle.py` verifies pinned source
+   bytes and installs/verifies the source closure.
+3. `environment.selected_reference.build_libero_selected_candidate()` binds
+   the source plan and LIBERO reset semantics to the existing TaskEnv route.
+4. `script/cli.py` runs a frozen A action sequence or the optional V8 policy.
+5. `trajectory/reader.py` validates task-specific result semantics on top of
    the existing TaskEnv record/readback owners.
 
 No parallel Runtime or Recorder is maintained here. LIBERO asset names,
 source hashes, reset sampling, contact policy, and task thresholds remain
 task-owned.
 
+## Reset realization record
+
+The normal-reset receipt uses `libero-normal-reset-realization-v2`. It stores
+the actual seed, selected `.pruned_init` row and hash, source and BDDL hashes,
+`ResetSampleV1` identity and state, placement draws, and asset geometry hashes.
+The fixed `libero-normal-reset-order-v1` algorithm is described here instead of
+being copied into every receipt.
+
+For each reset, the sampler uses a task-seeded `numpy.random.RandomState`. It
+consumes seven zero-magnitude Panda arm-noise draws before placement sampling,
+then samples movable objects in BDDL order with horizontal-radius margins and
+the upstream overlap rule. It samples fixtures in BDDL order without overlap
+rejection, applies the selected `.pruned_init` row, restores source simulation
+time, and forwards derived state without integrating physics. These draws are
+retained even though the pruned row overwrites movable-object placement.
+
 ## Active versions and recovery
 
-The D01 CLI route uses `LiberoMixedControllerV1`; the accepted A reference
-profile is `LiberoMixedControllerV6`, and optional rim control is V7. The only
-active Solution class is optional `LiberoPickPlaceSolutionV8`; its private V5–V7
-parent-hash chain remains inside identity construction to preserve existing V8
-hashes. Only `solution_identity_v8` is exported as the identity entry point.
-`trajectory/reader.py` accepts the current D01 result schema and optional V8
-Solution schema. It does not dispatch historical worker or Solution versions.
+The active A reference profile is `LiberoMixedControllerV6`; optional rim
+control remains V7. The only active Solution class is optional
+`LiberoPickPlaceSolutionV8`; its private V5–V7 parent-hash data remains inside
+identity construction to preserve existing V8 hashes. Only
+`solution_identity_v8` is exported as the identity entry point. The independent
+reader accepts one current replay-result schema. Retired D01 and V8 bundle
+formats remain recoverable from the frozen input commit.
 
 Retired implementations are recoverable from input HEAD
-`65891af449918e7162c78dec7c01a3bc0b7eecd0`; for example:
+`b5e93509b758d523bb8328e9104f6b82ea086570`; for example:
 
 ```sh
-git show 65891af449918e7162c78dec7c01a3bc0b7eecd0:bench_deploy/libero/solution.py
+git show b5e93509b758d523bb8328e9104f6b82ea086570:bench_deploy/libero/trajectory/reader.py
 ```
 
 Unused `LiberoOperationalSpaceConfigV1` defaults are summarized in the
@@ -63,24 +83,35 @@ The R-route documentation snapshots are byte-preserved under
 [`docs/archive/phase_ii_01_r_routes/`](../../docs/archive/phase_ii_01_r_routes/README.md)
 with source paths, byte counts, and SHA-256 values.
 
-## Build a recipe
+## Source bundle commands
 
-From the repository root, with the pinned LIBERO and robosuite source installed
-and verified:
+The old `source_bundle.py recipe` command and its v1 deployment metadata are
+retired. The source bundle CLI still supports `build-manifest`, `install`, and
+`verify`; use `assembly.official_model` for the pinned upstream model capture.
+That capture currently records exact XML and builder receipt only. A complete
+source-preparation route must also emit and validate the plan and closure before
+its output is used for task execution.
+
+## Capture an upstream source model
+
+Run source preparation from a fresh Python process with local checkouts at the
+pinned LIBERO and robosuite revisions. The upstream `ControlEnv` builds the
+model; the command captures its exact XML, records the options and closure
+identity, and closes the upstream environment before writing the result:
 
 ```sh
-PYTHONPATH=. python asset/benchmarks/libero/tools/source_bundle.py recipe \
-  --manifest asset/benchmarks/libero/source_manifest.json \
-  --target /local/audit/libero-pilot \
-  --task-input bench_deploy/libero/artifacts/task_input.json \
-  --output /local/audit/libero-pilot.recipe.json
+PYTHONPATH=. python -m bench_deploy.libero.assembly.official_model \
+  --task task2 --libero-source-root /local/LIBERO \
+  --robosuite-source-root /local/robosuite \
+  --source-closure-sha256 <verified-source-closure-sha256> \
+  --output /local/task2-source-model
 ```
 
-The recipe records the bounded A123 technical status and its remaining limits.
-Creating the recipe does not run native physics or produce new trajectory
-evidence.
+This captures the model and its build receipt. The pinned source-bundle and
+asset-closure verifier remains responsible for verifying and packaging the
+referenced bytes.
 
-## Run or read a bounded diagnostic
+## Replay frozen actions or read a result
 
 Use the frozen run package, its resource limits, and the shared native lock.
 The normal entry point is:
@@ -89,10 +120,18 @@ The normal entry point is:
 PYTHONPATH=. python -m bench_deploy.libero.script.cli --help
 ```
 
-The CLI default `--run-worker` route is the bounded D01 joint-space diagnostic;
-it does not regenerate the accepted A-stage replay. `--task-solution` selects
-the optional V8 demonstration-derived policy. The accepted A-stage reference
-profile and task 2 exception are recorded in
+Use the selected source build, action sequence, task, and provider explicitly:
+
+```sh
+PYTHONPATH=. python -m bench_deploy.libero.script.cli --run-replay /local/run \
+  --task task2 --provider mujoco --actions /local/task2-actions.json \
+  --reset-sample /local/task2-reset.json --source-xml /local/source.xml \
+  --composition-plan /local/composition-plan.json --install-root /local/libero \
+  --init-path /local/task2/install/init.pruned_init
+```
+
+`--solution` selects optional V8 and uses the same runner and result reader.
+The accepted A-stage reference profile and task 2 exception are recorded in
 [`20261101_r07_a123_sol_acceptance.md`](../../docs/maintenance/20261101_r07_a123_sol_acceptance.md).
 A short smoke or completed worker bundle is not task success, provider parity,
 or Qualification.
@@ -101,13 +140,20 @@ or Qualification.
 
 | Package | Responsibility |
 | --- | --- |
-| `artifacts/` | Task source contracts, recipe inputs, and source provenance |
-| `assembly/` | Pinned source verification and MJCF composition |
+| `artifacts/` | Task source contracts and source provenance |
+| `assembly/` | Official source model intake and compile-first model verification |
 | `controllers/` | Reference OSC, gripper mapping, and optional rim-control profile |
 | `environment/` | Candidate construction, public Runtime binding, and reset glue |
-| `objects/`, `robots/` | LIBERO object/fixture and mounted Panda semantics |
-| `observations/`, `planners/`, `tasks/` | Public state projection, planner configuration, predicates, optional Solution |
+| `objects/` | LIBERO object/fixture layout facts used by source reset |
+| `artifacts/`, source manifest | Pinned Panda, mount, gripper and source asset identities |
+| `tasks/` | Public observation projection, predicates, optional Solution |
 | `trajectory/`, `diagnostics/`, `script/` | Task result validation, focused regression coverage, CLI/worker entry |
+
+The former `robots/mounted_panda.py` and `observations/libero.py` files were
+planning-only dictionary wrappers; the installed robot assets and runtime
+observation schema are owned by the pinned source manifest and TaskEnv route.
+They are recoverable with the frozen input commit below, but are not current
+deployment modules.
 
 Historical R00–R07 decisions and attempt details are indexed from
 `docs/module/task_env/goal/Phase_II_01/README.md`; fixed source commits remain

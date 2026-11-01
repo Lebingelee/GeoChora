@@ -13,11 +13,7 @@ from bench_deploy.libero.tasks.predicates import (
     evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1,
 )
-from bench_deploy.libero.controllers.osc import (
-    LiberoMixedControlConfigV1,
-    LiberoMixedControllerV1,
-)
-from bench_deploy.libero.artifacts.contracts import TASK_2, TASK_3
+from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
 from bench_deploy.libero.tasks.solution import (
     LiberoPickPlaceSolutionConfigV1, solution_identity_v8,
 )
@@ -39,6 +35,7 @@ def test_task_one_solution_v8_identity_binds_source_resolver_and_motion_config()
         arm_resolver_identity="d" * 64,
     )
     identity = solution_identity_v8(**values, config=config)
+    assert identity == "b8291a086579f57fa4b9ede5d29435e10af65fb6f5f8e3ac4369301ce32b3598"
     assert len(identity) == 64
     assert identity == solution_identity_v8(**values, config=config)
     assert identity != solution_identity_v8(
@@ -51,38 +48,6 @@ def test_task_one_solution_v8_identity_binds_source_resolver_and_motion_config()
     assert identity != solution_identity_v8(**values, config=stricter_tolerance)
 
 
-def test_independent_reader_reset_pose_match_uses_runtime_numeric_tolerance():
-    from bench_deploy.libero.trajectory.worker import _pose_world_mapping_matches
-
-    expected = {
-        "fixture": {
-            "position": [0.032160686061349086, -0.26769535926827864, 0.905],
-            "quaternion_wxyz": [0.21813924162729167, 0.0, 0.0, 0.9759176559844944],
-        },
-    }
-    mujoco_forward = {
-        "fixture": {
-            "position": [0.032160686061349086, -0.26769535926827864, 0.905],
-            "quaternion_wxyz": [0.2181392416272917, 0.0, 0.0, 0.9759176559844945],
-        },
-    }
-    assert _pose_world_mapping_matches(mujoco_forward, expected)
-    sign_equivalent = {
-        "fixture": {
-            "position": expected["fixture"]["position"],
-            "quaternion_wxyz": [-value for value in expected["fixture"]["quaternion_wxyz"]],
-        },
-    }
-    assert _pose_world_mapping_matches(sign_equivalent, expected)
-    outside_tolerance = {
-        "fixture": {
-            "position": [expected["fixture"]["position"][0] + 1.1e-12,
-                         *expected["fixture"]["position"][1:]],
-            "quaternion_wxyz": expected["fixture"]["quaternion_wxyz"],
-        },
-    }
-    assert not _pose_world_mapping_matches(outside_tolerance, expected)
-    assert not _pose_world_mapping_matches({}, expected)
 
 
 def test_optional_rim_controller_bounds_velocity_feedforward():
@@ -139,7 +104,9 @@ def test_source_closure_archive_reads_only_manifest_members_and_rejects_tamperin
     import io
     import tarfile
 
-    from bench_deploy.libero.controllers.source_gravity import read_source_closure_archive
+    from task_env.assembly.assets import _read_source_closure_archive
+
+    read_source_closure_archive = _read_source_closure_archive
 
     payload = {"canonical-source.xml": b"<mujoco/>", "assets/mesh.bin": b"mesh-bytes"}
     manifest = [
@@ -186,46 +153,45 @@ def test_source_closure_archive_reads_only_manifest_members_and_rejects_tamperin
         )
 
 
-def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitive(tmp_path):
+def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitive(tmp_path, monkeypatch):
     import hashlib
-    import io
     import json
-    from pathlib import Path
-    import tarfile
     from types import SimpleNamespace
 
     from bench_deploy.libero.controllers.source_gravity import MujocoSourceGravityBiasV1
-    from task_env.assembly.assets import _source_closure_digest
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
 
     xml = b'<mujoco><worldbody/></mujoco>'
+    expected_model_xml = xml
     closure = {
         "canonical-source.xml": xml,
         "scene.xml": xml,
         "upstream/example.bin": b"source asset bytes",
     }
-    bundle = tmp_path / "bundle"
-    closure_root = bundle / "source_inputs/closure"
-    for logical, raw in closure.items():
-        path = closure_root / logical
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(raw)
     plan = {
         "identity": {"task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate"},
         "output": {"composed_mjcf_sha256": hashlib.sha256(xml).hexdigest()},
     }
     plan_bytes = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()
-    (bundle / "source_inputs/composition_plan.json").write_bytes(plan_bytes)
+    source_receipt = ExecutionSourceReceiptV1.create(
+        source_id="libero-source-gravity-test-v1", canonical_xml=xml,
+        importer_xml=xml, closure_files=closure,
+    )
 
     class FakeModel:
         nq = nv = njnt = 7
-        nbody = 8
+        nbody, nsite = 8, 1
         qpos0 = np.zeros(7)
         jnt_qposadr = np.arange(7)
         jnt_dofadr = np.arange(7)
 
         @classmethod
-        def from_xml_path(cls, path):
-            assert Path(path).read_bytes() == xml
+        def from_xml_string(cls, source_xml, assets):
+            assert source_xml.encode("utf-8") == expected_model_xml
+            if expected_model_xml == xml:
+                assert assets == {"upstream/example.bin": b"source asset bytes"}
+            else:
+                assert assets == {}
             return cls()
 
     class FakeData:
@@ -233,7 +199,9 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
             self.qpos = np.zeros(model.nq)
             self.qvel = np.zeros(model.nv)
             self.qfrc_bias = np.zeros(model.nv)
-            self.qfrc_passive = np.zeros(model.nv)
+            self.qM = np.zeros(model.nv * (model.nv + 1) // 2)
+            self.site_xpos = np.zeros((model.nsite, 3))
+            self.site_xmat = np.eye(3).reshape(1, 9)
 
     def fake_name2id(model, obj_type, name):
         if obj_type == 1:
@@ -244,65 +212,91 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
 
     def fake_forward(model, data):
         data.qfrc_bias[:] = data.qpos
+        data.site_xpos[0] = data.qpos[:3]
+
+    def fake_full_mass(model, destination, _qM):
+        destination[:] = np.eye(model.nv)
+
+    def fake_jacobian(_model, _data, jacp, jacr, _site_id):
+        jacp[0, 0] = 1.0
+        jacr[0, 1] = 1.0
 
     fake_mujoco = SimpleNamespace(
         __version__="3.8.1", mj_version=lambda: 3008001,
         MjModel=FakeModel, MjData=FakeData,
         mjtObj=SimpleNamespace(mjOBJ_JOINT=0, mjOBJ_SITE=1),
         mj_name2id=fake_name2id, mj_forward=fake_forward,
+        mj_fullM=fake_full_mass, mj_jacSite=fake_jacobian,
     )
-    source_xml_sha = hashlib.sha256(xml).hexdigest()
-    source_closure = _source_closure_digest(closure)
     model = MujocoSourceGravityBiasV1(
-        bundle_root=bundle, source_closure_files=closure,
-        source_xml_sha256=source_xml_sha, source_closure_digest=source_closure,
-        composition_plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
+        source_receipt=source_receipt, composition_plan_bytes=plan_bytes,
         mujoco_api=fake_mujoco,
     )
-    assert np.array_equal(model.gravity_torque(np.arange(7, dtype=np.float64)), np.arange(7))
+    state = model.operational_space_state_v2(
+        np.arange(7, dtype=np.float64), np.zeros(7),
+    )
+    assert np.array_equal(state["qfrc_bias_arm_Nm"], np.arange(7))
+    assert state["mass_matrix_arm"].shape == (7, 7)
     assert model.forward_calls == 1
     close = model.close()
     assert close["closed"] and close["model_released"] and close["data_released"]
+    assert model.close_receipt is close
     assert close["mj_step_call_count"] == 0
     with pytest.raises(RuntimeError, match="closed"):
-        model.gravity_torque(np.zeros(7))
+        model.operational_space_state_v2(np.zeros(7), np.zeros(7))
+    source_receipt.close()
 
-    archived_bundle = tmp_path / "archived_bundle"
-    archived_source = archived_bundle / "source_inputs"
-    archived_source.mkdir(parents=True)
-    (archived_source / "composition_plan.json").write_bytes(plan_bytes)
-    with tarfile.open(archived_source / "closure.tar.gz", "w:gz") as archive:
-        for directory_name in ("closure/", "closure/upstream/"):
-            directory = tarfile.TarInfo(directory_name)
-            directory.type = tarfile.DIRTYPE
-            archive.addfile(directory)
-        for logical, raw in sorted(closure.items()):
-            member = tarfile.TarInfo("closure/" + logical)
-            member.size = len(raw)
-            archive.addfile(member, io.BytesIO(raw))
-    assert not (archived_source / "closure").exists()
-    archived_model = MujocoSourceGravityBiasV1(
-        bundle_root=archived_bundle, source_closure_files=closure,
-        source_xml_sha256=source_xml_sha, source_closure_digest=source_closure,
-        composition_plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
-        mujoco_api=fake_mujoco,
+    from bench_deploy.libero.assembly import model_profile
+    from bench_deploy.libero.assembly.model_profile import ROBOT_MODEL_PROFILE_V3_ID
+
+    profiled_xml = b'<mujoco model="profiled"><worldbody/></mujoco>'
+    raw_xml = b'<mujoco model="raw"><worldbody/></mujoco>'
+    expected_model_xml = profiled_xml
+    profile = {
+        "profile_id": ROBOT_MODEL_PROFILE_V3_ID,
+        "raw_source_xml_sha256": hashlib.sha256(raw_xml).hexdigest(),
+        "runtime_model_xml_sha256": hashlib.sha256(profiled_xml).hexdigest(),
+    }
+    profile_bytes = json.dumps(profile, sort_keys=True, separators=(",", ":")).encode()
+    monkeypatch.setattr(
+        model_profile, "normalize_libero_robosuite_model_xml_v3",
+        lambda source: (profiled_xml, profile),
     )
-    assert archived_model.source_model_path.endswith("closure.tar.gz#closure/canonical-source.xml")
-    assert np.array_equal(archived_model.gravity_torque(np.zeros(7)), np.zeros(7))
-    assert archived_model.close()["closed"] is True
+    profiled_receipt = ExecutionSourceReceiptV1.create(
+        source_id="libero-profiled-source-gravity-test-v1",
+        canonical_xml=profiled_xml, importer_xml=profiled_xml,
+        closure_files={"canonical-source.xml": profiled_xml},
+    )
+    profiled_plan = {
+        "identity": {"task_uid": TASK_1},
+        "output": {"composed_mjcf_sha256": hashlib.sha256(raw_xml).hexdigest()},
+    }
+    profiled_model = MujocoSourceGravityBiasV1(
+        source_receipt=profiled_receipt,
+        composition_plan_bytes=json.dumps(
+            profiled_plan, sort_keys=True, separators=(",", ":"),
+        ).encode(),
+        mujoco_api=fake_mujoco, raw_source_xml_bytes=raw_xml,
+        model_profile_bytes=profile_bytes,
+    )
+    assert profiled_model.model_profile_id == ROBOT_MODEL_PROFILE_V3_ID
+    assert profiled_model.raw_source_xml_sha256 == hashlib.sha256(raw_xml).hexdigest()
+    assert profiled_model.close()["closed"]
+    profiled_receipt.close()
 
-
-def test_task_one_controller_identity_binds_unqualified_braking_experiment():
-    config = LiberoMixedControlConfigV1()
-    assert config.kp_Nm_per_rad == (20.0,) * 7
-    assert config.kd_Nm_s_per_rad == (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0)
-    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp20_kd4_8_v6"
-    controller = LiberoMixedControllerV1(config)
-    receipt = controller.identity_mapping()
-    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v6"
-    assert receipt["kp_Nm_per_rad"] == [20.0] * 7
-    assert receipt["kd_Nm_s_per_rad"] == [4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0]
-    assert receipt["qualification"] == "diagnostic_only_unqualified_gains"
+    tampered_receipt = ExecutionSourceReceiptV1.create(
+        source_id="libero-source-gravity-tamper-test-v1", canonical_xml=xml,
+        importer_xml=xml, closure_files=closure,
+    )
+    source_path = tampered_receipt.snapshot_root / "canonical-source.xml"
+    source_path.chmod(0o644)
+    source_path.write_bytes(b"<mujoco model='tampered'/>")
+    with pytest.raises(ValueError, match="snapshot bytes changed"):
+        MujocoSourceGravityBiasV1(
+            source_receipt=tampered_receipt, composition_plan_bytes=plan_bytes,
+            mujoco_api=fake_mujoco,
+        )
+    tampered_receipt.close()
 
 
 def _boundary(task_uid: str = TASK_2) -> LiberoPredicateBoundaryV1:

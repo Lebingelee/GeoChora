@@ -294,20 +294,12 @@ def _task_regions_and_initial_state(install_root: Path, source_manifest: dict):
         (str(item[0]).lower(), str(item[1]), str(item[2]))
         for item in initial_form[1:] if isinstance(item, list) and len(item) == 3
     )
-    expected_states = (
-        ("on", "akita_black_bowl_1", "main_table_between_plate_ramekin_region"),
-        ("on", "akita_black_bowl_2", "main_table_next_to_ramekin_region"),
-        ("on", "plate_1", "main_table_plate_region"),
-        ("on", "cookies_1", "main_table_box_region"),
-        ("on", "glazed_rim_porcelain_ramekin_1", "main_table_ramekin_region"),
-        ("on", "wooden_cabinet_1", "main_table_cabinet_region"),
-        ("on", "flat_stove_1", "main_table_stove_region"),
+    expected_states = tuple(
+        ("on", name, f"main_table_{region}")
+        for name, region, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES)
     )
     if states != expected_states:
         raise ValueError("pinned LIBERO BDDL initial-state order or content changed")
-    expected_placement_order = tuple(name for name, _, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES))
-    if tuple(item[1] for item in states) != expected_placement_order:
-        raise ValueError("pinned LIBERO placement order differs from the BDDL initial-state order")
     result = {}
     for region in regions_form[1:]:
         if not isinstance(region, list) or not region:
@@ -389,6 +381,27 @@ def _object_placement_properties(install_root: Path, source_manifest: dict, sour
     }
 
 
+def _placement_draw(*, position, quaternion_wxyz, range_index, attempt, source_sampler,
+                    region_bounds, sample_bounds, margin, z_offset, rotation_axis,
+                    rotation_bounds, angle, object_class=None):
+    x0, y0, x1, y1 = sample_bounds
+    record = {
+        "position": position, "quaternion_wxyz": quaternion_wxyz,
+        "range_index": range_index, "attempt": attempt,
+        "source_sampler": source_sampler,
+        "region_ranges_m": list(region_bounds),
+        "x_sample_bounds_m": [x0, x1], "y_sample_bounds_m": [y0, y1],
+        "x_sample_interval_m": [min(x0, x1), max(x0, x1)],
+        "y_sample_interval_m": [min(y0, y1), max(y0, y1)],
+        "horizontal_radius_margin_m": margin, "z_offset_m": z_offset,
+        "rotation_axis": rotation_axis, "rotation_range_rad": list(rotation_bounds),
+        "rotation_angle_rad": angle,
+    }
+    if object_class is not None:
+        record["object_class"] = object_class
+    return record
+
+
 def sample_libero_normal_reset_v1(
     *,
     init_bytes: bytes,
@@ -423,10 +436,7 @@ def sample_libero_normal_reset_v1(
     )
     profiled_source_identity = (
         len(source_parts) == 4
-        and source_parts[0] in {
-            "libero-spatial-pilot-model-profile-v2",
-            "libero-spatial-official-model-profile-v3",
-        }
+        and source_parts[0] == "libero-spatial-official-model-profile-v3"
         and all(re.fullmatch(r"[0-9a-f]{64}", value) for value in source_parts[1:])
     )
     if (not (legacy_source_identity or profiled_source_identity)
@@ -479,23 +489,17 @@ def sample_libero_normal_reset_v1(
             # endpoints coincide, so retain that RNG draw.
             angle = float(rng.uniform(low=math.pi / 2, high=math.pi / 2))
             quaternion = (math.cos(angle / 2), math.sin(angle / 2), 0.0, 0.0)
-            selected = {
-                "position": (x, y, z), "quaternion_wxyz": quaternion,
-                "range_index": range_index, "attempt": attempt + 1,
-                "object_class": PILOT_MOVABLE_OBJECT_CLASSES[object_name],
-                "source_sampler": "libero.envs.regions.workspace_region_sampler.TableRegionSampler",
-                "region_ranges_m": [x0 - properties["horizontal_radius"],
-                                    y0 - properties["horizontal_radius"],
-                                    x1 + properties["horizontal_radius"],
-                                    y1 + properties["horizontal_radius"]],
-                "x_sample_bounds_m": [x0, x1], "y_sample_bounds_m": [y0, y1],
-                "x_sample_interval_m": [min(x0, x1), max(x0, x1)],
-                "y_sample_interval_m": [min(y0, y1), max(y0, y1)],
-                "horizontal_radius_margin_m": properties["horizontal_radius"],
-                "z_offset_m": PILOT_MOVABLE_Z_OFFSET_M,
-                "rotation_axis": "x", "rotation_range_rad": [math.pi / 2, math.pi / 2],
-                "rotation_angle_rad": angle,
-            }
+            radius = properties["horizontal_radius"]
+            selected = _placement_draw(
+                position=(x, y, z), quaternion_wxyz=quaternion,
+                range_index=range_index, attempt=attempt + 1,
+                source_sampler="libero.envs.regions.workspace_region_sampler.TableRegionSampler",
+                region_bounds=(x0 - radius, y0 - radius, x1 + radius, y1 + radius),
+                sample_bounds=(x0, y0, x1, y1), margin=radius,
+                z_offset=PILOT_MOVABLE_Z_OFFSET_M, rotation_axis="x",
+                rotation_bounds=(math.pi / 2, math.pi / 2), angle=angle,
+                object_class=PILOT_MOVABLE_OBJECT_CLASSES[object_name],
+            )
             placed[object_name] = {
                 **selected, "horizontal_radius": properties["horizontal_radius"],
                 "top_offset": properties["top_offset"], "bottom_offset": properties["bottom_offset"],
@@ -511,32 +515,22 @@ def sample_libero_normal_reset_v1(
             source_path, _object_placement_properties(install_root, source_manifest, source_path),
         )
         region = regions[region_name]
-        selected = None
-        for attempt in range(5000):
-            range_index = int(rng.randint(len(region["ranges"])))
-            x0, y0, x1, y1 = region["ranges"][range_index]
-            x = float(rng.uniform(low=x0, high=x1))
-            y = float(rng.uniform(low=y0, high=y1))
-            angle_low, angle_high = region["yaw_ranges"][min(range_index, len(region["yaw_ranges"]) - 1)]
-            angle = float(rng.uniform(low=min(angle_low, angle_high), high=max(angle_low, angle_high)))
-            z = PILOT_FIXTURE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - properties["bottom_offset"][2]
-            quaternion = (math.cos(angle / 2), 0.0, 0.0, math.sin(angle / 2))
-            selected = {
-                "position": (x, y, z), "quaternion_wxyz": quaternion,
-                "range_index": range_index, "attempt": attempt + 1,
-                "source_sampler": "robosuite.utils.placement_samplers.MultiRegionRandomSampler",
-                "region_ranges_m": [x0, y0, x1, y1],
-                "x_sample_bounds_m": [x0, x1], "y_sample_bounds_m": [y0, y1],
-                "x_sample_interval_m": [min(x0, x1), max(x0, x1)],
-                "y_sample_interval_m": [min(y0, y1), max(y0, y1)],
-                "horizontal_radius_margin_m": 0.0,
-                "z_offset_m": PILOT_FIXTURE_Z_OFFSET_M,
-                "rotation_axis": "z", "rotation_range_rad": [angle_low, angle_high],
-                "rotation_angle_rad": angle,
-            }
-            break
-        if selected is None:
-            raise ValueError(f"LIBERO upstream sampler exhausted 5000 placements for {fixture_name}")
+        range_index = int(rng.randint(len(region["ranges"])))
+        x0, y0, x1, y1 = region["ranges"][range_index]
+        x = float(rng.uniform(low=x0, high=x1))
+        y = float(rng.uniform(low=y0, high=y1))
+        angle_low, angle_high = region["yaw_ranges"][min(range_index, len(region["yaw_ranges"]) - 1)]
+        angle = float(rng.uniform(low=min(angle_low, angle_high), high=max(angle_low, angle_high)))
+        z = PILOT_FIXTURE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - properties["bottom_offset"][2]
+        quaternion = (math.cos(angle / 2), 0.0, 0.0, math.sin(angle / 2))
+        selected = _placement_draw(
+            position=(x, y, z), quaternion_wxyz=quaternion,
+            range_index=range_index, attempt=1,
+            source_sampler="robosuite.utils.placement_samplers.MultiRegionRandomSampler",
+            region_bounds=(x0, y0, x1, y1), sample_bounds=(x0, y0, x1, y1),
+            margin=0.0, z_offset=PILOT_FIXTURE_Z_OFFSET_M, rotation_axis="z",
+            rotation_bounds=(angle_low, angle_high), angle=angle,
+        )
         draw_rows.append({"object": fixture_name, "region": region_name, **selected})
         fixture_poses[fixture_name] = PoseWorld(selected["position"], selected["quaternion_wxyz"])
 
@@ -577,67 +571,26 @@ def sample_libero_normal_reset_v1(
         initialization_order=PILOT_INIT_ORDER, settle_steps=0,
     )
     receipt = {
-        "schema_version": "libero-normal-reset-realization-v1",
+        "schema_version": "libero-normal-reset-realization-v2",
         "task_seed": task_seed, "init_row_index": init_row_index,
         "init_row_sha256": decoded.row_sha256[init_row_index],
+        "reset_sample_id": sample.sample_id,
+        "reset_sample_v1": sample.to_mapping(),
         "source_manifest_sha256": PILOT_SOURCE_MANIFEST_SHA256,
         "bddl_sha256": PILOT_BDDL_SHA256, "ordered_initial_states": [list(item) for item in ordered_states],
         "sampler_id": PILOT_RESET_SAMPLER_ID, "sampler_version": PILOT_RESET_SAMPLER_VERSION,
         "rng": {
             "generator": "numpy.random.RandomState / legacy np.random.seed compatible MT19937",
             "seed": task_seed,
-            "scope": (
-                "dedicated task-seeded candidate stream; mirrors upstream placement draws when the same seed is "
-                "set immediately before reset, including Panda's zero-magnitude Robot.reset RNG advance"
-            ),
-            "upstream_preplacement_draws": {
-                "source": "robosuite.robots.robot.Robot.reset",
-                "panda_arm_joint_count": PILOT_PANDA_ARM_RESET_NOISE_DRAWS,
-                "noise_type": "gaussian",
-                "noise_magnitude": 0.0,
-                "rng_call": "np.random.randn(7)",
-                "qpos_effect": "none; sampled noise is multiplied by zero",
-            },
-            "sampler_draw_order": [item[0] for item in (*PILOT_MOVABLES, *PILOT_FIXTURES)],
+            "upstream_preplacement_draw_count": PILOT_PANDA_ARM_RESET_NOISE_DRAWS,
         },
-        "reset_order_source": [
-            "RobotEnv._reset_internal calls robot.reset before BDDLBaseDomain._reset_internal",
-            "Panda Robot.reset consumes np.random.randn(7) for zero-magnitude Gaussian arm noise before placement sampling",
-            "BDDL property initializers run before mj_step1; this task has none",
-            "mj_step1 runs before BDDL placement sampler values are applied",
-            "movable free-joint poses and fixture model root poses are applied in BDDL initial-state order",
-            "Base.reset calls sim.forward after BDDL reset",
-            "LIBERO metric restores the selected pruned_init row after env.reset and forwards state",
-        ],
-        "candidate_reset_application_order": [
+        "algorithm_id": "libero-normal-reset-order-v1",
+        "candidate_reset_order": [
             "mj_resetData", "mj_step1", "apply_sampled_fixture_root_poses",
             "apply_sampled_movable_free_joint_poses", "restore_all_pruned_init_joint_and_free_state",
             "restore_source_simulation_time", "mj_forward",
         ],
-        "robot_initial_state_handling": (
-            "candidate mirrors the upstream seven zero-magnitude Gaussian RNG draws; no sampled noise changes "
-            "robot qpos, and the complete selected row restores all named robot joint positions and velocities"
-        ),
-        "placement_sampler": {
-            "bddl_problem_name": "libero_tabletop_manipulation",
-            "movable_object_classes": PILOT_MOVABLE_OBJECT_CLASSES,
-            "movable_class": "libero.envs.regions.workspace_region_sampler.TableRegionSampler",
-            "fixture_class": "robosuite.utils.placement_samplers.MultiRegionRandomSampler",
-            "append_order": [item[0] for item in (*PILOT_MOVABLES, *PILOT_FIXTURES)],
-            "movable_boundary_margin": "horizontal_radius_site; ensure_object_boundary_in_range=True",
-            "movable_overlap_rule": "2d horizontal distance <= summed radii AND vertical gap <= top-bottom offsets",
-            "fixture_boundary_margin": 0.0,
-            "fixture_overlap_check": False,
-            "movable_rotation": {"axis": "x", "range_rad": [math.pi / 2, math.pi / 2]},
-            "fixture_rotation": "per-BDDL-region yaw_rotation about z; uniform(low=min, high=max)",
-        },
-        "workspace_offset_m": [0.0, 0.0, PILOT_TABLE_TOP_Z_M],
-        "movable_z_offset_m": PILOT_MOVABLE_Z_OFFSET_M,
-        "fixture_z_offset_m": PILOT_FIXTURE_Z_OFFSET_M,
-        "object_property_initializers": [], "mj_step1": "called once before placements; non-integrating preprocessing",
         "placements_before_pruned_init_restore": draw_rows,
-        "placement_draws_per_attempt": ["range_index", "x_uniform", "y_uniform", "yaw_uniform"],
-        "placement_attempt_counts": {item["object"]: item["attempt"] for item in draw_rows},
         "asset_placement_geometry": {
             path: {
                 "asset_sha256": value["asset_sha256"],
@@ -647,13 +600,6 @@ def sample_libero_normal_reset_v1(
             }
             for path, value in asset_properties.items()
         },
-        "restoration": "selected pruned_init row overwrites robot, five free roots, four fixture scalar joints, time and qvel; fixture root pose remains sampled",
-        "fixture_pose_world": {
-            name: {"position": list(value.position), "quaternion_wxyz": list(value.quaternion_wxyz)}
-            for name, value in fixture_poses.items()
-        },
-        "mj_forward": "called once after named model/data restore; no integration",
-        "upstream_metric_dummy_policy_steps": "not part of reset; not executed in this deployment pilot",
     }
     return sample, receipt
 

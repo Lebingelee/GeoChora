@@ -733,7 +733,7 @@ def build_manifest(args) -> dict:
             "scope": "R07a004 allowed local source-level progress for the first pilot",
             "sol_review_sha256": sha256_bytes(review_bytes),
             "sol_review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/sol_review.md",
-            "permission_boundary": "local source install/verify and recipe only; no general license approval, runtime qualification, or redistribution",
+            "permission_boundary": "local source install/verify only; no general license approval, runtime qualification, or redistribution",
         },
         "source_inputs": {
             "pilot_asset_inputs_file_sha256": sha256_bytes(Path(args.asset_input).read_bytes()),
@@ -1183,113 +1183,6 @@ def verify(manifest_path: Path, target_raw: Path) -> dict:
     return result
 
 
-def validate_task_input(task_input: dict, manifest: dict, install_receipt: dict) -> None:
-    if not isinstance(task_input, dict) or task_input.get("schema_version") != "libero-pilot-deployment-input-v1":
-        raise BundleError("unsupported deployment task input schema")
-    if task_input.get("task_uid") != TASK_UID:
-        raise BundleError("deployment input has a different task UID")
-    if task_input.get("source_manifest_sha256") != install_receipt.get("manifest_sha256"):
-        raise BundleError("deployment input source manifest hash differs from install receipt")
-    if task_input.get("bddl") != manifest["task"]["bddl"]:
-        raise BundleError("deployment BDDL identity/goal differs from pinned task manifest")
-    if task_input.get("selected_pruned_init") != manifest["task"]["selected_pruned_init"]:
-        raise BundleError("deployment init identity differs from pinned task manifest")
-    if task_input.get("source_revisions") != FIXED_REVISIONS:
-        raise BundleError("deployment task input revisions differ from fixed source pins")
-    native = task_input.get("native_reference", {})
-    robot = native.get("robot", {})
-    if robot.get("robot_name") != "MountedPanda" or robot.get("base_robot_name") != "Panda":
-        raise BundleError("deployment input changes the pinned MountedPanda robot identity")
-    if robot.get("mount_name") != "RethinkMount" or robot.get("gripper_name") != "PandaGripper":
-        raise BundleError("deployment input changes the pinned mount or gripper")
-    if robot.get("arm_joint_names") != [f"joint{i}" for i in range(1, 8)]:
-        raise BundleError("deployment input arm slot order differs from the selected Panda joints")
-    if robot.get("arm_actuator_types") != ["motor"] * 7 or robot.get("finger_actuator_types") != ["position"] * 2:
-        raise BundleError("deployment input changes the authentic MountedPanda actuator types")
-    expected_arm = [
-        {"name": f"torq_j{i}", "type": "motor", "joint": f"joint{i}",
-         "control_range": [-80.0, 80.0] if i <= 5 else [-12.0, 12.0], "unit": "N*m", "role": "arm"}
-        for i in range(1, 8)
-    ]
-    expected_fingers = [
-        {"name": "gripper_finger_joint1", "type": "position", "joint": "finger_joint1",
-         "control_range_m": [0.0, 0.04], "force_range_N": [-20.0, 20.0], "unit": "m", "role": "finger"},
-        {"name": "gripper_finger_joint2", "type": "position", "joint": "finger_joint2",
-         "control_range_m": [-0.04, 0.0], "force_range_N": [-20.0, 20.0], "unit": "m", "role": "finger"},
-    ]
-    if robot.get("actuators") != expected_arm + expected_fingers:
-        raise BundleError("deployment input changes the ordered actuator slot/type/range mapping")
-    if robot.get("native_end_effector_body") != "eef" or robot.get("frames") != {
-        "source_frame_name": "eef", "core_frame_reference_status": "UNRESOLVED_CORE_MAPPING"
-    }:
-        raise BundleError("deployment input invents or changes a Core robot frame mapping")
-    if robot.get("units") != {"joint_position": "rad", "arm_effort": "N*m", "finger_position": "m", "translation": "m", "rotation": "rad"}:
-        raise BundleError("deployment input changes the pinned robot units")
-    controller = native.get("controller", {})
-    if controller.get("name") != "OSC_POSE" or controller.get("control_frequency_hz") != 20 or controller.get("control_timestep_seconds") != 0.05:
-        raise BundleError("deployment input changes the pinned native reference frequency")
-    if controller.get("physics_timestep_seconds") is not None or controller.get("physics_timestep_status") != "UNRESOLVED_SOURCE_CONSTANT; Robosuite BaseEnv reads macros.SIMULATION_TIMESTEP, not compiled here":
-        raise BundleError("deployment input asserts an uncompiled native physics clock")
-    if controller.get("core_equivalence") != "NOT_ESTABLISHED" or not controller.get("hold_policy"):
-        raise BundleError("deployment input invents native controller equivalence or omits hold semantics")
-    candidate = task_input.get("requested_core_candidate", {})
-    if candidate.get("control_frequency_hz") != 100 or candidate.get("control_period_seconds") != 0.01:
-        raise BundleError("deployment input changes the declared Core candidate clock")
-    if candidate.get("frame_mapping_status") != "UNRESOLVED" or "Not mapped" not in candidate.get("drive_or_hold_semantics", ""):
-        raise BundleError("deployment input falsely supplies a drive or frame mapping")
-    if native.get("active_scene_xml") != manifest["source_resolution"]["active_scene_xml"]:
-        raise BundleError("deployment input changes the selected LIBERO scene and style")
-    if native.get("problem_class") != "Libero_Tabletop_Manipulation":
-        raise BundleError("deployment input changes the selected tabletop problem class")
-    if task_input.get("requested_core_candidate", {}).get("observation_profile") != "state-only":
-        raise BundleError("pilot candidate must remain state-only")
-    if task_input.get("requested_core_candidate", {}).get("core_native_admission_ready") is not False:
-        raise BundleError("pilot recipe cannot claim Core native admission")
-    semantics = task_input.get("semantics", {})
-    if semantics.get("contact_evidence") != "UNAVAILABLE_UNTIL_PUBLIC_PROVIDER_STATE_EXISTS" or semantics.get("unavailable_is_not_false") is not True:
-        raise BundleError("contact semantics cannot be defaulted to true or false")
-    if semantics.get("goal_predicate") != "On(akita_black_bowl_1, plate_1)" or semantics.get("goal_threshold_m") != 0.03:
-        raise BundleError("deployment input changes the pinned bowl-on-plate goal predicate")
-    required_evidence = {"object-object geom-group contact", "vertical ordering", "strict XY body-centre distance < 0.03 m"}
-    if set(semantics.get("required_evidence", [])) != required_evidence:
-        raise BundleError("deployment input omits or changes a required On predicate evidence component")
-    cost = task_input.get("cost_protocol_binding", {})
-    if cost.get("protocol_sha256") != "a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e" or cost.get("measurement_baseline_commit") != "0309d73bb5b60f9989907c3eede8c0cd2893f29f":
-        raise BundleError("deployment input cost protocol binding differs from the frozen R07a003 v2.1 record")
-
-
-def compile_recipe(manifest_path: Path, target: Path, task_input_path: Path) -> dict:
-    independent = verify(manifest_path, target)
-    manifest = read_json(manifest_path)
-    install_receipt = read_json(target / "install_receipt.json")
-    task_input = read_json(task_input_path)
-    validate_task_input(task_input, manifest, install_receipt)
-    code_refs = {(row["repository"], row["path"]) for row in manifest["source_code_references"]}
-    required_code = {
-        ("libero", "libero/libero/envs/env_wrapper.py"),
-        ("libero", "libero/libero/envs/bddl_base_domain.py"),
-        ("libero", "libero/libero/envs/problems/libero_tabletop_manipulation.py"),
-        ("libero", "libero/libero/envs/arenas/table_arena.py"),
-        ("libero", "libero/libero/envs/arenas/style.py"),
-        ("libero", "libero/libero/envs/robots/mounted_panda.py"),
-    }
-    if not required_code.issubset(code_refs):
-        raise BundleError("deployment recipe lacks source references for real LIBERO task/robot owners")
-    repository_root = Path(__file__).resolve().parents[4]
-    if str(repository_root) not in sys.path:
-        sys.path.insert(0, str(repository_root))
-    from bench_deploy.libero.artifacts.recipe import compose_recipe
-    binding = {
-        "source_manifest_id": manifest["manifest_id"],
-        "source_manifest_sha256": independent["manifest_sha256"],
-        "asset_closure_sha256": independent["asset_closure_sha256"],
-        "install_receipt_sha256": install_receipt["receipt_sha256"],
-        "independent_verify_sha256": independent["result_sha256"],
-        "task_uid": TASK_UID,
-        "source_revisions": FIXED_REVISIONS,
-    }
-    return compose_recipe(manifest, task_input, binding)
-
 def _manifest_command(args) -> int:
     manifest = build_manifest(args)
     write_json(Path(args.output), manifest)
@@ -1324,11 +1217,6 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser.add_argument("--target", required=True)
     verify_parser.add_argument("--receipt-out", required=True)
     verify_parser.add_argument("--source-roots-file", default=None, help=argparse.SUPPRESS)
-    recipe_parser = sub.add_parser("recipe", help="compile the versioned pilot deployment recipe from a verified installation")
-    recipe_parser.add_argument("--manifest", required=True)
-    recipe_parser.add_argument("--target", required=True)
-    recipe_parser.add_argument("--task-input", required=True)
-    recipe_parser.add_argument("--output", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "build-manifest":
@@ -1341,19 +1229,6 @@ def main(argv: list[str] | None = None) -> int:
             result = verify(Path(args.manifest), Path(args.target))
             write_json(Path(args.receipt_out), result)
             print(json.dumps({k: v for k, v in result.items() if k != "payload_files"}, sort_keys=True))
-            return 0
-        if args.command == "recipe":
-            result = compile_recipe(Path(args.manifest), Path(args.target), Path(args.task_input))
-            write_json(Path(args.output), result)
-            print(json.dumps({
-                "status": "RECIPE_COMPILED",
-                "recipe_id": result["recipe_id"],
-                "recipe_sha256": result["recipe_sha256"],
-                "task_uid": result["task"]["uid"],
-                "accepted_scope_status": result["accepted_scope"]["status"],
-                "qualification": result["accepted_scope"]["qualification"],
-                "output": str(Path(args.output)),
-            }, sort_keys=True))
             return 0
     except (BundleError, OSError, KeyError, TypeError, ValueError) as exc:
         print("ERROR: " + str(exc), file=sys.stderr)

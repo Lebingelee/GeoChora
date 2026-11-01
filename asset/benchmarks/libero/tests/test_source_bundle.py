@@ -1,4 +1,4 @@
-"""Provider-free S1 for the real R07b source/install/recipe CLI."""
+"""Provider-free S1 for the real R07b source/install CLI."""
 from __future__ import annotations
 
 import hashlib
@@ -130,43 +130,6 @@ def test_manifest_boundary_rejections(tmp_path: Path, label, mutate, expected):
     _verify_manifest_variant(tmp_path, mutate, expected, label)
 
 
-@pytest.mark.parametrize(
-    "label,mutate,expected",
-    [
-        ("task_input_schema", lambda x: x.update(schema_version="wrong"), "unsupported deployment task input schema"),
-        ("task_input_task_uid", lambda x: x.update(task_uid="other/task"), "different task UID"),
-        ("task_input_manifest_hash", lambda x: x.update(source_manifest_sha256="0" * 64), "source manifest hash differs"),
-        ("task_input_bddl", lambda x: x["bddl"].update(sha256="0" * 64), "BDDL identity/goal differs"),
-        ("task_input_init", lambda x: x["selected_pruned_init"].update(sha256="0" * 64), "init identity differs"),
-        ("task_input_revision", lambda x: x["source_revisions"].update(libero="0" * 40), "source pins"),
-        ("task_input_actuator_type", lambda x: x["native_reference"]["robot"].update(arm_actuator_types=["position"] * 7), "authentic MountedPanda actuator types"),
-        ("task_input_arm_order", lambda x: x["native_reference"]["robot"].update(arm_joint_names=list(reversed(x["native_reference"]["robot"]["arm_joint_names"]))), "arm slot order"),
-        ("task_input_slot_range", lambda x: x["native_reference"]["robot"]["actuators"][7].update(control_range_m=[-0.04, 0.0]), "ordered actuator slot/type/range"),
-        ("task_input_frame", lambda x: x["native_reference"]["robot"]["frames"].update(core_frame_reference_status="MAPPED"), "Core robot frame mapping"),
-        ("task_input_native_clock", lambda x: x["native_reference"]["controller"].update(control_frequency_hz=100), "pinned native reference frequency"),
-        ("task_input_native_physics_dt", lambda x: x["native_reference"]["controller"].update(physics_timestep_seconds=0.002), "uncompiled native physics clock"),
-        ("task_input_drive", lambda x: x["requested_core_candidate"].update(drive_or_hold_semantics="equivalent to OSC_POSE"), "falsely supplies a drive or frame mapping"),
-        ("task_input_candidate_clock", lambda x: x["requested_core_candidate"].update(control_period_seconds=0.05), "Core candidate clock"),
-        ("task_input_camera_profile", lambda x: x["requested_core_candidate"].update(observation_profile="rgbd"), "must remain state-only"),
-        ("task_input_false_admission", lambda x: x["requested_core_candidate"].update(core_native_admission_ready=True), "cannot claim Core native admission"),
-        ("task_input_contact_false", lambda x: x["semantics"].update(contact_evidence=False), "contact semantics cannot be defaulted"),
-        ("task_input_unavailable_false", lambda x: x["semantics"].update(unavailable_is_not_false=False), "contact semantics cannot be defaulted"),
-        ("task_input_goal_threshold", lambda x: x["semantics"].update(goal_threshold_m=0.04), "changes the pinned bowl-on-plate goal"),
-        ("task_input_goal_evidence", lambda x: x["semantics"].update(required_evidence=["lift height"]), "omits or changes a required On predicate"),
-    ],
-)
-def test_recipe_input_boundary_rejections(tmp_path: Path, label, mutate, expected):
-    task = json.loads(_path("R07B_TASK_INPUT").read_text(encoding="utf-8"))
-    mutate(task)
-    task_path = _write_json(tmp_path / f"{label}.json", task)
-    proc = _cli(["recipe", "--manifest", str(_path("R07B_MANIFEST")), "--target", str(_path("R07B_INSTALL_A")),
-                 "--task-input", str(task_path), "--output", str(tmp_path / f"{label}.recipe.json")],
-                case=label, expected=expected)
-    assert proc.returncode != 0
-    assert expected in proc.stderr
-    assert not (tmp_path / f"{label}.recipe.json").exists()
-
-
 @pytest.mark.parametrize("label,mutation,expected", [
     ("target_payload_tamper", "payload", "size mismatch"),
     ("target_missing_file", "missing", "file set differs"),
@@ -209,32 +172,6 @@ def test_installed_target_is_reread_and_bound(label, mutation, expected, tmp_pat
             payload.unlink()
         payload.write_bytes(original_payload)
         receipt.write_bytes(original_receipt)
-
-
-def test_real_recipe_cli_success(tmp_path: Path):
-    output = tmp_path / "recipe.json"
-    proc = _cli(["recipe", "--manifest", str(_path("R07B_MANIFEST")), "--target", str(_path("R07B_INSTALL_A")),
-                 "--task-input", str(_path("R07B_TASK_INPUT")), "--output", str(output)],
-                case="recipe_success", expect_success=True)
-    assert proc.returncode == 0, proc.stderr
-    recipe = json.loads(output.read_text(encoding="utf-8"))
-    claimed_recipe_hash = recipe.pop("recipe_sha256")
-    canonical_recipe = json.dumps(recipe, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
-    assert hashlib.sha256(canonical_recipe).hexdigest() == claimed_recipe_hash
-    recipe["recipe_sha256"] = claimed_recipe_hash
-    assert recipe["schema_version"] == "libero-deployment-recipe-v1"
-    assert recipe["task"]["uid"] == "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate"
-    assert recipe["robot"]["native_reference"]["arm_actuator_types"] == ["motor"] * 7
-    assert recipe["controller"]["control_frequency_hz"] == 20
-    assert recipe["controller"]["core_equivalence"] == "diagnostic joint-space profile; not OSC_POSE equivalence"
-    assert recipe["controller"]["hold_policy"] == "joint_torque_zero_order_hold_per_outer_step_v1"
-    assert recipe["observation"]["requested_core_candidate"] == "state-only"
-    assert recipe["evaluation"]["unavailable_is_not_false"] is True
-    assert recipe["accepted_scope"]["status"] == "ACCEPTED_BOUNDED_R07_A123_TECHNICAL"
-    assert recipe["accepted_scope"]["qualification"] is False
-    assert recipe["accepted_scope"]["task_success"] is False
-    assert recipe["limits"]["file_specific_asset_license_or_attribution"] == "unresolved"
-    assert recipe["recording"]["status"] == "recipe_only_no_new_recording_run"
 
 
 def test_matching_install_is_idempotent():

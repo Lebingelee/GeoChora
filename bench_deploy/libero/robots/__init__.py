@@ -1,1 +1,0 @@
-"""LIBERO robots responsibilities."""

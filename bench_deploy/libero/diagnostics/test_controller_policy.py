@@ -12,7 +12,6 @@ from bench_deploy.libero.controllers.osc import (
     LiberoMixedControllerV7,
 )
 from bench_deploy.libero.controllers.source_gravity import (
-    SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
     SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
 )
 from bench_deploy.libero.environment.selected_reference import (
@@ -75,15 +74,9 @@ def test_v6_official_reference_and_v7_rim_profiles_have_distinct_identities():
     _assert_identity_hash(rim)
 
 
-def test_v1_and_v2_source_state_profiles_remain_separate():
-    assert SOURCE_OPERATIONAL_SPACE_PROFILE_V1 != SOURCE_OPERATIONAL_SPACE_PROFILE_V2
-
-
 def test_task23_upstream_replay_uses_reference_v6_osc_without_planner_twist():
     controller = _make_candidate_controller(
-        solution_rim_profile=False,
-        solution_profile=False,
-        upstream_pose_replay=True,
+        execution_profile="a-reference",
         task_uid=TASK_3,
         arm_resolver_identity=None,
     )
@@ -140,8 +133,8 @@ def test_task_local_limit_monitor_allowance_is_scoped_to_approved_a_replay():
     assert _a_upstream_pose_replay_joint_limit_tolerances("mujoco", TASK_3, False) == {}
 
 
-def test_selected_candidate_rejects_retired_v4_solution_selector():
+def test_factory_rejects_a_non_versioned_solution_selector():
     from bench_deploy.libero.environment.selected_reference import build_libero_selected_candidate
 
-    with pytest.raises(TypeError, match="false or final v8"):
-        build_libero_selected_candidate(_solution_profile=True)
+    with pytest.raises(TypeError, match="named A-reference or V8"):
+        build_libero_selected_candidate(_execution_profile=True)

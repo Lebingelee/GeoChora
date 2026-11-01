@@ -6,8 +6,8 @@ control, observation, and recording ownership.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, replace
-from collections.abc import Mapping
+from dataclasses import asdict, dataclass, replace
+from collections.abc import Callable, Mapping
 import hashlib
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ from gymnasium.spaces import Box, Dict
 
 from task_env.artifacts import (
     ActionIntent, EntityDefinition, InitializationContract, RequiredCapabilitySet,
-    SemanticDefinition, TaskArtifact, Timebase, UniformDimension, WorldDefinition,
+    SemanticDefinition, TaskArtifact, Timebase, WorldDefinition,
 )
 from task_env.assembly.source import TaskSceneSource
 from task_env.controllers.canonical.contracts import (
@@ -29,31 +29,26 @@ from task_env.environment.configuration import resolve_env_config
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
-from task_env.environment.types import ReferenceSpec, TaskEvaluation
+from task_env.environment.types import ReferenceSpec
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
-from bench_deploy.libero.controllers.osc import (
-    LiberoMixedControllerV1, LiberoMixedControllerV6, LiberoMixedControllerV7,
-)
+from bench_deploy.libero.controllers.osc import LiberoMixedControllerV6, LiberoMixedControllerV7
 from bench_deploy.libero.tasks.predicates import (
-    LiberoPredicateBoundaryV1, OpenMiddleDrawerEvidenceV1,
     PILOT_TASK_UID, evaluate_on_bowl_plate_v1, evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1, observe_selected_reference_v1,
+    observe_task23_reference_v1,
 )
 from bench_deploy.libero.environment.init_state import (
-    INIT_SHA256, PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
+    PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
     init_layout_v1, sample_libero_normal_reset_v1,
 )
 from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3, task_source_contract_v1
 from bench_deploy.libero.assembly.model_profile import (
-    normalize_libero_robosuite_model_xml_v2,
     normalize_libero_robosuite_model_xml_v3,
     validate_libero_official_source_plan_v1,
 )
 
 
-PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
-CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v6'
 PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID = 'robosuite-panda-gripper-delta-v1'
 PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID = 'robosuite-panda-gripper-delta-endpoint-guard-v2'
 PANDA_GRIPPER_DELTA_PROFILE_IDS = frozenset({
@@ -63,10 +58,6 @@ PANDA_GRIPPER_DELTA_PROFILE_IDS = frozenset({
 PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID = 'libero-world-pose-wxyz-panda-gripper-delta-v1'
 _PANDA_GRIPPER_DELTA_PER_SUBSTEP = 0.01
 _PANDA_GRIPPER_ENDPOINT_MARGIN_M = 5.0e-4
-
-
-def _is_panda_gripper_delta_profile(profile_id) -> bool:
-    return profile_id in PANDA_GRIPPER_DELTA_PROFILE_IDS
 
 
 def _a_upstream_pose_replay_joint_limit_tolerances(
@@ -96,26 +87,20 @@ def _controller_hold_policy(controller):
 
 
 def _make_candidate_controller(
-    *, solution_rim_profile: bool, solution_profile: bool,
-    upstream_pose_replay: bool, task_uid: str,
+    *, execution_profile: str, task_uid: str,
     arm_resolver_identity: str | None,
     nullspace_reference_joint_position_rad=None,
 ):
-    """Choose the existing controller owned by the selected task profile."""
-    if solution_rim_profile:
+    """Select the final optional V8 or accepted A-reference controller."""
+    if execution_profile == 'v8':
         return LiberoMixedControllerV7(arm_resolver_identity=arm_resolver_identity)
-    if upstream_pose_replay:
-        # Task 3's auxiliary IK seed may remain nonconverged and is logged per action.
+    if execution_profile == 'a-reference':
         return LiberoMixedControllerV6(
             arm_resolver_identity=arm_resolver_identity,
             allow_unconverged_arm_resolution=(task_uid == TASK_3),
-        )
-    if solution_profile:
-        return LiberoMixedControllerV6(
-            arm_resolver_identity=arm_resolver_identity,
             nullspace_reference_joint_position_rad=nullspace_reference_joint_position_rad,
         )
-    return LiberoMixedControllerV1()
+    raise ValueError('LIBERO candidate requires execution_profile="a-reference" or "v8"')
 
 
 def _panda_gripper_action_after_substep(current_action: float, action: float) -> float:
@@ -149,70 +134,25 @@ def _panda_gripper_aggregate_opening_m(
 
 
 def _compiled_physics_fingerprint_diff_v1(actual, expected):
-    """Return compact, name-aware diagnostics for a failed pinned-model readback."""
-    differences = {}
-    for field in ('model_dimensions',):
-        actual_values = actual.get(field, {})
-        expected_values = expected.get(field, {})
-        differences[field] = {
-            key: {'actual': actual_values.get(key), 'expected': expected_values.get(key)}
-            for key in sorted(set(actual_values) | set(expected_values))
-            if actual_values.get(key) != expected_values.get(key)
-        }
-    actual_names = actual.get('object_names', {})
-    expected_names = expected.get('object_names', {})
-    name_differences = {}
-    for category in sorted(set(actual_names) | set(expected_names)):
-        actual_rows = actual_names.get(category, ())
-        expected_rows = expected_names.get(category, ())
-        if actual_rows == expected_rows:
-            continue
-        mismatched_indices = [
-            index for index in range(max(len(actual_rows), len(expected_rows)))
-            if (actual_rows[index] if index < len(actual_rows) else None)
-            != (expected_rows[index] if index < len(expected_rows) else None)
-        ]
-        name_differences[category] = {
-            'actual_count': len(actual_rows),
-            'expected_count': len(expected_rows),
+    """Return bounded field-level differences for a failed model readback."""
+    result = {}
+    for field in ('model_dimensions', 'object_names', 'numeric_array_fields'):
+        left, right = actual.get(field, {}), expected.get(field, {})
+        keys = sorted(set(left) | set(right))
+        changed = [key for key in keys if left.get(key) != right.get(key)]
+        result[field] = {
+            'mismatch_count': len(changed),
             'first_mismatches': [
-                {
-                    'index': index,
-                    'actual': actual_rows[index] if index < len(actual_rows) else None,
-                    'expected': expected_rows[index] if index < len(expected_rows) else None,
-                }
-                for index in mismatched_indices[:12]
+                {'name': key, 'actual': left.get(key), 'expected': right.get(key)}
+                for key in changed[:12]
             ],
-            'mismatch_count': len(mismatched_indices),
         }
-    differences['object_names'] = name_differences
-    actual_fields = actual.get('numeric_array_fields', {})
-    expected_fields = expected.get('numeric_array_fields', {})
-    field_differences = []
-    for name in sorted(set(actual_fields) | set(expected_fields)):
-        actual_field = actual_fields.get(name)
-        expected_field = expected_fields.get(name)
-        if actual_field == expected_field:
-            continue
-        field_differences.append({
-            'field': name,
-            'actual': actual_field,
-            'expected': expected_field,
-        })
-    differences['numeric_array_fields'] = {
-        'mismatch_count': len(field_differences),
-        'first_mismatches': field_differences[:32],
-    }
-    return differences
+    return result
 
 
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
 SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[3] / 'asset/benchmarks/libero/source_manifest.json'
-DEFAULT_OUTPUT_ROOT = Path(
-    '/home/lly/Program_Files/Geochora/workspace/maintenance/'
-    'phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001'
-)
 DEFAULT_INSTALL_ROOT = Path(
     '/home/lly/Program_Files/Geochora/workspace/maintenance/'
     'phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001_install/final_001'
@@ -222,6 +162,50 @@ INIT_RELATIVE_PATH = (
     'pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.pruned_init'
 )
 TASK_ID = PILOT_TASK_UID
+
+
+@dataclass(frozen=True)
+class _TaskProfile:
+    semantic_id: str
+    semantic_entities: tuple[str, ...]
+    semantic_parameters: tuple[tuple[str, float], ...]
+    success_rule: str
+    static_instances: tuple[str, ...]
+    observer: Callable
+    object_poses: tuple[tuple[str, str], ...] | None = None
+
+    @property
+    def fixture_bodies(self):
+        return ('wooden_cabinet_1', 'flat_stove_1', *self.static_instances)
+
+
+_TASK_PROFILES = {
+    TASK_1: _TaskProfile(
+        'libero_on_bowl_plate_v1',
+        ('panda-v1/ee', 'main_table', 'akita_black_bowl_1', 'plate_1'),
+        (('xy_threshold_m', 0.03),),
+        'libero_on_bowl_plate_geom_contact_and_xy_lt_0_03m_v1',
+        (),
+        observe_selected_reference_v1,
+        (('akita_black_bowl_1', 'bowl'), ('plate_1', 'plate')),
+    ),
+    TASK_2: _TaskProfile(
+        'libero_open_middle_drawer_source_predicate_v1',
+        ('panda-v1/ee', 'wooden_cabinet_1', 'main_table'),
+        (('middle_drawer_open_threshold_m', -0.14),),
+        'libero_open_middle_drawer_joint_position_lt_minus_0_14m_v1',
+        ('wine_rack_1',),
+        observe_task23_reference_v1,
+    ),
+    TASK_3: _TaskProfile(
+        'libero_plate_front_of_stove_source_predicate_v1',
+        ('panda-v1/ee', 'main_table', 'plate_1', 'flat_stove_1'),
+        (('stove_front_xy_half_extent_m', 0.01),),
+        'libero_site_object_under_plate_and_stove_front_v1',
+        ('wine_rack_1',),
+        observe_task23_reference_v1,
+    ),
+}
 
 
 class _LiberoMJCFReferenceScene:
@@ -355,13 +339,11 @@ def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TA
     }
 
 
-def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
-              provider: str = 'mujoco', task_uid: str = TASK_1,
-              upstream_pose_replay: bool = False) -> TaskArtifact:
-    solution_v8 = solution_profile == 'v8'
-    solution_profile = bool(solution_profile)
-    pose_action_profile = bool(solution_profile or upstream_pose_replay)
+def _artifact(init_bytes: bytes, *, execution_profile: str,
+              provider: str = 'mujoco', task_uid: str = TASK_1) -> TaskArtifact:
+    solution_profile = execution_profile == 'v8'
     contract = task_source_contract_v1(task_uid)
+    profile = _TASK_PROFILES[task_uid]
     decoded = decode_pruned_init_bytes(init_bytes, task_uid=task_uid)
     layout = init_layout_v1(task_uid)
     qpos = dict(zip(
@@ -397,16 +379,15 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
                          (joints[12],), 'source-authored-articulated-fixture',
                          'source-authored-collision', {}),
     ))
-    if task_uid != TASK_1:
+    for instance in profile.static_instances:
+        asset_slug = instance.rsplit('_', 1)[0].replace('_', '-')
         shared_entities.append(EntityDefinition(
-            'wine_rack_1', 'static', 'asset:libero-wine-rack-v1', (), (),
+            instance, 'static', f'asset:libero-{asset_slug}-v1', (), (),
             'source-authored-static-fixture', 'source-authored-collision', {},
         ))
     entities = tuple(shared_entities)
     from task_env.runtime.sessions.api import CAPABILITIES
 
-    if provider not in {'mujoco', 'geophys'}:
-        raise ValueError('LIBERO Artifact candidate supports MuJoCo or GeoPhys CPU')
     required_capabilities = (
         tuple(CAPABILITIES) + ('joint_torque_actuation',)
         if provider == 'geophys'
@@ -421,12 +402,7 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
         task_uid, 'diagnostic-v1' if not solution_profile else 'diagnostic-solution-v8',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
-            ActionIntent(
-                'absolute_pose' if pose_action_profile else 'absolute_joint',
-                'world' if pose_action_profile else None,
-                'quaternion_wxyz' if pose_action_profile else 'none',
-                'arm_joint_position_and_gripper',
-            ),
+            ActionIntent('absolute_pose', 'world', 'quaternion_wxyz', 'arm_joint_position_and_gripper'),
             ('canonical-state-v0', 'task-contact-summary-v2'), (),
         ),
         InitializationContract(
@@ -434,21 +410,8 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
             'restore_source_named_pruned_init_row', 'pinned_libero_normal_reset_v1', 0,
         ),
         SemanticDefinition(
-            'semantics-v0',
-            ('libero_on_bowl_plate_v1' if task_uid == TASK_1 else
-             'libero_open_middle_drawer_source_predicate_v1' if task_uid == TASK_2 else
-             'libero_plate_front_of_stove_source_predicate_v1'),
-            (('panda-v1/ee', 'main_table', 'akita_black_bowl_1', 'plate_1')
-             if task_uid == TASK_1 else
-             ('panda-v1/ee', 'wooden_cabinet_1', 'main_table') if task_uid == TASK_2 else
-             ('panda-v1/ee', 'main_table', 'plate_1', 'flat_stove_1')),
-            joints,
-            ({'xy_threshold_m': 0.03} if task_uid == TASK_1 else
-             {'middle_drawer_open_threshold_m': -0.14} if task_uid == TASK_2 else
-             {'stove_front_xy_half_extent_m': 0.01}),
-            ('libero_on_bowl_plate_geom_contact_and_xy_lt_0_03m_v1' if task_uid == TASK_1 else
-             'libero_open_middle_drawer_joint_position_lt_minus_0_14m_v1' if task_uid == TASK_2 else
-             'libero_site_object_under_plate_and_stove_front_v1'),
+            'semantics-v0', profile.semantic_id, profile.semantic_entities, joints,
+            dict(profile.semantic_parameters), profile.success_rule,
         ),
         Timebase(0.002, 25, 0.05),
         RequiredCapabilitySet(required_capabilities),
@@ -461,34 +424,19 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False,
 
 def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         install_root: Path, composition_plan_path: Path,
-                        init_path: Path, horizon: int, solution_profile: bool | str = False,
-                        provider: str = 'mujoco',
-                        task_uid: str = TASK_1,
-                        upstream_pose_replay: bool = False,
-                        panda_gripper_delta_replay: bool = False,
-                        panda_gripper_delta_replay_profile_id: str | None = None,
+                        init_path: Path, horizon: int, execution_profile: str,
+                        provider: str = 'mujoco', task_uid: str = TASK_1,
+                        gripper_action_profile: str | None = None,
                         official_nullspace_reference_joint_position_rad=None,
                         official_compiled_mujoco_profile_v1=None):
-    solution_v8 = solution_profile == 'v8'
-    solution_rim_profile = solution_v8
-    solution_profile = bool(solution_profile)
-    pose_action_profile = bool(solution_profile or upstream_pose_replay)
+    solution_profile = execution_profile == 'v8'
+    upstream_pose_replay = execution_profile == 'a-reference' and task_uid in {TASK_2, TASK_3}
+    a_reference_profile = execution_profile == 'a-reference'
     contract = task_source_contract_v1(task_uid)
-    if type(upstream_pose_replay) is not bool:
-        raise TypeError('upstream pose replay selector must be bool')
-    if upstream_pose_replay and (task_uid == TASK_1 or solution_profile):
-        raise ValueError('upstream task2/3 pose replay is a diagnostic profile separate from task1 Solution')
-    if panda_gripper_delta_replay:
-        if panda_gripper_delta_replay_profile_id is None:
-            panda_gripper_delta_replay_profile_id = PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
-        if panda_gripper_delta_replay_profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
-            raise ValueError('unsupported PandaGripper delta replay profile')
-    elif panda_gripper_delta_replay_profile_id is not None:
-        raise ValueError('PandaGripper delta profile identity requires delta replay to be enabled')
+    profile = _TASK_PROFILES[task_uid]
+    panda_gripper_delta_replay = gripper_action_profile is not None
     official_nullspace_reference = None
     if official_nullspace_reference_joint_position_rad is not None:
-        if not panda_gripper_delta_replay:
-            raise ValueError('official robosuite nullspace reference is restricted to the frozen PandaGripper replay profile')
         official_nullspace_reference = np.asarray(
             official_nullspace_reference_joint_position_rad, dtype=np.float64,
         )
@@ -498,9 +446,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         official_nullspace_reference = tuple(float(x) for x in official_nullspace_reference)
     official_compiled_mujoco_profile = None
     if official_compiled_mujoco_profile_v1 is not None:
-        if not panda_gripper_delta_replay or not isinstance(
-                official_compiled_mujoco_profile_v1, Mapping):
-            raise ValueError('official compiled MuJoCo options are restricted to the frozen PandaGripper replay profile')
+        if not isinstance(official_compiled_mujoco_profile_v1, Mapping):
+            raise TypeError('public candidate must provide a mapping for compiled MuJoCo options')
         official_compiled_mujoco_profile = json.loads(json.dumps(
             official_compiled_mujoco_profile_v1, allow_nan=False,
         ))
@@ -525,12 +472,9 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     model_profile_receipt = None
     model_profile_bytes = None
     if solution_profile:
-        profile_transform = (
-            normalize_libero_robosuite_model_xml_v3
-            if compile_first_official_model
-            else normalize_libero_robosuite_model_xml_v2
-        )
-        runtime_model_xml_bytes, model_profile_receipt = profile_transform(raw_xml_bytes)
+        if not compile_first_official_model:
+            raise ValueError('optional V8 requires the pinned official compile-first LIBERO model')
+        runtime_model_xml_bytes, model_profile_receipt = normalize_libero_robosuite_model_xml_v3(raw_xml_bytes)
         model_profile_bytes = json.dumps(
             model_profile_receipt, sort_keys=True, separators=(',', ':'), allow_nan=False,
         ).encode('utf-8')
@@ -567,10 +511,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         ).encode('utf-8')
         source_manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
     artifact = _artifact(
-        init_bytes, solution_profile='v8' if solution_v8 else solution_profile,
-        provider=provider,
-        task_uid=task_uid,
-        upstream_pose_replay=upstream_pose_replay,
+        init_bytes, execution_profile=execution_profile, provider=provider, task_uid=task_uid,
     )
 
     importer_xml = runtime_model_xml_bytes
@@ -585,13 +526,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         )
     external_assets = source_asset_bytes(install_root, importer_xml.decode('utf-8'))
     closure = {'canonical-source.xml': runtime_model_xml_bytes, **external_assets}
-    profile_source_tag = (
-        'libero-spatial-official-model-profile-v3'
-        if compile_first_official_model
-        else 'libero-spatial-pilot-model-profile-v2'
-    )
     source_id = (
-        f'{profile_source_tag}:{expected_xml_sha}:{model_profile_sha}:{runtime_model_xml_sha}'
+        f'libero-spatial-official-model-profile-v3:{expected_xml_sha}:{model_profile_sha}:{runtime_model_xml_sha}'
         if solution_profile else
         f'libero-spatial-pilot-v1:{expected_xml_sha}' if task_uid == TASK_1 else
         f'libero-task-a-v1:{task_uid}:{expected_xml_sha}'
@@ -607,7 +543,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         diagnostics=(
             ('A-stage immutable LIBERO source; GeoPhys importer-only fluid-parameter projection is recorded in provider_import_projection',)
             if provider == 'geophys' and task_uid in {TASK_2, TASK_3} else
-            ('R07c D01 immutable importer snapshot; physical attributes preserved from composed MJCF',)
+            ('A123 reference replay source; physical attributes preserved from the frozen model',)
             if not solution_profile else
             ('R07 v2.1.0 task #1 immutable importer snapshot; physical attributes preserved from composed MJCF',)
         ),
@@ -615,35 +551,28 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     semantic_bodies = dict(plan['semantic_to_compiled_body_names'])
     expected_bodies = {
         'main_table': 'table' if compile_first_official_model or task_uid != TASK_1 else 'main_table',
-        **{name: f'{name}_main' for name in contract.movable_instances},
+        **{name: f'{name}_main' for name in (*contract.movable_instances, *profile.static_instances)},
         'wooden_cabinet_1': 'wooden_cabinet_1_main',
         'flat_stove_1': 'flat_stove_1_main',
     }
-    if task_uid != TASK_1:
-        expected_bodies['wine_rack_1'] = 'wine_rack_1_main'
     if semantic_bodies != expected_bodies:
         source_receipt.close()
         raise ValueError('composition plan semantic body map differs from the fixed pilot allowlist')
     bound_bodies = dict(semantic_bodies)
     groups = plan['composition_receipt']['contact_geom_name_transform']['groups']
     contact_geom_groups = {key: tuple(value) for key, value in groups.items()}
-    if solution_profile or (upstream_pose_replay and provider == 'mujoco'):
-        bound_bodies.update({
-            'panda-v1/finger-left': 'gripper0_leftfinger',
-            'panda-v1/finger-right': 'gripper0_rightfinger',
-        })
-    if solution_profile or (upstream_pose_replay and provider == 'mujoco'):
-        # Keep the read-only contact groups aligned with all source-authored
-        # collidable parts of each finger; task2/3 A replay uses these groups
-        # for public contact readback without adding object/body bindings.
-        contact_geom_groups.update({
-            'panda-v1/finger-left': (
-                'gripper0_finger1_collision', 'gripper0_finger1_pad_collision',
-            ),
-            'panda-v1/finger-right': (
-                'gripper0_finger2_collision', 'gripper0_finger2_pad_collision',
-            ),
-        })
+    bound_bodies.update({
+        'panda-v1/finger-left': 'gripper0_leftfinger',
+        'panda-v1/finger-right': 'gripper0_rightfinger',
+    })
+    contact_geom_groups.update({
+        'panda-v1/finger-left': (
+            'gripper0_finger1_collision', 'gripper0_finger1_pad_collision',
+        ),
+        'panda-v1/finger-right': (
+            'gripper0_finger2_collision', 'gripper0_finger2_pad_collision',
+        ),
+    })
     expected_group_names = set(expected_bodies) - {'main_table'}
     if set(groups) != expected_group_names:
         source_receipt.close()
@@ -656,40 +585,35 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         },
         render={'camera_obs': False}, episode={'horizon': horizon, 'ignore_done': False},
         success_definition=(
-            'diagnostic LIBERO On(bowl,plate) source predicate'
-            if not solution_profile and task_uid == TASK_1 else
-            f'diagnostic LIBERO source task {task_uid} predicate; A-stage replay does not claim success'
-            if not solution_profile else
+            'A-stage replay; task success is not claimed' if a_reference_profile else
             'pinned LIBERO On(akita_black_bowl_1,plate_1) task success and caller-owned Solution completion'
         ),
     )
-    arm_resolver = None
-    if pose_action_profile:
-        from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
-        from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
-        tcp_profile = derive_panda_tcp_profile_v2(
-            runtime_model_xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
-            hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
-        )
-        arm_kinematics = PandaKinematics(
-            runtime_model_xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
-            base_body_id='robot0_link0',
-        )
-        resolver_action_config = (
-            replace(
-                config.action,
-                ik_position_deadband=0.0005,
-                ik_rotation_deadband=0.0025,
-            ) if solution_v8 else config.action
-        )
-        arm_resolver = CanonicalPandaController(
-            arm_kinematics, artifact_hash=artifact.identity_hash,
-            config=resolver_action_config,
-        )
-    arm_resolver_position_tolerance_m = 0.001 if solution_v8 else 0.006
-    arm_resolver_max_iterations = 64 if solution_v8 or upstream_pose_replay else 12
+    from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
+    from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
+    tcp_profile = derive_panda_tcp_profile_v2(
+        runtime_model_xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
+        hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
+    )
+    arm_kinematics = PandaKinematics(
+        runtime_model_xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
+        base_body_id='robot0_link0',
+    )
+    resolver_action_config = (
+        replace(
+            config.action,
+            ik_position_deadband=0.0005,
+            ik_rotation_deadband=0.0025,
+        ) if solution_profile else config.action
+    )
+    arm_resolver = CanonicalPandaController(
+        arm_kinematics, artifact_hash=artifact.identity_hash,
+        config=resolver_action_config,
+    )
+    arm_resolver_position_tolerance_m = 0.001 if solution_profile else 0.006
+    arm_resolver_max_iterations = 64
     arm_resolver_orientation_tolerance_rad = (
-        0.04 if panda_gripper_delta_replay else 0.005 if solution_v8 else 0.03
+        0.04 if panda_gripper_delta_replay else 0.005 if solution_profile else 0.03
     )
     arm_resolver_identity = (
         None if arm_resolver is None else arm_resolver.iterative_resolution_identity_v1(
@@ -699,21 +623,15 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         )
     )
     controller = _make_candidate_controller(
-        solution_rim_profile=solution_rim_profile,
-        solution_profile=solution_profile,
-        upstream_pose_replay=upstream_pose_replay,
+        execution_profile=execution_profile,
         task_uid=task_uid,
         arm_resolver_identity=arm_resolver_identity,
         nullspace_reference_joint_position_rad=official_nullspace_reference,
     )
     expected_controller_profile = (
-        (LiberoMixedControllerV7.profile_id if solution_rim_profile
-         else (
-             LiberoMixedControllerV6.OFFICIAL_REFERENCE_PROFILE_ID
-             if official_nullspace_reference is not None
-             else LiberoMixedControllerV6.profile_id
-        )) if solution_profile else
-        LiberoMixedControllerV6.profile_id if upstream_pose_replay else CONTROLLER_PROFILE_ID
+        LiberoMixedControllerV7.profile_id if solution_profile else
+        LiberoMixedControllerV6.OFFICIAL_REFERENCE_PROFILE_ID
+        if official_nullspace_reference is not None else LiberoMixedControllerV6.profile_id
     )
     if controller.profile_id != expected_controller_profile:
         raise ValueError('LIBERO task-local controller profile changed')
@@ -791,10 +709,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'gripper0_gripper_finger_joint1': 'm',
             'gripper0_gripper_finger_joint2': 'm',
         },
-        fixture_bodies=(
-            ('wooden_cabinet_1', 'flat_stove_1') if task_uid == TASK_1
-            else ('wooden_cabinet_1', 'flat_stove_1', 'wine_rack_1')
-        ),
+        fixture_bodies=profile.fixture_bodies,
         contact_geom_groups=(contact_geom_groups if provider == 'mujoco' else {}),
         mixed_actuator_plan=mixed_plan,
         task_local_joint_limit_tolerance_overrides=(
@@ -803,7 +718,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             )
         ),
     )
-    controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
     if solution_profile:
         from bench_deploy.libero.tasks.solution import solution_identity_v8
@@ -812,7 +726,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             runtime_model_xml_sha, source_receipt.source_closure_digest,
             arm_resolver_identity=arm_resolver_identity,
         )
-    reference_solution_identity = solution_identity
     if panda_gripper_delta_replay:
         # This opt-in profile replays frozen upstream actions directly; it is
         # not the V5 task Solution lifecycle or identity.
@@ -849,7 +762,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'controller_identity': controller.identity,
         }),
         'solution_identity': solution_identity,
-        'reference_solution_identity': reference_solution_identity,
         'arm_resolver': arm_resolver,
         'arm_resolver_identity': arm_resolver_identity,
         'arm_resolver_max_iterations': arm_resolver_max_iterations,
@@ -863,7 +775,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         'model_profile_receipt': model_profile_receipt,
         'provider_import_projection': importer_projection,
         'solution_profile': bool(solution_profile),
-        'upstream_pose_replay': bool(upstream_pose_replay),
         'resolved_configuration': asdict(config),
         'reset_realizations': {},
         'init_bytes': init_bytes,
@@ -873,57 +784,49 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
 
 
 def build_libero_selected_candidate(
-    *, xml_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composed_candidate.xml',
+    *, xml_path: Path | None = None,
     xml: str | bytes | None = None,
-    composed_mjcf_sha256: str | None = None,
-    composition_plan_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composition_plan.json',
+    composition_plan_path: Path | None = None,
     install_root: Path = DEFAULT_INSTALL_ROOT,
     init_path: Path | None = None,
     horizon: int = 64,
     provider: str = 'mujoco',
     task_uid: str = TASK_1,
-    _solution_profile: bool = False,
-    _upstream_pose_replay: bool = False,
-    _panda_gripper_delta_replay: bool = False,
-    _panda_gripper_delta_profile_id: str | None = None,
+    _execution_profile: str = 'a-reference',
+    _gripper_action_profile: str | None = None,
     _official_nullspace_reference_joint_position_rad=None,
     _official_compiled_mujoco_profile_v1=None,
 ):
     """Construct the fixed LIBERO candidate through the existing Core route.
 
-    The default retains the frozen D01 diagnostic envelope. The task-owned
-    solution wrapper below selects the separately versioned full Solution
-    profile and its bounded horizon.
+    The default selects the accepted A-reference controller. The task-owned
+    solution wrapper selects optional V8 explicitly.
     """
-    if (_solution_profile is not False
-            and not (type(_solution_profile) is str and _solution_profile == 'v8')):
-        raise TypeError('internal LIBERO Solution profile selector must be false or final v8')
+    if type(_execution_profile) is not str or _execution_profile not in {'a-reference', 'v8'}:
+        raise TypeError('LIBERO execution profile must be the named A-reference or V8 profile')
+    solution_profile = _execution_profile == 'v8'
+    upstream_pose_replay = solution_profile is False and task_uid in {TASK_2, TASK_3}
+    if solution_profile and task_uid != TASK_1:
+        raise ValueError('optional V8 Solution is defined only for LIBERO task1')
     contract = task_source_contract_v1(task_uid)
-    if type(_upstream_pose_replay) is not bool:
-        raise TypeError('upstream pose replay selector must be bool')
-    if _upstream_pose_replay and (task_uid not in {TASK_2, TASK_3} or _solution_profile):
-        raise ValueError('upstream pose replay is limited to task2/3 A-stage diagnostics')
-    pose_action_profile = bool(_solution_profile or _upstream_pose_replay)
-    if type(_panda_gripper_delta_replay) is not bool:
-        raise TypeError('PandaGripper delta replay selector must be bool')
-    if _panda_gripper_delta_replay and not pose_action_profile:
-        raise ValueError('PandaGripper delta replay requires a task-local pose-action route')
-    if _panda_gripper_delta_replay:
-        if _panda_gripper_delta_profile_id is None:
-            _panda_gripper_delta_profile_id = PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
-        if _panda_gripper_delta_profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
-            raise ValueError('unsupported PandaGripper delta replay profile')
-    elif _panda_gripper_delta_profile_id is not None:
-        raise ValueError('PandaGripper delta profile identity requires delta replay to be enabled')
+    profile = _TASK_PROFILES[task_uid]
+    if _gripper_action_profile is not None and _gripper_action_profile not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
+        raise ValueError('unsupported PandaGripper delta replay profile')
+    panda_gripper_delta_replay = _gripper_action_profile is not None
     if (_official_nullspace_reference_joint_position_rad is not None
-            and not _panda_gripper_delta_replay):
+            and not panda_gripper_delta_replay):
         raise ValueError('official robosuite nullspace reference is restricted to the frozen PandaGripper replay profile')
     if (_official_compiled_mujoco_profile_v1 is not None
-            and not _panda_gripper_delta_replay):
+            and not panda_gripper_delta_replay):
         raise ValueError('official compiled MuJoCo options are restricted to the frozen PandaGripper replay profile')
-    maximum_horizon = 1000 if (_solution_profile or _upstream_pose_replay) else 64
+    maximum_horizon = 1000
     if type(horizon) is not int or not 1 <= horizon <= maximum_horizon:
         raise ValueError(f'LIBERO candidate horizon must be in [1,{maximum_horizon}]')
+    if composition_plan_path is None:
+        raise ValueError('LIBERO candidate requires an explicit source composition plan')
+    if xml is None and xml_path is None:
+        raise ValueError('LIBERO candidate requires source XML bytes or an explicit XML path')
+    xml_path = Path(xml_path) if xml_path is not None else Path(composition_plan_path).with_name('composed_candidate.xml')
     if provider not in {'mujoco', 'geophys'}:
         raise ValueError('LIBERO candidate supports MuJoCo or GeoPhys CPU')
     install_root = Path(install_root).resolve(strict=True)
@@ -946,8 +849,6 @@ def build_libero_selected_candidate(
         return matches[0]
 
     def bind_source_gravity_model(model):
-        if not pose_action_profile:
-            raise RuntimeError('source gravity feed-forward requires the task-local pose-control profile')
         # Register ownership before validating/binding. If a caller supplies a
         # source-mismatched model, the binding error remains primary while the
         # ordinary Env.close() path can still release the newly created helper.
@@ -976,11 +877,7 @@ def build_libero_selected_candidate(
                 or getattr(model, 'model_profile_id', None) != expected_model_profile_id
                 or getattr(model, 'model_profile_receipt_sha256', None)
                 != source['source_sha256']['model_profile_receipt']
-                or not callable(getattr(model, 'gravity_torque', None))
-                or (pose_action_profile
-                    and not callable(getattr(model, 'operational_space_state_v1', None)))
-                or (pose_action_profile
-                    and not callable(getattr(model, 'operational_space_state_v2', None)))):
+                or not callable(getattr(model, 'operational_space_state_v2', None))):
             raise ValueError('task Solution gravity model differs from its selected source identity')
         live_env = env_holder.get('env')
         if live_env is not None and live_env.controller.gravity_bias_model is None:
@@ -1007,28 +904,12 @@ def build_libero_selected_candidate(
         first_error = None
         for model in source_gravity_model_resources:
             try:
-                if controller is not None and getattr(controller, 'gravity_bias_model', None) is model:
+                if getattr(model, 'closed', False):
+                    receipt = getattr(model, 'close_receipt', None)
+                    if not isinstance(receipt, Mapping):
+                        raise RuntimeError('closed task source helper omitted its own close receipt')
+                elif controller is not None and getattr(controller, 'gravity_bias_model', None) is model:
                     receipt = controller.close_resources()
-                elif getattr(model, 'closed', False):
-                    # A task-local caller may have explicitly closed the
-                    # helper already; do not invoke its single-use close twice.
-                    receipt = {
-                        'schema_version': 'libero-source-gravity-model-close-v1',
-                        'profile_id': getattr(model, 'profile_id', None),
-                        'model_identity_sha256': getattr(model, 'model_identity_sha256', None),
-                        'source_xml_sha256': getattr(model, 'source_xml_sha256', None),
-                        'source_closure_digest': getattr(model, 'source_closure_digest', None),
-                        **({
-                            'raw_source_xml_sha256': getattr(model, 'raw_source_xml_sha256', None),
-                            'model_profile_id': getattr(model, 'model_profile_id', None),
-                            'model_profile_receipt_sha256': getattr(
-                                model, 'model_profile_receipt_sha256', None,
-                            ),
-                        } if getattr(model, 'model_profile_id', None) is not None else {}),
-                        'model_created': True, 'closed': True,
-                        'model_released': True, 'data_released': True,
-                        'close_receipt_recovered': False,
-                    }
                 else:
                     receipt = model.close()
                 receipts.append(receipt)
@@ -1055,21 +936,16 @@ def build_libero_selected_candidate(
         return dict(state['receipt'])
 
     def build_value(provider, backend):
-        if (provider not in {'mujoco', 'geophys'} or backend != 'cpu'):
-            route = 'R07 v2.1.0 task #1 Solution candidate' if _solution_profile else 'R07c D01 candidate'
-            raise ValueError(f'{route} is limited to MuJoCo or GeoPhys CPU')
         if provider not in value_cache:
             xml_bytes = None if xml is None else (xml.encode('utf-8') if isinstance(xml, str) else bytes(xml))
-            value_cache[provider] = _build_fixed_source(
+            value = _build_fixed_source(
                 xml_path=Path(xml_path), xml_bytes_override=xml_bytes, install_root=install_root,
                 composition_plan_path=Path(composition_plan_path),
                 init_path=Path(init_path), horizon=horizon,
-                solution_profile=_solution_profile,
+                execution_profile=_execution_profile,
                 provider=provider,
                 task_uid=task_uid,
-                upstream_pose_replay=_upstream_pose_replay,
-                panda_gripper_delta_replay=_panda_gripper_delta_replay,
-                panda_gripper_delta_replay_profile_id=_panda_gripper_delta_profile_id,
+                gripper_action_profile=_gripper_action_profile,
                 official_nullspace_reference_joint_position_rad=(
                     _official_nullspace_reference_joint_position_rad
                 ),
@@ -1077,78 +953,53 @@ def build_libero_selected_candidate(
                     _official_compiled_mujoco_profile_v1
                 ),
             )
-            if (composed_mjcf_sha256 is not None
-                    and value_cache[provider]['source_sha256']['composed_candidate_xml'] != composed_mjcf_sha256):
-                value_cache[provider]['source'].execution_source_receipt.close()
-                del value_cache[provider]
-                raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
-        value = dict(value_cache[provider])
-        value['controller'] = _make_candidate_controller(
-            solution_rim_profile=_solution_profile == 'v8',
-            solution_profile=bool(_solution_profile),
-            upstream_pose_replay=_upstream_pose_replay,
-            task_uid=task_uid,
-            arm_resolver_identity=value['arm_resolver_identity'],
-            nullspace_reference_joint_position_rad=(
-                value['official_nullspace_reference_joint_position_rad']
-            ),
-        )
+            value_cache[provider] = value
+        else:
+            value = dict(value_cache[provider])
+            value['controller'] = _make_candidate_controller(
+                execution_profile=_execution_profile,
+                task_uid=task_uid,
+                arm_resolver_identity=value['arm_resolver_identity'],
+                nullspace_reference_joint_position_rad=(
+                    value['official_nullspace_reference_joint_position_rad']
+                ),
+            )
         value['controller'].plan_identity_hash = value['source'].mixed_actuator_plan.identity_hash
         value['reset_realizations'] = reset_receipts
-        if pose_action_profile:
-            value['bind_source_gravity_model'] = bind_source_gravity_model
-            value['close_task_resources'] = close_task_resources
-            model = source_gravity_model_ref['model']
-            if model is not None:
-                value['controller'].set_source_gravity_model(
-                    model,
-                    source_xml_sha256=value['source_sha256']['runtime_model_xml'],
-                    source_closure_digest=value['source_sha256']['source_closure_digest'],
-                )
-        if pose_action_profile:
-            value['panda_gripper_delta_replay_profile_id'] = (
-                _panda_gripper_delta_profile_id
-                if _panda_gripper_delta_replay else None
+        value['bind_source_gravity_model'] = bind_source_gravity_model
+        value['close_task_resources'] = close_task_resources
+        model = source_gravity_model_ref['model']
+        if model is not None:
+            value['controller'].set_source_gravity_model(
+                model,
+                source_xml_sha256=value['source_sha256']['runtime_model_xml'],
+                source_closure_digest=value['source_sha256']['source_closure_digest'],
             )
-            if _panda_gripper_delta_replay:
-                value['panda_gripper_delta_replay_state'] = {
-                    'current_action': 0.0,
-                    'committed_control_step': 0,
-                    'pending': None,
-                }
-            components = (
-                'world_x_m', 'world_y_m', 'world_z_m',
-                'world_qw', 'world_qx', 'world_qy', 'world_qz',
-                ('gripper_action_normalized_delta' if _panda_gripper_delta_replay
-                 else 'gripper_normalized'),
-            )
-            value['action_schema'] = {
-                'schema_id': (PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID
-                              if _panda_gripper_delta_replay
-                              else 'libero-world-pose-wxyz-absolute-v1'),
-                'schema_version': 1,
-                'controller_kind': ('absolute_pose_with_robosuite_panda_gripper_delta'
-                                    if _panda_gripper_delta_replay else 'absolute_pose'),
-                'reference': 'world',
-                'rotation_representation': 'quaternion_wxyz',
-                'dimension': len(components), 'components': components,
-                'gripper_profile_id': value['panda_gripper_delta_replay_profile_id'],
-                'gripper_endpoint_margin_m': (
-                    (_PANDA_GRIPPER_ENDPOINT_MARGIN_M
-                     if _panda_gripper_delta_profile_id == PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID
-                     else 0.0) if _panda_gripper_delta_replay else None
-                ),
-                'arm_resolver_orientation_tolerance_rad': (
-                    value['arm_resolver_orientation_tolerance_rad']
-                ),
+        value['panda_gripper_delta_replay_profile_id'] = _gripper_action_profile
+        if panda_gripper_delta_replay:
+            value['panda_gripper_delta_replay_state'] = {
+                'current_action': 0.0, 'committed_control_step': 0, 'pending': None,
             }
-        else:
-            components = tuple([*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'])
-            value['action_schema'] = {
-                'schema_id': 'libero-joint-space-absolute-v1', 'schema_version': 1,
-                'controller_kind': 'absolute_joint', 'reference': 'joint_coordinates',
-                'dimension': len(components), 'components': components,
-            }
+        components = (
+            'world_x_m', 'world_y_m', 'world_z_m',
+            'world_qw', 'world_qx', 'world_qy', 'world_qz',
+            'gripper_action_normalized_delta' if panda_gripper_delta_replay else 'gripper_normalized',
+        )
+        value['action_schema'] = {
+            'schema_id': PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID if panda_gripper_delta_replay
+            else 'libero-world-pose-wxyz-absolute-v1',
+            'schema_version': 1,
+            'controller_kind': 'absolute_pose_with_robosuite_panda_gripper_delta'
+            if panda_gripper_delta_replay else 'absolute_pose',
+            'reference': 'world', 'rotation_representation': 'quaternion_wxyz',
+            'dimension': len(components), 'components': components,
+            'gripper_profile_id': _gripper_action_profile,
+            'gripper_endpoint_margin_m': (
+                _PANDA_GRIPPER_ENDPOINT_MARGIN_M
+                if _gripper_action_profile == PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID else 0.0
+            ) if panda_gripper_delta_replay else None,
+            'arm_resolver_orientation_tolerance_rad': value['arm_resolver_orientation_tolerance_rad'],
+        }
         object_names = contract.movable_instances
         value['action_space'] = Box(-np.inf, np.inf, (len(components),), dtype=np.float64)
         value['observation_space'] = Dict({
@@ -1166,8 +1017,6 @@ def build_libero_selected_candidate(
 
     def reset_with_options(artifact, seed, options, source):
         cached_value = value_for_artifact(artifact)
-        if artifact.identity_hash != cached_value['artifact'].identity_hash:
-            raise ValueError('LIBERO reset Artifact differs from its source candidate')
         if task_uid != TASK_1:
             from task_env.artifacts import ResetSampleV1
 
@@ -1196,34 +1045,6 @@ def build_libero_selected_candidate(
                 'source_manifest_sha256': cached_value['source_manifest_sha256'],
                 'reset_sample_id': reset_sample.sample_id,
                 'reset_source': 'pinned ControlEnv.reset then ControlEnv.set_init_state(row0)',
-            }
-            reset_receipts[reset_sample.sample_id] = receipt
-            return reset_sample
-        reset_plan = options.get('reset_plan_v1')
-        if reset_plan is not None:
-            from task_env.artifacts import ResetPlanV1
-
-            if type(reset_plan) is not ResetPlanV1:
-                raise TypeError('LIBERO candidate reset requires the public ResetPlanV1 value')
-            reset_plan.validate()
-            reset_sample = reset_plan.reset_sample
-            if (reset_plan.purpose != 'diagnostic_contact_endpoint'
-                    or reset_sample.task_seed != seed
-                    or reset_sample.task_artifact_hash != artifact.identity_hash
-                    or reset_sample.source_id != source.scene_source.source_id
-                    or reset_sample.source_closure_digest != source.source_closure_digest):
-                raise ValueError('LIBERO ResetPlanV1 does not match this task, seed, or immutable source')
-            receipt = {
-                'schema_version': 'libero-diagnostic-reset-plan-realization-v1',
-                'purpose': reset_plan.purpose,
-                'reset_plan_identity_sha256': reset_plan.identity_hash,
-                'init_row_index': reset_sample.init_row_index,
-                'init_row_sha256': reset_sample.init_row_sha256,
-                'sampler_id': reset_sample.sampler_id,
-                'sampler_version': reset_sample.sampler_version,
-                'task_seed': reset_sample.task_seed,
-                'source_manifest_sha256': cached_value['source_manifest_sha256'],
-                'reset_sample_id': reset_sample.sample_id,
             }
             reset_receipts[reset_sample.sample_id] = receipt
             return reset_sample
@@ -1272,16 +1093,7 @@ def build_libero_selected_candidate(
         )
         request.validate()
         action_schema_id = env.value['action_schema']['schema_id']
-        controller_values = values_tuple
-        arm_resolution = None
         aggregate_opening_m = None
-        substep_context = None
-        canonical_action = {
-            'schema_version': 'libero-joint-space-canonical-v1',
-            'interpreted_values': values_tuple,
-            'controller_identity': env.controller.identity,
-            'hold_policy': _controller_hold_policy(env.controller),
-        }
         pose_action_schema_ids = {
             'libero-world-pose-wxyz-absolute-v1',
             PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID,
@@ -1289,114 +1101,112 @@ def build_libero_selected_candidate(
         panda_gripper_delta_replay = (
             action_schema_id == PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID
         )
-        if action_schema_id in pose_action_schema_ids:
-            if (env.value.get('arm_resolver') is None
-                    or not hasattr(env.controller, 'last_control_receipt')):
-                raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
-            from task_env.controllers.canonical.contracts import CanonicalArmResolutionV1
-            arm_resolution = env.value['arm_resolver'].resolve_world_pose_target_iterative_v1(
-                current_joint_position_rad=tuple(
-                    float(state.joint_position[f'joint{index}']) for index in range(1, 8)
-                ),
-                current_pose_world=state.pose_world['panda-v1/ee'],
-                target_pose_world=values_tuple[:7],
-                gripper_scalar=values_tuple[7],
-                max_iterations=env.value['arm_resolver_max_iterations'],
-                position_tolerance_m=env.value['arm_resolver_position_tolerance_m'],
-                model_position_tolerance_m=0.003,
-                orientation_tolerance_rad=env.value['arm_resolver_orientation_tolerance_rad'],
-                model_orientation_tolerance_rad=0.03,
-            )
-            if type(arm_resolution) is not CanonicalArmResolutionV1:
-                raise TypeError('canonical arm resolver returned an untyped iterative result')
-            if (not arm_resolution.diagnostics.converged
-                    and not (_upstream_pose_replay and task_uid == TASK_3)):
-                raise ValueError('shared canonical arm resolver did not meet its FK residual gates')
-            arm_target = arm_resolution.target
-            normalized_opening = float(values_tuple[7])
-            if panda_gripper_delta_replay:
-                gripper_profile_id = env.value.get('panda_gripper_delta_replay_profile_id')
-                if not _is_panda_gripper_delta_profile(gripper_profile_id):
-                    raise RuntimeError('PandaGripper delta action schema has no matching task adapter')
-                gripper_state = env.value.get('panda_gripper_delta_replay_state')
-                if (not isinstance(gripper_state, dict)
-                        or gripper_state.get('committed_control_step') != state.control_step
-                        or gripper_state.get('pending') is not None):
-                    raise RuntimeError('PandaGripper replay state is stale or has an uncommitted action')
-                current_gripper_action = float(gripper_state['current_action'])
-                first_gripper_action = _panda_gripper_action_after_substep(
-                    current_gripper_action, normalized_opening,
-                )
-                final_gripper_action = current_gripper_action
-                action_trace = [current_gripper_action]
-                opening_trace = []
-                for _ in range(env.artifact.timebase.control_substeps):
-                    final_gripper_action = _panda_gripper_action_after_substep(
-                        final_gripper_action, normalized_opening,
-                    )
-                    action_trace.append(final_gripper_action)
-                    opening_trace.append(
-                        _panda_gripper_aggregate_opening_m(
-                            final_gripper_action, gripper_profile_id,
-                        )
-                    )
-                aggregate_opening_m = opening_trace[0]
-                panda_gripper_context = {
-                    'profile_id': gripper_profile_id,
-                    'action_scalar': normalized_opening,
-                    'current_action_before': current_gripper_action,
-                    'action_trace_after_substeps': tuple(action_trace[1:]),
-                    'opening_trace_m': tuple(opening_trace),
-                    'current_action_after': final_gripper_action,
-                }
-                canonical_gripper_fields = {
-                    'gripper_profile_id': gripper_profile_id,
-                    'gripper_action_scalar': normalized_opening,
-                    'gripper_current_action_before': current_gripper_action,
-                    'gripper_current_action_after_first_substep': first_gripper_action,
-                    'gripper_current_action_after_outer_step': final_gripper_action,
-                    'gripper_current_action_trace_after_each_substep': list(action_trace[1:]),
-                    'gripper_aggregate_opening_trace_m': opening_trace,
-                    'gripper_format_calls_per_outer_step': env.artifact.timebase.control_substeps,
-                }
-            else:
-                aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
-                if not 0.0 <= aggregate_opening_m <= 0.08:
-                    raise ValueError('normalized planner gripper is outside the aggregate opening range')
-                panda_gripper_context = None
-                canonical_gripper_fields = {
-                    'normalized_gripper_scalar': normalized_opening,
-                    'aggregate_opening_m': aggregate_opening_m,
-                    'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
-                }
-            ordered_q = env.controller.map_arm_target_to_control_order(arm_target)
-            named_servo = dict(zip(arm_target.arm_joint_order, arm_target.servo_position_rad, strict=True))
-            ordered_servo = tuple(
-                float(named_servo[f'panda-v1/{name}']) for name in env.controller.control_joint_order
-            )
-            controller_values = (*ordered_q, aggregate_opening_m)
-            substep_context = {
-                'arm_resolution': arm_resolution,
-                'aggregate_opening_m': aggregate_opening_m,
-                'panda_gripper_delta_replay': panda_gripper_context,
-            }
-            canonical_action = {
-                'schema_version': 'libero-world-pose-canonical-v1',
-                'interpreted_values': values_tuple,
-                'controller_identity': env.controller.identity,
-                'hold_policy': _controller_hold_policy(env.controller),
-                'arm_target_schema_version': arm_target.schema_version,
-                'arm_target_source_xml_sha256': arm_target.source_xml_sha256,
-                'arm_target_controller_identity': arm_target.controller_identity,
-                'arm_resolution_diagnostics': arm_resolution.diagnostics.to_mapping(),
-                'qdesired_rad': list(ordered_q),
-                'qdesired_joint_order': list(env.controller.control_joint_order),
-                'arm_joint_order': list(arm_target.arm_joint_order),
-                'arm_servo_position_rad': list(ordered_servo),
-                **canonical_gripper_fields,
-            }
-        elif action_schema_id != 'libero-joint-space-absolute-v1':
+        if action_schema_id not in pose_action_schema_ids:
             raise ValueError('unsupported LIBERO selected task action schema')
+        if (env.value.get('arm_resolver') is None
+                or not hasattr(env.controller, 'last_control_receipt')):
+            raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
+        from task_env.controllers.canonical.contracts import CanonicalArmResolutionV1
+        arm_resolution = env.value['arm_resolver'].resolve_world_pose_target_iterative_v1(
+            current_joint_position_rad=tuple(
+                float(state.joint_position[f'joint{index}']) for index in range(1, 8)
+            ),
+            current_pose_world=state.pose_world['panda-v1/ee'],
+            target_pose_world=values_tuple[:7],
+            gripper_scalar=values_tuple[7],
+            max_iterations=env.value['arm_resolver_max_iterations'],
+            position_tolerance_m=env.value['arm_resolver_position_tolerance_m'],
+            model_position_tolerance_m=0.003,
+            orientation_tolerance_rad=env.value['arm_resolver_orientation_tolerance_rad'],
+            model_orientation_tolerance_rad=0.03,
+        )
+        if type(arm_resolution) is not CanonicalArmResolutionV1:
+            raise TypeError('canonical arm resolver returned an untyped iterative result')
+        if (not arm_resolution.diagnostics.converged
+                and not (upstream_pose_replay and task_uid == TASK_3)):
+            raise ValueError('shared canonical arm resolver did not meet its FK residual gates')
+        arm_target = arm_resolution.target
+        normalized_opening = float(values_tuple[7])
+        if panda_gripper_delta_replay:
+            gripper_profile_id = env.value.get('panda_gripper_delta_replay_profile_id')
+            if gripper_profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
+                raise RuntimeError('PandaGripper delta action schema has no matching task adapter')
+            gripper_state = env.value.get('panda_gripper_delta_replay_state')
+            if (not isinstance(gripper_state, dict)
+                    or gripper_state.get('committed_control_step') != state.control_step
+                    or gripper_state.get('pending') is not None):
+                raise RuntimeError('PandaGripper replay state is stale or has an uncommitted action')
+            current_gripper_action = float(gripper_state['current_action'])
+            first_gripper_action = _panda_gripper_action_after_substep(
+                current_gripper_action, normalized_opening,
+            )
+            final_gripper_action = current_gripper_action
+            action_trace = [current_gripper_action]
+            opening_trace = []
+            for _ in range(env.artifact.timebase.control_substeps):
+                final_gripper_action = _panda_gripper_action_after_substep(
+                    final_gripper_action, normalized_opening,
+                )
+                action_trace.append(final_gripper_action)
+                opening_trace.append(
+                    _panda_gripper_aggregate_opening_m(
+                        final_gripper_action, gripper_profile_id,
+                    )
+                )
+            aggregate_opening_m = opening_trace[0]
+            panda_gripper_context = {
+                'profile_id': gripper_profile_id,
+                'action_scalar': normalized_opening,
+                'current_action_before': current_gripper_action,
+                'action_trace_after_substeps': tuple(action_trace[1:]),
+                'opening_trace_m': tuple(opening_trace),
+                'current_action_after': final_gripper_action,
+            }
+            canonical_gripper_fields = {
+                'gripper_profile_id': gripper_profile_id,
+                'gripper_action_scalar': normalized_opening,
+                'gripper_current_action_before': current_gripper_action,
+                'gripper_current_action_after_first_substep': first_gripper_action,
+                'gripper_current_action_after_outer_step': final_gripper_action,
+                'gripper_current_action_trace_after_each_substep': list(action_trace[1:]),
+                'gripper_aggregate_opening_trace_m': opening_trace,
+                'gripper_format_calls_per_outer_step': env.artifact.timebase.control_substeps,
+            }
+        else:
+            aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
+            if not 0.0 <= aggregate_opening_m <= 0.08:
+                raise ValueError('normalized planner gripper is outside the aggregate opening range')
+            panda_gripper_context = None
+            canonical_gripper_fields = {
+                'normalized_gripper_scalar': normalized_opening,
+                'aggregate_opening_m': aggregate_opening_m,
+                'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
+            }
+        ordered_q = env.controller.map_arm_target_to_control_order(arm_target)
+        named_servo = dict(zip(arm_target.arm_joint_order, arm_target.servo_position_rad, strict=True))
+        ordered_servo = tuple(
+            float(named_servo[f'panda-v1/{name}']) for name in env.controller.control_joint_order
+        )
+        substep_context = {
+            'arm_resolution': arm_resolution,
+            'aggregate_opening_m': aggregate_opening_m,
+            'panda_gripper_delta_replay': panda_gripper_context,
+        }
+        canonical_action = {
+            'schema_version': 'libero-world-pose-canonical-v1',
+            'interpreted_values': values_tuple,
+            'controller_identity': env.controller.identity,
+            'hold_policy': _controller_hold_policy(env.controller),
+            'arm_target_schema_version': arm_target.schema_version,
+            'arm_target_source_xml_sha256': arm_target.source_xml_sha256,
+            'arm_target_controller_identity': arm_target.controller_identity,
+            'arm_resolution_diagnostics': arm_resolution.diagnostics.to_mapping(),
+            'qdesired_rad': list(ordered_q),
+            'qdesired_joint_order': list(env.controller.control_joint_order),
+            'arm_joint_order': list(arm_target.arm_joint_order),
+            'arm_servo_position_rad': list(ordered_servo),
+            **canonical_gripper_fields,
+        }
         target_kwargs = {
             'task_artifact_hash': env.artifact.identity_hash,
             'source_id': source.scene_source.source_id,
@@ -1406,25 +1216,21 @@ def build_libero_selected_candidate(
             'reset_sample_id': env.sample.sample_id,
             'state_revision': env.session.state_revision,
         }
-        if arm_resolution is None:
-            target = env.controller.compute_target(controller_values, state, **target_kwargs)
-        else:
-            target = env.controller.compute_pose_target(
-                arm_resolution, aggregate_opening_m, state, **target_kwargs,
-            )
-        if action_schema_id in pose_action_schema_ids:
-            canonical_action['controller_receipt'] = env.controller.last_control_receipt
-            if panda_gripper_delta_replay:
-                first_action = panda_gripper_context['action_trace_after_substeps'][0]
-                canonical_action['controller_receipt'] = {
-                    **dict(canonical_action['controller_receipt']),
-                    'panda_gripper_action_v1': {
-                        'profile_id': panda_gripper_context['profile_id'],
-                        'substep_index': 0,
-                        'current_action': first_action,
-                        'aggregate_opening_m': aggregate_opening_m,
-                    },
+        target = env.controller.compute_pose_target(
+            arm_resolution, aggregate_opening_m, state, **target_kwargs,
+        )
+        canonical_action['controller_receipt'] = env.controller.last_control_receipt
+        if panda_gripper_delta_replay:
+            first_action = panda_gripper_context['action_trace_after_substeps'][0]
+            canonical_action['controller_receipt'] = {
+                **dict(canonical_action['controller_receipt']),
+                'panda_gripper_action_v1': {
+                    'profile_id': panda_gripper_context['profile_id'],
+                    'substep_index': 0,
+                    'current_action': first_action,
+                    'aggregate_opening_m': aggregate_opening_m,
                 }
+            }
         prepared = {
             'action_values': values_tuple,
             'universal_action': values_tuple,
@@ -1443,15 +1249,12 @@ def build_libero_selected_candidate(
                     'values': values_tuple,
                     'unit': ('world_xyz_m_quaternion_wxyz_plus_panda_gripper_delta'
                              if panda_gripper_delta_replay else
-                             'world_xyz_m_quaternion_wxyz_plus_absolute_normalized_gripper'
-                             if action_schema_id in pose_action_schema_ids
-                             else 'rad_x7_plus_aggregate_opening_m'),
+                             'world_xyz_m_quaternion_wxyz_plus_absolute_normalized_gripper'),
                 },
                 'canonical_action': canonical_action,
             },
         }
-        if pose_action_profile:
-            prepared['substep_context'] = substep_context
+        prepared['substep_context'] = substep_context
         if panda_gripper_delta_replay:
             env.value['panda_gripper_delta_replay_state']['pending'] = {
                 'control_step': int(state.control_step) + 1,
@@ -1507,96 +1310,9 @@ def build_libero_selected_candidate(
             raise TypeError('physics-rate OSC callback omitted its recomputation receipt')
         return {'target': target, 'controller_receipt': dict(receipt)}
 
-    def observe_task23_reference_v1(env, state):
-        source = env.value['source']
-        boundary = LiberoPredicateBoundaryV1(
-            task_uid=task_uid,
-            source_manifest_sha256=env.value['source_manifest_sha256'],
-            source_id=source.scene_source.source_id,
-            source_closure_digest=source.source_closure_digest,
-            provider_materialization_id=env.session.provider_materialization_id,
-            episode_id=env.session.episode_id,
-            reset_sample_id=env.sample.sample_id,
-            control_step=int(state.control_step),
-            state_revision=int(env.session.state_revision),
-            simulation_time_s=float(state.simulation_time),
-        )
-        if task_uid == TASK_2:
-            evidence = OpenMiddleDrawerEvidenceV1(
-                boundary, 'wooden_cabinet_1.middle_level',
-                float(state.joint_position['wooden_cabinet_1.middle_level']),
-            )
-            predicate = env.binding.evaluate(evidence, env.artifact.semantics)
-        else:
-            # The task3 source predicate requires public table/site contact plus
-            # site pose. The selected RuntimeSession publishes neither as a
-            # typed task-state field in this A-stage profile, so leave it
-            # unavailable rather than manufacture task success.
-            predicate = env.binding.evaluate(None, env.artifact.semantics)
-        success = bool(predicate.value) if predicate.status == 'available' else False
-        evaluation = TaskEvaluation(
-            reward=1.0 if success else 0.0, success=success,
-            metrics={
-                'source_goal_predicate_available': predicate.status == 'available',
-                'source_goal_predicate': success,
-            },
-        )
-        identity = {
-            'source_id': source.scene_source.source_id,
-            'source_closure_digest': source.source_closure_digest,
-            'provider_materialization_id': env.session.provider_materialization_id,
-            'episode_id': env.session.episode_id,
-            'reset_sample_id': env.sample.sample_id,
-            'control_step': int(state.control_step),
-            'state_revision': int(env.session.state_revision),
-            'simulation_time_s': float(state.simulation_time),
-        }
-        boundary_sha = digest(identity)
-        ee = state.pose_world['panda-v1/ee']
-        obs = {
-            'state': {
-                'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
-                'joint_position': np.asarray(
-                    [state.joint_position[f'joint{i}'] for i in range(1, 8)]
-                    + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
-                    dtype=np.float32,
-                ),
-                'boundary_identity_sha256': np.frombuffer(bytes.fromhex(boundary_sha), dtype=np.uint8).copy(),
-            },
-            'privileged_state': {
-                key + '_body_pose': np.asarray(
-                    [(*state.pose_world[semantic].position, *state.pose_world[semantic].quaternion_wxyz)],
-                    dtype=np.float32,
-                ) for semantic, key in env.binding.object_poses
-            },
-        }
-        info = {
-            'is_success': success,
-            'task_failure': False,
-            'task_metrics': dict(evaluation.metrics),
-            'task_predicate_v1': {
-                'status': predicate.status, 'value': predicate.value, 'reason': predicate.reason,
-            },
-            'state_boundary_identity_sha256': boundary_sha,
-            'boundary_context_v1': {'schema_version': 'task-observation-context-v1', **identity,
-                                    'state_boundary_identity_sha256': boundary_sha},
-            'source_id': source.scene_source.source_id,
-            'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
-            'source_closure_digest': source.source_closure_digest,
-            'provider_materialization_id': env.session.provider_materialization_id,
-            'episode_id': env.session.episode_id,
-            'reset_sample_id': env.sample.sample_id,
-            'control_step': int(state.control_step),
-            'simulation_time_s': float(state.simulation_time),
-        }
-        return obs, info, evaluation
-
     def observe_mixed_control(env, state):
-        result = (observe_selected_reference_v1(env, state) if task_uid == TASK_1
-                  else observe_task23_reference_v1(env, state))
-        if _is_panda_gripper_delta_profile(
-            env.value.get('panda_gripper_delta_replay_profile_id'),
-        ):
+        result = profile.observer(env, state)
+        if env.value.get('panda_gripper_delta_replay_profile_id') in PANDA_GRIPPER_DELTA_PROFILE_IDS:
             gripper_state = env.value['panda_gripper_delta_replay_state']
             if state.control_step == 0:
                 gripper_state.update({
@@ -1631,7 +1347,7 @@ def build_libero_selected_candidate(
         return {
             'env_metadata': {
                 'env_name': ('SelectedReferenceEnv.LiberoMixedDiagnosticV1'
-                             if not _solution_profile else
+                             if not solution_profile else
                 'SelectedReferenceEnv.LiberoMixedSolutionV4'),
                 'task_name': env.artifact.task_id,
                 'task_version': env.artifact.artifact_version,
@@ -1644,16 +1360,11 @@ def build_libero_selected_candidate(
                     'controller_kind': env.value['action_schema']['controller_kind'],
                     'reference': env.value['action_schema']['reference'],
                     'rotation_representation': env.value['action_schema'].get('rotation_representation'),
-                    'units': (
-                        ['meter'] * 3 + ['unit_quaternion_wxyz'] * 4 + [
-                            'normalized_panda_gripper_increment' if env.value['action_schema']['schema_id']
-                            == PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID else 'normalized_absolute_gripper_target'
-                        ]
-                        if env.value['action_schema']['schema_id'] in {
-                            'libero-world-pose-wxyz-absolute-v1', PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID,
-                        }
-                        else ['radian'] * 7 + ['meter_total_opening']
-                    ),
+                    'units': ['meter'] * 3 + ['unit_quaternion_wxyz'] * 4 + [
+                        'normalized_panda_gripper_increment'
+                        if env.value['action_schema']['schema_id'] == PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID
+                        else 'normalized_absolute_gripper_target'
+                    ],
                 },
                 'observation_schema': {
                     'state.ee_pose': 'world_position_m_quaternion_wxyz',
@@ -1699,163 +1410,123 @@ def build_libero_selected_candidate(
                 'reset_realization_v1': reset_realization,
                 'reset_readback_v1': reset_readback,
             },
-            'candidate_identity': {
-                'task_artifact_identity_hash': env.artifact.identity_hash,
-                'source_id': source.scene_source.source_id,
-                'source_xml_sha256': receipt.canonical_xml_sha256,
-                'source_closure_digest': source.source_closure_digest,
-                'provider_materialization_id': env.session.provider_materialization_id,
-                'controller_identity': env.controller.identity,
-                'source_manifest_sha256': env.value['source_manifest_sha256'],
-                'solution_identity': env.value.get('solution_identity'),
-            },
         }
 
     def validate_compiled_session(session, value):
-        receipt = session.compiled_layout_receipt
-        if receipt.get('provider') == 'geophys':
-            if (receipt.get('source_id') != value['source'].scene_source.source_id
-                    or receipt.get('source_closure_digest') != value['source'].source_closure_digest):
-                raise ValueError('compiled GeoPhys layout receipt is not bound to the selected LIBERO source')
-            if (set(receipt.get('named_joint_addresses', {})) != set(value['source'].joints)
-                    or set(receipt.get('named_free_joint_addresses', {})) != set(value['source'].free_joints)
-                    or set(receipt.get('named_torque_actuator_ids', {})) != set(value['source'].torque_actuators)
-                    or set(receipt.get('named_position_actuator_ids', {})) != set(value['source'].position_actuators)):
-                raise ValueError('compiled GeoPhys named layout differs from RuntimeSource')
-            expected_channels = {
-                channel.semantic_id: channel for channel in value['source'].mixed_actuator_plan.channels
-            }
-            compiled_channels = receipt.get('named_actuator_channels')
-            if not isinstance(compiled_channels, Mapping) or set(compiled_channels) != set(expected_channels):
-                raise ValueError('compiled GeoPhys actuator channels differ from the source-bound plan')
-            for semantic, channel in expected_channels.items():
-                record = compiled_channels[semantic]
-                if (record.get('actuator_name') != channel.actuator_name
-                        or record.get('joint_name') != channel.joint_name
-                        or record.get('drive_mode') != channel.drive_mode
-                        or record.get('unit') != channel.unit
-                        or record.get('control_limited') is not True
-                        or not np.allclose(record.get('control_range'), channel.control_range,
-                                           rtol=0.0, atol=1e-7)):
-                    raise ValueError(f'compiled GeoPhys channel differs from the frozen plan: {semantic}')
+        receipt, source = session.compiled_layout_receipt, value["source"]
+        provider = receipt.get("provider")
+        if (receipt.get("source_id") != source.scene_source.source_id
+                or receipt.get("source_closure_digest") != source.source_closure_digest):
+            raise ValueError("compiled LIBERO layout receipt is not source-bound")
+        for field, expected in (
+            ("named_joint_addresses", source.joints),
+            ("named_free_joint_addresses", source.free_joints),
+            ("named_torque_actuator_ids", source.torque_actuators),
+            ("named_position_actuator_ids", source.position_actuators),
+        ):
+            actual = receipt.get(field)
+            if not isinstance(actual, Mapping) or set(actual) != set(expected):
+                raise ValueError(f"compiled LIBERO {field} differs from RuntimeSource")
+        expected_channels = {
+            channel.semantic_id: channel for channel in source.mixed_actuator_plan.channels
+        }
+        compiled_channels = receipt.get("named_actuator_channels")
+        if (not isinstance(compiled_channels, Mapping)
+                or set(compiled_channels) != set(expected_channels)):
+            raise ValueError("compiled LIBERO actuator channels differ from the source-bound plan")
+        for semantic, channel in expected_channels.items():
+            record = compiled_channels[semantic]
+            ranges_match = (
+                np.allclose(record.get("control_range"), channel.control_range, rtol=0.0, atol=1e-7)
+                if provider == "geophys"
+                else record.get("control_range") == list(channel.control_range)
+            )
+            if (record.get("actuator_name") != channel.actuator_name
+                    or record.get("joint_name") != channel.joint_name
+                    or record.get("drive_mode") != channel.drive_mode
+                    or record.get("unit") != channel.unit
+                    or record.get("control_limited") is not True or not ranges_match):
+                raise ValueError(f"compiled LIBERO actuator differs from the frozen plan: {semantic}")
+        if provider == "geophys":
             return {
-                'schema_version': 'libero-geophys-pre-reset-layout-validation-v1',
-                'provider': 'geophys',
-                'compiled_layout': receipt,
-                'reset_not_yet_applied': True,
+                "schema_version": "libero-pre-reset-layout-validation-v1",
+                "provider": provider, "compiled_layout": receipt,
+                "reset_not_yet_applied": True,
             }
-        dimensions = receipt['dimensions']
-        contract = task_source_contract_v1(value['artifact'].task_id)
+
+        contract = task_source_contract_v1(value["artifact"].task_id)
+        dimensions = receipt["dimensions"]
         expected_dimensions = (
             9 + 7 * len(contract.movable_instances) + len(contract.fixture_joint_names),
             9 + 6 * len(contract.movable_instances) + len(contract.fixture_joint_names),
             0, 9,
         )
-        if (dimensions.get('nq'), dimensions.get('nv'), dimensions.get('na'), dimensions.get('nu')) != expected_dimensions:
-            raise ValueError('compiled LIBERO dimensions differ from the locked source layout')
-        if set(receipt['named_joint_addresses']) != set(value['source'].joints):
-            raise ValueError('compiled LIBERO named scalar joints differ from RuntimeSource')
-        if set(receipt['named_free_joint_addresses']) != set(value['source'].free_joints):
-            raise ValueError('compiled LIBERO named free joints differ from RuntimeSource')
-        if set(receipt['named_torque_actuator_ids']) != set(value['source'].torque_actuators):
-            raise ValueError('compiled LIBERO torque actuator map differs from RuntimeSource')
-        if set(receipt['named_position_actuator_ids']) != set(value['source'].position_actuators):
-            raise ValueError('compiled LIBERO finger actuator map differs from RuntimeSource')
+        if (dimensions.get("nq"), dimensions.get("nv"), dimensions.get("na"), dimensions.get("nu")) != expected_dimensions:
+            raise ValueError("compiled LIBERO dimensions differ from the locked source layout")
         scalar_qpos_start = 9 + 7 * len(contract.movable_instances)
         scalar_dof_start = 9 + 6 * len(contract.movable_instances)
         expected_scalar_addresses = {
-            **{f'joint{i}': [i - 1, i - 1] for i in range(1, 8)},
-            'finger_joint1': [7, 7], 'finger_joint2': [8, 8],
-            **{
-                name: [scalar_qpos_start + index, scalar_dof_start + index]
-                for index, name in enumerate(contract.fixture_joint_names)
-            },
+            **{f"joint{i}": [i - 1, i - 1] for i in range(1, 8)},
+            "finger_joint1": [7, 7], "finger_joint2": [8, 8],
+            **{name: [scalar_qpos_start + index, scalar_dof_start + index]
+               for index, name in enumerate(contract.fixture_joint_names)},
         }
         expected_free_addresses = {
             name: [9 + 7 * index, 9 + 6 * index]
             for index, name in enumerate(contract.movable_instances)
         }
-        if (receipt['named_joint_addresses'] != expected_scalar_addresses
-                or receipt['named_free_joint_addresses'] != expected_free_addresses):
-            raise ValueError('compiled scalar joint order differs from the fixed source init layout')
-        expected_channels = {
-            channel.semantic_id: channel for channel in value['source'].mixed_actuator_plan.channels
-        }
-        compiled_channels = receipt.get('named_actuator_channels')
-        if not isinstance(compiled_channels, dict) or set(compiled_channels) != set(expected_channels):
-            raise ValueError('compiled named actuator channels differ from the fixed source plan')
-        for semantic, channel in expected_channels.items():
-            record = compiled_channels[semantic]
-            if (record.get('actuator_name') != channel.actuator_name
-                    or record.get('joint_name') != channel.joint_name
-                    or record.get('drive_mode') != channel.drive_mode
-                    or record.get('unit') != channel.unit
-                    or record.get('control_range') != list(channel.control_range)
-                    or record.get('control_limited') is not True):
-                raise ValueError(f'compiled actuator differs from the fixed source channel: {semantic}')
-        if (receipt['source_id'] != value['source'].scene_source.source_id
-                or receipt['source_closure_digest'] != value['source'].source_closure_digest):
-            raise ValueError('compiled LIBERO layout receipt is not source-bound')
-        compiled_options = getattr(session, 'compiled_model_options_receipt_v1', None)
-        expected_profile = value.get('official_compiled_mujoco_profile_v1')
-        if _is_panda_gripper_delta_profile(
-            value.get('panda_gripper_delta_replay_profile_id'),
-        ):
+        if (receipt["named_joint_addresses"] != expected_scalar_addresses
+                or receipt["named_free_joint_addresses"] != expected_free_addresses):
+            raise ValueError("compiled scalar joint order differs from the fixed source init layout")
+
+        compiled_options = getattr(session, "compiled_model_options_receipt_v1", None)
+        expected_profile = value.get("official_compiled_mujoco_profile_v1")
+        if value.get("panda_gripper_delta_replay_profile_id") in PANDA_GRIPPER_DELTA_PROFILE_IDS:
             if not isinstance(compiled_options, Mapping):
-                raise ValueError('PandaGripper replay requires the public compiled MuJoCo options receipt')
-            if (compiled_options.get('schema_version') != 'compiled-model-options-v1'
-                    or compiled_options.get('provider') != 'mujoco'
-                    or compiled_options.get('backend') != 'cpu'
-                    or compiled_options.get('source_id') != receipt['source_id']
-                    or compiled_options.get('source_closure_digest') != receipt['source_closure_digest']
-                    or compiled_options.get('canonical_xml_sha256') != receipt['canonical_xml_sha256']):
-                raise ValueError('compiled MuJoCo options receipt is not bound to the admitted runtime source')
+                raise ValueError("PandaGripper replay requires the public compiled MuJoCo options receipt")
+            if (compiled_options.get("schema_version") != "compiled-model-options-v1"
+                    or compiled_options.get("provider") != "mujoco"
+                    or compiled_options.get("backend") != "cpu"
+                    or compiled_options.get("source_id") != receipt["source_id"]
+                    or compiled_options.get("source_closure_digest") != receipt["source_closure_digest"]
+                    or compiled_options.get("canonical_xml_sha256") != receipt["canonical_xml_sha256"]):
+                raise ValueError("compiled MuJoCo options receipt is not bound to the admitted runtime source")
             if not isinstance(expected_profile, Mapping):
-                raise ValueError('PandaGripper replay requires the frozen official compiled-model comparison profile')
-            actual_runtime = compiled_options.get('mujoco_runtime')
-            actual_options = compiled_options.get('options')
-            actual_sizes = compiled_options.get('model_sizes')
-            if not all(isinstance(row, Mapping) for row in (
-                    actual_runtime, actual_options, actual_sizes,
-                    expected_profile.get('mujoco_runtime'),
-                    expected_profile.get('options'), expected_profile.get('model_sizes'))):
-                raise ValueError('compiled MuJoCo options receipt or expected profile is incomplete')
-            for section, actual, expected in (
-                    ('mujoco_runtime', actual_runtime, expected_profile['mujoco_runtime']),
-                    ('model_sizes', actual_sizes, expected_profile['model_sizes'])):
-                for key, expected_value in expected.items():
-                    if actual.get(key) != expected_value:
-                        raise ValueError(
-                            f'compiled MuJoCo {section}.{key} differs from the pinned official model'
-                        )
-            for key, expected_value in expected_profile['options'].items():
-                actual_value = actual_options.get(key)
-                equal = (
-                    tuple(actual_value) == tuple(expected_value)
-                    if isinstance(expected_value, list)
-                    else actual_value == expected_value
-                )
-                if not equal:
-                    raise ValueError(
-                        f'compiled MuJoCo option {key} differs from the pinned official model'
+                raise ValueError("PandaGripper replay requires the frozen official compiled-model comparison profile")
+            actual = tuple(compiled_options.get(key) for key in (
+                "mujoco_runtime", "options", "model_sizes",
+            ))
+            expected = tuple(expected_profile.get(key) for key in (
+                "mujoco_runtime", "options", "model_sizes",
+            ))
+            if any(not isinstance(row, Mapping) for row in (*actual, *expected)):
+                raise ValueError("compiled MuJoCo options receipt or expected profile is incomplete")
+            for section, actual_section, expected_section in zip(
+                    ("mujoco_runtime", "options", "model_sizes"), actual, expected, strict=True):
+                for key, expected_value in expected_section.items():
+                    measured = actual_section.get(key)
+                    equal = (
+                        tuple(measured) == tuple(expected_value)
+                        if isinstance(expected_value, list) else measured == expected_value
                     )
-            if (actual_options.get('integrator_name') != 'euler'
-                    or actual_options.get('solver_name') != 'newton'
-                    or actual_options.get('cone_name') != 'elliptic'):
-                raise ValueError('compiled MuJoCo option enum names differ from the pinned LIBERO profile')
+                    if not equal:
+                        raise ValueError(f"compiled MuJoCo {section}.{key} differs from the pinned official model")
+            options = compiled_options["options"]
+            if (options.get("integrator_name") != "euler"
+                    or options.get("solver_name") != "newton"
+                    or options.get("cone_name") != "elliptic"):
+                raise ValueError("compiled MuJoCo option enum names differ from the pinned LIBERO profile")
         return {
-            'schema_version': 'r07c-d01-pre-reset-compiled-validation-v1',
-            'runtime_identity': session.runtime_identity,
-            'compiled_layout': receipt,
-            'compiled_model_options_v1': compiled_options,
-            'compiled_model_physics_fingerprint_stage': 'post_reset_before_first_physics_step',
-            'reset_not_yet_applied': True,
+            "schema_version": "libero-pre-reset-compiled-validation-v1",
+            "runtime_identity": session.runtime_identity,
+            "compiled_layout": receipt,
+            "compiled_model_options_v1": compiled_options,
+            "compiled_model_physics_fingerprint_stage": "post_reset_before_first_physics_step",
+            "reset_not_yet_applied": True,
         }
 
     def validate_post_reset_compiled_session(session, value):
-        if not _is_panda_gripper_delta_profile(
-            value.get('panda_gripper_delta_replay_profile_id'),
-        ):
+        if value.get('panda_gripper_delta_replay_profile_id') not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
             return None
         if session.compiled_layout_receipt.get('provider') == 'geophys':
             return {
@@ -1929,7 +1600,7 @@ def build_libero_selected_candidate(
                 }, sort_keys=True, separators=(',', ':'))
             )
         return {
-            'schema_version': 'r07c-d01-post-reset-compiled-validation-v1',
+            'schema_version': 'libero-post-reset-compiled-validation-v1',
             'boundary': 'after_nonintegrating_reset_before_first_physics_step',
             'native_physics_steps_at_validation': 0,
             'runtime_identity': session.runtime_identity,
@@ -1979,39 +1650,33 @@ def build_libero_selected_candidate(
             artifact, seed, {'init_row_index': 0}, value_for_artifact(artifact)['source'],
         ),
         evaluate=evaluate,
-        object_poses=(
-            (('akita_black_bowl_1', 'bowl'), ('plate_1', 'plate'))
-            if task_uid == TASK_1
-            else tuple((name, name) for name in contract.movable_instances)
-        ),
+        object_poses=(profile.object_poses or
+                      tuple((name, name) for name in contract.movable_instances)),
         external_actions=True, interval_mode='grouped', recorder_mode='canonical',
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
         build_mixed_control_profile=build_value,
         build_external=(lambda provider: build_value(provider, 'cpu'))
-        if _solution_profile and not _panda_gripper_delta_replay else None,
+        if solution_profile and not panda_gripper_delta_replay else None,
         validate_external_solution=validate_external_solution
-        if _solution_profile and not _panda_gripper_delta_replay else None,
+        if solution_profile and not panda_gripper_delta_replay else None,
         reset_sample_with_options=reset_with_options,
         prepare_mixed_control=prepare_mixed_control,
-        prepare_mixed_control_substep=(
-            prepare_mixed_control_substep if pose_action_profile else None
-        ),
+        prepare_mixed_control_substep=prepare_mixed_control_substep,
         observe_mixed_control=observe_mixed_control,
         mixed_record_metadata=mixed_record_metadata,
         pre_reset_session_validator=validate_compiled_session,
         post_reset_session_validator=validate_post_reset_compiled_session,
-        close_task_resources=close_task_resources if pose_action_profile else None,
+        close_task_resources=close_task_resources,
     )
     env = SelectedReferenceEnv.from_mixed_control_candidate(
         binding, provider=provider, backend='cpu', horizon=horizon,
     )
     env_holder['env'] = env
-    if _solution_profile:
+    if solution_profile:
         env.metadata.update({
             'provider': provider, 'backend': 'cpu',
             'solution_identity': env.value['solution_identity'],
-            'reference_solution_identity': env.value['reference_solution_identity'],
             'source_xml_sha256': env.value['source_sha256']['runtime_model_xml'],
             'source_closure_digest': env.value['source_sha256']['source_closure_digest'],
             'provider_import_projection': env.value['provider_import_projection'],
@@ -2022,32 +1687,4 @@ def build_libero_selected_candidate(
     return env
 
 
-def build_libero_solution_candidate(
-    *, xml_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composed_candidate.xml',
-    xml: str | bytes | None = None,
-    composed_mjcf_sha256: str | None = None,
-    composition_plan_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composition_plan.json',
-    install_root: Path = DEFAULT_INSTALL_ROOT,
-    init_path: Path | None = None,
-    horizon: int = 1000,
-    provider: str = 'mujoco',
-    gripper_action_profile: str | None = None,
-):
-    """Construct the latest optional demonstration-derived task #1 Solution."""
-    if type(horizon) is not int or not 1 <= horizon <= 1000:
-        raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
-    if gripper_action_profile is not None and not _is_panda_gripper_delta_profile(
-        gripper_action_profile,
-    ):
-        raise ValueError('unsupported LIBERO task gripper action profile')
-    return build_libero_selected_candidate(
-        xml_path=xml_path, xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
-        composition_plan_path=composition_plan_path, install_root=install_root,
-        init_path=init_path, horizon=horizon, provider=provider,
-        _solution_profile='v8',
-        _panda_gripper_delta_replay=_is_panda_gripper_delta_profile(gripper_action_profile),
-        _panda_gripper_delta_profile_id=gripper_action_profile,
-    )
-
-
-__all__ = ['build_libero_selected_candidate', 'build_libero_solution_candidate']
+__all__ = ['build_libero_selected_candidate']

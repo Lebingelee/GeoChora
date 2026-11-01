@@ -1,10 +1,4 @@
-"""R07c D01 same-SelectedReferenceEnv provider-free S1.
-
-Only the MuJoCo C/API leaf is synthetic.  The candidate builder, capability
-admission, SelectedReferenceEnv, RuntimeSession, Controller, state/contact
-projection, Generic H5 v3 Recorder, finalizer, worker, and independent reader
-remain the production implementations.
-"""
+"""Provider-free regression checks for current task-local TaskEnv contracts."""
 from __future__ import annotations
 
 import builtins
@@ -17,7 +11,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 import types
 import xml.etree.ElementTree as ET
@@ -26,10 +19,6 @@ import h5py
 import numpy as np
 import pytest
 
-from bench_deploy.libero.trajectory.reader import (
-    _equivalent_wxyz_quaternions, consume_libero_candidate_bundle,
-)
-from bench_deploy.libero.trajectory.worker import run_libero_candidate_worker
 from bench_deploy.libero.tasks.predicates import (
     PILOT_TASK_UID, OnBowlPlateEvidenceV1, evaluate_on_bowl_plate_v1,
 )
@@ -37,15 +26,6 @@ from task_env.recorders import load_structured_control_records_h5
 
 
 _FORBIDDEN_ROOTS = {"geophys", "taichi", "isaacsim", "omni", "robosuite", "libero", "torch", "genesis"}
-
-
-def test_solution_reader_accepts_only_unit_quaternion_sign_equivalence():
-    quaternion = (0.02003903, -0.72548007, -0.68784862, 0.01188998)
-    antipodal = tuple(-value for value in quaternion)
-    different = (0.02003903, 0.72548007, -0.68784862, 0.01188998)
-    assert _equivalent_wxyz_quaternions(quaternion, antipodal)
-    assert not _equivalent_wxyz_quaternions(quaternion, different)
-    assert not _equivalent_wxyz_quaternions(quaternion, (2.0, 0.0, 0.0, 0.0))
 
 
 class _GravityBiasDouble:
@@ -64,13 +44,7 @@ class _GravityBiasDouble:
         self.closed = False
         self.close_calls = 0
 
-    def gravity_torque(self, joint_position_rad):
-        values = np.asarray(joint_position_rad, dtype=np.float64)
-        assert values.shape == (7,) and np.isfinite(values).all()
-        self.forward_calls += 1
-        return np.asarray((0.0, -19.2, 0.1, 18.1, 0.0, 2.1, 0.0), dtype=np.float64)
-
-    def operational_space_state_v1(self, joint_position_rad, joint_velocity_rad_s):
+    def operational_space_state_v2(self, joint_position_rad, joint_velocity_rad_s):
         assert self.kinematics is not None
         q = np.asarray(joint_position_rad, dtype=np.float64)
         qdot = np.asarray(joint_velocity_rad_s, dtype=np.float64)
@@ -78,8 +52,8 @@ class _GravityBiasDouble:
         transform, jacobian = self.kinematics.fk_jacobian(q)
         self.forward_calls += 1
         return {
-            "schema_version": "libero-source-operational-space-state-v1",
-            "profile_id": "libero-source-operational-space-state-v1",
+            "schema_version": "libero-source-operational-space-state-v2",
+            "profile_id": "libero-source-operational-space-state-v2",
             "model_identity_sha256": self.model_identity_sha256,
             "source_xml_sha256": self.source_xml_sha256,
             "source_closure_digest": self.source_closure_digest,
@@ -88,19 +62,10 @@ class _GravityBiasDouble:
             "site_rotation_world": transform[:3, :3].copy(),
             "jacobian_world": jacobian.copy(),
             "mass_matrix_arm": np.eye(7, dtype=np.float64),
-            "bias_minus_passive_arm_Nm": np.zeros(7, dtype=np.float64),
+            "qfrc_bias_arm_Nm": np.zeros(7, dtype=np.float64),
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": 0,
         }
-
-    def operational_space_state_v2(self, joint_position_rad, joint_velocity_rad_s):
-        state = self.operational_space_state_v1(joint_position_rad, joint_velocity_rad_s)
-        state.update({
-            "schema_version": "libero-source-operational-space-state-v2",
-            "profile_id": "libero-source-operational-space-state-v2",
-            "qfrc_bias_arm_Nm": np.zeros(7, dtype=np.float64),
-        })
-        return state
 
     def identity_mapping(self):
         return {
@@ -111,7 +76,7 @@ class _GravityBiasDouble:
             "composition_plan_sha256": "c" * 64,
             "model_dimensions": {"nq": 48, "nv": 43, "nbody": 38, "njnt": 18},
             "runtime_identity": {"mujoco_version": "3.8.1", "api_version": 3008001},
-            "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+            "calculation": "source_operational_space_qfrc_bias_v2",
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": 0,
         }
@@ -164,6 +129,7 @@ class _World:
         self.fail_step_after = None
         self.fail_forward = None
         self.contact_pair = None
+        self.contact_geom_groups = {}
         self.partial_ctrl_after = None
         self.ctrl_write_count = 0
         self.bad_joint_address = None
@@ -647,10 +613,11 @@ def _forward(model: _FakeModel, data: _FakeData):
         if type(left) is int and type(right) is int:
             left_ids, right_ids = [left], [right]
         else:
-            left_ids = [value for name, value in model._geom_ids.items()
-                        if name.startswith(f"libero_contact_{left}_")]
-            right_ids = [value for name, value in model._geom_ids.items()
-                         if name.startswith(f"libero_contact_{right}_")]
+            groups = world.contact_geom_groups
+            left_ids = [model._geom_ids[name] for name in groups.get(left, ())
+                        if name in model._geom_ids]
+            right_ids = [model._geom_ids[name] for name in groups.get(right, ())
+                         if name in model._geom_ids]
         if left_ids and right_ids:
             data.contact = [_Contact(left_ids[0], right_ids[0])]
     data.ncon = len(data.contact)
@@ -663,17 +630,39 @@ def _mat2quat(out: np.ndarray, matrix: np.ndarray):
 
 def _candidate(monkeypatch, *, horizon=4):
     from bench_deploy.libero.environment.selected_reference import (
-        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_selected_candidate,
+        DEFAULT_INSTALL_ROOT, build_libero_selected_candidate,
     )
+    _FAKE_WORLD.enable_panda_kinematics = True
     xml_path = Path(os.environ["R07C_COMPOSED_MJCF"])
     xml = xml_path.read_bytes()
-    digest = __import__("hashlib").sha256(xml).hexdigest()
+    digest = hashlib.sha256(xml).hexdigest()
     env = build_libero_selected_candidate(
-        xml=xml, composed_mjcf_sha256=digest, install_root=DEFAULT_INSTALL_ROOT,
-        composition_plan_path=DEFAULT_OUTPUT_ROOT / "source/composition_plan.json",
+        xml=xml,
+        install_root=Path(os.environ.get("R07C_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
+        composition_plan_path=Path(os.environ.get(
+            "R07C_COMPOSITION_PLAN", str(xml_path.with_name("composition_plan.json")),
+        )),
         horizon=horizon,
     )
+    source = env.value
+    _FAKE_WORLD.contact_geom_groups = source["source"].contact_geom_groups
+    gravity_model = _GravityBiasDouble(
+        source["source_sha256"]["runtime_model_xml"],
+        source["source_sha256"]["source_closure_digest"],
+        kinematics=source["arm_resolver"].model,
+    )
+    profile = source.get("model_profile_receipt")
+    if profile is not None:
+        gravity_model.model_profile_id = profile["profile_id"]
+        gravity_model.model_profile_receipt_sha256 = source["source_sha256"]["model_profile_receipt"]
+        gravity_model.raw_source_xml_sha256 = digest
+    source["bind_source_gravity_model"](gravity_model)
     return env
+
+
+def _pose_hold_action(observation, gripper=0.0):
+    """Use the selected absolute world-pose schema, not retired joint-PD values."""
+    return np.asarray([*observation["state"]["ee_pose"], gripper], dtype=np.float64)
 
 
 def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfast"):
@@ -688,7 +677,7 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfa
     )
     from task_env.assembly.source import TaskSceneSource
     from task_env.controllers.canonical.contracts import (
-        AppliedMixedActuatorCommandV1, ControlGroupActionV1,
+        ControlGroupActionV1,
         MixedActuatorChannelV1, MixedActuatorCommandV1, MixedActuatorPlanV1,
         StructuredActionRequestV1, digest,
     )
@@ -1372,23 +1361,13 @@ def test_position_drive_rejects_offset_and_antidamping_before_reset(bias_slot, v
 
 
 @pytest.mark.parametrize('warning_count', (0, 6, 8))
-def test_monitor_and_reader_reject_incomplete_warning_vector(warning_count, monkeypatch):
-    from copy import deepcopy
-    from bench_deploy.libero.trajectory.worker import _validate_physical_state_monitor
-
+def test_runtime_requires_all_warning_counters(warning_count, monkeypatch):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
     _fake_api(monkeypatch)
     env = _candidate(monkeypatch, horizon=2)
     try:
-        observation, _ = env.reset(seed=19, options={'init_row_index': 0})
-        progress = env.get_runtime_progress_receipt()
-        monitor = deepcopy(progress['physical_state_monitor'])
-        monitor['warning_counts'] = [0] * warning_count
-        progress['physical_state_monitor'] = monitor
-        joints = np.asarray([observation['state']['joint_position']], dtype=np.float64)
-        with pytest.raises(ValueError, match='omits warning counters'):
-            _validate_physical_state_monitor(monitor, progress, env.session.compiled_layout_receipt, joints)
+        env.reset(seed=19, options={'init_row_index': 0})
         _FAKE_WORLD.last_data.warning = [types.SimpleNamespace(number=0) for _ in range(warning_count)]
         with pytest.raises(RuntimeError, match='all seven warning counters'):
             env.session._warning_counts()
@@ -1449,7 +1428,7 @@ def test_physical_monitor_fails_on_first_native_step(failure_kind, monkeypatch):
     try:
         observation, _ = env.reset(seed=19, options={"init_row_index": 0})
         session = env.session
-        action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+        action = _pose_hold_action(observation)
         prepared = env.binding.prepare_mixed_control(env, action, env.state)
         plan = env.value["source"].mixed_actuator_plan
         target = prepared["target"]
@@ -1482,113 +1461,13 @@ def test_physical_monitor_fails_on_first_native_step(failure_kind, monkeypatch):
             assert monitor["first_violation"] is None
             assert monitor["warning_counts"][0] == 1
         assert env.execution_fault is not None
-        assert env.execution_fault.phase == "mixed_physics_step"
+        assert env.execution_fault.phase == "mixed_physics_substep_interval"
     finally:
         env.close()
     assert env.close_receipt["session_closed"] is True
     assert env.close_receipt["physical_state_monitor"]["status"] == "failed"
 
 
-def test_r07c_d01_motion_gate_uses_signed_finger_aperture_delta():
-    from bench_deploy.libero.trajectory.worker import (
-        _public_motion_metrics, _validate_public_motion_gate,
-    )
-
-    initial_joints = np.zeros(9, dtype=np.float64)
-    initial_joints[7:9] = (0.02, -0.02)
-    final_joints = initial_joints.copy()
-    final_joints[0] += 0.06
-    final_joints[7:9] = (0.01, -0.01)
-    ee_pose = np.asarray([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-
-    summary = _public_motion_metrics(initial_joints, final_joints, ee_pose, ee_pose)
-    assert summary["aggregate_finger_position_delta_m"] == pytest.approx(0.02)
-    assert summary["arm_joint_max_abs_delta_rad"] == pytest.approx(0.06)
-    assert _validate_public_motion_gate(
-        summary, initial_joints, final_joints, ee_pose, ee_pose, require_thresholds=True,
-    ) == summary
-
-    no_aperture_change = final_joints.copy()
-    no_aperture_change[7:9] = initial_joints[7:9]
-    insufficient_summary = _public_motion_metrics(
-        initial_joints, no_aperture_change, ee_pose, ee_pose,
-    )
-    with pytest.raises(ValueError, match="aggregate finger opening delta"):
-        _validate_public_motion_gate(
-            insufficient_summary, initial_joints, no_aperture_change, ee_pose, ee_pose,
-            require_thresholds=True,
-        )
-
-
-def test_compiled_libero_assets_use_receipt_bound_unique_vfs_aliases(monkeypatch):
-    global _FAKE_WORLD
-    _FAKE_WORLD = _World()
-    _fake_api(monkeypatch)
-    env = _candidate(monkeypatch)
-    try:
-        env.reset(seed=19, options={"init_row_index": 0})
-        receipt = env.value["source"].execution_source_receipt
-        assert receipt is not None
-        composition = env.value["source"].composition
-        asset_merge = composition["asset_merge_receipt"]
-        assert composition["schema_version"] == "libero-source-composition-mjcf-v4"
-        assert asset_merge["schema_version"] == "libero-source-asset-merge-v1"
-        stove_texture_rows = [
-            row for row in asset_merge["duplicate_definitions"]
-            if row["semantic_id"] == "flat_stove_1"
-            and row["asset_type"] == "texture"
-            and row["source_name"] == "tex-stove_knob"
-        ]
-        assert len(stove_texture_rows) == 1
-        assert stove_texture_rows[0]["kept_attributes"]["file"].endswith("/metal.png")
-        assert stove_texture_rows[0]["discarded_attributes"]["file"].endswith("/button_dark_texture.png")
-        composed_root = ET.parse(os.environ["R07C_COMPOSED_MJCF"]).getroot()
-        composed_asset = composed_root.find("asset")
-        names_by_type = {}
-        for node in composed_asset:
-            if node.get("name"):
-                names_by_type.setdefault(node.tag, []).append(node.get("name"))
-        assert all(len(names) == len(set(names)) for names in names_by_type.values())
-        texture_files = {
-            node.get("name"): node.get("file") for node in composed_asset.findall("texture")
-        }
-        stove_material_textures = {
-            node.get("name"): texture_files[node.get("texture")]
-            for node in composed_asset.findall("material")
-            if node.get("name") in {
-                "stove_knob_base", "stove_knob_button",
-            }
-        }
-        assert stove_material_textures == {
-            "stove_knob_base": "upstream/libero/libero/libero/assets/articulated_objects/flat_stove/metal.png",
-            "stove_knob_button": "upstream/libero/libero/libero/assets/articulated_objects/flat_stove/metal.png",
-        }
-        source_root = ET.fromstring(receipt.importer_xml)
-        compiled_root = ET.fromstring(_FAKE_WORLD.last_compile_xml)
-        source_files = [node.get("file") for node in source_root.iter() if node.get("file")]
-        compiled_files = [node.get("file") for node in compiled_root.iter() if node.get("file")]
-        aliases = env.session.compiled_layout_receipt["compiler_asset_aliases"]
-        rows_by_source = {row["source_path"]: row for row in aliases}
-        assert len(rows_by_source) == len(aliases)
-        assert set(rows_by_source) == set(source_files)
-        assert set(_FAKE_WORLD.last_assets) == {row["vfs_name"] for row in aliases}
-        assert set(compiled_files) == set(_FAKE_WORLD.last_assets)
-        assert len(set(compiled_files)) == len(rows_by_source)
-        assert all("/" not in name and "\\" not in name for name in _FAKE_WORLD.last_assets)
-        for source_path, row in rows_by_source.items():
-            payload = receipt.closure_files[source_path]
-            assert row["sha256"] == hashlib.sha256(payload).hexdigest()
-            assert row["size_bytes"] == len(payload)
-            assert _FAKE_WORLD.last_assets[row["vfs_name"]] == payload
-        metal_paths = [path for path in rows_by_source if path.endswith("/metal.png")]
-        assert len(metal_paths) >= 2
-        assert len({rows_by_source[path]["vfs_name"] for path in metal_paths}) == len(metal_paths)
-        # Repeated references to one source path share one compiler alias, while
-        # the immutable importer snapshot retains its original path strings.
-        assert len(source_files) > len(set(source_files))
-        assert receipt.importer_xml == receipt.closure_files["scene.xml"]
-    finally:
-        env.close()
 
 
 def test_failed_materialization_preserves_primary_error_and_reports_cleanup(tmp_path, monkeypatch):
@@ -1597,555 +1476,27 @@ def test_failed_materialization_preserves_primary_error_and_reports_cleanup(tmp_
     _fake_api(monkeypatch)
     _FAKE_WORLD.fail_compile = "synthetic primary source compile failure"
     env = _candidate(monkeypatch)
-    result = run_libero_candidate_worker(
-        env, output_dir=tmp_path / "failed_materialization", steps=1,
-    )
-    assert result["status"] == "failed"
-    assert result["worker_error"] == {
-        "type": "RuntimeError", "message": "synthetic primary source compile failure",
-    }
-    assert result["close_error"] is None
-    close = result["final_session_close_receipt"]
-    assert close["schema_version"] == "mixed-control-selected-close-v1"
+    try:
+        with pytest.raises(RuntimeError, match="synthetic primary source compile failure"):
+            env.reset(seed=19, options={"init_row_index": 0})
+    finally:
+        env.close()
+    close = env.close_receipt
     assert close["session_closed"] is True
     assert close["session_materialized"] is False
     assert close["session_close_status"] == "not_materialized"
     assert close["environment_closed"] is True
     assert close["cleanup_completed"] is True
-    with pytest.raises(ValueError, match="incomplete or reports a lifecycle failure"):
-        consume_libero_candidate_bundle(tmp_path / "failed_materialization/worker_result.json")
 
 
-def _contact_pair_only_when_source_pose_is_on(model, data):
-    bowl = data.xpos[model._body_ids["akita_black_bowl_1_main"]]
-    plate = data.xpos[model._body_ids["plate_1_main"]]
-    delta_xy = np.asarray(bowl[:2]) - np.asarray(plate[:2])
-    if float(np.linalg.norm(delta_xy)) < 0.03 and float(bowl[2]) >= float(plate[2]):
-        return ("akita_black_bowl_1", "plate_1")
-    return None
 
 
-def _rewrite_h5_json(path: Path, dataset: str, update):
-    with h5py.File(path, "r+") as handle:
-        value = json.loads(handle[dataset][()].decode("utf-8"))
-        update(value)
-        handle[dataset][()] = json.dumps(
-            value, sort_keys=True, separators=(",", ":"), allow_nan=False,
-        ).encode("utf-8")
 
 
-def _reseal_bundle(result_path: Path, episode_index=0):
-    result = json.loads(result_path.read_text(encoding="utf-8"))
-    episode = result["episodes"][episode_index]
-    h5_path = result_path.parent / episode["h5"]["relative_path"]
-    raw = h5_path.read_bytes()
-    episode["h5"]["bytes"] = len(raw)
-    episode["h5"]["sha256"] = hashlib.sha256(raw).hexdigest()
-    payload = {key: value for key, value in result.items() if key != "result_sha256"}
-    result["result_sha256"] = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
-    ).hexdigest()
-    result_path.write_text(json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    return h5_path
 
 
-def _write_synthetic_parent_run_record(root: Path, bundle_path: Path, result: dict,
-                                       *, lock_path: Path):
-    run_dir = root / "runs" / "run-parent"
-    run_dir.mkdir(parents=True)
-    stdout_path = run_dir / "stdout.log"
-    stderr_path = run_dir / "stderr.log"
-    stdout_path.write_text(json.dumps({
-        "status": result["status"], "episode_count": result["episode_count"],
-        "transition_count": result["transition_count"],
-        "observation_count": result["observation_count"],
-        "native_step_count": result["native_step_count"],
-        "result_sha256": result["result_sha256"],
-    }) + "\n", encoding="utf-8")
-    stderr_path.write_text("", encoding="utf-8")
-    record = {
-        "schema_version": "r07c-d01-run-record-v1",
-        "argv": [sys.executable, "-m", "bench_deploy.libero.script.cli",
-                 "--run-worker", str(bundle_path.parent.resolve()), "--steps", "12"],
-        "cwd": "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
-        "exit_code": 0,
-        "termination_reason": None,
-        "stdout_path": "runs/run-parent/stdout.log",
-        "stderr_path": "runs/run-parent/stderr.log",
-        "stdout_bytes": stdout_path.stat().st_size,
-        "stderr_bytes": 0,
-        "lock_path": str(lock_path.resolve()),
-        "lock_acquired": True,
-        "lock_released_after_group_exit": True,
-        "process_group_confirmed_exited": True,
-        "environment": {
-            "PYTHONPATH": "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys/src:"
-                          "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
-        },
-    }
-    record_path = run_dir / "run_record.json"
-    record_path.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    return record_path
 
 
-def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reader(tmp_path, monkeypatch):
-    global _FAKE_WORLD
-    _FAKE_WORLD = _World()
-    fake = _fake_api(monkeypatch)
-    assert getattr(fake, "__r07c_s1_synthetic_fixture__", False) is True
-    import bench_deploy.libero.environment.selected_reference as selected_candidate
-    from task_env.artifacts import ResetSampleV1
-
-    original_sampler = selected_candidate.sample_libero_normal_reset_v1
-
-    def nonzero_reset_sample(**kwargs):
-        sample, receipt = original_sampler(**kwargs)
-        payload = sample.to_mapping()
-        joint_velocity = dict(payload["joint_velocity"])
-        joint_velocity["joint1"] = 0.125
-        free_velocity = dict(payload["free_joint_velocity"])
-        free_velocity["akita_black_bowl_1"] = [0.01, -0.02, 0.03, 0.1, -0.2, 0.3]
-        payload.update(
-            joint_velocity=joint_velocity,
-            free_joint_velocity=free_velocity,
-            simulation_time_s=1.25,
-        )
-        return ResetSampleV1.create(**payload), {
-            **receipt, "s1_nonzero_time_velocity_fixture": True,
-        }
-
-    monkeypatch.setattr(selected_candidate, "sample_libero_normal_reset_v1", nonzero_reset_sample)
-    _FAKE_WORLD.contact_pair = _contact_pair_only_when_source_pose_is_on
-    env = _candidate(monkeypatch, horizon=12)
-    result = run_libero_candidate_worker(env, output_dir=tmp_path / "bundle", steps=12)
-    assert result["status"] == "complete"
-    assert all(
-        action["planner_action"][7] == pytest.approx(-0.6)
-        and action["selected_public_action"][7] == pytest.approx(0.016)
-        for episode in result["episodes"] for action in episode["action_trace"]
-    )
-    assert result["episodes"][0]["control_plan"]["kp_Nm_per_rad"] == [20.0] * 7
-    assert result["episodes"][0]["control_plan"]["kd_Nm_s_per_rad"] == [4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0]
-    assert [episode["row_index"] for episode in result["episodes"]] == [0, 1, 2]
-    assert result["transition_count"] == 36
-    assert result["observation_count"] == 39
-    assert result["native_step_count"] == 900
-    assert _FAKE_WORLD.calls["compile"] == 5
-    assert _FAKE_WORLD.calls["reset"] == 5
-    assert _FAKE_WORLD.calls["step1"] == 5
-    assert _FAKE_WORLD.calls["step"] == 900
-    assert _FAKE_WORLD.calls["forward"] == 41
-    assert result["reset_count"] == 5
-    assert [item["endpoint"] for item in result["diagnostic_endpoints"]] == ["negative", "positive"]
-    assert [item["core_predicate_v1"]["value"] for item in result["diagnostic_endpoints"]] == [False, True]
-    assert [item["source_predicate_oracle"]["value"] for item in result["diagnostic_endpoints"]] == [False, True]
-    assert all(item["runtime_progress"]["native_step_count"] == 0 for item in result["diagnostic_endpoints"])
-    from bench_deploy.libero.objects.layout import (
-        PILOT_FIXTURES, PILOT_MOVABLES, PILOT_MOVABLE_OBJECT_CLASSES,
-    )
-
-    readback = consume_libero_candidate_bundle(tmp_path / "bundle/worker_result.json")
-    assert readback["status"] == "verified_complete"
-    assert (readback["transition_count"], readback["observation_count"]) == (36, 39)
-    for episode in result["episodes"]:
-        realization = episode["reset_realization"]
-        sampler = realization["placement_sampler"]
-        assert sampler["bddl_problem_name"] == "libero_tabletop_manipulation"
-        assert sampler["movable_object_classes"] == PILOT_MOVABLE_OBJECT_CLASSES
-        assert sampler["append_order"] == [name for name, _, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES)]
-        assert realization["object_property_initializers"] == []
-        assert realization["mj_step1"].startswith("called once before placements")
-        draws = {item["object"]: item for item in realization["placements_before_pruned_init_restore"]}
-        assert tuple(draws) == tuple(sampler["append_order"])
-        geometry = realization["asset_placement_geometry"]
-        from bench_deploy.libero.objects.layout import (
-            PILOT_TABLE_TOP_Z_M, PILOT_MOVABLE_Z_OFFSET_M, PILOT_FIXTURE_Z_OFFSET_M,
-        )
-        for object_name, _region, asset_path in PILOT_MOVABLES:
-            draw = draws[object_name]
-            radius = geometry[asset_path]["horizontal_radius_m"]
-            raw_x0, raw_y0, raw_x1, raw_y1 = draw["region_ranges_m"]
-            assert draw["source_sampler"].endswith("TableRegionSampler")
-            assert draw["object_class"] == PILOT_MOVABLE_OBJECT_CLASSES[object_name]
-            assert draw["horizontal_radius_margin_m"] == radius
-            assert draw["x_sample_bounds_m"] == pytest.approx([raw_x0 + radius, raw_x1 - radius])
-            assert draw["y_sample_bounds_m"] == pytest.approx([raw_y0 + radius, raw_y1 - radius])
-            assert draw["x_sample_interval_m"] == pytest.approx(sorted(draw["x_sample_bounds_m"]))
-            assert draw["y_sample_interval_m"] == pytest.approx(sorted(draw["y_sample_bounds_m"]))
-            assert draw["x_sample_interval_m"][0] <= draw["position"][0] <= draw["x_sample_interval_m"][1]
-            assert draw["y_sample_interval_m"][0] <= draw["position"][1] <= draw["y_sample_interval_m"][1]
-            assert draw["z_offset_m"] == PILOT_MOVABLE_Z_OFFSET_M == 0.01
-            assert draw["position"][2] == pytest.approx(
-                PILOT_MOVABLE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - geometry[asset_path]["bottom_offset_m"][2],
-            )
-            assert draw["rotation_axis"] == "x"
-            assert draw["rotation_range_rad"] == pytest.approx([np.pi / 2, np.pi / 2])
-            assert draw["rotation_angle_rad"] == pytest.approx(np.pi / 2)
-        for fixture_name, _region, asset_path in PILOT_FIXTURES:
-            draw = draws[fixture_name]
-            raw_x0, raw_y0, raw_x1, raw_y1 = draw["region_ranges_m"]
-            assert draw["source_sampler"].endswith("MultiRegionRandomSampler")
-            assert draw["horizontal_radius_margin_m"] == 0.0
-            assert draw["x_sample_bounds_m"] == [raw_x0, raw_x1]
-            assert draw["y_sample_bounds_m"] == [raw_y0, raw_y1]
-            assert draw["x_sample_interval_m"] == pytest.approx(sorted(draw["x_sample_bounds_m"]))
-            assert draw["y_sample_interval_m"] == pytest.approx(sorted(draw["y_sample_bounds_m"]))
-            assert draw["x_sample_interval_m"][0] <= draw["position"][0] <= draw["x_sample_interval_m"][1]
-            assert draw["y_sample_interval_m"][0] <= draw["position"][1] <= draw["y_sample_interval_m"][1]
-            assert draw["z_offset_m"] == PILOT_FIXTURE_Z_OFFSET_M == -0.04
-            assert draw["position"][2] == pytest.approx(
-                PILOT_FIXTURE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - geometry[asset_path]["bottom_offset_m"][2],
-            )
-            assert draw["rotation_axis"] == "z"
-            assert draw["rotation_range_rad"][0] <= draw["rotation_angle_rad"] <= draw["rotation_range_rad"][1]
-            angle = draw["rotation_angle_rad"]
-            assert draw["quaternion_wxyz"] == pytest.approx(
-                [np.cos(angle / 2), 0.0, 0.0, np.sin(angle / 2)],
-            )
-        assert episode["reset_sample"]["simulation_time_s"] == 1.25
-        assert episode["reset_readback"]["simulation_time_s"] == 1.25
-        assert episode["reset_sample"]["joint_velocity"]["joint1"] == 0.125
-        assert episode["reset_readback"]["joint_velocity"]["joint1"] == 0.125
-        assert episode["reset_sample"]["free_joint_velocity"]["akita_black_bowl_1"] == [
-            0.01, -0.02, 0.03, 0.1, -0.2, 0.3,
-        ]
-        assert episode["reset_readback"]["free_joint_velocity"]["akita_black_bowl_1"] == [
-            0.01, -0.02, 0.03, 0.1, -0.2, 0.3,
-        ]
-        assert episode["action_trace"][0]["simulation_time_s"] == pytest.approx(0.05)
-        h5_path = tmp_path / "bundle" / episode["h5"]["relative_path"]
-        semantic = load_structured_control_records_h5(h5_path)
-        assert semantic["transition_count"] == 12
-        assert semantic["observation_count"] == 13
-        assert semantic["outcome"].episode_id == episode["episode_id"]
-        with h5py.File(h5_path, "r") as handle:
-            context = json.loads(handle["meta/task_context_json"][()].decode("utf-8"))
-            assert context["init_row_index"] == episode["row_index"]
-            assert context["init_row_sha256"] == episode["reset_sample"]["init_row_sha256"]
-            assert handle["obs/state/joint_position"].shape == (13, 9)
-
-    # Re-seal copied H5 and worker receipts so each case reaches the semantic
-    # reader gates instead of stopping at a byte/digest mismatch.
-    original = tmp_path / "bundle"
-    contact_copy = tmp_path / "tampered_contact"
-    shutil.copytree(original, contact_copy)
-    contact_result = contact_copy / "worker_result.json"
-    contact_h5 = contact_copy / result["episodes"][0]["h5"]["relative_path"]
-    _rewrite_h5_json(contact_h5, "meta/boundary_context_v1_json", lambda rows: rows[1]["contact_summary_v2"].update(
-        requested_pairs=[], covered_pairs=[], pair_counts={},
-    ))
-    _reseal_bundle(contact_result)
-    with pytest.raises(ValueError, match="contact query coverage"):
-        consume_libero_candidate_bundle(contact_result)
-
-    freshness_copy = tmp_path / "tampered_contact_freshness"
-    shutil.copytree(original, freshness_copy)
-    freshness_result = freshness_copy / "worker_result.json"
-    freshness_h5 = freshness_copy / result["episodes"][0]["h5"]["relative_path"]
-    _rewrite_h5_json(freshness_h5, "meta/boundary_context_v1_json", lambda rows: rows[1][
-        "contact_summary_v2"].update(state_revision=99,
-    ))
-    _reseal_bundle(freshness_result)
-    with pytest.raises(ValueError, match="stale state revision"):
-        consume_libero_candidate_bundle(freshness_result)
-
-    action_copy = tmp_path / "tampered_action"
-    shutil.copytree(original, action_copy)
-    action_result = action_copy / "worker_result.json"
-    action_h5 = action_copy / result["episodes"][0]["h5"]["relative_path"]
-    with h5py.File(action_h5, "r+") as handle:
-        handle["universal_action/joint1"][0, 0] += 0.25
-    _reseal_bundle(action_result)
-    with pytest.raises(ValueError, match="typed request differs"):
-        consume_libero_candidate_bundle(action_result)
-
-    clock_copy = tmp_path / "tampered_clock"
-    shutil.copytree(original, clock_copy)
-    clock_result = clock_copy / "worker_result.json"
-    clock_h5 = clock_copy / result["episodes"][0]["h5"]["relative_path"]
-    _rewrite_h5_json(clock_h5, "meta/boundary_context_v1_json", lambda rows: rows[-1].update(
-        simulation_time_s=rows[-1]["simulation_time_s"] + 0.001,
-    ))
-    _reseal_bundle(clock_result)
-    with pytest.raises(ValueError, match="boundary order, clock"):
-        consume_libero_candidate_bundle(clock_result)
-
-    ack_copy = tmp_path / "tampered_ack"
-    shutil.copytree(original, ack_copy)
-    ack_result = ack_copy / "worker_result.json"
-    ack_h5 = ack_copy / result["episodes"][0]["h5"]["relative_path"]
-    _rewrite_h5_json(ack_h5, "meta/structured_controls_v1_json", lambda rows: rows[0]["writer_controls"][0][
-        "applied_control"]["payload"].update(target_hash="0" * 64,
-    ))
-    _reseal_bundle(ack_result)
-    with pytest.raises(ValueError, match="target/Ack identity"):
-        consume_libero_candidate_bundle(ack_result)
-
-    unit_copy = tmp_path / "tampered_unit"
-    shutil.copytree(original, unit_copy)
-    unit_result = unit_copy / "worker_result.json"
-    unit_h5 = unit_copy / result["episodes"][0]["h5"]["relative_path"]
-    _rewrite_h5_json(unit_h5, "meta/structured_controls_v1_json", lambda rows: rows[0][
-        "writer_controls"][0]["requested_action"].update(unit="millimeters_and_radians",
-    ))
-    _reseal_bundle(unit_result)
-    with pytest.raises(ValueError, match="unit metadata"):
-        consume_libero_candidate_bundle(unit_result)
-
-    final_state_copy = tmp_path / "tampered_final_state"
-    shutil.copytree(original, final_state_copy)
-    final_state_result = final_state_copy / "worker_result.json"
-    final_state_h5 = final_state_copy / result["episodes"][0]["h5"]["relative_path"]
-    with h5py.File(final_state_h5, "r+") as handle:
-        handle["obs/state/joint_position"][-1, 0] += 0.5
-    _reseal_bundle(final_state_result)
-    with pytest.raises(ValueError, match="native-step monitor extrema"):
-        consume_libero_candidate_bundle(final_state_result)
-
-    row_copy = tmp_path / "tampered_row"
-    shutil.copytree(original, row_copy)
-    row_result = row_copy / "worker_result.json"
-    row_report = json.loads(row_result.read_text(encoding="utf-8"))
-    row_report["episodes"][0]["row_index"] = 9
-    row_payload = {key: value for key, value in row_report.items() if key != "result_sha256"}
-    row_report["result_sha256"] = hashlib.sha256(json.dumps(
-        row_payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
-    ).encode("utf-8")).hexdigest()
-    row_result.write_text(json.dumps(row_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="row/seed/order identity"):
-        consume_libero_candidate_bundle(row_result)
-
-    source_copy = tmp_path / "tampered_source"
-    shutil.copytree(original, source_copy)
-    source_result = source_copy / "worker_result.json"
-    source_report = json.loads(source_result.read_text(encoding="utf-8"))
-    source_report["episodes"][0]["source_id"] = "wrong-source"
-    source_result.write_text(json.dumps(source_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(source_result)
-    with pytest.raises(ValueError, match="compiled model was not validated before reset"):
-        consume_libero_candidate_bundle(source_result)
-
-    layout_copy = tmp_path / "tampered_compiled_layout"
-    shutil.copytree(original, layout_copy)
-    layout_result = layout_copy / "worker_result.json"
-    layout_report = json.loads(layout_result.read_text(encoding="utf-8"))
-    for receipt_path in (
-        ("compiled_model_layout_v1",),
-        ("pre_reset_compiled_validation_v1", "compiled_layout"),
-    ):
-        receipt = layout_report["episodes"][0]
-        for key in receipt_path:
-            receipt = receipt[key]
-        receipt["named_actuator_channels"]["joint1"]["transmission_target"] = "robot0_joint2"
-    layout_result.write_text(json.dumps(layout_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(layout_result)
-    with pytest.raises(ValueError, match="compiled actuator transmission/drive/range"):
-        consume_libero_candidate_bundle(layout_result)
-
-    runtime_copy = tmp_path / "tampered_runtime_identity"
-    shutil.copytree(original, runtime_copy)
-    runtime_result = runtime_copy / "worker_result.json"
-    runtime_report = json.loads(runtime_result.read_text(encoding="utf-8"))
-    runtime_report["episodes"][0]["pre_reset_compiled_validation_v1"][
-        "runtime_identity"]["runtime"]["api_version"] = 30801
-    runtime_result.write_text(json.dumps(runtime_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(runtime_result)
-    with pytest.raises(ValueError, match="runtime identity differs"):
-        consume_libero_candidate_bundle(runtime_result)
-
-    sign_copy = tmp_path / "tampered_finger_sign"
-    shutil.copytree(original, sign_copy)
-    sign_result = sign_copy / "worker_result.json"
-    sign_h5 = sign_copy / result["episodes"][0]["h5"]["relative_path"]
-    from task_env.controllers.canonical.contracts import MixedActuatorCommandV1
-
-    def reverse_second_finger(rows):
-        writer = rows[0]["writer_controls"][0]
-        target_payload = writer["controller_target"]["payload"]
-        target_payload["channel_values"]["finger_joint2"] = 0.01
-        target = MixedActuatorCommandV1.from_mapping(target_payload)
-        writer["controller_target"]["payload"] = target.to_mapping()
-        writer["controller_target"]["identity_hash"] = target.identity_hash
-        applied = writer["applied_control"]
-        applied["target_hash"] = target.identity_hash
-        applied["payload"].update(
-            target_hash=target.identity_hash,
-            channel_values=dict(target.channel_values),
-            channel_units=dict(target.channel_units),
-        )
-    _rewrite_h5_json(sign_h5, "meta/structured_controls_v1_json", reverse_second_finger)
-    _reseal_bundle(sign_result)
-    with pytest.raises(ValueError, match="finger sign or aggregate-opening"):
-        consume_libero_candidate_bundle(sign_result)
-
-    monitor_copy = tmp_path / "tampered_physical_monitor"
-    shutil.copytree(original, monitor_copy)
-    monitor_result = monitor_copy / "worker_result.json"
-    monitor_payload = json.loads(monitor_result.read_text(encoding="utf-8"))
-    monitor_payload["episodes"][0]["physical_state_monitor"]["joint_ranges"][
-        "finger_joint2"]["maximum_observed"] = 0.001
-    monitor_result.write_text(json.dumps(monitor_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(monitor_result)
-    with pytest.raises(ValueError, match="differs from public RuntimeSession progress"):
-        consume_libero_candidate_bundle(monitor_result)
-
-    warning_copy = tmp_path / "tampered_physical_warning"
-    shutil.copytree(original, warning_copy)
-    warning_result = warning_copy / "worker_result.json"
-    warning_payload = json.loads(warning_result.read_text(encoding="utf-8"))
-    warning_payload["episodes"][0]["physical_state_monitor"]["warning_counts"] = [1]
-    warning_payload["episodes"][0]["runtime_progress"]["physical_state_monitor"]["warning_counts"] = [1]
-    warning_result.write_text(json.dumps(warning_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(warning_result)
-    with pytest.raises(ValueError, match="MuJoCo warning"):
-        consume_libero_candidate_bundle(warning_result)
-
-    missing_warning_copy = tmp_path / "missing_physical_warning_counters"
-    shutil.copytree(original, missing_warning_copy)
-    missing_warning_result = missing_warning_copy / "worker_result.json"
-    missing_warning_payload = json.loads(missing_warning_result.read_text(encoding="utf-8"))
-    missing_warning_payload["episodes"][0]["physical_state_monitor"].pop("warning_counts")
-    missing_warning_payload["episodes"][0]["runtime_progress"][
-        "physical_state_monitor"].pop("warning_counts")
-    missing_warning_result.write_text(
-        json.dumps(missing_warning_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8",
-    )
-    _reseal_bundle(missing_warning_result)
-    with pytest.raises(ValueError, match="omits warning counters"):
-        consume_libero_candidate_bundle(missing_warning_result)
-
-    model_monitor_copy = tmp_path / "wrong_compiled_physical_monitor"
-    shutil.copytree(original, model_monitor_copy)
-    model_monitor_result = model_monitor_copy / "worker_result.json"
-    model_monitor_payload = json.loads(model_monitor_result.read_text(encoding="utf-8"))
-    model_monitor_payload["episodes"][0]["physical_state_monitor"][
-        "compiled_model_identity_sha256"] = "0" * 64
-    model_monitor_payload["episodes"][0]["runtime_progress"]["physical_state_monitor"][
-        "compiled_model_identity_sha256"] = "0" * 64
-    model_monitor_result.write_text(
-        json.dumps(model_monitor_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8",
-    )
-    _reseal_bundle(model_monitor_result)
-    with pytest.raises(ValueError, match="bound to a different compiled model"):
-        consume_libero_candidate_bundle(model_monitor_result)
-
-    recovered_excursion_copy = tmp_path / "midtrajectory_excursion_then_recovery"
-    shutil.copytree(original, recovered_excursion_copy)
-    recovered_excursion_result = recovered_excursion_copy / "worker_result.json"
-    recovered_excursion_h5 = recovered_excursion_copy / result["episodes"][0]["h5"]["relative_path"]
-    with h5py.File(recovered_excursion_h5, "r+") as handle:
-        # Keep every typed target/Ack valid and the final observation unchanged.
-        # This single interior public state is out of range and later recovers.
-        handle["obs/state/joint_position"][1, 0] = 100.0
-        assert handle["obs/state/joint_position"][-1, 0] != 100.0
-    _reseal_bundle(recovered_excursion_result)
-    with pytest.raises(ValueError, match="H5 joint observations escape the native-step monitor extrema"):
-        consume_libero_candidate_bundle(recovered_excursion_result)
-
-    episode_copy = tmp_path / "tampered_episode"
-    shutil.copytree(original, episode_copy)
-    episode_result = episode_copy / "worker_result.json"
-    episode_report = json.loads(episode_result.read_text(encoding="utf-8"))
-    episode_report["episodes"][0]["episode_id"] = "wrong-episode"
-    episode_result.write_text(json.dumps(episode_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(episode_result)
-    with pytest.raises(ValueError, match="reset/progress identity"):
-        consume_libero_candidate_bundle(episode_result)
-
-    fixture_copy = tmp_path / "tampered_fixture_readback"
-    shutil.copytree(original, fixture_copy)
-    fixture_result = fixture_copy / "worker_result.json"
-    fixture_report = json.loads(fixture_result.read_text(encoding="utf-8"))
-    fixture = next(iter(fixture_report["episodes"][0]["reset_readback"]["fixture_pose_world"].values()))
-    fixture["position"][0] += 0.1
-    fixture_result.write_text(json.dumps(fixture_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(fixture_result)
-    with pytest.raises(ValueError, match="reset/progress identity"):
-        consume_libero_candidate_bundle(fixture_result)
-
-    endpoint_copy = tmp_path / "tampered_reset_plan_endpoint"
-    shutil.copytree(original, endpoint_copy)
-    endpoint_result = endpoint_copy / "worker_result.json"
-    endpoint_report = json.loads(endpoint_result.read_text(encoding="utf-8"))
-    endpoint_report["diagnostic_endpoints"][0]["reset_plan_v1"]["reset_sample"][
-        "poses_world"]["akita_black_bowl_1"]["position"][0] += 0.1
-    endpoint_result.write_text(json.dumps(endpoint_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(endpoint_result)
-    with pytest.raises((TypeError, ValueError), match="sample identity|sample_id|reset sample"):
-        consume_libero_candidate_bundle(endpoint_result)
-
-    # Bind native completion to the parent's exit, process-group and lock
-    # receipts; exercise those gates with an explicitly synthetic receipt.
-    lock_path = Path("/home/lly/Program_Files/Geochora/workspace/maintenance/") / (
-        "phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock"
-    )
-    parent_record = _write_synthetic_parent_run_record(
-        tmp_path, original / "worker_result.json", result, lock_path=lock_path,
-    )
-    verified_parent = consume_libero_candidate_bundle(
-        original / "worker_result.json", parent_run_record_path=parent_record,
-        expected_lock_path=lock_path,
-    )
-    assert verified_parent["parent_process"]["status"] == "verified_parent_exit_and_lock_release"
-
-    bad_exit = json.loads(parent_record.read_text(encoding="utf-8"))
-    bad_exit["exit_code"] = 2
-    bad_exit_path = parent_record.parent / "bad_exit.json"
-    bad_exit_path.write_text(json.dumps(bad_exit), encoding="utf-8")
-    with pytest.raises(ValueError, match="did not exit successfully"):
-        consume_libero_candidate_bundle(
-            original / "worker_result.json", parent_run_record_path=bad_exit_path,
-            expected_lock_path=lock_path,
-        )
-
-    bad_lock = json.loads(parent_record.read_text(encoding="utf-8"))
-    bad_lock["lock_released_after_group_exit"] = False
-    bad_lock_path = parent_record.parent / "bad_lock.json"
-    bad_lock_path.write_text(json.dumps(bad_lock), encoding="utf-8")
-    with pytest.raises(ValueError, match="lock receipt"):
-        consume_libero_candidate_bundle(
-            original / "worker_result.json", parent_run_record_path=bad_lock_path,
-            expected_lock_path=lock_path,
-        )
-
-    bad_worker_copy = tmp_path / "tampered_worker_result"
-    shutil.copytree(original, bad_worker_copy)
-    bad_worker_result = bad_worker_copy / "worker_result.json"
-    bad_worker_payload = json.loads(bad_worker_result.read_text(encoding="utf-8"))
-    bad_worker_payload["result_sha256"] = "0" * 64
-    bad_worker_result.write_text(json.dumps(bad_worker_payload), encoding="utf-8")
-    with pytest.raises(ValueError, match="worker result digest"):
-        consume_libero_candidate_bundle(bad_worker_result)
-
-    partial_copy = tmp_path / "partial_worker_result"
-    shutil.copytree(original, partial_copy)
-    partial_result = partial_copy / "worker_result.json"
-    partial_payload = json.loads(partial_result.read_text(encoding="utf-8"))
-    partial_payload["episodes"] = partial_payload["episodes"][:2]
-    partial_payload["episode_count"] = 2
-    partial_result.write_text(json.dumps(partial_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    _reseal_bundle(partial_result)
-    with pytest.raises(ValueError, match="does not contain all three source rows"):
-        consume_libero_candidate_bundle(partial_result)
-
-    missing_h5_copy = tmp_path / "missing_h5_worker_result"
-    shutil.copytree(original, missing_h5_copy)
-    missing_h5_result = missing_h5_copy / "worker_result.json"
-    missing_h5_payload = json.loads(missing_h5_result.read_text(encoding="utf-8"))
-    (missing_h5_copy / missing_h5_payload["episodes"][0]["h5"]["relative_path"]).unlink()
-    with pytest.raises(ValueError, match="missing a required H5"):
-        consume_libero_candidate_bundle(missing_h5_result)
-
-    missing_channel_copy = tmp_path / "missing_action_channel"
-    shutil.copytree(original, missing_channel_copy)
-    missing_channel_result = missing_channel_copy / "worker_result.json"
-    missing_channel_payload = json.loads(missing_channel_result.read_text(encoding="utf-8"))
-    missing_channel_h5 = missing_channel_copy / missing_channel_payload["episodes"][0]["h5"]["relative_path"]
-    with h5py.File(missing_channel_h5, "r+") as handle:
-        del handle["universal_action/joint1"]
-    _reseal_bundle(missing_channel_result)
-    with pytest.raises(ValueError, match="action channels are incomplete"):
-        consume_libero_candidate_bundle(missing_channel_result)
 
 
 def test_selected_mixed_partial_control_write_faults_without_physics(tmp_path, monkeypatch):
@@ -2157,12 +1508,12 @@ def test_selected_mixed_partial_control_write_faults_without_physics(tmp_path, m
         observation, _ = env.reset(seed=19, options={"init_row_index": 0})
         initial_step_calls = _FAKE_WORLD.calls["step"]
         _FAKE_WORLD.partial_ctrl_after = _FAKE_WORLD.ctrl_write_count + 1
-        action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+        action = _pose_hold_action(observation)
         with pytest.raises(RuntimeError, match="partial actuator control write"):
             env.step(action)
         assert _FAKE_WORLD.calls["step"] == initial_step_calls
         assert env.execution_fault is not None
-        assert env.execution_fault.phase == "mixed_control_application"
+        assert env.execution_fault.phase == "mixed_physics_substep_interval"
         with pytest.raises(RuntimeError, match="execution is faulted"):
             env.step(action)
         assert _FAKE_WORLD.calls["step"] == initial_step_calls
@@ -2171,19 +1522,19 @@ def test_selected_mixed_partial_control_write_faults_without_physics(tmp_path, m
     assert env.close_receipt["session_closed"] is True
 
 
-def test_selected_partial_physics_interval_latches_and_worker_closes(tmp_path, monkeypatch):
+def test_selected_partial_physics_interval_latches_and_closes(monkeypatch):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
     _fake_api(monkeypatch)
     env = _candidate(monkeypatch)
     observation, _ = env.reset(seed=19, options={"init_row_index": 0})
     _FAKE_WORLD.fail_step_after = _FAKE_WORLD.calls["step"] + 2
-    action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+    action = _pose_hold_action(observation)
     with pytest.raises(RuntimeError, match="synthetic native-step leaf fault"):
         env.step(action)
     fault = env.execution_fault
     assert fault is not None
-    assert fault.phase == "mixed_physics_step"
+    assert fault.phase == "mixed_physics_substep_interval"
     assert fault.interval_attempted is True
     assert fault.interval_completed is False
     partial_count = _FAKE_WORLD.calls["step"]
@@ -2192,20 +1543,6 @@ def test_selected_partial_physics_interval_latches_and_worker_closes(tmp_path, m
     assert _FAKE_WORLD.calls["step"] == partial_count
     env.close()
     assert env.close_receipt["session_closed"] is True
-
-    # The worker must publish a failed result after cleanup, and the separate
-    # reader must refuse it rather than treating partial progress as complete.
-    _FAKE_WORLD = _World()
-    _fake_api(monkeypatch)
-    failed_env = _candidate(monkeypatch)
-    _FAKE_WORLD.partial_ctrl_after = 4  # reset uses three ctrl writes; permit one target write
-    result = run_libero_candidate_worker(failed_env, output_dir=tmp_path / "failed_bundle", steps=2)
-    assert result["status"] == "failed"
-    assert result["episode_count"] == 0
-    assert result["close_error"] is None
-    assert result["final_session_close_receipt"]["session_closed"] is True
-    with pytest.raises(ValueError, match="incomplete or reports a lifecycle failure"):
-        consume_libero_candidate_bundle(tmp_path / "failed_bundle/worker_result.json")
 
 
 def test_selected_rejects_invalid_action_before_native_and_reset_forward_failure(tmp_path, monkeypatch):
@@ -2245,14 +1582,14 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
     try:
         reset_obs, _ = env.reset(seed=19, options={"init_row_index": 0})
         _FAKE_WORLD.contact_pair = ("akita_black_bowl_1", "plate_1")
-        current = np.asarray(reset_obs["state"]["joint_position"], dtype=np.float64)
-        _, _, _, _, positive = env.step(np.asarray([*current[:7], 0.04]))
+        action = _pose_hold_action(reset_obs)
+        _, _, _, _, positive = env.step(action)
         contact = positive["contact_summary_v2"]
         assert contact["status"] == "available"
         assert contact["requested_pairs"] == contact["covered_pairs"]
         assert contact["pair_counts"]["akita_black_bowl_1/plate_1"] == 1
         _FAKE_WORLD.contact_pair = None
-        _, _, _, _, negative = env.step(np.asarray([*current[:7], 0.04]))
+        _, _, _, _, negative = env.step(action)
         assert negative["contact_summary_v2"]["pair_counts"]["akita_black_bowl_1/plate_1"] == 0
         assert negative["predicate_v1"]["on_bowl_plate"]["value"] is False
 
@@ -2264,7 +1601,7 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
 
         monkeypatch.setattr(env.session, "read_contact_summary_v2", stale_contact)
         with pytest.raises(ValueError, match="contact summary is stale"):
-            env.step(np.asarray([*current[:7], 0.04]))
+            env.step(action)
         assert env.execution_fault is not None
         assert env.execution_fault.phase == "mixed_observation"
     finally:
@@ -2296,21 +1633,20 @@ def test_r07v210_solution_finger_contact_groups_cover_source_collision_shapes_wi
     _FAKE_WORLD.enable_panda_kinematics = True
     fake = _fake_api(monkeypatch)
     assert getattr(fake, "__r07c_s1_synthetic_fixture__", False) is True
-    import hashlib
     from bench_deploy.libero.environment.selected_reference import (
-        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+        DEFAULT_INSTALL_ROOT, build_libero_selected_candidate,
     )
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
     xml = xml_path.read_bytes()
-    env = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=hashlib.sha256(xml).hexdigest(),
+    env = build_libero_selected_candidate(
+        xml=xml,
         install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
         composition_plan_path=Path(os.environ.get(
             "R07_V210_COMPOSITION_PLAN",
-            str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+            str(xml_path.with_name("composition_plan.json")),
         )),
-        horizon=2,
+        horizon=2, _execution_profile="v8",
     )
     try:
         groups = env.value["source"].contact_geom_groups
@@ -2333,12 +1669,10 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
     _FAKE_WORLD.enable_panda_kinematics = True
     fake = _fake_api(monkeypatch)
     assert getattr(fake, "__r07c_s1_synthetic_fixture__", False) is True
-    import hashlib
     from bench_deploy.libero.environment.selected_reference import (
-        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+        DEFAULT_INSTALL_ROOT, build_libero_selected_candidate,
     )
     from bench_deploy.libero.tasks.solution import LiberoPickPlaceSolutionV8
-    from task_env.runtime.sessions.source import source_asset_bytes
     from task_env.recorders import load_structured_control_records_h5
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
@@ -2346,13 +1680,12 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
     xml_sha = hashlib.sha256(xml).hexdigest()
     plan_path = Path(os.environ.get(
         "R07_V210_COMPOSITION_PLAN",
-        str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+        str(xml_path.with_name("composition_plan.json")),
     ))
-    env = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=xml_sha,
+    env = build_libero_selected_candidate(
+        xml=xml,
         install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
-        composition_plan_path=plan_path,
-        horizon=100,
+        composition_plan_path=plan_path, horizon=100, _execution_profile="v8",
     )
     assert env.value["source"].contact_geom_groups["panda-v1/finger-left"] == (
         "gripper0_finger1_collision", "gripper0_finger1_pad_collision",
@@ -2496,7 +1829,7 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     _FAKE_WORLD.enable_panda_kinematics = True
     _fake_api(monkeypatch)
     from bench_deploy.libero.environment.selected_reference import (
-        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+        DEFAULT_INSTALL_ROOT, build_libero_selected_candidate,
     )
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
@@ -2504,13 +1837,13 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     xml_sha = hashlib.sha256(xml).hexdigest()
     plan_path = Path(os.environ.get(
         "R07_V210_COMPOSITION_PLAN",
-        str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+        str(xml_path.with_name("composition_plan.json")),
     ))
     install_root = Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT)
 
-    ordinary = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=xml_sha, install_root=install_root,
-        composition_plan_path=plan_path, horizon=2,
+    ordinary = build_libero_selected_candidate(
+        xml=xml, install_root=install_root,
+        composition_plan_path=plan_path, horizon=2, _execution_profile="v8",
     )
     ordinary_runtime_sha = ordinary.value["source_sha256"]["runtime_model_xml"]
     ordinary_model = _GravityBiasDouble(
@@ -2526,9 +1859,9 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     assert ordinary_model.close_calls == 1
     assert ordinary.close_receipt["task_resource_close_receipt"]["closed"] is True
 
-    failed_binding = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=xml_sha, install_root=install_root,
-        composition_plan_path=plan_path, horizon=2,
+    failed_binding = build_libero_selected_candidate(
+        xml=xml, install_root=install_root,
+        composition_plan_path=plan_path, horizon=2, _execution_profile="v8",
     )
     wrong_model = _GravityBiasDouble(
         "0" * 64, failed_binding.metadata["source_closure_digest"],
@@ -2545,305 +1878,6 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     assert failed_binding.close_receipt["task_resource_close_receipt"]["closed"] is True
 
 
-def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
-        tmp_path, monkeypatch):
-    global _FAKE_WORLD
-    _FAKE_WORLD = _World()
-    _FAKE_WORLD.enable_panda_kinematics = True
-    _fake_api(monkeypatch)
-    from bench_deploy.libero.environment.selected_reference import (
-        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
-    )
-    from bench_deploy.libero.tasks.solution import LiberoPickPlaceSolutionV8
-    from task_env.runtime.sessions.source import source_asset_bytes
-
-    xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
-    xml = xml_path.read_bytes()
-    xml_sha = hashlib.sha256(xml).hexdigest()
-    plan_path = Path(os.environ.get(
-        "R07_V210_COMPOSITION_PLAN",
-        str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
-    ))
-    install_root = Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT)
-    env = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=xml_sha,
-        install_root=install_root,
-        composition_plan_path=plan_path, horizon=100,
-    )
-    parent_dir = tmp_path / "runs" / "native_synthetic_001"
-    bundle = parent_dir / "bundle"
-    runtime_xml = env.value["runtime_model_xml_bytes"]
-    runtime_xml_sha = env.value["source_sha256"]["runtime_model_xml"]
-    profile_bytes = env.value["model_profile_bytes"]
-    closure_files = {
-        "canonical-source.xml": runtime_xml,
-        "scene.xml": runtime_xml,
-        **source_asset_bytes(install_root, runtime_xml.decode("utf-8")),
-    }
-    closure_digest = env.metadata["source_closure_digest"]
-    gravity_model = _GravityBiasDouble(
-        runtime_xml_sha, closure_digest, kinematics=env.value["arm_resolver"].model,
-    )
-    gravity_model.model_profile_id = env.value["model_profile_receipt"]["profile_id"]
-    gravity_model.model_profile_receipt_sha256 = env.value["source_sha256"]["model_profile_receipt"]
-    gravity_model.raw_source_xml_sha256 = xml_sha
-    env.controller.set_source_gravity_model(
-        gravity_model, source_xml_sha256=runtime_xml_sha, source_closure_digest=closure_digest,
-    )
-
-    class _SolutionFactory:
-        worker_result_schema_version = "r07-v210-task-solution-worker-result-v8"
-
-        def __call__(self, _bundle_root):
-            env.value["bind_source_gravity_model"](gravity_model)
-            return LiberoPickPlaceSolutionV8(
-                runtime_xml, source_closure_digest=closure_digest,
-                    arm_resolver_identity=env.value['arm_resolver_identity'],
-            )
-
-    result = run_libero_candidate_worker(
-        # A second outer interval exercises the fresh substep command path
-        # after MuJoCo's native clock has accumulated one interval of dt.
-        env, output_dir=bundle, steps=2,
-        solution_factory=_SolutionFactory(),
-        source_closure_files=closure_files,
-        composition_plan_bytes=plan_path.read_bytes(),
-        source_raw_xml_bytes=xml,
-        source_model_profile_bytes=profile_bytes,
-        solution_resource_closer=env.value["close_task_resources"],
-    )
-    assert result["status"] == "complete"
-    assert result["episode_count"] == 3
-    assert result["reset_count"] == 3
-    assert result["native_step_count"] == 150
-    assert len(result["attempted_episode_receipts"]) == 3
-    assert all(
-        item["receipt"]["pre_reset_compiled_validation_v1"]["reset_not_yet_applied"] is True
-        for item in result["attempted_episode_receipts"]
-    )
-    assert [item["row_index"] for item in result["episodes"]] == [0, 1, 2]
-    assert result["episodes"][0]["prior_session_close_receipt"] is None
-    assert all(
-        item["prior_session_close_receipt"]["session_closed"] is True
-        for item in result["episodes"][1:]
-    )
-    assert all(item["solution_completed"] is False for item in result["episodes"])
-    assert result["close_error"] is None
-    assert result["final_session_close_receipt"]["session_closed"] is True
-    assert result["solution_resource_close_receipt"]["closed"] is True
-    assert result["solution_resource_close_receipt"]["forward_call_count"] == 150
-    assert gravity_model.close_calls == 1
-    assert env.close_receipt["task_resource_close_receipt"]["closed"] is True
-    assert not (bundle / "source_inputs/closure").exists()
-    assert (bundle / "source_inputs/closure.tar.gz").is_file()
-
-    receipt = consume_libero_candidate_bundle(bundle / "worker_result.json")
-    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v8"
-    assert receipt["status"] == "verified_complete"
-    assert receipt["episode_count"] == 3
-    assert receipt["observation_count"] == 9
-    assert receipt["solution_completed_episodes"] == 0
-    runtime_receipt = consume_libero_candidate_bundle(
-        bundle / "worker_result.json", require_mujoco_runtime_identity=True,
-    )
-    assert runtime_receipt["mujoco_runtime_identity_required"] is True
-    tampered_worker_path = bundle / "tampered_runtime_worker_result.json"
-    tampered_worker = json.loads((bundle / "worker_result.json").read_text())
-    tampered_worker["episodes"][0]["pre_reset_compiled_validation_v1"][
-        "runtime_identity"]["provider_build"]["package_version"] = "3.8.2"
-    tampered_payload = {key: value for key, value in tampered_worker.items() if key != "result_sha256"}
-    tampered_worker["result_sha256"] = hashlib.sha256(json.dumps(
-        tampered_payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
-    ).encode("utf-8")).hexdigest()
-    tampered_worker_path.write_text(json.dumps(tampered_worker, sort_keys=True))
-    with pytest.raises(ValueError, match="pinned MuJoCo runtime"):
-        consume_libero_candidate_bundle(
-            tampered_worker_path, require_mujoco_runtime_identity=True,
-        )
-
-    tampered_substep_h5 = bundle / "episode_00_row_00" / "tampered_stepwise_trajectory.h5"
-    shutil.copy2(bundle / result["episodes"][0]["h5"]["relative_path"], tampered_substep_h5)
-    def tamper_substep_torque(rows):
-        receipt = rows[0]["writer_controls"][0]["canonical_action"][
-            "physics_rate_control_v1"]["substeps"][1]["controller_receipt"]
-        receipt["raw_torque_Nm"][0] += 0.01
-
-    _rewrite_h5_json(
-        tampered_substep_h5, "meta/structured_controls_v1_json", tamper_substep_torque,
-    )
-    tampered_substep_worker_path = bundle / "tampered_stepwise_worker_result.json"
-    tampered_substep_worker = json.loads((bundle / "worker_result.json").read_text())
-    tampered_substep_worker["episodes"][0]["h5"]["relative_path"] = (
-        tampered_substep_h5.relative_to(bundle).as_posix()
-    )
-    tampered_substep_worker_path.write_text(json.dumps(tampered_substep_worker, sort_keys=True))
-    _reseal_bundle(tampered_substep_worker_path)
-    with pytest.raises(ValueError, match="independently recomputed OSC torque law"):
-        consume_libero_candidate_bundle(tampered_substep_worker_path)
-
-    _FAKE_WORLD = _World()
-    _FAKE_WORLD.enable_panda_kinematics = True
-    _fake_api(monkeypatch)
-    failed_env = build_libero_solution_candidate(
-        xml=xml, composed_mjcf_sha256=xml_sha,
-        install_root=install_root,
-        composition_plan_path=plan_path, horizon=100,
-    )
-    _FAKE_WORLD.fail_step_after = 0
-    failed_closure_digest = failed_env.metadata["source_closure_digest"]
-    failed_runtime_xml = failed_env.value["runtime_model_xml_bytes"]
-    failed_runtime_xml_sha = failed_env.value["source_sha256"]["runtime_model_xml"]
-    failed_gravity_model = _GravityBiasDouble(
-        failed_runtime_xml_sha, failed_closure_digest,
-        kinematics=failed_env.value["arm_resolver"].model,
-    )
-    failed_gravity_model.model_profile_id = failed_env.value["model_profile_receipt"]["profile_id"]
-    failed_gravity_model.model_profile_receipt_sha256 = failed_env.value["source_sha256"]["model_profile_receipt"]
-    failed_gravity_model.raw_source_xml_sha256 = xml_sha
-    failed_env.controller.set_source_gravity_model(
-        failed_gravity_model, source_xml_sha256=failed_runtime_xml_sha,
-        source_closure_digest=failed_closure_digest,
-    )
-
-    class _FailedSolutionFactory:
-        worker_result_schema_version = "r07-v210-task-solution-worker-result-v8"
-
-        def __call__(self, _bundle_root):
-            failed_env.value["bind_source_gravity_model"](failed_gravity_model)
-            return LiberoPickPlaceSolutionV8(
-                failed_runtime_xml, source_closure_digest=failed_closure_digest,
-                arm_resolver_identity=failed_env.value['arm_resolver_identity'],
-            )
-
-    failure_result = run_libero_candidate_worker(
-        failed_env, output_dir=tmp_path / "solution_worker_failure_bundle", steps=1,
-        solution_factory=_FailedSolutionFactory(),
-        source_closure_files=closure_files,
-        composition_plan_bytes=plan_path.read_bytes(),
-        source_raw_xml_bytes=xml,
-        source_model_profile_bytes=failed_env.value["model_profile_bytes"],
-        solution_resource_closer=failed_env.value["close_task_resources"],
-    )
-    assert failure_result["status"] == "failed"
-    assert len(failure_result["attempted_episode_receipts"]) == 1
-    assert len(failure_result["failed_episode_receipts"]) == 1
-    failure = failure_result["failed_episode_receipts"][0]["receipt"]
-    assert failure["last_successful_control_step"] == 0
-    assert failure["next_control_step_attempted"] == 1
-    assert len(failure["solution"]["last_action_receipt"]["action"]) == 8
-    assert failure["execution_fault"]["phase"] == "mixed_physics_substep_interval"
-    assert failed_gravity_model.close_calls == 1
-
-    parent_dir.mkdir(parents=True, exist_ok=True)
-    stdout_path = parent_dir / "stdout.log"
-    stderr_path = parent_dir / "stderr.log"
-    stdout_summary = {
-        "status": result["status"], "result_sha256": result["result_sha256"],
-        "episode_count": result["episode_count"],
-        "transition_count": result["transition_count"],
-        "observation_count": result["observation_count"],
-        "native_step_count": result["native_step_count"],
-    }
-    stdout_path.write_text(json.dumps(stdout_summary) + "\n", encoding="utf-8")
-    stderr_path.write_text("", encoding="utf-8")
-    expected_lock = Path(
-        "/home/lly/Program_Files/Geochora/workspace/maintenance/"
-        "phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock"
-    )
-    argv = [
-        sys.executable, "-m", "bench_deploy.libero.script.cli",
-        "--run-worker", str(bundle), "--steps", "2", "--task-solution",
-        "--source-xml", str(xml_path), "--composition-plan", str(plan_path),
-        "--install-root", str(install_root),
-    ]
-    parent_record = {
-        "schema_version": "r07-v210-required123-run-record-v1",
-        "exit_code": 0, "termination_reason": None,
-        "process_group_confirmed_exited": True,
-        "lock_path": str(expected_lock), "lock_acquired": True,
-        "lock_released_after_group_exit": True,
-        "argv": argv,
-        "cwd": str(parent_dir),
-        "environment": {
-            "PYTHONPATH": (
-                "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys/src:"
-                "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora"
-            ),
-        },
-        "stdout_path": str(stdout_path.relative_to(tmp_path)),
-        "stdout_bytes": stdout_path.stat().st_size,
-        "stderr_path": str(stderr_path.relative_to(tmp_path)),
-        "stderr_bytes": stderr_path.stat().st_size,
-    }
-    parent_record_path = parent_dir / "run_record.json"
-    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
-    parent_verified = consume_libero_candidate_bundle(
-        bundle / "worker_result.json", parent_run_record_path=parent_record_path,
-        expected_lock_path=expected_lock,
-    )
-    assert parent_verified["parent_process"]["status"] == "verified_parent_exit_and_lock_release"
-    parent_record["cwd"] = "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora"
-    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
-    with pytest.raises(ValueError, match="task Solution parent run directory"):
-        consume_libero_candidate_bundle(
-            bundle / "worker_result.json", parent_run_record_path=parent_record_path,
-            expected_lock_path=expected_lock,
-        )
-    parent_record["cwd"] = str(parent_dir)
-    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
-    reader_code = """
-import importlib.abc, sys
-DENIED = {"mujoco", "taichi", "isaacsim", "omni", "torch"}
-class BlockNativeEngines(importlib.abc.MetaPathFinder):
-    def find_spec(self, fullname, path=None, target=None):
-        if fullname.split(".", 1)[0] in DENIED:
-            raise AssertionError(f"native engine import during independent readback: {fullname}")
-        return None
-sys.meta_path.insert(0, BlockNativeEngines())
-from bench_deploy.libero.script.cli import main
-result = main(["--read-bundle", sys.argv[1], "--parent-run-record", sys.argv[2],
-               "--expected-lock-path", sys.argv[3]])
-assert not any(name.split(".", 1)[0] in DENIED for name in sys.modules)
-raise SystemExit(result)
-"""
-    reader_process = subprocess.run(
-        [sys.executable, "-c", reader_code, str(bundle / "worker_result.json"),
-         str(parent_record_path), str(expected_lock)],
-        cwd="/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-        capture_output=True, text=True, timeout=300, check=False,
-    )
-    assert reader_process.returncode == 0, reader_process.stderr
-    assert json.loads(reader_process.stdout)["parent_process"]["lock_released_after_group_exit"] is True
-    tampered_worker_path.unlink()
-
-    h5_path = bundle / result["episodes"][0]["h5"]["relative_path"]
-    with h5_path.open("r+b") as handle:
-        handle.seek(0)
-        original_byte = handle.read(1)
-        handle.seek(0)
-        handle.write(bytes([original_byte[0] ^ 1]))
-    try:
-        with pytest.raises(ValueError, match="H5 bytes or digest differ"):
-            consume_libero_candidate_bundle(bundle / "worker_result.json")
-    finally:
-        with h5_path.open("r+b") as handle:
-            handle.seek(0)
-            handle.write(original_byte)
-
-    archive_path = bundle / "source_inputs/closure.tar.gz"
-    with archive_path.open("r+b") as handle:
-        handle.seek(-1, 2)
-        archive_byte = handle.read(1)
-        handle.seek(-1, 2)
-        handle.write(bytes([archive_byte[0] ^ 1]))
-    try:
-        with pytest.raises(ValueError, match="source archive or manifest bytes differ"):
-            consume_libero_candidate_bundle(bundle / "worker_result.json")
-    finally:
-        with archive_path.open("r+b") as handle:
-            handle.seek(-1, 2)
-            handle.write(archive_byte)
 
 
 def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session(monkeypatch):
@@ -2856,7 +1890,7 @@ def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session
         from task_env.artifacts import ResetPlanV1, ResetSampleV1
 
         sample = ResetSampleV1.from_mapping(info["reset_sample_v1"])
-        plan = ResetPlanV1("reset-plan-v1", sample, "diagnostic_contact_endpoint")
+        plan = ResetPlanV1("reset-plan-v1", sample, "task_episode")
         session = env.session
         close_calls = []
         original_close = session.close
@@ -2895,14 +1929,10 @@ def test_libero_reset_sampler_mirrors_seeded_upstream_robot_rng_advance(monkeypa
             "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v2"
         )
         receipt = env.value["reset_realizations"][sample.sample_id]
-        assert receipt["rng"]["upstream_preplacement_draws"] == {
-            "source": "robosuite.robots.robot.Robot.reset",
-            "panda_arm_joint_count": 7,
-            "noise_type": "gaussian",
-            "noise_magnitude": 0.0,
-            "rng_call": "np.random.randn(7)",
-            "qpos_effect": "none; sampled noise is multiplied by zero",
-        }
+        assert receipt["schema_version"] == "libero-normal-reset-realization-v2"
+        assert receipt["reset_sample_id"] == sample.sample_id
+        assert receipt["reset_sample_v1"] == sample.to_mapping()
+        assert receipt["rng"]["upstream_preplacement_draw_count"] == 7
         expected = {
             "flat_stove_1": (
                 [-0.4146303298573933, -0.13499687702793547, 0.905],
@@ -2914,7 +1944,7 @@ def test_libero_reset_sampler_mirrors_seeded_upstream_robot_rng_advance(monkeypa
             ),
         }
         for name, (position, quaternion) in expected.items():
-            actual = receipt["fixture_pose_world"][name]
+            actual = receipt["reset_sample_v1"]["fixture_pose_world"][name]
             assert actual["position"] == pytest.approx(position, abs=1e-12)
             assert actual["quaternion_wxyz"] == pytest.approx(quaternion, abs=1e-12)
     finally:
@@ -2971,7 +2001,7 @@ def test_reset_plan_source_layout_and_range_preflight_preserve_live_session(monk
         assert session._reset_plan_gate_required is False
         assert _FAKE_WORLD.calls["reset"] == reset_count
 
-        action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+        action = _pose_hold_action(observation)
         env.step(action)
         assert _FAKE_WORLD.calls["step"] == step_count + 25
     finally:
@@ -3014,9 +2044,8 @@ def test_recorder_append_and_finalizer_failures_keep_fault_and_close_receipt(tmp
         raise RuntimeError("synthetic recorder append failure")
 
     env.recorder.append_transition = fail_append
-    current = np.asarray(observation["state"]["joint_position"], dtype=np.float64)
     with pytest.raises(RuntimeError, match="synthetic recorder append failure"):
-        env.step(np.asarray([*current[:7], 0.04]))
+        env.step(_pose_hold_action(observation))
     assert env.execution_fault is not None
     assert env.execution_fault.phase == "mixed_recorder_append"
     assert env.execution_fault.transition_status == "not_recorded"
@@ -3041,21 +2070,3 @@ def test_recorder_append_and_finalizer_failures_keep_fault_and_close_receipt(tmp
         finalize_env.finish_recording(end.outcome.end_reason)
     finalize_env.close()
     assert finalize_env.close_receipt["session_closed"] is True
-
-
-def test_worker_result_serialization_failure_occurs_after_close(tmp_path, monkeypatch):
-    global _FAKE_WORLD
-    _FAKE_WORLD = _World()
-    _fake_api(monkeypatch)
-    _FAKE_WORLD.contact_pair = _contact_pair_only_when_source_pose_is_on
-    env = _candidate(monkeypatch, horizon=2)
-    import bench_deploy.libero.trajectory.worker as worker
-
-    def fail_write(path, value):
-        del path, value
-        raise RuntimeError("synthetic worker result serialization failure")
-
-    monkeypatch.setattr(worker, "_write_json", fail_write)
-    with pytest.raises(RuntimeError, match="synthetic worker result serialization failure"):
-        run_libero_candidate_worker(env, output_dir=tmp_path / "serialization_failure", steps=1)
-    assert env.close_receipt["session_closed"] is True

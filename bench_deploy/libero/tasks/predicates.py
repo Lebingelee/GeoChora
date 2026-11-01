@@ -10,8 +10,6 @@ from typing import Any
 import numpy as np
 
 from task_env.environment import (
-    TaskEvaluationContextV1,
-    TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
 )
 from task_env.environment.types import TaskEvaluation
@@ -239,6 +237,86 @@ def evaluate_on_bowl_plate_v1(
     return TaskPredicateResultV1.available(xy_distance < ON_THRESHOLD_M)
 
 
+def _observation_payload_v1(env, state, success, metrics, info_fields, boundary_fields):
+    source = env.value['source']
+    identity = {
+        'source_id': source.scene_source.source_id,
+        'source_closure_digest': source.source_closure_digest,
+        'provider_materialization_id': env.session.provider_materialization_id,
+        'episode_id': env.session.episode_id,
+        'reset_sample_id': env.sample.sample_id,
+        'control_step': int(state.control_step),
+        'state_revision': int(env.session.state_revision),
+        'simulation_time_s': float(state.simulation_time),
+    }
+    boundary_sha = digest(identity)
+    ee = state.pose_world['panda-v1/ee']
+    observation = {
+        'state': {
+            'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
+            'joint_position': np.asarray(
+                [state.joint_position[f'joint{i}'] for i in range(1, 8)]
+                + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
+                dtype=np.float32,
+            ),
+            'boundary_identity_sha256': np.frombuffer(bytes.fromhex(boundary_sha), dtype=np.uint8).copy(),
+        },
+        'privileged_state': {
+            key + '_body_pose': np.asarray(
+                [(*state.pose_world[name].position, *state.pose_world[name].quaternion_wxyz)],
+                dtype=np.float32,
+            ) for name, key in env.binding.object_poses
+        },
+    }
+    info = {
+        'is_success': success, 'task_failure': False, 'task_metrics': dict(metrics),
+        **{key: value for key, value in identity.items() if key != 'state_revision'},
+        'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
+        'state_boundary_identity_sha256': boundary_sha,
+        'boundary_context_v1': {
+            'schema_version': 'task-observation-context-v1', **identity,
+            'state_boundary_identity_sha256': boundary_sha, **boundary_fields,
+        },
+        **info_fields,
+    }
+    return observation, info, TaskEvaluation(
+        reward=1.0 if success else 0.0, success=success, metrics=dict(metrics),
+    )
+
+
+def observe_task23_reference_v1(env, state):
+    """Observe task2/3 through the same public state and boundary projection."""
+    source, task_uid = env.value['source'], env.artifact.task_id
+    boundary = LiberoPredicateBoundaryV1(
+        task_uid=task_uid,
+        source_manifest_sha256=env.value['source_manifest_sha256'],
+        source_id=source.scene_source.source_id,
+        source_closure_digest=source.source_closure_digest,
+        provider_materialization_id=env.session.provider_materialization_id,
+        episode_id=env.session.episode_id,
+        reset_sample_id=env.sample.sample_id,
+        control_step=int(state.control_step),
+        state_revision=int(env.session.state_revision),
+        simulation_time_s=float(state.simulation_time),
+    )
+    evidence = (
+        OpenMiddleDrawerEvidenceV1(
+            boundary, 'wooden_cabinet_1.middle_level',
+            float(state.joint_position['wooden_cabinet_1.middle_level']),
+        ) if task_uid == TASK_2 else None
+    )
+    predicate = env.binding.evaluate(evidence, env.artifact.semantics)
+    success = bool(predicate.value) if predicate.status == 'available' else False
+    mapping = {'status': predicate.status, 'value': predicate.value, 'reason': predicate.reason}
+    metrics = {
+        'source_goal_predicate_available': predicate.status == 'available',
+        'source_goal_predicate': success,
+    }
+    return _observation_payload_v1(
+        env, state, success, metrics, {'task_predicate_v1': mapping}, {},
+    )
+
+
 def observe_selected_reference_v1(env, state):
     """Build this task's observation and predicate from public runtime values."""
     source = env.value['source']
@@ -301,40 +379,6 @@ def observe_selected_reference_v1(env, state):
     if not isinstance(predicate, TaskPredicateResultV1):
         raise TypeError('task observation callback must return TaskPredicateResultV1')
     success = bool(predicate.value) if predicate.status == 'available' else False
-    evaluation = TaskEvaluation(
-        reward=1.0 if success else 0.0, success=success,
-        metrics={'on_bowl_plate_available': predicate.status == 'available',
-                 'on_bowl_plate': success},
-    )
-    boundary_identity = {
-        'source_id': source.scene_source.source_id,
-        'source_closure_digest': source.source_closure_digest,
-        'provider_materialization_id': env.session.provider_materialization_id,
-        'episode_id': env.session.episode_id,
-        'reset_sample_id': env.sample.sample_id,
-        'control_step': int(state.control_step),
-        'state_revision': int(env.session.state_revision),
-        'simulation_time_s': float(state.simulation_time),
-    }
-    boundary_digest = digest(boundary_identity)
-    ee = state.pose_world['panda-v1/ee']
-    obs = {
-        'state': {
-            'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
-            'joint_position': np.asarray(
-                [state.joint_position[f'joint{i}'] for i in range(1, 8)]
-                + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
-                dtype=np.float32,
-            ),
-            'boundary_identity_sha256': np.frombuffer(bytes.fromhex(boundary_digest), dtype=np.uint8).copy(),
-        },
-        'privileged_state': {
-            key + '_body_pose': np.asarray(
-                [(*state.pose_world[semantic].position, *state.pose_world[semantic].quaternion_wxyz)],
-                dtype=np.float32,
-            ) for semantic, key in env.binding.object_poses
-        },
-    }
     contact_mapping = {
         'schema_version': contact.schema_version,
         'source_id': contact.source_id,
@@ -354,45 +398,14 @@ def observe_selected_reference_v1(env, state):
     predicate_mapping = {
         'status': predicate.status, 'value': predicate.value, 'reason': predicate.reason,
     }
-    info = {
-        'is_success': success, 'task_failure': False,
-        'task_metrics': dict(evaluation.metrics),
-        'control_step': int(state.control_step),
-        'simulation_time_s': float(state.simulation_time),
-        'predicate_v1': {'on_bowl_plate': predicate_mapping},
-        'contact_summary_v2': contact_mapping,
-        'source_id': source.scene_source.source_id,
-        'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
-        'source_closure_digest': source.source_closure_digest,
-        'provider_materialization_id': env.session.provider_materialization_id,
-        'episode_id': env.session.episode_id,
-        'reset_sample_id': env.sample.sample_id,
-        'state_boundary_identity_sha256': boundary_digest,
-        'boundary_context_v1': {
-            'schema_version': 'task-observation-context-v1',
-            **boundary_identity,
-            'state_boundary_identity_sha256': boundary_digest,
-            'contact_summary_v2': contact_mapping,
-            'predicate_v1': predicate_mapping,
-        },
-    }
-    return obs, info, evaluation
-
-
-def build_evaluation(task_input: dict, manifest: dict) -> dict:
-    semantics = task_input["semantics"]
-    return {
-        "source_goal": manifest["task"]["bddl"]["goal_expression"],
-        "native_predicate_owner": "LIBERO object state and predicate sources",
-        "required_contact": semantics["contact_evidence"],
-        "required_xy_threshold_m": semantics["goal_threshold_m"],
-        "required_evidence": semantics["required_evidence"],
-        "unavailable_is_not_false": semantics["unavailable_is_not_false"],
-        "core_evaluator_owner": "task_env/environment/task_definition.py::TaskDefinitionBase.evaluate_predicates",
-        "candidate_evaluator": "evaluate_on_bowl_plate_v1",
-        "candidate_evaluator_scope": "provider-free explicit-evidence fixture only; no current Core public contact publisher is connected",
-        "status": "NOT_ADMITTED_CONTACT_PUBLICATION_UNAVAILABLE",
-    }
+    metrics = {'on_bowl_plate_available': predicate.status == 'available', 'on_bowl_plate': success}
+    predicate_field = {'on_bowl_plate': predicate_mapping}
+    contact_field = {'contact_summary_v2': contact_mapping}
+    return _observation_payload_v1(
+        env, state, success, metrics,
+        {'predicate_v1': predicate_field, **contact_field},
+        {'predicate_v1': predicate_field, **contact_field},
+    )
 
 
 __all__ = [
@@ -401,8 +414,8 @@ __all__ = [
     "PILOT_TASK_UID",
     "OnBowlPlateEvidenceV1", "LiberoPredicateBoundaryV1",
     "OpenMiddleDrawerEvidenceV1", "StoveFrontRegionEvidenceV1",
-    "build_evaluation",
     "evaluate_open_middle_drawer_v1", "evaluate_stove_front_region_v1",
     "evaluate_on_bowl_plate_v1",
     "observe_selected_reference_v1",
+    "observe_task23_reference_v1",
 ]

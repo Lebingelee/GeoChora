@@ -3,24 +3,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path, PurePosixPath
-import tarfile
-import tempfile
-from typing import Mapping
 
 import numpy as np
 
-from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
+from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
 
 from bench_deploy.libero.artifacts.contracts import TASK_1, TASK_2, TASK_3
 
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
-SOURCE_OPERATIONAL_SPACE_PROFILE_V1 = "libero-source-operational-space-state-v1"
 SOURCE_OPERATIONAL_SPACE_PROFILE_V2 = "libero-source-operational-space-state-v2"
-_MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
-_MAX_EXPANDED_BYTES = 128 * 1024 * 1024
-_MAX_ARCHIVE_MEMBERS = 1024
 _TCP_SITE_NAME = "gripper0_grip_site"
 
 
@@ -28,128 +20,30 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_source_closure_archive(path: Path, expected_manifest) -> dict[str, bytes]:
-    """Read a bounded tar closure and reject aliases, links and special members."""
-    archive_path = Path(path)
-    if archive_path.is_symlink():
-        raise ValueError("source closure archive must not be a symlink")
-    archive_path = archive_path.resolve(strict=True)
-    if not archive_path.is_file() or archive_path.stat().st_size > _MAX_ARCHIVE_BYTES:
-        raise ValueError("source closure archive is not a bounded regular file")
-    expected = {}
-    for row in expected_manifest:
-        if not isinstance(row, Mapping):
-            raise ValueError("source closure archive manifest row is malformed")
-        logical = row.get("path")
-        if (type(logical) is not str or not logical or logical in expected
-                or logical.startswith("/") or "\\" in logical
-                or any(part in {"", ".", ".."} for part in logical.split("/"))):
-            raise ValueError("source closure archive manifest has an unsafe or duplicate path")
-        size = row.get("size_bytes")
-        sha = row.get("sha256")
-        if (type(size) is not int or size < 0 or type(sha) is not str
-                or len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha)):
-            raise ValueError("source closure archive manifest has invalid byte identity")
-        expected[logical] = (size, sha)
-    if not expected:
-        raise ValueError("source closure archive manifest is empty")
-    expected_dirs = {"closure"}
-    for logical in expected:
-        parts = PurePosixPath("closure", logical).parts
-        for i in range(1, len(parts)):
-            expected_dirs.add("/".join(parts[:i]))
-    files: dict[str, bytes] = {}
-    directories: set[str] = set()
-    expanded = 0
-    try:
-        with tarfile.open(archive_path, mode="r:gz") as archive:
-            members = archive.getmembers()
-            if len(members) > _MAX_ARCHIVE_MEMBERS:
-                raise ValueError("source closure archive has too many members")
-            seen = set()
-            for member in members:
-                name = member.name
-                if (type(name) is not str or not name or name.startswith("/")
-                        or "\\" in name or any(part in {"", ".", ".."} for part in name.rstrip("/").split("/"))):
-                    raise ValueError("source closure archive has an unsafe member path")
-                if name in seen:
-                    raise ValueError("source closure archive has duplicate members")
-                seen.add(name)
-                normalized = name.rstrip("/")
-                if member.isdir():
-                    if normalized not in expected_dirs or member.size != 0:
-                        raise ValueError("source closure archive has an unlisted directory")
-                    directories.add(normalized)
-                    continue
-                if not member.isfile() or not name.startswith("closure/"):
-                    raise ValueError("source closure archive contains a link or non-regular member")
-                logical = name[len("closure/"):]
-                if logical not in expected or logical in files:
-                    raise ValueError("source closure archive member set differs from its manifest")
-                expected_size, expected_sha = expected[logical]
-                if member.size != expected_size:
-                    raise ValueError("source closure archive member size differs from its manifest")
-                expanded += member.size
-                if expanded > _MAX_EXPANDED_BYTES:
-                    raise ValueError("source closure archive exceeds the expanded byte limit")
-                stream = archive.extractfile(member)
-                if stream is None:
-                    raise ValueError("source closure archive member could not be read")
-                content = stream.read(expected_size + 1)
-                if len(content) != expected_size or _sha256(content) != expected_sha:
-                    raise ValueError("source closure archive member bytes differ from its manifest")
-                files[logical] = content
-    except (OSError, tarfile.TarError) as exc:
-        raise ValueError("source closure archive is not a valid bounded tar.gz") from exc
-    if set(files) != set(expected):
-        raise ValueError("source closure archive is missing manifest members")
-    return files
-
-
 class MujocoSourceGravityBiasV1:
-    """Compute static arm gravity bias from an independently compiled source MJCF.
-
-    The helper consumes the exact immutable source closure already written by
-    the worker. It never reads a live Env or provider-private model/data object,
-    and it never advances physics with ``mj_step``.
-    """
+    """Compute OSC dynamics from the selected RuntimeSource's verified bytes."""
 
     profile_id = SOURCE_GRAVITY_PROFILE_V1
 
-    def __init__(self, *, bundle_root: Path, source_closure_files: Mapping[str, bytes],
-                 source_xml_sha256: str, source_closure_digest: str,
-                 composition_plan_sha256: str, mujoco_api=None,
+    def __init__(self, *, source_receipt: ExecutionSourceReceiptV1,
+                 composition_plan_bytes: bytes, mujoco_api=None,
                  raw_source_xml_bytes: bytes | None = None,
                  model_profile_bytes: bytes | None = None,
                  task_uid: str = TASK_1):
         if task_uid not in {TASK_1, TASK_2, TASK_3}:
             raise ValueError("source gravity task identity is outside the pinned LIBERO task set")
-        bundle = Path(bundle_root)
-        if bundle.is_symlink():
-            raise ValueError("gravity-bias bundle root must not be a symlink")
-        bundle = bundle.resolve(strict=True)
-        source_root = bundle / "source_inputs"
-        if source_root.is_symlink() or source_root.resolve(strict=True) != source_root:
-            raise ValueError("gravity-bias source root is unsafe")
-        if bundle not in source_root.parents:
-            raise ValueError("gravity-bias source root escaped its worker bundle")
-        closure_root = source_root / "closure"
-        archive_path = source_root / "closure.tar.gz"
-
-        files = dict(source_closure_files)
-        if not files or any(type(name) is not str or not name or type(raw) is not bytes
-                            for name, raw in files.items()):
-            raise ValueError("gravity-bias source closure must map safe names to bytes")
-        for logical in files:
-            path = PurePosixPath(logical)
-            if (path.is_absolute() or path.as_posix() != logical or "\\" in logical
-                    or any(part in {"", ".", ".."} for part in logical.split("/"))):
-                raise ValueError("gravity-bias source closure contains an unsafe logical path")
-        xml = files.get("canonical-source.xml")
-        if (xml is None or not isinstance(files.get("scene.xml"), bytes)
-                or _sha256(xml) != source_xml_sha256
-                or _source_closure_digest(files) != source_closure_digest):
-            raise ValueError("gravity-bias source XML or closure identity does not recompute")
+        if not isinstance(source_receipt, ExecutionSourceReceiptV1):
+            raise TypeError("source gravity model requires the selected RuntimeSource receipt")
+        source_receipt.validate_snapshot()
+        source_xml_bytes = source_receipt.closure_files.get("canonical-source.xml")
+        if (type(source_xml_bytes) is not bytes
+                or _sha256(source_xml_bytes) != source_receipt.canonical_xml_sha256):
+            raise ValueError("source gravity receipt has no verified canonical XML bytes")
+        if type(composition_plan_bytes) is not bytes:
+            raise TypeError("source gravity model requires immutable composition plan bytes")
+        source_xml_sha256 = source_receipt.canonical_xml_sha256
+        source_closure_digest = source_receipt.source_closure_digest
+        composition_plan_sha256 = _sha256(composition_plan_bytes)
         profiled_source = raw_source_xml_bytes is not None or model_profile_bytes is not None
         if profiled_source:
             if type(raw_source_xml_bytes) is not bytes or type(model_profile_bytes) is not bytes:
@@ -165,16 +59,12 @@ class MujocoSourceGravityBiasV1:
                 raise ValueError("model profile receipt is not canonically serialized")
             from bench_deploy.libero.assembly.model_profile import (
                 ROBOT_MODEL_PROFILE_V3_ID,
-                normalize_libero_robosuite_model_xml_v2,
                 normalize_libero_robosuite_model_xml_v3,
             )
-            normalize = (
-                normalize_libero_robosuite_model_xml_v3
-                if profile_receipt.get("profile_id") == ROBOT_MODEL_PROFILE_V3_ID
-                else normalize_libero_robosuite_model_xml_v2
-            )
-            transformed, expected_profile = normalize(raw_source_xml_bytes)
-            if (transformed != xml or canonical_profile != json.dumps(
+            if profile_receipt.get("profile_id") != ROBOT_MODEL_PROFILE_V3_ID:
+                raise ValueError("only the pinned compile-first LIBERO model profile remains supported")
+            transformed, expected_profile = normalize_libero_robosuite_model_xml_v3(raw_source_xml_bytes)
+            if (transformed != source_xml_bytes or canonical_profile != json.dumps(
                     expected_profile, sort_keys=True, separators=(",", ":"), allow_nan=False,
             ).encode("utf-8")):
                 raise ValueError("profiled source XML differs from the deterministic task model transform")
@@ -183,13 +73,6 @@ class MujocoSourceGravityBiasV1:
                     or profile_receipt.get("runtime_model_xml_sha256") != source_xml_sha256
                     or profile_receipt.get("profile_id") != expected_profile.get("profile_id")):
                 raise ValueError("model profile receipt does not bind the selected raw/runtime XML bytes")
-            raw_profile_path = source_root / "raw-composed-source.xml"
-            receipt_profile_path = source_root / "model-profile.json"
-            if (not raw_profile_path.is_file() or raw_profile_path.is_symlink()
-                    or raw_profile_path.read_bytes() != raw_source_xml_bytes
-                    or not receipt_profile_path.is_file() or receipt_profile_path.is_symlink()
-                    or receipt_profile_path.read_bytes() != model_profile_bytes):
-                raise ValueError("worker source bundle omits or changes the profiled raw source metadata")
             model_profile_id = profile_receipt["profile_id"]
             model_profile_receipt_sha256 = _sha256(model_profile_bytes)
         else:
@@ -198,34 +81,7 @@ class MujocoSourceGravityBiasV1:
             model_profile_id = None
             model_profile_receipt_sha256 = None
 
-        expected_paths = set(files)
-        if closure_root.exists():
-            if closure_root.is_symlink() or closure_root.resolve(strict=True) != closure_root:
-                raise ValueError("gravity-bias source closure root is unsafe")
-            actual_paths: set[str] = set()
-            for path in closure_root.rglob("*"):
-                if path.is_symlink():
-                    raise ValueError("gravity-bias source closure contains a symlink")
-                if path.is_file():
-                    actual_paths.add(path.relative_to(closure_root).as_posix())
-            if actual_paths != expected_paths:
-                raise ValueError("gravity-bias source closure has missing or unlisted files")
-            for logical, expected in files.items():
-                source_path = (closure_root / Path(*PurePosixPath(logical).parts)).resolve(strict=True)
-                if closure_root not in source_path.parents or source_path.read_bytes() != expected:
-                    raise ValueError(f"gravity-bias source bytes differ from the verified closure: {logical}")
-            source_xml_path = closure_root / "canonical-source.xml"
-        else:
-            archive_files = read_source_closure_archive(archive_path, _source_closure_manifest(files))
-            if archive_files != files:
-                raise ValueError("gravity-bias source archive differs from the verified closure")
-            source_xml_path = None
-
-        plan_path = bundle / "source_inputs/composition_plan.json"
-        plan_bytes = plan_path.read_bytes()
-        if _sha256(plan_bytes) != composition_plan_sha256:
-            raise ValueError("gravity-bias composition plan hash differs from the selected source")
-        plan = json.loads(plan_bytes.decode("utf-8"))
+        plan = json.loads(composition_plan_bytes.decode("utf-8"))
         plan_xml_sha = raw_sha if profiled_source else source_xml_sha256
         if (plan.get("identity", {}).get("task_uid") != task_uid
                 or plan.get("output", {}).get("composed_mjcf_sha256") != plan_xml_sha):
@@ -234,19 +90,13 @@ class MujocoSourceGravityBiasV1:
         if mujoco_api is None:
             import mujoco as mujoco_api  # noqa: PLC0415 - selected native primitive only
         self._mujoco = mujoco_api
-        if source_xml_path is not None:
-            self._model = mujoco_api.MjModel.from_xml_path(str(source_xml_path))
-            self.source_model_path = str(source_xml_path)
-        else:
-            with tempfile.TemporaryDirectory(prefix=".source-gravity-", dir=source_root) as scratch:
-                scratch_root = Path(scratch) / "closure"
-                for logical, content in files.items():
-                    target = scratch_root.joinpath(*PurePosixPath(logical).parts)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(content)
-                model_path = scratch_root / "canonical-source.xml"
-                self._model = mujoco_api.MjModel.from_xml_path(str(model_path))
-                self.source_model_path = f"{archive_path}#closure/canonical-source.xml"
+        external_assets = {
+            name: payload for name, payload in source_receipt.closure_files.items()
+            if name not in {"canonical-source.xml", "scene.xml"}
+        }
+        self._model = mujoco_api.MjModel.from_xml_string(
+            source_xml_bytes.decode("utf-8"), external_assets,
+        )
         self._data = mujoco_api.MjData(self._model)
         self.source_xml_sha256 = source_xml_sha256
         self.source_closure_digest = source_closure_digest
@@ -278,10 +128,7 @@ class MujocoSourceGravityBiasV1:
             "api_version": int(mujoco_api.mj_version()),
         }
         identity_payload = {
-            "schema_version": (
-                "libero-source-gravity-model-identity-v2" if profiled_source
-                else "libero-source-gravity-model-identity-v1"
-            ),
+            "schema_version": "libero-source-dynamics-model-identity-v3",
             "profile_id": self.profile_id,
             "task_uid": task_uid,
             "source_xml_sha256": source_xml_sha256,
@@ -292,7 +139,7 @@ class MujocoSourceGravityBiasV1:
                 "nbody": int(self._model.nbody), "njnt": int(self._model.njnt),
             },
             "runtime": runtime,
-            "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+            "calculation": "source_operational_space_qfrc_bias_v2",
         }
         if profiled_source:
             identity_payload.update({
@@ -309,34 +156,10 @@ class MujocoSourceGravityBiasV1:
         self.forward_calls = 0
         self.mj_step_calls = 0
         self.closed = False
+        self.close_receipt = None
 
-    def gravity_torque(self, joint_position_rad) -> np.ndarray:
-        if self.closed or self._model is None or self._data is None:
-            raise RuntimeError("source gravity model is closed")
-        q = np.asarray(joint_position_rad, dtype=np.float64)
-        if q.shape != (7,) or not np.isfinite(q).all():
-            raise ValueError("source gravity query requires seven finite named arm joint positions")
-        self._data.qpos[:] = self._model.qpos0
-        self._data.qvel[:] = 0.0
-        for address, value in zip(self._qpos_addresses, q, strict=True):
-            self._data.qpos[address] = float(value)
-        self._mujoco.mj_forward(self._model, self._data)
-        self.forward_calls += 1
-        torque = np.asarray([
-            self._data.qfrc_bias[address] - self._data.qfrc_passive[address]
-            for address in self._dof_addresses
-        ], dtype=np.float64)
-        if torque.shape != (7,) or not np.isfinite(torque).all():
-            raise ValueError("source gravity model produced invalid arm force terms")
-        return torque
-
-    def operational_space_state_v1(self, joint_position_rad, joint_velocity_rad_s):
-        """Return copied source-model M/J/TCP/bias values for one public boundary.
-
-        This task-local calculation uses only the pinned source model and named
-        Panda coordinates. It never reads a live RuntimeSession or Provider
-        model/data object and never advances physics.
-        """
+    def operational_space_state_v2(self, joint_position_rad, joint_velocity_rad_s):
+        """Return the pinned source model's OSC state and unmodified qfrc_bias."""
         if self.closed or self._model is None or self._data is None:
             raise RuntimeError("source dynamics model is closed")
         q = np.asarray(joint_position_rad, dtype=np.float64)
@@ -368,19 +191,19 @@ class MujocoSourceGravityBiasV1:
         site_rotation = np.asarray(
             self._data.site_xmat[self._tcp_site_id], dtype=np.float64,
         ).reshape(3, 3).copy()
-        bias = np.asarray([
-            self._data.qfrc_bias[address] - self._data.qfrc_passive[address]
-            for address in self._dof_addresses
-        ], dtype=np.float64)
+        qfrc_bias = np.asarray(
+            [self._data.qfrc_bias[address] for address in self._dof_addresses],
+            dtype=np.float64,
+        )
         if (mass.shape != (7, 7) or jacobian.shape != (6, 7)
                 or site_position.shape != (3,) or site_rotation.shape != (3, 3)
-                or bias.shape != (7,)
+                or qfrc_bias.shape != (7,)
                 or any(not np.isfinite(value).all()
-                       for value in (mass, jacobian, site_position, site_rotation, bias))):
+                       for value in (mass, jacobian, site_position, site_rotation, qfrc_bias))):
             raise ValueError("source OSC model produced non-finite or incomplete dynamics")
         return {
-            "schema_version": "libero-source-operational-space-state-v1",
-            "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
+            "schema_version": "libero-source-operational-space-state-v2",
+            "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
             "model_identity_sha256": self.model_identity_sha256,
             "source_xml_sha256": self.source_xml_sha256,
             "source_closure_digest": self.source_closure_digest,
@@ -389,25 +212,10 @@ class MujocoSourceGravityBiasV1:
             "site_rotation_world": site_rotation,
             "jacobian_world": jacobian,
             "mass_matrix_arm": mass,
-            "bias_minus_passive_arm_Nm": bias,
+            "qfrc_bias_arm_Nm": qfrc_bias.copy(),
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": self.mj_step_calls,
         }
-
-    def operational_space_state_v2(self, joint_position_rad, joint_velocity_rad_s):
-        """Return the V1 source state plus robosuite's unmodified qfrc_bias vector."""
-        state = self.operational_space_state_v1(joint_position_rad, joint_velocity_rad_s)
-        qfrc_bias = np.asarray([
-            self._data.qfrc_bias[address] for address in self._dof_addresses
-        ], dtype=np.float64)
-        if qfrc_bias.shape != (7,) or not np.isfinite(qfrc_bias).all():
-            raise ValueError("source OSC model produced invalid arm qfrc_bias values")
-        state.update({
-            "schema_version": "libero-source-operational-space-state-v2",
-            "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
-            "qfrc_bias_arm_Nm": qfrc_bias.copy(),
-        })
-        return state
 
     def identity_mapping(self) -> dict[str, object]:
         identity = {
@@ -418,28 +226,14 @@ class MujocoSourceGravityBiasV1:
             "composition_plan_sha256": self.composition_plan_sha256,
             "model_dimensions": dict(self.model_dimensions),
             "runtime_identity": dict(self.runtime_identity),
-            "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+            "calculation": "source_operational_space_qfrc_bias_v2",
             "operations": {
-                "gravity_torque": {
-                    "profile_id": SOURCE_GRAVITY_PROFILE_V1,
-                    "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
-                },
-                "operational_space_state": {
-                    "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
-                    "inputs": ["named_arm_joint_position_rad", "named_arm_joint_velocity_rad_s"],
-                    "outputs": [
-                        "arm_mass_matrix", "world_tcp_jacobian", "world_tcp_pose",
-                        "bias_minus_passive_arm_torque",
-                    ],
-                    "physics_steps": 0,
-                    "runtime_identity": dict(self.runtime_identity),
-                },
                 "operational_space_state_v2": {
                     "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
                     "inputs": ["named_arm_joint_position_rad", "named_arm_joint_velocity_rad_s"],
                     "outputs": [
                         "arm_mass_matrix", "world_tcp_jacobian", "world_tcp_pose",
-                        "bias_minus_passive_arm_torque", "qfrc_bias_arm_torque",
+                        "qfrc_bias_arm_torque",
                     ],
                     "physics_steps": 0,
                     "runtime_identity": dict(self.runtime_identity),
@@ -482,8 +276,9 @@ class MujocoSourceGravityBiasV1:
                 "model_profile_id": self.model_profile_id,
                 "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
             })
+        self.close_receipt = receipt
         return receipt
 
 
 __all__ = ["MujocoSourceGravityBiasV1", "SOURCE_GRAVITY_PROFILE_V1",
-           "SOURCE_OPERATIONAL_SPACE_PROFILE_V1", "SOURCE_OPERATIONAL_SPACE_PROFILE_V2"]
+           "SOURCE_OPERATIONAL_SPACE_PROFILE_V2"]

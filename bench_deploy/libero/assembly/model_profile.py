@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 from bench_deploy.libero.objects.layout import FIXTURE_WORLD_POSES, TABLE_REGION_SITES
 
 
-ROBOT_MODEL_PROFILE_ID = "libero-robosuite-panda-layout-seed19-v2"
 ROBOSUITE_REVISION = "fbee5844ff5632f5b5698e204ec5357ca50be0df"
 LIBERO_REVISION = "8f1084e3132a39270c3a13ebe37270a43ece2a01"
 ROBOT_MODEL_PROFILE_V3_ID = "libero-robosuite-panda-layout-seed19-compile-first-v3"
@@ -65,10 +64,7 @@ def validate_libero_official_source_plan_v1(
     return plan
 
 
-def _normalize_libero_robosuite_model_xml(
-    source_xml: bytes, *, schema_version: str, profile_id: str,
-    compile_fixture_world_poses: bool,
-) -> tuple[bytes, dict[str, object]]:
+def _normalize_libero_robosuite_model_xml_v3(source_xml: bytes) -> tuple[bytes, dict[str, object]]:
     """Apply pinned robosuite defaults and the seed-19 LIBERO scene layout.
 
     The pinned source MJCF remains the transform input. Values already authored
@@ -168,21 +164,19 @@ def _normalize_libero_robosuite_model_xml(
         values = {}
         for field_name, expected_values in pose.items():
             actual = body.get(field_name)
-            if not compile_fixture_world_poses:
-                origin = (1.0, 0.0, 0.0, 0.0) if field_name == "quat" else (0.0, 0.0, 0.0)
-                actual_values = origin if actual is None else tuple(float(item) for item in actual.split())
-                if (len(actual_values) != len(origin)
-                        or any(not math.isclose(a, b, rel_tol=0.0, abs_tol=1.0e-12)
-                               for a, b in zip(actual_values, origin, strict=True))):
-                    raise ValueError(
-                        f"LIBERO compile-first profile requires {body_name}.{field_name} at its authored origin"
-                    )
-                values[field_name] = {
-                    "action": "preserved_at_compile_origin",
-                    "xml_value": actual,
-                    "post_compile_world_value": [float(value) for value in expected_values],
-                }
-                continue
+            origin = (1.0, 0.0, 0.0, 0.0) if field_name == "quat" else (0.0, 0.0, 0.0)
+            actual_values = origin if actual is None else tuple(float(item) for item in actual.split())
+            if (len(actual_values) != len(origin)
+                    or any(not math.isclose(a, b, rel_tol=0.0, abs_tol=1.0e-12)
+                           for a, b in zip(actual_values, origin, strict=True))):
+                raise ValueError(
+                    f"LIBERO compile-first profile requires {body_name}.{field_name} at its authored origin"
+                )
+            values[field_name] = {
+                "action": "preserved_at_compile_origin",
+                "xml_value": actual,
+                "post_compile_world_value": [float(value) for value in expected_values],
+            }
             expected = " ".join(format(value, ".17g") for value in expected_values)
             if actual is None:
                 body.set(field_name, expected)
@@ -257,8 +251,8 @@ def _normalize_libero_robosuite_model_xml(
 
     normalized = ET.tostring(root, encoding="utf-8", short_empty_elements=True)
     receipt: dict[str, object] = {
-        "schema_version": schema_version,
-        "profile_id": profile_id,
+        "schema_version": "libero-robosuite-model-transform-v3",
+        "profile_id": ROBOT_MODEL_PROFILE_V3_ID,
         "libero_revision": LIBERO_REVISION,
         "robosuite_revision": ROBOSUITE_REVISION,
         "raw_source_xml_sha256": hashlib.sha256(source_xml).hexdigest(),
@@ -269,10 +263,7 @@ def _normalize_libero_robosuite_model_xml(
         "joint_default_policy": "force_false_preserve_authored_values_v1",
         "mjcf_option_integrator": "Euler",
         "fixture_pose_source": "pinned LIBERO task model compiled twice with Python/NumPy seed 19",
-        "fixture_pose_timing": (
-            "post_compile_reset_sample_v1" if not compile_fixture_world_poses
-            else "before_compile_mjcf_v1"
-        ),
+        "fixture_pose_timing": "post_compile_reset_sample_v1",
         "official_task_construction_seed": 19,
         "task_region_site_source": "pinned LIBERO task model compiled with seed 19",
         "contact_decomposition_authored_flags": contact_geom_authored_flags,
@@ -280,29 +271,18 @@ def _normalize_libero_robosuite_model_xml(
     return normalized, receipt
 
 
-def normalize_libero_robosuite_model_xml_v2(source_xml: bytes) -> tuple[bytes, dict[str, object]]:
-    """Preserve the historical precompile fixture profile for v2 bundles."""
-    return _normalize_libero_robosuite_model_xml(
-        source_xml, schema_version="libero-robosuite-model-transform-v2",
-        profile_id=ROBOT_MODEL_PROFILE_ID, compile_fixture_world_poses=True,
-    )
-
-
 def normalize_libero_robosuite_model_xml_v3(source_xml: bytes) -> tuple[bytes, dict[str, object]]:
     """Normalize only the pinned compile-first LIBERO/robosuite model bytes."""
     if type(source_xml) is not bytes or hashlib.sha256(source_xml).hexdigest() != (
             LIBERO_OFFICIAL_REBASED_MODEL_SHA256):
         raise ValueError("LIBERO compile-first profile requires its pinned rebased model bytes")
-    return _normalize_libero_robosuite_model_xml(
-        source_xml, schema_version="libero-robosuite-model-transform-v3",
-        profile_id=ROBOT_MODEL_PROFILE_V3_ID, compile_fixture_world_poses=False,
-    )
+    return _normalize_libero_robosuite_model_xml_v3(source_xml)
 
 
 __all__ = [
-    "LIBERO_REVISION", "ROBOSUITE_REVISION", "ROBOT_MODEL_PROFILE_ID",
+    "LIBERO_REVISION", "ROBOSUITE_REVISION",
     "ROBOT_MODEL_PROFILE_V3_ID", "LIBERO_OFFICIAL_SOURCE_PLAN_SHA256",
     "LIBERO_OFFICIAL_AUTHORED_MODEL_SHA256", "LIBERO_OFFICIAL_REBASED_MODEL_SHA256",
     "LIBERO_OFFICIAL_TASK_UID", "validate_libero_official_source_plan_v1",
-    "normalize_libero_robosuite_model_xml_v2", "normalize_libero_robosuite_model_xml_v3",
+    "normalize_libero_robosuite_model_xml_v3",
 ]
