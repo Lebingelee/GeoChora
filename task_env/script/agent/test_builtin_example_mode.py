@@ -273,3 +273,24 @@ def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound():
     }
     assert controller_profile['joint_velocity_limit_rad_s'] == 4.0
     assert built['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'
+
+
+def test_isaac_core_site_overlay_excludes_conflicting_openusd_package(tmp_path):
+    from builtin_example_validation import _populate_isaac_core_site_overlay
+
+    core_site = tmp_path / 'core-site'
+    core_site.mkdir()
+    (core_site / 'h5py').mkdir()
+    (core_site / 'pxr').mkdir()
+    (core_site / 'usd_core-26.11.dist-info').mkdir()
+    (core_site / 'numpy.py').write_text('sentinel = True\n')
+    overlay = tmp_path / 'isaac-overlay'
+
+    manifest = _populate_isaac_core_site_overlay(core_site, overlay)
+
+    assert manifest['schema_version'] == 'isaac-core-site-overlay-v1'
+    assert manifest['excluded_entries'] == ['pxr', 'usd_core-26.11.dist-info']
+    assert manifest['included_entry_count'] == 2
+    assert (overlay / 'h5py').is_symlink()
+    assert (overlay / 'numpy.py').is_symlink()
+    assert not (overlay / 'pxr').exists()

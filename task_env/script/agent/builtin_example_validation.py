@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import tempfile
 import time
 
 from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
@@ -21,6 +22,34 @@ CPU_PYTHON = Path('/home/lly/miniconda3/envs/geochora/bin/python')
 ISAAC_PYTHON = CORE / 'workspace/environments/isaacsim-6.2.0/bin/python'
 MAX_WORKER_LOG_BYTES = 64 * 1024**2
 MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
+
+
+def _populate_isaac_core_site_overlay(core_site, overlay):
+    """Expose Core dependencies to Isaac without shadowing its OpenUSD package."""
+    core_site = Path(core_site).resolve(strict=True)
+    overlay = Path(overlay).resolve()
+    overlay.mkdir(parents=True, exist_ok=True)
+    excluded = []
+    included = []
+    for item in sorted(core_site.iterdir(), key=lambda entry: entry.name):
+        name = item.name
+        if name == 'pxr' or (
+            name.lower().startswith('usd_core-') and name.endswith('.dist-info')
+        ):
+            excluded.append(name)
+            continue
+        (overlay / name).symlink_to(item, target_is_directory=item.is_dir())
+        included.append(name)
+    names_digest = hashlib.sha256(
+        json.dumps(included, separators=(',', ':'), ensure_ascii=True).encode('ascii')
+    ).hexdigest()
+    return {
+        'schema_version': 'isaac-core-site-overlay-v1',
+        'source_site_packages': str(core_site),
+        'excluded_entries': excluded,
+        'included_entry_count': len(included),
+        'included_names_sha256': names_digest,
+    }
 
 
 def _write_json(path, value):
@@ -218,6 +247,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_RESOURCE_GATE',
                 'gpu_free_mib': gpu_start, 'reason': 'less than 5120 MiB free GPU memory'}
     environment = os.environ.copy()
+    isaac_core_site_owner = None
     environment.pop('PYTHONPATH', None) if provider == 'isaacsim' else None
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     if provider != 'isaacsim':
@@ -229,11 +259,20 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             'OPENBLAS_NUM_THREADS': '4', 'NUMEXPR_NUM_THREADS': '4',
             'TOKENIZERS_PARALLELISM': 'false',
         })
-        environment['GEOCHORA_CORE_SITE'] = subprocess.check_output(
+        core_site = Path(subprocess.check_output(
             [str(CPU_PYTHON), '-c',
              'import sysconfig; print(sysconfig.get_paths()["purelib"])'],
             cwd=CORE, text=True, timeout=10,
-        ).strip()
+        ).strip())
+        isaac_core_site_owner = tempfile.TemporaryDirectory(
+            prefix='geochora-isaac-core-site-'
+        )
+        overlay = Path(isaac_core_site_owner.name)
+        plan['isaac_core_site_overlay'] = _populate_isaac_core_site_overlay(
+            core_site, overlay,
+        )
+        environment['GEOCHORA_CORE_SITE'] = str(overlay)
+        _write_json(output / 'run_plan.json', plan)
     command = [str(executable), str(Path(__file__).with_name('builtin_example_worker.py')),
                '--spec', str(spec_path), '--catalog', str(catalog_path),
                '--working-tree-scope', str(scope_path), '--seed', str(seed),
@@ -243,6 +282,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            if isaac_core_site_owner is not None:
+                isaac_core_site_owner.cleanup()
             _write_json(output / 'run_preflight.json', {
                 'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
                 'status': 'BLOCKED_NATIVE_LOCK', 'mem_available_start_bytes': mem_start,
@@ -322,6 +363,10 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             _kill_process_group(process, signal.SIGKILL)
             resource_violation = resource_violation or 'worker process group did not end after parent exit'
         fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+    if isaac_core_site_owner is not None:
+        # The child and all Kit subprocesses have ended; remove the temporary
+        # Core dependency overlay before cold-reading or writing final receipts.
+        isaac_core_site_owner.cleanup()
     _write_json(output / 'lock_receipt.json', {
         'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
         'shared_native_lock_path': str(LOCK), 'released_after_worker_process_group_exit': not pg_alive,
