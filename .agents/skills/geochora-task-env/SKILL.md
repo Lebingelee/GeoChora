@@ -1428,24 +1428,28 @@ is persisted as `NOT_RUN_DEPENDENCY` with zero worker starts; an absent Core
 provider manifest is `UNSUPPORTED_CAPABILITY`. Do not install an optional
 engine just to change this disposition.
 
-Current bounded evidence at source HEAD `00c10296255f3a90c6aeb31d0bb0eec5e612cbad`:
-GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX each have one current route identity
-across seeds31/32/33, with 3/3 runtime-valid H5, planned actions, independent
-cold reads and close evidence. Outcomes are GeoPhys `descend_pose_readiness_timeout`
-(seed31) and `gripper_readiness_timeout` (seeds32/33); Isaac
-`episode_truncated` (seed31) and `gripper_readiness_timeout` (seeds32/33).
-None of the six episodes solved the task. MuJoCo R3 seed31 repeatedly hit the
-QACC DOF13 execution-fault gate on source revisions `64a5b61`, `e6e5fb4`, and
-`93efad5`. The last fault occurred during `move_above_cube`, before grasp,
-after the cube had shifted about 6.9 cm in x. A later `f0d3273` repair raises
-the TCP before lateral transit and passed focused provider-free checks, but
-has no MuJoCo native validation. The earlier bounded PickCube MuJoCo pass used
-production R1, not F06 R3. Preserve the maintainer's stop decision, do not
-substitute the separate R1 diagnostic, and do not retry MuJoCo without a new
-maintainer decision. Seeds32/33 were not run for MuJoCo, so the executed
-evidence matrix has 6/9 primary H5 files and remains
-`F06_PICKCUBE_HARNESS_THREE_BACKEND_EXAMPLE_PARTIAL_PENDING_SOL_REVIEW`.
-The current [evidence index](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md)
-contains exact route identities, H5/cold-reader hashes, commands and the
-planned-vs-measured seed31 trajectory plot. No Qualification or F07 training
-follows from this result.
+Earlier bounded evidence at source HEAD `00c10296255f3a90c6aeb31d0bb0eec5e612cbad`
+had GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX at 3/3 runtime-valid H5 each;
+none of those six episodes solved the task. Those H5 files predate the
+measured-clearance solution identity below. Four earlier MuJoCo R3 seed31
+attempts hit QACC DOF13; historical successful PickCube × MuJoCo evidence used
+production R1 and does not establish the R3 intersection.
+
+One maintainer-authorized MuJoCo 3.8.1 CPU / R3 / seed31 measured-clearance run
+at source `ce3f344cb5833dff99c9862ca18a34878bb696cd` was runtime-valid, finalized
+an H5, passed independent cold read, and closed/released the shared lock. It did
+not reproduce QACC. The gate uses measured `state.ee_pose` and the task's
+existing expert `privileged_state.cube_v1_body_pose`; it reads no provider-private
+solver/controller state. Expert execution stopped after 100 vertical-gate hold
+actions: measured TCP clearance was 0.21448994 m versus the unchanged
+0.215 m threshold. The run therefore failed task/Expert completion. Commit
+`dcd71e3cffd540b4ba4b82f7d10ec93afce17523` adds 20 mm of planned transit
+headroom only when R3 measured gates are enabled; the threshold, final hover
+target, task contract and R1 route stay unchanged. Focused PickCube/Harness
+checks pass 28/28, but this follow-up source identity has no native evidence.
+The previous six H5s and this experimental seed31 H5 are not a coherent matrix
+for the final source. Keep F06 **PARTIAL**; do not run another MuJoCo episode
+or seeds32/33 without a new exact maintainer authorization. See the current
+[evidence index](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md)
+and its raw run, trace, cold-read and diagnosis references. No Qualification or
+F07 training follows from these results.
