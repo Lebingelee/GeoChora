@@ -288,6 +288,63 @@ def test_isaac_app_owner_uses_public_close_and_retains_wrapper_until_worker_exit
     }
 
 
+def test_f06_isaac_app_profile_disables_rendering_without_changing_default(monkeypatch):
+    import importlib.metadata
+    import sys
+    from types import ModuleType, SimpleNamespace
+
+    from task_env.runtime.sessions.isaac_native_io import (
+        DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1,
+        F06_ISAAC_APP_LAUNCH_PROFILE_V1,
+        IsaacSimAppOwnerV1,
+    )
+
+    app_calls = []
+
+    class _FakeSimulationApp:
+        def __init__(self, config):
+            app_calls.append(dict(config))
+
+        def close(self):
+            pass
+
+    simulation_app_module = ModuleType('isaacsim.simulation_app')
+    simulation_app_module.SimulationApp = _FakeSimulationApp
+    carb_module = ModuleType('carb')
+    carb_module.settings = SimpleNamespace(get_settings=lambda: SimpleNamespace(
+        get_as_int=lambda _name: 4,
+    ))
+    isaacsim_module = ModuleType('isaacsim')
+    isaacsim_module.__path__ = []
+    monkeypatch.setitem(sys.modules, 'isaacsim', isaacsim_module)
+    monkeypatch.setitem(sys.modules, 'isaacsim.simulation_app', simulation_app_module)
+    monkeypatch.setitem(sys.modules, 'carb', carb_module)
+    monkeypatch.setattr(importlib.metadata, 'version', lambda name: '6.2.0.0')
+
+    default_owner = IsaacSimAppOwnerV1(
+        launch_profile_id=DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1,
+    )
+    default_owner.open()
+    f06_owner = IsaacSimAppOwnerV1(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+    f06_owner.open()
+
+    assert app_calls == [
+        {
+            'headless': True, 'enable_cameras': False, 'limit_cpu_threads': 4,
+            'fast_shutdown': False,
+        },
+        {
+            'headless': True, 'enable_cameras': False, 'limit_cpu_threads': 4,
+            'fast_shutdown': False, 'renderer': 'MinimalRendering',
+            'minimal_shading_mode': 4, 'disable_viewport_updates': True,
+        },
+    ]
+    assert f06_owner.launch_profile_receipt() == {
+        'profile_id': F06_ISAAC_APP_LAUNCH_PROFILE_V1,
+        'simulation_app_config': app_calls[1],
+    }
+
+
 def test_isaac_app_owner_close_does_not_drop_closed_app_reference():
     from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1
 

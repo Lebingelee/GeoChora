@@ -65,7 +65,10 @@ def _planned_action_count(trajectory):
 def _validate_f06_bootstrap_receipt(bootstrap, run_plan, *, row):
     """Validate observed Isaac startup steps against the frozen finite plan."""
     if (not isinstance(run_plan, dict)
-            or run_plan.get('schema_version') != 'harness-builtin-pickcube-example-run-plan-v1'
+            or run_plan.get('schema_version') not in (
+                'harness-builtin-pickcube-example-run-plan-v1',
+                'harness-builtin-pickcube-example-run-plan-v2',
+            )
             or run_plan.get('provider') != 'isaacsim'):
         raise ValueError('F06 Isaac bootstrap has no exact Harness run plan')
     for key, expected in (
@@ -342,6 +345,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         'qualification': False,
         'isaac_app_precompile_start_attempted': False,
         'isaac_app_precompile_start_completed': False,
+        'isaac_app_launch_profile': None,
         'isaac_app_owner_close_receipt': None,
     }
     env = None
@@ -360,10 +364,19 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             # this same process-owned App.
             execution_phase = 'isaac_app_precompile_startup'
             row['isaac_app_precompile_start_attempted'] = True
-            from task_env.runtime.sessions.isaac_native_io import _process_app_owner
+            from task_env.runtime.sessions.isaac_native_io import (
+                F06_ISAAC_APP_LAUNCH_PROFILE_V1, _process_app_owner,
+            )
 
-            app_owner = _process_app_owner()
+            run_plan = json.loads((output / 'run_plan.json').read_text())
+            launch_profile_id = run_plan.get('isaac_app_launch_profile_id')
+            if (run_plan.get('schema_version') != 'harness-builtin-pickcube-example-run-plan-v2'
+                    or launch_profile_id != F06_ISAAC_APP_LAUNCH_PROFILE_V1):
+                raise ValueError('Isaac Harness run plan lacks an explicit App launch profile')
+
+            app_owner = _process_app_owner(launch_profile_id=launch_profile_id)
             app_owner.open()
+            row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
             row['isaac_app_precompile_start_completed'] = True
         # The built-in profile has its own tracked-clean + exact untracked
         # scope; the legacy strict catalog validator correctly remains strict.

@@ -28,6 +28,17 @@ from .source import UsdRuntimeSourceV1
 _APP_LOCK = RLock()
 _PROCESS_APP_OWNER: "IsaacSimAppOwnerV1 | None" = None
 
+DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1 = "isaac-headless-default-v1"
+F06_ISAAC_APP_LAUNCH_PROFILE_V1 = "f06-headless-no-render-v1"
+_ISAAC_APP_LAUNCH_PROFILE_OVERRIDES = {
+    DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1: {},
+    F06_ISAAC_APP_LAUNCH_PROFILE_V1: {
+        "renderer": "MinimalRendering",
+        "minimal_shading_mode": 4,
+        "disable_viewport_updates": True,
+    },
+}
+
 
 def _validate_isaac_task_thread_count(actual: int) -> int:
     if type(actual) is not int or not 1 <= actual <= 4:
@@ -100,7 +111,10 @@ def _dg03_collision_filter_witness(stage, UsdPhysics) -> dict[str, list[dict[str
 class IsaacSimAppOwnerV1:
     """One headless Isaac App per worker process, separate from Env sessions."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, launch_profile_id: str = DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1) -> None:
+        if launch_profile_id not in _ISAAC_APP_LAUNCH_PROFILE_OVERRIDES:
+            raise ValueError(f"unsupported Isaac App launch profile: {launch_profile_id!r}")
+        self.launch_profile_id = launch_profile_id
         self._app = None
         self._closed = False
         self._process_lifetime_holds = 0
@@ -121,6 +135,16 @@ class IsaacSimAppOwnerV1:
     def app(self):
         return self._app
 
+    def launch_profile_receipt(self) -> dict[str, object]:
+        config = {
+            "headless": True,
+            "enable_cameras": False,
+            "limit_cpu_threads": 4,
+            "fast_shutdown": False,
+            **_ISAAC_APP_LAUNCH_PROFILE_OVERRIDES[self.launch_profile_id],
+        }
+        return {"profile_id": self.launch_profile_id, "simulation_app_config": config}
+
     def open(self):
         if self._closed or self._close_attempted:
             raise RuntimeError("Isaac App owner cannot reopen after close")
@@ -133,14 +157,9 @@ class IsaacSimAppOwnerV1:
             self.start_attempts += 1
             from isaacsim.simulation_app import SimulationApp
 
-            self._app = SimulationApp({
-                "headless": True,
-                "enable_cameras": False,
-                "limit_cpu_threads": 4,
-                # Kit's default fast shutdown can terminate Python before the
-                # worker writes its producer-owned completion receipt.
-                "fast_shutdown": False,
-            })
+            # Kit's default fast shutdown can terminate Python before the
+            # worker writes its producer-owned completion receipt.
+            self._app = SimulationApp(self.launch_profile_receipt()["simulation_app_config"])
             import carb
 
             actual = int(carb.settings.get_settings().get_as_int(
@@ -219,11 +238,21 @@ class IsaacSimAppOwnerV1:
         }
 
 
-def _process_app_owner() -> IsaacSimAppOwnerV1:
+def _process_app_owner(*, launch_profile_id: str | None = None) -> IsaacSimAppOwnerV1:
     global _PROCESS_APP_OWNER
     with _APP_LOCK:
         if _PROCESS_APP_OWNER is None:
-            _PROCESS_APP_OWNER = IsaacSimAppOwnerV1()
+            _PROCESS_APP_OWNER = IsaacSimAppOwnerV1(
+                launch_profile_id=(
+                    DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1
+                    if launch_profile_id is None else launch_profile_id
+                )
+            )
+        elif (launch_profile_id is not None
+              and _PROCESS_APP_OWNER.launch_profile_id != launch_profile_id):
+            raise RuntimeError(
+                "the process Isaac App already has a different launch profile"
+            )
         if _PROCESS_APP_OWNER._closed:
             raise RuntimeError("the process Isaac App was already closed")
         return _PROCESS_APP_OWNER

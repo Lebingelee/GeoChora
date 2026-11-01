@@ -175,6 +175,15 @@ def _cold_read_h5(output, receipt, *, provider):
                 'source_provenance': isinstance(payload, dict) and payload.get('source_provenance_present') is True,
                 'transition_count': isinstance(payload, dict) and payload.get('transitions') == receipt.get('executed_transition_count'),
             }
+            if provider == 'isaacsim':
+                run_plan = json.loads((Path(output) / 'run_plan.json').read_text())
+                app_profile = receipt.get('isaac_app_launch_profile')
+                checks['isaac_app_launch_profile_matches_plan'] = (
+                    run_plan.get('schema_version') == 'harness-builtin-pickcube-example-run-plan-v2'
+                    and isinstance(app_profile, dict)
+                    and app_profile.get('profile_id') == run_plan.get('isaac_app_launch_profile_id')
+                    and isinstance(app_profile.get('simulation_app_config'), dict)
+                )
             result['checks'] = checks
             result['status'] = 'PASS' if all(checks.values()) else 'FAIL'
         except BaseException as error:
@@ -213,8 +222,11 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
     catalog = json.loads(Path(catalog_path).read_text())
     scope = ExampleWorkingTreeScopeV1.load(scope_path)
     plan = {
-        'schema_version': 'harness-builtin-pickcube-example-run-plan-v1',
+        'schema_version': 'harness-builtin-pickcube-example-run-plan-v2',
         'provider': provider, 'backend': spec.backend, 'device': spec.device,
+        'isaac_app_launch_profile_id': (
+            'f06-headless-no-render-v1' if provider == 'isaacsim' else None
+        ),
         'controller_profile': spec.controller_profile, 'seed': seed,
         'horizon_control_ticks': spec.horizon_control_ticks,
         'physics_dt_s': spec.physics_dt_s, 'control_substeps': spec.control_substeps,
@@ -413,6 +425,10 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         'worker_stderr': str(stderr_path.relative_to(CORE)),
         'task_outcome': receipt.get('task_outcome') if receipt else None,
         'runtime_valid': receipt.get('runtime_valid') if receipt else False,
+        'isaac_app_launch_profile_id': (
+            receipt.get('isaac_app_launch_profile', {}).get('profile_id')
+            if receipt and isinstance(receipt.get('isaac_app_launch_profile'), dict) else None
+        ),
         'planning_action_count': receipt.get('planning_action_count') if receipt else 0,
         'recording': receipt.get('recording') if receipt else None,
         'independent_cold_read': cold_read,
