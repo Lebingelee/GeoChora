@@ -135,7 +135,7 @@ def _candidate_identity(candidate, input_v1) -> dict:
 
 def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> dict:
     from task_env.diagnostics.tasks.f05_dg02_core_n2_probe import (
-        _finite, _pose_mapping, _record_state, _request, _target_pose,
+        _finite, _pose as _pose_mapping, _record_state, _request, _target_pose,
     )
     from task_env.recorders import load_structured_control_records_h5
     from isaacsim.core.simulation_manager import SimulationManager
