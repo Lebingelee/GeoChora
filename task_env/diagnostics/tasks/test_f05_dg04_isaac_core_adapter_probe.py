@@ -7,6 +7,7 @@ import pytest
 from task_env.diagnostics.tasks.f05_dg04_isaac_core_adapter_probe import (
     _bootstrap_attempted_steps,
     _diagnostic_contact_reset_sample,
+    _open_app_with_progress,
     _verify_paired_physics_response,
 )
 
@@ -52,6 +53,25 @@ def test_bootstrap_receipt_rejects_inexact_or_inconsistent_facts(key, value):
 def test_bootstrap_receipt_rejects_non_mapping_input():
     with pytest.raises(TypeError):
         _bootstrap_attempted_steps(None)
+
+
+def test_app_open_progress_brackets_synchronous_owner_open():
+    events = []
+
+    class AppOwner:
+        def open(self):
+            events.append("owner.open")
+
+    def checkpoint(stage, **kwargs):
+        events.append((stage, kwargs["attempted_steps_exact"]))
+
+    _open_app_with_progress(AppOwner(), checkpoint)
+
+    assert events == [
+        ("isaac_app_open_start", False),
+        "owner.open",
+        ("isaac_app_opened", False),
+    ]
 
 
 def _paired_response_receipts(*, physics_changes: bool):

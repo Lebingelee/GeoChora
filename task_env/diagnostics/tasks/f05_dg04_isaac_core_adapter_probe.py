@@ -115,6 +115,13 @@ def _validate_loaded_pxr_paths() -> None:
         raise RuntimeError(f"OpenUSD resolved outside the matching Isaac installation: {pxr_paths!r}")
 
 
+def _open_app_with_progress(app_owner, checkpoint) -> None:
+    """Expose the synchronous Kit-open interval to the external watchdog."""
+    checkpoint("isaac_app_open_start", attempted_steps_exact=False)
+    app_owner.open()
+    checkpoint("isaac_app_opened", attempted_steps_exact=False)
+
+
 def _public_view_state(input_v1, native_io, sample, *, finger_positions, finger_velocities):
     import omni.usd
     import torch
@@ -384,9 +391,8 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
     from task_env.runtime.sessions.native_io import UsdCoreRuntimeSession
 
     app_owner = _process_app_owner()
-    app_owner.open()
+    _open_app_with_progress(app_owner, checkpoint)
     native_io = None
-    checkpoint("isaac_app_opened", attempted_steps_exact=False)
     original_frequency = IsaacSourceEqualityComplianceV1.natural_frequency_hz
     original_damping = IsaacSourceEqualityComplianceV1.damping_ratio_for_residual
 
