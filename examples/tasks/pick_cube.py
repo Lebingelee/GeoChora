@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -21,20 +22,52 @@ from examples._common import (
 ENV_ID = "pick-cube-p16-reference-v1"
 
 
-def _run_isaac_harness(args):
+def _write_optional_preflight(run_root: Path, *, provider: str, status: str, reason: str) -> int:
+    result_dir = run_root / "result"
+    result_dir.mkdir(parents=True, exist_ok=False)
+    receipt = {
+        "schema_version": "f06-pickcube-optional-provider-preflight-v1",
+        "provider": provider,
+        "disposition": status,
+        "reason": reason,
+        "native_starts": 0,
+        "qualification": False,
+    }
+    (result_dir / "preflight.json").write_text(
+        json.dumps(receipt, indent=2, ensure_ascii=False) + "\n"
+    )
+    print(json.dumps({**receipt, "output_dir": str(result_dir)}, sort_keys=True))
+    return 0
+
+
+def _run_harness(args):
     if args.controller_profile != "r3_continuous_v1":
-        raise ValueError("the F06 Isaac Harness route is frozen to r3_continuous_v1")
+        raise ValueError("the F06 built-in Harness route is frozen to r3_continuous_v1")
     if args.horizon != 1000 or args.seed not in (31, 32, 33):
-        raise ValueError("the F06 Isaac Harness route requires horizon 1000 and seed 31/32/33")
-    if args.source_delivery_manifest is None:
+        raise ValueError("the F06 built-in Harness route requires horizon 1000 and seed 31/32/33")
+    if args.provider == "isaacsim" and args.source_delivery_manifest is None:
         raise ValueError("--source-delivery-manifest is required for the F06 Isaac route")
     if args.recording is not None:
-        raise ValueError("Isaac H5 is written inside the supervised run directory; use --harness-output-dir")
+        raise ValueError("Harness H5 is written inside its supervised run directory; use --harness-output-dir")
 
     run_root = (args.harness_output_dir.expanduser().resolve() if args.harness_output_dir else
                 (_REPOSITORY_ROOT / "workspace/examples/pick_cube"
-                 / f"f06-isaac-seed{args.seed}-{time.time_ns()}").resolve())
+                 / f"f06-{args.provider}-seed{args.seed}-{time.time_ns()}").resolve())
     run_root.mkdir(parents=True, exist_ok=False)
+
+    optional_imports = {"genesis": "genesis", "sapien": "sapien"}
+    if args.provider in optional_imports:
+        module_name = optional_imports[args.provider]
+        try:
+            available = importlib.util.find_spec(module_name) is not None
+        except (ImportError, ModuleNotFoundError, ValueError):
+            available = False
+        if not available:
+            return _write_optional_preflight(
+                run_root, provider=args.provider, status="NOT_RUN_DEPENDENCY",
+                reason=f"optional engine module {module_name!r} is not installed; no worker started",
+            )
+
     inputs = run_root / "inputs"
     inputs.mkdir()
 
@@ -46,15 +79,31 @@ def _run_isaac_harness(args):
     from catalog_query import build_catalog
 
     spec_data = json.loads((_REPOSITORY_ROOT / "examples/tasks/pick_cube_harness.json").read_text())
+    routes = {
+        "mujoco": ("cpu", "cpu"), "geophys": ("cpu", "cpu"),
+        "isaacsim": ("cuda", "cuda:0"), "genesis": ("cpu", "cpu"),
+        "sapien": ("cpu", "cpu"),
+    }
+    backend, device = routes[args.provider]
     spec_data.update({
-        "provider": "isaacsim", "backend": "cuda", "device": "cuda:0",
+        "provider": args.provider, "backend": backend, "device": device,
         "controller_profile": args.controller_profile,
-        "source_delivery_manifest": str(args.source_delivery_manifest.expanduser().resolve()),
+        "source_delivery_manifest": (
+            str(args.source_delivery_manifest.expanduser().resolve())
+            if args.provider == "isaacsim" else None
+        ),
     })
     spec_path = inputs / "example_spec.json"
     spec_path.write_text(json.dumps(BuiltinPickCubeExampleV1.from_dict(spec_data).to_dict(),
                                     indent=2, ensure_ascii=False) + "\n")
-    catalog = build_catalog(str(_REPOSITORY_ROOT), providers=("geophys", "mujoco"))
+    catalog_providers = ("geophys", "mujoco") if args.provider == "isaacsim" else (args.provider,)
+    catalog = build_catalog(str(_REPOSITORY_ROOT), providers=catalog_providers)
+    if args.provider in optional_imports and not catalog["providers"].get(args.provider, {}).get("available"):
+        reason = catalog["providers"].get(args.provider, {}).get("error", "provider manifest is unavailable")
+        return _write_optional_preflight(
+            run_root, provider=args.provider, status="UNSUPPORTED_CAPABILITY",
+            reason=f"existing Core provider capability is unavailable: {reason}",
+        )
     catalog_path = inputs / "catalog.json"
     catalog_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n")
     scope_path = _REPOSITORY_ROOT / "examples/tasks/pick_cube_harness_working_tree_scope.json"
@@ -71,8 +120,10 @@ def _run_isaac_harness(args):
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider", choices=("geophys", "mujoco", "isaacsim"), required=True,
-                        help="MuJoCo/GeoPhys CPU, or the supervised F06 Isaac Harness route")
+    parser.add_argument("--provider", choices=("geophys", "mujoco", "isaacsim", "genesis", "sapien"), required=True,
+                        help="selected PickCube provider; Genesis/SAPIEN are optional Harness routes")
+    parser.add_argument("--execution", choices=("direct", "harness"), default="direct",
+                        help="direct public make_env route or the versioned built-in Harness route")
     parser.add_argument("--seed", type=int, default=31)
     parser.add_argument("--horizon", type=int, default=1000)
     parser.add_argument("--controller-profile", choices=("r1", "r3_continuous_v1"),
@@ -92,9 +143,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if not 1 <= args.horizon <= 6000:
         parser.error("--horizon must be in [1, 6000]")
-    if args.provider == "isaacsim":
+    if args.provider in ("genesis", "sapien") and args.execution != "harness":
+        parser.error("Genesis/SAPIEN are optional and may only be selected through --execution harness")
+    if args.provider == "isaacsim" or args.execution == "harness":
         try:
-            return _run_isaac_harness(args)
+            return _run_harness(args)
         except (ValueError, FileExistsError) as error:
             parser.error(str(error))
 

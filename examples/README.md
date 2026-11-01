@@ -8,18 +8,24 @@ qualifications. Run them from the repository root in the GeoChora environment;
 the repository has no editable-install metadata, so set `PYTHONPATH` explicitly.
 
 ```bash
-PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution direct --seed 31
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution direct --seed 31
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-mujoco-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider genesis --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-genesis-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider sapien --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-sapien-seed31-run01
 PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19
-PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json
 ```
 
-PickCube selects `pick-cube-p16-reference-v1`; MuJoCo and GeoPhys use CPU.
-Isaac uses the versioned F06 USD delivery, CUDA PhysX and the supervised
-Harness worker; provide its exact delivery manifest explicitly. That route
-uses the same public `make_env` and PickCube task owner and does not apply the
-CPU process `RLIMIT_AS` option. Genesis/SAPIEN remain optional catalog entries;
-this task binding reports them unsupported until their existing dependency and
-capability intersections are ready. NutAssembly selects
+PickCube selects `pick-cube-p16-reference-v1`. `--execution direct` calls the
+public `make_env` example; `--execution harness` uses the versioned built-in
+Harness contract and the same Core task owner. Isaac always uses the supervised
+Harness worker, CUDA PhysX and its exact versioned USD delivery manifest; it
+does not apply the CPU process `RLIMIT_AS` option. Genesis/SAPIEN Harness
+commands write `NOT_RUN_DEPENDENCY` without starting a worker when their engine
+module is absent, and report `UNSUPPORTED_CAPABILITY` when the Core provider
+manifest is unavailable. Use fresh output directories. NutAssembly selects
 `nut-assembly-outcome-reference-v1` and advances only through guarded
 `step_expert()`. Both report task success separately from expert completion.
 NutAssembly must complete its planned stages and retreat to return success; a
@@ -37,8 +43,10 @@ runtime imports.
 
 | Workflow | Command | Current scope and result |
 | --- | --- | --- |
-| Scalar task construction and expert rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31` | Selected PickCube P1.6 expert, scalar CPU; bounded MuJoCo example completed successfully. |
-| F06 PickCube on Isaac Sim | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json` | The built-in Harness compiles the exact locally validated PickCube USD delivery and supervises one CUDA PhysX episode; result is runtime evidence only, with task outcome reported separately. |
+| Scalar task construction and expert rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution direct --seed 31` | Direct public `make_env` example. The F06 R3 three-seed MuJoCo route separately failed its repeated QACC gate; do not treat this historical smoke row as that campaign. |
+| F06 built-in Harness, CPU provider | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01` | Compiles the versioned built-in PickCube example and calls the same public Core task owner; runtime validity and task outcome are separate. |
+| F06 PickCube on Isaac Sim | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01` | Uses the exact locally validated PickCube USD delivery and supervises one CUDA PhysX episode; runtime evidence only, with task outcome reported separately. |
+| Optional Genesis/SAPIEN preflight | Same command with `--provider genesis` or `--provider sapien` and `--execution harness` | Optional only. Missing engine dependency is recorded as `NOT_RUN_DEPENDENCY` without a worker; provider manifest gaps are `UNSUPPORTED_CAPABILITY`. |
 | Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI uses the retained `step_expert()` path; incomplete route exits nonzero. Separately, the task-owned external Solution has bounded MuJoCo CPU S2/S3 and a diagnostic GeoPhys CPU/CUDA × 100/500 Hz S2/S3 comparison. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05c). |
 | Canonical expert recording | `PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 --output workspace/examples/pickcube-mujoco.h5` | Requires a fresh output path; finalizes the existing canonical H5 recorder and checks transitions, T+1 boundaries, provenance, and storage roundtrip. |
 | Offline H5 inspection | `PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/examples/pickcube-mujoco.h5` | Reads the existing canonical schema and validates logical/numeric integrity and T+1 boundaries. It does not replay the task or claim D0. |
@@ -69,3 +77,14 @@ Generic trajectory conversion, explicit historical replay, selected-source
 reexecution, parallel environment, SB3, and RSL-RL APIs remain separate routes.
 Do not map retired task IDs to current task behavior. The S4.5-B source-recovery
 manifest records retired script identities and their exact recovery blobs.
+
+**F06 current result (2026-11-01; PARTIAL pending Sol review):** GeoPhys and
+Isaac each completed the same-route 31/32/33 runtime-valid matrix with planned
+actions, H5 and cold-reader evidence; all six episodes reported task/Expert
+failure. The maintained MuJoCo `r3_continuous_v1` route stopped after the
+repeated seed31 QACC DOF13 gate failure. The maintainer selected preserving
+R3 and recording the route failure; the successful R1 diagnostic is not a
+substitute. Thus 6/9 required primary-provider H5 files exist, not 9/9. The
+seed31 plot, raw evidence index, optional-provider preflights and limits are in
+the [F06 closeout summary](../docs/maintenance/20261101_f06_pickcube_harness_partial.md).
+This result grants no Qualification and starts no F07 work.

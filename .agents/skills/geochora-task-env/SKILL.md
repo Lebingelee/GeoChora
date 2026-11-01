@@ -1398,4 +1398,46 @@ Formal Core N2 run013 now passes its source-hash-bound independent H5 cold read:
 
 The F05 three-route closeout reuses already accepted bounded DG01 MuJoCo/Core and DG02 GeoPhys/USD/Core evidence and adds the DG04 native-adaptation route pending Sol review. R3 cross-provider comparison remains `PARTIAL`; the older strict DG03 Isaac profile remains at zero accepted formal steps. Historical ordinary F05 remains `PARTIAL`. See the [window004 closeout matrix](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/f05_native_adaptation_closeout.md), [N2 plan](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/n2_formal_013.plan.json), [cold-reader receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/n2_formal_013/independent_cold_reader_receipt.json), and updated [F06 entry-only note](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_001/f06_entry_readiness.md).
 
-F06 remains entry-only: DG04’s airborne/free-body diagnostic scene is not the F06 tabletop task and is not connected through the Harness public compiler. No F06/F07 campaign, 20-seed run, Expert, Oracle, Judge or Qualification was started. The previous [window004 TaskEnv Skill refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_receipt.json) records the earlier N1-only state; the [closeout refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_closeout_receipt.json) records current N2 evidence and documentation checks. Human review remains required.
+At the F05 DG04 closeout timestamp, F06 was entry-only: DG04’s airborne/free-body diagnostic scene was not the tabletop PickCube task, and no F06/F07 campaign, Expert, Oracle, Judge or Qualification had started. That was the historical state when the previous [window004 TaskEnv Skill refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_receipt.json) and [closeout refresh receipt](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_004/skill_refresh_closeout_receipt.json) were written. F06 has since run as the separate built-in PickCube example described below.
+
+## F06 built-in PickCube Harness example (2026-11-01; PARTIAL pending Sol review)
+
+The versioned `pickcube-harness-example-v1` selects the existing public UID
+`pick-cube-p16-reference-v1` and delegates task, reset, readiness solution,
+controller, RuntimeSession and Recorder behavior to their current owners. It
+is separate from strict `pick-lift-v0` candidate readiness: the 20-seed
+all-solved candidate/Oracle/Judge contract remains unchanged. The fixed F06
+profile is `r3_continuous_v1`, seeds31/32/33, 1000 control ticks, 0.002 s
+physics with five substeps, and runtime validity is reported separately from
+Task/Expert outcome.
+
+Run the direct public example or the built-in Harness route from the repository
+root with the GeoPhys Python environment and explicit `PYTHONPATH`:
+
+```bash
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution direct --seed 31
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01
+```
+
+Use a fresh Harness output directory for every run. Isaac requires the exact
+versioned F06 USD delivery, CUDA `cuda:0`, and its supervised Kit worker; it
+does not use the CPU `RLIMIT_AS` bound. Optional Genesis/SAPIEN are only
+selected through `--execution harness`: an absent `genesis`/`sapien` package
+is persisted as `NOT_RUN_DEPENDENCY` with zero worker starts; an absent Core
+provider manifest is `UNSUPPORTED_CAPABILITY`. Do not install an optional
+engine just to change this disposition.
+
+Current bounded evidence: GeoPhys CPU seed31/32/33 and Isaac Sim 6.2 CUDA
+PhysX seed31/32/33 are each runtime-valid under one route-local identity, with
+planned actions, H5, independent cold read, and close/process-group/lock
+evidence. All six report a task/Expert failure. MuJoCo R3 seed31 repeated the
+QACC DOF13 execution-fault gate; the maintainer chose to preserve R3, mark the
+route failed, and continue with the other backends. Do not substitute the
+separate successful R1 diagnostic or retry MuJoCo without a new maintainer
+decision. Seeds32/33 were not run for MuJoCo, so this Goal has 6/9 primary H5
+files and remains `F06_PICKCUBE_HARNESS_THREE_BACKEND_EXAMPLE_PARTIAL_PENDING_SOL_REVIEW`.
+The current [evidence index](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md)
+contains exact route identities, H5/cold-reader hashes, commands and the
+planned-vs-measured seed31 trajectory plot. No Qualification or F07 training
+follows from this result.
