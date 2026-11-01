@@ -1428,15 +1428,23 @@ is persisted as `NOT_RUN_DEPENDENCY` with zero worker starts; an absent Core
 provider manifest is `UNSUPPORTED_CAPABILITY`. Do not install an optional
 engine just to change this disposition.
 
-Current bounded evidence: GeoPhys CPU seed31/32/33 and Isaac Sim 6.2 CUDA
-PhysX seed31/32/33 are each runtime-valid under one route-local identity, with
-planned actions, H5, independent cold read, and close/process-group/lock
-evidence. All six report a task/Expert failure. MuJoCo R3 seed31 repeated the
-QACC DOF13 execution-fault gate; the maintainer chose to preserve R3, mark the
-route failed, and continue with the other backends. Do not substitute the
-separate successful R1 diagnostic or retry MuJoCo without a new maintainer
-decision. Seeds32/33 were not run for MuJoCo, so this Goal has 6/9 primary H5
-files and remains `F06_PICKCUBE_HARNESS_THREE_BACKEND_EXAMPLE_PARTIAL_PENDING_SOL_REVIEW`.
+Current bounded evidence at source HEAD `00c10296255f3a90c6aeb31d0bb0eec5e612cbad`:
+GeoPhys CPU and Isaac Sim 6.2 CUDA PhysX each have one current route identity
+across seeds31/32/33, with 3/3 runtime-valid H5, planned actions, independent
+cold reads and close evidence. Outcomes are GeoPhys `descend_pose_readiness_timeout`
+(seed31) and `gripper_readiness_timeout` (seeds32/33); Isaac
+`episode_truncated` (seed31) and `gripper_readiness_timeout` (seeds32/33).
+None of the six episodes solved the task. MuJoCo R3 seed31 repeatedly hit the
+QACC DOF13 execution-fault gate on source revisions `64a5b61`, `e6e5fb4`, and
+`93efad5`. The last fault occurred during `move_above_cube`, before grasp,
+after the cube had shifted about 6.9 cm in x. A later `f0d3273` repair raises
+the TCP before lateral transit and passed focused provider-free checks, but
+has no MuJoCo native validation. The earlier bounded PickCube MuJoCo pass used
+production R1, not F06 R3. Preserve the maintainer's stop decision, do not
+substitute the separate R1 diagnostic, and do not retry MuJoCo without a new
+maintainer decision. Seeds32/33 were not run for MuJoCo, so the executed
+evidence matrix has 6/9 primary H5 files and remains
+`F06_PICKCUBE_HARNESS_THREE_BACKEND_EXAMPLE_PARTIAL_PENDING_SOL_REVIEW`.
 The current [evidence index](../../../docs/maintenance/20261101_f06_pickcube_harness_partial.md)
 contains exact route identities, H5/cold-reader hashes, commands and the
 planned-vs-measured seed31 trajectory plot. No Qualification or F07 training
