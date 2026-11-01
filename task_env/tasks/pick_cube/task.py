@@ -548,6 +548,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         "reset_plan": runtime_input.reset_plan,
         "controller_binding_plan": None,
         "f06_pickcube_isaac_input": runtime_input,
+        "session_admission_input": runtime_input,
         "f06_delivery_manifest_path": str(manifest_path),
         "kinematics_source_xml": panda_xml,
     }

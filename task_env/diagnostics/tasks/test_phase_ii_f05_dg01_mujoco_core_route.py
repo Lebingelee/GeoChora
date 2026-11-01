@@ -106,7 +106,7 @@ def stop_at_native_boundary(artifact, execution, source, *, f05_dg01_input=None)
 session_api._materialize_admitted = stop_at_native_boundary
 session = materialize(
     candidate.artifact, candidate.execution, source=candidate.source,
-    _f05_dg01_mujoco_input=candidate.candidate_input,
+    _session_admission_input=candidate.candidate_input,
 )
 assert observed_execution_types == ['ExecutionSpec']
 assert observed_manifest_profiles == ['mujoco-mjcf-f05-dg01-core-v1']
@@ -118,7 +118,7 @@ controlled = materialize_control(
     binding=ControlBinding('panda-main/gripper', .08),
     controller_binding_plan=candidate.controller_binding_plan,
     controller_profile=profile,
-    f05_dg01_mujoco_input=candidate.candidate_input,
+    session_admission_input=candidate.candidate_input,
 )
 assert type(controlled) is NativeBoundaryReceipt
 assert controlled._control_binding == ControlBinding('panda-main/gripper', .08)

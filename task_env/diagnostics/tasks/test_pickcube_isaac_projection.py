@@ -6,6 +6,18 @@ from task_env.tasks.pick_cube.isaac import compile_pickcube_isaac_task_artifact
 from task_env.tasks.pick_cube.task import _configuration, build_artifact
 
 
+def test_session_admission_dispatch_uses_exact_pickcube_runtime_input_type():
+    from types import SimpleNamespace
+
+    from task_env.runtime.sessions.api import _session_admission_input_route
+    from task_env.tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+
+    runtime_input = object.__new__(PickCubeIsaacRuntimeInputV1)
+    assert _session_admission_input_route(runtime_input) == 'f06_pickcube'
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(SimpleNamespace())
+
+
 def test_pickcube_isaac_projection_preserves_task_semantics_and_binds_runtime_frames():
     legacy = build_artifact()
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(

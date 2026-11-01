@@ -604,17 +604,47 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
     )
 
 
+def _session_admission_input_route(input_v1) -> str | None:
+    """Classify one exact task-owned input for a versioned Session route."""
+    if input_v1 is None:
+        return None
+    from ...tasks.position_candidate.builder import (
+        F05Dg01MujocoCandidateInputV1,
+        F05Dg02GeoPhysUsdCandidateInputV1,
+        F05Dg04IsaacNativeCandidateInputV1,
+        F05NativePositionCandidateInputV1,
+    )
+    routes = (
+        (F05NativePositionCandidateInputV1, 'f05_native'),
+        (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
+        (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
+        (F05Dg01MujocoCandidateInputV1, 'f05_dg01'),
+    )
+    for input_type, route in routes:
+        if type(input_v1) is input_type:
+            return route
+    from ...tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+
+    if type(input_v1) is PickCubeIsaacRuntimeInputV1:
+        return 'f06_pickcube'
+    raise TypeError('Session admission requires one exact supported task runtime input')
+
+
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _f05_native_input=None, _f05_dg02_geophys_input=None,
-                _f05_dg04_isaac_native_input=None,
-                _f05_dg01_mujoco_input=None, _f06_pickcube_isaac_input=None) -> RuntimeSession:
+                _session_admission_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    admission_route = _session_admission_input_route(_session_admission_input)
+    _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
+    _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
+    _f05_dg04_isaac_native_input = _session_admission_input if admission_route == 'f05_dg04' else None
+    _f05_dg01_mujoco_input = _session_admission_input if admission_route == 'f05_dg01' else None
+    _f06_pickcube_isaac_input = _session_admission_input if admission_route == 'f06_pickcube' else None
     if (_f06_pickcube_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
                 and execution.physics_profile == F06_PICKCUBE_ISAAC_PROFILE)):

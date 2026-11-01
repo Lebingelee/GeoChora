@@ -31,7 +31,7 @@ def run_n0(output: Path):
         session = materialize(
             candidate.artifact, candidate.execution,
             source=candidate.source,
-            _f05_dg01_mujoco_input=candidate.candidate_input,
+            _session_admission_input=candidate.candidate_input,
         )
         model_receipt = getattr(session, '_f05_dg01_model_receipt', None)
         if not isinstance(model_receipt, dict):

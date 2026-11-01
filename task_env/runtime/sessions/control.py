@@ -562,11 +562,7 @@ def materialize_control(
     controller_profile=None,
     leaf_plan=None,
     diagnostic_profile=None,
-    f05_native_input=None,
-    f05_dg02_geophys_input=None,
-    f05_dg04_isaac_native_input=None,
-    f05_dg01_mujoco_input=None,
-    f06_pickcube_isaac_input=None,
+    session_admission_input=None,
 ):
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
@@ -575,6 +571,7 @@ def materialize_control(
     from .api import (
         _current_f05_s1_native_io_context,
         _current_f05_dg04_s1_native_io_context,
+        _session_admission_input_route,
     )
     f05_scope = _current_f05_s1_native_io_context()
     f05_dg04_s1_scope = _current_f05_dg04_s1_native_io_context()
@@ -584,14 +581,17 @@ def materialize_control(
     s1_scope = f05_scope
     synthetic_s1 = s1_scope is not None
     f04_native = False
-    f05_native = f05_native_input is not None
-    f05_dg02_native = f05_dg02_geophys_input is not None
-    f05_dg04_native = f05_dg04_isaac_native_input is not None
-    f05_dg01_mujoco = f05_dg01_mujoco_input is not None
-    f06_pickcube_isaac = f06_pickcube_isaac_input is not None
-    if sum((f05_native, f05_dg02_native, f05_dg04_native,
-            f05_dg01_mujoco, f06_pickcube_isaac)) > 1:
-        raise ValueError('distinct versioned native exact-cell inputs cannot overlap')
+    admission_route = _session_admission_input_route(session_admission_input)
+    f05_native_input = session_admission_input if admission_route == 'f05_native' else None
+    f05_dg02_geophys_input = session_admission_input if admission_route == 'f05_dg02' else None
+    f05_dg04_isaac_native_input = session_admission_input if admission_route == 'f05_dg04' else None
+    f05_dg01_mujoco_input = session_admission_input if admission_route == 'f05_dg01' else None
+    f06_pickcube_isaac_input = session_admission_input if admission_route == 'f06_pickcube' else None
+    f05_native = admission_route == 'f05_native'
+    f05_dg02_native = admission_route == 'f05_dg02'
+    f05_dg04_native = admission_route == 'f05_dg04'
+    f05_dg01_mujoco = admission_route == 'f05_dg01'
+    f06_pickcube_isaac = admission_route == 'f06_pickcube'
     if (f05_native or f05_dg02_native) and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
     if f05_dg01_mujoco and (synthetic_s1 or f04_native):
@@ -1011,11 +1011,7 @@ def materialize_control(
         manifest=None if f04_native else admission_manifest,
         _materialization_authority=materialization_authority,
         _diagnostic_profile=diagnostic_profile,
-        _f05_native_input=f05_native_input,
-        _f05_dg02_geophys_input=f05_dg02_geophys_input,
-        _f05_dg04_isaac_native_input=f05_dg04_isaac_native_input,
-        _f05_dg01_mujoco_input=f05_dg01_mujoco_input,
-        _f06_pickcube_isaac_input=f06_pickcube_isaac_input,
+        _session_admission_input=session_admission_input,
     )
     if f04_native:
         try:

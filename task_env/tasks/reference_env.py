@@ -770,11 +770,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         ),
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
-                        f05_native_input=self.value.get('f05_native_position_input'),
-                        f05_dg02_geophys_input=self.value.get('f05_dg02_geophys_input'),
-                        f05_dg04_isaac_native_input=self.value.get('f05_dg04_isaac_native_input'),
-                        f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
-                        f06_pickcube_isaac_input=self.value.get('f06_pickcube_isaac_input'),
+                        session_admission_input=self.value.get('session_admission_input'),
                     )
             else:
                 self.position_profile = False

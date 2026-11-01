@@ -126,6 +126,7 @@ def test_f05_native_adapter_binds_public_model_and_core_io_without_engine_init()
     adapter._native_step_count = 0
     adapter._native_step_counter_baseline = 0
     adapter._closed = False
+    adapter._dg02_contact_observation = False
     lease = _LeaseDouble()
     adapter._composer = lease
     adapter._runtime = SimpleNamespace(solver=_PublicSolverDouble(model))
@@ -235,7 +236,10 @@ def test_f05_native_materialization_rejects_unsupported_artifact_before_native_f
 
     monkeypatch.setattr(geophys_native_io, 'create_f05_geophys_native_io', forbidden_factory)
     with pytest.raises(ValueError, match=expected):
-        api.materialize(artifact, rejected.execution, source=source, _f05_native_input=rejected)
+        api.materialize(
+            artifact, rejected.execution, source=source,
+            _session_admission_input=rejected,
+        )
     assert not native_calls
 
 

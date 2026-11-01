@@ -960,6 +960,10 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
             'reset_plan': input_v1.reset_plan,
             'controller_binding_plan': plan,
             'execution_spec_v1': input_v1.execution,
+            'session_admission_input': input_v1 if type(input_v1) in (
+                F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
+                F05Dg04IsaacNativeCandidateInputV1, F05Dg01MujocoCandidateInputV1,
+            ) else None,
             'f04_position_input': input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
             'f05_position_input': input_v1 if type(input_v1) in (
                 F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
