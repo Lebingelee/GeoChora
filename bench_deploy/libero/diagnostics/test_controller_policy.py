@@ -43,9 +43,7 @@ def test_v6_uses_qfrc_bias_and_versions_the_source_and_controller_profiles():
         "bias_minus_passive_arm_Nm": passive_adjusted,
         "qfrc_bias_arm_Nm": upstream_bias,
     }), upstream_bias)
-    assert controller._source_state_contract() == (
-        "libero-source-operational-space-state-v2", SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
-    )
+    assert identity["source_state_profile_id"] == SOURCE_OPERATIONAL_SPACE_PROFILE_V2
     assert identity["schema_version"] == "libero-mixed-controller-identity-v6"
     assert identity["gravity_feedforward_source"] == "qfrc_bias_arm_Nm"
     assert identity["gravity_feedforward_receipt_field"] == "gravity_feedforward_Nm"
@@ -66,9 +64,6 @@ def test_v6_official_reference_and_v7_rim_profiles_have_distinct_identities():
     )
     assert rim_identity["schema_version"] == "libero-mixed-controller-identity-v7"
     assert rim_identity["gravity_feedforward_source"] == "qfrc_bias_arm_Nm"
-    assert rim._source_state_contract() == (
-        "libero-source-operational-space-state-v2", SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
-    )
     assert rim_identity["source_state_profile_id"] == SOURCE_OPERATIONAL_SPACE_PROFILE_V2
     _assert_identity_hash(official_reference)
     _assert_identity_hash(rim)

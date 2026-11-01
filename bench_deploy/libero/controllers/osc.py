@@ -97,12 +97,6 @@ class _SourceOSCController:
         self.source_closure_digest = None
         return receipt
 
-    def _source_operational_space_state(self, model, q, qdot):
-        return model.operational_space_state_v2(q, qdot)
-
-    def _source_state_contract(self):
-        return ('libero-source-operational-space-state-v2', SOURCE_OPERATIONAL_SPACE_PROFILE_V2)
-
     def map_arm_target_to_control_order(self, arm_target):
         from task_env.controllers.canonical.contracts import CanonicalArmTargetV1
 
@@ -156,10 +150,9 @@ class _SourceOSCController:
         q_reference, q_reference_source = self._nullspace_reference(q, q_reference)
         if q_reference.shape != (7,) or not np.isfinite(q_reference).all():
             raise ValueError('OSC nullspace reference must be a finite named seven-joint vector')
-        source_state = self._source_operational_space_state(model, q, qdot)
-        expected_state_schema, expected_state_profile = self._source_state_contract()
-        if (source_state.get('schema_version') != expected_state_schema
-                or source_state.get('profile_id') != expected_state_profile
+        source_state = model.operational_space_state_v2(q, qdot)
+        if (source_state.get('schema_version') != 'libero-source-operational-space-state-v2'
+                or source_state.get('profile_id') != SOURCE_OPERATIONAL_SPACE_PROFILE_V2
                 or source_state.get('source_xml_sha256') != self.source_xml_sha256
                 or source_state.get('source_closure_digest') != self.source_closure_digest
                 or source_state.get('tcp_site_name') != 'gripper0_grip_site'):
@@ -285,12 +278,12 @@ class _SourceOSCController:
              'finger_joint1': 'm', 'finger_joint2': 'm'},
         )
 
-    def _source_feedforward_torque(self, source_state):
-        return np.asarray(source_state['qfrc_bias_arm_Nm'], dtype=np.float64)
-
     def _nullspace_reference(self, current_q, resolved_target_q):
         """Return this profile's named OSC posture reference and its provenance."""
         return np.asarray(resolved_target_q, dtype=np.float64), 'resolved_pose_target_v1'
+
+    def _source_feedforward_torque(self, source_state):
+        return np.asarray(source_state['qfrc_bias_arm_Nm'], dtype=np.float64)
 
     def identity_mapping(self):
         config = self.operational_config
@@ -582,7 +575,6 @@ class LiberoMixedControllerV7(LiberoMixedControllerV6):
         receipt.update({
             'schema_version': 'libero-mixed-control-receipt-v7',
             'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_qfrc_bias_v1',
-            'gravity_feedforward_source': 'qfrc_bias_arm_Nm',
             'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
             'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
             'desired_tcp_twist_world': self._desired_tcp_twist_world.tolist(),
@@ -590,7 +582,7 @@ class LiberoMixedControllerV7(LiberoMixedControllerV6):
         return target
 
     def identity_mapping(self):
-        payload = _PhysicsRateOSCController.identity_mapping(self)
+        payload = super().identity_mapping()
         payload.update({
             'schema_version': 'libero-mixed-controller-identity-v7',
             'profile_id': type(self).profile_id,
@@ -598,11 +590,6 @@ class LiberoMixedControllerV7(LiberoMixedControllerV6):
             'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_qfrc_bias_v1',
             'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
             'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
-            'hold_policy': self.operational_config.hold_policy,
-            'source_state_profile_id': SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
-            'gravity_feedforward_source': 'qfrc_bias_arm_Nm',
-            'gravity_feedforward_receipt_field': 'gravity_feedforward_Nm',
-            'gravity_feedforward_semantics': 'robosuite_qfrc_bias_without_qfrc_passive_v1',
         })
         return payload
 
