@@ -308,10 +308,24 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
     ).validate(1, 0.002)
 
     wrong_declared_limit = dict(application, maximum_effort_N=100.0)
-    with pytest.raises(ValueError, match='declared effort cap'):
+    with pytest.raises(ValueError, match='maximum_effort_N=100'):
         NativeAdvanceReceiptV1(
             'native-advance-receipt-v1', 1, 1, 0.002,
             native_adaptation_application=wrong_declared_limit,
+        ).validate(1, 0.002)
+
+    over_limit_effort = dict(application, reference_effort_N=5.01)
+    with pytest.raises(ValueError, match='reference_effort_N=5.01'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=over_limit_effort,
+        ).validate(1, 0.002)
+
+    broken_relation = dict(application, relation_error_m=0.003)
+    with pytest.raises(ValueError, match='relation_error_m=0.003'):
+        NativeAdvanceReceiptV1(
+            'native-advance-receipt-v1', 1, 1, 0.002,
+            native_adaptation_application=broken_relation,
         ).validate(1, 0.002)
 
     wrong_profile = dict(application, profile_id='isaacsim-6.2-physx-native-mimic-leader-drive-v1')

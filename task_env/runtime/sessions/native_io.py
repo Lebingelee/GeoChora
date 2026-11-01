@@ -410,6 +410,15 @@ class NativeAdvanceReceiptV1:
             if (abs(float(application['relation_error_m'])) > 0.002
                     or float(application['maximum_effort_N']) != expected_maximum_effort_N
                     or abs(float(application['reference_effort_N'])) > expected_maximum_effort_N + 1e-6):
+                if is_f06_pickcube:
+                    raise ValueError(
+                        'native F06 PickCube PhysX mimic relation or declared effort cap failed: '
+                        f"native_step_index={expected_index}, "
+                        f"relation_error_m={float(application['relation_error_m']):.9g}, "
+                        f"reference_effort_N={float(application['reference_effort_N']):.9g}, "
+                        f"maximum_effort_N={float(application['maximum_effort_N']):.9g}, "
+                        f"expected_maximum_effort_N={expected_maximum_effort_N:.9g}"
+                    )
                 raise ValueError('native PhysX mimic relation or declared effort cap failed')
             if is_f06_pickcube:
                 return
