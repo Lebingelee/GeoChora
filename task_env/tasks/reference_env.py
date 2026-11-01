@@ -48,35 +48,6 @@ def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
     return (int(native_steps) + 2) * clock_ulp
 
 
-def _dg01_position_recording_receipt_failures(
-    write_receipt, model_receipt, source_closure_digest, target, applied,
-    advance_attempts, advances, expected_substeps,
-):
-    """Name the failed public receipts required by the DG01 recording boundary."""
-    failures = []
-    if not isinstance(write_receipt, dict):
-        failures.append('missing_position_write_receipt')
-    else:
-        expected_target_hash = target.target.identity_hash
-        if write_receipt.get('target_identity_sha256') != expected_target_hash:
-            failures.append('position_write_target_identity')
-        if write_receipt.get('source_closure_sha256') != source_closure_digest:
-            failures.append('position_write_source_closure')
-        if (not isinstance(model_receipt, dict)
-                or write_receipt.get('model_receipt_identity_sha256')
-                != model_receipt.get('identity_sha256')):
-            failures.append('position_write_model_receipt')
-    if not isinstance(model_receipt, dict):
-        failures.append('missing_model_receipt')
-    if applied.target_hash != target.target.identity_hash:
-        failures.append('applied_control_target_identity')
-    if advance_attempts != expected_substeps:
-        failures.append('interval_advance_attempt_count')
-    if len(advances) != expected_substeps:
-        failures.append('accepted_interval_advance_count')
-    return tuple(failures)
-
-
 def _identity_seed(seed):
     return seed
 
@@ -343,7 +314,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-dg02-core-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg04-native-mimic-v1'),
-                ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-pickcube-f06-v1'),
             }
             if execution_route not in allowed_versioned_routes:
@@ -1158,7 +1128,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             position_input_kind = _versioned_position_input_kind(
                 self.value.get('versioned_position_input'),
             )
-            if position_input_kind in ('dg01_mujoco', 'dg02_geophys'):
+            if position_input_kind == 'dg02_geophys':
                 info.update({
                     'task_success_semantics': 'raw_predicate_only',
                     'raw_task_predicate': bool(evaluation.success),
@@ -1171,7 +1141,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
             if position_input_kind in (
-                'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native', 'dg01_mujoco',
+                'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native',
             ):
                 # Versioned USD state-only routes expose the Core-owned typed
                 # publication used by observations and Position control.
@@ -1756,9 +1726,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     terminated=bool(terminated),
                     truncated=not bool(terminated),
                     bootstrap_allowed=not bool(terminated),
-                    **({'task_success': None} if _versioned_position_input_kind(
-                        self.value.get('versioned_position_input'),
-                    ) == 'dg01_mujoco' else {}),
                 )
                 self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -2263,20 +2230,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 })
             details['pending_controller_switch_application'] = switch_application
         details.update(dict(payload or {}))
-        if _versioned_position_input_kind(
-            self.value.get('versioned_position_input'),
-        ) == 'dg01_mujoco':
-            evaluation = self._published_position_evaluation
-            metrics = {} if evaluation is None else dict(evaluation.metrics)
-            details['task_predicate_v1'] = {
-                'semantics': self.artifact.semantics.evaluator,
-                'raw_predicate': bool(metrics.get('raw_lift_height_predicate', False)),
-                'raw_predicate_metrics': metrics,
-                'lifecycle_valid_success': None,
-                'lifecycle_valid_success_assessed': False,
-                'terminated': bool(terminated),
-                'termination_source': 'task_failure_only',
-            }
         if task_success is _INFER_POSITION_TASK_SUCCESS:
             success = (None if self._published_position_evaluation is None
                        else bool(self._published_position_evaluation.success))
@@ -2319,10 +2272,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._position_episode_end = self._make_position_episode_end(
                 'execution_fault', terminated=False, truncated=True,
                 bootstrap_allowed=False,
-                task_success=(None if _versioned_position_input_kind(
-                    self.value.get('versioned_position_input'),
-                ) == 'dg01_mujoco'
-                              else _INFER_POSITION_TASK_SUCCESS),
+                task_success=_INFER_POSITION_TASK_SUCCESS,
                 payload={
                     'requested_reason': reason,
                     'fault': fault.to_mapping(),
@@ -2338,9 +2288,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 terminated=False,
                 truncated=True,
                 bootstrap_allowed=True,
-                **({'task_success': None} if _versioned_position_input_kind(
-                    self.value.get('versioned_position_input'),
-                ) == 'dg01_mujoco' else {}),
                 payload={'requested_reason': reason},
             )
         self._stopped = True
@@ -2584,7 +2531,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'canonical_state_view_v1': self.info['canonical_state_view_v1'],
             } if _versioned_position_input_kind(
                 self.value.get('versioned_position_input'),
-            ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native', 'dg01_mujoco') else {}),
+            ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
             **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
             } if self.camera_observation_config is not None else {}),
@@ -2707,154 +2654,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _position_record_metadata(self):
         from dataclasses import asdict
 
-        versioned_position_input = self.value.get('versioned_position_input')
-        versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
-        dg01_input = versioned_position_input if versioned_input_kind == 'dg01_mujoco' else None
-        if dg01_input is not None:
-            from ..runtime.sessions.source import lower_mujoco_scene_source
-            from ..runtime.sessions.provenance import provider_build_identity
-            from .position_candidate.source import (
-                EXPECTED_PANDA_CLOSURE, MENAGERIE_REVISION,
-                F05_DG01_RECIPE_SHA256,
-            )
-
-            source = self.value['source']
-            model_receipt = getattr(self.session, '_f05_dg01_model_receipt', None)
-            reset_receipt = getattr(self.session, '_reset_write_receipt', None)
-            write_receipt = getattr(self.session, '_last_dg01_position_application', None)
-            if not isinstance(model_receipt, dict) or reset_receipt is None:
-                raise RuntimeError('DG01 recording requires its exact compiled model and reset receipts')
-            lowered_xml, assets = lower_mujoco_scene_source(
-                source.scene_source, source.scene_definition, source.source_closure_digest,
-            )
-            asset_hashes = {
-                name: hashlib.sha256(content).hexdigest()
-                for name, content in sorted(assets.items())
-            }
-            recipe_bytes = (Path(__file__).parent / 'position_candidate' / 'assets'
-                            / 'f05_dg01_task_scene_recipe.json').read_bytes()
-            if hashlib.sha256(recipe_bytes).hexdigest() != F05_DG01_RECIPE_SHA256:
-                raise ValueError('DG01 recording recipe bytes differ from the frozen candidate input')
-            action_schema = self.controller.controller_binding().action_schema
-            code_files = {
-                'task_env/runtime/sessions/source.py': __file__.replace(
-                    'tasks/reference_env.py', 'runtime/sessions/source.py',
-                ),
-                'task_env/runtime/sessions/api.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'api.py'),
-                'task_env/runtime/sessions/control.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'control.py'),
-                'task_env/runtime/sessions/mujoco.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'mujoco.py'),
-                'task_env/tasks/position_candidate/builder.py': str(Path(__file__).parent / 'position_candidate' / 'builder.py'),
-                'task_env/tasks/position_candidate/source.py': str(Path(__file__).parent / 'position_candidate' / 'source.py'),
-                'task_env/tasks/reference_env.py': __file__,
-            }
-            code_hashes = {
-                name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
-                for name, path in code_files.items()
-            }
-            profile = {
-                'schema_version': 'f05-dg01-mujoco-core-recording-profile-v1',
-                'profile_id': 'f05-dg01-mujoco-core-v1',
-                'provenance_kind': 'native_runtime',
-                'runtime_admitted': True,
-                'task_source_identity_sha256': dg01_input.task_source.identity_hash,
-                'task_artifact_identity_sha256': self.artifact.identity_hash,
-                'scene_identity_sha256': source.scene_definition.identity_hash,
-                'source_id': source.source_id,
-                'source_format': 'mjcf',
-                'source_revision': MENAGERIE_REVISION,
-                'panda_xml_sha256': '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273',
-                'panda_source_closure_sha256': EXPECTED_PANDA_CLOSURE,
-                'task_scene_recipe_sha256': dg01_input.recipe_sha256,
-                'derived_scene_xml_sha256': hashlib.sha256(
-                    source.scene_source.xml.encode('utf-8'),
-                ).hexdigest(),
-                'runtime_lowered_xml_sha256': hashlib.sha256(lowered_xml.encode('utf-8')).hexdigest(),
-                'runtime_lowered_asset_sha256': asset_hashes,
-                'source_closure_sha256': source.source_closure_digest,
-                'source_mappings': {
-                    'joints': dict(source.joints), 'free_joints': dict(source.free_joints),
-                    'bodies': dict(source.bodies), 'frames': dict(source.frames),
-                    'joint_targets': dict(source.joint_targets),
-                    'open_actuators': tuple(source.open_actuators),
-                },
-                'execution_spec_v1': self.execution.to_mapping(),
-                'execution_identity_sha256': self.execution.identity_hash,
-                'provider_build_identity': provider_build_identity('mujoco'),
-                'timebase': {
-                    'physics_dt_s': self.artifact.timebase.physics_dt,
-                    'control_substeps': self.artifact.timebase.control_substeps,
-                    'control_dt_s': self.artifact.timebase.control_dt,
-                    'clock_domain': 'evaluation_boundary',
-                },
-                'reset_plan_identity_sha256': self.value['reset_plan'].identity_hash,
-                'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
-                'reset_write_receipt': reset_receipt.to_mapping(),
-                'controller_identity_sha256': self.controller.identity,
-                'controller_action_config': asdict(self.controller.config),
-                'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
-                'kinematics_source_sha256': dg01_input.kinematics_source_sha256,
-                'model_receipt': model_receipt,
-                'model_receipt_identity_sha256': model_receipt['identity_sha256'],
-                'control_law': {
-                    'arm_actuators': tuple(f'actuator{index}' for index in range(1, 8)),
-                    'gripper_actuator': 'actuator8',
-                    'gripper_transmission': 'fixed_tendon_split',
-                    'tendon_jacobian_source': 'compiled public MjModel receipt',
-                    'force_limit_application': 'Core MuJoCo RuntimeSession model forcerange updated from Controller request at each outer boundary',
-                    'first_application_receipt_at_episode_start': None if write_receipt is None else write_receipt.get('identity_sha256'),
-                },
-                'typed_state_h5_witness_schema_version': 'f05-public-typed-state-witness-v1',
-                'task_predicate': {
-                    'evaluator': self.artifact.semantics.evaluator,
-                    'parameters_si': dict(self.artifact.semantics.parameters_si),
-                    'raw_predicate_is_lifecycle_success': False,
-                    'lifecycle_valid_success_assessed': False,
-                },
-                'recording_scope': 'DG01 source-bound Menagerie MJCF / MuJoCo 3.8.1 CPU through SelectedReferenceEnv and TaskEnv Core',
-                'code_sha256': code_hashes,
-            }
-            return {
-                'env_metadata': {
-                    'env_name': 'SelectedReferenceEnv.F05Dg01MenagerieMujocoCore',
-                    'task_name': self.artifact.task_id,
-                    'task_version': self.artifact.artifact_version,
-                    'scene_uid': source.scene_definition.scene_id,
-                    'agent_uids': ('panda-main',),
-                    'physics_dt': self.artifact.timebase.physics_dt,
-                    'control_substeps': self.artifact.timebase.control_substeps,
-                    'control_frequency': 1.0 / self.artifact.timebase.control_dt,
-                    'action_schema': asdict(action_schema),
-                    'observation_schema': {'leaf_specs': (
-                        {'path': 'state.joint_position', 'semantic': 'named_arm_then_finger_joint_positions'},
-                        {'path': 'state.hand_pose', 'semantic': 'measured_hand_frame_pose_world'},
-                        {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
-                        {'path': 'privileged_state.target_body_pose', 'semantic': 'free_cube_world_pose'},
-                    )},
-                    'reference_profile': profile,
-                },
-                'universal_action_schema': {
-                    'version': 'f05-dg01-mujoco-core-action-v1',
-                    'dimension': len(action_schema.components),
-                    'components': tuple(action_schema.components),
-                },
-                'resolved_config': {
-                    'provider': self.provider, 'backend': self.backend,
-                    'device': self.execution.physics_device, 'horizon': self.horizon,
-                    'controller_profile': self.controller.profile_id,
-                    'execution_identity_sha256': self.execution.identity_hash,
-                },
-                'candidate_identity': {
-                    'task_artifact_identity_hash': self.artifact.identity_hash,
-                    'task_source_identity_sha256': dg01_input.task_source.identity_hash,
-                    'scene_identity_hash': source.scene_definition.identity_hash,
-                    'source_id': source.source_id,
-                    'source_closure_digest': source.source_closure_digest,
-                    'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-                    'execution_identity_sha256': self.execution.identity_hash,
-                    'controller_identity_sha256': self.controller.identity,
-                    'model_receipt_identity_sha256': model_receipt['identity_sha256'],
-                },
-            }
 
         versioned_position_input = self.value.get('versioned_position_input')
         versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
@@ -3333,39 +3132,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
         f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
         f05_input = versioned_position_input if versioned_input_kind in ('f05', 'f05_native') else None
-        f05_dg01_input = versioned_position_input if versioned_input_kind == 'dg01_mujoco' else None
-        if f05_dg01_input is not None:
-            write_receipt = getattr(self.session, '_last_dg01_position_application', None)
-            advances = tuple(getattr(self.session, '_last_dg01_interval_advances', ()))
-            advance_attempts = getattr(self.session, '_last_dg01_interval_advance_attempts', None)
-            model_receipt = getattr(self.session, '_f05_dg01_model_receipt', None)
-            receipt_failures = _dg01_position_recording_receipt_failures(
-                write_receipt, model_receipt, self.value['source'].source_closure_digest,
-                target, applied, advance_attempts, advances,
-                self.artifact.timebase.control_substeps,
-            )
-            if receipt_failures:
-                raise ValueError(
-                    'DG01 recording receipt gate failed: ' + ', '.join(receipt_failures)
-                )
-            if any(
-                item.get('substep_index') != index
-                or item.get('native_step_index') != (
-                    (self.state.control_step - 1) * self.artifact.timebase.control_substeps + index + 1
-                )
-                or not np.isclose(
-                    item.get('time_after_s'),
-                    self.state.simulation_time - self.artifact.timebase.physics_dt * (
-                        self.artifact.timebase.control_substeps - index - 1
-                    ),
-                    rtol=0.0, atol=1.0e-12,
-                )
-                for index, item in enumerate(advances)
-            ):
-                raise ValueError('DG01 MuJoCo substep receipt has a sequence or clock mismatch')
-            applied_payload['mujoco_position_write_receipt_v1'] = dict(write_receipt)
-            applied_payload['mujoco_interval_advance_receipts_v1'] = [dict(item) for item in advances]
-            applied_payload['mujoco_interval_advance_attempts'] = int(advance_attempts)
         f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
         if (f04_input is not None or f05_input is not None
                 or f05_dg02_input is not None

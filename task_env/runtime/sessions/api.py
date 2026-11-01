@@ -30,7 +30,6 @@ PROFILE = 'p1_2_scalar_cpu_v0'
 F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
 F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
-F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
@@ -456,106 +455,10 @@ def _f06_pickcube_isaac_capability_manifest(artifact):
         ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
         'bounded F06 PickCube Isaac desktop cell; no provider-wide qualification',
     )
-def _validate_f05_dg01_mujoco_source(artifact, execution, source) -> None:
-    """Admit only the exact source-bound DG01 Menagerie MJCF/Core route."""
-    from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
-
-    if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
-        raise TypeError('F05 DG01 requires exact TaskArtifactV1 and ExecutionSpecV1 contracts')
-    if type(source) is not RuntimeSource:
-        raise TypeError('F05 DG01 requires the existing canonical RuntimeSource')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'mujoco', 'cpu', 'cpu', F05_DG01_MUJOCO_PROFILE, 'strict'):
-        raise ValueError('unsupported F05 DG01 provider/backend/device/profile intersection')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-            artifact.timebase.control_dt) != (0.002, 5, 0.01):
-        raise ValueError('F05 DG01 requires 100 Hz control and five 2 ms native steps')
-    if (source.scene_definition is None
-            or source.scene_definition.scene_id != 'f05-dg01-menagerie-panda-cube-support'
-            or source.scene_source.source_id != (
-                f'scene-definition-v3:{source.scene_definition.identity_hash}'
-            )
-            or artifact.scene_identity_hash != source.scene_definition.identity_hash
-            or artifact.scene_id != source.scene_definition.scene_id):
-        raise ValueError('F05 DG01 RuntimeSource/Artifact does not bind the exact task Scene')
-    artifact.validate_scene(source.scene_definition)
-    if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
-            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
-            or source.config.runtime.backend != execution.physics_backend
-            or source.config.render.camera_obs):
-        raise ValueError('F05 DG01 source execution/timebase/renderer mismatch')
-    expected_joints = {
-        **{f'panda-main/joint{i}': f'joint{i}' for i in range(1, 8)},
-        'panda-main/finger_joint1': 'finger_joint1',
-        'panda-main/finger_joint2': 'finger_joint2',
-    }
-    expected_targets = {f'panda-main/joint{i}': f'actuator{i}' for i in range(1, 8)}
-    expected_free_joints = {'free-cube/free_cube': 'cube_freejoint'}
-    expected_bodies = {
-        f'{frame.entity_id}/{frame.frame_id}': frame.frame_id
-        for frame in source.scene_definition.frames or () if frame.frame_kind == 'runtime'
-    }
-    if (dict(source.joints) != expected_joints
-            or dict(source.joint_targets) != expected_targets
-            or dict(source.free_joints) != expected_free_joints
-            or dict(source.bodies) != expected_bodies
-            or dict(source.frames)
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('F05 DG01 logical-to-native Joint/Frame/Actuator map mismatch')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or not source.source_closure_digest
-            or len(source.source_closure_digest) != 64):
-        raise ValueError('F05 DG01 source closure is not bound to its TaskArtifact')
-    # Run the exact existing compatibility-lowering/closure checker before any
-    # adapter is created. This reads bytes only; it never imports MuJoCo.
-    from .source import lower_mujoco_scene_source
-    lowered_xml, assets = lower_mujoco_scene_source(
-        source.scene_source, source.scene_definition, source.source_closure_digest,
-    )
-    if not lowered_xml or not assets:
-        raise ValueError('F05 DG01 source closure lacks its bounded mesh bytes')
-    if (artifact.task_id, artifact.artifact_version) != (
-            'phase-ii-f05-dg01-panda-cube', 'candidate-v1'):
-        raise ValueError('F05 DG01 TaskArtifact identity is outside its exact candidate')
 
 
-def _f05_dg01_legacy_execution_projection(execution):
-    """Project only the exact DG01 CPU selection into the legacy session view.
-
-    ExecutionSpec has a CPU backend field but no device field. For this one
-    route, the v1 device value is admitted only when it is exactly the same
-    ``cpu`` value as the backend; the original v1 declaration remains attached
-    to the RuntimeSession for provenance.
-    """
-    if type(execution) is not ExecutionSpecV1:
-        raise TypeError('F05 DG01 requires its exact ExecutionSpecV1')
-    renderer = execution.render_default
-    if (
-        execution.physics_provider, execution.physics_backend, execution.physics_device,
-        execution.determinism_mode, renderer.provider, renderer.backend,
-        renderer.profile, renderer.device, execution.camera_overrides,
-    ) != (
-        'mujoco', 'cpu', 'cpu', 'strict', 'none', 'cpu', 'none', None, (),
-    ):
-        raise ValueError('F05 DG01 legacy session projection only supports exact CPU/no-renderer execution')
-    return legacy_execution_projection(replace(execution, physics_device=None))
 
 
-def _f05_dg01_mujoco_admission_manifest():
-    """Bind existing MuJoCo capabilities to DG01's exact source-bound profile."""
-    manifest = provider_manifest('mujoco')
-    if (
-        manifest.provider_name, manifest.backend, manifest.physics_profile,
-        manifest.render_profile, manifest.determinism_mode,
-    ) != ('mujoco', 'cpu', PROFILE, 'none', 'strict'):
-        raise ValueError('F05 DG01 requires the existing MuJoCo CPU capability manifest')
-    return replace(
-        manifest,
-        adapter_version='task-env-f05-dg01-mujoco-core-v1',
-        physics_profile=F05_DG01_MUJOCO_PROFILE,
-        evidence_reference='exact-source-bound-diagnostic-candidate-no-qualification',
-    )
 
 
 def _diagnostic_manifest(artifact, execution, source, profile_id):
@@ -609,7 +512,6 @@ def _session_admission_input_route(input_v1) -> str | None:
     if input_v1 is None:
         return None
     from ...tasks.position_candidate.builder import (
-        F05Dg01MujocoCandidateInputV1,
         F05Dg02GeoPhysUsdCandidateInputV1,
         F05Dg04IsaacNativeCandidateInputV1,
         F05NativePositionCandidateInputV1,
@@ -618,7 +520,6 @@ def _session_admission_input_route(input_v1) -> str | None:
         (F05NativePositionCandidateInputV1, 'f05_native'),
         (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
         (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
-        (F05Dg01MujocoCandidateInputV1, 'f05_dg01'),
     )
     for input_type, route in routes:
         if type(input_v1) is input_type:
@@ -643,7 +544,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
     _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
     _f05_dg04_isaac_native_input = _session_admission_input if admission_route == 'f05_dg04' else None
-    _f05_dg01_mujoco_input = _session_admission_input if admission_route == 'f05_dg01' else None
     _f06_pickcube_isaac_input = _session_admission_input if admission_route == 'f06_pickcube' else None
     if (_f06_pickcube_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
@@ -814,39 +714,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE
             and _f05_dg02_geophys_input is None):
         raise ValueError('DG02 GeoPhys/USD profile cannot use generic v1 admission')
-    if (_f05_dg01_mujoco_input is not None
-            or (type(execution) is ExecutionSpecV1
-                and execution.physics_profile == F05_DG01_MUJOCO_PROFILE)):
-        if _f05_dg01_mujoco_input is None:
-            raise ValueError('F05 DG01 MuJoCo profile requires its exact versioned candidate input')
-        from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
-        if type(_f05_dg01_mujoco_input) is not F05Dg01MujocoCandidateInputV1:
-            raise TypeError('F05 DG01 materialization requires F05Dg01MujocoCandidateInputV1')
-        _f05_dg01_mujoco_input.validate()
-        if (artifact is not _f05_dg01_mujoco_input.artifact
-                or source is not _f05_dg01_mujoco_input.runtime_source
-                or type(declared_execution) is not ExecutionSpecV1
-                or declared_execution.identity_hash != _f05_dg01_mujoco_input.execution.identity_hash):
-            raise ValueError('F05 DG01 materialization differs from its exact candidate input identities')
-        _validate_f05_dg01_mujoco_source(artifact, declared_execution, source)
-        projected_execution = _f05_dg01_legacy_execution_projection(declared_execution)
-        if manifest is not None:
-            admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
-        actual = _f05_dg01_mujoco_admission_manifest()
-        admit_capabilities(artifact.required_capabilities, actual, projected_execution)
-        if _materialization_authority is not None or _diagnostic_profile is not None:
-            raise ValueError('F05 DG01 exact admission cannot combine with other authorities')
-        session = _materialize_admitted(
-            artifact, projected_execution, source,
-            f05_dg01_input=_f05_dg01_mujoco_input,
-        )
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
-    if (type(execution) is ExecutionSpecV1
-            and execution.physics_profile == F05_DG01_MUJOCO_PROFILE
-            and _f05_dg01_mujoco_input is None):
-        raise ValueError('F05 DG01 MuJoCo profile cannot use generic v1 admission')
     if type(source) is UsdRuntimeSourceV1:
         if type(declared_execution) is not ExecutionSpecV1:
             raise TypeError('USD RuntimeSource requires an explicit ExecutionSpecV1')
@@ -1169,13 +1036,13 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
-def _materialize_admitted(artifact, execution, source, *, f05_dg01_input=None):
+def _materialize_admitted(artifact, execution, source):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         return _GeoPhysSession(artifact, source)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
-        return _MuJoCoSession(artifact, source, f05_dg01_input=f05_dg01_input)
+        return _MuJoCoSession(artifact, source)
     if execution.physics_provider == 'sapien':
         from .sapien import _SapienSession
         return _SapienSession(artifact, source)

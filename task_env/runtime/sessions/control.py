@@ -585,17 +585,13 @@ def materialize_control(
     f05_native_input = session_admission_input if admission_route == 'f05_native' else None
     f05_dg02_geophys_input = session_admission_input if admission_route == 'f05_dg02' else None
     f05_dg04_isaac_native_input = session_admission_input if admission_route == 'f05_dg04' else None
-    f05_dg01_mujoco_input = session_admission_input if admission_route == 'f05_dg01' else None
     f06_pickcube_isaac_input = session_admission_input if admission_route == 'f06_pickcube' else None
     f05_native = admission_route == 'f05_native'
     f05_dg02_native = admission_route == 'f05_dg02'
     f05_dg04_native = admission_route == 'f05_dg04'
-    f05_dg01_mujoco = admission_route == 'f05_dg01'
     f06_pickcube_isaac = admission_route == 'f06_pickcube'
     if (f05_native or f05_dg02_native) and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
-    if f05_dg01_mujoco and (synthetic_s1 or f04_native):
-        raise ValueError('DG01 MuJoCo exact admission cannot overlap another versioned native route')
     if synthetic_s1:
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
 
@@ -724,29 +720,6 @@ def materialize_control(
             declared_execution.provider_seed, 'best_effort',
         )
         actual_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
-    elif f05_dg01_mujoco:
-        from .api import (
-            F05_DG01_MUJOCO_PROFILE,
-            _f05_dg01_mujoco_admission_manifest,
-            _f05_dg01_legacy_execution_projection,
-            _validate_f05_dg01_mujoco_source,
-        )
-        from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
-
-        if (type(f05_dg01_mujoco_input) is not F05Dg01MujocoCandidateInputV1
-                or type(declared_execution) is not ExecutionSpecV1):
-            raise TypeError('DG01 control admission requires the exact versioned candidate and ExecutionSpecV1')
-        f05_dg01_mujoco_input.validate()
-        if (artifact is not f05_dg01_mujoco_input.artifact
-                or source is not f05_dg01_mujoco_input.runtime_source
-                or declared_execution.identity_hash != f05_dg01_mujoco_input.execution.identity_hash
-                or declared_execution.physics_profile != F05_DG01_MUJOCO_PROFILE):
-            raise ValueError('DG01 control admission differs from its exact source-bound candidate identities')
-        if manifest is not None or diagnostic_profile is not None or leaf_plan is not None:
-            raise ValueError('DG01 control admission cannot combine with caller manifests or other routes')
-        _validate_f05_dg01_mujoco_source(artifact, declared_execution, source)
-        execution = _f05_dg01_legacy_execution_projection(declared_execution)
-        actual_manifest = _f05_dg01_mujoco_admission_manifest()
     elif (type(declared_execution) is ExecutionSpecV1
           and getattr(declared_execution, 'physics_provider', None) == 'isaacsim'):
         from .api import F04_ISAAC_POSITION_PROFILE, _validate_f04_isaac_position_source
@@ -831,13 +804,11 @@ def materialize_control(
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-            and not f05_dg04_native
-            and not f05_dg01_mujoco and not f06_pickcube_isaac
+            and not f05_dg04_native and not f06_pickcube_isaac
             and diagnostic_profile is None):
         actual_manifest = provider_manifest(execution.physics_provider)
     elif (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
-          and not f05_dg04_native and not f05_dg01_mujoco
-          and not f06_pickcube_isaac):
+          and not f05_dg04_native and not f06_pickcube_isaac):
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')

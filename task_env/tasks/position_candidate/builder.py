@@ -44,7 +44,6 @@ from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReference
 POSITION_CANDIDATE_TASK_ID = 'phase-ii-c02b-position-servo'
 POSITION_CANDIDATE_VERSION = 'candidate-v1'
 POSITION_CANDIDATE_SEED = 31
-F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 
 
@@ -786,105 +785,6 @@ def _prepare_f05_isaac_usd_source(delivery_manifest, *, task_seed=POSITION_CANDI
     )
     source_prep.validate()
     return source_prep
-
-
-@dataclass(frozen=True)
-class F05Dg01MujocoCandidateInputV1:
-    """Exact source-bound Menagerie MJCF → MuJoCo Core candidate for DG01."""
-
-    schema_version: str
-    task_source: TaskSourceV1
-    artifact: TaskArtifactV1
-    runtime_source: RuntimeSource
-    execution: ExecutionSpecV1
-    reset_plan: EpisodeResetPlanV1
-    kinematics_source_xml: str
-    kinematics_source_sha256: str
-    recipe_sha256: str
-
-    def validate(self):
-        if self.schema_version != 'f05-dg01-mujoco-candidate-input-v1':
-            raise ValueError('unsupported F05 DG01 MuJoCo candidate input schema')
-        if (type(self.task_source) is not TaskSourceV1
-                or type(self.artifact) is not TaskArtifactV1
-                or type(self.runtime_source) is not RuntimeSource
-                or type(self.execution) is not ExecutionSpecV1
-                or type(self.reset_plan) is not EpisodeResetPlanV1):
-            raise TypeError('F05 DG01 requires exact TaskSource/Artifact/RuntimeSource/Execution/ResetPlan contracts')
-        self.execution.validate()
-        self.artifact.validate()
-        self.reset_plan.validate()
-        source = self.runtime_source
-        scene = source.scene_definition
-        if scene is None:
-            raise ValueError('F05 DG01 MuJoCo RuntimeSource requires its canonical SceneDefinition')
-        self.artifact.validate_scene(scene)
-        if (self.task_source.task_id, self.task_source.version, self.task_source.scene_ref,
-                self.artifact.task_id, self.artifact.artifact_version, scene.scene_id) != (
-                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID,
-                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID):
-            raise ValueError('F05 DG01 candidate task/source/Scene identity mismatch')
-        if (source.task_artifact_hash != self.artifact.identity_hash
-                or source.scene_source.source_id != f'scene-definition-v3:{scene.identity_hash}'
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != scene.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
-            raise ValueError('F05 DG01 candidate source/Artifact/reset identities disagree')
-        if (self.execution.physics_provider, self.execution.physics_backend,
-                self.execution.physics_device, self.execution.physics_profile,
-                self.execution.determinism_mode) != (
-                'mujoco', 'cpu', 'cpu', F05_DG01_MUJOCO_PROFILE, 'strict'):
-            raise ValueError('F05 DG01 candidate requires the exact MuJoCo 3.8.1 CPU execution profile')
-        if (self.execution.render_default.provider, self.execution.render_default.backend,
-                self.execution.render_default.profile, self.execution.render_default.device,
-                self.execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
-            raise ValueError('F05 DG01 is state-only and does not admit a renderer or camera overrides')
-        if (self.artifact.timebase.physics_dt, self.artifact.timebase.control_substeps,
-                self.artifact.timebase.control_dt) != (0.002, 5, 0.01):
-            raise ValueError('F05 DG01 requires 100 Hz control with five 2 ms physics steps')
-        expected_scalar_joints = {
-            **{f'panda-main/joint{i}': f'joint{i}' for i in range(1, 8)},
-            'panda-main/finger_joint1': 'finger_joint1',
-            'panda-main/finger_joint2': 'finger_joint2',
-        }
-        expected_targets = {f'panda-main/joint{i}': f'actuator{i}' for i in range(1, 8)}
-        expected_free_joints = {'free-cube/free_cube': 'cube_freejoint'}
-        expected_bodies = {
-            f'{frame.entity_id}/{frame.frame_id}': frame.frame_id
-            for frame in scene.frames or () if frame.frame_kind == 'runtime'
-        }
-        if (dict(source.joints) != expected_scalar_joints
-                or dict(source.joint_targets) != expected_targets
-                or dict(source.free_joints) != expected_free_joints
-                or dict(source.bodies) != expected_bodies
-                or dict(source.frames)
-                or tuple(source.open_actuators) != ('actuator8',)):
-            raise ValueError('F05 DG01 logical-to-native bindings differ from the frozen nine-joint/free-cube map')
-        if (not source.source_closure_digest or len(source.source_closure_digest) != 64
-                or self.recipe_sha256 != F05_DG01_RECIPE_SHA256):
-            raise ValueError('F05 DG01 requires the exact task-recipe and composed-source closure hashes')
-        expected_home = {
-            'panda-main/joint1': 0.012, 'panda-main/joint2': -0.568,
-            'panda-main/joint3': 0.0, 'panda-main/joint4': -2.811,
-            'panda-main/joint5': 0.0, 'panda-main/joint6': 3.037,
-            'panda-main/joint7': 0.741,
-            'panda-main/finger_joint1': 0.03999999910593033,
-            'panda-main/finger_joint2': 0.03999999910593033,
-        }
-        if (dict(self.artifact.initialization.joint_position) != expected_home
-                or dict(self.reset_plan.reset_sample.joint_position) != expected_home
-                or set(self.artifact.initialization.poses_world) != {'free-cube/free_cube'}
-                or set(self.reset_plan.reset_sample.poses_world) != {'free-cube/free_cube'}):
-            raise ValueError('F05 DG01 reset does not use the frozen original home and r009 free-cube pose')
-        from task_env.runtime.sessions.api import _validate_f05_dg01_mujoco_source
-        _validate_f05_dg01_mujoco_source(self.artifact, self.execution, source)
-        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
-                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
-                != self.kinematics_source_sha256
-                or self.kinematics_source_xml != source.scene_source.xml):
-            raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
-
-
 def _versioned_position_candidate_kind(input_v1):
     if input_v1 is None:
         return None
@@ -892,7 +792,6 @@ def _versioned_position_candidate_kind(input_v1):
         F04PositionCandidateInputV1: 'f04',
         F05PositionCandidateInputV1: 'f05',
         F05NativePositionCandidateInputV1: 'f05_native',
-        F05Dg01MujocoCandidateInputV1: 'dg01_mujoco',
         F05Dg02GeoPhysUsdCandidateInputV1: 'dg02_geophys',
         F05Dg04IsaacNativeCandidateInputV1: 'dg04_isaac_native',
     }
@@ -902,7 +801,7 @@ def _versioned_position_candidate_kind(input_v1):
         raise TypeError('versioned Position value requires an exact supported candidate input') from error
 
 
-def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
@@ -910,9 +809,8 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
     if type(input_v1) not in (F04PositionCandidateInputV1,
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
-                              F05Dg04IsaacNativeCandidateInputV1,
-                              F05Dg01MujocoCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F04/F05/DG01/DG02/DG04 input contract')
+                              F05Dg04IsaacNativeCandidateInputV1):
+        raise TypeError('versioned Position candidate requires an exact F04/F05/DG02/DG04 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
@@ -922,8 +820,8 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
     elif type(input_v1) is F05Dg04IsaacNativeCandidateInputV1:
         if controller_config is not None and controller_config != input_v1.action_config:
             raise ValueError('DG04 controller override differs from its frozen ActionConfig')
-    elif controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
-        raise ValueError('explicit Position ActionConfig is supported only by exact F05 native, DG01, or DG02 candidates')
+    elif controller_config is not None:
+        raise ValueError('explicit Position ActionConfig is supported only by exact F05 native, DG02, or DG04 candidates')
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
@@ -980,7 +878,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
             'versioned_position_input': input_v1,
             'session_admission_input': input_v1 if type(input_v1) in (
                 F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
-                F05Dg04IsaacNativeCandidateInputV1, F05Dg01MujocoCandidateInputV1,
+                F05Dg04IsaacNativeCandidateInputV1,
             ) else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
@@ -1007,8 +905,6 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
                                 if type(input_v1) is F04PositionCandidateInputV1
                                 else 'F05-versioned-geophys-usd-native-v1'
                                 if type(input_v1) is F05NativePositionCandidateInputV1
-                                else 'F05-DG01-versioned-menagerie-mjcf-mujoco-core-v1'
-                                if type(input_v1) is F05Dg01MujocoCandidateInputV1
                                 else 'F05-DG02-source-preserving-geophys-usd-core-v1'
                                 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
                                 else 'F05-DG04-native-physx-mimic-core-v1'
@@ -1029,7 +925,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
 
     def evaluate(state, semantics):
         if type(input_v1) not in (
-                F05Dg01MujocoCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
+                F05Dg02GeoPhysUsdCandidateInputV1,
                 F05Dg04IsaacNativeCandidateInputV1):
             return SimpleNamespace(reward=0.0, success=False, failure=False, metrics={})
         pose_name = 'free-cube/free_cube'
@@ -1185,84 +1081,13 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     )
 
 
-def build_f05_dg01_mujoco_candidate(workspace: Path | str, *, horizon: int = 300,
-                                   environment_type=SelectedReferenceEnv,
-                                   controller_config=None):
-    """Construct DG01 from the frozen Menagerie source through the existing Core path."""
-    import importlib
-
-    from task_env.environment import compile_task_artifact_v1, sample_episode_reset_plan
-
-    root = Path(workspace).resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    scene = _f05_dg01_scene()
-    legacy_artifact, _ = _f05_dg01_artifact_and_sample(scene)
-    task_source = _f05_dg01_task_source(scene)
-    artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact)
-    reset_plan = sample_episode_reset_plan(
-        task_source, scene, artifact, task_seed=POSITION_CANDIDATE_SEED,
-    )
-    scene_module = importlib.import_module('scene')
-    source_root, panda_files, panda_digest = _copy_panda_snapshot(
-        scene_module, root / 'source-closure' / 'menagerie-panda', scene,
-    )
-    source_xml = _compose_f05_dg01_scene_source(
-        scene, source_root, physics_dt=artifact.timebase.physics_dt,
-    )
-    source, imported, closure_digest = _f05_dg01_runtime_source(
-        scene_module, scene, source_root, source_xml, artifact,
-    )
-    if imported is None or len(panda_digest) != 64 or len(closure_digest) != 64:
-        raise ValueError('F05 DG01 Panda/task-scene source closure evidence is incomplete')
-    execution = ExecutionSpecV1(
-        schema_version='execution-spec-v1',
-        physics_provider='mujoco',
-        physics_backend='cpu',
-        physics_profile=F05_DG01_MUJOCO_PROFILE,
-        provider_seed=0,
-        determinism_mode='strict',
-        render_default=RendererSelectionV1(
-            'renderer-selection-v1', 'none', 'cpu', 'none', None,
-        ),
-        physics_device='cpu',
-        camera_overrides=(),
-    )
-    kinematics_xml = source.scene_source.xml
-    candidate_input = F05Dg01MujocoCandidateInputV1(
-        schema_version='f05-dg01-mujoco-candidate-input-v1',
-        task_source=task_source,
-        artifact=artifact,
-        runtime_source=source,
-        execution=execution,
-        reset_plan=reset_plan,
-        kinematics_source_xml=kinematics_xml,
-        kinematics_source_sha256=hashlib.sha256(kinematics_xml.encode()).hexdigest(),
-        recipe_sha256=F05_DG01_RECIPE_SHA256,
-    )
-    candidate_input.validate()
-    built = build_versioned_position_candidate(
-        candidate_input, horizon=horizon, environment_type=environment_type,
-        controller_config=controller_config,
-    )
-    return SimpleNamespace(
-        **vars(built),
-        candidate_input=candidate_input,
-        panda_closure_digest=panda_digest,
-        panda_file_count=len(panda_files),
-        derived_source_xml=source_xml,
-        derived_source_sha256=hashlib.sha256(source_xml.encode()).hexdigest(),
-        source_closure_digest=closure_digest,
-        recipe_sha256=F05_DG01_RECIPE_SHA256,
-        provider='mujoco',
-    )
 
 
 __all__ = [
     'F04PositionCandidateInputV1',
     'F05PositionCandidateInputV1', 'F05NativePositionCandidateInputV1',
-    'F05Dg01MujocoCandidateInputV1', 'F05_DG01_MUJOCO_PROFILE',
     'POSITION_CANDIDATE_SEED',
     'POSITION_CANDIDATE_TASK_ID', 'POSITION_CANDIDATE_VERSION',
-    'build_f05_dg01_mujoco_candidate', 'build_position_candidate',
+    'build_position_candidate',
     'build_versioned_position_candidate',
 ]
