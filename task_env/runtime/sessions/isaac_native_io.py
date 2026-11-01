@@ -510,10 +510,14 @@ class IsaacSimNativeRuntimeIOV1:
 
             if self._dg04_native:
                 self._dg04_native_input.validate()
-                self._verify_dg04_native_mimic(PhysxSchema, UsdPhysics)
+                self._verify_native_mimic_profile(
+                    PhysxSchema, UsdPhysics, route='dg04',
+                )
             elif self._f06_pickcube:
                 self._f06_pickcube_input.validate()
-                self._verify_f06_pickcube_mimic(PhysxSchema, UsdPhysics)
+                self._verify_native_mimic_profile(
+                    PhysxSchema, UsdPhysics, route='f06',
+                )
 
             authored_scenes = [p for p in self._stage.Traverse() if p.IsA(UsdPhysics.Scene)]
             if len(authored_scenes) != 1:
@@ -998,96 +1002,136 @@ class IsaacSimNativeRuntimeIOV1:
             })
         return witness
 
-    def _verify_dg04_native_mimic(self, PhysxSchema, UsdPhysics) -> None:
-        """Author the fixed PhysX mimic/leader-drive profile on the exact Menagerie USD stage."""
-        if not self._dg04_native or self._stage is None:
-            raise RuntimeError('DG04 native mimic adaptation requires its exact composed USD stage')
+    def _verify_native_mimic_profile(self, PhysxSchema, UsdPhysics, *, route: str) -> None:
+        """Verify the shared Panda mimic relation with route-owned drive settings."""
+        if route == 'dg04':
+            if not self._dg04_native or self._stage is None:
+                raise RuntimeError('DG04 native mimic requires its exact composed USD stage')
+            label, entity_id = 'DG04', 'panda-main'
+            expected_source_sha256 = '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'
+            leader_drive = ('force', 2000.0, 100.0, 100.0)
+            authors_drive = True
+        elif route == 'f06':
+            if not self._f06_pickcube or self._stage is None:
+                raise RuntimeError('F06 native mimic requires its exact composed USD stage')
+            label, entity_id = 'F06', 'panda-v1'
+            expected_source_sha256 = None
+            leader_drive = ('force', 5000.0, 120.0, 5.0)
+            authors_drive = False
+        else:
+            raise ValueError(f'unsupported Isaac mimic profile route: {route!r}')
+
         import xml.etree.ElementTree as ET
 
-        expected_native = ('finger_joint1', 'finger_joint2')
-        if {self._source.joints.get(f'panda-main/{name}') for name in expected_native} != set(expected_native):
-            raise ValueError('DG04 RuntimeSource does not bind the exact finger Joint pair')
+        finger_joints = ('finger_joint1', 'finger_joint2')
+        if {self._source.joints.get(f'{entity_id}/{name}') for name in finger_joints} != set(finger_joints):
+            raise ValueError(f'{label} RuntimeSource does not bind the exact finger Joint pair')
         source_xml = self._source.scene_source.loaded_delivery.source_input_bytes.get('panda.xml')
-        if type(source_xml) is not bytes or hashlib.sha256(source_xml).hexdigest() != (
-                '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'):
+        if type(source_xml) is not bytes:
+            raise ValueError(f'{label} source delivery omits the original Panda XML bytes')
+        source_xml_sha256 = hashlib.sha256(source_xml).hexdigest()
+        if expected_source_sha256 is not None and source_xml_sha256 != expected_source_sha256:
             raise ValueError('DG04 source adaptation requires the exact frozen Menagerie Panda XML bytes')
-        root = ET.fromstring(source_xml)
-        equalities = root.findall('./equality/joint')
+        equalities = ET.fromstring(source_xml).findall('./equality/joint')
         if len(equalities) != 1:
-            raise ValueError('DG04 source must contain exactly one finger equality')
+            raise ValueError(f'{label} source must contain exactly one finger equality')
         equality = equalities[0]
         polycoef = tuple(float(value) for value in equality.get('polycoef', '0 1 0 0 0').split())
         if ((equality.get('joint1'), equality.get('joint2'), equality.get('active', 'true'))
                 != ('finger_joint1', 'finger_joint2', 'true')
                 or polycoef != (0.0, 1.0, 0.0, 0.0, 0.0)):
-            raise ValueError('DG04 native profile requires the exact active affine finger relation')
+            raise ValueError(f'{label} source must retain its exact active affine finger relation')
 
-        matches = {name: [] for name in expected_native}
+        matches = {name: [] for name in finger_joints}
         for prim in self._stage.Traverse():
             if prim.GetName() in matches and prim.IsA(UsdPhysics.PrismaticJoint):
                 matches[prim.GetName()].append(prim)
         if any(len(rows) != 1 for rows in matches.values()):
-            raise ValueError('DG04 source must compose exactly one public prismatic prim per finger Joint')
+            raise ValueError(f'{label} source must compose exactly one public prismatic prim per finger Joint')
         reference, follower = matches['finger_joint1'][0], matches['finger_joint2'][0]
         if not follower.HasAPI(PhysxSchema.PhysxMimicJointAPI, 'transX'):
-            raise ValueError('DG04 source-derived PhysxMimicJointAPI is absent from the composed delivery')
+            raise ValueError(f'{label} source-derived PhysxMimicJointAPI is absent from the composed delivery')
         relationship = follower.GetRelationship('physxMimicJoint:transX:referenceJoint')
         if not relationship or relationship.GetTargets() != [reference.GetPath()]:
-            raise ValueError('DG04 native mimic reference differs from the exact source finger equality')
+            raise ValueError(f'{label} native mimic reference differs from the source finger equality')
         for name, expected in (('gearing', 1.0), ('offset', 0.0)):
             attribute = follower.GetAttribute(f'physxMimicJoint:transX:{name}')
             if not attribute or not attribute.IsValid() or not math.isclose(
                     float(attribute.Get()), expected, rel_tol=0.0, abs_tol=1e-6):
-                raise ValueError(f'DG04 authored mimic {name} differs from its exact affine source relation')
+                raise ValueError(f'{label} authored mimic {name} differs from its exact affine source relation')
         frequency_attr = follower.GetAttribute('physxMimicJoint:transX:naturalFrequency')
         damping_attr = follower.GetAttribute('physxMimicJoint:transX:dampingRatio')
         if not frequency_attr or not frequency_attr.IsValid() or not damping_attr or not damping_attr.IsValid():
-            raise ValueError('DG04 authored PhysX mimic omits its fixed native profile attributes')
-        if frequency_attr.Set(25.0) is False or damping_attr.Set(1.0) is False:
-            raise RuntimeError('DG04 public USD setter rejected the fixed native mimic profile')
-        if (not math.isclose(float(frequency_attr.Get()), 25.0, rel_tol=0.0, abs_tol=1e-6)
+            raise ValueError(f'{label} authored PhysX mimic omits its native profile attributes')
+        if (frequency_attr.Set(25.0) is False or damping_attr.Set(1.0) is False
+                or not math.isclose(float(frequency_attr.Get()), 25.0, rel_tol=0.0, abs_tol=1e-6)
                 or not math.isclose(float(damping_attr.Get()), 1.0, rel_tol=0.0, abs_tol=1e-6)):
-            raise ValueError('DG04 fixed native mimic frequency/damping did not read back')
+            raise ValueError(f'{label} native PhysX mimic profile could not be authored/read back')
 
-        existing_drive = reference.HasAPI(UsdPhysics.DriveAPI, 'linear')
-        if existing_drive:
-            raise ValueError('DG04 source leader unexpectedly already has a second linear DriveAPI')
-        drive = UsdPhysics.DriveAPI.Apply(reference, 'linear')
-        if not drive:
-            raise RuntimeError('DG04 could not apply the public linear DriveAPI to the native mimic leader')
-        for attr_name, value in (
-                ('Type', 'force'), ('Stiffness', 2000.0), ('Damping', 100.0), ('MaxForce', 100.0)):
-            creator = getattr(drive, f'Create{attr_name}Attr', None)
-            if not callable(creator):
-                raise RuntimeError(f'DG04 installed UsdPhysics DriveAPI lacks Create{attr_name}Attr')
-            attribute = creator()
-            if not attribute or not attribute.IsValid() or attribute.Set(value) is False:
-                raise RuntimeError(f'DG04 public DriveAPI rejected the fixed leader {attr_name} value')
-        self._dg04_native_mimic_receipt = {
-            'schema_version': 'isaac-dg04-native-mimic-stage-receipt-v1',
-            'source_entry_sha256': hashlib.sha256(source_xml).hexdigest(),
-            'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
-            'reference_joint': 'finger_joint1', 'reference_path': str(reference.GetPath()),
-            'source_polycoef': polycoef,
-            'native_mimic_api': 'PhysxMimicJointAPI:transX',
-            'native_mimic_properties': {
-                'gearing': float(follower.GetAttribute('physxMimicJoint:transX:gearing').Get()),
-                'offset': float(follower.GetAttribute('physxMimicJoint:transX:offset').Get()),
-                'naturalFrequency': float(frequency_attr.Get()),
-                'dampingRatio': float(damping_attr.Get()),
-            },
-            'native_drive_api': 'PhysicsDriveAPI:linear',
-            'leader_drive_joint': 'finger_joint1',
-            'leader_drive_path': str(reference.GetPath()),
-            'leader_drive_properties': {
-                'type': str(drive.GetTypeAttr().Get()),
-                'stiffness_N_m': float(drive.GetStiffnessAttr().Get()),
-                'damping_N_s_m': float(drive.GetDampingAttr().Get()),
-                'max_force_N': float(drive.GetMaxForceAttr().Get()),
-            },
-            'profile_id': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
-            'runtime_stage_mutated': True,
-        }
+        drive_exists = reference.HasAPI(UsdPhysics.DriveAPI, 'linear')
+        if authors_drive:
+            if drive_exists:
+                raise ValueError('DG04 source leader unexpectedly already has a second linear DriveAPI')
+            drive = UsdPhysics.DriveAPI.Apply(reference, 'linear')
+            if not drive:
+                raise RuntimeError('DG04 could not apply the public linear DriveAPI to the mimic leader')
+            for attr_name, value in zip(('Type', 'Stiffness', 'Damping', 'MaxForce'), leader_drive):
+                creator = getattr(drive, f'Create{attr_name}Attr', None)
+                if not callable(creator):
+                    raise RuntimeError(f'DG04 installed UsdPhysics DriveAPI lacks Create{attr_name}Attr')
+                attribute = creator()
+                if not attribute or not attribute.IsValid() or attribute.Set(value) is False:
+                    raise RuntimeError(f'DG04 public DriveAPI rejected the fixed leader {attr_name} value')
+        else:
+            if not drive_exists:
+                raise ValueError('F06 source-bound leader DriveAPI is absent from the desktop USD')
+            drive = UsdPhysics.DriveAPI(reference, 'linear')
+        actual_drive = (
+            str(drive.GetTypeAttr().Get()), float(drive.GetStiffnessAttr().Get()),
+            float(drive.GetDampingAttr().Get()), float(drive.GetMaxForceAttr().Get()),
+        )
+        if (actual_drive[0] != leader_drive[0]
+                or any(not math.isclose(actual_drive[index], leader_drive[index], rel_tol=0.0, abs_tol=1e-6)
+                       for index in range(1, 4))):
+            raise ValueError(f'{label} source-bound leader drive differs from its exact profile: {actual_drive!r}')
+
+        if route == 'dg04':
+            self._dg04_native_mimic_receipt = {
+                'schema_version': 'isaac-dg04-native-mimic-stage-receipt-v1',
+                'source_entry_sha256': source_xml_sha256,
+                'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
+                'reference_joint': 'finger_joint1', 'reference_path': str(reference.GetPath()),
+                'source_polycoef': polycoef,
+                'native_mimic_api': 'PhysxMimicJointAPI:transX',
+                'native_mimic_properties': {
+                    'gearing': float(follower.GetAttribute('physxMimicJoint:transX:gearing').Get()),
+                    'offset': float(follower.GetAttribute('physxMimicJoint:transX:offset').Get()),
+                    'naturalFrequency': float(frequency_attr.Get()),
+                    'dampingRatio': float(damping_attr.Get()),
+                },
+                'native_drive_api': 'PhysicsDriveAPI:linear',
+                'leader_drive_joint': 'finger_joint1', 'leader_drive_path': str(reference.GetPath()),
+                'leader_drive_properties': {
+                    'type': actual_drive[0], 'stiffness_N_m': actual_drive[1],
+                    'damping_N_s_m': actual_drive[2], 'max_force_N': actual_drive[3],
+                },
+                'profile_id': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
+                'runtime_stage_mutated': True,
+            }
+        else:
+            self._f06_native_mimic_receipt = {
+                'schema_version': 'isaac-f06-pickcube-native-mimic-stage-receipt-v1',
+                'source_xml_sha256': source_xml_sha256,
+                'source_polycoef': polycoef,
+                'follower_path': str(follower.GetPath()), 'reference_path': str(reference.GetPath()),
+                'native_mimic_api': 'PhysxMimicJointAPI:transX',
+                'mimic_frequency_hz': float(frequency_attr.Get()),
+                'mimic_damping_ratio': float(damping_attr.Get()),
+                'leader_drive_api': 'PhysicsDriveAPI:linear',
+                'leader_stiffness_N_m': actual_drive[1], 'leader_damping_N_s_m': actual_drive[2],
+                'leader_max_force_N': actual_drive[3],
+                'runtime_stage_mutated_for_native_mimic_profile': True,
+            }
 
     def _verify_public_drives(self, *, route: str) -> dict[str, object]:
         """Check the shared seven-arm/one-leader surface against its exact profile."""
@@ -1211,78 +1255,6 @@ class IsaacSimNativeRuntimeIOV1:
                 for path, name, schema in sorted(authored)
             ],
         }
-
-    def _verify_f06_pickcube_mimic(self, PhysxSchema, UsdPhysics) -> None:
-        """Verify the locally authored F06 Panda source relation and 5 N leader drive."""
-        if not self._f06_pickcube or self._stage is None:
-            raise RuntimeError('F06 mimic verification requires its exact composed USD stage')
-        import xml.etree.ElementTree as ET
-
-        expected_native = ('finger_joint1', 'finger_joint2')
-        if {self._source.joints.get(f'panda-v1/{name}') for name in expected_native} != set(expected_native):
-            raise ValueError('F06 RuntimeSource does not bind the exact Panda finger Joint pair')
-        source_xml = self._source.scene_source.loaded_delivery.source_input_bytes.get('panda.xml')
-        if type(source_xml) is not bytes:
-            raise ValueError('F06 source delivery omits the original Panda XML bytes')
-        root = ET.fromstring(source_xml)
-        equalities = root.findall('./equality/joint')
-        if len(equalities) != 1:
-            raise ValueError('F06 Panda source must contain exactly one finger equality')
-        equality = equalities[0]
-        polycoef = tuple(float(value) for value in equality.get('polycoef', '0 1 0 0 0').split())
-        if ((equality.get('joint1'), equality.get('joint2'), equality.get('active', 'true'))
-                != ('finger_joint1', 'finger_joint2', 'true')
-                or polycoef != (0.0, 1.0, 0.0, 0.0, 0.0)):
-            raise ValueError('F06 source must retain its exact active affine finger relation')
-        matches = {name: [] for name in expected_native}
-        for prim in self._stage.Traverse():
-            if prim.GetName() in matches and prim.IsA(UsdPhysics.PrismaticJoint):
-                matches[prim.GetName()].append(prim)
-        if any(len(rows) != 1 for rows in matches.values()):
-            raise ValueError('F06 USD must compose exactly one public prismatic prim per Panda finger Joint')
-        reference, follower = matches['finger_joint1'][0], matches['finger_joint2'][0]
-        if not follower.HasAPI(PhysxSchema.PhysxMimicJointAPI, 'transX'):
-            raise ValueError('F06 USD source-derived PhysxMimicJointAPI is absent')
-        relationship = follower.GetRelationship('physxMimicJoint:transX:referenceJoint')
-        if not relationship or relationship.GetTargets() != [reference.GetPath()]:
-            raise ValueError('F06 mimic reference differs from the exact source finger equality')
-        for name, expected in (('gearing', 1.0), ('offset', 0.0)):
-            attribute = follower.GetAttribute(f'physxMimicJoint:transX:{name}')
-            if not attribute or not attribute.IsValid() or not math.isclose(
-                    float(attribute.Get()), expected, rel_tol=0.0, abs_tol=1e-6):
-                raise ValueError(f'F06 authored mimic {name} differs from its source relation')
-        frequency_attr = follower.GetAttribute('physxMimicJoint:transX:naturalFrequency')
-        damping_attr = follower.GetAttribute('physxMimicJoint:transX:dampingRatio')
-        if not frequency_attr or not frequency_attr.IsValid() or not damping_attr or not damping_attr.IsValid():
-            raise ValueError('F06 mimic source omits its native PhysX frequency/damping attributes')
-        if (frequency_attr.Set(25.0) is False or damping_attr.Set(1.0) is False
-                or not math.isclose(float(frequency_attr.Get()), 25.0, rel_tol=0.0, abs_tol=1e-6)
-                or not math.isclose(float(damping_attr.Get()), 1.0, rel_tol=0.0, abs_tol=1e-6)):
-            raise ValueError('F06 native PhysX mimic profile could not be authored/read back')
-        if not reference.HasAPI(UsdPhysics.DriveAPI, 'linear'):
-            raise ValueError('F06 source-bound leader DriveAPI is absent from the desktop USD')
-        drive = UsdPhysics.DriveAPI(reference, 'linear')
-        if (str(drive.GetTypeAttr().Get()) != 'force'
-                or not math.isclose(float(drive.GetStiffnessAttr().Get()), 5000.0, rel_tol=0.0, abs_tol=1e-6)
-                or not math.isclose(float(drive.GetDampingAttr().Get()), 120.0, rel_tol=0.0, abs_tol=1e-6)
-                or not math.isclose(float(drive.GetMaxForceAttr().Get()), 5.0, rel_tol=0.0, abs_tol=1e-6)):
-            raise ValueError('F06 USD leader DriveAPI differs from its exact 5000/120/5N source adapter')
-        self._f06_native_mimic_receipt = {
-            'schema_version': 'isaac-f06-pickcube-native-mimic-stage-receipt-v1',
-            'source_xml_sha256': hashlib.sha256(source_xml).hexdigest(),
-            'source_polycoef': polycoef,
-            'follower_path': str(follower.GetPath()),
-            'reference_path': str(reference.GetPath()),
-            'native_mimic_api': 'PhysxMimicJointAPI:transX',
-            'mimic_frequency_hz': float(frequency_attr.Get()),
-            'mimic_damping_ratio': float(damping_attr.Get()),
-            'leader_drive_api': 'PhysicsDriveAPI:linear',
-            'leader_stiffness_N_m': float(drive.GetStiffnessAttr().Get()),
-            'leader_damping_N_s_m': float(drive.GetDampingAttr().Get()),
-            'leader_max_force_N': float(drive.GetMaxForceAttr().Get()),
-            'runtime_stage_mutated_for_native_mimic_profile': True,
-        }
-
 
     def metadata(self) -> NativeRuntimeIOMetadataV1:
         if self._closed or self._metadata is None:
