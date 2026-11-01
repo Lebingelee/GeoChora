@@ -106,10 +106,18 @@ class _ProviderFreeRuntimeSession(_SessionValues):
             tuple(float(value) for value in world_from_hand[:3, 3]),
             tuple(float(value) for value in matrix_to_quat_wxyz(world_from_hand[:3, :3])),
         )
-        return {
+        poses = {
             "panda-main/hand": hand,
             "square-peg-instance/peg1": self._peg_pose,
         }
+        # The public typed snapshot contract requires an exact projection for
+        # every source body/frame name. Only the hand and peg poses above are
+        # consumed by this provider-free camera fixture; fill the remaining
+        # entries with explicit synthetic identity poses.
+        identity_pose = self._PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+        for name in set(self._source.bodies) | set(self._source.frames):
+            poses.setdefault(name, identity_pose)
+        return poses
 
     def _canonical_state(self):
         self._require_reset()
@@ -125,13 +133,9 @@ class _ProviderFreeRuntimeSession(_SessionValues):
         return self._canonical_state(), {}
 
     def snapshot_v1(self, *, scene, joint_bindings, frame_bindings, requirements):
-        selected_frames = {
-            key: value for key, value in frame_bindings.items()
-            if key in {"panda-main/hand", "square-peg-instance/peg1"}
-        }
         return self._values_owner.snapshot_v1(
             self, scene=scene, joint_bindings=joint_bindings,
-            frame_bindings=selected_frames, requirements=requirements,
+            frame_bindings=frame_bindings, requirements=requirements,
         )
 
     def apply_control(self, target):
