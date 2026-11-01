@@ -92,6 +92,10 @@ def _verify_plan(path: Path, sidecar: Path) -> tuple[dict, str]:
         raise ValueError(f"Core dirty paths differ from plan freeze: {dirty!r}")
     if int(plan["oracle"]["episode_count"]) != 2 or int(plan["limits"]["physics_steps_reserved"]) != 3000:
         raise ValueError("DG04 formal N2 must reserve exactly two episodes and 3000 accepted steps")
+    bootstrap_cap = int(plan["limits"].get("bootstrap_steps_per_materialization_max", -1))
+    bootstrap_reserved = int(plan["limits"].get("bootstrap_physics_steps_reserved", -1))
+    if (bootstrap_cap < 0 or bootstrap_reserved < bootstrap_cap * 3):
+        raise ValueError("DG04 formal N2 requires a finite app-open plus two-reset bootstrap reservation")
     return plan, plan_sha
 
 
@@ -143,8 +147,9 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
     app_steps_before_reset = int(SimulationManager.get_num_physics_steps())
     obs, info = env.reset()
     app_steps_after_reset = int(SimulationManager.get_num_physics_steps())
-    if app_steps_after_reset != app_steps_before_reset:
-        raise ValueError("DG04 Core reset advanced native physics despite reset_physics_steps_expected=0")
+    reset_manager_steps_delta = app_steps_after_reset - app_steps_before_reset
+    if reset_manager_steps_delta < 0:
+        raise RuntimeError("DG04 public Isaac physics counter moved backwards during Core reset")
     if env.state.control_step != 0 or abs(float(env.state.simulation_time)) > 1e-12:
         raise ValueError("DG04 Core N2 reset did not start at boundary/time zero")
     if info.get("source_closure_digest") != env.value["source"].source_closure_digest:
@@ -239,11 +244,49 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
             or cold_metadata["transition_count"] != interval_count
             or cold_metadata["observation_count"] != interval_count + 1):
         raise ValueError("DG04 Core Generic H5 finalizer/readback rejected T/T+1 counts")
+    env_meta = cold_metadata.get("env_meta", {})
+    reference_profile = env_meta.get("reference_profile", {}) if isinstance(env_meta, dict) else {}
+    bootstrap_receipt = reference_profile.get("native_public_bootstrap_receipt")
+    if not isinstance(bootstrap_receipt, dict):
+        raise ValueError("DG04 H5 did not persist the public NativeIO bootstrap receipt")
+    bootstrap_steps = bootstrap_receipt.get("physics_steps")
+    bootstrap_dt = bootstrap_receipt.get("physics_dt_s")
+    bootstrap_time = bootstrap_receipt.get("physics_time_s")
+    bootstrap_step_before = bootstrap_receipt.get("step_index_before")
+    bootstrap_step_after = bootstrap_receipt.get("step_index_after")
+    if (bootstrap_receipt.get("schema_version") != "isaac-public-physics-bootstrap-v1"
+            or type(bootstrap_steps) is not int or bootstrap_steps < 0
+            or bootstrap_steps > int(plan["limits"]["bootstrap_steps_per_materialization_max"])
+            or type(bootstrap_step_before) is not int or type(bootstrap_step_after) is not int
+            or not isinstance(bootstrap_dt, (int, float))
+            or not isinstance(bootstrap_time, (int, float))
+            or not math.isfinite(float(bootstrap_dt))
+            or float(bootstrap_dt) <= 0.0
+            or not math.isfinite(float(bootstrap_time))
+            or abs(float(bootstrap_time) - bootstrap_steps * float(bootstrap_dt)) > 1e-8
+            or bootstrap_step_after - bootstrap_step_before != bootstrap_steps):
+        raise ValueError("DG04 H5 public NativeIO bootstrap receipt is invalid or exceeds its frozen bound")
+    reset_steps_outside_bootstrap = reset_manager_steps_delta - bootstrap_steps
+    if reset_steps_outside_bootstrap != 0:
+        raise ValueError(
+            "DG04 Core reset manager delta differs from the separately measured NativeIO bootstrap: "
+            f"reset_delta={reset_manager_steps_delta}, bootstrap={bootstrap_steps}"
+        )
+    bootstrap_receipt_identity = hashlib.sha256(json.dumps(
+        bootstrap_receipt, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")).hexdigest()
     return {
         "episode_index": episode_index,
         "run_instance_id": run_instance_id,
         "reset": initial,
         "reset_sample_id": env.sample.sample_id,
+        "reset_manager_physics_steps_before": app_steps_before_reset,
+        "reset_manager_physics_steps_after": app_steps_after_reset,
+        "reset_manager_physics_steps_delta": reset_manager_steps_delta,
+        "reset_physics_steps_outside_bootstrap": reset_steps_outside_bootstrap,
+        "bootstrap_physics_steps": bootstrap_steps,
+        "bootstrap_physics_time_s": float(bootstrap_time),
+        "bootstrap_receipt_identity_sha256": bootstrap_receipt_identity,
         "task_seed": int(env.sample.task_seed),
         "provider": env.provider,
         "backend": env.backend,
@@ -301,9 +344,18 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     from isaacsim.core.simulation_manager import SimulationManager
 
     bootstrap_steps_after_app_open = int(SimulationManager.get_num_physics_steps())
+    bootstrap_steps_per_materialization_max = int(
+        plan["limits"]["bootstrap_steps_per_materialization_max"]
+    )
+    if bootstrap_steps_after_app_open > bootstrap_steps_per_materialization_max:
+        raise RuntimeError("DG04 app-open bootstrap exceeded its frozen per-materialization bound")
     input_v1, candidate = build_f05_dg04_isaac_native_candidate(
         plan["source"]["delivery_manifest"]["path"], horizon=300,
     )
+    bootstrap_steps_after_candidate_build = int(SimulationManager.get_num_physics_steps())
+    candidate_build_physics_steps = bootstrap_steps_after_candidate_build - bootstrap_steps_after_app_open
+    if candidate_build_physics_steps != 0:
+        raise RuntimeError("DG04 source-bound candidate construction unexpectedly advanced native physics")
     input_v1.validate()
     actual_candidate = _candidate_identity(candidate, input_v1)
     if actual_candidate != plan["candidate"]:
@@ -339,16 +391,29 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
                 primary_error.add_note(f"SelectedReferenceEnv.close also failed: {cleanup_error!r}")
     counter = json.loads(counter_path.read_text(encoding="utf-8"))
     expected = int(plan["limits"]["physics_steps_reserved"])
+    episode_bootstrap_steps = [int(row["bootstrap_physics_steps"]) for row in episodes]
+    episode_bootstrap_total = sum(episode_bootstrap_steps)
+    bootstrap_steps_charged = int(bootstrap_steps_after_app_open) + episode_bootstrap_total
+    manager_delta_including_episode_bootstrap = (
+        None if physics_after_formal is None else physics_after_formal - physics_before
+    )
+    formal_manager_delta = (
+        None if manager_delta_including_episode_bootstrap is None
+        else manager_delta_including_episode_bootstrap - episode_bootstrap_total
+    )
+    if bootstrap_steps_charged > int(plan["limits"]["bootstrap_physics_steps_reserved"]):
+        if primary_error is None:
+            primary_error = RuntimeError("DG04 app/reset bootstrap exceeded its frozen aggregate reservation")
     if primary_error is None and (
         counter.get("attempted_physics_steps") != expected
         or counter.get("completed_physics_steps") != expected
-        or physics_after_formal is None
-        or physics_after_formal - physics_before != expected
+        or formal_manager_delta != expected
     ):
         primary_error = RuntimeError(
             "DG04 formal step accounting differs from the exact 3000-step reservation: "
             f"counter={counter!r}, public_manager_delta="
-            f"{None if physics_after_formal is None else physics_after_formal - physics_before}"
+            f"{formal_manager_delta}, including_bootstrap={manager_delta_including_episode_bootstrap}, "
+            f"bootstrap_steps={episode_bootstrap_steps}"
         )
     result = {
         "schema_version": "f05-dg04-core-n2-worker-receipt-v1",
@@ -358,9 +423,11 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         "candidate": actual_candidate,
         "pxr_runtime_identity": pxr_identity,
         "bootstrap_steps_at_app_open": bootstrap_steps_after_app_open,
-        "formal_physics_steps_public_manager_delta": (
-            None if physics_after_formal is None else physics_after_formal - physics_before
-        ),
+        "candidate_build_physics_steps": candidate_build_physics_steps,
+        "episode_bootstrap_physics_steps": episode_bootstrap_steps,
+        "bootstrap_steps_charged": bootstrap_steps_charged,
+        "manager_physics_steps_delta_including_episode_bootstrap": manager_delta_including_episode_bootstrap,
+        "formal_physics_steps_public_manager_delta": formal_manager_delta if primary_error is None else None,
         "physics_steps_attempted": counter.get("attempted_physics_steps"),
         "physics_steps_completed": counter.get("completed_physics_steps"),
         "native_starts": 1,

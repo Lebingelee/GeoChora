@@ -88,6 +88,59 @@ def _bound_errors(bundle: dict) -> list[dict]:
            "runtime_identity", "native OpenUSD module origins were not bound to the Isaac 6.2 install")
     _check(worker.get("bootstrap_steps_at_app_open", 0) >= 0,
            "runtime_identity", "worker did not report app-start bootstrap steps separately")
+    _check(worker.get("candidate_build_physics_steps") == 0,
+           "reset_bootstrap", "source-bound candidate construction advanced native physics")
+    bootstrap_receipt_total = int(worker.get("bootstrap_steps_at_app_open", -1))
+    episode_bootstrap_steps = []
+    if len(bundle["episodes"]) == 2 and len(worker.get("episodes", [])) == 2:
+        for episode_index, (episode, producer_episode) in enumerate(
+                zip(bundle["episodes"], worker["episodes"], strict=True), 1):
+            env_meta = episode.get("metadata", {}).get("env_meta", {})
+            reference_profile = env_meta.get("reference_profile", {}) if isinstance(env_meta, dict) else {}
+            bootstrap = reference_profile.get("native_public_bootstrap_receipt", {})
+            steps = bootstrap.get("physics_steps") if isinstance(bootstrap, dict) else None
+            bootstrap_dt = bootstrap.get("physics_dt_s") if isinstance(bootstrap, dict) else None
+            bootstrap_time = bootstrap.get("physics_time_s") if isinstance(bootstrap, dict) else None
+            bootstrap_step_before = bootstrap.get("step_index_before") if isinstance(bootstrap, dict) else None
+            bootstrap_step_after = bootstrap.get("step_index_after") if isinstance(bootstrap, dict) else None
+            reset_delta = producer_episode.get("reset_manager_physics_steps_delta")
+            reset_outside_bootstrap = producer_episode.get("reset_physics_steps_outside_bootstrap")
+            valid_steps = type(steps) is int and 0 <= steps <= int(
+                plan["limits"]["bootstrap_steps_per_materialization_max"]
+            )
+            valid_time = (
+                isinstance(bootstrap_dt, (int, float))
+                and isinstance(bootstrap_time, (int, float))
+                and math.isfinite(float(bootstrap_dt))
+                and float(bootstrap_dt) > 0.0
+                and math.isfinite(float(bootstrap_time))
+                and abs(float(bootstrap_time) - int(steps or 0) * float(bootstrap_dt)) <= 1e-8
+                and type(bootstrap_step_before) is int
+                and type(bootstrap_step_after) is int
+                and bootstrap_step_after - bootstrap_step_before == steps
+            )
+            bootstrap_identity = hashlib.sha256(json.dumps(
+                bootstrap, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")).hexdigest() if isinstance(bootstrap, dict) else None
+            _check(bootstrap.get("schema_version") == "isaac-public-physics-bootstrap-v1"
+                   and valid_steps and valid_time,
+                   "reset_bootstrap", f"episode {episode_index} H5 public bootstrap receipt is missing or invalid")
+            _check(type(reset_delta) is int and valid_steps and reset_delta == steps
+                   and reset_outside_bootstrap == 0,
+                   "reset_bootstrap", f"episode {episode_index} reset manager delta is not explained solely by its persisted bootstrap receipt")
+            _check(producer_episode.get("bootstrap_physics_steps") == steps
+                   and producer_episode.get("bootstrap_receipt_identity_sha256") == bootstrap_identity,
+                   "reset_bootstrap", f"episode {episode_index} producer bootstrap facts differ from cold H5 metadata")
+            if valid_steps:
+                episode_bootstrap_steps.append(steps)
+                bootstrap_receipt_total += steps
+    if len(episode_bootstrap_steps) == 2:
+        expected_manager_delta = int(plan["limits"]["physics_steps_reserved"]) + sum(episode_bootstrap_steps)
+        _check(worker.get("manager_physics_steps_delta_including_episode_bootstrap") == expected_manager_delta,
+               "reset_bootstrap", "worker public manager total does not equal 3000 formal steps plus episode bootstrap")
+    _check(bootstrap_receipt_total <= int(plan["limits"]["bootstrap_physics_steps_reserved"])
+           and worker.get("bootstrap_steps_charged") == bootstrap_receipt_total,
+           "reset_bootstrap", "measured app-open plus episode bootstrap exceeds or differs from the frozen bootstrap reservation")
     _check(supervisor.get("max_process_group_rss_bytes", 2**63) <= plan["limits"]["max_process_group_rss_bytes"]
            and supervisor.get("min_mem_available_bytes", 0) >= plan["limits"]["abort_mem_available_bytes_below"]
            and supervisor.get("min_gpu_free_bytes", 0) >= plan["limits"]["abort_gpu_free_bytes_below"]

@@ -274,6 +274,12 @@ def build_plan(output_root: Path) -> tuple[dict, Path, Path, Path]:
     gpu_free_bytes = int(gpu_query) * 1024**2
     limits = {
         "physics_steps_reserved": 3000,
+        # N1 measured 18 public Isaac bootstrap steps for one native
+        # materialization. N2 can materialize once per episode reset plus the
+        # initial app-open boundary, so freeze a finite 3 x 18 bootstrap cap
+        # separately from the 3000 formal interval steps.
+        "bootstrap_steps_per_materialization_max": 18,
+        "bootstrap_physics_steps_reserved": 54,
         "worker_wall_s_max": 1800,
         "supervisor_wall_s_max": 1860,
         "sample_period_s": 0.1,
@@ -341,7 +347,7 @@ def build_plan(output_root: Path) -> tuple[dict, Path, Path, Path]:
         "method": {
             "entry": "build_f05_dg04_isaac_native_candidate -> SelectedReferenceEnv.reset -> Core RuntimeSession -> structured Position request -> existing Generic H5 v3 Recorder -> separate H5 cold reader",
             "episode_lifecycle": "same SelectedReferenceEnv instance reset twice; 300 accepted control intervals per episode; only the explicit final horizon boundary truncates",
-            "native_step_accounting": "formal counter charges five exact Isaac physics advances before every Core step and completes them only after transition return; app bootstrap is separate",
+            "native_step_accounting": "formal counter charges five exact Isaac physics advances before every Core step and completes them only after transition return; app-open and per-episode lazy NativeIO bootstrap are measured separately and paired with each H5 bootstrap receipt",
             "physical_contact_evidence": "read raw public PhysX RigidPrim.get_raw_contact_data substep witnesses persisted in native_interval_advance_receipts_v1; retain source paths, signed scalar, magnitude, normals, separation and support normal force; do not relabel as GeoPhys impulse",
             "qualification": False,
         },
