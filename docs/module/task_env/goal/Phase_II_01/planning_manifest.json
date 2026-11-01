@@ -1865,7 +1865,7 @@
     "README.md": "446e275d74cbad788e17613ef87356ff45a963d344b7d5da382a3c03998caf76",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "6ad8307650d41b229940491e22933fb8cc6bf03ffb8ba3030b035adb3448ae29",
     "12_F05_F07_Execution_Playbook.md": "f73cfe82c683e64cf5793ed73a0b35c4f466d4a599dcb5f242b871f6ba2b9e90",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "dcff3b6a2d2c51db924c0ff515c956c243c280c1d7e56b652269a5a0cfd11af9"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "dea5762a94b4184b95d4c1f2702be97cc901312095f28e3618443c01baa7dbf7"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -5091,7 +5091,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Manual relay of diagnostic04 window002: repair source formula and physical consumer detector, use already-authorized N1 headroom, protect formal N2 reserve; execution uses fresh package snapshot HEAD.",
+      "selected_next": "Manual relay of DG04 window003 under new maintainer no-aggregate-quota/two-failures-question policy; route question already answered: research supported public bridge first, then implement and validate.",
       "after_that_priority": [
         "Implement source equality compliance, fixed-tendon and drive/contact consumers in the existing DG03/Core owners.",
         "Complete unchanged formal Isaac N2 and cold reader, then three-route bounded F05 review.",
@@ -5106,7 +5106,7 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "PARTIAL. DG01/DG02 bounded acceptances retained; DG03 live/formal still incomplete. DG04 window001 reviewed with source-law/detector and budget-arithmetic findings; next window uses original limits.",
+      "F05": "PARTIAL. DG01/DG02 bounded retained; DG03 physical response failed in window002, new public bridge route research authorized. Formal N2 still not run.",
       "F06": "NOT_STARTED; diagnostic04 prepares an entry checklist only.",
       "DG01_goal01": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE; frozen source/task/controller/provider scope only."
     },
@@ -6734,7 +6734,7 @@
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
     "f05_early_diagnostic_three_goals_20261030": {
       "authority": "maintainerexplicitlydesignated earlydiagnosticimplementation and3longgoalprompts, manualrelay, adaptnextafterreport",
-      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_PARTIAL_DIAGNOSTIC04_WINDOW002_REWORK_PREPARED",
+      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_PARTIAL_DG04_WINDOW003_PUBLIC_BRIDGE_POLICY_PREPARED",
       "preparation_input_head": "e7382adc0f31ca5fbff74c61a5163247d080759e",
       "ordinary_successor_history": {
         "completed": 2,
@@ -6779,7 +6779,7 @@
       "new_branch_worktrees": 0,
       "preparation_tests": 0,
       "preparation_native": 0,
-      "diagnostic04_alias": "f05_diagnostic04_window002_package_preparation_20261101; original three Goals unchanged"
+      "diagnostic04_alias": "f05_diagnostic04_window003_package_preparation_20261101; original three Goals retained"
     },
     "latest_f05_successor_diagnostic_plan": "f05_dg02_pickcube_r3_window002_preparation_20261031",
     "dg01_goal01_window_001": {
@@ -7010,7 +7010,7 @@
       "verified_continuation_manifest_sha256": "2d779febb8f7ccb78fa1036d40272814be924079a8eb51b2b271d37e3bee09cf",
       "doc_validation_log_sha256": "2dd5ab972278f3a4f153643c614a334258c3a75901f73c7e0b5bb204005a4179"
     },
-    "latest_f05_diagnostic_package_preparation": "f05_diagnostic04_window002_package_preparation_20261101",
+    "latest_f05_diagnostic_package_preparation": "f05_diagnostic04_window003_package_preparation_20261101",
     "f05_diagnostic04_package_preparation_20261101": {
       "date": "2026-11-01",
       "status": "EXECUTED_PARTIAL_REVIEWED_REWORK_REQUIRED",
@@ -7074,7 +7074,7 @@
     },
     "f05_diagnostic04_window002_package_preparation_20261101": {
       "date": "2026-11-01",
-      "status": "PREPARED_FOR_MAINTAINER_MANUAL_RELAY_NOT_EXECUTED",
+      "status": "EXECUTED_PARTIAL_REVIEWED_PUBLIC_BRIDGE_RESEARCH_NEXT",
       "package_id": "F05_DIAGNOSTIC04_WINDOW002_REPAIR_SOURCE_ORACLE_AND_LIVE_CONSUMER",
       "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_002",
       "planning_anchor": "13_F05_Early_Diagnostic_Three_Goals.md#f05-diagnostic04-window001-sol-review-and-window002",
@@ -7111,6 +7111,44 @@
       },
       "active_hours_max": 8,
       "scope": "Source formula/oracle, defect-sensitive physical response detector, source-bound S1/live N1, then unchanged formal N2/reader and matrix; F06 entry only",
+      "preparation_native_starts": 0,
+      "preparation_software_tests": 0,
+      "execution_output_head": "1d71aeab84a6fa576265e0cba33b886b9d83326f"
+    },
+    "f05_diagnostic04_window002_sol_review_20261101": {
+      "decision": "F05_DIAGNOSTIC04_WINDOW002_PARTIAL_REVIEWED_PUBLIC_BRIDGE_RESEARCH_NEXT",
+      "reviewed_head": "1d71aeab84a6fa576265e0cba33b886b9d83326f",
+      "review_directory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_diagnostic04_002/",
+      "physical_gate": "attempt004/005 failed; frequency readback change is not physical acceptance; exit -11 retained",
+      "window002_original_budget_stop": "Valid: remaining N1 wall below observed App lifecycle",
+      "maintainer_new_policy": "No cumulative step/native wall/start/Goal-active-time cap in DG04 continuation; mandatory question after two failures at same gate; per-run resource protection retained.",
+      "route_reply": "先查明受支持的 Isaac／PhysX 公开桥接路径，再实施验证（推荐）",
+      "route_decision_answered": true,
+      "F05": "PARTIAL",
+      "F06_F07_Qualification": "not started/not granted"
+    },
+    "f05_diagnostic04_window003_package_preparation_20261101": {
+      "date": "2026-11-01",
+      "status": "PREPARED_FOR_MAINTAINER_MANUAL_RELAY_NOT_EXECUTED",
+      "package_id": "F05_DIAGNOSTIC04_WINDOW003_NO_AGGREGATE_QUOTA_ASK_ON_REPEATED_GATE_FAILURE",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_003/",
+      "planning_anchor": "13_F05_Early_Diagnostic_Three_Goals.md#f05-diagnostic04-window003-policy-and-public-bridge",
+      "reviewed_base_before_planning_commit": "1d71aeab84a6fa576265e0cba33b886b9d83326f",
+      "execution_head": "Post-review/policy commit frozen in package input_snapshot.json",
+      "branch": "develop-full",
+      "provider_read_only_head": "a9e4c4850bd225f5929e74831ac282b18ff517ce",
+      "aggregate_caps": {
+        "native_attempted_steps": null,
+        "native_wall_seconds": null,
+        "native_starts": null,
+        "goal_active_hours": null,
+        "meaning": "No cumulative hard ceiling under current maintainer instruction; exact history accounting remains mandatory."
+      },
+      "same_gate_question_after_failures": 2,
+      "maintainer_route_reply": "先查明受支持的 Isaac／PhysX 公开桥接路径，再实施验证（推荐）",
+      "state": "PUBLIC_BRIDGE_RESEARCH_AUTHORIZED; no unchanged old-route native",
+      "per_run_finite_watchdog_and_resources_required": true,
+      "new_branches_worktrees": 0,
       "preparation_native_starts": 0,
       "preparation_software_tests": 0
     }

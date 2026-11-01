@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01/DG02精确Core cell有界接收、R3对照PARTIAL保持。诊断04 window001经Sol复核仍PARTIAL：预算耗尽判断不成立，源柔顺公式与实际consumer判别需返工。window002准备供维护者转述，继续原Goal和原预算；正式N2尚未启动。**
+> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。维护者已改用无累计额度、同门连续两次失败先询问的规则，并裁定优先研究受支持的Isaac/PhysX公开桥接再实施；window003按新规则准备，正式N2未启动。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -250,3 +250,15 @@ F06只准备了ignored [f06_entry_readiness.md](../../../../../workspace/mainten
 新包`sol_f05_diagnostic04_002/`，ID `F05_DIAGNOSTIC04_WINDOW002_REPAIR_SOURCE_ORACLE_AND_LIVE_CONSUMER`。执行HEAD由Sol本次planning/Skill提交后的snapshot冻结，不复用旧输入。先离线修公式/oracle、独立版本USD、实际consumer detector与预算计算，再用原额度内N1最多1,400步/500秒验证；正式预留6,400 attempted步/2,400秒保持。live门成立后才运行完整3,000步正式N2、独立冷读及三路线矩阵。新窗口Isaac总计≤7,800步/2,900秒、必要CPU回归≤6,000步/600秒，全部新增native≤13,800步/3,500秒，且旧累计上限同时生效；不是增加总额度。主动最多8小时，旧window001至少2小时带入原12小时时间盒；压缩、换名和新turn不清账。
 
 F06只准备入口；不执行F06/F07或授Qualification。保持同阶段分支、原只读provider和单writer，维护者人工转述后Luna才继续；本次Sol只进行离线复核和冻结准备，没有发送其他线程消息。
+
+<a id="f05-diagnostic04-window003-policy-and-public-bridge"></a>
+
+### 16.3 window002复核、维护者新执行规则与公开桥接裁定（2026-11-01）
+
+window002输出HEAD `1d71aeab84a6fa576265e0cba33b886b9d83326f`，Sol复核为`F05_DIAGNOSTIC04_WINDOW002_PARTIAL_REVIEWED_PUBLIC_BRIDGE_RESEARCH_NEXT`。源齐次映射已修正，v4及27/27离线检查有记录；attempt004/005均未过实际物理响应门。attempt005读回频率差约1.2861Hz，残差差约2.6077e-8m、相对速度差约4.2409e-5m/s，未达原门，worker `-11`退出。原500秒N1子预算仅余约46.983秒，确实不足约89.123秒的App生命周期，因此原包停点有效。公开API检查仅界定已查安装范围，不证明任何公开桥接均不存在，也不把USD属性变化称为solver消费。
+
+维护者随后明确要求暂不设置Luna累计额度、同一门多次未通过必须询问。该指令在DG04 window003取代旧累计steps/native wall/启动次数/Goal主动工时硬上限；所有历史消耗及旧formal reserve未动的事实保留，新执行不再用旧余额或预留作启动判据。每个run仍须有限steps/timeout计划、资源监控、共享锁及受控退出；正式N2仍是完整3,000步，内存/显存/并发保护和验收阈值保持。
+
+具体提问规则：同一稳定gate连续两次实际验证失败后，必须停止该门后续native，交根因/观测/阈值/已试方案与明确选项并等待维护者或网页GPT裁定；不能靠新window/commit/压缩清零。用户明确选择新方案后，以有引用的decision epoch推进且保留原失败史。重复报告旧失败的自动turn不算新验证，未到达物理门的接口错误单列相应门，避免用不同traceback绕过规则。当前attempt004/005已触发提问，维护者答复为优先查明受支持的Isaac/PhysX公开桥接路径，再实施验证；Luna不重复询问同一决定，不原样重跑旧Set/Get路线。
+
+新包`sol_f05_diagnostic04_003/`，ID `F05_DIAGNOSTIC04_WINDOW003_NO_AGGREGATE_QUOTA_ASK_ON_REPEATED_GATE_FAILURE`，实际输入HEAD由本次review/docs提交后的snapshot冻结。先同版公开bridge研究→原owner实现/S1及有缺陷敏感性的live判别→required门通过后正式N2/冷读→新F05三路线联合收口。若需要额外SDK/依赖安装下载或新语义裁定，先形成具体方案再询问；不放宽原禁止私有solver访问和重复Runtime的边界。F06只入口，F07/Qualification不执行。复核与授权转述记录位于ignored `sol_review_f05_diagnostic04_002/`及新冻结包。
