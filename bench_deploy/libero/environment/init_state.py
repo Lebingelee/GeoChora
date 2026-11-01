@@ -584,12 +584,6 @@ def sample_libero_normal_reset_v1(
             "seed": task_seed,
             "upstream_preplacement_draw_count": PILOT_PANDA_ARM_RESET_NOISE_DRAWS,
         },
-        "algorithm_id": "libero-normal-reset-order-v1",
-        "candidate_reset_order": [
-            "mj_resetData", "mj_step1", "apply_sampled_fixture_root_poses",
-            "apply_sampled_movable_free_joint_poses", "restore_all_pruned_init_joint_and_free_state",
-            "restore_source_simulation_time", "mj_forward",
-        ],
         "placements_before_pruned_init_restore": draw_rows,
         "asset_placement_geometry": {
             path: {
