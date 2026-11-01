@@ -128,6 +128,35 @@ def test_r3_readiness_holds_vertical_action_until_public_tcp_clearance_is_measur
         execution_info=execution_info(vertical_gate.after_actions + 1),
     )
 
-    lateral = solution.act()
-    assert lateral.diagnostics.get("measured_tcp_clearance_gate_hold") is False
-    assert np.array_equal(lateral.action, plan.actions[vertical_gate.after_actions])
+    lateral_gate = plan.measured_tcp_gates[1]
+    assert lateral_gate.after_actions > vertical_gate.after_actions
+    for action_index in range(vertical_gate.after_actions, lateral_gate.after_actions):
+        lateral = solution.act()
+        assert lateral.diagnostics.get("measured_tcp_clearance_gate_hold") is False
+        assert np.array_equal(lateral.action, plan.actions[action_index])
+        solution.observe(
+            cleared_observation, 0.0, False, False, info,
+            execution_info=execution_info(action_index + 2),
+        )
+
+    hold_over_cube = solution.act()
+    assert hold_over_cube.diagnostics["measured_tcp_clearance_gate_hold"] is True
+    assert hold_over_cube.diagnostics["measured_tcp_clearance_gate"] == "over_cube_before_descent"
+    assert np.array_equal(
+        hold_over_cube.action, plan.actions[lateral_gate.after_actions - 1],
+    )
+
+    measured_over_cube = measured_clear.copy()
+    measured_over_cube[:2] = cube[:2]
+    over_cube_observation = {
+        "state": {"ee_pose": measured_over_cube},
+        "privileged_state": observation["privileged_state"],
+    }
+    solution.observe(
+        over_cube_observation, 0.0, False, False, info,
+        execution_info=execution_info(lateral_gate.after_actions + 2),
+    )
+
+    descent = solution.act()
+    assert descent.diagnostics.get("measured_tcp_clearance_gate_hold") is False
+    assert np.array_equal(descent.action, plan.actions[lateral_gate.after_actions])
