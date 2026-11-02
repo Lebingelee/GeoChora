@@ -61,7 +61,7 @@ R05B_CANONICAL_MENAGERIE_ASSET_ROOT = Path(
 R05B_CANONICAL_XML_SHA256 = '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
 
 
-from .task import (semantic_definition, evaluate, sample_reset, _reset_seed,
+from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sample_reset, _reset_seed,
                    _native_feedback_sample, _native_interval_receipt, _observe_kwargs)
 
 def _configuration():
@@ -489,11 +489,16 @@ def _validate_external_solution(value, solution):
 
 
 def _binding(resolved_config=None, lift_height_m=None, task_config=None):
+    task_config = _configuration() if task_config is None else task_config
+    declaration = NutAssemblyTaskDefinition.from_artifact(
+        build_artifact(lift_height_m=lift_height_m, task_config=task_config),
+        task_config['recipe']['reset'],
+    )
     return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, include_solution=False,
                                                                       resolved_config=resolved_config,
                                                                       lift_height_m=lift_height_m, task_config=task_config),
-        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
-        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
+        reset_sample=declaration.sample_reset,
+        evaluate=declaration.evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
         external_actions=False, interval_mode="native", recorder_mode="execution",
         external_action_error="selected NutAssembly requires step_expert; unguarded external actions are not admitted",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 import math
 import numpy as np
 
@@ -38,6 +39,11 @@ def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = N
     semantics = expected if semantics is None else semantics
     if not isinstance(state, CanonicalStateView) or semantics != expected:
         raise ValueError("unsupported canonical NutAssembly state/semantics")
+    return _evaluate_bound(state, semantics)
+
+
+def _evaluate_bound(state: CanonicalStateView, semantics: SemanticDefinition):
+    from ...environment import TaskEvaluation
     semantics.require_state(state)
     p = semantics.parameters_si
     nut, peg = state.pose_world[NUT], state.pose_world[PEG]
@@ -100,6 +106,46 @@ def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=N
         velocity_policy=reset["inherited_state_policy"],
         control_policy=reset["control_policy"],
         settle_steps=int(reset["settle_steps"]))
+
+
+@dataclass(frozen=True)
+class NutAssemblyTaskDefinition:
+    """Immutable selected reset and evaluation contract bound to an Artifact."""
+
+    artifact_hash: str
+    semantics: SemanticDefinition
+    sampler_id: str
+    sampler_version: str
+    velocity_policy: str
+    control_policy: str
+    settle_steps: int
+
+    @classmethod
+    def from_artifact(cls, artifact: TaskArtifact, reset: dict):
+        if not isinstance(artifact, TaskArtifact) or artifact.semantics.evaluator != 'nut_assembly_state_v0':
+            raise ValueError('NutAssembly task definition requires its semantic Artifact')
+        return cls(artifact.identity_hash, artifact.semantics, reset['sampler_id'],
+                   reset['sampler_version'], reset['inherited_state_policy'],
+                   reset['control_policy'], int(reset['settle_steps']))
+
+    def evaluate(self, state, semantics):
+        if not isinstance(state, CanonicalStateView) or semantics != self.semantics:
+            raise ValueError('unsupported canonical NutAssembly state/semantics')
+        return _evaluate_bound(state, semantics)
+
+    def sample_reset(self, artifact, task_seed):
+        if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != self.artifact_hash:
+            raise ValueError('selected NA-S0 TaskArtifact required')
+        if type(task_seed) is not int or task_seed != 19:
+            raise ValueError('selected NA-S0 uses fixed provenance seed19')
+        initial = artifact.initialization
+        return ResetSample.create(
+            schema_version='reset-sample-v0', task_artifact_hash=artifact.identity_hash,
+            sampler_id=self.sampler_id, sampler_version=self.sampler_version, task_seed=task_seed,
+            joint_position=dict(initial.joint_position), poses_world=dict(initial.poses_world),
+            velocity_policy=self.velocity_policy, control_policy=self.control_policy,
+            settle_steps=self.settle_steps,
+        )
 
 
 def _reset_seed(seed):
@@ -189,7 +235,7 @@ from .specialization import (
     build_native_feedback_solution,
 )
 
-__all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
+__all__ = ["NutAssemblyTaskDefinition", "NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
            "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
            "sample_reset", "semantic_definition", "build_gripper_cadence_diagnostic_reference",
            "build_gripper_cadence_diagnostic_solution", "build_native_feedback_reference",
