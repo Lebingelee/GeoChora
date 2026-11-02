@@ -118,7 +118,7 @@ def test_compiler_uses_builtin_catalog_but_preserves_candidate_spec():
         'repo_dirty': False, 'expected_untracked': [],
     }), patch('catalog_query.core_context', return_value={'core_repo': '/tmp/core', 'core_commit': 'commit', 'core_dirty': False}), \
          patch.object(subprocess, 'check_output', return_value=''), \
-         patch('task_env.tasks.pick_cube.task.build_reference', return_value=value):
+         patch('task_env.tasks.pick_cube.specialization.build_reference', return_value=value):
         compiled = harness_compiler.compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
 
     assert compiled.artifact_hash == 'f' * 64
@@ -149,7 +149,7 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
         'repo_dirty': False, 'expected_untracked': [],
     }), patch('catalog_query.core_context', return_value={'core_repo': '/tmp/core', 'core_commit': 'commit', 'core_dirty': False}), \
          patch.object(subprocess, 'check_output', return_value=''), \
-         patch('task_env.tasks.pick_cube.task.build_isaac_reference', return_value={
+         patch('task_env.tasks.pick_cube.specialization.build_isaac_reference', return_value={
              'artifact': _artifact(), 'construction_id': 'f06', 'recipe_identity': 'a' * 64,
              'controller': SimpleNamespace(identity='b' * 64),
              'solution_identity': 'c' * 64, 'source_revision': 'commit',

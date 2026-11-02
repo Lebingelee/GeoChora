@@ -180,7 +180,7 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         controller_profile='r3_continuous_v1',
         source_delivery_manifest=manifest,
     )
-    with patch('task_env.tasks.pick_cube.task.build_isaac_reference',
+    with patch('task_env.tasks.pick_cube.specialization.build_isaac_reference',
                return_value={'construction': 'external'}) as build:
         result = binding.build_external('isaacsim')
 

@@ -146,7 +146,7 @@ def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliver
         'required_object_kinds':['cube-v1'],'required_scene_uid':'tabletop-v1',
         'timebase':{'physics_dt':.002,'control_substeps':5},'reset_z_fixed':True,
         'additional_fixtures':False,'lift_height_m_max':.105}}
-    from task_env.tasks.pick_cube.task import build_artifact
+    from task_env.tasks.pick_cube.specialization import build_artifact
     base=build_artifact()
     result['template_details']['pick-lift-v0']['spec_template']={
         'schema_version':'harness-candidate-spec-v0','task_id':'suite/task-v0','template':'pick-lift-v0',
@@ -159,7 +159,7 @@ def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliver
     # The selected PickCube task is a built-in Core owner, not a synthetic
     # external asset. Keep its example contract separate from the strict
     # pick-lift-v0 CandidateSpec / 20-seed Oracle path.
-    from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID
+    from task_env.tasks.pick_cube.specialization import REFERENCE_ENV_ID
     result['builtin_examples'] = {
         'pickcube-harness-example-v1': {
             'schema_version': 'harness-builtin-example-catalog-v1',

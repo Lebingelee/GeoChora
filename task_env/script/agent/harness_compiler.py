@@ -156,7 +156,7 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         provider_row = catalog.get('providers', {}).get(spec.provider)
         if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
             raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
-        from task_env.tasks.pick_cube.task import build_reference
+        from task_env.tasks.pick_cube.specialization import build_reference
         value = build_reference(backend='cpu', controller_profile=spec.controller_profile)
     else:
         route = record.get('provider_routes', {}).get('isaacsim')
@@ -164,7 +164,7 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
                 or route.get('device') != 'cuda:0'
                 or type(route.get('runtime_tested')) is not bool):
             raise ValueError('catalog does not expose the exact F06 Isaac execution intersection')
-        from task_env.tasks.pick_cube.task import build_isaac_reference
+        from task_env.tasks.pick_cube.specialization import build_isaac_reference
         value = build_isaac_reference(
             delivery_manifest=spec.source_delivery_manifest,
             task_seed=spec.seeds[0], horizon=spec.horizon_control_ticks,

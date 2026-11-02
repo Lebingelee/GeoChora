@@ -259,7 +259,7 @@ def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
 ) -> PickCubeIsaacRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
-    from .task import _configuration, build_artifact
+    from .specialization import _configuration, build_artifact
 
     if type(task_seed) is not int or task_seed < 0:
         raise ValueError("F06 PickCube task_seed must be a nonnegative integer")
