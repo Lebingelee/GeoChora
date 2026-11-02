@@ -445,7 +445,8 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
-                          include_solution=True, controller_profile="r3_continuous_v1"):
+                          include_solution=True, controller_profile="r3_continuous_v1",
+                          resolved_config=None):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
         raise ValueError("F06 Isaac freezes the existing r3_continuous_v1 profile")
@@ -458,7 +459,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     # Reuse the task's existing action/readiness configuration and production
     # R3 physical profile; only the source-bound position writer changes.
     legacy = build_reference(backend="cpu", include_solution=False,
-                             controller_profile=controller_profile)
+                             controller_profile=controller_profile, resolved_config=resolved_config)
     runtime_input = build_pickcube_isaac_runtime_input_v1(
         delivery_manifest, task_seed=task_seed, horizon=horizon,
     )
@@ -498,13 +499,17 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
                                        text=True).strip()
+    effective_config = (legacy["resolved_configuration"]["runtime_config"]
+                        if resolved_config is None else asdict(resolved_config))
+    effective_config_sha = hashlib.sha256(json.dumps(
+        effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     resolved = {
         "construction_id": "pickcube-p16-reference-construction-v2",
         "task_recipe": legacy["resolved_configuration"]["task_recipe"],
         "artifact": runtime_input.artifact.to_mapping(),
         "artifact_sha256": runtime_input.artifact.identity_hash,
-        "runtime_config": legacy["resolved_configuration"]["runtime_config"],
-        "runtime_config_sha256": legacy["resolved_configuration"]["runtime_config_sha256"],
+        "runtime_config": effective_config,
+        "runtime_config_sha256": effective_config_sha,
         "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
         "resolved_controller_gripper": legacy["resolved_configuration"]["resolved_controller_gripper"],
         "controller_identity": controller.identity,
@@ -570,6 +575,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
+                **({"resolved_config": resolved_config} if resolved_config is not None else {}),
             )
         return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
 
@@ -578,6 +584,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
+                **({"resolved_config": resolved_config} if resolved_config is not None else {}),
             )
         return build_reference(backend="cpu", include_solution=False,
                                controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
@@ -589,6 +596,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
+                **({"resolved_config": resolved_config} if resolved_config is not None else {}),
             )
         return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
 
@@ -654,7 +662,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         if provider == 'isaacsim':
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,
-                                            controller_profile=profile)
+                                            controller_profile=profile, resolved_config=config.environment)
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
                       _execution_spec_v1=initial['execution_spec_v1'], _initial_value=initial)
         else:
