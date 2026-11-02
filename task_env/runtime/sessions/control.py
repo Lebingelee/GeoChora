@@ -779,10 +779,11 @@ def materialize_control(
         )
         from ...controllers.canonical.contracts import digest
         expected_controller_identity = {
-            # The integrated R3 implementation has a new source-bound identity
-            # after the F/R merge; keep the same narrow cadence allowlist.
-            100: '6855bc21cb40a338c2696b3ad2199bba7643ed843eae420b3529bee0bc0d7f41',
-            500: '7185baab832521314236907ba93221e6151f94ac5a5e71036fd07047bb028571',
+            # Pin the current source-bound R3 identity after the v2.1 shared
+            # construction migration; the field-level controller contract
+            # below remains independently checked.
+            100: 'fc305c8e0b4e784ef32a4c3a8d54330ccb493d50e0561d2ab204df9200ec5eb8',
+            500: '927eb0ac7e09a9787a8577e84488be905896e3c6a1d3f786202d0a6e0cfadad1',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
@@ -813,12 +814,12 @@ def materialize_control(
                     (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
                 or actual_controller.gripper_config.force_limit_N != 10.0
                 or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
-                or selected_solution.identity != 'febccdaf76da5e44760f44b82907f7e4982717c2fd68ca2919c9453523ec0712'
+                or selected_solution.identity != 'f8478e2810955389c1a6e65bfe6ba66e5e4281bb01684c0cc007325a360065ad'
                 or selected_solution.require_native_feedback_contract is not True
                 or digest(asdict(selected_solution.config)) !=
                     '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
                 or selected_solution.base_controller_identity !=
-                    '05f395e0653ccc4e2f0702544d0b78ce333a449aac5a07409b4de06bdeca0db6'
+                    '6571627a613f60a0e9d221e5ef1557899b4aa793b81d4d7c0202abc1ee075184'
                 or selected_solution.control_dt != 0.01
                 or selected_solution.physics_dt_s != 0.002
                 or selected_solution.source_closure_digest is not None
