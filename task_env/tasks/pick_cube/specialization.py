@@ -20,7 +20,8 @@ from ...artifacts import (
 )
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
-from ...assembly.compiler import compile_reference_source
+from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
+                                   compile_panda_box_source)
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest
 from ...environment import (
@@ -89,99 +90,45 @@ def _environment_config():
     return replace(config, runtime=runtime, render=replace(config.render, camera_obs=False))
 
 
-def build_artifact(*, lift_height_m=None) -> TaskArtifact:
-    """Build the selected serialized TaskArtifact through canonical Core contracts."""
+def _declaration(*, lift_height_m=None):
     recipe = _recipe()
-    scene = recipe["scene"]
-    reset = recipe["reset"]
-    center = tuple(float(value) for value in np.asarray(reset["center_xy"], dtype=np.float32))
-    half_extent = float(reset["half_extent_m"])
-    dimensions = tuple(
-        UniformDimension(f"cube-v1.position_world.{axis}",
-            (value - half_extent, value + half_extent),
-            (value - half_extent, value + half_extent),
-            (value - half_extent, value + half_extent),
-            (value - half_extent, value + half_extent))
-        for axis, value in zip(("x", "y"), center, strict=True)
-    )
-    initial_joints = {f"panda-v1/{name}": value
-        for name, value in PandaAgent().initial_state_spec().joint_positions}
-    table_half = tuple(float(value) for value in scene["table_half_size"])
-    artifact = compile_declared_artifact(
-        artifact_id=recipe["artifact_id"], task_id=recipe["task_uid"],
-        version=recipe["artifact_version"],
-        entities=(
-                EntityDefinition("tabletop-v1", "static", "tabletop-v1/task-local",
-                    ("tabletop-v1/top",), (), "box", "support_contact",
-                    {"top_z": float(scene["table_top_z"]), **{
-                        f"half_size_{axis}": value for axis, value in zip("xyz", table_half, strict=True)}}),
-                EntityDefinition("panda-v1", "embodiment",
-                    "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
-                    ("panda-v1/base", EEF),
-                    (*tuple(f"panda-v1/joint{i}" for i in range(1, 8)), *FINGERS),
-                    "referenced_articulation", "arm_hand_finger_collision", {}),
-                EntityDefinition("cube-v1", "movable", "cube-v1/task-local", (), (),
-                    "free_box", "table_hand_contact",
-                    {"half_size": CUBE_HALF_SIZE, "mass": CUBE_MASS, **{
-                        f"inertia_{axis}": value for axis, value in zip("xyz", CUBE_DIAG_INERTIA, strict=True)}}),
-            ),
-        action=ActionIntent("absolute_pose", "world", "quaternion_wxyz",
-            "arm_joint_position_and_gripper"),
-        observations=("task-env-state-v2", "privileged_state"),
-        initialization=InitializationContract(
-            schema_version="initialization-v0",
-            poses_world={"cube-v1": PoseWorld(
-                (center[0], center[1], float(scene["table_top_z"]) + CUBE_HALF_SIZE + CUBE_CONTACT_MARGIN),
-                (1.0, 0.0, 0.0, 0.0))},
-            joint_position=initial_joints, randomization=dimensions,
-            inherited_state_policy="zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
-            reset_validity="cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz",
-            settle_steps=0,
-        ),
+    scene, reset = recipe["scene"], recipe["reset"]
+    return PandaBoxDeclaration(
+        task_id=recipe["task_uid"], artifact_id=recipe["artifact_id"],
+        version=recipe["artifact_version"], object_id="cube-v1",
+        success_definition=recipe["success_definition"],
+        table_half_size=tuple(scene["table_half_size"]), table_top_z=scene["table_top_z"],
+        table_center_xy=tuple(scene["table_center_xy"]),
+        source_box_position=tuple(scene["initial_cube_position"]),
+        source_box_quaternion_wxyz=tuple(scene["initial_cube_quaternion_wxyz"]),
+        reset_center_xy=tuple(reset["center_xy"]), reset_half_extent_m=reset["half_extent_m"],
         semantics=semantic_definition(lift_height_m=lift_height_m),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]),
                           float(recipe["control_dt"])),
-        capabilities=(
-            "rigid_body", "free_body", "articulated_robot", "joint_position_actuation",
-            "joint_state_query", "body_pose_query", "frame_pose_query",
-        ),
     )
-    return artifact
+
+
+def build_artifact(*, lift_height_m=None) -> TaskArtifact:
+    return compile_panda_box_artifact(_declaration(lift_height_m=lift_height_m))
 
 
 def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None, lift_height_m=None) -> RuntimeSource:
-    if artifact.identity_hash != build_artifact(lift_height_m=lift_height_m).identity_hash:
+    declaration = _declaration(lift_height_m=lift_height_m)
+    if artifact.identity_hash != compile_panda_box_artifact(declaration).identity_hash:
         raise ValueError("selected P1.6 TaskArtifact required")
     if backend not in {"cpu", "cuda"}:
         raise ValueError("PickCube reference backend must be cpu or cuda")
-    recipe = _recipe()
-    scene = recipe["scene"]
-    cube_position = tuple(float(value) for value in scene["initial_cube_position"])
-    cube_quaternion = tuple(float(value) for value in scene["initial_cube_quaternion_wxyz"])
-    composer = PickCubeSceneComposer(
-        table_half_size=scene["table_half_size"], table_top_z=scene["table_top_z"],
-        table_center_xy=scene["table_center_xy"], cube_world_pos=cube_position,
-        cube_world_quat=cube_quaternion,
-    )
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
-    composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
-        tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
-        success_definition=recipe["success_definition"])
-    return compile_reference_source(
-        artifact=artifact, scene_source=composer.build_source_description(),
-        bodies={"cube-v1": "PickCube"}, frames={EEF: EE_SITE_NAME},
-        free_joints={"cube-v1": "PickCube_joint"},
-        joint_targets={f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)},
-        open_actuators=("actuator8",), composition=composition, config=config,
-    )
+    return compile_panda_box_source(declaration, artifact, config)
 
 
 def _source_identity_files(controller, solution_type, *, profile_source=None):
     root = Path(__file__).resolve().parents[3]
     files = {Path(__file__).resolve(), Path(__file__).with_name("task.py").resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
-             Path(inspect.getsourcefile(compile_reference_source)).resolve(),
+             Path(inspect.getsourcefile(compile_panda_box_source)).resolve(),
+             Path(__file__).parents[2].joinpath("assembly/compiler.py").resolve(),
              Path(inspect.getsourcefile(compile_declared_artifact)).resolve(),
              Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
