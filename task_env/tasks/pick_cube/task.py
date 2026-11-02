@@ -619,35 +619,49 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
     binding = make_reference_binding()
 
+    uses_selected_public_config = True
+    selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
+    selected_supports_isaac = True
+
+    @staticmethod
+    def selected_default_config():
+        return _environment_config()
+
+    @staticmethod
+    def selected_default_controller_profile():
+        return _recipe()["default_controller_profile"]
+
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
-        values = {} if config is None else dict(config)
+        """Compatibility entry; parsing belongs to the common resolver."""
+        from ...environment.configuration import resolve_task_env_config
+        return cls.from_resolved_config(resolve_task_env_config(cls, config),
+                                        render_mode=render_mode, **kwargs)
+
+    @classmethod
+    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
+        from ...environment.config import ResolvedSelectedConfig
+        if type(config) is not ResolvedSelectedConfig:
+            raise TypeError("selected construction requires resolved configuration")
         if kwargs or render_mode is not None:
             raise ValueError('selected reference admits state-only execution without extra kwargs')
-        if set(values) - {'provider', 'backend', 'horizon', 'controller_profile',
-                          'source_delivery_manifest'}:
-            raise ValueError('PickCube selected config admits provider/backend/horizon/controller_profile/source_delivery_manifest only')
-        provider = values.get('provider', 'geophys')
-        backend = values.get('backend', 'cpu')
-        controller_profile = values.pop('controller_profile', _recipe()['default_controller_profile'])
-        manifest = values.pop('source_delivery_manifest', None)
-        binding = make_reference_binding(
-            controller_profile=controller_profile,
-            source_delivery_manifest=manifest,
-        )
+        provider = config.physics_provider
+        backend = config.environment.runtime.backend
+        horizon = config.environment.episode.horizon
+        profile = config.controller_profile
+        manifest = config.source_delivery_manifest
+        binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest)
         if provider == 'isaacsim':
-            if backend != 'cuda' or manifest is None:
-                raise ValueError('F06 Isaac PickCube requires backend=cuda and source_delivery_manifest')
-            initial = build_isaac_reference(
-                delivery_manifest=manifest, task_seed=31, include_solution=False,
-                horizon=values.get('horizon', 1000),
-                controller_profile=controller_profile,
-            )
-            return cls(_binding=binding,
-                       _execution_spec_v1=initial['execution_spec_v1'], **values)
-        if manifest is not None:
-            raise ValueError('source_delivery_manifest is only admitted for the exact Isaac F06 route')
-        return cls(_binding=binding, **values)
+            initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
+                                            horizon=horizon, include_solution=False,
+                                            controller_profile=profile)
+            env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
+                      _execution_spec_v1=initial['execution_spec_v1'])
+        else:
+            env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding)
+        env.resolved_public_config = config
+        return env
+
 
 
 __all__ = [

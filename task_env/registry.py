@@ -153,10 +153,14 @@ def make_env(
             "Restore the immutable v1.0.0 source for historical execution."
         )
     environment_type = ENV_REGISTRY.get(uid)
-    if hasattr(environment_type, 'from_reference_config'):
-        return environment_type.from_reference_config(config, render_mode=render_mode, **kwargs)
     from .environment.configuration import resolve_task_env_config
 
+    if getattr(environment_type, "uses_selected_public_config", False):
+        resolved_config = resolve_task_env_config(environment_type, config)
+        return environment_type.from_resolved_config(resolved_config, render_mode=render_mode, **kwargs)
+    if hasattr(environment_type, 'from_reference_config'):
+        # Other selected candidates retain their bounded compatibility route.
+        return environment_type.from_reference_config(config, render_mode=render_mode, **kwargs)
     resolved_config = resolve_task_env_config(environment_type, config)
     if resolved_config.runtime.batch_physics_layout != "merged_scene":
         from .environment.types import StageUnavailableError

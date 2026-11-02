@@ -40,7 +40,7 @@ def main(argv=None) -> int:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
 
-            env = make_env(ENV_ID, config={"provider": args.provider, "backend": "cpu", "horizon": args.horizon})
+            env = make_env(ENV_ID, config={"execution": {"physics_provider": args.provider, "physics_backend": "cpu"}, "episode": {"horizon": args.horizon}})
             episode = run_expert(env, seed=args.seed, horizon=args.horizon)
             report.update(episode=episode, identity=identity_summary(env, provider=args.provider), resource_budget=budget)
             report["status"] = episode["status"]

@@ -19,6 +19,7 @@ from .config import (
     ObservationConfig,
     RenderConfig,
     ResolvedEnvConfig,
+    ResolvedSelectedConfig,
     RobotConfig,
     RobotControllerConfig,
     RuntimeConfig,
@@ -233,6 +234,88 @@ def overlay_public_env_config(
     )
 
 
+def _resolve_selected_config(environment_type, config):
+    """Normalize selected legacy fields at the common configuration boundary."""
+    supplied = config if isinstance(config, ResolvedSelectedConfig) else None
+    if supplied is not None:
+        if supplied.task_uid != environment_type.uid:
+            raise ValueError("resolved configuration belongs to another task")
+        config = {"execution": {"physics_provider": supplied.physics_provider,
+                                "physics_backend": supplied.environment.runtime.backend,
+                                "physics_device": supplied.physics_device,
+                                "source_delivery_manifest": supplied.source_delivery_manifest},
+                  "episode": {"horizon": supplied.environment.episode.horizon}}
+        if supplied.controller_profile is not None:
+            config["task"] = {"controller_profile": supplied.controller_profile}
+    if isinstance(config, (str, Path)):
+        config = load_yaml_mapping(config)
+    if config is None:
+        config = {}
+    if not isinstance(config, Mapping):
+        raise TypeError("selected TaskEnv config must be a mapping or YAML path")
+    values = dict(config)
+    allowed = {"execution", "episode", "task", "provider", "backend", "horizon",
+               "controller_profile", "source_delivery_manifest"}
+    unknown = set(values) - allowed
+    if unknown:
+        raise KeyError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
+    sections = {}
+    for name in ("execution", "episode", "task"):
+        section = values.get(name, {})
+        if not isinstance(section, Mapping):
+            raise TypeError(f"{name} must be a mapping")
+        sections[name] = dict(section)
+    allowed_sections = {
+        "execution": {"physics_provider", "physics_backend", "physics_device", "source_delivery_manifest"},
+        "episode": {"horizon"},
+        "task": {"controller_profile"} if environment_type.selected_controller_profiles else set(),
+    }
+    for name, section in sections.items():
+        unknown = set(section) - allowed_sections[name]
+        if unknown:
+            raise KeyError(f"unsupported selected {name} fields: {sorted(unknown)}")
+    aliases = {"provider": ("execution", "physics_provider"),
+               "backend": ("execution", "physics_backend"),
+               "horizon": ("episode", "horizon"),
+               "controller_profile": ("task", "controller_profile"),
+               "source_delivery_manifest": ("execution", "source_delivery_manifest")}
+    for old, (section, key) in aliases.items():
+        if old not in values:
+            continue
+        if key not in allowed_sections[section]:
+            raise KeyError(f"{old} is not available for this task")
+        if key in sections[section]:
+            raise ValueError(f"{old} conflicts with {section}.{key}")
+        sections[section][key] = values[old]
+    base = environment_type.selected_default_config()
+    execution = sections["execution"]
+    provider = execution.get("physics_provider", "geophys")
+    backend = execution.get("physics_backend", "cpu")
+    device = execution.get("physics_device", "cuda:0" if backend == "cuda" else "cpu")
+    if (provider, backend, device) not in {("geophys", "cpu", "cpu"),
+                                           ("mujoco", "cpu", "cpu"),
+                                           ("isaacsim", "cuda", "cuda:0")}:
+        raise ValueError("unsupported selected physics provider/backend/device combination")
+    profile = sections["task"].get("controller_profile", environment_type.selected_default_controller_profile())
+    if profile is not None and profile not in environment_type.selected_controller_profiles:
+        raise ValueError(f"unsupported selected controller profile: {profile!r}")
+    manifest = execution.get("source_delivery_manifest")
+    if provider == "isaacsim":
+        if not environment_type.selected_supports_isaac or manifest is None or profile != "r3_continuous_v1":
+            raise ValueError("Isaac PickCube requires R3 and an explicit source delivery manifest")
+    elif manifest is not None:
+        raise ValueError("source_delivery_manifest requires the supported Isaac route")
+    horizon = sections["episode"].get("horizon", base.episode.horizon)
+    if type(horizon) is not int or not 1 <= horizon <= 6000:
+        raise ValueError("selected reference horizon must be an integer in [1, 6000]")
+    env = replace(base, runtime=replace(base.runtime, backend=backend),
+                  episode=replace(base.episode, horizon=horizon))
+    result = ResolvedSelectedConfig(env, environment_type.uid, provider, device, profile, manifest)
+    if supplied is not None and supplied != result:
+        raise ValueError("resolved selected configuration contains unsupported overrides")
+    return result
+
+
 def resolve_task_env_config(
     environment_type,
     config: ResolvedEnvConfig | Mapping[str, object] | str | Path | None,
@@ -246,6 +329,8 @@ def resolve_task_env_config(
     cannot replace task-owned scene, object, agent, or success-definition fields.
     """
 
+    if getattr(environment_type, "uses_selected_public_config", False):
+        return _resolve_selected_config(environment_type, config)
     if isinstance(config, ResolvedEnvConfig):
         return config
     base = environment_type.default_config()

@@ -557,6 +557,22 @@ class ResolvedEnvConfig:
 
 
 @dataclass(frozen=True)
+class ResolvedSelectedConfig:
+    """Resolved common environment and selected execution choices.
+
+    Task-specific switches are validated before this value is constructed.
+    Physics and renderer choices remain separate in their existing owners.
+    """
+
+    environment: ResolvedEnvConfig
+    task_uid: str
+    physics_provider: str
+    physics_device: str
+    controller_profile: str | None = None
+    source_delivery_manifest: str | None = None
+
+
+@dataclass(frozen=True)
 class ExecutionPlan:
     """Immutable static projection of the current generic TaskEnv route.
 

@@ -170,8 +170,9 @@ def main(argv=None) -> int:
             from task_env import make_env
 
             env = make_env(ENV_ID, config={
-                "provider": args.provider, "backend": "cpu", "horizon": args.horizon,
-                "controller_profile": args.controller_profile,
+                "execution": {"physics_provider": args.provider, "physics_backend": "cpu"},
+                "episode": {"horizon": args.horizon},
+                "task": {"controller_profile": args.controller_profile},
             })
             construction_succeeded = True
             _, reset_info = env.reset(seed=args.seed)

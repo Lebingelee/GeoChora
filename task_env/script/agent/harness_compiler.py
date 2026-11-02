@@ -66,12 +66,14 @@ class CompiledBuiltinPickCubeExampleV1:
         # parallel task factory or binding implementation.
         from task_env import make_env
         return make_env(self.spec.task_uid, config={
-            'provider': self.spec.provider,
-            'backend': self.spec.backend,
-            'horizon': self.spec.horizon_control_ticks,
-            'controller_profile': self.spec.controller_profile,
-            **({'source_delivery_manifest': self.spec.source_delivery_manifest}
-               if self.spec.source_delivery_manifest is not None else {}),
+            'execution': {
+                'physics_provider': self.spec.provider,
+                'physics_backend': self.spec.backend,
+                **({'source_delivery_manifest': self.spec.source_delivery_manifest}
+                   if self.spec.source_delivery_manifest is not None else {}),
+            },
+            'episode': {'horizon': self.spec.horizon_control_ticks},
+            'task': {'controller_profile': self.spec.controller_profile},
         })
 
 

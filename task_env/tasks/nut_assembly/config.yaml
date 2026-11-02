@@ -145,7 +145,7 @@ environment:
     schema_version: task-env-state-v2
     include_privileged_state: true
   episode:
-    horizon: 1000
+    horizon: 6000
   runtime:
     rigid_solver_backend: row_pgs
   robot:

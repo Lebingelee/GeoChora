@@ -666,6 +666,35 @@ def _binding():
 class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
     binding = _binding()
+    uses_selected_public_config = True
+    selected_controller_profiles = frozenset()
+    selected_supports_isaac = False
+
+    @staticmethod
+    def selected_default_config():
+        return _environment_config()
+
+    @staticmethod
+    def selected_default_controller_profile():
+        return None
+
+    @classmethod
+    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
+        from ...environment.configuration import resolve_task_env_config
+        return cls.from_resolved_config(resolve_task_env_config(cls, config),
+                                        render_mode=render_mode, **kwargs)
+
+    @classmethod
+    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
+        from ...environment.config import ResolvedSelectedConfig
+        if type(config) is not ResolvedSelectedConfig:
+            raise TypeError("selected construction requires resolved configuration")
+        if kwargs or render_mode is not None:
+            raise ValueError('selected reference admits state-only execution without extra kwargs')
+        env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
+                  horizon=config.environment.episode.horizon)
+        env.resolved_public_config = config
+        return env
 
     @classmethod
     def for_gripper_cadence_diagnostic(cls, *, backend, gripper_control_hz, horizon=6000):
