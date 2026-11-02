@@ -364,12 +364,12 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu") -> RuntimeSou
     )
 
 
-def _source_identity_files(controller, solution, *, profile_source=None):
+def _source_identity_files(controller, solution_type, *, profile_source=None):
     root = Path(__file__).resolve().parents[3]
     files = {Path(__file__).resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
              Path(inspect.getsourcefile(type(controller))).resolve(),
-             Path(inspect.getsourcefile(type(solution))).resolve(),
+             Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     canonical = root / "task_env" / "controllers" / "canonical"
@@ -412,10 +412,11 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
                 PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
             ),
         )
-    solution = PickCubeReadinessSolution(config=readiness)
+    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+    solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    source_ids = _source_identity_files(controller, solution, profile_source=profile_source)
+    source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
     runtime_config = asdict(source.config)
     resolved = {
         "construction_id": recipe["construction_id"], "task_recipe": _configuration(),
@@ -424,7 +425,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
             json.dumps(runtime_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
         "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
         "resolved_controller_gripper": asdict(controller.gripper_config),
-        "controller_identity": controller.identity, "solution_identity": solution.identity,
+        "controller_identity": controller.identity, "solution_identity": solution_identity,
         "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
         "source_revision": revision, "source_sha256": source_ids,
         "runtime_source_bindings": {name: dict(getattr(source, name)) for name in
@@ -439,8 +440,9 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
         "readiness": readiness, "controller": controller,
-        "solution": solution if include_solution else None,
-        "solution_identity": solution.identity,
+        "solution": solution,
+        "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
+        "solution_identity": solution_identity,
         "source_revision": revision, "source_sha256": source_ids,
         "recipe_identity": digest(resolved), "resolved_configuration": resolved,
     }
@@ -486,7 +488,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
     )
     readiness = legacy["readiness"]
-    solution_identity = PickCubeReadinessSolution(config=readiness).identity
+    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     source_ids = dict(legacy["source_sha256"])
     for path in (Path(__file__), Path(__file__).with_name("isaac.py"),
@@ -530,6 +532,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         "readiness": readiness,
         "controller": controller,
         "solution": solution,
+        "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
         "solution_identity": solution_identity,
         "source_revision": revision,
         "source_sha256": source_ids,
@@ -545,7 +548,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     }
 
 
-def build_readiness_solution(*, backend="cpu", controller_profile="r1"):
+def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
     """Build the task-owned PickCube readiness Solution for an external driver."""
     return build_reference(backend=backend, controller_profile=controller_profile)["solution"]
 
@@ -569,10 +572,10 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             if source_delivery_manifest is None:
                 raise ValueError("F06 Isaac PickCube requires its explicit source_delivery_manifest")
             return build_isaac_reference(
-                delivery_manifest=source_delivery_manifest,
+                delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", controller_profile=controller_profile)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile)
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -589,9 +592,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
-                horizon=horizon, controller_profile=controller_profile,
+                horizon=horizon, include_solution=False, controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", controller_profile=controller_profile)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile)
 
     return ReferenceTaskBinding(
         build=build,
@@ -636,7 +639,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             if backend != 'cuda' or manifest is None:
                 raise ValueError('F06 Isaac PickCube requires backend=cuda and source_delivery_manifest')
             initial = build_isaac_reference(
-                delivery_manifest=manifest, task_seed=31,
+                delivery_manifest=manifest, task_seed=31, include_solution=False,
                 horizon=values.get('horizon', 1000),
                 controller_profile=controller_profile,
             )

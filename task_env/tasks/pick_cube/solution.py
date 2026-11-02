@@ -622,10 +622,18 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._last_measured_tcp_gate_hold = False
         self._last_public_observation = None
         super().__init__(config=config.base)
-        implementation_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-        self.identity = digest({
-            "version": self.version, "config": config.identity,
-            "implementation_sha256": implementation_hash,
+        self.identity = self.identity_for_config(config)
+
+    @classmethod
+    def identity_for_config(cls, config: PickCubeReadinessConfig):
+        """Identify an expert configuration without constructing mutable rollout state."""
+        version = (
+            "pick-cube-p16-readiness-expert-v3-measured-tcp-clearance"
+            if config.measured_tcp_clearance_gate else cls.version
+        )
+        return digest({
+            "version": version, "config": config.identity,
+            "implementation_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         })
 
     def _execution(self, execution_info, *, reset=False):

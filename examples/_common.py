@@ -102,6 +102,7 @@ def run_expert(env, *, seed: int, horizon: int, already_reset: bool = False,
         info = dict(initial_info or {})
     terminated = truncated = False
     transitions = 0
+    env.prepare_expert()
     while transitions < horizon and not env.solution.done and not env.solution.failed:
         _, _, terminated, truncated, info = env.step_expert()
         transitions += 1

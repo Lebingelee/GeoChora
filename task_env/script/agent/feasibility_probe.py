@@ -66,6 +66,7 @@ def run_seed(env_class, provider, seed, horizon):
         row['reset_attempted'] = True
         _, info = env.reset(seed=seed)
         row['reset_succeeded'] = True
+        env.prepare_expert()
         phase = 'execution'
         row['phase'] = phase
         while True:

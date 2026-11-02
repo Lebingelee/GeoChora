@@ -49,7 +49,7 @@ def reexecute_selected(path, *, output):
         if digest(env.value['resolved_configuration']) != digest(recipe['resolved_configuration']):
             raise ValueError('construction source/configuration identity mismatch')
         if (env.controller.identity != metadata['controller_identity'] or
-                env.solution.identity != metadata['expert_identity']):
+                env.value['solution_identity'] != metadata['expert_identity']):
             raise ValueError('controller/solution identity mismatch')
         env.reset(seed=metadata['task_seed'])
         if env.sample.to_mapping() != metadata['reset_sample']:

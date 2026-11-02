@@ -416,7 +416,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                 'quaternion_wxyz': list(env.sample.poses_world['cube-v1'].quaternion_wxyz),
             },
         }
-        row['solution_identity'] = env.solution.identity
+        row['solution_identity'] = env.value['solution_identity']
         row['controller_identity'] = env.controller.identity
         row['provider_materialization_id'] = env.session.provider_materialization_id
         action_trace, write_action_trace = _install_action_trace(env, output / 'step_trace.json')

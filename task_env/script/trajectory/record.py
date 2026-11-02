@@ -59,6 +59,7 @@ def main(argv=None):
         _, info = env.reset(seed=args.seed)
         env.start_recording(args.output)
         terminated = truncated = False
+        env.prepare_expert()
         while not env.solution.done and not env.solution.failed:
             _, _, terminated, truncated, info = env.step_expert()
             if terminated or truncated:

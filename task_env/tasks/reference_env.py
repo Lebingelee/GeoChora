@@ -2315,6 +2315,26 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
             raise
 
+    def prepare_expert(self):
+        """Create and reset the task Solution on demand after an environment reset."""
+        if self._execution_fault is not None or self._stopped or self._episode_mode in {'external', 'external_solution'}:
+            raise RuntimeError('reset required before preparing expert execution')
+        if self.solution is None:
+            factory = self.value.get('solution_factory')
+            if not callable(factory):
+                raise RuntimeError('selected profile does not provide expert execution')
+            try:
+                solution = factory()
+                if getattr(solution, 'identity', None) != self.value.get('solution_identity'):
+                    raise ValueError('constructed Solution identity differs from compiled task')
+                solution.reset(self.obs, self.info, self.metadata,
+                               **self.binding.reset_expert_kwargs(self))
+            except BaseException as error:
+                self._latch_fault('solution_reset', error, before_state=self.state)
+                raise
+            self.solution = solution
+        return self.solution
+
     def step_expert(self):
         if self._execution_fault is not None:
             fault = self._execution_fault
@@ -2324,8 +2344,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
         if self._stopped or self._episode_mode in {'external', 'external_solution'}:
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
-        if self.solution is None:
-            raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
+        self.prepare_expert()
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')

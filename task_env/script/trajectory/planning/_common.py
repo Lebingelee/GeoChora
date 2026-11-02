@@ -63,7 +63,7 @@ def rollout_solution(
     if not callable(getattr(env, "step_expert", None)):
         raise TypeError("planning workflow requires a selected task-owned step_expert() route")
     observation, info = env.reset(seed=seed)
-    solution = env.solution
+    solution = env.prepare_expert()
     transitions = 0
     stages: list[str] = []
     reward_sum = 0.0
