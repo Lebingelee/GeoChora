@@ -60,21 +60,14 @@ class CompiledBuiltinPickCubeExampleV1:
     runtime_source_sha256: str
     working_tree_scope: dict
     repo_dirty: bool
+    resolved_config: object = None
 
     def make_env(self):
         # Keep construction on the public Core factory; Harness does not own a
         # parallel task factory or binding implementation.
         from task_env import make_env
-        return make_env(self.spec.task_uid, config={
-            'execution': {
-                'physics_provider': self.spec.provider,
-                'physics_backend': self.spec.backend,
-                **({'source_delivery_manifest': self.spec.source_delivery_manifest}
-                   if self.spec.source_delivery_manifest is not None else {}),
-            },
-            'episode': {'horizon': self.spec.horizon_control_ticks},
-            'task': {'controller_profile': self.spec.controller_profile},
-        })
+        return make_env(self.spec.task_uid, config=self.resolved_config)
+
 
 
 def _example_working_tree_context(core_repo, scope):
@@ -152,12 +145,24 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         raise ValueError(f'{spec.provider} is optional and not admitted by the F06 primary route compiler')
     if spec.task_uid not in catalog.get('env_uids', ()):
         raise ValueError('selected public PickCube UID is absent from the current Core registry')
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    resolved_config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': spec.provider, 'physics_backend': spec.backend,
+                      'physics_device': spec.device,
+                      **({'source_delivery_manifest': spec.source_delivery_manifest}
+                         if spec.source_delivery_manifest is not None else {})},
+        'episode': {'horizon': spec.horizon_control_ticks},
+        'task': {'controller_profile': spec.controller_profile},
+    })
     if spec.provider != 'isaacsim':
         provider_row = catalog.get('providers', {}).get(spec.provider)
         if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
             raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
         from task_env.tasks.pick_cube.specialization import build_reference
-        value = build_reference(backend='cpu', controller_profile=spec.controller_profile)
+        value = build_reference(backend='cpu', include_solution=False,
+                                controller_profile=spec.controller_profile,
+                                resolved_config=resolved_config.environment)
     else:
         route = record.get('provider_routes', {}).get('isaacsim')
         if (not isinstance(route, dict) or route.get('backend') != 'cuda'
@@ -168,7 +173,8 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         value = build_isaac_reference(
             delivery_manifest=spec.source_delivery_manifest,
             task_seed=spec.seeds[0], horizon=spec.horizon_control_ticks,
-            controller_profile=spec.controller_profile,
+            controller_profile=spec.controller_profile, include_solution=False,
+            resolved_config=resolved_config.environment,
         )
     artifact = value['artifact']
     if artifact.task_id != 'pick-cube-v1' or artifact.timebase.physics_dt != spec.physics_dt_s \
@@ -192,6 +198,7 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         runtime_source_sha256=source_digest,
         working_tree_scope=tree,
         repo_dirty=actual_dirty,
+        resolved_config=resolved_config,
     )
 
 
