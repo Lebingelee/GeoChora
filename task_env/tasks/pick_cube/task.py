@@ -656,7 +656,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                                             horizon=horizon, include_solution=False,
                                             controller_profile=profile)
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
-                      _execution_spec_v1=initial['execution_spec_v1'])
+                      _execution_spec_v1=initial['execution_spec_v1'], _initial_value=initial)
         else:
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding)
         env.resolved_public_config = config

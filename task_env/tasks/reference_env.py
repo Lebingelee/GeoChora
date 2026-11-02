@@ -347,7 +347,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                  _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
-                 _execution_spec_v1=None, _mixed_control_candidate=False):
+                 _execution_spec_v1=None, _mixed_control_candidate=False,
+                 _initial_value=None):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if camera_observation_config is not None:
@@ -449,7 +450,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
         try:
-            self.value = build_value()
+            if _initial_value is not None:
+                if (_execution_spec_v1 is None or not isinstance(_initial_value, dict)
+                        or _initial_value.get('execution_spec_v1') != _execution_spec_v1):
+                    raise ValueError('precompiled selected value must match its execution specification')
+                self.value = _initial_value
+            else:
+                self.value = build_value()
         except BaseException as error:
             fault = ExecutionFaultV1.from_exception(
                 'selected_construction', error
