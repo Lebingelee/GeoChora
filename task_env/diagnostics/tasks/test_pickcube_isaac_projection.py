@@ -281,6 +281,8 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         build_seeded=lambda *_args: rebuilt_value,
     )
     env._diagnostic_profile = None
+    env._native_feedback_profile = None
+    env._mixed_control_candidate = False
     env._position_episode_end = None
     env.session = None
     env.recorder = None
