@@ -22,7 +22,9 @@ from ...assembly.nut_assembly import build_nut_assembly_model_xml
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import StableArmTargetHold
-from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
+from ...controllers.canonical.production_r3 import (
+    ProductionCanonicalPandaControllerR3, R3_PROFILE_PATH, load_r3_dynamic_profile,
+)
 from ...environment import TaskCompositionSpec
 from ...environment.configuration import overlay_public_env_config, resolve_env_config
 from ...objects.nut_assembly import (
@@ -232,9 +234,7 @@ def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_prof
         raise ValueError('NutAssembly CUDA requires its explicit cadence or native-feedback profile')
     return replace(config, runtime=replace(config.runtime, backend=backend, prewarm=False,
         physics_dt=float(recipe["physics_dt"]), control_substeps=int(recipe["control_substeps"])),
-        render=replace(config.render, camera_obs=False),
-        robot=replace(config.robot, controller=replace(config.robot.controller,
-            kind="absolute_pose", reference="world", rotation_representation="quaternion_wxyz")))
+        render=replace(config.render, camera_obs=False))
 
 
 def _r05b_execution_source(source):
@@ -379,7 +379,8 @@ def _source_identity_files():
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
     )
     controller = root / "task_env/controllers/canonical"
-    relative = (*relative, *(p.relative_to(root).as_posix() for p in controller.glob("*.py") if p.is_file()))
+    relative = (*relative, R3_PROFILE_PATH.relative_to(root).as_posix(),
+                *(p.relative_to(root).as_posix() for p in controller.glob("*.py") if p.is_file()))
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
@@ -393,7 +394,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         artifact, provider, backend=backend, _diagnostic=diagnostic,
         _native_feedback_profile=native_feedback_profile,
     )
-    dynamic = recipe["controller"]["dynamic_profile"]
+    dynamic = load_r3_dynamic_profile()
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
     # The accepted R3 route fixes a 10 N force target/cap while preserving its
     # controller law and task-facing close authorization.

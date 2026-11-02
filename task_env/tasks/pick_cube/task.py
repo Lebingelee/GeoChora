@@ -381,17 +381,8 @@ def _source_identity_files(controller, solution, *, profile_source=None):
 
 
 def _r3_dynamic_profile():
-    """Read the already-owned NutAssembly R3 arm profile without task logic."""
-    path = Path(__file__).resolve().parents[1] / "nut_assembly" / "config.yaml"
-    data = yaml.safe_load(path.read_text())
-    recipe = data.get("recipe", {}) if isinstance(data, dict) else {}
-    controller = recipe.get("controller", {}) if isinstance(recipe, dict) else {}
-    if controller.get("implementation") != "ProductionCanonicalPandaControllerR3":
-        raise ValueError("PickCube R3 profile source no longer selects the production R3 owner")
-    profile = controller.get("dynamic_profile")
-    if not isinstance(profile, dict):
-        raise ValueError("PickCube R3 requires the existing versioned NutAssembly dynamic profile")
-    return profile, path
+    from ...controllers.canonical.production_r3 import R3_PROFILE_PATH, load_r3_dynamic_profile
+    return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1"):
@@ -635,7 +626,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             raise ValueError('PickCube selected config admits provider/backend/horizon/controller_profile/source_delivery_manifest only')
         provider = values.get('provider', 'geophys')
         backend = values.get('backend', 'cpu')
-        controller_profile = values.pop('controller_profile', 'r1')
+        controller_profile = values.pop('controller_profile', _recipe()['default_controller_profile'])
         manifest = values.pop('source_delivery_manifest', None)
         binding = make_reference_binding(
             controller_profile=controller_profile,

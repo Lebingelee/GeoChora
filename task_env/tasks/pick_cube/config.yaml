@@ -2,6 +2,7 @@ recipe:
   construction_id: pickcube-p16-reference-construction-v2
   task_uid: pick-cube-v1
   reference_env_id: pick-cube-p16-reference-v1
+  default_controller_profile: r3_continuous_v1
   artifact_id: pick-cube-v1/p1_6_experimental_100hz
   artifact_version: ver_p1_6_experimental_100hz
   control_hz: 100

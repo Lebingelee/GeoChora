@@ -17,6 +17,18 @@ from .kinematics import ARM
 from .production_r2 import ProductionCanonicalPandaControllerR2
 
 
+
+R3_PROFILE_PATH = Path(__file__).with_name("production_r3_profile.yaml")
+
+def load_r3_dynamic_profile():
+    """Return a fresh copy of the shared, versioned production profile."""
+    import yaml
+
+    profile = yaml.safe_load(R3_PROFILE_PATH.read_text(encoding="utf-8"))
+    if not isinstance(profile, dict) or set(profile) != {"controller", "gripper", "planner"}:
+        raise ValueError("invalid production R3 dynamic profile")
+    return profile
+
 def _limit_joint_velocity_direction_preserving(qdot_raw, limit_rad_s):
     """Uniformly limit a joint-velocity vector without changing its direction."""
     velocity = np.asarray(qdot_raw, dtype=float)
