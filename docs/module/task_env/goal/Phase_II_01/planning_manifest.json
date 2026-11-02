@@ -4633,7 +4633,8 @@
     "12_F05_F07_Execution_Playbook.md": "be5cac8c821904f7de62bb6e32371b84c4e09a80cf6ce4aef33b9ce248f6cf7a",
     "13_F05_Early_Diagnostic_Three_Goals.md": "f5083292146ae932c475c4be50824107ac574e4bf49506d08c33e9f1b973d77a",
     "14_F06_PickCube_Harness_Multi_Backend_Goal.md": "bf008de6e25223ec8ffffbf3718529e63e16d6dc207cf836b87c7e2e051725df",
-    "README.md": "3862eb660767a235535a09cf3fd5140a647bdbd762d765f9d9f4ac165cafd8a4"
+    "README.md": "dd3ae022063289d7b295752170af6f127344e691675d0d267ef523e744086f3d",
+    "15_V210_Public_Task_API_Refactor.md": "927c43608a5f28690978048f0c3a1e427fb57f928631529ff243751baa02baaa"
   },
   "execution_workflow": {
     "authority": "Explicit maintainer workflow preferences in the 2026-10-25 conversation; takes precedence over conflicting older workflow instructions.",
@@ -6787,6 +6788,12 @@
       "input_provider_head": "67da1165149486d3ae3e779c13ce31af49e17d50",
       "scope": "Recomputed document_sha256 against final merged planning documents; historical acceptance and failure records remain unchanged.",
       "local_evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/v210_integration_001/"
+    },
+    {
+      "date": "2026-11-02",
+      "input_core_head": "35e0b89a40e47aa17f01915ad25831c53474598f",
+      "kind": "V210_PUBLIC_TASK_API_REFACTOR_PLAN",
+      "scope": "Implementation-first API/task convergence with minimal affected validation; retains separate task.py reduction target, not cancelled historical F/R cleanup thresholds."
     }
   ],
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
@@ -9625,5 +9632,21 @@
       "cost_protocol_status": "PROPOSED_NOT_YET_FROZEN_FOR_DEPLOYMENT"
     },
     "merge_policy": "F owns F-prefixed slice/current checkpoint facts; R owns R-prefixed slice and 2026-11-01 R07 scope/acceptance facts; unique revision and authorization history entries are retained. Both source snapshots are identified above."
+  },
+  "v210_public_task_api_refactor": {
+    "attempt": 1,
+    "branch": "codex/v2.1-integration",
+    "date": "2026-11-02",
+    "execution_input_head": "frozen in ignored package input_snapshot.json after this planning commit",
+    "goal_id": "V210_PUBLIC_TASK_API_REFACTOR_20261102_001",
+    "implementation_authorized": true,
+    "implementation_baseline": "35e0b89a40e47aa17f01915ad25831c53474598f",
+    "package_id": "sol_v210_task_api_refactor_20261102_001",
+    "plan": "15_V210_Public_Task_API_Refactor.md",
+    "provider_pin": "67da1165149486d3ae3e779c13ce31af49e17d50",
+    "qualification_granted": false,
+    "release_authorized": false,
+    "scope": "PickCube/NutAssembly public construction and config; LIBERO shared construction; lightweight tasks compatibility; docs/Skills; bounded affected checks only",
+    "status": "READY_FOR_MAINTAINER_FORWARDING_NOT_EXECUTED"
   }
 }
