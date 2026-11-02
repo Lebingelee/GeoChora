@@ -302,7 +302,7 @@ def _r05b_execution_source(source):
 
 
 def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu',
-                         _diagnostic=False, _native_feedback_profile=False):
+                         _diagnostic=False, _native_feedback_profile=False, resolved_config=None):
     if artifact.to_mapping() != build_artifact().to_mapping():
         raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
@@ -312,10 +312,9 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         raise ValueError('selected NutAssembly CUDA source requires an explicit GeoPhys profile')
     recipe = _recipe()
     source_config = recipe["controller"]
-    config = _environment_config(
-        backend=backend, diagnostic=_diagnostic,
-        native_feedback_profile=_native_feedback_profile,
-    )
+    config = (_environment_config(backend=backend, diagnostic=_diagnostic,
+                                  native_feedback_profile=_native_feedback_profile)
+              if resolved_config is None else resolved_config)
     config = replace(config,
         action=replace(config.action, **source_config["action_overrides"]),
         robot=replace(config.robot,
@@ -385,14 +384,14 @@ def _source_identity_files():
 
 
 def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
-                     diagnostic, native_feedback_profile=False):
+                     diagnostic, native_feedback_profile=False, resolved_config=None):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
     recipe = _recipe()
     artifact = build_artifact()
     source, contact_profile = build_runtime_source(
         artifact, provider, backend=backend, _diagnostic=diagnostic,
-        _native_feedback_profile=native_feedback_profile,
+        _native_feedback_profile=native_feedback_profile, resolved_config=resolved_config,
     )
     dynamic = load_r3_dynamic_profile()
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
@@ -486,11 +485,11 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         "_contact_profile": contact_profile}
 
 
-def build_reference(*, provider="mujoco", include_solution=True):
+def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None):
     """Build the unchanged selected 100 Hz/500 Hz reference route."""
     return _build_reference(
         provider=provider, include_solution=include_solution,
-        backend='cpu', gripper_control_hz=500, diagnostic=False,
+        backend='cpu', gripper_control_hz=500, diagnostic=False, resolved_config=resolved_config,
     )
 
 
@@ -635,8 +634,8 @@ def _observe_kwargs(env, native_samples, receipt):
         "native_interval_receipt": receipt}
 
 
-def _binding():
-    return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider),
+def _binding(resolved_config=None):
+    return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, resolved_config=resolved_config),
         reset_sample=sample_reset, evaluate=evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
         external_actions=False, interval_mode="native", recorder_mode="execution",
@@ -644,7 +643,8 @@ def _binding():
         reset_seed=_reset_seed, observe_expert_kwargs=_observe_kwargs,
         native_sample_factory=_native_feedback_sample,
         native_interval_receipt_factory=_native_interval_receipt,
-        build_external=lambda provider: build_reference(provider=provider, include_solution=False),
+        build_external=lambda provider: build_reference(provider=provider, include_solution=False,
+                                                        resolved_config=resolved_config),
         build_gripper_cadence_diagnostic=lambda provider, backend, gripper_control_hz, include_solution:
             build_gripper_cadence_diagnostic_reference(
                 backend=backend, gripper_control_hz=gripper_control_hz,
@@ -692,7 +692,7 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
         if kwargs or render_mode is not None:
             raise ValueError('selected reference admits state-only execution without extra kwargs')
         env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
-                  horizon=config.environment.episode.horizon)
+                  horizon=config.environment.episode.horizon, _binding=_binding(config.environment))
         env.resolved_public_config = config
         return env
 

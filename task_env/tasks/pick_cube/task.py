@@ -330,7 +330,7 @@ def sample_reset(artifact: TaskArtifact, task_seed: int) -> ResetSample:
     )
 
 
-def build_runtime_source(artifact: TaskArtifact, *, backend="cpu") -> RuntimeSource:
+def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None) -> RuntimeSource:
     if artifact.identity_hash != build_artifact().identity_hash:
         raise ValueError("selected P1.6 TaskArtifact required")
     if backend not in {"cpu", "cuda"}:
@@ -344,7 +344,7 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu") -> RuntimeSou
         table_center_xy=scene["table_center_xy"], cube_world_pos=cube_position,
         cube_world_quat=cube_quaternion,
     )
-    config = _environment_config()
+    config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
     spec = recipe
     joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
@@ -385,7 +385,7 @@ def _r3_dynamic_profile():
     return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1"):
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
@@ -393,7 +393,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
     recipe = _recipe()
     artifact = build_artifact()
-    source = build_runtime_source(artifact, backend=backend)
+    source = build_runtime_source(artifact, backend=backend, resolved_config=resolved_config)
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     readiness = PickCubeReadinessConfig.from_source(
@@ -564,7 +564,7 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None):
+def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def build(provider):
@@ -575,7 +575,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config)
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -584,7 +584,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 controller_profile=controller_profile,
             )
         return build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile)
+                               controller_profile=controller_profile, resolved_config=resolved_config)
 
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
@@ -594,7 +594,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config)
 
     return ReferenceTaskBinding(
         build=build,
@@ -650,7 +650,8 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         horizon = config.environment.episode.horizon
         profile = config.controller_profile
         manifest = config.source_delivery_manifest
-        binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest)
+        binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest,
+                                         resolved_config=config.environment)
         if provider == 'isaacsim':
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,
