@@ -9,6 +9,8 @@ import json
 from math import isfinite, pi
 from typing import Any, Literal
 
+from ..artifacts.contracts import RendererSelectionV1
+
 
 @dataclass(frozen=True)
 class AssetConfig:
@@ -572,6 +574,20 @@ class ResolvedSelectedConfig:
     source_delivery_manifest: str | None = None
     task_parameters: tuple[tuple[str, float], ...] = ()
     task_configuration_json: str | None = None
+    render_default: RendererSelectionV1 = field(default_factory=lambda: RendererSelectionV1(
+        "renderer-selection-v1", "none", "cpu", "none", None,
+    ))
+
+    def __post_init__(self) -> None:
+        if type(self.render_default) is not RendererSelectionV1:
+            raise TypeError("selected render_default must be a RendererSelectionV1")
+        self.render_default.validate()
+        if (self.render_default.provider, self.render_default.backend,
+                self.render_default.profile, self.render_default.device) != (
+                "none", "cpu", "none", None):
+            raise ValueError(
+                "selected reference currently supports only the state-only renderer selection"
+            )
 
 
 @dataclass(frozen=True)

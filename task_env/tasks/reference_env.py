@@ -3097,7 +3097,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'backend': self.backend, 'horizon': self.horizon}
         execution = {'physics_provider': resolved.physics_provider,
                      'physics_backend': resolved.environment.runtime.backend,
-                     'physics_device': resolved.physics_device}
+                     'physics_device': resolved.physics_device,
+                     'render_default': resolved.render_default.to_mapping()}
         if resolved.source_delivery_manifest is not None:
             execution['source_delivery_manifest'] = resolved.source_delivery_manifest
         task = dict(resolved.task_parameters)

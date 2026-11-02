@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Mapping, TypeVar
 
+from ..artifacts.contracts import RendererSelectionV1
+
 from .config import (
     ActionConfig,
     AgentConfig,
@@ -29,6 +31,19 @@ from .config import (
 
 
 T = TypeVar("T")
+
+_CORE_SELECTED_EXECUTION_DEFAULTS = {
+    "physics_provider": "geophys",
+    "physics_backend": "cpu",
+    "physics_device": "cpu",
+    "render_default": {
+        "schema_version": "renderer-selection-v1",
+        "provider": "none",
+        "backend": "cpu",
+        "profile": "none",
+        "device": None,
+    },
+}
 
 
 PUBLIC_ENV_CONFIG_SECTIONS = frozenset(
@@ -243,7 +258,8 @@ def _resolve_selected_config(environment_type, config):
         config = {"execution": {"physics_provider": supplied.physics_provider,
                                 "physics_backend": supplied.environment.runtime.backend,
                                 "physics_device": supplied.physics_device,
-                                "source_delivery_manifest": supplied.source_delivery_manifest},
+                                "source_delivery_manifest": supplied.source_delivery_manifest,
+                                "render_default": supplied.render_default.to_mapping()},
                   "episode": {"horizon": supplied.environment.episode.horizon}}
         config["task"] = dict(supplied.task_parameters)
         if supplied.controller_profile is not None:
@@ -267,7 +283,8 @@ def _resolve_selected_config(environment_type, config):
             raise TypeError(f"{name} must be a mapping")
         sections[name] = dict(section)
     allowed_sections = {
-        "execution": {"physics_provider", "physics_backend", "physics_device", "source_delivery_manifest"},
+        "execution": {"physics_provider", "physics_backend", "physics_device",
+                      "source_delivery_manifest", "render_default"},
         "episode": {"horizon"},
         "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
                 | set(environment_type.selected_parameter_limits),
@@ -293,14 +310,44 @@ def _resolve_selected_config(environment_type, config):
     task_configuration = configuration_loader() if configuration_loader is not None else None
     base = (environment_type.selected_default_config(task_configuration)
             if configuration_loader is not None else environment_type.selected_default_config())
-    execution = sections["execution"]
-    provider = execution.get("physics_provider", "geophys")
-    backend = execution.get("physics_backend", "cpu")
-    device = execution.get("physics_device", "cuda:0" if backend == "cuda" else "cpu")
+    execution_defaults = dict(_CORE_SELECTED_EXECUTION_DEFAULTS)
+    class_defaults = getattr(environment_type, "selected_execution_defaults", {})
+    if callable(class_defaults):
+        class_defaults = class_defaults()
+    task_yaml_defaults = (
+        {} if task_configuration is None else task_configuration.get("execution", {})
+    )
+    for source_name, source in (
+        ("task class execution defaults", class_defaults),
+        ("task YAML execution defaults", task_yaml_defaults),
+        ("caller execution configuration", sections["execution"]),
+    ):
+        if not isinstance(source, Mapping):
+            raise TypeError(f"{source_name} must be a mapping")
+        unknown = set(source) - allowed_sections["execution"]
+        if unknown:
+            raise KeyError(f"unsupported {source_name} fields: {sorted(unknown)}")
+        execution_defaults.update(source)
+
+    provider = execution_defaults["physics_provider"]
+    backend = execution_defaults["physics_backend"]
+    device = execution_defaults["physics_device"]
     if (provider, backend, device) not in {("geophys", "cpu", "cpu"),
                                            ("mujoco", "cpu", "cpu"),
                                            ("isaacsim", "cuda", "cuda:0")}:
-        raise ValueError("unsupported selected physics provider/backend/device combination")
+        raise ValueError(
+            "unsupported selected physics provider/backend/device combination: "
+            f"{provider!r}/{backend!r}/{device!r}"
+        )
+    renderer_value = execution_defaults["render_default"]
+    renderer = (renderer_value if type(renderer_value) is RendererSelectionV1
+                else RendererSelectionV1.from_mapping(renderer_value))
+    if (renderer.provider, renderer.backend, renderer.profile, renderer.device) != (
+            "none", "cpu", "none", None):
+        raise ValueError(
+            "selected reference currently admits only the state-only renderer selection; "
+            "non-none renderer and physics-renderer combinations are unsupported"
+        )
     default_profile = (environment_type.selected_default_controller_profile(task_configuration)
                        if configuration_loader is not None else environment_type.selected_default_controller_profile())
     profile = sections["task"].get("controller_profile", default_profile)
@@ -314,7 +361,7 @@ def _resolve_selected_config(environment_type, config):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not lower <= value <= upper:
             raise ValueError(f"task.{key} must be within [{lower}, {upper}]")
         params.append((key, float(value)))
-    manifest = execution.get("source_delivery_manifest")
+    manifest = execution_defaults.get("source_delivery_manifest")
     if provider == "isaacsim" and params:
         raise ValueError("task parameter overrides are not yet admitted by the Isaac source")
     if provider == "isaacsim":
@@ -327,10 +374,27 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
     env = replace(base, runtime=replace(base.runtime, backend=backend),
                   episode=replace(base.episode, horizon=horizon))
-    task_configuration_json = (None if task_configuration is None else json.dumps(
-        task_configuration, sort_keys=True, separators=(",", ":"), allow_nan=False))
-    result = ResolvedSelectedConfig(env, environment_type.uid, provider, device, profile, manifest,
-                                    tuple(sorted(params)), task_configuration_json)
+    task_configuration_json = None
+    if task_configuration is not None:
+        # Keep physics/render defaults in their resolved execution owner.  The
+        # task configuration snapshot remains recipe/environment data so this
+        # additive execution layer does not change existing task identities.
+        task_values = dict(task_configuration)
+        task_values.pop("execution", None)
+        task_configuration_json = json.dumps(
+            task_values, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        )
+    result = ResolvedSelectedConfig(
+        environment=env,
+        task_uid=environment_type.uid,
+        physics_provider=provider,
+        physics_device=device,
+        controller_profile=profile,
+        source_delivery_manifest=manifest,
+        task_parameters=tuple(sorted(params)),
+        task_configuration_json=task_configuration_json,
+        render_default=renderer,
+    )
     if supplied is not None and supplied != result:
         raise ValueError("resolved selected configuration contains unsupported overrides")
     return result

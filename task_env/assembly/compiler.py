@@ -69,7 +69,7 @@ def reference_task_identity_fields(artifact, source, controller, *,
         "artifact_sha256": artifact.identity_hash,
         "runtime_config": runtime_config,
         "source_xml_sha256": hashlib.sha256(xml_bytes).hexdigest(),
-        "controller_identity": controller.identity,
+        "controller_identity": None if controller is None else controller.identity,
         "runtime_source_bindings": {
             name: dict(getattr(source, name))
             for name in ("joints", "bodies", "frames", "free_joints", "joint_targets")

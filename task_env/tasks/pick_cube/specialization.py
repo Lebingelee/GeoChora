@@ -11,7 +11,6 @@ from pathlib import Path
 import subprocess
 
 import numpy as np
-import yaml
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
@@ -33,7 +32,11 @@ from ...environment import (
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
 )
-from ...environment.configuration import overlay_public_env_config, resolve_env_config
+from ...environment.configuration import (
+    load_yaml_mapping,
+    overlay_public_env_config,
+    resolve_env_config,
+)
 from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
 from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
@@ -64,9 +67,13 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
 from .task import semantic_definition, evaluate, sample_reset
 
 def _configuration() -> dict:
-    data = yaml.safe_load(CONFIG_PATH.read_text())
-    if not isinstance(data, dict) or set(data) != set(TASK_CONFIGURATION_KEYS):
-        raise ValueError("PickCube config.yaml must define exactly recipe and environment")
+    data = load_yaml_mapping(CONFIG_PATH)
+    if (not isinstance(data, dict)
+            or not {"recipe", "environment"}.issubset(data)
+            or set(data) - {"recipe", "environment", "execution"}):
+        raise ValueError("PickCube config.yaml must define recipe, environment, and optional execution")
+    if "execution" in data and not isinstance(data["execution"], dict):
+        raise TypeError("PickCube execution defaults must be a mapping")
     recipe = data["recipe"]
     if recipe.get("control_hz") != 100 or recipe.get("artifact_id") != "pick-cube-v1/p1_6_experimental_100hz":
         raise ValueError("PickCube task admits only the selected P1.6 100 Hz recipe")
@@ -399,6 +406,11 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25)}
     selected_supports_isaac = True
+    selected_execution_defaults = {
+        "physics_provider": "geophys",
+        "physics_backend": "cpu",
+        "physics_device": "cpu",
+    }
 
     @staticmethod
     def selected_task_configuration():

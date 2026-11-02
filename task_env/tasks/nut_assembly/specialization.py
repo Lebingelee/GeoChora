@@ -10,7 +10,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 import numpy as np
-import yaml
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
@@ -30,7 +29,11 @@ from ...controllers.canonical.production_r3 import (
     ProductionCanonicalPandaControllerR3, R3_PROFILE_PATH, load_r3_dynamic_profile,
 )
 from ...environment import TaskCompositionSpec
-from ...environment.configuration import overlay_public_env_config, resolve_env_config
+from ...environment.configuration import (
+    load_yaml_mapping,
+    overlay_public_env_config,
+    resolve_env_config,
+)
 from ...environment.task_source import TaskArtifactDeclarationV1
 from ...objects.nut_assembly import (
     NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,
@@ -69,9 +72,13 @@ from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sam
                    _native_feedback_sample, _native_interval_receipt, _observe_kwargs)
 
 def _configuration():
-    value = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or set(value) != {"recipe", "environment"}:
-        raise ValueError("NutAssembly config.yaml must contain recipe and environment only")
+    value = load_yaml_mapping(CONFIG_PATH)
+    if (not isinstance(value, dict)
+            or not {"recipe", "environment"}.issubset(value)
+            or set(value) - {"recipe", "environment", "execution"}):
+        raise ValueError("NutAssembly config.yaml must contain recipe, environment, and optional execution")
+    if "execution" in value and not isinstance(value["execution"], dict):
+        raise TypeError("NutAssembly execution defaults must be a mapping")
     recipe = value["recipe"]
     if (recipe.get("control_hz") != 100 or recipe.get("control_substeps") != 5
             or recipe.get("physics_dt") != 0.002 or recipe.get("control_dt") != 0.01
@@ -547,6 +554,11 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     selected_controller_profiles = frozenset()
     selected_parameter_limits = {"lift_height_m": (0.01, 0.15)}
     selected_supports_isaac = False
+    selected_execution_defaults = {
+        "physics_provider": "geophys",
+        "physics_backend": "cpu",
+        "physics_device": "cpu",
+    }
 
     @staticmethod
     def selected_task_configuration():

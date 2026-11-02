@@ -165,3 +165,14 @@ environment:
       padding: 0.0
     training:
       every: 1
+
+execution:
+  physics_provider: geophys
+  physics_backend: cpu
+  physics_device: cpu
+  render_default:
+    schema_version: renderer-selection-v1
+    provider: none
+    backend: cpu
+    profile: none
+    device: null
