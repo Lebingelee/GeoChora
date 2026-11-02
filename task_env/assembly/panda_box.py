@@ -16,6 +16,11 @@ from ..robots.panda import PandaAgent
 from .compiler import compile_reference_source
 
 
+PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
+                          'joint_position_actuation', 'joint_state_query',
+                          'body_pose_query', 'frame_pose_query')
+
+
 @dataclass(frozen=True)
 class PandaBoxDeclaration:
     """Task identity, physical placement, and semantics for the shared box asset."""
@@ -35,13 +40,16 @@ class PandaBoxDeclaration:
     semantics: SemanticDefinition
     timebase: Timebase
     object_asset_reference: str = 'cube-v1/task-local'
+    cast_reset_center_float32: bool = True
+    include_table_center: bool = False
+    capabilities: tuple[str, ...] = PANDA_BOX_CAPABILITIES
 
     def __post_init__(self):
         if not all(isinstance(v, str) and v for v in
                    (self.task_id, self.artifact_id, self.version, self.object_id, self.success_definition)):
             raise ValueError('task and Entity identities must be nonempty strings')
-        if not math.isfinite(self.reset_half_extent_m) or self.reset_half_extent_m <= 0:
-            raise ValueError('reset half extent must be finite and positive')
+        if not math.isfinite(self.reset_half_extent_m) or self.reset_half_extent_m < 0:
+            raise ValueError('reset half extent must be finite and nonnegative')
         if self.semantics.success_definition != self.success_definition:
             raise ValueError('semantic success definition differs from task declaration')
         if self.object_id not in self.semantics.required_poses:
@@ -51,21 +59,24 @@ class PandaBoxDeclaration:
 def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
     """Compile declarations into the current Artifact with no native runtime."""
     d = declaration
-    center = tuple(float(value) for value in np.asarray(d.reset_center_xy, dtype=np.float32))
+    center = (tuple(float(value) for value in np.asarray(d.reset_center_xy, dtype=np.float32))
+              if d.cast_reset_center_float32 else tuple(float(value) for value in d.reset_center_xy))
     extent = float(d.reset_half_extent_m)
     dimensions = tuple(
         UniformDimension(f'{d.object_id}.position_world.{axis}',
                          (value - extent, value + extent), (value - extent, value + extent),
                          (value - extent, value + extent), (value - extent, value + extent))
         for axis, value in zip(('x', 'y'), center, strict=True)
-    )
+    ) if extent else ()
     joints = {f'panda-v1/{name}': value for name, value in PandaAgent().initial_state_spec().joint_positions}
     entities = (
         EntityDefinition('tabletop-v1', 'static', 'tabletop-v1/task-local',
                          ('tabletop-v1/top',), (), 'box', 'support_contact',
                          {'top_z': float(d.table_top_z), **{
                              f'half_size_{axis}': float(value)
-                             for axis, value in zip('xyz', d.table_half_size, strict=True)}}),
+                             for axis, value in zip('xyz', d.table_half_size, strict=True)},
+                          **({'center_x': d.table_center_xy[0], 'center_y': d.table_center_xy[1]}
+                             if d.include_table_center else {})}),
         EntityDefinition('panda-v1', 'embodiment',
                          'mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml',
                          ('panda-v1/base', 'panda-v1/ee'),
@@ -91,8 +102,7 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
         action=ActionIntent('absolute_pose', 'world', 'quaternion_wxyz', 'arm_joint_position_and_gripper'),
         observations=('task-env-state-v2', 'privileged_state'), initialization=initialization,
         semantics=d.semantics, timebase=d.timebase,
-        capabilities=('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
-                      'joint_state_query', 'body_pose_query', 'frame_pose_query'),
+        capabilities=d.capabilities,
     )
 
 

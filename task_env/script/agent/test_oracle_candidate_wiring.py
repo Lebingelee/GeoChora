@@ -70,7 +70,7 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                 self.horizon = compiled.horizon
                 self.value = value
                 self.controller = value['controller']
-                self.solution = SolutionLifecycleSubstitute(value['solution'].identity)
+                self.solution = SolutionLifecycleSubstitute(value['solution_identity'])
                 self._external_solution_owner = None
                 self.execution = ExecutionSpec(provider, PROFILE, 'none', 'cpu', 0, 'strict')
                 self.session = ProviderSessionSubstitute()

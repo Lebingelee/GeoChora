@@ -231,14 +231,16 @@ def evaluate_lift(state, semantics):
 def compile_candidate(spec,catalog,*,provider='mujoco'):
     # Re-validate/copy caller-owned nested dictionaries before closing over any data.
     spec=CandidateSpec.from_dict(spec.to_dict())
-    from task_env.artifacts import (PoseWorld,UniformDimension,RequiredCapabilitySet,
-        ExecutionSpec,admit_capabilities)
+    from task_env.artifacts import (PoseWorld, RequiredCapabilitySet, SemanticDefinition, Timebase,
+        ExecutionSpec, admit_capabilities)
     from task_env.artifacts.contracts import CapabilityAdmissionError
     from task_env.artifacts.execution import ResetSample
-    from task_env.tasks.pick_cube import task as pick_cube
+    from task_env.assembly.panda_box import (PANDA_BOX_CAPABILITIES, PandaBoxDeclaration,
+        compile_panda_box_artifact, compile_panda_box_source)
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
     from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig,PickCubeReadinessSolution
     from task_env.tasks.reference_env import ReferenceTaskBinding
-    from task_env.objects.pick_cube import PickCubeSceneComposer,CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
+    from task_env.objects.pick_cube import CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
     from task_env.controllers.canonical import ProductionCanonicalPandaController
     from task_env.planners.completion import ExpertExecutionInfo
     from task_env.runtime.sessions import provider_manifest
@@ -274,9 +276,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             reject('reset_supported_by_table',f'object_config.initial_pos_xy[{i}]',obj['initial_pos_xy'][i],
                    f'entire {axis} reset envelope including cube lies on table','init_infeasible','task_local',
                    'Move or narrow the reset envelope to fit the declared support surface.')
-    base=pick_cube.build_artifact()
-    missing=set(base.required_capabilities.names)-set(spec.required_capabilities)
-    if missing:reject('template_capabilities','required_capabilities',spec.required_capabilities,sorted(base.required_capabilities.names))
+    missing=set(PANDA_BOX_CAPABILITIES)-set(spec.required_capabilities)
+    if missing:reject('template_capabilities','required_capabilities',spec.required_capabilities,sorted(PANDA_BOX_CAPABILITIES))
     if findings:
         raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings))
     try:
@@ -293,31 +294,33 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings)) from error
 
     spec_hash=spec.spec_sha256()
-    extent=obj['reset_half_extent_m']
-    dims=tuple(UniformDimension(f'cube-v1.position_world.{axis}',*((c-extent,c+extent),)*4)
-               for axis,c in zip('xy',obj['initial_pos_xy'],strict=True)) if extent else ()
     position=(*obj['initial_pos_xy'],scene['table_top_z']+CUBE_HALF_SIZE+CUBE_CONTACT_MARGIN)
-    initial=replace(base.initialization,poses_world={'cube-v1':PoseWorld(position,(1.,0.,0.,0.))},randomization=dims)
-    entities=tuple(replace(e,parameters_si={'top_z':scene['table_top_z'],
-        **{f'half_size_{axis}':v for axis,v in zip('xyz',scene['table_half_size'],strict=True)},
-        'center_x':scene['table_center_xy'][0],'center_y':scene['table_center_xy'][1]})
-        if e.semantic_id=='tabletop-v1' else e for e in base.world.entities)
-    if external is not None:
-        entities=tuple(replace(e,asset_reference=f"external-mock/{external['uid']}/{external['sha256']}") if e.semantic_id=='cube-v1' else e for e in entities)
-    world=replace(base.world,entities=entities,randomization_dimensions=tuple(d.name for d in dims))
-    semantics=replace(base.semantics,evaluator='harness_pick_lift_v0',parameters_si={
-        'rest_height':scene['table_top_z']+CUBE_HALF_SIZE,'lift_height':spec.success_config['lift_height_m'],
-        'reach_distance':spec.success_config['reach_distance_m'],
-        'gripper_closed_opening':spec.success_config['gripper_closed_opening_m']})
-    artifact=replace(base,artifact_id=f'{spec.task_id}/compiler-{COMPILER_VERSION}/spec-{spec_hash}',
-        task_id=spec.task_id,artifact_version='ver_001',world=world,initialization=initial,semantics=semantics,
-        required_capabilities=RequiredCapabilitySet(tuple(spec.required_capabilities)))
-    base_source=pick_cube.build_runtime_source(base,backend='cpu')
-    composer=PickCubeSceneComposer(table_half_size=scene['table_half_size'],table_top_z=scene['table_top_z'],
-        table_center_xy=scene['table_center_xy'],cube_world_pos=position,cube_world_quat=(1.,0.,0.,0.))
-    source=replace(base_source,task_artifact_hash=artifact.identity_hash,scene_source=composer.build_source_description(),
-        composition=replace(base_source.composition,task_uid=spec.task_id),
-        config=replace(base_source.config,task=replace(base_source.config.task,task_uid=spec.task_id)))
+    semantics=SemanticDefinition(
+        'semantics-v0', 'harness_pick_lift_v0', ('cube-v1', 'panda-v1/ee'),
+        ('panda-v1/finger_joint1', 'panda-v1/finger_joint2'), {
+            'rest_height': scene['table_top_z']+CUBE_HALF_SIZE,
+            'lift_height': spec.success_config['lift_height_m'],
+            'reach_distance': spec.success_config['reach_distance_m'],
+            'gripper_closed_opening': spec.success_config['gripper_closed_opening_m'],
+        }, 'cube_lifted_v1')
+    declaration=PandaBoxDeclaration(
+        task_id=spec.task_id, artifact_id=f'{spec.task_id}/compiler-{COMPILER_VERSION}/spec-{spec_hash}',
+        version='ver_001', object_id='cube-v1', success_definition='cube_lifted_v1',
+        table_half_size=tuple(scene['table_half_size']), table_top_z=scene['table_top_z'],
+        table_center_xy=tuple(scene['table_center_xy']), source_box_position=position,
+        source_box_quaternion_wxyz=(1.,0.,0.,0.), reset_center_xy=tuple(obj['initial_pos_xy']),
+        reset_half_extent_m=obj['reset_half_extent_m'], semantics=semantics,
+        timebase=Timebase(.002,5,.01), cast_reset_center_float32=False, include_table_center=True,
+        object_asset_reference=(f"external-mock/{external['uid']}/{external['sha256']}"
+                                if external is not None else 'cube-v1/task-local'),
+        capabilities=tuple(spec.required_capabilities),
+    )
+    artifact=compile_panda_box_artifact(declaration)
+    initial=artifact.initialization
+    dims=initial.randomization
+    default_config=PickCubeReferenceEnv.selected_default_config()
+    config=replace(default_config,task=replace(default_config.task,task_uid=spec.task_id))
+    source=compile_panda_box_source(declaration,artifact,config)
 
     if external is not None:
         body=ET.fromstring(Path(external['path']).read_text())
@@ -344,11 +347,12 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         # Native provider materialization/admission remains owned by Core.
         readiness=PickCubeReadinessConfig.from_source(artifact,source)
         controller=ProductionCanonicalPandaController.from_source(artifact,source)
-        solution=PickCubeReadinessSolution(config=readiness)
+        solution_identity=PickCubeReadinessSolution.identity_for_config(readiness)
         source_ids={name:hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
             for name in ('harness_compiler.py','harness_spec_schema.py')}
         for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py',
-                     'task_env/controllers/canonical/production.py'):
+                     'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
+                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py'):
             path=Path(catalog['core_repo'])/name
             if path.is_file():source_ids[name]=hashlib.sha256(path.read_bytes()).hexdigest()
         return dict(construction_id='harness-pick-lift-v0',artifact=artifact,source=source,
@@ -364,7 +368,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
                 'external_asset':external,'asset_bundle_sha256':catalog.get('asset_bundle_sha256'),
                 'source_revision':catalog['core_commit'],'source_sha256':source_ids},
             source_revision=catalog['core_commit'],source_sha256=source_ids,
-            controller=controller,solution=solution)
+            controller=controller, solution=None, solution_identity=solution_identity,
+            solution_factory=lambda:PickCubeReadinessSolution(config=readiness))
 
     def sample_reset(requested_artifact,seed):
         if requested_artifact.identity_hash!=artifact.identity_hash:raise ValueError('compiled artifact required')
