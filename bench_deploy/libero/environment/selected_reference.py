@@ -17,15 +17,17 @@ import numpy as np
 from gymnasium.spaces import Box, Dict
 
 from task_env.artifacts import (
-    ActionIntent, EntityDefinition, InitializationContract, RequiredCapabilitySet,
-    SemanticDefinition, TaskArtifact, Timebase, WorldDefinition,
+    ActionIntent, EntityDefinition, InitializationContract,
+    SemanticDefinition, TaskArtifact, Timebase,
 )
+from task_env.assembly.compiler import compile_reference_source
 from task_env.assembly.source import TaskSceneSource
 from task_env.controllers.canonical.contracts import (
     ControlGroupActionV1, MixedActuatorChannelV1, MixedActuatorPlanV1,
     StructuredActionRequestV1, digest,
 )
 from task_env.environment.configuration import resolve_env_config
+from task_env.environment.task_source import compile_declared_artifact
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
@@ -428,30 +430,25 @@ def _artifact(init_bytes: bytes, *, execution_profile: str,
         if provider == 'geophys'
         else tuple(CAPABILITIES) + ('contact_detection',)
     )
-    artifact = TaskArtifact(
-        'task-artifact-v0',
-        (ARTIFACT_ID if task_uid == TASK_1 else f'libero/{task_uid.rsplit("/", 1)[-1]}/mixed-v1')
-        if not solution_profile else
-        (ARTIFACT_ID + '/solution-v8' if task_uid == TASK_1 else
-         f'libero/{task_uid.rsplit("/", 1)[-1]}/solution-v8'),
-        task_uid, 'diagnostic-v1' if not solution_profile else 'diagnostic-solution-v8',
-        WorldDefinition(
-            'world-v0', 'SI_right_handed_z_up_wxyz', entities,
-            ActionIntent('absolute_pose', 'world', 'quaternion_wxyz', 'arm_joint_position_and_gripper'),
-            ('canonical-state-v0', 'task-contact-summary-v2'), (),
-        ),
-        InitializationContract(
+    artifact = compile_declared_artifact(
+        artifact_id=(ARTIFACT_ID if task_uid == TASK_1 else f'libero/{task_uid.rsplit("/", 1)[-1]}/mixed-v1')
+            if not solution_profile else
+            (ARTIFACT_ID + '/solution-v8' if task_uid == TASK_1 else
+             f'libero/{task_uid.rsplit("/", 1)[-1]}/solution-v8'),
+        task_id=task_uid, version='diagnostic-v1' if not solution_profile else 'diagnostic-solution-v8',
+        entities=entities,
+        action=ActionIntent('absolute_pose', 'world', 'quaternion_wxyz', 'arm_joint_position_and_gripper'),
+        observations=('canonical-state-v0', 'task-contact-summary-v2'),
+        initialization=InitializationContract(
             'initialization-v0', {}, {name: float(qpos[name]) for name in joints}, (),
             'restore_source_named_pruned_init_row', 'pinned_libero_normal_reset_v1', 0,
         ),
-        SemanticDefinition(
+        semantics=SemanticDefinition(
             'semantics-v0', profile.semantic_id, profile.semantic_entities, joints,
             dict(profile.semantic_parameters), profile.success_rule,
         ),
-        Timebase(0.002, 25, 0.05),
-        RequiredCapabilitySet(required_capabilities),
+        timebase=Timebase(0.002, 25, 0.05), capabilities=required_capabilities,
     )
-    artifact.validate()
     if tuple(artifact.initialization.joint_position) != tuple(joints):
         raise ValueError('LIBERO initialization field order differs from the source row projection')
     return artifact
@@ -729,8 +726,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         # The ordinary MuJoCo adapter consumes the separate semantic object list;
         # GeoPhys resolves the imported MJCF through the task-local name contract.
         provider_objects = ()
-    source = RuntimeSource(
-        task_artifact_hash=artifact.identity_hash,
+    source = compile_reference_source(
+        artifact=artifact,
         scene_source=scene_source,
         joints=joints,
         bodies=bound_bodies,

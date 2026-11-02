@@ -234,26 +234,37 @@ def _initial_state(scene_model, agents, references: TaskReferences) -> EpisodePh
     )
 
 
+_UNSET_COMPONENT = object()
+
+
 def compile_reference_source(*, artifact, scene_source, composition, config,
                              bodies, frames, free_joints, joint_targets,
-                             open_actuators):
-    """Bind declared semantic names and registered components to a source value.
+                             open_actuators, joints=None, scene=_UNSET_COMPONENT,
+                             agents=_UNSET_COMPONENT, objects=_UNSET_COMPONENT, **source_options):
+    """Bind semantic names and declared components to a provider-free source.
 
-    This prepares data only; provider materialization remains a RuntimeSession
-    responsibility. Source and task identities remain explicit inputs.
+    Registered components are resolved from a TaskCompositionSpec by default.
+    A benchmark with already compiled components can supply those values and a
+    source-specific composition receipt explicitly.
     """
     from ..registry import make_agent, make_object, make_scene
     from ..runtime.sessions.source import RuntimeSource
 
-    joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
+    if joints is None:
+        joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
+    supplied = tuple(value is not _UNSET_COMPONENT for value in (scene, agents, objects))
+    if any(supplied) and not all(supplied):
+        raise ValueError("explicit source components must be supplied together")
+    if not any(supplied):
+        scene = make_scene(composition.scene_uid)
+        agents = tuple(make_agent(uid) for uid in composition.agent_uids)
+        objects = tuple(make_object(uid) for uid in composition.object_uids)
     return RuntimeSource(
         task_artifact_hash=artifact.identity_hash, scene_source=scene_source,
-        joints=joints, bodies=dict(bodies), frames=dict(frames),
-        free_joints=dict(free_joints), joint_targets=dict(joint_targets),
-        open_actuators=tuple(open_actuators), composition=composition, config=config,
-        scene=make_scene(composition.scene_uid),
-        agents=tuple(make_agent(uid) for uid in composition.agent_uids),
-        objects=tuple(make_object(uid) for uid in composition.object_uids),
+        joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,
+        joint_targets=joint_targets, open_actuators=tuple(open_actuators),
+        composition=composition, config=config, scene=scene,
+        agents=tuple(agents), objects=tuple(objects), **source_options,
     )
 
 
