@@ -12,6 +12,7 @@ from typing import Literal
 
 from ..artifacts import (
     ActionIntent,
+    EntityDefinition,
     FrameReference,
     InitializationContract,
     JointReference,
@@ -599,6 +600,90 @@ def sample_episode_reset_plan(
     return EpisodeResetPlanV1(
         "episode-reset-plan-v1", role_binding, sample, initializer.sampling_domain,
     )
+
+
+@dataclass(frozen=True)
+class TaskArtifactDeclarationV1:
+    """Immutable task-owned values consumed by the shared Artifact compiler.
+
+    Authors describe the task's Entities and contracts once. Core owns the v0
+    compatibility Artifact and can bind the same declaration to a canonical
+    Scene as TaskArtifactV1 without asking the author to hand-build that bridge.
+    """
+
+    artifact_id: str
+    task_id: str
+    version: str
+    entities: tuple[EntityDefinition, ...]
+    action: ActionIntent
+    observations: tuple[str, ...]
+    initialization: InitializationContract
+    semantics: SemanticDefinition
+    timebase: Timebase
+    capabilities: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for name in ("artifact_id", "task_id", "version"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must be a nonempty string")
+        entities = tuple(self.entities)
+        if not entities or any(type(value) is not EntityDefinition for value in entities):
+            raise TypeError("entities must be a nonempty sequence of EntityDefinition values")
+        object.__setattr__(self, "entities", entities)
+        observations = tuple(self.observations)
+        if any(not isinstance(value, str) or not value for value in observations):
+            raise ValueError("observations must contain nonempty names")
+        object.__setattr__(self, "observations", observations)
+        capabilities = tuple(self.capabilities)
+        if any(not isinstance(value, str) or not value for value in capabilities):
+            raise ValueError("capabilities must contain nonempty names")
+        object.__setattr__(self, "capabilities", capabilities)
+        expected_types = (
+            ("action", self.action, ActionIntent),
+            ("initialization", self.initialization, InitializationContract),
+            ("semantics", self.semantics, SemanticDefinition),
+            ("timebase", self.timebase, Timebase),
+        )
+        for name, value, expected in expected_types:
+            if type(value) is not expected:
+                raise TypeError(f"{name} must be {expected.__name__}")
+
+    def compiler_values(self) -> dict[str, object]:
+        """Return a fresh argument mapping for the Core-owned compilers."""
+        return {
+            "artifact_id": self.artifact_id,
+            "task_id": self.task_id,
+            "version": self.version,
+            "entities": self.entities,
+            "action": self.action,
+            "observations": self.observations,
+            "initialization": self.initialization,
+            "semantics": self.semantics,
+            "timebase": self.timebase,
+            "capabilities": self.capabilities,
+        }
+
+    def compile(self) -> TaskArtifact:
+        """Compile the active runtime Artifact without importing a provider."""
+        return compile_declared_artifact(**self.compiler_values())
+
+    def compile_v1(
+        self,
+        source: TaskSourceV1,
+        scene: SceneDefinition,
+        *,
+        frame_bindings: Mapping[str, FrameReference] | None = None,
+        joint_bindings: Mapping[str, JointReference] | None = None,
+    ) -> TaskArtifactV1:
+        """Compile TaskArtifactV1 through Core's owned compatibility bridge."""
+        return compile_declared_artifact_v1(
+            source,
+            scene,
+            frame_bindings=frame_bindings,
+            joint_bindings=joint_bindings,
+            **self.compiler_values(),
+        )
 
 
 def compile_declared_artifact(*, artifact_id: str, task_id: str, version: str,

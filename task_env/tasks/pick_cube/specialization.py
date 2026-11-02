@@ -21,7 +21,8 @@ from ...artifacts import (
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
-                                   compile_panda_box_source)
+                                   compile_panda_box_source, compile_panda_box_task)
+from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest
 from ...environment import (
@@ -155,9 +156,13 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
-    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
-    source = build_runtime_source(artifact, backend=backend, resolved_config=resolved_config,
-                                  lift_height_m=lift_height_m, task_config=task_config)
+    if backend not in {"cpu", "cuda"}:
+        raise ValueError("PickCube reference backend must be cpu or cuda")
+    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
+    config = _environment_config() if resolved_config is None else resolved_config
+    config = replace(config, runtime=replace(config.runtime, backend=backend))
+    compiled = compile_panda_box_task(declaration, config=config)
+    artifact, source = compiled.artifact, compiled.source
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     readiness = PickCubeReadinessConfig.from_source(
@@ -181,21 +186,15 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
-    runtime_config = asdict(source.config)
+    construction_identity = reference_task_identity_fields(artifact, source, controller)
     resolved = {
         "construction_id": recipe["construction_id"], "task_recipe": task_config,
         "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
-        "artifact": artifact.to_mapping(), "artifact_sha256": artifact.identity_hash,
-        "runtime_config": runtime_config, "runtime_config_sha256": hashlib.sha256(
-            json.dumps(runtime_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "artifact": artifact.to_mapping(), **construction_identity,
         "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
         "resolved_controller_gripper": asdict(controller.gripper_config),
-        "controller_identity": controller.identity, "solution_identity": solution_identity,
-        "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        "solution_identity": solution_identity,
         "source_revision": revision, "source_sha256": source_ids,
-        "runtime_source_bindings": {name: dict(getattr(source, name)) for name in
-            ("joints", "bodies", "frames", "free_joints", "joint_targets")},
-        "runtime_open_actuators": list(source.open_actuators),
         "qualification": "NOT_REQUALIFIED",
     }
     if controller_profile != "r1":

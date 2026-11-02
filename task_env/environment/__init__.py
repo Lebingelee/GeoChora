@@ -42,6 +42,7 @@ from .task_definition import (
 )
 from .task_source import (
     TaskHookDeclarationV1,
+    TaskArtifactDeclarationV1,
     TaskInitializationV1,
     TaskRoleDeclarationV1,
     TaskSourceV1,
@@ -159,6 +160,7 @@ __all__ = [
     "TaskEnvironmentComponent",
     "TaskEvaluation",
     "TaskHookDeclarationV1",
+    "TaskArtifactDeclarationV1",
     "TaskInitializationV1",
     "TaskRoleDeclarationV1",
     "TaskSourceV1",

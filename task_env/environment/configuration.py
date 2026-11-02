@@ -259,7 +259,7 @@ def _resolve_selected_config(environment_type, config):
                "controller_profile", "source_delivery_manifest"}
     unknown = set(values) - allowed
     if unknown:
-        raise KeyError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
+        raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
     sections = {}
     for name in ("execution", "episode", "task"):
         section = values.get(name, {})

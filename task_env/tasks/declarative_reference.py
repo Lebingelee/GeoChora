@@ -5,7 +5,6 @@ Artifact, source bindings, controller and selected runtime lifecycle.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
 import hashlib
 import inspect
 from pathlib import Path
@@ -14,7 +13,13 @@ import numpy as np
 
 from ..artifacts import PoseWorld
 from ..artifacts.execution import ResetSample
-from ..assembly.panda_box import PandaBoxDeclaration, compile_panda_box_artifact, compile_panda_box_source
+from ..assembly.compiler import reference_task_identity_fields
+from ..assembly.panda_box import (
+    PandaBoxDeclaration,
+    compile_panda_box_artifact,
+    compile_panda_box_source,
+    compile_panda_box_task,
+)
 from ..controllers.canonical import ProductionCanonicalPandaController
 from ..controllers.canonical.contracts import digest
 from ..environment.configuration import resolve_env_config
@@ -44,14 +49,16 @@ def _sample_box_reset(declaration, artifact, seed):
 
 
 def _compile_value(declaration, config, evaluator):
-    artifact = compile_panda_box_artifact(declaration)
-    source = compile_panda_box_source(declaration, artifact, config)
+    compiled = compile_panda_box_task(declaration, config=config)
+    artifact, source = compiled.artifact, compiled.source
     controller = ProductionCanonicalPandaController.from_source(artifact, source)
-    from ..assembly.compiler import compile_reference_source
-    from ..environment.task_source import compile_declared_artifact
+    construction_identity = reference_task_identity_fields(artifact, source, controller)
+    from ..assembly.compiler import ReferenceTaskDeclarationV1, compile_reference_source
+    from ..environment.task_source import TaskArtifactDeclarationV1
     from ..objects.pick_cube import PickCubeSceneComposer
     owners = (type(declaration), evaluator, compile_panda_box_artifact, compile_panda_box_source,
-              compile_reference_source, compile_declared_artifact, PickCubeSceneComposer,
+              compile_panda_box_task, ReferenceTaskDeclarationV1, compile_reference_source,
+              TaskArtifactDeclarationV1, reference_task_identity_fields, PickCubeSceneComposer,
               ProductionCanonicalPandaController)
     paths = {Path(__file__).resolve(), *(Path(inspect.getsourcefile(owner)).resolve() for owner in owners)}
     root = Path(__file__).resolve().parents[2]
@@ -61,9 +68,8 @@ def _compile_value(declaration, config, evaluator):
     resolved = {
         'schema_version': 'declared-panda-box-construction-v1',
         'task_id': declaration.task_id, 'object_id': declaration.object_id,
-        'artifact_sha256': artifact.identity_hash, 'runtime_config': asdict(config),
-        'source_xml_sha256': hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
-        'source_sha256': source_hashes, 'controller_identity': controller.identity,
+        **construction_identity,
+        'source_sha256': source_hashes,
         'solution': 'not_declared', 'qualification': 'NOT_REQUALIFIED',
     }
     return {'construction_id': 'declared-panda-box-construction-v1', 'artifact': artifact,

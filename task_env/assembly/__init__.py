@@ -5,7 +5,13 @@ from .references import ReferenceSpec
 from .source import TaskSceneSource
 
 __all__ = ["AssetManifest", "ReferenceSpec", "TaskSceneSource"]
-from .compiler import CompiledTaskScene, compile_task_scene
+from .compiler import (
+    CompiledReferenceTaskV1,
+    CompiledTaskScene,
+    ReferenceTaskDeclarationV1,
+    compile_task_scene,
+    reference_task_identity_fields,
+)
 from .references import (
     AgentReferences,
     ObjectReferences,
@@ -34,10 +40,13 @@ from .usd_delivery import (
 __all__ = [
     "AgentReferences",
     "CompiledTaskScene",
+    "CompiledReferenceTaskV1",
     "ObjectReferences",
     "SceneNameTable",
     "TaskReferences",
     "compile_task_scene",
+    "ReferenceTaskDeclarationV1",
+    "reference_task_identity_fields",
     "resolve_task_references",
     "LogicalAssemblySourceProjectionV1",
     "ProjectedEntitySourceV1",

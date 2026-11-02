@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import asdict, dataclass
+import hashlib
+import json
+from types import MappingProxyType
 import xml.etree.ElementTree as ET
 
 import numpy as np
 
 from ..environment import EpisodePhysicsState, TaskCompositionSpec
+from ..environment.task_source import TaskArtifactDeclarationV1
 from .references import TaskReferences, resolve_task_references
 from .logical_source import LogicalAssemblySourceProjectionV1, project_logical_assembly_source
 
@@ -35,6 +40,122 @@ class CompiledTaskScene:
     references: TaskReferences
     initial_state: EpisodePhysicsState
     composition_adapter: str
+
+
+@dataclass(frozen=True)
+class CompiledReferenceTaskV1:
+    """Provider-free Artifact/source facts produced from one task declaration."""
+
+    artifact: object
+    source: object
+    controller: object | None = None
+
+    def identity_fields(self, *, include_runtime_config_sha256: bool = True) -> dict[str, object]:
+        return reference_task_identity_fields(
+            self.artifact, self.source, self.controller,
+            include_runtime_config_sha256=include_runtime_config_sha256,
+        )
+
+
+def reference_task_identity_fields(artifact, source, controller, *,
+                                   include_runtime_config_sha256: bool = True) -> dict[str, object]:
+    """Return the shared resolved identity facts for a compiled task route."""
+    runtime_config = asdict(source.config)
+    xml = source.scene_source.xml
+    if not isinstance(xml, (str, bytes)):
+        raise TypeError("reference source identity requires immutable XML bytes or text")
+    xml_bytes = xml.encode("utf-8") if isinstance(xml, str) else xml
+    result = {
+        "artifact_sha256": artifact.identity_hash,
+        "runtime_config": runtime_config,
+        "source_xml_sha256": hashlib.sha256(xml_bytes).hexdigest(),
+        "controller_identity": controller.identity,
+        "runtime_source_bindings": {
+            name: dict(getattr(source, name))
+            for name in ("joints", "bodies", "frames", "free_joints", "joint_targets")
+        },
+        "runtime_open_actuators": list(source.open_actuators),
+    }
+    if include_runtime_config_sha256:
+        result["runtime_config_sha256"] = hashlib.sha256(json.dumps(
+            runtime_config, sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest()
+    return result
+
+
+@dataclass(frozen=True)
+class ReferenceTaskDeclarationV1:
+    """Task data plus Core source bindings for a selected reference construction.
+
+    The task owns scene bytes and semantic names; this declaration makes Core
+    the single owner of Artifact validation and RuntimeSource binding.
+    """
+
+    artifact: TaskArtifactDeclarationV1
+    composition: TaskCompositionSpec
+    bodies: Mapping[str, str]
+    frames: Mapping[str, str]
+    free_joints: Mapping[str, str]
+    joint_targets: Mapping[str, str]
+    open_actuators: tuple[str, ...]
+    joints: Mapping[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.artifact) is not TaskArtifactDeclarationV1:
+            raise TypeError("artifact must be a TaskArtifactDeclarationV1")
+        if type(self.composition) is not TaskCompositionSpec:
+            raise TypeError("composition must be a TaskCompositionSpec")
+        if self.composition.task_uid != self.artifact.task_id:
+            raise ValueError("task composition identity differs from Artifact declaration")
+        for name in ("bodies", "frames", "free_joints", "joint_targets"):
+            value = getattr(self, name)
+            if not isinstance(value, Mapping):
+                raise TypeError(f"{name} must be a mapping")
+            if any(not isinstance(key, str) or not key or not isinstance(item, str) or not item
+                   for key, item in value.items()):
+                raise ValueError(f"{name} must map nonempty names to nonempty names")
+            object.__setattr__(self, name, MappingProxyType(dict(value)))
+        if self.joints is not None:
+            if not isinstance(self.joints, Mapping):
+                raise TypeError("joints must be a mapping when supplied")
+            object.__setattr__(self, "joints", MappingProxyType(dict(self.joints)))
+        actuators = tuple(self.open_actuators)
+        if any(not isinstance(value, str) or not value for value in actuators):
+            raise ValueError("open_actuators must contain nonempty names")
+        object.__setattr__(self, "open_actuators", actuators)
+
+    def compile_source(self, artifact, *, scene_source, config, **source_options):
+        """Bind one declared Artifact to its source without native materialization."""
+        expected = self.artifact.compile()
+        if type(artifact) is not type(expected) or artifact.identity_hash != expected.identity_hash:
+            raise ValueError("source Artifact does not match the task declaration")
+        return compile_reference_source(
+            artifact=artifact,
+            scene_source=scene_source,
+            composition=self.composition,
+            config=config,
+            bodies=self.bodies,
+            frames=self.frames,
+            free_joints=self.free_joints,
+            joint_targets=self.joint_targets,
+            open_actuators=self.open_actuators,
+            **({"joints": self.joints} if self.joints is not None else {}),
+            **source_options,
+        )
+
+    def compile(self, *, scene_source, config, controller_factory: Callable | None = None,
+                **source_options) -> CompiledReferenceTaskV1:
+        """Compile Artifact, source bindings and an optional pure controller."""
+        artifact = self.artifact.compile()
+        source = self.compile_source(
+            artifact, scene_source=scene_source, config=config, **source_options,
+        )
+        controller = None
+        if controller_factory is not None:
+            if not callable(controller_factory):
+                raise TypeError("controller_factory must be callable")
+            controller = controller_factory(artifact, source)
+        return CompiledReferenceTaskV1(artifact, source, controller)
 
 
 def _find_body(root: ET.Element, name: str) -> ET.Element:
@@ -317,4 +438,10 @@ def compile_task_scene(
     )
 
 
-__all__ = ["CompiledTaskScene", "compile_task_scene"]
+__all__ = [
+    "CompiledReferenceTaskV1",
+    "CompiledTaskScene",
+    "ReferenceTaskDeclarationV1",
+    "compile_task_scene",
+    "reference_task_identity_fields",
+]

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from task_env.artifacts import SemanticDefinition, Timebase
 from task_env.assembly.panda_box import PandaBoxDeclaration
+from task_env import make_env as make_registered_env
 from task_env.environment import TaskEvaluation
 from task_env.registry import register_env
 from task_env.tasks.declarative_reference import DeclaredPandaBoxEnv
@@ -37,3 +38,8 @@ class MarkerHeightEnv(DeclaredPandaBoxEnv):
         return TaskEvaluation(float(success), success, False,
                               {'marker_height_m': height, 'task_success': success},
                               {'height': float(success)})
+
+
+def make_marker_env(*, config=None):
+    """Construct the registered task through the public Core entry point."""
+    return make_registered_env(MarkerHeightEnv.uid, config=config)

@@ -8,12 +8,12 @@ import numpy as np
 
 from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract, PoseWorld,
                          SemanticDefinition, Timebase, UniformDimension)
-from ..environment.task_source import compile_declared_artifact
+from ..environment.task_source import TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec
 from ..objects.pick_cube import (CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE,
                                  CUBE_MASS, EE_SITE_NAME, PickCubeSceneComposer)
 from ..robots.panda import PandaAgent
-from .compiler import compile_reference_source, panda_entity_declaration
+from .compiler import ReferenceTaskDeclarationV1, panda_entity_declaration
 
 
 PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
@@ -56,8 +56,8 @@ class PandaBoxDeclaration:
             raise ValueError('task semantics must reference the declared box Entity')
 
 
-def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
-    """Compile declarations into the current Artifact with no native runtime."""
+def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
+    """Project the Panda box task data onto the shared Core construction API."""
     d = declaration
     center = (tuple(float(value) for value in np.asarray(d.reset_center_xy, dtype=np.float32))
               if d.cast_reset_center_float32 else tuple(float(value) for value in d.reset_center_xy))
@@ -92,29 +92,47 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
         inherited_state_policy='zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open',
         reset_validity='cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz', settle_steps=0,
     )
-    return compile_declared_artifact(
-        artifact_id=d.artifact_id, task_id=d.task_id, version=d.version, entities=entities,
-        action=ActionIntent('absolute_pose', 'world', 'quaternion_wxyz', 'arm_joint_position_and_gripper'),
-        observations=('task-env-state-v2', 'privileged_state'), initialization=initialization,
-        semantics=d.semantics, timebase=d.timebase,
-        capabilities=d.capabilities,
+    return ReferenceTaskDeclarationV1(
+        artifact=TaskArtifactDeclarationV1(
+            artifact_id=d.artifact_id, task_id=d.task_id, version=d.version, entities=entities,
+            action=ActionIntent('absolute_pose', 'world', 'quaternion_wxyz',
+                                'arm_joint_position_and_gripper'),
+            observations=('task-env-state-v2', 'privileged_state'), initialization=initialization,
+            semantics=d.semantics, timebase=d.timebase, capabilities=d.capabilities,
+        ),
+        composition=TaskCompositionSpec(d.task_id, 'tabletop-v1', ('panda-v1',), ('cube-v1',),
+                                        success_definition=d.success_definition),
+        bodies={d.object_id: 'PickCube'},
+        frames={'panda-v1/ee': EE_SITE_NAME},
+        free_joints={d.object_id: 'PickCube_joint'},
+        joint_targets={f'panda-v1/joint{i}': f'actuator{i}' for i in range(1, 8)},
+        open_actuators=('actuator8',),
     )
+
+
+def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
+    """Compile declarations into the current Artifact with no native runtime."""
+    return _panda_box_reference_declaration(declaration).artifact.compile()
 
 
 def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config):
     """Resolve the same box asset into source names and registered components."""
+    return compile_panda_box_task(declaration, config=config, artifact=artifact).source
+
+
+def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None):
+    """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
     composer = PickCubeSceneComposer(
         table_half_size=d.table_half_size, table_top_z=d.table_top_z,
         table_center_xy=d.table_center_xy, cube_world_pos=d.source_box_position,
         cube_world_quat=d.source_box_quaternion_wxyz,
     )
-    composition = TaskCompositionSpec(d.task_id, 'tabletop-v1', ('panda-v1',), ('cube-v1',),
-                                      success_definition=d.success_definition)
-    return compile_reference_source(
-        artifact=artifact, scene_source=composer.build_source_description(), composition=composition,
-        config=config, bodies={d.object_id: 'PickCube'}, frames={'panda-v1/ee': EE_SITE_NAME},
-        free_joints={d.object_id: 'PickCube_joint'},
-        joint_targets={f'panda-v1/joint{i}': f'actuator{i}' for i in range(1, 8)},
-        open_actuators=('actuator8',),
+    reference = _panda_box_reference_declaration(d)
+    if artifact is not None:
+        expected = reference.artifact.compile()
+        if artifact.identity_hash != expected.identity_hash:
+            raise ValueError("selected Artifact does not match the Panda box declaration")
+    return reference.compile(
+        scene_source=composer.build_source_description(), config=config,
     )

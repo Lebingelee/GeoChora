@@ -20,14 +20,17 @@ from task_env.artifacts import (
     ActionIntent, EntityDefinition, InitializationContract,
     SemanticDefinition, TaskArtifact, Timebase,
 )
-from task_env.assembly.compiler import compile_reference_source
+from task_env.assembly.compiler import (
+    ReferenceTaskDeclarationV1,
+    reference_task_identity_fields,
+)
 from task_env.assembly.source import TaskSceneSource
 from task_env.controllers.canonical.contracts import (
     ControlGroupActionV1, MixedActuatorChannelV1, MixedActuatorPlanV1,
     StructuredActionRequestV1, digest,
 )
 from task_env.environment.configuration import resolve_env_config
-from task_env.environment.task_source import compile_declared_artifact
+from task_env.environment.task_source import TaskArtifactDeclarationV1
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
@@ -385,8 +388,8 @@ def _mapping_differences(
     return differences
 
 
-def _artifact(init_bytes: bytes, *, execution_profile: str,
-              provider: str = 'mujoco', task_uid: str = TASK_1) -> TaskArtifact:
+def _artifact_declaration(init_bytes: bytes, *, execution_profile: str,
+                          provider: str = 'mujoco', task_uid: str = TASK_1) -> TaskArtifactDeclarationV1:
     solution_profile = execution_profile == 'v8'
     contract = task_source_contract_v1(task_uid)
     profile = _TASK_PROFILES[task_uid]
@@ -430,7 +433,7 @@ def _artifact(init_bytes: bytes, *, execution_profile: str,
         if provider == 'geophys'
         else tuple(CAPABILITIES) + ('contact_detection',)
     )
-    artifact = compile_declared_artifact(
+    return TaskArtifactDeclarationV1(
         artifact_id=(ARTIFACT_ID if task_uid == TASK_1 else f'libero/{task_uid.rsplit("/", 1)[-1]}/mixed-v1')
             if not solution_profile else
             (ARTIFACT_ID + '/solution-v8' if task_uid == TASK_1 else
@@ -449,6 +452,20 @@ def _artifact(init_bytes: bytes, *, execution_profile: str,
         ),
         timebase=Timebase(0.002, 25, 0.05), capabilities=required_capabilities,
     )
+
+
+def _compile_artifact_declaration(declaration: TaskArtifactDeclarationV1) -> TaskArtifact:
+    artifact = declaration.compile()
+    if tuple(artifact.initialization.joint_position) != tuple(artifact.semantics.required_joints):
+        raise ValueError('LIBERO initialization field order differs from the source row projection')
+    return artifact
+
+
+def _artifact(init_bytes: bytes, *, execution_profile: str,
+              provider: str = 'mujoco', task_uid: str = TASK_1) -> TaskArtifact:
+    return _compile_artifact_declaration(_artifact_declaration(
+        init_bytes, execution_profile=execution_profile, provider=provider, task_uid=task_uid,
+    ))
     if tuple(artifact.initialization.joint_position) != tuple(joints):
         raise ValueError('LIBERO initialization field order differs from the source row projection')
     return artifact
@@ -546,9 +563,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             source_manifest, sort_keys=True, separators=(',', ':'), allow_nan=False,
         ).encode('utf-8')
         source_manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
-    artifact = _artifact(
+    artifact_declaration = _artifact_declaration(
         init_bytes, execution_profile=execution_profile, provider=provider, task_uid=task_uid,
     )
+    artifact = _compile_artifact_declaration(artifact_declaration)
 
     importer_xml = runtime_model_xml_bytes
     importer_projection = {
@@ -726,15 +744,18 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         # The ordinary MuJoCo adapter consumes the separate semantic object list;
         # GeoPhys resolves the imported MJCF through the task-local name contract.
         provider_objects = ()
-    source = compile_reference_source(
-        artifact=artifact,
-        scene_source=scene_source,
-        joints=joints,
+    reference_declaration = ReferenceTaskDeclarationV1(
+        artifact=artifact_declaration,
+        composition=plan['composition_receipt'],
         bodies=bound_bodies,
         frames=frames,
         free_joints=free_joints,
         joint_targets={}, open_actuators=(),
-        composition=plan['composition_receipt'], config=config, scene=provider_reference_scene,
+        joints=joints,
+    )
+    source = reference_declaration.compile_source(
+        artifact, scene_source=scene_source, config=config,
+        scene=provider_reference_scene,
         agents=provider_agents, objects=provider_objects,
         source_closure_digest=source_receipt.source_closure_digest,
         execution_source_receipt=source_receipt,
@@ -766,6 +787,9 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         # This opt-in profile replays frozen upstream actions directly; it is
         # not the V5 task Solution lifecycle or identity.
         solution_identity = None
+    construction_identity = reference_task_identity_fields(
+        artifact, source, controller, include_runtime_config_sha256=False,
+    )
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
@@ -790,10 +814,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         },
         'construction_id': digest({
             'schema_version': 'libero-selected-construction-v1',
-            'artifact_identity_hash': artifact.identity_hash,
+            'artifact_identity_hash': construction_identity['artifact_sha256'],
             'source_id': source.scene_source.source_id,
             'source_closure_digest': source.source_closure_digest,
-            'controller_identity': controller.identity,
+            'controller_identity': construction_identity['controller_identity'],
         }),
         'solution_identity': solution_identity,
         'arm_resolver': arm_resolver,

@@ -18,7 +18,11 @@ from ...artifacts import (
 )
 from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
-from ...assembly.compiler import compile_reference_source, panda_entity_declaration
+from ...assembly.compiler import (
+    ReferenceTaskDeclarationV1,
+    panda_entity_declaration,
+    reference_task_identity_fields,
+)
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import StableArmTargetHold
@@ -27,7 +31,7 @@ from ...controllers.canonical.production_r3 import (
 )
 from ...environment import TaskCompositionSpec
 from ...environment.configuration import overlay_public_env_config, resolve_env_config
-from ...environment.task_source import compile_declared_artifact
+from ...environment.task_source import TaskArtifactDeclarationV1
 from ...objects.nut_assembly import (
     NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,
     NUTASSEMBLY_NOMINAL_V1_ID, NUTASSEMBLY_NOMINAL_V1_MASS,
@@ -105,7 +109,7 @@ def _recipe():
     return _configuration()["recipe"]
 
 
-def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
+def _artifact_declaration(*, lift_height_m=None, task_config=None) -> TaskArtifactDeclarationV1:
     recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, reset, asset = recipe["scene"], recipe["reset"], recipe["asset"]
     initialization = {"nut_pose": reset["nut_pose"], "joint_position": reset["joint_position"]}
@@ -114,7 +118,7 @@ def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
     if (mass != NUTASSEMBLY_NOMINAL_V1_MASS
             or inertia != tuple(NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA)):
         raise ValueError("selected nominal Nut asset profile changed")
-    return compile_declared_artifact(artifact_id=recipe["artifact_id"], task_id=recipe["task_uid"],
+    return TaskArtifactDeclarationV1(artifact_id=recipe["artifact_id"], task_id=recipe["task_uid"],
         version=recipe["artifact_version"], entities=(
             EntityDefinition("tabletop-v1", "static", "nut-assembly-square-v1/task-local/table",
                 (), (), "box", "support_contact", {"top_z": float(scene["table_top_z"])}),
@@ -137,6 +141,11 @@ def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
         semantics=semantic_definition(lift_height_m=lift_height_m, task_config=task_config),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]), float(recipe["control_dt"])),
         capabilities=tuple(recipe["required_capabilities"]))
+
+
+def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
+    """Compatibility entry backed by the shared declaration compiler."""
+    return _artifact_declaration(lift_height_m=lift_height_m, task_config=task_config).compile()
 
 
 def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_profile=False, task_config=None):
@@ -267,14 +276,20 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
-    runtime_source = compile_reference_source(
-        artifact=artifact,
-        scene_source=TaskSceneSource(scene_xml, base, "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
+    runtime_source = ReferenceTaskDeclarationV1(
+        artifact=_artifact_declaration(lift_height_m=lift_height_m, task_config=task_config),
+        composition=composition,
         bodies={"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
                 "round-peg-v1": "peg2", "panda-v1/base": "link0"},
-        frames={EEF: scene["ee_site_name"]}, free_joints={"square-nut-v1": "SquareNut_joint"},
+        frames={EEF: scene["ee_site_name"]},
+        free_joints={"square-nut-v1": "SquareNut_joint"},
         joint_targets={f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)},
-        open_actuators=("actuator8",), composition=composition, config=config,
+        open_actuators=("actuator8",),
+    ).compile_source(
+        artifact,
+        scene_source=TaskSceneSource(scene_xml, base,
+            "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
+        config=config,
     )
     if _native_feedback_profile:
         if provider != 'geophys':
@@ -361,9 +376,11 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
     controller.identity = digest(controller_identity)
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    construction_identity = reference_task_identity_fields(
+        artifact, source, controller, include_runtime_config_sha256=False,
+    )
     resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
-        "artifact_sha256": artifact.identity_hash,
-        "runtime_config": asdict(source.config), "solution_config": asdict(solution_config),
+        **construction_identity, "solution_config": asdict(solution_config),
         "solution_parameters": {name: getattr(solution_type, name) for name in (
             "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
             "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
@@ -374,7 +391,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         "physical_profile": controller.physical_profile,
         "resolved_controller_action": asdict(controller.config),
         "resolved_controller_gripper": asdict(controller.gripper_config),
-        "controller_identity": controller.identity, "base_controller_identity": base_controller_identity,
+        "base_controller_identity": base_controller_identity,
         "solution_identity": description["identity"], "guard_policy": description["policy_mapping"],
         "guard_policy_identity": description["policy_identity"],
         "outcome_policy": description["outcome_policy_mapping"],
@@ -390,12 +407,9 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
            if native_feedback_profile else {}),
         "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
         "provider_contact_profile": contact_profile,
-        "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
         "source_revision": revision, "source_sha256": source_files,
         "qualification": "NOT_REQUALIFIED",
-        "runtime_source_bindings": {name: dict(getattr(source, name)) for name in (
-            "joints", "bodies", "frames", "free_joints", "joint_targets")},
-        "runtime_open_actuators": list(source.open_actuators)}
+        }
     return {"construction_id": construction_id, "artifact": artifact, "source": source,
         "controller": ReferenceExecutionController(
             holder, artifact.timebase.control_dt, gripper_rate_hz=gripper_control_hz,
