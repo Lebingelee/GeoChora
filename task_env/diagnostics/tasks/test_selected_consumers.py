@@ -407,7 +407,8 @@ def test_reporter_and_expert_factory_use_selected_owner(fake):
         env = make_env(uid, config={'provider': 'geophys', 'backend': 'cpu', 'horizon': 5})
         assert env.uid == uid
         assert env.artifact.identity_hash == env.metadata['task_artifact_hash']
-        assert env.solution.identity
+        assert env.solution is None
+        assert env.value['solution_identity']
         env.close()
     assert _config() == config2() == {'provider':'geophys', 'backend':'cpu', 'horizon':8}
 
@@ -953,7 +954,7 @@ def test_expert_proposal_exception_faults_before_physics_and_blocks_step(fake):
     def fail_proposal():
         raise RuntimeError('injected expert proposal failure')
 
-    env.solution.act=fail_proposal
+    env.prepare_expert().act=fail_proposal
     with pytest.raises(RuntimeError, match='expert proposal failure'):
         env.step_expert()
     assert env.execution_fault.phase == 'expert_proposal'
