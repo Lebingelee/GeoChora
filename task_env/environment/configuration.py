@@ -245,8 +245,9 @@ def _resolve_selected_config(environment_type, config):
                                 "physics_device": supplied.physics_device,
                                 "source_delivery_manifest": supplied.source_delivery_manifest},
                   "episode": {"horizon": supplied.environment.episode.horizon}}
+        config["task"] = dict(supplied.task_parameters)
         if supplied.controller_profile is not None:
-            config["task"] = {"controller_profile": supplied.controller_profile}
+            config["task"]["controller_profile"] = supplied.controller_profile
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if config is None:
@@ -268,7 +269,8 @@ def _resolve_selected_config(environment_type, config):
     allowed_sections = {
         "execution": {"physics_provider", "physics_backend", "physics_device", "source_delivery_manifest"},
         "episode": {"horizon"},
-        "task": {"controller_profile"} if environment_type.selected_controller_profiles else set(),
+        "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
+                | set(environment_type.selected_parameter_limits),
     }
     for name, section in sections.items():
         unknown = set(section) - allowed_sections[name]
@@ -299,7 +301,17 @@ def _resolve_selected_config(environment_type, config):
     profile = sections["task"].get("controller_profile", environment_type.selected_default_controller_profile())
     if profile is not None and profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
+    params = []
+    for key, (lower, upper) in environment_type.selected_parameter_limits.items():
+        if key not in sections["task"]:
+            continue
+        value = sections["task"][key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not lower <= value <= upper:
+            raise ValueError(f"task.{key} must be within [{lower}, {upper}]")
+        params.append((key, float(value)))
     manifest = execution.get("source_delivery_manifest")
+    if provider == "isaacsim" and params:
+        raise ValueError("task parameter overrides are not yet admitted by the Isaac source")
     if provider == "isaacsim":
         if not environment_type.selected_supports_isaac or manifest is None or profile != "r3_continuous_v1":
             raise ValueError("Isaac PickCube requires R3 and an explicit source delivery manifest")
@@ -310,7 +322,8 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
     env = replace(base, runtime=replace(base.runtime, backend=backend),
                   episode=replace(base.episode, horizon=horizon))
-    result = ResolvedSelectedConfig(env, environment_type.uid, provider, device, profile, manifest)
+    result = ResolvedSelectedConfig(env, environment_type.uid, provider, device, profile, manifest,
+                                    tuple(sorted(params)))
     if supplied is not None and supplied != result:
         raise ValueError("resolved selected configuration contains unsupported overrides")
     return result

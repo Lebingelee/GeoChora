@@ -88,7 +88,7 @@ def _environment_config():
     return replace(config, runtime=runtime, render=replace(config.render, camera_obs=False))
 
 
-def semantic_definition() -> SemanticDefinition:
+def semantic_definition(*, lift_height_m=None) -> SemanticDefinition:
     recipe = _recipe()
     scene, task = recipe["scene"], recipe["success"]
     return SemanticDefinition(
@@ -96,7 +96,7 @@ def semantic_definition() -> SemanticDefinition:
         required_poses=("cube-v1", EEF), required_joints=FINGERS,
         parameters_si={
             "rest_height": float(scene["table_top_z"]) + CUBE_HALF_SIZE,
-            "lift_height": float(task["lift_height_m"]),
+            "lift_height": float(task["lift_height_m"] if lift_height_m is None else lift_height_m),
             "reach_distance": float(task["reach_distance_m"]),
             "gripper_closed_opening": float(task["gripper_closed_opening_m"]),
         },
@@ -132,11 +132,11 @@ def _evaluate_values(cube_pos, eef_pos, gripper_opening, semantics=None) -> Task
     return TaskEvaluation(float(sum(terms.values())), lifted, False, metrics, terms)
 
 
-def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None) -> TaskEvaluation:
+def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None, *, lift_height_m=None) -> TaskEvaluation:
     """Lift is the sole success gate; grasp remains a reward diagnostic."""
     if not isinstance(state, CanonicalStateView):
         raise TypeError("PickCube evaluation requires CanonicalStateView")
-    expected = semantic_definition()
+    expected = semantic_definition(lift_height_m=lift_height_m)
     semantics = expected if semantics is None else semantics
     if semantics != expected:
         raise ValueError("unsupported PickCube semantic definition")
@@ -247,7 +247,7 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
-def build_artifact() -> TaskArtifact:
+def build_artifact(*, lift_height_m=None) -> TaskArtifact:
     """Build the selected serialized TaskArtifact through canonical Core contracts."""
     recipe = _recipe()
     scene = recipe["scene"]
@@ -296,7 +296,7 @@ def build_artifact() -> TaskArtifact:
             reset_validity="cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz",
             settle_steps=0,
         ),
-        semantics=semantic_definition(),
+        semantics=semantic_definition(lift_height_m=lift_height_m),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]),
                           float(recipe["control_dt"])),
         capabilities=(
@@ -307,9 +307,9 @@ def build_artifact() -> TaskArtifact:
     return artifact
 
 
-def sample_reset(artifact: TaskArtifact, task_seed: int) -> ResetSample:
+def sample_reset(artifact: TaskArtifact, task_seed: int, *, lift_height_m=None) -> ResetSample:
     """Sample the selected PCG64-v0 reset distribution at the task boundary."""
-    if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != build_artifact().identity_hash:
+    if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != build_artifact(lift_height_m=lift_height_m).identity_hash:
         raise ValueError("selected P1.6 experimental_100hz TaskArtifact required")
     if type(task_seed) is not int or task_seed < 0:
         raise ValueError("task_seed must be a nonnegative integer")
@@ -328,8 +328,8 @@ def sample_reset(artifact: TaskArtifact, task_seed: int) -> ResetSample:
     )
 
 
-def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None) -> RuntimeSource:
-    if artifact.identity_hash != build_artifact().identity_hash:
+def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None, lift_height_m=None) -> RuntimeSource:
+    if artifact.identity_hash != build_artifact(lift_height_m=lift_height_m).identity_hash:
         raise ValueError("selected P1.6 TaskArtifact required")
     if backend not in {"cpu", "cuda"}:
         raise ValueError("PickCube reference backend must be cpu or cuda")
@@ -379,15 +379,16 @@ def _r3_dynamic_profile():
     return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None):
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
     recipe = _recipe()
-    artifact = build_artifact()
-    source = build_runtime_source(artifact, backend=backend, resolved_config=resolved_config)
+    artifact = build_artifact(lift_height_m=lift_height_m)
+    source = build_runtime_source(artifact, backend=backend, resolved_config=resolved_config,
+                                  lift_height_m=lift_height_m)
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     readiness = PickCubeReadinessConfig.from_source(
@@ -414,6 +415,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     runtime_config = asdict(source.config)
     resolved = {
         "construction_id": recipe["construction_id"], "task_recipe": _configuration(),
+        "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
         "artifact": artifact.to_mapping(), "artifact_sha256": artifact.identity_hash,
         "runtime_config": runtime_config, "runtime_config_sha256": hashlib.sha256(
             json.dumps(runtime_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
@@ -558,7 +560,7 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None):
+def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None, lift_height_m=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def build(provider):
@@ -569,7 +571,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -578,7 +580,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 controller_profile=controller_profile,
             )
         return build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile, resolved_config=resolved_config)
+                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
 
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
@@ -588,14 +590,15 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
 
     return ReferenceTaskBinding(
         build=build,
         build_external=build_external,
         build_seeded=build_seeded,
         validate_external_solution=_validate_external_readiness_solution,
-        reset_sample=sample_reset, evaluate=evaluate,
+        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m),
+        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m),
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True, interval_mode="grouped", recorder_mode="canonical",
         reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
@@ -615,6 +618,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
     uses_selected_public_config = True
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
+    selected_parameter_limits = {"lift_height_m": (0.01, 0.25)}
     selected_supports_isaac = True
 
     @staticmethod
@@ -645,7 +649,8 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         profile = config.controller_profile
         manifest = config.source_delivery_manifest
         binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest,
-                                         resolved_config=config.environment)
+                                         resolved_config=config.environment,
+                                         lift_height_m=dict(config.task_parameters).get("lift_height_m"))
         if provider == 'isaacsim':
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,

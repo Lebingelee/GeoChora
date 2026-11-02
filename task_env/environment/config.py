@@ -570,6 +570,7 @@ class ResolvedSelectedConfig:
     physics_device: str
     controller_profile: str | None = None
     source_delivery_manifest: str | None = None
+    task_parameters: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)
