@@ -76,8 +76,8 @@ def _recipe() -> dict:
     return _configuration()["recipe"]
 
 
-def _environment_config():
-    data = _configuration()
+def _environment_config(data=None):
+    data = _configuration() if data is None else data
     recipe = data["recipe"]
     base = resolve_env_config(
         task_uid=recipe["task_uid"], scene_uid=recipe["scene_uid"],
@@ -90,8 +90,8 @@ def _environment_config():
     return replace(config, runtime=runtime, render=replace(config.render, camera_obs=False))
 
 
-def _declaration(*, lift_height_m=None):
-    recipe = _recipe()
+def _declaration(*, lift_height_m=None, task_config=None):
+    recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, reset = recipe["scene"], recipe["reset"]
     return PandaBoxDeclaration(
         task_id=recipe["task_uid"], artifact_id=recipe["artifact_id"],
@@ -102,18 +102,18 @@ def _declaration(*, lift_height_m=None):
         source_box_position=tuple(scene["initial_cube_position"]),
         source_box_quaternion_wxyz=tuple(scene["initial_cube_quaternion_wxyz"]),
         reset_center_xy=tuple(reset["center_xy"]), reset_half_extent_m=reset["half_extent_m"],
-        semantics=semantic_definition(lift_height_m=lift_height_m),
+        semantics=semantic_definition(lift_height_m=lift_height_m, task_config=task_config),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]),
                           float(recipe["control_dt"])),
     )
 
 
-def build_artifact(*, lift_height_m=None) -> TaskArtifact:
-    return compile_panda_box_artifact(_declaration(lift_height_m=lift_height_m))
+def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
+    return compile_panda_box_artifact(_declaration(lift_height_m=lift_height_m, task_config=task_config))
 
 
-def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None, lift_height_m=None) -> RuntimeSource:
-    declaration = _declaration(lift_height_m=lift_height_m)
+def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None, lift_height_m=None, task_config=None) -> RuntimeSource:
+    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
     if artifact.identity_hash != compile_panda_box_artifact(declaration).identity_hash:
         raise ValueError("selected P1.6 TaskArtifact required")
     if backend not in {"cpu", "cuda"}:
@@ -147,16 +147,17 @@ def _r3_dynamic_profile():
     return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None):
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
-    recipe = _recipe()
-    artifact = build_artifact(lift_height_m=lift_height_m)
+    task_config = _configuration() if task_config is None else task_config
+    recipe = task_config["recipe"]
+    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
     source = build_runtime_source(artifact, backend=backend, resolved_config=resolved_config,
-                                  lift_height_m=lift_height_m)
+                                  lift_height_m=lift_height_m, task_config=task_config)
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     readiness = PickCubeReadinessConfig.from_source(
@@ -182,7 +183,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
     runtime_config = asdict(source.config)
     resolved = {
-        "construction_id": recipe["construction_id"], "task_recipe": _configuration(),
+        "construction_id": recipe["construction_id"], "task_recipe": task_config,
         "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
         "artifact": artifact.to_mapping(), "artifact_sha256": artifact.identity_hash,
         "runtime_config": runtime_config, "runtime_config_sha256": hashlib.sha256(
@@ -214,7 +215,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile="r3_continuous_v1",
-                          resolved_config=None):
+                          resolved_config=None, task_config=None):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
         raise ValueError("F06 Isaac freezes the existing r3_continuous_v1 profile")
@@ -227,9 +228,9 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     # Reuse the task's existing action/readiness configuration and production
     # R3 physical profile; only the source-bound position writer changes.
     legacy = build_reference(backend="cpu", include_solution=False,
-                             controller_profile=controller_profile, resolved_config=resolved_config)
+                             controller_profile=controller_profile, resolved_config=resolved_config, task_config=task_config)
     runtime_input = build_pickcube_isaac_runtime_input_v1(
-        delivery_manifest, task_seed=task_seed, horizon=horizon,
+        delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
     )
     manifest_path = Path(delivery_manifest).resolve(strict=True)
     panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
@@ -333,7 +334,7 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None, lift_height_m=None):
+def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None, lift_height_m=None, task_config=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def build(provider):
@@ -344,8 +345,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
+                **({"task_config": task_config} if task_config is not None else {}),
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -353,9 +355,10 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, include_solution=False,
                 controller_profile=controller_profile,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
+                **({"task_config": task_config} if task_config is not None else {}),
             )
         return build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
+                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
 
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
@@ -365,16 +368,17 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
+                **({"task_config": task_config} if task_config is not None else {}),
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m)
+        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
 
     return ReferenceTaskBinding(
         build=build,
         build_external=build_external,
         build_seeded=build_seeded,
         validate_external_solution=_validate_external_readiness_solution,
-        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m),
-        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m),
+        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
+        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True, interval_mode="grouped", recorder_mode="canonical",
         reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
@@ -398,12 +402,16 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     selected_supports_isaac = True
 
     @staticmethod
-    def selected_default_config():
-        return _environment_config()
+    def selected_task_configuration():
+        return _configuration()
 
     @staticmethod
-    def selected_default_controller_profile():
-        return _recipe()["default_controller_profile"]
+    def selected_default_config(task_config=None):
+        return _environment_config(task_config)
+
+    @staticmethod
+    def selected_default_controller_profile(task_config=None):
+        return (_recipe() if task_config is None else task_config["recipe"])["default_controller_profile"]
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
@@ -424,13 +432,16 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         horizon = config.environment.episode.horizon
         profile = config.controller_profile
         manifest = config.source_delivery_manifest
+        task_config = json.loads(config.task_configuration_json)
         binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest,
                                          resolved_config=config.environment,
-                                         lift_height_m=dict(config.task_parameters).get("lift_height_m"))
+                                         lift_height_m=dict(config.task_parameters).get("lift_height_m"),
+                                         task_config=task_config)
         if provider == 'isaacsim':
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,
-                                            controller_profile=profile, resolved_config=config.environment)
+                                            controller_profile=profile, resolved_config=config.environment,
+                                            task_config=task_config)
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
                       _execution_spec_v1=initial['execution_spec_v1'], _initial_value=initial)
         else:

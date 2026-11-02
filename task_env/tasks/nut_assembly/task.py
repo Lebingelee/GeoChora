@@ -17,8 +17,8 @@ PEG = "square-peg-v1"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 SUCCESS = "nut_on_square_peg_canonical_state_v0"
 
-def semantic_definition(*, lift_height_m=None) -> SemanticDefinition:
-    recipe = _recipe()
+def semantic_definition(*, lift_height_m=None, task_config=None) -> SemanticDefinition:
+    recipe = _recipe() if task_config is None else task_config["recipe"]
     p = recipe["semantic_parameters"]
     scene = recipe["scene"]
     return SemanticDefinition("semantics-v0", "nut_assembly_state_v0",
@@ -32,9 +32,9 @@ def semantic_definition(*, lift_height_m=None) -> SemanticDefinition:
          "peg_half_height": float(scene["peg_half_height"])}, SUCCESS)
 
 
-def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None, *, lift_height_m=None):
+def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None, *, lift_height_m=None, task_config=None):
     from ...environment import TaskEvaluation
-    expected = semantic_definition(lift_height_m=lift_height_m)
+    expected = semantic_definition(lift_height_m=lift_height_m, task_config=task_config)
     semantics = expected if semantics is None else semantics
     if not isinstance(state, CanonicalStateView) or semantics != expected:
         raise ValueError("unsupported canonical NutAssembly state/semantics")
@@ -85,20 +85,21 @@ def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = N
         failure=False, metrics=metrics, reward_terms=terms)
 
 
-def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=None) -> ResetSample:
-    expected = build_artifact(lift_height_m=lift_height_m)
+def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=None, task_config=None) -> ResetSample:
+    expected = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
     if not isinstance(artifact, TaskArtifact) or artifact.to_mapping() != expected.to_mapping():
         raise ValueError("selected NA-S0 TaskArtifact required")
     if type(task_seed) is not int or task_seed != 19:
         raise ValueError("selected NA-S0 uses fixed provenance seed19")
     initialization = artifact.initialization
+    reset = (_recipe() if task_config is None else task_config["recipe"])["reset"]
     return ResetSample.create(schema_version="reset-sample-v0",
-        task_artifact_hash=artifact.identity_hash, sampler_id=_recipe()["reset"]["sampler_id"],
-        sampler_version=_recipe()["reset"]["sampler_version"], task_seed=task_seed,
+        task_artifact_hash=artifact.identity_hash, sampler_id=reset["sampler_id"],
+        sampler_version=reset["sampler_version"], task_seed=task_seed,
         joint_position=dict(initialization.joint_position), poses_world=dict(initialization.poses_world),
-        velocity_policy=_recipe()["reset"]["inherited_state_policy"],
-        control_policy=_recipe()["reset"]["control_policy"],
-        settle_steps=int(_recipe()["reset"]["settle_steps"]))
+        velocity_policy=reset["inherited_state_policy"],
+        control_policy=reset["control_policy"],
+        settle_steps=int(reset["settle_steps"]))
 
 
 def _reset_seed(seed):

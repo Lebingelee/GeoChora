@@ -289,7 +289,10 @@ def _resolve_selected_config(environment_type, config):
         if key in sections[section]:
             raise ValueError(f"{old} conflicts with {section}.{key}")
         sections[section][key] = values[old]
-    base = environment_type.selected_default_config()
+    configuration_loader = getattr(environment_type, "selected_task_configuration", None)
+    task_configuration = configuration_loader() if configuration_loader is not None else None
+    base = (environment_type.selected_default_config(task_configuration)
+            if configuration_loader is not None else environment_type.selected_default_config())
     execution = sections["execution"]
     provider = execution.get("physics_provider", "geophys")
     backend = execution.get("physics_backend", "cpu")
@@ -298,7 +301,9 @@ def _resolve_selected_config(environment_type, config):
                                            ("mujoco", "cpu", "cpu"),
                                            ("isaacsim", "cuda", "cuda:0")}:
         raise ValueError("unsupported selected physics provider/backend/device combination")
-    profile = sections["task"].get("controller_profile", environment_type.selected_default_controller_profile())
+    default_profile = (environment_type.selected_default_controller_profile(task_configuration)
+                       if configuration_loader is not None else environment_type.selected_default_controller_profile())
+    profile = sections["task"].get("controller_profile", default_profile)
     if profile is not None and profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
     params = []
@@ -322,8 +327,10 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
     env = replace(base, runtime=replace(base.runtime, backend=backend),
                   episode=replace(base.episode, horizon=horizon))
+    task_configuration_json = (None if task_configuration is None else json.dumps(
+        task_configuration, sort_keys=True, separators=(",", ":"), allow_nan=False))
     result = ResolvedSelectedConfig(env, environment_type.uid, provider, device, profile, manifest,
-                                    tuple(sorted(params)))
+                                    tuple(sorted(params)), task_configuration_json)
     if supplied is not None and supplied != result:
         raise ValueError("resolved selected configuration contains unsupported overrides")
     return result

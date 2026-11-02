@@ -571,6 +571,7 @@ class ResolvedSelectedConfig:
     controller_profile: str | None = None
     source_delivery_manifest: str | None = None
     task_parameters: tuple[tuple[str, float], ...] = ()
+    task_configuration_json: str | None = None
 
 
 @dataclass(frozen=True)

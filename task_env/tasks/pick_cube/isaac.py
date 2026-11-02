@@ -257,6 +257,7 @@ def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
 
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
+    task_config=None,
 ) -> PickCubeIsaacRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
     from .specialization import _configuration, build_artifact
@@ -273,8 +274,8 @@ def build_pickcube_isaac_runtime_input_v1(
             or loaded.delivery.representation_id != ISAAC_REPRESENTATION_V1):
         raise ValueError("F06 builder requires the exact generated PickCube desktop delivery v1")
 
-    task_config = _configuration()
-    legacy_artifact = build_artifact()
+    task_config = _configuration() if task_config is None else task_config
+    legacy_artifact = build_artifact(task_config=task_config)
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
         task_config, legacy_artifact,
     )

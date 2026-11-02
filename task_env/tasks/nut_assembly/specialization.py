@@ -105,8 +105,9 @@ def _recipe():
     return _configuration()["recipe"]
 
 
-def build_artifact(*, lift_height_m=None) -> TaskArtifact:
-    recipe, scene, reset, asset = _recipe(), _recipe()["scene"], _recipe()["reset"], _recipe()["asset"]
+def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
+    recipe = _recipe() if task_config is None else task_config["recipe"]
+    scene, reset, asset = recipe["scene"], recipe["reset"], recipe["asset"]
     initialization = {"nut_pose": reset["nut_pose"], "joint_position": reset["joint_position"]}
     mass = float(asset["nut_mass_kg"])
     inertia = tuple(float(v) for v in asset["nut_diagonal_inertia_kg_m2"])
@@ -138,17 +139,18 @@ def build_artifact(*, lift_height_m=None) -> TaskArtifact:
             dict(initialization["joint_position"]), (),
             "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
             "NA-S0_frozen_deterministic_semantic_joint_and_pose_request", 0),
-        semantics=semantic_definition(lift_height_m=lift_height_m),
+        semantics=semantic_definition(lift_height_m=lift_height_m, task_config=task_config),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]), float(recipe["control_dt"])),
         capabilities=tuple(recipe["required_capabilities"]))
 
 
-def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_profile=False):
-    recipe = _recipe()
+def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_profile=False, task_config=None):
+    task_config = _configuration() if task_config is None else task_config
+    recipe = task_config["recipe"]
     base = resolve_env_config(task_uid=recipe["task_uid"], scene_uid=recipe["scene_uid"],
         agent_uids=tuple(recipe["agent_uids"]), object_uids=tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
-    config = overlay_public_env_config(base, _configuration()["environment"])
+    config = overlay_public_env_config(base, task_config["environment"])
     if backend != 'cpu' and not ((diagnostic or native_feedback_profile)
                                   and backend == 'cuda'):
         raise ValueError('NutAssembly CUDA requires its explicit cadence or native-feedback profile')
@@ -226,18 +228,19 @@ def _r05b_execution_source(source):
 
 def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu',
                          _diagnostic=False, _native_feedback_profile=False, resolved_config=None,
-                         lift_height_m=None):
-    if artifact.to_mapping() != build_artifact(lift_height_m=lift_height_m).to_mapping():
+                         lift_height_m=None, task_config=None):
+    task_config = _configuration() if task_config is None else task_config
+    if artifact.to_mapping() != build_artifact(lift_height_m=lift_height_m, task_config=task_config).to_mapping():
         raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
     if backend != 'cpu' and not ((_diagnostic or _native_feedback_profile)
                                  and provider == 'geophys' and backend == 'cuda'):
         raise ValueError('selected NutAssembly CUDA source requires an explicit GeoPhys profile')
-    recipe = _recipe()
+    recipe = task_config["recipe"]
     source_config = recipe["controller"]
     config = (_environment_config(backend=backend, diagnostic=_diagnostic,
-                                  native_feedback_profile=_native_feedback_profile)
+                                  native_feedback_profile=_native_feedback_profile, task_config=task_config)
               if resolved_config is None else resolved_config)
     config = replace(config,
         action=replace(config.action, **source_config["action_overrides"]),
@@ -309,15 +312,16 @@ def _source_identity_files():
 
 
 def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
-                     diagnostic, native_feedback_profile=False, resolved_config=None, lift_height_m=None):
+                     diagnostic, native_feedback_profile=False, resolved_config=None, lift_height_m=None, task_config=None):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
-    recipe = _recipe()
-    artifact = build_artifact(lift_height_m=lift_height_m)
+    task_config = _configuration() if task_config is None else task_config
+    recipe = task_config["recipe"]
+    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
     source, contact_profile = build_runtime_source(
         artifact, provider, backend=backend, _diagnostic=diagnostic,
         _native_feedback_profile=native_feedback_profile, resolved_config=resolved_config,
-        lift_height_m=lift_height_m,
+        lift_height_m=lift_height_m, task_config=task_config,
     )
     dynamic = load_r3_dynamic_profile()
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
@@ -369,7 +373,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
             "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
             "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
             "postclose_hold_s", "servo_height_compensation_m", "stable_height_tolerance_m")},
-        "task_recipe": _configuration(),
+        "task_recipe": task_config,
         "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
         "dynamic_profile": dynamic,
         "physical_profile": controller.physical_profile,
@@ -417,12 +421,12 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         "_contact_profile": contact_profile}
 
 
-def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None):
+def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None, task_config=None):
     """Build the unchanged selected 100 Hz/500 Hz reference route."""
     return _build_reference(
         provider=provider, include_solution=include_solution,
         backend='cpu', gripper_control_hz=500, diagnostic=False, resolved_config=resolved_config,
-        lift_height_m=lift_height_m,
+        lift_height_m=lift_height_m, task_config=task_config,
     )
 
 
@@ -489,12 +493,12 @@ def _validate_external_solution(value, solution):
         raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
 
 
-def _binding(resolved_config=None, lift_height_m=None):
+def _binding(resolved_config=None, lift_height_m=None, task_config=None):
     return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, include_solution=False,
                                                                       resolved_config=resolved_config,
-                                                                      lift_height_m=lift_height_m),
-        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m),
-        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m),
+                                                                      lift_height_m=lift_height_m, task_config=task_config),
+        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
+        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
         external_actions=False, interval_mode="native", recorder_mode="execution",
         external_action_error="selected NutAssembly requires step_expert; unguarded external actions are not admitted",
@@ -503,7 +507,7 @@ def _binding(resolved_config=None, lift_height_m=None):
         native_interval_receipt_factory=_native_interval_receipt,
         build_external=lambda provider: build_reference(provider=provider, include_solution=False,
                                                         resolved_config=resolved_config,
-                                                        lift_height_m=lift_height_m),
+                                                        lift_height_m=lift_height_m, task_config=task_config),
         build_gripper_cadence_diagnostic=lambda provider, backend, gripper_control_hz, include_solution:
             build_gripper_cadence_diagnostic_reference(
                 backend=backend, gripper_control_hz=gripper_control_hz,
@@ -531,11 +535,15 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     selected_supports_isaac = False
 
     @staticmethod
-    def selected_default_config():
-        return _environment_config()
+    def selected_task_configuration():
+        return _configuration()
 
     @staticmethod
-    def selected_default_controller_profile():
+    def selected_default_config(task_config=None):
+        return _environment_config(task_config=task_config)
+
+    @staticmethod
+    def selected_default_controller_profile(task_config=None):
         return None
 
     @classmethod
@@ -553,7 +561,8 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
             raise ValueError('selected reference admits state-only execution without extra kwargs')
         env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
                   horizon=config.environment.episode.horizon,
-                  _binding=_binding(config.environment, dict(config.task_parameters).get("lift_height_m")))
+                  _binding=_binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
+                                    json.loads(config.task_configuration_json)))
         env.resolved_public_config = config
         return env
 

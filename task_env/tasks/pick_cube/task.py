@@ -16,8 +16,8 @@ from ...objects.pick_cube import CUBE_HALF_SIZE
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 
-def semantic_definition(*, lift_height_m=None) -> SemanticDefinition:
-    recipe = _recipe()
+def semantic_definition(*, lift_height_m=None, task_config=None) -> SemanticDefinition:
+    recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, task = recipe["scene"], recipe["success"]
     return SemanticDefinition(
         schema_version="semantics-v0", evaluator="pick_cube_lift_v0",
@@ -60,11 +60,11 @@ def _evaluate_values(cube_pos, eef_pos, gripper_opening, semantics=None) -> Task
     return TaskEvaluation(float(sum(terms.values())), lifted, False, metrics, terms)
 
 
-def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None, *, lift_height_m=None) -> TaskEvaluation:
+def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None, *, lift_height_m=None, task_config=None) -> TaskEvaluation:
     """Lift is the sole success gate; grasp remains a reward diagnostic."""
     if not isinstance(state, CanonicalStateView):
         raise TypeError("PickCube evaluation requires CanonicalStateView")
-    expected = semantic_definition(lift_height_m=lift_height_m)
+    expected = semantic_definition(lift_height_m=lift_height_m, task_config=task_config)
     semantics = expected if semantics is None else semantics
     if semantics != expected:
         raise ValueError("unsupported PickCube semantic definition")
@@ -175,9 +175,9 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
-def sample_reset(artifact: TaskArtifact, task_seed: int, *, lift_height_m=None) -> ResetSample:
+def sample_reset(artifact: TaskArtifact, task_seed: int, *, lift_height_m=None, task_config=None) -> ResetSample:
     """Sample the selected PCG64-v0 reset distribution at the task boundary."""
-    if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != build_artifact(lift_height_m=lift_height_m).identity_hash:
+    if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != build_artifact(lift_height_m=lift_height_m, task_config=task_config).identity_hash:
         raise ValueError("selected P1.6 experimental_100hz TaskArtifact required")
     if type(task_seed) is not int or task_seed < 0:
         raise ValueError("task_seed must be a nonnegative integer")
