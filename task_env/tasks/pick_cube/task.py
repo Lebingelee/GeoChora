@@ -15,8 +15,8 @@ import yaml
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
-    PoseWorld, RequiredCapabilitySet, SemanticDefinition, TaskArtifact,
-    Timebase, UniformDimension, WorldDefinition,
+    PoseWorld, SemanticDefinition, TaskArtifact,
+    Timebase, UniformDimension,
 )
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
@@ -32,6 +32,7 @@ from ...environment import (
 )
 from ...environment.configuration import overlay_public_env_config, resolve_env_config
 from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
+from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource
@@ -263,12 +264,10 @@ def build_artifact() -> TaskArtifact:
     initial_joints = {f"panda-v1/{name}": value
         for name, value in PandaAgent().initial_state_spec().joint_positions}
     table_half = tuple(float(value) for value in scene["table_half_size"])
-    artifact = TaskArtifact(
-        schema_version="task-artifact-v0", artifact_id=recipe["artifact_id"],
-        task_id=recipe["task_uid"], artifact_version=recipe["artifact_version"],
-        world=WorldDefinition(
-            schema_version="world-v0", convention="SI_right_handed_z_up_wxyz",
-            entities=(
+    artifact = compile_declared_artifact(
+        artifact_id=recipe["artifact_id"], task_id=recipe["task_uid"],
+        version=recipe["artifact_version"],
+        entities=(
                 EntityDefinition("tabletop-v1", "static", "tabletop-v1/task-local",
                     ("tabletop-v1/top",), (), "box", "support_contact",
                     {"top_z": float(scene["table_top_z"]), **{
@@ -283,11 +282,9 @@ def build_artifact() -> TaskArtifact:
                     {"half_size": CUBE_HALF_SIZE, "mass": CUBE_MASS, **{
                         f"inertia_{axis}": value for axis, value in zip("xyz", CUBE_DIAG_INERTIA, strict=True)}}),
             ),
-            action=ActionIntent("absolute_pose", "world", "quaternion_wxyz",
-                "arm_joint_position_and_gripper"),
-            observation_requirements=("task-env-state-v2", "privileged_state"),
-            randomization_dimensions=tuple(dimension.name for dimension in dimensions),
-        ),
+        action=ActionIntent("absolute_pose", "world", "quaternion_wxyz",
+            "arm_joint_position_and_gripper"),
+        observations=("task-env-state-v2", "privileged_state"),
         initialization=InitializationContract(
             schema_version="initialization-v0",
             poses_world={"cube-v1": PoseWorld(
@@ -301,10 +298,10 @@ def build_artifact() -> TaskArtifact:
         semantics=semantic_definition(),
         timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]),
                           float(recipe["control_dt"])),
-        required_capabilities=RequiredCapabilitySet((
+        capabilities=(
             "rigid_body", "free_body", "articulated_robot", "joint_position_actuation",
             "joint_state_query", "body_pose_query", "frame_pose_query",
-        )),
+        ),
     )
     return artifact
 

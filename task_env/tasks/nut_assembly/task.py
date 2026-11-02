@@ -14,8 +14,7 @@ import yaml
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
-    PoseWorld, RequiredCapabilitySet, SemanticDefinition, TaskArtifact, Timebase,
-    WorldDefinition,
+    PoseWorld, SemanticDefinition, TaskArtifact, Timebase,
 )
 from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
@@ -27,6 +26,7 @@ from ...controllers.canonical.production_r3 import (
 )
 from ...environment import TaskCompositionSpec
 from ...environment.configuration import overlay_public_env_config, resolve_env_config
+from ...environment.task_source import compile_declared_artifact
 from ...objects.nut_assembly import (
     NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,
     NUTASSEMBLY_NOMINAL_V1_ID, NUTASSEMBLY_NOMINAL_V1_MASS,
@@ -176,9 +176,8 @@ def build_artifact() -> TaskArtifact:
     if (mass != NUTASSEMBLY_NOMINAL_V1_MASS
             or inertia != tuple(NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA)):
         raise ValueError("selected nominal Nut asset profile changed")
-    return TaskArtifact("task-artifact-v0", recipe["artifact_id"], recipe["task_uid"],
-        recipe["artifact_version"],
-        WorldDefinition("world-v0", "SI_right_handed_z_up_wxyz", (
+    return compile_declared_artifact(artifact_id=recipe["artifact_id"], task_id=recipe["task_uid"],
+        version=recipe["artifact_version"], entities=(
             EntityDefinition("tabletop-v1", "static", "nut-assembly-square-v1/task-local/table",
                 (), (), "box", "support_contact", {"top_z": float(scene["table_top_z"])}),
             EntityDefinition("panda-v1", "embodiment",
@@ -195,16 +194,16 @@ def build_artifact() -> TaskArtifact:
                 (), (), "box", "nut_contact", {"half_height": float(scene["peg_half_height"])}),
             EntityDefinition("round-peg-v1", "static", "nut-assembly-square-v1/task-local/round-peg",
                 (), (), "cylinder", "nut_contact", {"half_height": float(scene["peg_half_height"])}),
-        ), ActionIntent("absolute_pose", "world", "quaternion_wxyz", "arm_joint_position_and_gripper"),
-        tuple(recipe["observation_requirements"]), ()),
-        InitializationContract("initialization-v0",
+        ), action=ActionIntent("absolute_pose", "world", "quaternion_wxyz", "arm_joint_position_and_gripper"),
+        observations=tuple(recipe["observation_requirements"]),
+        initialization=InitializationContract("initialization-v0",
             {"square-nut-v1": PoseWorld.from_mapping(initialization["nut_pose"])},
             dict(initialization["joint_position"]), (),
             "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
             "NA-S0_frozen_deterministic_semantic_joint_and_pose_request", 0),
-        semantic_definition(),
-        Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]), float(recipe["control_dt"])),
-        RequiredCapabilitySet(tuple(recipe["required_capabilities"])))
+        semantics=semantic_definition(),
+        timebase=Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]), float(recipe["control_dt"])),
+        capabilities=tuple(recipe["required_capabilities"]))
 
 
 def sample_reset(artifact: TaskArtifact, task_seed: int = 19) -> ResetSample:

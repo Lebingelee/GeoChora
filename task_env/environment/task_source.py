@@ -11,8 +11,14 @@ import re
 from typing import Literal
 
 from ..artifacts import (
+    ActionIntent,
     FrameReference,
+    InitializationContract,
     JointReference,
+    RequiredCapabilitySet,
+    SemanticDefinition,
+    Timebase,
+    WorldDefinition,
     SceneDefinition,
     TaskArtifact,
     TaskArtifactV1,
@@ -595,6 +601,37 @@ def sample_episode_reset_plan(
     )
 
 
+def compile_declared_artifact(*, artifact_id: str, task_id: str, version: str,
+                              entities: tuple, action: ActionIntent,
+                              observations: tuple[str, ...],
+                              initialization: InitializationContract,
+                              semantics: SemanticDefinition, timebase: Timebase,
+                              capabilities: tuple[str, ...]) -> TaskArtifact:
+    """Compile task declarations into the active runtime Artifact contract.
+
+    This is a pure value operation: it never materializes a provider or Solution.
+    The compiler owns the compatibility World and its randomization index.
+    """
+    from ..artifacts import EntityDefinition
+
+    if not entities or any(not isinstance(entity, EntityDefinition) for entity in entities):
+        raise TypeError("declared entities must be a nonempty tuple of EntityDefinition")
+    artifact = TaskArtifact(
+        schema_version="task-artifact-v0", artifact_id=artifact_id,
+        task_id=task_id, artifact_version=version,
+        world=WorldDefinition(
+            schema_version="world-v0", convention="SI_right_handed_z_up_wxyz",
+            entities=tuple(entities), action=action,
+            observation_requirements=tuple(observations),
+            randomization_dimensions=tuple(item.name for item in initialization.randomization),
+        ),
+        initialization=initialization, semantics=semantics, timebase=timebase,
+        required_capabilities=RequiredCapabilitySet(tuple(capabilities)),
+    )
+    artifact.validate()
+    return artifact
+
+
 def compile_task_artifact_v1(
     source: TaskSourceV1,
     scene: SceneDefinition,
@@ -745,6 +782,14 @@ def compile_task_artifact_v1(
         timebase=legacy_artifact.timebase,
         required_capabilities=legacy_artifact.required_capabilities,
     )
+
+
+def compile_declared_artifact_v1(source: TaskSourceV1, scene: SceneDefinition, *,
+                                 frame_bindings=None, joint_bindings=None, **declaration) -> TaskArtifactV1:
+    """Compile declarations and bind them to a canonical Scene without an authored v0 Artifact."""
+    legacy = compile_declared_artifact(**declaration)
+    return compile_task_artifact_v1(source, scene, legacy, frame_bindings=frame_bindings,
+                                    joint_bindings=joint_bindings)
 
 
 def adapt_legacy_recipe_task_source(values: Mapping) -> TaskSourceV1:
