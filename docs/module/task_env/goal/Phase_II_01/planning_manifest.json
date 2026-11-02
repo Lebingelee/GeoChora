@@ -4633,8 +4633,9 @@
     "12_F05_F07_Execution_Playbook.md": "be5cac8c821904f7de62bb6e32371b84c4e09a80cf6ce4aef33b9ce248f6cf7a",
     "13_F05_Early_Diagnostic_Three_Goals.md": "f5083292146ae932c475c4be50824107ac574e4bf49506d08c33e9f1b973d77a",
     "14_F06_PickCube_Harness_Multi_Backend_Goal.md": "bf008de6e25223ec8ffffbf3718529e63e16d6dc207cf836b87c7e2e051725df",
-    "README.md": "dd3ae022063289d7b295752170af6f127344e691675d0d267ef523e744086f3d",
-    "15_V210_Public_Task_API_Refactor.md": "927c43608a5f28690978048f0c3a1e427fb57f928631529ff243751baa02baaa"
+    "README.md": "836b114e883236f7c997d11de4f210e5e160069d8c7662fefb5f8b96b8ec13f4",
+    "15_V210_Public_Task_API_Refactor.md": "927c43608a5f28690978048f0c3a1e427fb57f928631529ff243751baa02baaa",
+    "16_V210_Release_Preparation_Goal.md": "044bfa772f82173d5b4b83f3ad1435af212c86c7ca47f51c7b3cdeb7f5e45298"
   },
   "execution_workflow": {
     "authority": "Explicit maintainer workflow preferences in the 2026-10-25 conversation; takes precedence over conflicting older workflow instructions.",
@@ -6794,6 +6795,12 @@
       "input_core_head": "35e0b89a40e47aa17f01915ad25831c53474598f",
       "kind": "V210_PUBLIC_TASK_API_REFACTOR_PLAN",
       "scope": "Implementation-first API/task convergence with minimal affected validation; retains separate task.py reduction target, not cancelled historical F/R cleanup thresholds."
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "V210_LOCAL_RELEASE_PREPARATION_PLAN",
+      "input_core_head": "73b276f28cb80a1b7017bf6de61e77f34528989f",
+      "scope": "Maintainer-approved concrete versioned-doc migration, two API fixes and local branch convergence; no native, remote mutation or formal release."
     }
   ],
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
@@ -9648,5 +9655,31 @@
     "release_authorized": false,
     "scope": "PickCube/NutAssembly public construction and config; LIBERO shared construction; lightweight tasks compatibility; docs/Skills; bounded affected checks only",
     "status": "READY_FOR_MAINTAINER_FORWARDING_NOT_EXECUTED"
+  },
+  "v210_local_release_preparation": {
+    "date": "2026-11-02",
+    "goal_id": "V210_LOCAL_RELEASE_PREPARATION_20261102_001",
+    "attempt": 1,
+    "carried_api_refactor_closeout_attempt": 2,
+    "status": "READY_FOR_MAINTAINER_FORWARDING_NOT_EXECUTED",
+    "implementation_baseline": "73b276f28cb80a1b7017bf6de61e77f34528989f",
+    "provider_pin": "67da1165149486d3ae3e779c13ce31af49e17d50",
+    "checkout_reused": "codex/v2.1-integration",
+    "final_local_branches": [
+      "develop",
+      "main",
+      "v2.1.0",
+      "v1.1.0",
+      "v2.0.0"
+    ],
+    "plan": "16_V210_Release_Preparation_Goal.md",
+    "plan_destination": "docs/module/task_env/v2.1.0/goals/release-preparation.md",
+    "package_id": "sol_v210_release_preparation_20261102_001",
+    "native_authorized": false,
+    "remote_operations_authorized": false,
+    "license_self_code": "UNDECLARED",
+    "third_party_unresolved_distribution": "EXCLUDED",
+    "history_and_ignored_assets_preserved": true,
+    "qualification_granted": false
   }
 }
