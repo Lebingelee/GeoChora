@@ -118,8 +118,9 @@ def test_compiler_uses_builtin_catalog_but_preserves_candidate_spec():
         'repo_dirty': False, 'expected_untracked': [],
     }), patch('catalog_query.core_context', return_value={'core_repo': '/tmp/core', 'core_commit': 'commit', 'core_dirty': False}), \
          patch.object(subprocess, 'check_output', return_value=''), \
-         patch('task_env.tasks.pick_cube.specialization.build_reference', return_value=value):
-        compiled = harness_compiler.compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+         patch('task_env.make_env', return_value=SimpleNamespace(value=value, resolved_public_config=object(), close=lambda: None)) as make_env:
+        compiled, env = harness_compiler.compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+        assert make_env.call_count == 1 and env.value is value
 
     assert compiled.artifact_hash == 'f' * 64
     assert compiled.runtime_source_id == 'test-source'
@@ -149,7 +150,7 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
         'repo_dirty': False, 'expected_untracked': [],
     }), patch('catalog_query.core_context', return_value={'core_repo': '/tmp/core', 'core_commit': 'commit', 'core_dirty': False}), \
          patch.object(subprocess, 'check_output', return_value=''), \
-         patch('task_env.tasks.pick_cube.specialization.build_isaac_reference', return_value={
+         patch('task_env.make_env', return_value=SimpleNamespace(close=lambda: None, resolved_public_config=object(), value={
              'artifact': _artifact(), 'construction_id': 'f06', 'recipe_identity': 'a' * 64,
              'controller': SimpleNamespace(identity='b' * 64),
              'solution_identity': 'c' * 64, 'source_revision': 'commit',
@@ -158,12 +159,13 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
                  scene_source=SimpleNamespace(source_id='f06-source'),
                  source_closure_digest='e' * 64,
              ),
-         }):
-        compiled = harness_compiler.compile_builtin_pickcube_example(
+         })) as make_env:
+        compiled, env = harness_compiler.compile_builtin_pickcube_example(
             spec, catalog, working_tree_scope=scope,
         )
         assert compiled.runtime_source_id == 'f06-source'
         assert compiled.runtime_source_sha256 == 'e' * 64
+        assert make_env.call_count == 1 and env.value['source'].source_closure_digest == 'e' * 64
 
 
 def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp_path):
@@ -190,8 +192,9 @@ def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp
         working_tree_scope={'expected_untracked': []}, repo_dirty=False,
     )
     row = {'seed': 31, 'provider': 'isaacsim', 'status': 'RUNTIME_VALID',
-           'runtime_valid': True, 'task_outcome': 'TASK_OR_EXPERT_FAILURE_REPORTED'}
-    with patch('harness_compiler.compile_builtin_pickcube_example', return_value=compiled), \
+           'runtime_valid': True, 'task_outcome': 'TASK_OR_EXPERT_FAILURE_REPORTED',
+           'compiled': {'artifact_sha256': compiled.artifact_hash}}
+    with patch('harness_compiler.resolve_builtin_pickcube_example', return_value=(None, {}, False)), \
          patch.object(builtin_example_validation, '_run_one', return_value=row):
         result = builtin_example_validation.validate_provider(
             spec_path, catalog_path, scope_path, tmp_path / 'result', only_seed=31,
@@ -438,7 +441,7 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
 
     def compile_example(*_args, **_kwargs):
         events.append('source_compile')
-        assert owner.opened
+        assert not owner.opened
         raise RuntimeError('offline compile probe')
 
     with patch.object(builtin_example_worker, 'core_context', return_value={
@@ -449,10 +452,10 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
             spec, catalog, scope, seed=31, output=output,
         )
 
-    assert events == ['app_open', 'source_compile', 'app_close']
-    assert row['isaac_app_precompile_start_attempted'] is True
-    assert row['isaac_app_precompile_start_completed'] is True
-    assert row['isaac_app_launch_profile']['profile_id'] == 'f06-headless-no-render-v1'
+    assert events == ['source_compile', 'app_close']
+    assert row['isaac_app_precompile_start_attempted'] is False
+    assert row['isaac_app_precompile_start_completed'] is False
+    assert row['isaac_app_launch_profile'] is None
     assert row['isaac_app_owner_close_receipt']['close_completed'] is True
     assert row['errors'][0]['phase'] == 'compile'
     assert row['runtime_valid'] is False

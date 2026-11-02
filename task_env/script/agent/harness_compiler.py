@@ -62,12 +62,6 @@ class CompiledBuiltinPickCubeExampleV1:
     repo_dirty: bool
     resolved_config: object = None
 
-    def make_env(self):
-        # Keep construction on the public Core factory; Harness does not own a
-        # parallel task factory or binding implementation.
-        from task_env import make_env
-        return make_env(self.spec.task_uid, config=self.resolved_config)
-
 
 
 def _example_working_tree_context(core_repo, scope):
@@ -107,7 +101,7 @@ def _example_working_tree_context(core_repo, scope):
     }
 
 
-def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
+def resolve_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     """Compile the F06 versioned example without touching strict CandidateSpec.
 
     Construction and source identity remain owned by the current Core PickCube
@@ -145,61 +139,67 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
         raise ValueError(f'{spec.provider} is optional and not admitted by the F06 primary route compiler')
     if spec.task_uid not in catalog.get('env_uids', ()):
         raise ValueError('selected public PickCube UID is absent from the current Core registry')
-    from task_env.environment.configuration import resolve_task_env_config
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
-    resolved_config = resolve_task_env_config(PickCubeReferenceEnv, {
+    # The public factory is the sole resolver in the worker. The versioned
+    # Harness spec has already validated these route and field domains.
+    selected_config = {
         'execution': {'physics_provider': spec.provider, 'physics_backend': spec.backend,
                       'physics_device': spec.device,
                       **({'source_delivery_manifest': spec.source_delivery_manifest}
                          if spec.source_delivery_manifest is not None else {})},
         'episode': {'horizon': spec.horizon_control_ticks},
         'task': {'controller_profile': spec.controller_profile},
-    })
+    }
     if spec.provider != 'isaacsim':
         provider_row = catalog.get('providers', {}).get(spec.provider)
         if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
             raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
-        from task_env.tasks.pick_cube.specialization import build_reference
-        value = build_reference(backend='cpu', include_solution=False,
-                                controller_profile=spec.controller_profile,
-                                resolved_config=resolved_config.environment)
     else:
         route = record.get('provider_routes', {}).get('isaacsim')
         if (not isinstance(route, dict) or route.get('backend') != 'cuda'
                 or route.get('device') != 'cuda:0'
                 or type(route.get('runtime_tested')) is not bool):
             raise ValueError('catalog does not expose the exact F06 Isaac execution intersection')
-        from task_env.tasks.pick_cube.specialization import build_isaac_reference
-        value = build_isaac_reference(
-            delivery_manifest=spec.source_delivery_manifest,
-            task_seed=spec.seeds[0], horizon=spec.horizon_control_ticks,
-            controller_profile=spec.controller_profile, include_solution=False,
-            resolved_config=resolved_config.environment,
+    return selected_config, tree, actual_dirty
+
+
+def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
+    """Construct the public environment once and return its facts with its owner."""
+    from task_env import make_env
+    selected_config, tree, actual_dirty = resolve_builtin_pickcube_example(
+        spec, catalog, working_tree_scope=working_tree_scope,
+    )
+    env = make_env(spec.task_uid, config=selected_config)
+    try:
+        resolved_config = env.resolved_public_config
+        value = env.value
+        artifact = value['artifact']
+        if artifact.task_id != 'pick-cube-v1' or artifact.timebase.physics_dt != spec.physics_dt_s \
+                or artifact.timebase.control_substeps != spec.control_substeps:
+            raise ValueError('built-in PickCube recipe or timebase differs from the F06 example contract')
+        source = value['source']
+        source_digest = (
+            source.source_closure_digest if spec.provider == 'isaacsim'
+            else hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
         )
-    artifact = value['artifact']
-    if artifact.task_id != 'pick-cube-v1' or artifact.timebase.physics_dt != spec.physics_dt_s \
-            or artifact.timebase.control_substeps != spec.control_substeps:
-        raise ValueError('built-in PickCube recipe or timebase differs from the F06 example contract')
-    source = value['source']
-    source_digest = (
-        source.source_closure_digest if spec.provider == 'isaacsim'
-        else hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
-    )
-    return CompiledBuiltinPickCubeExampleV1(
-        spec=spec,
-        artifact_hash=artifact.identity_hash,
-        construction_id=value['construction_id'],
-        recipe_identity=value['recipe_identity'],
-        controller_identity=value['controller'].identity,
-        solution_identity=value['solution_identity'],
-        source_revision=value['source_revision'],
-        source_sha256=dict(value['source_sha256']),
-        runtime_source_id=source.scene_source.source_id,
-        runtime_source_sha256=source_digest,
-        working_tree_scope=tree,
-        repo_dirty=actual_dirty,
-        resolved_config=resolved_config,
-    )
+        compiled = CompiledBuiltinPickCubeExampleV1(
+            spec=spec,
+            artifact_hash=artifact.identity_hash,
+            construction_id=value['construction_id'],
+            recipe_identity=value['recipe_identity'],
+            controller_identity=value['controller'].identity,
+            solution_identity=value['solution_identity'],
+            source_revision=value['source_revision'],
+            source_sha256=dict(value['source_sha256']),
+            runtime_source_id=source.scene_source.source_id,
+            runtime_source_sha256=source_digest,
+            working_tree_scope=tree,
+            repo_dirty=actual_dirty,
+            resolved_config=resolved_config,
+        )
+        return compiled, env
+    except BaseException:
+        env.close()
+        raise
 
 
 def evaluate_lift(state, semantics):

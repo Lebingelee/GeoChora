@@ -434,10 +434,10 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
     scope = ExampleWorkingTreeScopeV1.load(scope_path)
     catalog = json.loads(Path(catalog_path).read_text())
     if __package__:
-        from .harness_compiler import compile_builtin_pickcube_example
+        from .harness_compiler import resolve_builtin_pickcube_example
     else:
-        from harness_compiler import compile_builtin_pickcube_example
-    compiled = compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+        from harness_compiler import resolve_builtin_pickcube_example
+    resolve_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=False)
     save_inputs = output_dir / 'inputs'
@@ -457,22 +457,16 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
         )
         rows.append(row)
         planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(rows)
+        compiled_values = [item.get('compiled') for item in rows]
+        compiled_consistent = bool(compiled_values and all(
+            isinstance(value, dict) and value == compiled_values[0] for value in compiled_values
+        ))
         matrix = {
             'schema_version': 'harness-builtin-pickcube-example-matrix-v1',
             'updated_at': datetime.now(timezone.utc).isoformat(),
             'spec_sha256': spec.identity_sha256,
-            'compiled': {
-                'artifact_sha256': compiled.artifact_hash,
-                'construction_id': compiled.construction_id,
-                'recipe_identity': compiled.recipe_identity,
-                'controller_identity': compiled.controller_identity,
-                'solution_identity': compiled.solution_identity,
-                'source_revision': compiled.source_revision,
-                'runtime_source_id': compiled.runtime_source_id,
-                'runtime_source_sha256': compiled.runtime_source_sha256,
-                'working_tree_scope': compiled.working_tree_scope,
-                'repo_dirty': compiled.repo_dirty,
-            },
+            'compiled': compiled_values[0] if compiled_values else None,
+            'compiled_consistent': compiled_consistent,
             'provider': spec.provider, 'backend': spec.backend, 'device': spec.device,
             'profile': spec.controller_profile, 'horizon': spec.horizon_control_ticks,
             'seeds_required': list(spec.seeds), 'seeds_run': list(seeds),
@@ -486,9 +480,9 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             ),
             'disposition': 'PASS' if (
                 len(rows) == 3 and all(item.get('runtime_valid') is True for item in rows)
-                and planned_action_count_total > 0
+                and compiled_consistent and planned_action_count_total > 0
             )
-                           else 'PREFLIGHT' if only_seed is not None and all(item.get('runtime_valid') is True for item in rows)
+                           else 'PREFLIGHT' if only_seed is not None and compiled_consistent and all(item.get('runtime_valid') is True for item in rows)
                            else 'PARTIAL',
             'qualification': False,
             'strict_candidate_oracle_judge_unchanged': True,
