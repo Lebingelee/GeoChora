@@ -7,9 +7,9 @@ from pathlib import Path
 import subprocess
 import sys
 
-REPO = Path('/home/lly/Program_Files/Geochora')
+REPO = Path(__file__).resolve().parents[3]
 BASE = REPO / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001'
-PROVIDER = BASE / 'f05_geophys_provider/GeoPhys'
+PROVIDER = REPO / 'GeoPhys'
 for _path in (REPO, PROVIDER / 'src'):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))

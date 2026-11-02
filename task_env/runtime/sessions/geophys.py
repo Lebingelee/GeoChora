@@ -52,6 +52,7 @@ class _GeoPhysSession(_SessionValues):
         self._mixed_consumed_boundaries = set()
         self._mixed_fault = None
         self._inner_interval_active = False
+        self._reset_count = 0
         self._native_steps = 0
         self._last_close_receipt = None
         self._torque_actuators = {}
@@ -318,6 +319,8 @@ class _GeoPhysSession(_SessionValues):
         self._reset_force_measurement = force_measurement
         if force_measurement is not None:
             self._last_reset_force_sequence = force_measurement.sample_sequence
+        if self._mixed_actuator_plan is not None:
+            self._reset_count += 1
         return realized
 
     @staticmethod
@@ -365,6 +368,29 @@ class _GeoPhysSession(_SessionValues):
         if self._last_reset_readback_v1 is None:
             raise RuntimeError('GeoPhys reset readback is unavailable before an admitted mixed reset')
         return deepcopy(self._last_reset_readback_v1)
+
+    @property
+    def runtime_progress_receipt(self):
+        """Return provider-owned progress counters for the selected mixed route."""
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('mixed runtime progress is unavailable for this session profile')
+        state = self.snapshot()
+        return {
+            'schema_version': 'runtime-progress-v1',
+            'provider_materialization_id': self._provider_materialization_id,
+            'episode_id': self._episode_id,
+            'reset_sample_id': self._reset_sample_id,
+            'reset_count': int(self._reset_count),
+            'control_step': int(self._control_step),
+            'state_revision': int(self._state_revision),
+            'native_step_count': int(self._native_steps),
+            'simulation_time_native_s': float(state.simulation_time),
+            # Mixed GeoPhys reset admission is source-time-zero only.
+            'simulation_time_episode_s': float(state.simulation_time),
+            'source_id': self._source.scene_source.source_id,
+            'source_closure_digest': self._source.source_closure_digest,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+        }
 
     @property
     def close_receipt(self):
@@ -630,7 +656,7 @@ class _GeoPhysSession(_SessionValues):
         result = AppliedMixedActuatorCommandV1(
             'applied-mixed-actuator-command-v1', target.identity_hash, 'geophys',
             actual_values, units, clipped,
-            'source_bound_named_actuator_channels_zero_order_hold_v1',
+            'source_bound_named_actuator_channels_float32_control_zoh_v1',
         )
         result.validate()
         return result

@@ -297,7 +297,7 @@ def test_dg02_tracking_probe_worker_fails_closed_outside_frozen_step_modes(tmp_p
     from task_env.diagnostics.tasks.f05_dg02_core_n2_probe import _verify
 
     core = Path(__file__).resolve().parents[3]
-    provider = core / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_geophys_provider/GeoPhys"
+    provider = core / "GeoPhys"
     plan = {
         "schema_version": "f05-dg02-core-n2-plan-v1",
         "classification": (

@@ -4625,15 +4625,15 @@
     "04_R04_Dynamic_Camera_Consumer.md": "d5f8b61ab49a3cf8ead14267c25507e6458f2eac0e33257b2d93606d375e1a7b",
     "05_R05_Native_Rate_Feedback.md": "0b021df353245810fc1f81c4455104774922147996bb2911b5156b1efdc7cba6",
     "06_R06_Compatibility_and_Regression.md": "1ee5b8b1a6e462d39f496d80ce2fe7f8bbf6b8def213bf2632101ee10cade037",
-    "07_Execution_Order_and_Acceptance.md": "7f2f1a2b1bc30e0440e04965359e043c7978a205575695bb45c54f8c8ca23ded",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "632ec931e3ee7eeb9fd21d42c43689d9577c16c1cf8cff0ae218337aca0bfdb1",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "d59ad988f36b31ca67e1ef73b283ad444bf8706d4c99bc7ee04f9f712ff594d9",
+    "07_Execution_Order_and_Acceptance.md": "727c5e3259a24e7a2629488c4dcbd966f90559b628540a82c2fd569f2ff541f4",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "8a394bfde89524fa4179ccd3ef6c7d33d3ac3ce5be1003259199615fa518ff77",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "0db93432d74fc3e9af701141117cc010305ede168f7289f889d8d00ed3599e55",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "f2724d45e88ef31ced1dd87722c287bf2bd4845e2f9b1d31622327028ad7aedc",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "03e732ec5d9bde152e47ca2371582c340eb3ef05c31e6d2a9613a5229d892bfa",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "27694ffbc97c9214ccc29c25085d93aeb2a976fb5be0f55de935a308595c1994",
     "12_F05_F07_Execution_Playbook.md": "be5cac8c821904f7de62bb6e32371b84c4e09a80cf6ce4aef33b9ce248f6cf7a",
     "13_F05_Early_Diagnostic_Three_Goals.md": "f5083292146ae932c475c4be50824107ac574e4bf49506d08c33e9f1b973d77a",
     "14_F06_PickCube_Harness_Multi_Backend_Goal.md": "bf008de6e25223ec8ffffbf3718529e63e16d6dc207cf836b87c7e2e051725df",
-    "README.md": "aac54fde733f93dbeea768e7a9dc3df0d81cc8c77b026512fa5d53cf10d66146"
+    "README.md": "3862eb660767a235535a09cf3fd5140a647bdbd762d765f9d9f4ac165cafd8a4"
   },
   "execution_workflow": {
     "authority": "Explicit maintainer workflow preferences in the 2026-10-25 conversation; takes precedence over conflicting older workflow instructions.",
@@ -6779,6 +6779,14 @@
       "sol_acceptance_recorded": false,
       "task_success_claimed": false,
       "qualification_granted": false
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "V210_INTEGRATION_FINAL_DOCUMENT_HASH_REFRESH",
+      "input_core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+      "input_provider_head": "67da1165149486d3ae3e779c13ce31af49e17d50",
+      "scope": "Recomputed document_sha256 against final merged planning documents; historical acceptance and failure records remain unchanged.",
+      "local_evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/v210_integration_001/"
     }
   ],
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",

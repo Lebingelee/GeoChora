@@ -779,8 +779,10 @@ def materialize_control(
         )
         from ...controllers.canonical.contracts import digest
         expected_controller_identity = {
-            100: '3363817cfcb2913591b630c0bb6a6c942347778b90df23b34e7dd039e2f7ca8d',
-            500: 'e4db6123ec8d86ebcb229187d2dee578d43284cac9ce50252d7fe938617f745c',
+            # The integrated R3 implementation has a new source-bound identity
+            # after the F/R merge; keep the same narrow cadence allowlist.
+            100: '6855bc21cb40a338c2696b3ad2199bba7643ed843eae420b3529bee0bc0d7f41',
+            500: '7185baab832521314236907ba93221e6151f94ac5a5e71036fd07047bb028571',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
@@ -811,12 +813,12 @@ def materialize_control(
                     (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
                 or actual_controller.gripper_config.force_limit_N != 10.0
                 or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
-                or selected_solution.identity != '5590d2865c683d90c2aa38878d7c488bb1785914004c186946c76c6d7ebc9f04'
+                or selected_solution.identity != 'febccdaf76da5e44760f44b82907f7e4982717c2fd68ca2919c9453523ec0712'
                 or selected_solution.require_native_feedback_contract is not True
                 or digest(asdict(selected_solution.config)) !=
                     '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
                 or selected_solution.base_controller_identity !=
-                    '89eaab0630a9ada53a1db065d79aa4d3d996941791d49dd913fa0452565fb54e'
+                    '05f395e0653ccc4e2f0702544d0b78ce333a449aac5a07409b4de06bdeca0db6'
                 or selected_solution.control_dt != 0.01
                 or selected_solution.physics_dt_s != 0.002
                 or selected_solution.source_closure_digest is not None

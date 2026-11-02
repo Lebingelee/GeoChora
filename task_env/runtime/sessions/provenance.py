@@ -3,6 +3,7 @@ from importlib import metadata, util
 from pathlib import Path
 import hashlib
 import subprocess
+import sys
 
 
 def provider_build_identity(provider):
@@ -45,3 +46,29 @@ def provider_build_identity(provider):
             'repository_revision': revision, 'dirty_build_sha256': dirty,
             'import_origin': str(origin), 'origin_sha256': hashlib.sha256(origin.read_bytes()).hexdigest(),
             'manifest_version': manifest_version}
+
+
+def provider_module_origins(provider, module_names=('control', 'geophys', 'scene', 'simulation', 'solvers')):
+    """Report the resolved sibling package origins for a bounded GeoPhys run.
+
+    Already-imported modules use their live ``__file__`` so the receipt binds
+    the modules consumed by this process. A package not yet imported uses its
+    normal import spec, allowing startup checks before first materialization.
+    This diagnostic does not establish a capability or replace build identity.
+    """
+    if provider != 'geophys':
+        raise ValueError('module-origin inventory is currently defined only for geophys')
+    names = tuple(module_names)
+    if not names or any(not isinstance(name, str) or not name for name in names):
+        raise ValueError('module_names must be a nonempty sequence of package names')
+    origins = {}
+    for name in names:
+        module = sys.modules.get(name)
+        raw_origin = getattr(module, '__file__', None) if module is not None else None
+        if raw_origin is None:
+            spec = util.find_spec(name)
+            raw_origin = None if spec is None else spec.origin
+        if raw_origin is None:
+            raise ValueError(f'{name} import source unavailable')
+        origins[name] = str(Path(raw_origin).resolve())
+    return origins

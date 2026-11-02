@@ -299,6 +299,43 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
     tampered_receipt.close()
 
 
+def test_source_gravity_disambiguates_duplicate_asset_basenames_without_changing_bytes():
+    import xml.etree.ElementTree as ET
+
+    from bench_deploy.libero.controllers.source_gravity import (
+        _mujoco_source_asset_name_projection,
+    )
+
+    source_xml = (
+        b'<mujoco><compiler meshdir="meshes"/><asset>'
+        b'<mesh name="cabinet" file="cabinet/metal.png"/>'
+        b'<mesh name="stove" file="stove/metal.png"/>'
+        b'</asset><worldbody/></mujoco>'
+    )
+    closure_assets = {
+        "meshes/cabinet/metal.png": b"cabinet texture bytes",
+        "meshes/stove/metal.png": b"stove texture bytes",
+    }
+
+    compiled_xml, compiled_assets, projection_sha = _mujoco_source_asset_name_projection(
+        source_xml, closure_assets,
+    )
+
+    root = ET.fromstring(compiled_xml)
+    names = [node.get("file") for node in root.iter("mesh")]
+    assert len(names) == 2 and len(set(names)) == 2
+    assert all(name.startswith("geochora-source-") for name in names)
+    assert len({path.rsplit("/", 1)[-1] for path in compiled_assets}) == 2
+    assert sorted(compiled_assets.values()) == sorted(closure_assets.values())
+    assert source_xml == (
+        b'<mujoco><compiler meshdir="meshes"/><asset>'
+        b'<mesh name="cabinet" file="cabinet/metal.png"/>'
+        b'<mesh name="stove" file="stove/metal.png"/>'
+        b'</asset><worldbody/></mujoco>'
+    )
+    assert isinstance(projection_sha, str) and len(projection_sha) == 64
+
+
 def _boundary(task_uid: str = TASK_2) -> LiberoPredicateBoundaryV1:
     return LiberoPredicateBoundaryV1(
         task_uid=task_uid,

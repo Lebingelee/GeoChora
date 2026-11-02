@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
+from pathlib import PurePosixPath
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -18,6 +21,94 @@ _TCP_SITE_NAME = "gripper0_grip_site"
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _mujoco_source_asset_name_projection(
+    source_xml: bytes, external_assets: dict[str, bytes],
+) -> tuple[bytes, dict[str, bytes], str | None]:
+    """Disambiguate duplicate asset basenames for MuJoCo's in-memory asset map.
+
+    RuntimeSource keeps the exact canonical XML and path-keyed asset closure.
+    MuJoCo's ``MjModel.from_xml_string`` additionally requires unique asset
+    basenames, so this compiler-only copy gives colliding references stable,
+    source-bound names while preserving the referenced bytes.
+    """
+    basenames = {logical: PurePosixPath(logical).name for logical in external_assets}
+    counts: dict[str, int] = {}
+    for basename in basenames.values():
+        counts[basename] = counts.get(basename, 0) + 1
+    if all(count == 1 for count in counts.values()):
+        return source_xml, dict(external_assets), None
+
+    try:
+        root = ET.fromstring(source_xml)
+    except ET.ParseError as exc:
+        raise ValueError("source gravity XML is invalid while projecting duplicate asset names") from exc
+    compiler = root.find("compiler")
+    meshdir = "" if compiler is None else compiler.get("meshdir", "")
+    texturedir = "" if compiler is None else compiler.get("texturedir", "")
+    projected: dict[str, bytes] = {}
+    referenced: set[str] = set()
+    renamed: dict[str, str] = {}
+
+    def logical_for(directory: str, filename: str) -> str:
+        logical = posixpath.normpath(posixpath.join(directory, filename.replace("\\", "/")))
+        if logical in {".", ".."} or logical.startswith("../") or logical.startswith("/"):
+            raise ValueError("source gravity asset path escapes its verified closure")
+        return logical
+
+    for node in root.iter():
+        filename = node.get("file")
+        if filename is None:
+            continue
+        directory = meshdir if node.tag in {"mesh", "skin"} else texturedir if node.tag == "texture" else ""
+        logical = logical_for(directory, filename)
+        if logical not in external_assets:
+            raise ValueError(f"source gravity asset is absent from its verified closure: {logical!r}")
+        referenced.add(logical)
+        payload = external_assets[logical]
+        if counts[basenames[logical]] > 1:
+            new_filename = renamed.get(logical)
+            if new_filename is None:
+                suffix = hashlib.sha256(logical.encode("utf-8")).hexdigest()[:16]
+                new_filename = f"geochora-source-{suffix}-{basenames[logical]}"
+                renamed[logical] = new_filename
+            new_logical = logical_for(directory, new_filename)
+            existing = projected.get(new_logical)
+            if existing is not None and existing != payload:
+                raise ValueError("source gravity generated a colliding asset projection path")
+            projected[new_logical] = payload
+            node.set("file", new_filename)
+        else:
+            projected[logical] = payload
+
+    for logical, payload in external_assets.items():
+        if logical in referenced:
+            continue
+        if counts[basenames[logical]] > 1:
+            suffix = hashlib.sha256(logical.encode("utf-8")).hexdigest()[:16]
+            key = f"geochora-source-unused/{suffix}-{basenames[logical]}"
+            projected[key] = payload
+        else:
+            projected[logical] = payload
+
+    projected_basenames = [PurePosixPath(logical).name for logical in projected]
+    if len(projected_basenames) != len(set(projected_basenames)):
+        raise ValueError("source gravity asset filename projection is not unique")
+    compiled_xml = ET.tostring(root, encoding="utf-8")
+    projection = {
+        "schema_version": "libero-source-asset-filename-projection-v1",
+        "original_xml_sha256": _sha256(source_xml),
+        "compiled_xml_sha256": _sha256(compiled_xml),
+        "files": [
+            {"path": logical, "sha256": _sha256(payload)}
+            for logical, payload in sorted(projected.items())
+        ],
+    }
+    projection_sha256 = _sha256(json.dumps(
+        projection, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8"))
+    return compiled_xml, projected, projection_sha256
 
 
 class MujocoSourceGravityBiasV1:
@@ -94,8 +185,12 @@ class MujocoSourceGravityBiasV1:
             name: payload for name, payload in source_receipt.closure_files.items()
             if name not in {"canonical-source.xml", "scene.xml"}
         }
+        compiled_xml_bytes, compiled_assets, asset_projection_sha256 = (
+            _mujoco_source_asset_name_projection(source_xml_bytes, external_assets)
+        )
+        self.asset_name_projection_sha256 = asset_projection_sha256
         self._model = mujoco_api.MjModel.from_xml_string(
-            source_xml_bytes.decode("utf-8"), external_assets,
+            compiled_xml_bytes.decode("utf-8"), compiled_assets,
         )
         self._data = mujoco_api.MjData(self._model)
         self.source_xml_sha256 = source_xml_sha256
@@ -148,6 +243,8 @@ class MujocoSourceGravityBiasV1:
                 "model_profile_receipt_sha256": model_profile_receipt_sha256,
                 "runtime_model_xml_sha256": source_xml_sha256,
             })
+        if self.asset_name_projection_sha256 is not None:
+            identity_payload["asset_name_projection_sha256"] = self.asset_name_projection_sha256
         self.model_identity_sha256 = hashlib.sha256(json.dumps(
             identity_payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
@@ -230,6 +327,8 @@ class MujocoSourceGravityBiasV1:
                 "model_profile_id": self.model_profile_id,
                 "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
             })
+        if self.asset_name_projection_sha256 is not None:
+            fields["asset_name_projection_sha256"] = self.asset_name_projection_sha256
         return fields
 
     def identity_mapping(self) -> dict[str, object]:

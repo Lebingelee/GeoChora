@@ -227,7 +227,9 @@ class _LiberoMJCFReferenceScene:
         return self._reference_spec
 
 
-def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TASK_1):
+def _geophys_importer_site_projection_v1(
+    xml_bytes: bytes, *, task_uid: str = TASK_1, source_model_id: str | None = None,
+):
     """Apply explicit importer-only compatibility projections for the selected LIBERO task."""
     if type(xml_bytes) is not bytes:
         raise TypeError('GeoPhys LIBERO importer projection requires immutable MJCF bytes')
@@ -280,7 +282,14 @@ def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TA
     ET.fromstring(projected_xml)
     transformations = list(reversed(replacements))
     fluid_projection = None
-    if task_uid in {TASK_2, TASK_3}:
+    project_fluid_options = (
+        task_uid in {TASK_2, TASK_3}
+        or (
+            task_uid == TASK_1
+            and source_model_id == 'libero-official-runtime-source-profile-v4'
+        )
+    )
+    if project_fluid_options:
         projected_root = ET.fromstring(projected_xml)
         option_elements = tuple(projected_root.iter('option'))
         option_matches = tuple(re.finditer(rb'<option\b[^>]*>', projected_xml))
@@ -329,15 +338,22 @@ def _geophys_importer_site_projection_v1(xml_bytes: bytes, *, task_uid: str = TA
                 'importer_option_attributes': {},
                 'reason': 'GeoPhys MJCF importer has no density/viscosity fluid-force support; original MuJoCo source and compiled-model evidence remain unchanged',
                 'measured_impact': {
-                    'row0_static_fluid_force_N': 0.0,
-                    'maximum_force_fraction_of_object_weight_at_0_3m_s_translation_and_0_5rad_s_rotation': 0.0062,
-                    'evidence': 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_closeout_20261101_001/fluid_effect_check_retry003_resource_receipt.json',
+                    **({
+                        'row0_static_fluid_force_N': 0.0,
+                        'maximum_force_fraction_of_object_weight_at_0_3m_s_translation_and_0_5rad_s_rotation': 0.0062,
+                        'evidence': 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_closeout_20261101_001/fluid_effect_check_retry003_resource_receipt.json',
+                    } if task_uid in {TASK_2, TASK_3} else {
+                        'status': 'NOT_MEASURED_FOR_TASK1',
+                        'reason': 'the frozen fluid-effect probe covers task2/task3 source rows only',
+                    }),
                 },
             })
             fluid_projection = removed
     ET.fromstring(projected_xml)
     return projected_xml, {
         'schema_version': (
+            'libero-geophys-importer-projection-v3'
+            if fluid_projection is not None and task_uid == TASK_1 else
             'libero-geophys-importer-projection-v2' if fluid_projection is not None
             else 'libero-geophys-importer-site-projection-v1'
         ),
@@ -483,6 +499,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     expected_xml_sha = plan['output']['composed_mjcf_sha256']
     source_model_id = plan.get('identity', {}).get('source_model_id')
     compile_first_official_model = source_model_id == 'libero-official-model-builder-v1'
+    official_runtime_source_profile = (
+        source_model_id == 'libero-official-runtime-source-profile-v4'
+    )
+    official_model_layout = compile_first_official_model or official_runtime_source_profile
     if compile_first_official_model:
         validate_libero_official_source_plan_v1(plan_bytes, raw_xml_bytes)
     if hashlib.sha256(raw_xml_bytes).hexdigest() != expected_xml_sha:
@@ -541,7 +561,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     }
     if provider == 'geophys':
         importer_xml, importer_projection = _geophys_importer_site_projection_v1(
-            runtime_model_xml_bytes, task_uid=task_uid,
+            runtime_model_xml_bytes, task_uid=task_uid, source_model_id=source_model_id,
         )
     external_assets = source_asset_bytes(install_root, importer_xml.decode('utf-8'))
     closure = {'canonical-source.xml': runtime_model_xml_bytes, **external_assets}
@@ -569,7 +589,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     )
     semantic_bodies = dict(plan['semantic_to_compiled_body_names'])
     expected_bodies = {
-        'main_table': 'table' if compile_first_official_model or task_uid != TASK_1 else 'main_table',
+        'main_table': 'table' if official_model_layout or task_uid != TASK_1 else 'main_table',
         **{name: f'{name}_main' for name in (*contract.movable_instances, *profile.static_instances)},
         'wooden_cabinet_1': 'wooden_cabinet_1_main',
         'flat_stove_1': 'flat_stove_1_main',
@@ -1520,7 +1540,14 @@ def build_libero_selected_candidate(
             actual_dimensions, expected_dimensions, exclude=bookkeeping_dimensions,
         )
         if physical_dimension_differences:
-            raise ValueError('post-reset LIBERO physical model dimensions differ from the official compile')
+            raise ValueError(
+                'post-reset LIBERO physical model dimensions differ from the official compile: '
+                + json.dumps({
+                    'differences': physical_dimension_differences,
+                    'actual_dimensions': actual_dimensions,
+                    'official_dimensions': expected_dimensions,
+                }, sort_keys=True, separators=(',', ':'))
+            )
         if actual_names != expected_names:
             raise ValueError(
                 'post-reset LIBERO object names/order differ from the official compile: '

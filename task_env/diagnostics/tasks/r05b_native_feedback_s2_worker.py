@@ -10,7 +10,10 @@ import time
 import traceback
 
 from task_env.diagnostics.tasks.c05c_geophys_gripper_cadence import validate_h5
-from task_env.runtime.sessions.provenance import provider_build_identity
+from task_env.runtime.sessions.provenance import (
+    provider_build_identity,
+    provider_module_origins,
+)
 from task_env.tasks.nut_assembly.task import (
     NutAssemblyReferenceEnv,
     R05B_NATIVE_FEEDBACK_PROFILE,
@@ -56,6 +59,12 @@ def run(backend: str, output_dir: Path, *, gripper_hz: int = 500, full_episode: 
         source = env.value['source']
         receipt = source.execution_source_receipt
         provider = provider_build_identity('geophys')
+        module_origins = provider_module_origins('geophys')
+        provider_source_root = (Path(__file__).resolve().parents[3] / 'GeoPhys' / 'src').resolve()
+        if set(module_origins) != {'control', 'geophys', 'scene', 'simulation', 'solvers'} or any(
+            provider_source_root not in Path(origin).parents for origin in module_origins.values()
+        ):
+            raise RuntimeError('worker resolved a GeoPhys peer module outside the integration provider source root')
         if (provider['repository_revision'] !=
                 '67da1165149486d3ae3e779c13ce31af49e17d50'
                 or provider['dirty_build_sha256'] is not None):
@@ -64,6 +73,7 @@ def run(backend: str, output_dir: Path, *, gripper_hz: int = 500, full_episode: 
             raise RuntimeError('requested backend differs from the selected execution profile')
         result.update({
             'provider_build_identity': provider,
+            'provider_module_origins': module_origins,
             'artifact_identity': env.artifact.identity_hash,
             'source_id': source.scene_source.source_id,
             'source_xml_sha256': receipt.canonical_xml_sha256,

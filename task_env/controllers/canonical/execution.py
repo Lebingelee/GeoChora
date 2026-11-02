@@ -123,10 +123,18 @@ class StableArmTargetHold:
         self.last_applied_arm = values
 
     def compute(self, state, feedback, requested):
-        prior = self.controller._joint_reference.copy()
+        # R3's merged implementation owns the persistent reference in its
+        # arm-reference helper; earlier R3 layouts kept it on the controller.
+        # The hold adapter snapshots/restores the state owner while leaving
+        # the controller's outer step and gripper feedback lifecycle intact.
+        reference_owner = getattr(self.controller, "_arm_reference", self.controller)
+        joint_reference = getattr(reference_owner, "_joint_reference", None)
+        if joint_reference is None:
+            raise RuntimeError("R3 arm reference is unavailable for stable hold")
+        prior = np.array(joint_reference, dtype=float, copy=True)
         canonical, target = self.controller.compute(state, feedback, requested)
         if self.locked:
-            self.controller._joint_reference = prior
+            reference_owner._joint_reference = prior
             target = replace(target, arm_position=dict(self.fixed), arm_servo_position=dict(self.fixed))
             self.controller.last_arm_diagnostics.update(
                 experimental_joint_target_hold=True,

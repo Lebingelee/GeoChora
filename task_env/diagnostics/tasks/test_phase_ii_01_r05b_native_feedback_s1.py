@@ -523,7 +523,9 @@ class _ProviderFreeR05bSession(_SessionValues):
 
 
 def _install_provider_free_materialize(monkeypatch):
-    def materialize(artifact, execution, source):
+    def materialize(artifact, execution, source, *, mixed_actuator_plan=None):
+        if mixed_actuator_plan is not None:
+            raise ValueError('R05b provider-free fixture does not admit mixed actuator plans')
         return _ProviderFreeR05bSession(artifact, source, execution.physics_provider)
     monkeypatch.setattr(api, '_materialize_admitted', materialize)
 

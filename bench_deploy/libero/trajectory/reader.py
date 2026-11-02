@@ -163,9 +163,23 @@ def _validate_episode(episode: Mapping[str, Any], bundle: Path, mode: str) -> di
             raise ValueError(f"LIBERO replay transition {index} omits Target or Ack")
         target = MixedActuatorCommandV1.from_mapping(dict(target_row["payload"]))
         ack = AppliedMixedActuatorCommandV1.from_mapping(dict(ack_row["payload"]))
+        if ack.mapping == "source_bound_named_actuator_channels_float32_control_zoh_v1":
+            # GeoPhys stores native controls as float32. Its acknowledgement
+            # reports the exact representable value written to that control
+            # vector, so compare against that deterministic representation of
+            # the Target instead of treating ordinary narrowing as clipping.
+            applied_values_match = (
+                ack.provider_name == "geophys"
+                and dict(ack.channel_values) == {
+                    key: float(np.float32(value))
+                    for key, value in target.channel_values.items()
+                }
+            )
+        else:
+            applied_values_match = dict(ack.channel_values) == dict(target.channel_values)
         if (target.identity_hash != target_row.get("identity_hash")
                 or ack.target_hash != target.identity_hash or ack.clipped
-                or dict(ack.channel_values) != dict(target.channel_values)
+                or not applied_values_match
                 or dict(ack.channel_units) != dict(target.channel_units)):
             raise ValueError(f"LIBERO replay transition {index} Target/Ack mismatch or clipping")
         if (target.task_artifact_hash != episode.get("task_artifact_identity_hash")

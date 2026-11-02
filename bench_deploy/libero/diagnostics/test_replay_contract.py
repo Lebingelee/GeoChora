@@ -4,6 +4,7 @@ import hashlib
 import json
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from task_env.controllers.canonical.contracts import (
@@ -220,3 +221,45 @@ def test_independent_reader_rejects_replay_semantic_tampering(tmp_path, monkeypa
 def test_independent_reader_recomputes_the_v8_identity_hash(tmp_path, monkeypatch):
     _, result_path, _, _, _ = _bundle(tmp_path, monkeypatch, mode="solution-v8")
     assert reader.consume_libero_replay_result(result_path)["status"] == "verified_complete"
+
+
+def test_independent_reader_accepts_explicit_geophys_float32_acknowledgement(tmp_path, monkeypatch):
+    result, result_path, control, _, _ = _bundle(tmp_path, monkeypatch)
+    writer = control["writer_controls"][0]
+    target = MixedActuatorCommandV1.from_mapping(writer["controller_target"]["payload"])
+    ack = writer["applied_control"]["payload"]
+    ack["provider_name"] = "geophys"
+    ack["mapping"] = "source_bound_named_actuator_channels_float32_control_zoh_v1"
+    ack["channel_values"] = {
+        key: float(np.float32(value)) for key, value in target.channel_values.items()
+    }
+    result["episode"]["provider"] = "geophys"
+    _reseal(result)
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+
+    assert reader.consume_libero_replay_result(result_path)["status"] == "verified_complete"
+
+
+@pytest.mark.parametrize("tamper", ["value", "clipped"])
+def test_independent_reader_rejects_invalid_geophys_float32_acknowledgement(
+    tmp_path, monkeypatch, tamper,
+):
+    result, result_path, control, _, _ = _bundle(tmp_path, monkeypatch)
+    writer = control["writer_controls"][0]
+    target = MixedActuatorCommandV1.from_mapping(writer["controller_target"]["payload"])
+    ack = writer["applied_control"]["payload"]
+    ack["provider_name"] = "geophys"
+    ack["mapping"] = "source_bound_named_actuator_channels_float32_control_zoh_v1"
+    ack["channel_values"] = {
+        key: float(np.float32(value)) for key, value in target.channel_values.items()
+    }
+    result["episode"]["provider"] = "geophys"
+    if tamper == "value":
+        ack["channel_values"]["joint1"] += 1e-6
+    else:
+        ack["clipped"] = True
+    _reseal(result)
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Target/Ack mismatch or clipping"):
+        reader.consume_libero_replay_result(result_path)
