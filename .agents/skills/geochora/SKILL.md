@@ -28,9 +28,9 @@ Read these pages when the task crosses their concerns:
 
 - `docs/global/architecture.md`
 - `docs/global/ownership.md`
-- `docs/module/task_env/public-api.md`
-- `docs/module/task_env/task-artifact.md`
-- `docs/module/task_env/qualification.md`
+- `docs/module/task_env/v2.0.0/api/public-api.md`
+- `docs/module/task_env/v2.0.0/contracts/task-artifact.md`
+- `docs/module/task_env/v2.0.0/contracts/qualification.md`
 
 ## Classify the change first
 
@@ -67,7 +67,7 @@ GeoPhys             -X-> Geochora/task_env
 
 ## Phase branches and handoffs
 
-Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#phase-branch-workflow): plan branches/worktrees per phase or stage, reuse the current phase branch across Goal prompts, and associate each bounded output with its relevant local commit(s). For Phase II-01, the [execution table](../../../docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md#sol-luna-workflow) owns its concrete branch plan, sequential Sol → Luna → Sol review loop and audit-summary commit route. Preserve old receipts and check the actual committed HEAD before the next handoff; this workflow does not grant implementation, publishing or Qualification approval.
+Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#phase-branch-workflow): plan branches/worktrees per phase or stage, reuse the current phase branch across Goal prompts, and associate each bounded output with its relevant local commit(s). For Phase II-01, the [execution table](../../../docs/module/task_env/v2.1.0/history/phase_ii_01/07_Execution_Order_and_Acceptance.md#sol-luna-workflow) owns its concrete branch plan, sequential Sol → Luna → Sol review loop and audit-summary commit route. Preserve old receipts and check the actual committed HEAD before the next handoff; this workflow does not grant implementation, publishing or Qualification approval.
 
 ### One complete prompt per Luna execution window
 
@@ -144,6 +144,10 @@ to isolate the root cause before further execution. Preserve ordinary and
 diagnostic attempt histories separately. A new conversation alone does not
 authorize implementation, native execution or additional resources.
 
+## Local candidate and release boundary
+
+Treat v2.1.0 as a local draft candidate until its versioned evidence, asset exclusions, branch closeout and Human review are complete. A candidate branch is not a tag or published release. Keep the source candidate, `develop`/`main` synchronization, provider pin and historical refs explicit; do not push, retag, publish, or modify remote refs without direct authorization. The current candidate scope and local branch receipt live under `docs/module/task_env/v2.1.0/` and `docs/releases/v2.1.0/`.
+
 ## Runtime route consolidation direction
 
 The maintainer's migration target is one task execution route through
@@ -174,4 +178,4 @@ Use the specialized skills when their trigger applies:
 `geochora-public-api-governance`, and `geochora-test-governance`. When work
 concerns Task Artifact, Experiment, or Evidence, also read the canonical
 contract at
-`docs/module/task_env/task-artifact.md`.
+`docs/module/task_env/v2.0.0/contracts/task-artifact.md`.

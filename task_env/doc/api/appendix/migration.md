@@ -71,7 +71,7 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 | `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. |
 
 Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
-[`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/p2_0_s4_5_a_source_recovery.json).
+[`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_a_source_recovery.json).
 The S4.5-A code and examples remain local review candidates at the recorded
 review state; they do not alter frozen release documents or qualification labels. The S4 implementation was
 subsequently integrated into public `develop` at

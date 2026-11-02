@@ -14,8 +14,8 @@ from task_env.diagnostics.phase1.integration.route_receipt_contracts import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-IDENTITY_PATH = ROOT / 'docs/module/task_env/p2_0_s2_b1_source_identity.json'
-MANIFEST_PATH = ROOT / 'docs/module/task_env/p2_0_s2_b_deletion_manifest.json'
+IDENTITY_PATH = ROOT / 'docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s2_b1_source_identity.json'
+MANIFEST_PATH = ROOT / 'docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s2_b_deletion_manifest.json'
 RETIRED_MODULES = {
     'task_env.tasks.nut_assembly.clearance_candidate_v4',
     'task_env.tasks.nut_assembly.stable_grasp_reference',

@@ -11,7 +11,7 @@ def main(argv=None) -> int:
         "pick-cube-v1 task. CameraSpec remains available to Task Artifacts whose "
         "observation contract declares cameras; selected reference task camera "
         "acceptance is not established. See "
-        "docs/module/task_env/p2_0_s4_5_b_source_recovery.json for source recovery.",
+        "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_b_source_recovery.json for source recovery.",
         file=sys.stderr,
     )
     return 2

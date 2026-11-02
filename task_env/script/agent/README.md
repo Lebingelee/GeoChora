@@ -79,7 +79,7 @@ returns facts from the same `make_env` instance the worker will run.
 For runnable CPU/CUDA commands and optional-provider behavior, use the
 [PickCube example matrix](../../../examples/README.md#workflow-matrix). The
 current final headroom-identity 3×3 runtime evidence, task outcomes and limits
-are in the [F06 matrix report](../../../docs/maintenance/20261101_f06_pickcube_harness_headroom_matrix.md).
+are in the [F06 matrix report](../../../docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261101_f06_pickcube_harness_headroom_matrix.md).
 
 Passing feasibility rows use `harness-feasibility-completion-v1`. The probe,
 construction ledger and pending Judge verifier require raw task/expert outcome,

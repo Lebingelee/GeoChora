@@ -1,0 +1,25 @@
+{
+  "schema_version": "geochora-release-manifest-v1",
+  "version": "2.0.0",
+  "status": "FROZEN_SOURCE_SNAPSHOT",
+  "source_tag": "refs/tags/v2.0.0",
+  "annotated_tag_object": "4ebd8d536c0c054641c6edc1a31fcd317fa237cc",
+  "source_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+  "publication_date": null,
+  "publication_status": "NOT_ESTABLISHED_BY_THIS_REPOSITORY_RECORD",
+  "formal_qualification": "NO_NEW_QUALIFICATION_GRANTED_BY_TAG_ANNOTATION",
+  "provider_pins": {
+    "GeoPhys": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+    "MuJoCo Menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+  },
+  "project_license_status": {
+    "GeoChora": "UNDECLARED",
+    "GeoPhys": "UNDECLARED"
+  },
+  "distribution": {
+    "assets": "EXCLUDED_FROM_THIS_SOURCE_SNAPSHOT_GUIDE",
+    "local_USD_H5_benchmark_installations": "EXCLUDED",
+    "submodule_gitlinks": "SOURCE_REFERENCES_ONLY"
+  },
+  "notes": "This record documents a local annotated source tag. It does not assert a GitHub Release, publication date, asset license, or general capability."
+}

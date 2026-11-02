@@ -11,7 +11,7 @@ def main(argv=None) -> int:
         "pick-cube-v1 task and accessed renderer internals. Use only the public "
         "Renderer/Camera contracts on a separately supported task-provider route. "
         "No Physics × Flora capability is implied. See "
-        "docs/module/task_env/p2_0_s4_5_b_source_recovery.json for source recovery.",
+        "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_b_source_recovery.json for source recovery.",
         file=sys.stderr,
     )
     return 2

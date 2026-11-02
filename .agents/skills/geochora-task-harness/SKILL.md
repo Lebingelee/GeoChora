@@ -27,7 +27,7 @@ construction through Core's shared `PandaBoxDeclaration` compiler. Its
 `ReferenceTaskBinding` is an internal Harness adapter; do not make it a task
 authoring requirement. The built-in runtime example resolves the nested
 selected config once, calls public `make_env`, and returns facts from that same
-Env instance for the worker to reuse. See the [TaskEnv declaration API](../../../docs/module/task_env/public-api.md#declared-reference-task-construction-v210).
+Env instance for the worker to reuse. See the [current TaskEnv public API](../../../docs/module/task_env/v2.1.0/api/public-api.md).
 
 ## Construction decisions
 
@@ -77,8 +77,8 @@ Before packaging, read the existing `<Core>/task_env/.agents/skills/task-env-exp
 
 Completion is demonstrated by the ledger, checks, Oracle receipt and verified pending package. Report exactly what ran. One successful fresh session establishes that session's behavior only; it does not prove every Agent/LLM works. D0/D1/D2 and trajectory qualification remain independent work, and approval remains Human Judge's decision.
 
-## Planned LIBERO / bench_deploy integration (2026-10-30)
+## LIBERO and benchmark ownership
 
-The [R07 maintainer scope decision](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030) assigns benchmark recipes/reset/predicates/Solutions to bench_deploy and candidate checks/ledger/Oracle/pending packaging to this existing Harness. Its required R07 Solution coverage is MuJoCo three tasks plus at least one task each on GeoPhys and Isaac Sim; that is not a Harness feasibility approval. LIBERO On/region/Open templates and real-source input support are planned owner extensions, not supported by the current synthetic pick-lift-v0 template. Reuse one Core/runtime/recorder and version-bound source/Artifact/completion facts; do not relabel real assets synthetic or duplicate the construction stack.
+Benchmark-specific LIBERO source, reset, control and task semantics remain under `bench_deploy/libero`. The bounded A123 technical evidence is recorded in the [v2.1.0 capability matrix](../../../docs/module/task_env/v2.1.0/capabilities/capability-matrix.json) and [review record](../../../docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261101_r07_a123_sol_acceptance.md); it is not a generic Core UID, Candidate feasibility approval, Human Judge decision, or source-license closure. File-level asset terms and attribution remain unresolved. The next API handoff shares only common public construction and keeps benchmark behavior in `bench_deploy/libero`.
 
-This integration plan does not change the current Harness candidate gates: each declared passing task/provider intersection still requires the complete checks, at least 20 distinct solved seeds, Oracle and pending Stage-1 evidence. Preserve the current completion_facts/reader and owner-repair history when composing the older develop-harness snapshot. No new CLI example or provider admission follows from this note.
+The Task Harness candidate gates remain unchanged: a passing candidate needs the complete checks, at least 20 distinct solved seeds, Oracle evidence, and a pending Stage-1 package. Preserve current completion facts and owner-repair history; a runtime-valid rollout or H5 file is not a passing candidate.

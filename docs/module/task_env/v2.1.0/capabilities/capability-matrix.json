@@ -1,0 +1,445 @@
+{
+  "schema_version": "geochora-taskenv-capability-matrix-v2",
+  "release_version": "2.1.0",
+  "candidate_status": "DRAFT_LOCAL_CANDIDATE",
+  "candidate_implementation_commit": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+  "candidate_ref": "refs/heads/v2.1.0 (planned local ref; final candidate C is recorded in ignored closeout receipt)",
+  "provider_pin": "67da1165149486d3ae3e779c13ce31af49e17d50",
+  "provider_dirty": false,
+  "evidence_policy": "Each route is bounded to the exact source, backend, controller/control, Core head, and provider identity below. Evidence from f5d3646037874e70d33ed74e85300c4a76768c22 predates the selected-config/optional-Controller fixes in the candidate implementation; the focused API tests on 0bf4a8e are recorded separately. No native matrix was rerun after those API-only changes.",
+  "status_definitions": {
+    "IMPLEMENTED": "Source owner exists; no runtime evidence implied.",
+    "TESTED_BOUNDED": "Listed exact intersection passed the listed check.",
+    "PARTIAL": "A meaningful portion passed, with the stated outcome/gate unresolved.",
+    "NOT_RUN": "No evidence is claimed for the listed intersection.",
+    "DEFERRED": "Moved to a later approved scope."
+  },
+  "routes": [
+    {
+      "id": "API-SELECTED-CONFIG",
+      "task": "PickCube and NutAssembly selected-reference configuration",
+      "provider": "none",
+      "backend": "provider-free",
+      "source_identity": "task_env/tasks/{pick_cube,nut_assembly}/config.yaml; code identity 0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+      "controller_or_control": "default precedence Core→class→YAML→caller; state-only RendererSelectionV1",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "offline regression: test_selected_api_configuration_and_identity.py plus two existing consumer nodes",
+        "result": "10 passed on final focused run; no native construction",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Does not test task execution, arbitrary renderers, or provider admission."
+    },
+    {
+      "id": "API-OPTIONAL-CONTROLLER",
+      "task": "ReferenceTaskDeclarationV1 without a Controller and with a Controller",
+      "provider": "none",
+      "backend": "provider-free",
+      "source_identity": "TaskArtifactDeclarationV1 + ReferenceTaskDeclarationV1 compiler contract",
+      "controller_or_control": "controller_identity is null when absent; real Controller identity retained when present",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "same focused offline regression set",
+        "result": "No-controller compilation and identity contract covered; no provider constructed",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Successful compilation is not execution admission or Qualification."
+    },
+    {
+      "id": "F06-MUJOCO-CPU",
+      "task": "pick-cube-p16-reference-v1",
+      "provider": "MuJoCo 3.8.1",
+      "backend": "CPU",
+      "source_identity": {
+        "task_source_commit": "017392e86eb754749fc692263e08a1b33c3c5543",
+        "source": "frozen F06 PickCube task/config identity; R3 profile; source manifest and delivery identity bound in run receipts"
+      },
+      "controller_or_control": "r3_continuous_v1; versioned Harness → public make_env; same environment, seeds 31/32, 20 control intervals per episode",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "integration run f06-harness-mujoco-cpu-two-reset-020",
+        "result": "Runtime, independent H5 read, T+1, close, and process/lock checks passed for two short episodes; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not a full 1000-tick task-solution result, not a new Qualification; Isaac route uses separately installed Isaac 6.2."
+    },
+    {
+      "id": "F06-GEOPHYS-CPU",
+      "task": "pick-cube-p16-reference-v1",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": {
+        "task_source_commit": "017392e86eb754749fc692263e08a1b33c3c5543",
+        "source": "frozen F06 PickCube task/config identity; R3 profile; source manifest and delivery identity bound in run receipts"
+      },
+      "controller_or_control": "r3_continuous_v1; versioned Harness → public make_env; same environment, seeds 31/32, 20 control intervals per episode",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "integration run f06-harness-geophys-cpu-two-reset-021",
+        "result": "Runtime, independent H5 read, T+1, close, and process/lock checks passed for two short episodes; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not a full 1000-tick task-solution result, not a new Qualification; Isaac route uses separately installed Isaac 6.2."
+    },
+    {
+      "id": "F06-ISAAC-CUDA",
+      "task": "pick-cube-p16-reference-v1",
+      "provider": "Isaac Sim 6.2 PhysX",
+      "backend": "CUDA",
+      "source_identity": {
+        "task_source_commit": "017392e86eb754749fc692263e08a1b33c3c5543",
+        "source": "frozen F06 PickCube task/config identity; R3 profile; source manifest and delivery identity bound in run receipts"
+      },
+      "controller_or_control": "r3_continuous_v1; versioned Harness → public make_env; same environment, seeds 31/32, 20 control intervals per episode",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "integration run f06-harness-isaac-gpu-two-reset-022",
+        "result": "Runtime, independent H5 read, T+1, close, and process/lock checks passed for two short episodes; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not a full 1000-tick task-solution result, not a new Qualification; Isaac route uses separately installed Isaac 6.2."
+    },
+    {
+      "id": "A123-TASK1-MUJOCO",
+      "task": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "provider": "MuJoCo 3.8.1",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "22581d9b1da5b6a02098eb9d2734174aa8cc45348d8d10f7d0f6f3409251b866",
+        "frozen_actions": 95,
+        "completed_physics_steps": 2375
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt007-task1-mujoco",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "A123-TASK1-GEOPHYS",
+      "task": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "22581d9b1da5b6a02098eb9d2734174aa8cc45348d8d10f7d0f6f3409251b866",
+        "frozen_actions": 95,
+        "completed_physics_steps": 2375
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay; explicit float32 Target/Ack mapping on GeoPhys",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt009-task1-geophys",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "A123-TASK2-MUJOCO",
+      "task": "libero_goal/open_the_middle_drawer_of_the_cabinet",
+      "provider": "MuJoCo 3.8.1",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "ebbdca6413719f10441cf2a7b4a3a1373e0df17632e4839ea5a6b1f57fb5b07e",
+        "frozen_actions": 103,
+        "completed_physics_steps": 2575
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt009-task2-mujoco",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "A123-TASK2-GEOPHYS",
+      "task": "libero_goal/open_the_middle_drawer_of_the_cabinet",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "ebbdca6413719f10441cf2a7b4a3a1373e0df17632e4839ea5a6b1f57fb5b07e",
+        "frozen_actions": 103,
+        "completed_physics_steps": 2575
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay; explicit float32 Target/Ack mapping on GeoPhys",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt009-task2-geophys",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "A123-TASK3-MUJOCO",
+      "task": "libero_goal/push_the_plate_to_the_front_of_the_stove",
+      "provider": "MuJoCo 3.8.1",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "ebbdca6413719f10441cf2a7b4a3a1373e0df17632e4839ea5a6b1f57fb5b07e",
+        "frozen_actions": 245,
+        "completed_physics_steps": 6125
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt009-task3-mujoco",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "A123-TASK3-GEOPHYS",
+      "task": "libero_goal/push_the_plate_to_the_front_of_the_stove",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": {
+        "manifest_id": "libero-spatial-bowl-to-plate-r07b-pilot-v1",
+        "libero_commit": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "robosuite_commit": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+        "runtime_source_xml_sha256": "ebbdca6413719f10441cf2a7b4a3a1373e0df17632e4839ea5a6b1f57fb5b07e",
+        "frozen_actions": 245,
+        "completed_physics_steps": 6125
+      },
+      "controller_or_control": "frozen source-bound LIBERO control replay; explicit float32 Target/Ack mapping on GeoPhys",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "A123-attempt009-task3-geophys",
+        "result": "Full frozen action schedule, reset, T/T+1, independent result/H5 reader, physical-state oracle where applicable, and clean close passed; task_success=false.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Not task success, Expert completion, D0 replay, or cross-engine trajectory equivalence. Task2 GeoPhys exception is limited to the accepted task2 profile; task3 MuJoCo tolerance remains task-local. Source file-level licensing is unresolved."
+    },
+    {
+      "id": "F05-DG02-USD",
+      "task": "F05/DG02 Panda USD source-actuation candidate",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": {
+        "source": "frozen local F05 USD delivery and DG02 source-actuation plan; source bytes remain excluded from this package",
+        "source_route": "public USD delivery → UsdCoreRuntimeSession"
+      },
+      "controller_or_control": "public SelectedReferenceEnv; two complete frozen 8-command episodes",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "DG02 Core S1 attempt 002",
+        "result": "80 physics steps; two episodes; T=8/T+1=9; independent H5 reads passed; actual provider P and module-origin receipts verified.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Candidate reset raw-lift predicate was already true; external_stop and task_success=false. No D0 or Qualification claim."
+    },
+    {
+      "id": "F04-PANDA-ISAAC",
+      "task": "Panda named-drive source-bound route",
+      "provider": "Isaac Sim 6.2 PhysX",
+      "backend": "CUDA",
+      "source_identity": {
+        "source": "F04 official Panda delivery and pinned Menagerie source; not bundled",
+        "asset_pin": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+      },
+      "controller_or_control": "named Panda Arm/Finger drives; same public environment with two seed-31 resets",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "official-panda-isaac-attempt-004",
+        "result": "20 controls per episode, independent H5 reads, target/ack, source/unit/limit identity, worker/app/process/lock close passed.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Runtime-only; no task-success or Qualification claim. Requires separate Isaac installation/EULA and source delivery."
+    },
+    {
+      "id": "R05B-FORCE-CPU",
+      "task": "nut-assembly-outcome-reference-v1 force-feedback probe",
+      "provider": "GeoPhys",
+      "backend": "CPU",
+      "source_identity": "frozen R05b source/profile identity in the integration receipts",
+      "controller_or_control": "public force-aware control; 2 outer intervals, 10 native steps, one reset",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "r05b-native-cpu-attempt-002",
+        "result": "Production worker and independent reader passed; T=2/T+1=3; five provider module families resolve below the integration GeoPhys/src at P.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Short freshness probe only; not a full task episode or task-success result."
+    },
+    {
+      "id": "R05B-FORCE-CUDA",
+      "task": "nut-assembly-outcome-reference-v1 force-feedback probe",
+      "provider": "GeoPhys",
+      "backend": "CUDA",
+      "source_identity": "frozen R05b source/profile identity in the integration receipts",
+      "controller_or_control": "retained CUDA force-feedback profile; 2 outer intervals, 10 native steps, one reset",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "r05b-native-cuda-attempt-002",
+        "result": "Production worker and independent reader passed; T=2/T+1=3; module origins bind to P.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Short profile probe only; no inference to other CUDA routes or full-task success."
+    },
+    {
+      "id": "LIBERO-PUBLIC-TASK-API",
+      "task": "LIBERO common construction capability",
+      "provider": "Core public API",
+      "backend": "provider-free",
+      "source_identity": "next TaskDefinition migration scope",
+      "controller_or_control": "shared public construction, benchmark logic stays under bench_deploy/libero",
+      "status": "DEFERRED",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "approved next API handoff",
+        "result": "No generalized Core LIBERO task UID or migration is claimed.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Future Goal; not implemented or validated in this candidate."
+    },
+    {
+      "id": "LIGHTWEIGHT-TASK-COMPAT",
+      "task": "other lightweight registered tasks",
+      "provider": "various",
+      "backend": "various",
+      "source_identity": "current task registry, per-task source identity not exhaustively checked",
+      "controller_or_control": "compatibility with settled TaskDefinition contract",
+      "status": "NOT_RUN",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "no run claimed",
+        "result": "No broad compatibility sweep was run.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Explicit next API compatibility check."
+    },
+    {
+      "id": "SELECTED-RENDERER-NON-STATE",
+      "task": "PickCube/NutAssembly selected references",
+      "provider": "various",
+      "backend": "various",
+      "source_identity": "selected renderer selection contract",
+      "controller_or_control": "only renderer-selection-v1 state-only mapping admitted",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "offline API regression rejects non-none renderer and unsupported pairing",
+        "result": "Fail-closed rejection covered; no selected-task non-none render was run.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "No selected-task camera/Flora or general Physics × Renderer support is established."
+    },
+    {
+      "id": "F06-SOLUTION-EFFECTIVENESS",
+      "task": "PickCube R3 frozen 3×3 matrix",
+      "provider": "MuJoCo / GeoPhys / Isaac Sim",
+      "backend": "CPU / CUDA",
+      "source_identity": "F06 task source commit 017392e86eb754749fc692263e08a1b33c3c5543; R3 identity",
+      "controller_or_control": "r3_continuous_v1; 3 seeds × 3 routes",
+      "status": "PARTIAL",
+      "evidence": {
+        "core_head": "f5d3646037874e70d33ed74e85300c4a76768c22",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "accepted F06 headroom record",
+        "result": "9/9 runtime-valid; 0/9 task-success.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "Solution effectiveness is unresolved and remains a v2.1.x follow-up."
+    },
+    {
+      "id": "FORMAL-QUALIFICATION",
+      "task": "v2.1.0 overall",
+      "provider": "not applicable",
+      "backend": "not applicable",
+      "source_identity": "no formal qualification package in this Goal",
+      "controller_or_control": "not applicable",
+      "status": "DEFERRED",
+      "evidence": {
+        "core_head": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "no Qualification decision claimed",
+        "result": "No new Qualification is granted.",
+        "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
+      },
+      "limitations": "This candidate's local docs/API checks do not substitute for Human Judge or qualification gates."
+    }
+  ],
+  "non_claims": [
+    "No formal Qualification.",
+    "No task success inferred from runtime validity or external_stop.",
+    "No cross-engine trajectory equivalence.",
+    "GP07 is reused historical R04 evidence, not a new P renderer run.",
+    "Task1 GeoPhys fluid-parameter projection impact is NOT_MEASURED.",
+    "Natural Kit destruction is not claimed fixed.",
+    "Source-file licensing and asset attribution remain unresolved."
+  ]
+}

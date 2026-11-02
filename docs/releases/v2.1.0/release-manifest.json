@@ -1,0 +1,52 @@
+{
+  "schema_version": "geochora-release-manifest-v1",
+  "version": "2.1.0",
+  "status": "DRAFT_LOCAL_CANDIDATE",
+  "candidate_ref": "refs/heads/v2.1.0",
+  "candidate_commit": "RECORDED_IN_IGNORED_BRANCH_CLOSEOUT_RECEIPT_TO_AVOID_SELF_REFERENCE",
+  "implementation_commit": "0bf4a8e21cc0c19c087e6ca683c1d97eb990e50",
+  "provider": {
+    "name": "GeoPhys",
+    "commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+    "dirty": false,
+    "remote_reachability": "NOT_VERIFIED"
+  },
+  "menagerie_pin": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+  "source_history": {
+    "integration_merge": "1518559998ec79ac405abbd83e67f9488e0eebef",
+    "frozen_F": "5de9c44be4b06e70909db9087ce3d5ceb579e335",
+    "frozen_R": "2cba22d99c75eca6670b4f117bc1d9dd9193ca52",
+    "develop_merge": "98f4d0eb733a77a2e319d4805d1651985c76bea8"
+  },
+  "publication": {
+    "tag": null,
+    "published_at": null,
+    "github_release": null,
+    "push_performed": false,
+    "formal_qualification": "NOT_GRANTED"
+  },
+  "project_licenses": {
+    "GeoChora": "UNDECLARED",
+    "GeoPhys": "UNDECLARED"
+  },
+  "distribution": {
+    "source_candidate": "local review only",
+    "asset_archive": false,
+    "assets_policy": "unresolved third-party assets are EXCLUDED",
+    "excluded": [
+      "MuJoCo Menagerie asset bytes",
+      "LIBERO/robosuite source asset bundle",
+      "local USD deliveries",
+      "benchmark installation",
+      "mesh/data closures",
+      "H5/stdout/raw evidence",
+      "filtered Isaac overlay",
+      "ignored workspace artifacts"
+    ],
+    "submodule_references": {
+      "GeoPhys": "67da1165149486d3ae3e779c13ce31af49e17d50",
+      "MuJoCo Menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+    }
+  },
+  "evidence_policy": "The capability matrix records exact evidence heads. The focused API regressions ran on implementation_commit; earlier native/runtime evidence was not rerun after the API-only changes. This manifest does not claim that the candidate as a whole passed native execution."
+}

@@ -308,7 +308,7 @@ def test_projection_rejects_alias_typed_reference_and_dangling_member():
 
 
 def test_documentation_minimal_example_executes():
-    document = (ROOT / "docs/module/task_env/public-api.md").read_text(encoding="utf-8")
+    document = (ROOT / "docs/module/task_env/v2.0.0/api/public-api.md").read_text(encoding="utf-8")
     marker = "<!-- R01C_EXECUTABLE_EXAMPLE_BEGIN -->"
     assert marker in document
     example = document.split(marker, 1)[1].split("<!-- R01C_EXECUTABLE_EXAMPLE_END -->", 1)[0]

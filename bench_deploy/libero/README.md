@@ -76,11 +76,11 @@ git show b5e93509b758d523bb8328e9104f6b82ea086570:bench_deploy/libero/trajectory
 ```
 
 Unused `LiberoOperationalSpaceConfigV1` defaults are summarized in the
-[controller profile history supplement](../../docs/archive/phase_ii_01_r_routes/libero-controller-profile-history.md)
+[controller profile history supplement](../../docs/module/task_env/v2.1.0/history/r_route_originals/libero-controller-profile-history.md)
 and recoverable from that same input commit.
 
 The R-route documentation snapshots are byte-preserved under
-[`docs/archive/phase_ii_01_r_routes/`](../../docs/archive/phase_ii_01_r_routes/README.md)
+[`docs/archive/phase_ii_01_r_routes/`](../../docs/module/task_env/v2.1.0/history/r_route_originals/README.md)
 with source paths, byte counts, and SHA-256 values.
 
 ## Source bundle commands
@@ -132,7 +132,7 @@ PYTHONPATH=. python -m bench_deploy.libero.script.cli --run-replay /local/run \
 
 `--solution` selects optional V8 and uses the same runner and result reader.
 The accepted A-stage reference profile and task 2 exception are recorded in
-[`20261101_r07_a123_sol_acceptance.md`](../../docs/maintenance/20261101_r07_a123_sol_acceptance.md).
+[`20261101_r07_a123_sol_acceptance.md`](../../docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261101_r07_a123_sol_acceptance.md).
 A short smoke or completed worker bundle is not task success, provider parity,
 or Qualification.
 
@@ -156,5 +156,5 @@ They are recoverable with the frozen input commit below, but are not current
 deployment modules.
 
 Historical R00–R07 decisions and attempt details are indexed from
-`docs/module/task_env/goal/Phase_II_01/README.md`; fixed source commits remain
+`docs/module/task_env/v2.1.0/history/phase_ii_01/README.md`; fixed source commits remain
 the recovery route for retired implementations.

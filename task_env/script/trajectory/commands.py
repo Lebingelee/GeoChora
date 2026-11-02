@@ -35,7 +35,7 @@ def main(argv=None) -> int:
             "`python -m task_env.script.trajectory.record --env-id <selected-uid> "
             "--provider <geophys|mujoco> --output <fresh.h5>` for one selected expert route; "
             "restore the exact source ref listed for task_env.script.trajectory.commands "
-            "in docs/module/task_env/p2_0_s4_5_a_source_recovery.json for historical grouped collection."
+            "in docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_a_source_recovery.json for historical grouped collection."
         )
     if not arguments or arguments[0] in {"-h", "--help"}:
         parser = argparse.ArgumentParser(description=__doc__)

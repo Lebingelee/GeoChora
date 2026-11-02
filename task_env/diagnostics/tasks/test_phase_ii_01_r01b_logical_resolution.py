@@ -599,7 +599,7 @@ def test_result_and_input_snapshots_are_detached_and_failures_do_not_cache():
 
 
 def test_public_documented_minimal_example_executes():
-    document = (ROOT / "docs/module/task_env/public-api.md").read_text(encoding="utf-8")
+    document = (ROOT / "docs/module/task_env/v2.0.0/api/public-api.md").read_text(encoding="utf-8")
     match = re.search(
         r"### Bounded Logical Assembly resolution \(R01b\)\s+```python\n(.*?)\n```",
         document,

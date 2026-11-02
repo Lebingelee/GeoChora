@@ -3,7 +3,7 @@ import argparse,json,os,shlex,shutil,subprocess,sys,tempfile,tarfile,hashlib
 from pathlib import Path
 
 REPO=Path(__file__).resolve().parents[4]
-MANIFEST=REPO/'docs/module/task_env/p1_8_integration/experiment_manifest.json'
+MANIFEST=REPO/'docs/module/task_env/v1.1.0/maintenance/validation/p1_8_integration/experiment_manifest.json'
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--list',action='store_true');p.add_argument('--experiment');p.add_argument('--output',type=Path);p.add_argument('--prepare-only',action='store_true');args=p.parse_args()

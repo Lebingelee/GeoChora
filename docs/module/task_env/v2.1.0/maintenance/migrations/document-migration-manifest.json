@@ -1,0 +1,1165 @@
+{
+  "schema_version": "geochora-document-migration-manifest-v1",
+  "goal_id": "V210_LOCAL_RELEASE_PREPARATION_20261102_001",
+  "package_id": "V210_LOCAL_RELEASE_PREPARATION_20261102_001",
+  "source_package_manifest_sha256": "ce901fc37204e1477ca167da8f80d7badba3be2aa9e6d33c77e691c450602bfb",
+  "mapping_policy": "Exact per-file mapping from the frozen package. source_ref and old_path define provenance; content_policy defines whether the body is frozen, navigation-only, refreshed current content, or a tag-extracted historical copy.",
+  "entries": [
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/README.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/README.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/libero-controller-profile-history.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/libero-controller-profile-history.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/01_R01_Logical_Robot_Assembly.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/01_R01_Logical_Robot_Assembly.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/02_R02_Composite_Control_Profiles.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/02_R02_Composite_Control_Profiles.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/03_R03_Physical_Attachment.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/03_R03_Physical_Attachment.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/04_R04_Dynamic_Camera_Consumer.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/04_R04_Dynamic_Camera_Consumer.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/05_R05_Native_Rate_Feedback.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/05_R05_Native_Rate_Feedback.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/06_R06_Compatibility_and_Regression.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/06_R06_Compatibility_and_Regression.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/08_Codex_Phase_II_01_Planning_Prompt.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/08_Codex_Phase_II_01_Planning_Prompt.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/09_R07_Benchmark_Deployment_and_Agent_Cost.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/09_R07_Benchmark_Deployment_and_Agent_Cost.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/archive/phase_ii_01_r_routes/originals/README.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/r_route_originals/originals/README.md",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_FROZEN_BODY_ORIGINALS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/global/architecture.md",
+      "new_path": "docs/global/architecture.md",
+      "operation": "REFRESH",
+      "content_policy": "CURRENT_FACTS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/global/ownership.md",
+      "new_path": "docs/global/ownership.md",
+      "operation": "REFRESH",
+      "content_policy": "CURRENT_FACTS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261030_r07_v210_window001_pause_sol_review.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261030_r07_v210_window001_pause_sol_review.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md",
+      "new_path": "docs/module/task_env/v2.1.0/planning/r_route/20261030_r07c_diagnostic_d01_attempt001_plan.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261030_r07c_diagnostic_d01_attempt001_sol_review.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261030_r07c_diagnostic_d01_attempt002_sol_review.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261101_dg04_window002_n1_source_consumer_stop.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/checkpoints/f_route/20261101_dg04_window002_n1_source_consumer_stop.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261101_f06_pickcube_harness_headroom_matrix.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261101_f06_pickcube_harness_headroom_matrix.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261101_f06_pickcube_harness_partial.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261101_f06_pickcube_harness_partial.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261101_r07_a123_sol_acceptance.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/reviews/r_route/20261101_r07_a123_sol_acceptance.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261101_v2_1_f_r_convergence.md",
+      "new_path": "docs/module/task_env/v2.1.0/planning/integration/20261101_v2_1_f_r_convergence.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/20261102_v210_integration_baseline.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/reviews/integration/20261102_v210_integration_baseline.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/consolidation-inventory.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/recovery/consolidation-inventory.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/consolidation-review.md",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/reviews/consolidation-review.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/phase_ii_scope_freeze_20261023/evidence_index.json",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/decisions/phase_ii_scope_freeze_20261023/evidence_index.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/decisions/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/phase_ii_scope_freeze_20261023/validation_receipt.json",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/decisions/phase_ii_scope_freeze_20261023/validation_receipt.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/README.md",
+      "new_path": "docs/module/task_env/README.md",
+      "operation": "REWRITE_VERSION_INDEX",
+      "content_policy": "CURRENT_FACTS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
+      "new_path": "docs/module/task_env/v1.1.0/capabilities/capability_matrix_v1_1_0_candidate.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/01_Phase_A_Core_Object_Model.md",
+      "new_path": "docs/module/task_env/v2.0.0/goals/phase_ii/01_Phase_A_Core_Object_Model.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/02_Phase_B_Task_Semantics.md",
+      "new_path": "docs/module/task_env/v2.0.0/goals/phase_ii/02_Phase_B_Task_Semantics.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md",
+      "new_path": "docs/module/task_env/v2.0.0/goals/phase_ii/03_Phase_C_Execution_Lifecycle.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md",
+      "new_path": "docs/module/task_env/v2.0.0/goals/phase_ii/04_Phase_D_Physics_Rendering.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md",
+      "new_path": "docs/module/task_env/v2.0.0/planning/phase_ii/05_Architecture_Review_and_Execution_Order.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/A_Development_Record.md",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/A_Development_Record.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/B_Development_Record.md",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/B_Development_Record.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/C_Development_Record.md",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/C_Development_Record.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II/D_Development_Record.md",
+      "new_path": "docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/D_Development_Record.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/00_Phase_II_01_Blueprint.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/00_Phase_II_01_Blueprint.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/01_R01_Logical_Robot_Assembly.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/01_R01_Logical_Robot_Assembly.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/02_R02_Composite_Control_Profiles.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/02_R02_Composite_Control_Profiles.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/03_R03_Physical_Attachment.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/04_R04_Dynamic_Camera_Consumer.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/06_R06_Compatibility_and_Regression.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/07_Execution_Order_and_Acceptance.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/08_Codex_Phase_II_01_Planning_Prompt.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/08_Codex_Phase_II_01_Planning_Prompt.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/12_F05_F07_Execution_Playbook.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/12_F05_F07_Execution_Playbook.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/13_F05_Early_Diagnostic_Three_Goals.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/14_F06_PickCube_Harness_Multi_Backend_Goal.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/14_F06_PickCube_Harness_Multi_Backend_Goal.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/15_V210_Public_Task_API_Refactor.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/15_V210_Public_Task_API_Refactor.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/16_V210_Release_Preparation_Goal.md",
+      "new_path": "docs/module/task_env/v2.1.0/goals/release-preparation.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/README.md",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/README.md",
+      "operation": "MOVE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/planning_manifest.json",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/planning_manifest.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/r06c_scope_reconciliation.json",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/r06c_scope_reconciliation.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+      "new_path": "docs/module/task_env/v2.1.0/history/phase_ii_01/validation_receipt.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p1_8_integration/cross_provider_acceptance_v2_20261014/acceptance_contract.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/validation/p1_8_integration/cross_provider_acceptance_v2_20261014/acceptance_contract.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p1_8_integration/experiment_manifest.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/validation/p1_8_integration/experiment_manifest.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p2_0_s2_b1_source_identity.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s2_b1_source_identity.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p2_0_s2_b_deletion_manifest.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s2_b_deletion_manifest.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p2_0_s4_5_a_source_recovery.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_a_source_recovery.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/p2_0_s4_5_b_source_recovery.json",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_b_source_recovery.json",
+      "operation": "MOVE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/public-api.md",
+      "new_path": "docs/module/task_env/v2.1.0/api/public-api.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/qualification.md",
+      "new_path": "docs/module/task_env/v2.1.0/contracts/qualification.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/recording-and-learning.md",
+      "new_path": "docs/module/task_env/v2.1.0/contracts/recording-and-learning.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/runtime-and-providers.md",
+      "new_path": "docs/module/task_env/v2.1.0/contracts/runtime-and-providers.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/task-artifact.md",
+      "new_path": "docs/module/task_env/v2.1.0/contracts/task-artifact.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/module/task_env/troubleshooting.md",
+      "new_path": "docs/module/task_env/v2.1.0/guides/troubleshooting.md",
+      "operation": "MOVE",
+      "content_policy": "REFRESH_CURRENT",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/README.md",
+      "new_path": "docs/releases/v1.0/README.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/archive_manifest.json",
+      "new_path": "docs/releases/v1.0/archive_manifest.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/capability_matrix.json",
+      "new_path": "docs/releases/v1.0/capability_matrix.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/evidence_index.json",
+      "new_path": "docs/releases/v1.0/evidence_index.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/known_limitations.md",
+      "new_path": "docs/releases/v1.0/known_limitations.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/phase1_progress_summary.md",
+      "new_path": "docs/releases/v1.0/phase1_progress_summary.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/phase1_v1_release_handoff.md",
+      "new_path": "docs/releases/v1.0/phase1_v1_release_handoff.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/release_scope_decision.yaml",
+      "new_path": "docs/releases/v1.0/release_scope_decision.yaml",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/source_manifest.json",
+      "new_path": "docs/releases/v1.0/source_manifest.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.0/validation_report.md",
+      "new_path": "docs/releases/v1.0/validation_report.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/CHANGELOG.md",
+      "new_path": "docs/releases/v1.1/CHANGELOG.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/README.md",
+      "new_path": "docs/releases/v1.1/README.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/backup_manifest.json",
+      "new_path": "docs/releases/v1.1/backup_manifest.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/development-log.md",
+      "new_path": "docs/releases/v1.1/development-log.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_c2_20261017/provider_free_final.log",
+      "new_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_c2_20261017/provider_free_final.log",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/known-limitations.md",
+      "new_path": "docs/releases/v1.1/known-limitations.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/migration.md",
+      "new_path": "docs/releases/v1.1/migration.md",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_FACTS_NAVIGATION_ONLY",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/releases/v1.1/source_recovery_manifest.json",
+      "new_path": "docs/releases/v1.1/source_recovery_manifest.json",
+      "operation": "RETAIN",
+      "content_policy": "RETAIN_RELEASE_BYTES",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/roadmap/README.md",
+      "new_path": "docs/roadmap/README.md",
+      "operation": "REFRESH",
+      "content_policy": "CURRENT_FACTS",
+      "source_ref": "a3cd3312614212da1e589add4a6b7447c07e4e8a"
+    },
+    {
+      "old_path": "docs/maintenance/phase_ii_01_branch_integration_20261029/README.md",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/migrations/integration/phase_ii_01_branch_integration_20261029/README.md",
+      "operation": "MOVE_AFTER_DEVELOP_MERGE",
+      "content_policy": "NAVIGATION_ONLY_HISTORY",
+      "source_ref": "432b70741b06b8e635bcf1ac1c55009b8f478a6b"
+    },
+    {
+      "old_path": "docs/maintenance/phase_ii_01_branch_integration_20261029/integration_inputs.json",
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/migrations/integration/phase_ii_01_branch_integration_20261029/integration_inputs.json",
+      "operation": "MOVE_AFTER_DEVELOP_MERGE",
+      "content_policy": "PRESERVE_JSON_PROVENANCE",
+      "source_ref": "432b70741b06b8e635bcf1ac1c55009b8f478a6b"
+    },
+    {
+      "old_path": "docs/module/task_env/02-core-api-and-capability-scope.md",
+      "new_path": "docs/module/task_env/v1.1.0/api/public-api.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/03-task-artifact-experiment-evidence-contract.md",
+      "new_path": "docs/module/task_env/v1.1.0/contracts/task-artifact.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/04-core-qualification-and-governance.md",
+      "new_path": "docs/module/task_env/v1.1.0/contracts/qualification.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/05-phase-1-multi-simulator-blueprint.md",
+      "new_path": "docs/module/task_env/v1.1.0/planning/phase_i/original-blueprint.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
+      "new_path": "docs/module/task_env/v1.1.0/contracts/runtime-and-providers.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md",
+      "new_path": "docs/module/task_env/v1.1.0/maintenance/validation/phase_i-smoke.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md",
+      "new_path": "docs/module/task_env/v1.1.0/guides/troubleshooting.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/canonical-solution-guarded-transitions.md",
+      "new_path": "docs/module/task_env/v1.1.0/contracts/canonical-solution-guarded-transitions.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/canonical-solution-lifecycle-contract.md",
+      "new_path": "docs/module/task_env/v1.1.0/contracts/canonical-solution-lifecycle-contract.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/p2_0_s4_5_a_developer_workflows.md",
+      "new_path": "docs/module/task_env/v1.1.0/guides/workflows.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v1.1.0"
+    },
+    {
+      "old_path": "docs/module/task_env/public-api.md",
+      "new_path": "docs/module/task_env/v2.0.0/api/public-api.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    },
+    {
+      "old_path": "docs/module/task_env/task-artifact.md",
+      "new_path": "docs/module/task_env/v2.0.0/contracts/task-artifact.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    },
+    {
+      "old_path": "docs/module/task_env/qualification.md",
+      "new_path": "docs/module/task_env/v2.0.0/contracts/qualification.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    },
+    {
+      "old_path": "docs/module/task_env/runtime-and-providers.md",
+      "new_path": "docs/module/task_env/v2.0.0/contracts/runtime-and-providers.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    },
+    {
+      "old_path": "docs/module/task_env/recording-and-learning.md",
+      "new_path": "docs/module/task_env/v2.0.0/contracts/recording-and-learning.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    },
+    {
+      "old_path": "docs/module/task_env/troubleshooting.md",
+      "new_path": "docs/module/task_env/v2.0.0/guides/troubleshooting.md",
+      "operation": "COPY_FROM_TAG",
+      "content_policy": "FROZEN_FACTS_NAVIGATION_ONLY",
+      "source_ref": "refs/tags/v2.0.0"
+    }
+  ],
+  "additions": [
+    {
+      "new_path": "docs/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/maintenance/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v1.1.0/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.0.0/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/guides/installation.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/guides/quickstart.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/guides/task-authoring.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/api/configuration.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/api/migration.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/capabilities/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/capabilities/capability-matrix.json",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/planning/current-scope.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/planning/v2.1.x-followups.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/migrations/document-migration-manifest.json",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_env/v2.1.0/maintenance/migrations/branch-plan.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/task_harness/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/asset_harness/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/module/policy_harness/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/CHANGELOG.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/migration.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/installation.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/capabilities.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/known-limitations.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/third-party-assets.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.0.0/release-manifest.json",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/README.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/CHANGELOG.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/migration.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/installation.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/capabilities.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/known-limitations.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/third-party-assets.md",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    },
+    {
+      "new_path": "docs/releases/v2.1.0/release-manifest.json",
+      "operation": "ADD",
+      "source_ref": "current candidate evidence/code",
+      "content_policy": "NEW_VERSIONED_CURRENT_DOCUMENT"
+    }
+  ],
+  "additional_updated_entrypoints": [
+    "README.md",
+    "AGENTS.md",
+    ".agents/skills/geochora/SKILL.md",
+    ".agents/skills/geochora-doc-governance/SKILL.md",
+    ".agents/skills/geochora-doc-governance/scripts/validate_docs.py",
+    ".agents/skills/geochora-task-env/SKILL.md",
+    ".agents/skills/geochora-task-harness/SKILL.md",
+    "other active Skill/example/task_env/doc links affected by these exact path moves"
+  ],
+  "historical_resolution": {
+    "frozen_originals": "Interpret Markdown links and source paths from source_ref + old_path; do not rewrite original bytes to make current links appear local.",
+    "json_provenance": "Retain source paths, hashes, authorization and counts as facts about their source_ref; use this mapping to locate relocated files.",
+    "broken_historical_links": "Report separately from active current-link errors; do not change frozen verdicts to eliminate a historical break.",
+    "tag_extracts": {
+      "v1.1.0": "refs/tags/v1.1.0",
+      "v2.0.0": "refs/tags/v2.0.0"
+    }
+  },
+  "protected_local_input": {
+    "path": "docs/maintenance/20261030_runtime_route_diagnostic_handoff.md",
+    "policy": "preserve untracked local input at original path; do not migrate or commit",
+    "bytes": 14289,
+    "sha256": "18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61"
+  },
+  "raw_workspace_evidence": "Ignored outputs, H5, stdout, zip archives, local USD and source asset bundles remain outside docs and source distribution.",
+  "additional_local_inputs": [
+    {
+      "path": "MUJOCO_LOG.TXT",
+      "policy": "preserve untracked local input in F and integration worktrees",
+      "bytes": 120,
+      "sha256": "dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b"
+    }
+  ]
+}

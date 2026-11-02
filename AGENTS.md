@@ -21,16 +21,10 @@
 ## Canonical references
 
 - System and ownership: [architecture](docs/global/architecture.md), [ownership](docs/global/ownership.md).
-- Current module entry: [TaskEnv](docs/module/task_env/README.md), [public API](docs/module/task_env/public-api.md),
-  [Artifact/Experiment/Evidence](docs/module/task_env/task-artifact.md), [qualification](docs/module/task_env/qualification.md).
-- Published baseline: [v1.1.0](docs/releases/v1.1/README.md), its single capability matrix and limitations.
-  Historical [v1.0.0](docs/releases/v1.0/README.md) remains scoped to its frozen source.
-- Current direction: [post-v1.1.0 roadmap](docs/roadmap/README.md).
-- Repository governance: [.agents/skills/geochora/SKILL.md](.agents/skills/geochora/SKILL.md),
-  [documentation](.agents/skills/geochora-doc-governance/SKILL.md),
-  [architecture](.agents/skills/geochora-architecture-refactor/SKILL.md),
-  [public API](.agents/skills/geochora-public-api-governance/SKILL.md),
-  [tests](.agents/skills/geochora-test-governance/SKILL.md).
+- Current TaskEnv: [version index](docs/module/task_env/README.md), [v2.1.0 candidate API](docs/module/task_env/v2.1.0/api/public-api.md), [Task Artifact](docs/module/task_env/v2.1.0/contracts/task-artifact.md), and [Qualification boundaries](docs/module/task_env/v2.1.0/contracts/qualification.md).
+- Version records: [v1.1.0 published baseline](docs/releases/v1.1/README.md), [v2.0.0 frozen source snapshot](docs/releases/v2.0.0/README.md), and [v2.1.0 local candidate](docs/releases/v2.1.0/README.md). The v2.1.0 matrix records bounded evidence; it is not a new Qualification.
+- Current direction: [v2.1.0 roadmap and follow-ups](docs/roadmap/README.md).
+- Repository governance: [.agents/skills/geochora/SKILL.md](.agents/skills/geochora/SKILL.md), [documentation](.agents/skills/geochora-doc-governance/SKILL.md), [architecture](.agents/skills/geochora-architecture-refactor/SKILL.md), [public API](.agents/skills/geochora-public-api-governance/SKILL.md), [tests](.agents/skills/geochora-test-governance/SKILL.md), and [TaskEnv](.agents/skills/geochora-task-env/SKILL.md).
 
 ## Module Skill activation
 

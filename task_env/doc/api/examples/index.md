@@ -16,7 +16,7 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophy
 
 The v1.1.0 `single_inline` Pendulum route currently fails during stepping because its helper reads
 `env.binding`, which generic Pendulum does not expose. Use the public construction example below;
-[canonical troubleshooting](../../../../docs/module/task_env/troubleshooting.md#已复现的-cli-缺陷) records the reproducer.
+[canonical troubleshooting](../../../../docs/module/task_env/v2.0.0/guides/troubleshooting.md#已复现的-cli-缺陷) records the reproducer.
 
 ## Current commands
 

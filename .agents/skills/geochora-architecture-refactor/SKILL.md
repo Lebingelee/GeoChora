@@ -17,8 +17,8 @@ and provider provenance, and the canonical Geochora documents:
 
 - `docs/global/architecture.md`
 - `docs/global/ownership.md`
-- `docs/module/task_env/public-api.md`
-- `docs/module/task_env/qualification.md`
+- `docs/module/task_env/v2.0.0/api/public-api.md`
+- `docs/module/task_env/v2.0.0/contracts/qualification.md`
 
 Use CodeGraph when its index is current to trace symbols and call paths. A
 filename or line count is not evidence of an ownership seam.

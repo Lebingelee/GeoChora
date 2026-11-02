@@ -32,7 +32,7 @@ normal Core admission with a versioned source-closure receipt. R05b attempt001
 completed focused provider-free S1 plus two-outer CPU and CUDA native S2 with
 independent H5 readback, pending Sol review. This does not qualify the full
 100/500 Hz campaign, task/Expert completion, other sources or Providers, or
-Formal Qualification. See the [R05 execution record](../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29) and [public API contract](../docs/module/task_env/public-api.md#r05b-bounded-nutassembly-native-feedback-profile).
+Formal Qualification. See the [R05 execution record](../docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29) and [public API contract](../docs/module/task_env/v2.1.0/api/public-api.md).
 
 ## Current developer workflows
 

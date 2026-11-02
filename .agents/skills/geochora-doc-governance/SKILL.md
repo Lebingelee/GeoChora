@@ -58,10 +58,10 @@ not silently edit prose to hide the disagreement.
 For changes to public API or governed tests, also use
 `geochora-public-api-governance` or `geochora-test-governance` respectively.
 
-## Consolidation validation
+## Versioned documents and validation
 
-For this repository's tag-backed post-release inventory, run
-`python .agents/skills/geochora-doc-governance/scripts/validate_docs.py` after staging.
-The [validator](scripts/validate_docs.py) checks retained bytes, tag recovery, counts, links/anchors,
-JSON, source-document references and documentation-only scope against the consolidation inventory.
-It does not prove runtime behavior or qualification; retain actual failed smoke results separately.
+Current system documents live in `docs/global/` and `docs/roadmap/`. TaskEnv has a version index at `docs/module/task_env/README.md`; v2.1.0 owns current contracts, guides, capabilities, goals, planning and maintenance. v1.1.0 and v2.0.0 content is source-versioned and must not be silently rewritten with newer behavior. v2.0.0 is documented as a frozen source snapshot; v2.1.0 remains a local draft candidate until separately approved.
+
+The migration manifest at `docs/module/task_env/v2.1.0/maintenance/migrations/document-migration-manifest.json` maps each old path to its new path and source ref. For frozen originals, interpret relative links from the original source ref/path and report pre-existing historical breaks separately; do not edit frozen facts to produce a green current-link report.
+
+Run `python .agents/skills/geochora-doc-governance/scripts/validate_docs.py --mode current` for the active versioned structure, links/anchors, JSON, migration manifest, version indexes and active source/Skill references. Use `--mode historical` only for the tag-backed consolidation inventory and its preserved byte/count/doc-only constraints. The [validator](scripts/validate_docs.py) checks static documentation structure only; it does not prove runtime behavior, task success, or Qualification.

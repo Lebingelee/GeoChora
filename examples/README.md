@@ -43,7 +43,7 @@ For a small new-task declaration, see [`declared_marker.py`](tasks/declared_mark
 It supplies a distinct task/Entity identity, reset sampler and evaluator while
 reusing Core's shared Panda/table/box construction. `make_marker_env(config=...)` enters
 through the public `make_env` path; its bounded MuJoCo CPU example is described
-in the [TaskEnv public API](../docs/module/task_env/public-api.md#declared-reference-task-construction-v210).
+in the [current TaskEnv public API](../docs/module/task_env/v2.1.0/api/public-api.md).
 
 ## Workflow matrix
 
@@ -54,7 +54,7 @@ in the [TaskEnv public API](../docs/module/task_env/public-api.md#declared-refer
 | F06 built-in Harness, GeoPhys CPU | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01` | Same Core task owner and R3 profile; runtime validity and task outcome are reported separately. |
 | F06 PickCube on Isaac Sim | `OMNI_KIT_ACCEPT_EULA=YES PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01` | After accepting the NVIDIA Omniverse EULA, passes the non-interactive acceptance setting to the supervised CUDA PhysX worker; task outcome remains separate from runtime evidence. |
 | Optional Genesis/SAPIEN preflight | Same command with `--provider genesis` or `--provider sapien` and `--execution harness` | Optional only. Missing engine dependency is recorded as `NOT_RUN_DEPENDENCY` without a worker; provider manifest gaps are `UNSUPPORTED_CAPABILITY`. |
-| Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI uses the retained `step_expert()` path; incomplete route exits nonzero. Separately, the task-owned external Solution has bounded MuJoCo CPU S2/S3 and a diagnostic GeoPhys CPU/CUDA × 100/500 Hz S2/S3 comparison. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05c). |
+| Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI uses the retained `step_expert()` path; incomplete route exits nonzero. Separately, the task-owned external Solution has bounded MuJoCo CPU S2/S3 and a diagnostic GeoPhys CPU/CUDA × 100/500 Hz S2/S3 comparison. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/C_Development_Record.md#c05c). |
 | Canonical expert recording | `PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 --output workspace/examples/pickcube-mujoco.h5` | Requires a fresh output path; finalizes the existing canonical H5 recorder and checks transitions, T+1 boundaries, provenance, and storage roundtrip. |
 | Offline H5 inspection | `PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/examples/pickcube-mujoco.h5` | Reads the existing canonical schema and validates logical/numeric integrity and T+1 boundaries. It does not replay the task or claim D0. |
 | Generic batch environment smoke | `PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline --env-id pendulum-v1 --backend cpu --num-env 2 --steps 1` | Existing generic `make_parallel_env` Pendulum path; not a task or learner qualification. |
@@ -99,7 +99,7 @@ The earlier QACC attempts and 6/9 PARTIAL remain historical evidence for older
 solution identities. An initial zero-step Isaac EULA startup failure remains
 charged; the accepted EULA environment was supplied on retry. Genesis and
 SAPIEN remain `NOT_RUN_DEPENDENCY`. See the [final 3×3 matrix and raw evidence
-index](../docs/maintenance/20261101_f06_pickcube_harness_headroom_matrix.md),
+index](../docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261101_f06_pickcube_harness_headroom_matrix.md),
 the [recording/action/reset integrity audit](../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/headroom_identity_017392e8_matrix_002/recording_integrity_audit.json),
-and the [historical PARTIAL snapshot](../docs/maintenance/20261101_f06_pickcube_harness_partial.md).
+and the [historical PARTIAL snapshot](../docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261101_f06_pickcube_harness_partial.md).
 This partial acceptance is not task success or Qualification and starts no F07 work.
