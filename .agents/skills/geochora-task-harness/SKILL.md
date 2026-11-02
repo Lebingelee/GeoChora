@@ -19,6 +19,16 @@ remains unchanged. For F06 USD source rebuild and dependency-light help, follow
 the dated TaskEnv Skill guidance and the [Harness CLI README](../../../task_env/script/agent/README.md);
 this source preparation does not launch Isaac or establish source verification.
 
+## Current Core construction handoff
+
+The strict `pick-lift-v0` candidate path keeps its own spec, reset and
+feasibility policy, but delegates Panda/table/box Artifact and RuntimeSource
+construction through Core's shared `PandaBoxDeclaration` compiler. Its
+`ReferenceTaskBinding` is an internal Harness adapter; do not make it a task
+authoring requirement. The built-in runtime example resolves the nested
+selected config once, calls public `make_env`, and returns facts from that same
+Env instance for the worker to reuse. See the [TaskEnv declaration API](../../../docs/module/task_env/public-api.md#declared-reference-task-construction-v210).
+
 ## Construction decisions
 
 1. Read the upstream task and its referenced asset bundle / semantic examples. Query the requested provider and available templates. Catalog `available` means a manifest is readable, not that physics has run. Unknown capabilities/providers must fail explicitly.

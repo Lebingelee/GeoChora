@@ -48,7 +48,7 @@ runtime.
 | `harness_spec_schema.py` | Strict candidate JSON/YAML, findings and reports |
 | `catalog_query.py` | Registry/provider catalog and source identity |
 | `asset_check.py` | Asset UIDs, supplied bytes and capability vocabulary |
-| `harness_compiler.py` | Deterministic `pick-lift-v0` Artifact/binding |
+| `harness_compiler.py` | Strict `pick-lift-v0` policy plus shared PandaBox Artifact/source compiler; the internal candidate binding stays Harness-owned |
 | `semantic_check.py` | Declared lift goal and positive/negative endpoint examples |
 | `feasibility_probe.py` | Separate solved/invalid/expert_failed/unknown outcomes |
 | `completion_facts.py` | Versioned raw completion facts and independent row/report validation |
@@ -69,6 +69,12 @@ solution, controller, RuntimeSession and Recorder remain their owners. This
 path does not create a `CandidateSpec`, run the candidate/Oracle/Judge flow, or
 weaken the separate `pick-lift-v0` 20-seed all-solved requirement. Runtime
 validity and Task/Expert outcome are reported separately.
+
+The strict candidate compiler and public example both use the shared Core
+PandaBox declaration/compiler for Artifact and source construction. Candidate
+semantic checks, reset policy and strict feasibility gates remain in the
+Harness; the built-in runtime example resolves its selected config once and
+returns facts from the same `make_env` instance the worker will run.
 
 For runnable CPU/CUDA commands and optional-provider behavior, use the
 [PickCube example matrix](../../../examples/README.md#workflow-matrix). The

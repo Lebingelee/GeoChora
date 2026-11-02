@@ -12,15 +12,53 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | 类型 | 公共入口与配置 | 当前语义 |
 | --- | --- | --- |
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
-| PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
-| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
+| PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"execution":{"physics_provider":"mujoco","physics_backend":"cpu","physics_device":"cpu"},"episode":{"horizon":6000}})` | lift-only task predicate，保留 selected P1.6 Artifact；默认 R3，R1 需显式选择 |
+| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"execution":{"physics_provider":"mujoco","physics_backend":"cpu","physics_device":"cpu"},"episode":{"horizon":6000}})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
+| Declared marker example | `from examples.tasks.declared_marker import make_marker_env; env = make_marker_env(config=...)` | New Entity/task identity with shared Panda/table/box Artifact and source compiler; one MuJoCo CPU bounded example run exercised reset, 3 steps, recording, independent T/T+1 readback and close; this is not provider or qualification expansion |
 | Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps; state-only by default; opt-in R04a camera consumer checks capture identity against the actual request and typed Frame, while the H5 reader binds sidecars to stored state digests, clocks, typed controls and episode outcome; targeted provider-free S1 accepted by Sol as ACCEPTED_S1_BOUNDED, real renderer/Env/H5 S2/S3 not run; candidate without freeze/Judge/Qualification |
 
-PickCube/NutAssembly 两条 selected reference 只接受 `provider`、`backend`、`horizon`：provider 仅
-`geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
-legacy overlays 会失败。不要把通用 `runtime` section 传入 selected reference。
-每个 selected task 由 task-owned `task.py`、`solution.py`、`config.yaml` 与 `__init__.py` 所有。
-UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发布矩阵，避免重复维护。
+PickCube/NutAssembly selected reference 通过同一个 resolver 接受 `execution`、`episode`、`task` 三个 section；
+兼容 flat `provider`、`backend`、`horizon`、`controller_profile`、`source_delivery_manifest` 只在该边界映射，
+与对应 nested 字段并用会报错。支持 `geophys/cpu/cpu` 与 `mujoco/cpu/cpu`；PickCube 另接受精确的
+`isaacsim/cuda/cuda:0` + 显式 delivery manifest + `r3_continuous_v1`。NutAssembly 不接受通用 selected CUDA。
+`episode.horizon` 必须为 `[1,6000]` 内整数；`task.lift_height_m` 有任务各自的范围，PickCube 还接受
+`task.controller_profile`。PickCube 默认 `r3_continuous_v1`，`r1` 需显式选择。其他字段、`render_mode` 与额外
+constructor kwargs 均拒绝。Core defaults、任务 YAML 和显式覆盖经一次 resolver 得到可查询的最终配置；provider/source
+准备及任务身份均使用该 resolved snapshot。
+
+```python
+env = make_env("pick-cube-p16-reference-v1", config={
+    "execution": {"physics_provider": "mujoco", "physics_backend": "cpu",
+                  "physics_device": "cpu"},
+    "episode": {"horizon": 6000},
+    "task": {"controller_profile": "r3_continuous_v1", "lift_height_m": 0.12},
+})
+```
+
+PickCube 的 `lift_height_m` 范围为 `[0.01,0.25]` m，NutAssembly 为 `[0.01,0.15]` m；
+只有声明开放的 task 参数可覆盖，值会进入实际 Artifact、reset/evaluation 与录制身份。
+
+每个 selected task 仍由 task-owned semantic/reset/evaluation hooks、`config.yaml` 与现有注册 UID 组成；通用
+Artifact/source 编译归 Core。UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发布矩阵，避免重复维护。
+
+<a id="declared-reference-task-construction-v210"></a>
+## 声明式任务构造 (v2.1)
+
+新 selected reference 仍从 `make_env(uid, config=...)` 进入。task owner 提供不可变的
+`TaskArtifactDeclarationV1`（Entities、action/observation、initialization、semantics、timebase 和 capability），
+其 `compile()` 生成现有 TaskArtifact v0；`compile_v1(source, scene, frame_bindings=...,
+joint_bindings=...)` 由 Core 自动经兼容桥生成 Scene-bound TaskArtifact v1，不要求作者手写 v0 Artifact。
+`ReferenceTaskDeclarationV1` 将该声明与 `TaskCompositionSpec` 和命名 source bindings 组合；
+`compile(scene_source=..., config=..., controller_factory=...)` 统一编译 Artifact、RuntimeSource 和可选的纯
+Controller，并可通过 `identity_fields()` 生成共享的 Artifact/source/config/controller 身份事实。任务仍拥有其 source
+bytes/composer、reset sampler、evaluation semantics 与 Controller/solution policy。此过程不启动 Provider，也不创建 Solution；
+实际环境、reset、step、recording 与 close 继续由 `make_env()` → `SelectedReferenceEnv` → `RuntimeSession` 管理。
+
+`examples/tasks/declared_marker.py` 是当前可读扩展示例：它复用 Panda/table/box 资产和 Core compiler，以新 UID、
+独立 Entity 名称、reset 与 evaluator 注册为 `DeclaredPandaBoxEnv`。2026-11-02 的 bounded MuJoCo CPU run
+（Core `e7be344c`、Artifact `f20ab46664c65d12dae971d1eea073d98f6042e43d12d3e2b815b67e89dc1421`、seed 19）
+完成 1 reset、3 actions / 15 physics steps、canonical H5 冷读
+T=3/T+1=4 与 close。该单例不扩展其他资产、Provider 或 backend 支持，也不构成 Qualification。
 
 ## 生命周期与 evaluation
 
@@ -113,6 +151,8 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `AssetManifest` | `task_env.environment` | assembly 资产声明；保留本地 source/root 与版本字段，可选稳定 source reference/revision 和 procedural generator 元数据；构造时不读文件，也不证明 importer 消费了对应 bytes |
 | `make_parallel_env`, `register_parallel_env` | `task_env` | optional homogeneous factory，与 scalar 无互相 fallback |
 | `TaskArtifact`, `TaskArtifactV1`, `decode_task_artifact`, `ExecutionSpec`, `CanonicalStateView`, `admit_capabilities` | `task_env.artifacts` | advanced data/admission contracts；TaskArtifact dispatcher 按精确 discriminator 解码，不自动升级；不从 root 假造导出 |
+| `TaskArtifactDeclarationV1` | `task_env.environment` | task-owned immutable Entity/action/observation/reset/semantics/timebase/capability values；`compile()` 进入现有 v0 compiler，`compile_v1(TaskSourceV1, SceneDefinition)` 由 Core 建立 v0 bridge 并编译 Scene-bound v1 |
+| `ReferenceTaskDeclarationV1`, `CompiledReferenceTaskV1`, `reference_task_identity_fields` | `task_env.assembly` | shared provider-free Artifact + RuntimeSource/source-binding compiler and common identity facts; optional Controller factory remains pure. Task-specific scene bytes, reset/evaluation hooks and strategy policy stay with the task; no Provider, RuntimeSession or Solution is created here |
 | `TaskSourceV1`, `TaskRoleDeclarationV1`, `TaskHookDeclarationV1`, `load_task_source` | `task_env.environment` | B01 strict authoring-input envelope；只含 identity/Scene reference/explicit Entity-ID role candidates/hook declarations，不执行 hooks，也不接收 execution config |
 | `compile_task_artifact_v1` | `task_env.environment` | B04b bounded compiler；组合已验证 Source、结构化 A Scene 与现有 v0 semantic bridge，旧 Frame/Joint 别名只能通过显式类型化绑定解析，输出引用 Scene identity 的 TaskArtifact v1 candidate；D01b 仅在单 Robot、Scene v3、scalar reset/state 的 GeoPhys/MuJoCo CPU 交集中消费，不代表通用 Runtime/qualification 支持 |
 | `TaskInitializationV1`, `resolve_role_binding`, `sample_episode_reset_plan` | `task_env.environment` | B02 原 route 使用 TaskArtifact v0；D01b 扩展为接受精确 Scene-bound TaskArtifact v1。两者仍产生既有 provider-facing `ResetSample-v0`，边界由 `UniformDimension` 持有 |
@@ -1198,7 +1238,7 @@ required evidence is task-specific: MuJoCo source/model/reset and same-cadence
 upstream action replay; GeoPhys public construction, reset, meaningful step,
 state readback and close. High-precision tracking and autonomous Solution
 success are optional follow-up; Isaac Sim and B/C are deferred for this scope.
-The [A123 rework report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/libero_a123_review_rework_20261101_001/report.md) records the exact evidence and bounded decision.
+The [A123 rework report](../../maintenance/20261101_r07_a123_sol_acceptance.md) records the exact evidence and bounded decision.
 
 The Core GeoPhys reset path now preserves legacy `ResetSample-v0` behavior:
 absent joint/free-body velocities use the v0 zero-velocity policy and absent

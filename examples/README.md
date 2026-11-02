@@ -39,6 +39,12 @@ coordinating process; `--address-space-limit-mb` applies per-process
 process-tree memory cap. Native BLAS/OpenMP thread counts are set to one before
 runtime imports.
 
+For a small new-task declaration, see [`declared_marker.py`](tasks/declared_marker.py).
+It supplies a distinct task/Entity identity, reset sampler and evaluator while
+reusing Core's shared Panda/table/box construction. `make_marker_env(config=...)` enters
+through the public `make_env` path; its bounded MuJoCo CPU example is described
+in the [TaskEnv public API](../docs/module/task_env/public-api.md#declared-reference-task-construction-v210).
+
 ## Workflow matrix
 
 | Workflow | Command | Current scope and result |
