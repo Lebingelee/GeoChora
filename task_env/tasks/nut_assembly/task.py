@@ -18,6 +18,7 @@ from ...artifacts import (
 )
 from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
+from ...assembly.compiler import compile_reference_source
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import StableArmTargetHold
@@ -344,16 +345,15 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
-    runtime_source = RuntimeSource(artifact.identity_hash,
-        TaskSceneSource(scene_xml, base, "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
-        {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position},
-        {"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
-         "round-peg-v1": "peg2", "panda-v1/base": "link0"},
-        {EEF: scene["ee_site_name"]}, {"square-nut-v1": "SquareNut_joint"},
-        {f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)}, ("actuator8",),
-        composition, config, make_scene(recipe["scene_uid"]),
-        tuple(make_agent(uid) for uid in recipe["agent_uids"]),
-        tuple(make_object(uid) for uid in recipe["object_uids"]))
+    runtime_source = compile_reference_source(
+        artifact=artifact,
+        scene_source=TaskSceneSource(scene_xml, base, "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
+        bodies={"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
+                "round-peg-v1": "peg2", "panda-v1/base": "link0"},
+        frames={EEF: scene["ee_site_name"]}, free_joints={"square-nut-v1": "SquareNut_joint"},
+        joint_targets={f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)},
+        open_actuators=("actuator8",), composition=composition, config=config,
+    )
     if _native_feedback_profile:
         if provider != 'geophys':
             raise ValueError('R05b native feedback profile is GeoPhys-only')
@@ -371,6 +371,7 @@ def _source_identity_files():
         "task_env/tasks/nut_assembly/__init__.py",
         "task_env/tasks/nut_assembly/task.py", "task_env/tasks/nut_assembly/solution.py",
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
+        "task_env/assembly/compiler.py", "task_env/environment/task_source.py",
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
         "task_env/tasks/reference_env.py", "task_env/tasks/canonical_solution_lifecycle.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",

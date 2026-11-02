@@ -20,6 +20,7 @@ from ...artifacts import (
 )
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
+from ...assembly.compiler import compile_reference_source
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest
 from ...environment import (
@@ -343,21 +344,15 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_conf
     )
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
-    spec = recipe
-    joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
-    return RuntimeSource(
-        task_artifact_hash=artifact.identity_hash,
-        scene_source=composer.build_source_description(),
-        joints=joints, bodies={"cube-v1": "PickCube"}, frames={EEF: EE_SITE_NAME},
+    composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
+        tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
+        success_definition=recipe["success_definition"])
+    return compile_reference_source(
+        artifact=artifact, scene_source=composer.build_source_description(),
+        bodies={"cube-v1": "PickCube"}, frames={EEF: EE_SITE_NAME},
         free_joints={"cube-v1": "PickCube_joint"},
         joint_targets={f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)},
-        open_actuators=("actuator8",),
-        composition=TaskCompositionSpec(spec["task_uid"], spec["scene_uid"],
-            tuple(spec["agent_uids"]), tuple(spec["object_uids"]),
-            success_definition=spec["success_definition"]),
-        config=config, scene=make_scene(spec["scene_uid"]),
-        agents=tuple(make_agent(uid) for uid in spec["agent_uids"]),
-        objects=tuple(make_object(uid) for uid in spec["object_uids"]),
+        open_actuators=("actuator8",), composition=composition, config=config,
     )
 
 
@@ -365,6 +360,8 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
     root = Path(__file__).resolve().parents[3]
     files = {Path(__file__).resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
+             Path(inspect.getsourcefile(compile_reference_source)).resolve(),
+             Path(inspect.getsourcefile(compile_declared_artifact)).resolve(),
              Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
