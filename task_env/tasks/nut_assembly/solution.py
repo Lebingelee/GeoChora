@@ -467,35 +467,63 @@ class NutAssemblyOutcomeSolutionV1:
         ))
         self._lifecycle = CanonicalSolutionLifecycle(
             SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE)
-        self.policy_mapping = {
+        description = self.describe(
+            config=self.config, control_dt=self.control_dt, physics_dt_s=self.physics_dt_s,
+            provider=self.provider, task_artifact_hash=self.task_artifact_hash,
+            source_id=self.source_id, source_closure_digest=self.source_closure_digest,
+            source_xml_sha256=self.source_xml_sha256, base_controller_identity=self.base_controller_identity,
+            require_native_feedback_contract=self.require_native_feedback_contract,
+        )
+        for name, value in description.items():
+            setattr(self, name, value)
+        self._clear_rollout()
+
+    @classmethod
+    def describe(cls, *, config, control_dt, physics_dt_s, provider=None,
+                 task_artifact_hash=None, source_id=None, source_closure_digest=None,
+                 source_xml_sha256=None, base_controller_identity=None,
+                 require_native_feedback_contract=False):
+        """Compute immutable policy and Solution identities without rollout state."""
+        if abs(float(control_dt) - 0.01) > 1e-12 or abs(float(physics_dt_s) - 0.002) > 1e-12:
+            raise ValueError("Outcome Completion V1 admits only the accepted 100 Hz / 2 ms recipe")
+        if (config.capture_translation_slip_m != 0.008 or config.capture_rotation_slip_rad != 0.15
+                or config.pose_position_ready_m != 0.007 or config.pose_rotation_ready_rad != 0.06
+                or config.action_budget_s != 60.0):
+            raise ValueError("selected outcome policy requires unchanged limits and budget")
+        if require_native_feedback_contract and not all((provider, task_artifact_hash, source_id,
+                                                         source_xml_sha256, base_controller_identity)):
+            raise ValueError("native Solution requires actual provider/source/controller identity bindings")
+        def ticks(seconds):
+            return max(1, int(math.ceil(float(seconds) / float(control_dt) - 1e-10)))
+        policy_mapping = {
             "schema": "nutassembly-close-authorization-primary-alternative-v1",
-            "primary_guard": {"guard_id": self.primary_guard_id,
+            "primary_guard": {"guard_id": cls.primary_guard_id,
                 "conditions": ["controller_close_ready", "grasped_nut", "pose_ready"],
                 "meaning": "historical canonical Controller Readiness"},
-            "alternative_guard": {"guard_id": self.alternative_guard_id,
+            "alternative_guard": {"guard_id": cls.alternative_guard_id,
                 "conditions": ["measured_force_at_least_threshold", "force_mode_active",
                     "force_mode_initialized", "grasped_nut", "pose_ready"],
-                "threshold_N": self.alternative_force_threshold_N,
+                "threshold_N": cls.alternative_force_threshold_N,
                 "meaning": "task-facing alternative authorization; never relabeled as Controller Readiness"},
             "selection": {"allow_early_alternative": True,
                 "same_sample_tie_break": "primary_controller_readiness_first"},
-            "required_continuous_dwell_s": self.authorization_dwell_s,
-            "deadline_from_close_stage_entry_s": self.authorization_deadline_s,
+            "required_continuous_dwell_s": cls.authorization_dwell_s,
+            "deadline_from_close_stage_entry_s": cls.authorization_deadline_s,
             "sampling": {"clock": "native-physics-state-and-canonical-controller-feedback",
-                "sample_period_s": self.physics_dt_s,
+                "sample_period_s": physics_dt_s,
                 "sample_interval": "measured-left-closed-right-open",
                 "missing_samples": "break-continuity; no interpolation",
                 "decision_boundary": "next-outer-control-boundary"},
-            "post_authorization_hold_s": self.postclose_hold_s,
+            "post_authorization_hold_s": cls.postclose_hold_s,
             "physical_force_regulation": {"target_N": 10.0, "cap_N": 10.0,
                 "controller_law": "unchanged R3"},
         }
-        self.policy_identity = digest({"policy": self.policy_mapping,
+        policy_identity = digest({"policy": policy_mapping,
             "evaluator": GuardedTransitionEvaluator.version,
             "evaluator_source_sha256": hashlib.sha256(
                 Path(__import__(GuardedTransitionEvaluator.__module__, fromlist=["__file__"]).__file__).read_bytes()
             ).hexdigest()})
-        self.outcome_policy_mapping = {
+        outcome_policy_mapping = {
             "policy_id": OUTCOME_POLICY_ID, "rate_hz": 100,
             "grasp_control": {
                 "target": "fixed_world_pose",
@@ -505,52 +533,54 @@ class NutAssemblyOutcomeSolutionV1:
                 "lift_release": "native_linear_ramp_from_last_applied_ack",
             },
             "endpoint_z_alignment": {
-                "command_bias_m": self.descend_endpoint_command_bias_m,
-                "acceptance_compensation_m": self.servo_height_compensation_m,
-                "aligned": self.descend_endpoint_command_bias_m == self.servo_height_compensation_m,
+                "command_bias_m": cls.descend_endpoint_command_bias_m,
+                "acceptance_compensation_m": cls.servo_height_compensation_m,
+                "aligned": cls.descend_endpoint_command_bias_m == cls.servo_height_compensation_m,
             },
             "tracking_gate": {
                 "metric": "rolling_rms_euclidean_tcp_position_error",
-                "window_s": self.pose_window_s,
-                "minimum_samples": self._ticks(self.pose_window_s),
-                "strict_limit_m": self.tracking_position_rmse_limit_m,
+                "window_s": cls.pose_window_s,
+                "minimum_samples": ticks(cls.pose_window_s),
+                "strict_limit_m": cls.tracking_position_rmse_limit_m,
             },
             "allowlist": [{"stage": "descend_to_handle", "reason": "stable_height_mismatch",
-                "maximum_occurrences": 1, "maximum_height_residual_m": self.height_warning_limit_m,
-                "pose_position_ready_m": self.config.pose_position_ready_m,
-                "pose_rotation_ready_rad": self.config.pose_rotation_ready_rad,
-                "minimum_pose_wait_s": self.minimum_pose_wait_s,
-                "window_s": self.pose_window_s, "minimum_samples": self._ticks(self.pose_window_s),
-                "axis_span_m": self.pose_span_m, "speed_m_s": self.pose_speed_m_s}],
-            "strict_height_tolerance_m": self.stable_height_tolerance_m,
-            "capture_translation_slip_m": self.config.capture_translation_slip_m,
-            "capture_rotation_slip_rad": self.config.capture_rotation_slip_rad,
-            "close_authorization_policy_identity": self.policy_identity,
-            "force_target_and_cap_N": 10.0, "action_budget_s": self.config.action_budget_s,
-            "ordered_stages": list(self.STAGES),
+                "maximum_occurrences": 1, "maximum_height_residual_m": cls.height_warning_limit_m,
+                "pose_position_ready_m": config.pose_position_ready_m,
+                "pose_rotation_ready_rad": config.pose_rotation_ready_rad,
+                "minimum_pose_wait_s": cls.minimum_pose_wait_s,
+                "window_s": cls.pose_window_s, "minimum_samples": ticks(cls.pose_window_s),
+                "axis_span_m": cls.pose_span_m, "speed_m_s": cls.pose_speed_m_s}],
+            "strict_height_tolerance_m": cls.stable_height_tolerance_m,
+            "capture_translation_slip_m": config.capture_translation_slip_m,
+            "capture_rotation_slip_rad": config.capture_rotation_slip_rad,
+            "close_authorization_policy_identity": policy_identity,
+            "force_target_and_cap_N": 10.0, "action_budget_s": config.action_budget_s,
+            "ordered_stages": list(cls.STAGES),
             "completion": "all authored actions and endpoint gates including retreat; final inserted_on_peg AND released_nut",
             "fail_closed": ["unlisted_or_repeated_failure", "invalid_state_or_clock",
                 "capture_violation", "task_failure", "runtime_error", "terminated",
                 "truncated", "action_budget_exhausted", "incomplete_plan_or_retreat"],
             "diagnostic_shadow_override": False,
         }
-        self.outcome_policy_identity = digest(self.outcome_policy_mapping)
-        self.identity = digest({"version": self.version,
+        outcome_policy_identity = digest(outcome_policy_mapping)
+        identity = digest({"version": cls.version,
             "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            "solution_config": asdict(self.config),
+            "solution_config": asdict(config),
             "execution_binding": {
-                "provider": self.provider,
-                "task_artifact_hash": self.task_artifact_hash,
-                "source_id": self.source_id,
-                "source_closure_digest": self.source_closure_digest,
-                "source_xml_sha256": self.source_xml_sha256,
-                "base_controller_identity": self.base_controller_identity,
-                "native_feedback_contract": self.require_native_feedback_contract,
+                "provider": provider,
+                "task_artifact_hash": task_artifact_hash,
+                "source_id": source_id,
+                "source_closure_digest": source_closure_digest,
+                "source_xml_sha256": source_xml_sha256,
+                "base_controller_identity": base_controller_identity,
+                "native_feedback_contract": require_native_feedback_contract,
             },
-            "close_authorization_policy_identity": self.policy_identity,
-            "outcome_policy_identity": self.outcome_policy_identity,
+            "close_authorization_policy_identity": policy_identity,
+            "outcome_policy_identity": outcome_policy_identity,
             "lifecycle_policy": SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE.value})
-        self._clear_rollout()
+        return {"policy_mapping": policy_mapping, "policy_identity": policy_identity,
+                "outcome_policy_mapping": outcome_policy_mapping,
+                "outcome_policy_identity": outcome_policy_identity, "identity": identity}
 
     def _ticks(self, seconds):
         return max(1, int(math.ceil(float(seconds) / self.control_dt - 1e-10)))

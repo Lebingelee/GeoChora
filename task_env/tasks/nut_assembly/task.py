@@ -408,7 +408,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
     settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
     solution_config = NutAssemblySolutionConfig(**settings)
     base_controller_identity = controller.identity
-    solution = NutAssemblyOutcomeSolutionV1(config=solution_config,
+    solution_arguments = dict(config=solution_config,
         control_dt=artifact.timebase.control_dt, physics_dt_s=artifact.timebase.physics_dt,
         provider=provider, task_artifact_hash=artifact.identity_hash,
         source_id=source.scene_source.source_id,
@@ -416,11 +416,14 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         source_xml_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
         base_controller_identity=base_controller_identity,
         require_native_feedback_contract=True)
+    description = NutAssemblyOutcomeSolutionV1.describe(**solution_arguments)
+    solution = NutAssemblyOutcomeSolutionV1(**solution_arguments) if include_solution else None
+    solution_type = NutAssemblyOutcomeSolutionV1
     source_files = _source_identity_files()
     construction_id = recipe["construction_id"]
     controller_identity = {"construction_id": construction_id,
         "base_controller_identity": base_controller_identity,
-        "solution_identity": solution.identity,
+        "solution_identity": description["identity"],
         "construction_source_sha256": source_files["task_env/tasks/nut_assembly/task.py"],
         "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
         "cadence": ("native-gripper-500hz-v1" if gripper_control_hz == 500
@@ -439,7 +442,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
     resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
         "artifact_sha256": artifact.identity_hash,
         "runtime_config": asdict(source.config), "solution_config": asdict(solution_config),
-        "solution_parameters": {name: getattr(solution, name) for name in (
+        "solution_parameters": {name: getattr(solution_type, name) for name in (
             "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
             "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
             "postclose_hold_s", "servo_height_compensation_m", "stable_height_tolerance_m")},
@@ -450,10 +453,10 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         "resolved_controller_action": asdict(controller.config),
         "resolved_controller_gripper": asdict(controller.gripper_config),
         "controller_identity": controller.identity, "base_controller_identity": base_controller_identity,
-        "solution_identity": solution.identity, "guard_policy": solution.policy_mapping,
-        "guard_policy_identity": solution.policy_identity,
-        "outcome_policy": solution.outcome_policy_mapping,
-        "outcome_policy_identity": solution.outcome_policy_identity,
+        "solution_identity": description["identity"], "guard_policy": description["policy_mapping"],
+        "guard_policy_identity": description["policy_identity"],
+        "outcome_policy": description["outcome_policy_mapping"],
+        "outcome_policy_identity": description["outcome_policy_identity"],
         "completion_policy": "on_expert_terminal_stage",
         "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
         "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
@@ -476,12 +479,13 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
             holder, artifact.timebase.control_dt, gripper_rate_hz=gripper_control_hz,
         ),
         "controller_identity": controller.identity,
-        "solution": solution if include_solution else None,
-        "solution_identity": solution.identity, "solution_config": solution_config,
+        "solution": solution,
+        "solution_factory": lambda: solution_type(**solution_arguments),
+        "solution_identity": description["identity"], "solution_config": solution_config,
         "recipe": resolved, "resolved_configuration": resolved,
         "recipe_identity": digest(resolved), "close_authorization_policy": {
-            **solution.policy_mapping, "identity": solution.policy_identity},
-        "allowed_close_authorization_guards": [solution.primary_guard_id, solution.alternative_guard_id],
+            **description["policy_mapping"], "identity": description["policy_identity"]},
+        "allowed_close_authorization_guards": [solution_type.primary_guard_id, solution_type.alternative_guard_id],
         "execution_policy": {"policy_id": OUTCOME_POLICY_ID,
             "diagnostic_continuation": False, "strict_expert_gate": "preserved-with-bounded-readiness-warning",
             "grants_full_expert_pass": False, "outcome_completion": True},
@@ -641,7 +645,8 @@ def _observe_kwargs(env, native_samples, receipt):
 
 
 def _binding(resolved_config=None, lift_height_m=None):
-    return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, resolved_config=resolved_config,
+    return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, include_solution=False,
+                                                                      resolved_config=resolved_config,
                                                                       lift_height_m=lift_height_m),
         reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m),
         evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m),
