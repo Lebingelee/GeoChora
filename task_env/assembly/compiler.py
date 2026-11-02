@@ -234,6 +234,19 @@ def _initial_state(scene_model, agents, references: TaskReferences) -> EpisodePh
     )
 
 
+def panda_entity_declaration():
+    """Return the shared pinned Panda embodiment declaration."""
+    from ..artifacts import EntityDefinition
+    return EntityDefinition(
+        'panda-v1', 'embodiment',
+        'mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml',
+        ('panda-v1/base', 'panda-v1/ee'),
+        (*tuple(f'panda-v1/joint{i}' for i in range(1, 8)),
+         'panda-v1/finger_joint1', 'panda-v1/finger_joint2'),
+        'referenced_articulation', 'arm_hand_finger_collision', {},
+    )
+
+
 _UNSET_COMPONENT = object()
 
 

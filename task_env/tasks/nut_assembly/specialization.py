@@ -18,7 +18,7 @@ from ...artifacts import (
 )
 from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
-from ...assembly.compiler import compile_reference_source
+from ...assembly.compiler import compile_reference_source, panda_entity_declaration
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import StableArmTargetHold
@@ -118,12 +118,7 @@ def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
         version=recipe["artifact_version"], entities=(
             EntityDefinition("tabletop-v1", "static", "nut-assembly-square-v1/task-local/table",
                 (), (), "box", "support_contact", {"top_z": float(scene["table_top_z"])}),
-            EntityDefinition("panda-v1", "embodiment",
-                "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
-                ("panda-v1/base", EEF),
-                ("panda-v1/joint1", "panda-v1/joint2", "panda-v1/joint3", "panda-v1/joint4",
-                 "panda-v1/joint5", "panda-v1/joint6", "panda-v1/joint7", *FINGERS),
-                "referenced_articulation", "arm_hand_finger_collision", {}),
+            panda_entity_declaration(),
             EntityDefinition("square-nut-v1", "movable",
                 "nut-assembly-square-v1/task-local/square-nut/" + NUTASSEMBLY_NOMINAL_V1_ID,
                 (), (), "authored_compound", "table_hand_peg_contact",

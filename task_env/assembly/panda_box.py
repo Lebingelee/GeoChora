@@ -13,7 +13,7 @@ from ..environment.types import TaskCompositionSpec
 from ..objects.pick_cube import (CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE,
                                  CUBE_MASS, EE_SITE_NAME, PickCubeSceneComposer)
 from ..robots.panda import PandaAgent
-from .compiler import compile_reference_source
+from .compiler import compile_reference_source, panda_entity_declaration
 
 
 PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
@@ -77,12 +77,7 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
                              for axis, value in zip('xyz', d.table_half_size, strict=True)},
                           **({'center_x': d.table_center_xy[0], 'center_y': d.table_center_xy[1]}
                              if d.include_table_center else {})}),
-        EntityDefinition('panda-v1', 'embodiment',
-                         'mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml',
-                         ('panda-v1/base', 'panda-v1/ee'),
-                         (*tuple(f'panda-v1/joint{i}' for i in range(1, 8)),
-                          'panda-v1/finger_joint1', 'panda-v1/finger_joint2'),
-                         'referenced_articulation', 'arm_hand_finger_collision', {}),
+        panda_entity_declaration(),
         EntityDefinition(d.object_id, 'movable', d.object_asset_reference, (), (),
                          'free_box', 'table_hand_contact',
                          {'half_size': CUBE_HALF_SIZE, 'mass': CUBE_MASS, **{
