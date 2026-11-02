@@ -425,6 +425,26 @@ def test_current_source_reexecution_uses_selected_factory(uid, fake, tmp_path):
     assert report['D0']=='NOT_ASSESSED'
 
 
+def test_pickcube_reexecution_preserves_explicit_profile_and_task_parameter(fake, tmp_path):
+    from task_env.trajectory.reference_replay import reexecute_selected
+    from task_env.trajectory.canonical.h5 import load
+    config = {'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+              'episode': {'horizon': 3},
+              'task': {'controller_profile': 'r1', 'lift_height_m': 0.12}}
+    env = make_env(IDS[0], config=config)
+    env.reset(seed=19)
+    env.start_recording(tmp_path / 'configured.h5')
+    while not env._stopped:
+        env.step_expert()
+    env.finish_recording('bounded_truncation')
+    env.close()
+    metadata = load(tmp_path / 'configured.h5').to_mapping()['metadata']
+    recorded = json.loads(metadata['source_provenance']['execution_configuration_json'])
+    assert recorded['task'] == config['task']
+    report = reexecute_selected(tmp_path / 'configured.h5', output=tmp_path / 'replay.h5')
+    assert report['status'] == 'PASS' and report['transitions'] == 3
+
+
 def test_nut_reset_provenance_is_not_silently_relabelled(fake):
     env=make_env(IDS[1])
     with pytest.raises(ValueError, match='seed19'):env.reset(seed=31)

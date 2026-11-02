@@ -3089,6 +3089,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         result['integrity_hash'] = digest(result)
         return result
 
+    def _recorded_execution_configuration(self):
+        """Retain the selected public inputs required for same-source replay."""
+        resolved = getattr(self, 'resolved_public_config', None)
+        if resolved is None:
+            return {'env_id': self.uid, 'provider': self.provider,
+                    'backend': self.backend, 'horizon': self.horizon}
+        execution = {'physics_provider': resolved.physics_provider,
+                     'physics_backend': resolved.environment.runtime.backend,
+                     'physics_device': resolved.physics_device}
+        if resolved.source_delivery_manifest is not None:
+            execution['source_delivery_manifest'] = resolved.source_delivery_manifest
+        task = dict(resolved.task_parameters)
+        if resolved.controller_profile is not None:
+            task['controller_profile'] = resolved.controller_profile
+        return {'env_id': self.uid, 'execution': execution,
+                'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+
     def start_recording(self, path):
         from ..trajectory.canonical.contracts import EpisodeMetadata
         from ..trajectory.canonical.execution import ExecutionRecorder
@@ -3143,8 +3160,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'construction': digest(config), 'adapter': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
             'resolved_configuration_json': json.dumps(config, sort_keys=True),
-            'execution_configuration_json': json.dumps({'env_id': self.uid, 'provider': self.provider,
-                'backend': self.backend, 'horizon': self.horizon}, sort_keys=True),
+            'execution_configuration_json': json.dumps(self._recorded_execution_configuration(), sort_keys=True),
         }
         if 'source_revision' in self.value:
             runtime_source = self.value['source']
@@ -3176,7 +3192,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         owners = self._owners()
         recipe = {'factory': type(self).__module__ + '.' + type(self).__name__,
             'artifact': self.artifact.to_mapping(), 'resolved_configuration': config,
-            'execution_configuration': {'env_id': self.uid, 'provider': self.provider, 'backend': 'cpu', 'horizon': self.horizon},
+            'execution_configuration': self._recorded_execution_configuration(),
             'stages': ['reference'], 'cadence': 'selected-native-stream-v1',
             'owner_schema': {k: {'version': v['version'], 'source_sha256': v['source_sha256'],
                 'fields': list(v['fields'])} for k, v in owners['owners'].items()},
