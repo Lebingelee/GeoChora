@@ -58,6 +58,12 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
     try:
         env = compiled.env_class()(provider=provider, backend=compiled.backend)
         _, reset_info = env.reset(seed=seed)
+        if requires_native_worker(provider):
+            metadata = env.get_record_metadata()
+            facts['recording_identity'] = {
+                'seed': env.value['reset_plan'].reset_sample.task_seed,
+                'profile': metadata['env_metadata']['reference_profile'],
+            }
         env.start_recording(h5)
         facts['recording_started'] = True
         from examples._common import run_expert, identity_summary
@@ -150,7 +156,17 @@ def _storage_checks(h5, directory, *, ctx, spec, artifact_hash, details, deadlin
         # binds to the worker receipt and the parent compilation, not to H5 bytes.
         worker = worker or {}
         compiled = worker.get('compiled') or {}
+        from task_env.recorders import load_structured_control_records_h5
+        actual_profile = load_structured_control_records_h5(h5)['env_meta']['reference_profile']
+        identity = (worker.get('facts') or {}).get('recording_identity') or {}
+        expected_profile = identity.get('profile') or {}
         checks = {**common,
+                  'requested_seed': worker.get('seed') == details['seed'] == identity.get('seed'),
+                  **{'recorded_' + key: bool(expected_profile.get(key))
+                     and actual_profile.get(key) == expected_profile[key]
+                     for key in ('execution_identity_sha256', 'reset_plan_identity_hash',
+                                 'reset_sample_id', 'source_id', 'source_closure_digest',
+                                 'delivery_manifest_sha256', 'provider', 'backend', 'device')},
                   'provider_provenance': summary.get('provider_provenance_present') is True,
                   'source_provenance': summary.get('source_provenance_present') is True,
                   'core_identity': worker.get('core_commit') == ctx['core_commit'] and worker.get('core_dirty') is False,

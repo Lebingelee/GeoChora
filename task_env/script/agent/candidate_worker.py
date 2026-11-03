@@ -21,6 +21,9 @@ import traceback
 _CORE_ROOT = Path(__file__).resolve().parents[3]
 if str(_CORE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CORE_ROOT))
+_GEOPHYS_SOURCE = _CORE_ROOT / 'GeoPhys' / 'src'
+if _GEOPHYS_SOURCE.is_dir() and str(_GEOPHYS_SOURCE) not in sys.path:
+    sys.path.insert(1, str(_GEOPHYS_SOURCE))
 _CORE_SITE = os.environ.get('GEOCHORA_CORE_SITE')
 if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
     # Keep Isaac's native packages first; the frozen Core environment only
