@@ -441,7 +441,7 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
 
     def compile_example(*_args, **_kwargs):
         events.append('source_compile')
-        assert not owner.opened
+        assert owner.opened
         raise RuntimeError('offline compile probe')
 
     with patch.object(builtin_example_worker, 'core_context', return_value={
@@ -452,10 +452,10 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
             spec, catalog, scope, seed=31, output=output,
         )
 
-    assert events == ['source_compile', 'app_close']
-    assert row['isaac_app_precompile_start_attempted'] is False
-    assert row['isaac_app_precompile_start_completed'] is False
-    assert row['isaac_app_launch_profile'] is None
+    assert events == ['app_open', 'source_compile', 'app_close']
+    assert row['isaac_app_precompile_start_attempted'] is True
+    assert row['isaac_app_precompile_start_completed'] is True
+    assert row['isaac_app_launch_profile']['profile_id'] == 'f06-headless-no-render-v1'
     assert row['isaac_app_owner_close_receipt']['close_completed'] is True
     assert row['errors'][0]['phase'] == 'compile'
     assert row['runtime_valid'] is False

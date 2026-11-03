@@ -58,6 +58,50 @@ runtime.
 | `judge_package.py` | Portable evidence index and pending-only verification |
 | `builtin_example_schema.py` / `harness_compiler.compile_builtin_pickcube_example` | Versioned built-in PickCube example input; delegates to the public Core UID and never creates a CandidateSpec |
 | `builtin_example_validation.py` / `builtin_example_worker.py` | Bounded fixed-seed runtime example, existing Core Recorder H5, identity/finite/T+1 readback and separate task/runtime outcome facts |
+| `provider_routes.py` / `native_candidate_runner.py` / `candidate_worker.py` | Explicit provider/backend route and supervised Isaac candidate episodes |
+
+## Isaac candidate execution
+
+The `isaacsim` candidate route composes the existing F06 PickCube owners with
+CUDA PhysX, `r3_continuous_v1`, the pinned USD delivery, and a horizon of at
+most 1000 control ticks. It accepts the built-in cube and frozen table
+geometry; task reset bounds and success thresholds may vary within the
+compiler's declared envelope. MJCF proxy assets and table geometry changes are
+rejected. This implementation does not establish candidate success or
+Qualification.
+
+Run the catalog, checks and Oracle under the Core Python environment. The
+Harness launches its own worker under the existing Isaac Python; no external
+bootstrap or interpreter wrapper is needed. The worker initializes the shared
+Core App owner before USD source construction and records its close outcome.
+The filtered dependency overlay excludes Core's `pxr` package so Kit uses its
+own USD libraries and schemas. Both interpreters must use the same Python ABI.
+
+```sh
+export GEOCHORA_CORE_PYTHON=/absolute/path/to/core-environment/bin/python
+export GEOCHORA_ISAAC_PYTHON=/absolute/path/to/isaac-environment/bin/python
+export GEOCHORA_NATIVE_LOCK=/absolute/shared/path/native-execution.lock
+export OMNI_KIT_ACCEPT_EULA=YES
+export PYTHONPATH="$CORE/GeoPhys/src:$CORE"
+"$GEOCHORA_CORE_PYTHON" "$RT/catalog_query.py" --core-repo "$CORE" \
+  --providers isaacsim --isaac-delivery-manifest /absolute/path/to/delivery_manifest.json \
+  --output "$OUT/catalog.json"
+"$GEOCHORA_CORE_PYTHON" "$RT/feasibility_probe.py" --core-repo "$CORE" \
+  --spec "$OUT/candidate.spec.json" --catalog "$OUT/catalog.json" \
+  --provider isaacsim --seeds 31 --output "$OUT/probe.json"
+```
+
+Generate the candidate from the catalog and actual task inputs, using the
+Isaac horizon and geometry envelope above. A small seed set is a diagnostic,
+not the strict 20-seed passing-candidate gate. The Oracle uses the same native
+worker and independently checks the structured-control v3 H5, requested reset,
+source, controller, solution and provider identities. Task failure remains
+failure even if the H5 storage checks pass.
+
+The same interpreter and lock settings apply to the built-in example below.
+Without overrides, Core Python is the calling interpreter and Isaac Python uses
+`workspace/environments/isaacsim-6.2.0/bin/python`. All simultaneous checkouts
+using the same GPU must use the same `GEOCHORA_NATIVE_LOCK` path.
 
 ## Built-in PickCube runtime example
 

@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -23,7 +24,7 @@ else:
 
 CORE = Path(__file__).resolve().parents[3]
 LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
-CPU_PYTHON = Path('/home/lly/miniconda3/envs/geochora/bin/python')
+CPU_PYTHON = Path(sys.executable)
 ISAAC_PYTHON = CORE / 'workspace/environments/isaacsim-6.2.0/bin/python'
 MAX_WORKER_LOG_BYTES = 64 * 1024**2
 MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
@@ -33,6 +34,29 @@ ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 
 
 _populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
+
+
+def core_python() -> Path:
+    override = os.environ.get('GEOCHORA_CORE_PYTHON')
+    return Path(override).expanduser() if override else CPU_PYTHON
+
+
+def isaac_python() -> Path:
+    override = os.environ.get('GEOCHORA_ISAAC_PYTHON')
+    return Path(override).expanduser() if override else ISAAC_PYTHON
+
+
+def native_lock_path() -> Path:
+    """Share one lock between built-in and candidate workers on this machine."""
+    override = os.environ.get('GEOCHORA_NATIVE_LOCK')
+    if override:
+        path = Path(override).expanduser().resolve()
+    elif LOCK.parent.is_dir():
+        path = LOCK
+    else:
+        path = CORE / 'workspace/harness/shared_native_execution.lock'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _write_json(path, value):
@@ -134,7 +158,7 @@ def _cold_read_h5(output, receipt, *, provider):
         environment['PYTHONDONTWRITEBYTECODE'] = '1'
         try:
             inspected = subprocess.run(
-                [str(CPU_PYTHON), str(CORE / 'examples/recording/inspect_h5.py'),
+                [str(core_python()), str(CORE / 'examples/recording/inspect_h5.py'),
                  '--input', str(h5_path)],
                 cwd=CORE, env=environment, capture_output=True, text=True, timeout=30,
                 start_new_session=True,
@@ -193,10 +217,10 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
     output.mkdir(parents=True, exist_ok=False)
     stdout_path, stderr_path = output / 'worker.stdout.log', output / 'worker.stderr.log'
     if provider == 'isaacsim':
-        executable = ISAAC_PYTHON
+        executable = isaac_python()
         timeout_s = 1200
     else:
-        executable = CPU_PYTHON
+        executable = core_python()
         timeout_s = 420
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     catalog = json.loads(Path(catalog_path).read_text())
@@ -272,7 +296,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             'TOKENIZERS_PARALLELISM': 'false',
         })
         core_site = Path(subprocess.check_output(
-            [str(CPU_PYTHON), '-c',
+            [str(core_python()), '-c',
              'import sysconfig; print(sysconfig.get_paths()["purelib"])'],
             cwd=CORE, text=True, timeout=10,
         ).strip())
@@ -290,7 +314,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
                '--working-tree-scope', str(scope_path), '--seed', str(seed),
                '--output', str(output)]
     wall_start = time.perf_counter()
-    with LOCK.open('a') as lock_stream:
+    lock_path = native_lock_path()
+    with lock_path.open('a') as lock_stream:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -307,7 +332,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
             'status': 'READY', 'mem_available_start_bytes': mem_start,
             'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': True,
-            'shared_native_lock_path': str(LOCK), 'cpu_affinity_slots': 4,
+            'shared_native_lock_path': str(lock_path), 'cpu_affinity_slots': 4,
         })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
             process = subprocess.Popen(
@@ -381,7 +406,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         isaac_core_site_owner.cleanup()
     _write_json(output / 'lock_receipt.json', {
         'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
-        'shared_native_lock_path': str(LOCK), 'released_after_worker_process_group_exit': not pg_alive,
+        'shared_native_lock_path': str(lock_path), 'released_after_worker_process_group_exit': not pg_alive,
         'lock_held_for_worker': True,
     })
     receipt_path = output / 'run.json'
@@ -404,6 +429,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         'worker_stdout': str(stdout_path.relative_to(CORE)),
         'worker_stderr': str(stderr_path.relative_to(CORE)),
         'task_outcome': receipt.get('task_outcome') if receipt else None,
+        'compiled': receipt.get('compiled') if receipt else None,
         'runtime_valid': receipt.get('runtime_valid') if receipt else False,
         'isaac_app_launch_profile_id': (
             receipt.get('isaac_app_launch_profile', {}).get('profile_id')

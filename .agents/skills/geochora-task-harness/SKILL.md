@@ -29,6 +29,16 @@ authoring requirement. The built-in runtime example resolves the nested
 selected config once, calls public `make_env`, and returns facts from that same
 Env instance for the worker to reuse. See the [current TaskEnv public API](../../../docs/module/task_env/v2.1.0/api/public-api.md).
 
+The bounded `isaacsim` candidate route composes the existing F06 PickCube USD
+owners with CUDA PhysX and R3, a built-in cube, frozen table geometry and at
+most 1000 control ticks. Query the exact delivery with
+`--isaac-delivery-manifest`; unsupported geometry or MJCF proxy assets fail
+explicitly. The repository's supervised worker starts the Core App owner
+before USD compilation, then runs probe or Oracle recording. Configure the
+Core/Isaac interpreters and common native lock as documented in the CLI README;
+do not wrap the worker with an external startup script. Implementation and
+runtime-valid evidence do not establish solved candidates or Qualification.
+
 ## Construction decisions
 
 1. Read the upstream task and its referenced asset bundle / semantic examples. Query the requested provider and available templates. Catalog `available` means a manifest is readable, not that physics has run. Unknown capabilities/providers must fail explicitly.

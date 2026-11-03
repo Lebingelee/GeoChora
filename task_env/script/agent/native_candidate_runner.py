@@ -24,18 +24,20 @@ from pathlib import Path
 
 if __package__:
     from .builtin_example_validation import (
-        ISAAC_PYTHON, LOCK as F06_LOCK, MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
+        MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
         _directory_bytes, _gpu_free_mib, _kill_process_group, _mem_available_bytes,
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
+        isaac_python, native_lock_path,
     )
     from .feasibility_probe import invalid_row
     from .harness_spec_schema import save_json
     from .provider_routes import requires_native_worker, route_for
 else:
     from builtin_example_validation import (
-        ISAAC_PYTHON, LOCK as F06_LOCK, MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
+        MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
         _directory_bytes, _gpu_free_mib, _kill_process_group, _mem_available_bytes,
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
+        isaac_python, native_lock_path,
     )
     from feasibility_probe import invalid_row
     from harness_spec_schema import save_json
@@ -48,24 +50,6 @@ RECEIPT_SCHEMA = 'harness-candidate-native-run-receipt-v1'
 PLAN_SCHEMA = 'harness-candidate-native-run-plan-v1'
 DEFAULT_TIMEOUT_S = 1200
 NOT_RUN_STATUSES = ('NOT_RUN_DEPENDENCY', 'NOT_RUN_RESOURCE_GATE', 'BLOCKED_NATIVE_LOCK')
-
-
-def isaac_python() -> Path:
-    override = os.environ.get('GEOCHORA_ISAAC_PYTHON')
-    return Path(override).expanduser() if override else ISAAC_PYTHON
-
-
-def native_lock_path() -> Path:
-    """One lock serializes every native run on a machine; the F06 lock is reused when present."""
-    override = os.environ.get('GEOCHORA_NATIVE_LOCK')
-    if override:
-        path = Path(override).expanduser().resolve()
-    elif F06_LOCK.parent.is_dir():
-        path = F06_LOCK
-    else:
-        path = DEFAULT_LOCK
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
 
 
 def _core_site() -> Path:

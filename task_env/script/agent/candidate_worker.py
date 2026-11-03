@@ -1,8 +1,8 @@
 """One strict-candidate episode inside the frozen Isaac Python.
 
-Launched only by ``native_candidate_runner``. The worker compiles the same
-candidate the parent already admitted, opens the one headless Isaac App for
-this process, runs either the feasibility ``run_seed`` loop (mode ``probe``)
+Launched only by ``native_candidate_runner``. The worker opens the one headless
+Isaac App before compiling the candidate the parent already admitted, then
+runs either the feasibility ``run_seed`` loop (mode ``probe``)
 or the Oracle recording body (mode ``oracle``) through the unchanged Core
 PickCube owners, writes its raw facts, and leaves through the controlled Kit
 exit boundary. It never classifies on behalf of the parent.
@@ -73,9 +73,11 @@ def run_worker(*, mode, spec, catalog, provider, seed, horizon, output, h5=None,
         from task_env.runtime.sessions.isaac_native_io import (
             F06_ISAAC_APP_LAUNCH_PROFILE_V1, _process_app_owner,
         )
-        # Select the process App owner now; open it only after construction has
-        # read the pinned USD bytes, mirroring the F06 example worker.
         app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+        # Kit must register its USD libraries and schemas before source construction.
+        phase = 'app_open'
+        app_owner.open()
+        receipt['app'] = {'launch_profile': app_owner.launch_profile_receipt()}
         phase = 'compile'
         compiled = compile_candidate(spec, catalog, provider=provider)
         initial = compiled.initial_value or {}
@@ -89,9 +91,6 @@ def run_worker(*, mode, spec, catalog, provider, seed, horizon, output, h5=None,
             'controller_identity': getattr(initial.get('controller'), 'identity', None),
             'route': compiled.route,
         }
-        phase = 'app_open'
-        app_owner.open()
-        receipt['app'] = {'launch_profile': app_owner.launch_profile_receipt()}
         phase = 'episode'
         if mode == 'probe':
             if __package__:

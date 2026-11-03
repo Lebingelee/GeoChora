@@ -2,7 +2,7 @@
 
 Use the caller's paths; examples below use `PY`, `CORE`, `RT`, `UP` and `OUT` as task-local shell variables. `PY` is the Core venv's Python, `RT` contains the CLI files, `UP` is the upstream directory, `OUT` is a fresh writable workspace. Set `PYTHONDONTWRITEBYTECODE=1` and run with `OUT` as the working directory so native logs do not dirty Core.
 
-The CLIs can be called directly or imported with their directory on `PYTHONPATH`. They do not need an LLM or a package installation. No implicit engine fallback: choose a provider explicitly. Current physical acceptance is MuJoCo CPU; other provider names can be queried, and unsupported ones fail.
+The CLIs can be called directly or imported with their directory on `PYTHONPATH`. They do not need an LLM or a package installation. No implicit engine fallback: choose a provider explicitly. Candidate success evidence and supported implementation routes are separate. The bounded Isaac PickCube route uses a supervised worker; see the CLI README for its frozen geometry, pinned delivery, Python environment and shared-lock settings. Unsupported routes fail explicitly.
 
 ## A. Catalog and initial spec
 
@@ -101,4 +101,4 @@ After reading the Core evidence Skill:
 
 The validation directory holds candidate.spec.json, candidate.artifact.json and the four reports. The package copies raw bytes, checks original semantic/upstream/asset/H5/source hashes and produces a relative evidence index. Mutable Human decision is outside the digest it will cite, avoiding a hash cycle. `pending` means no Human decision; the eventual final decision is approve/reject. No video is claimed on the selected route, whose render config is unsupported. Original absolute history refs are preserved with a relocation map.
 
-For this bounded implementation, `prepare` accepts the supplied synthetic upstream bundle contract. Real asset bundle formats, additional templates and Isaac native execution require their respective owner implementations and new acceptance; do not infer support from a provider parameter.
+For this bounded implementation, `prepare` accepts the supplied synthetic upstream bundle contract. Real asset bundle formats and additional templates require their respective owner implementations and new acceptance. Isaac's implemented native route does not admit those MJCF proxy bundles; do not infer candidate acceptance from its provider parameter or a runtime-valid episode.
