@@ -348,7 +348,8 @@ def _compile_isaac_candidate(spec,catalog,route):
 
     spec_hash=spec.spec_sha256()
     obj=spec.object_config
-    task_config=copy.deepcopy(PickCubeReferenceEnv.selected_task_configuration())
+    selected_config=PickCubeReferenceEnv.selected_task_configuration()
+    task_config=copy.deepcopy({key:selected_config[key] for key in ('recipe','environment')})
     recipe=task_config['recipe']
     # TaskSourceV1 identifiers reject '/', so the Core task_uid stays; the
     # Harness candidate identity is the spec hash carried in artifact_id/reports.
