@@ -1,0 +1,31 @@
+# G06：并行执行、部分 reset 与整批切换
+
+规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
+
+<a id="6a"></a>
+## 6a：批量契约接通
+
+- **输入／依赖：**3c、4c、5c；1a 冻结的两个以上后端／模式，及 1d 的同步／终止边界。
+- **工作：**接入 env ID、batch 轴、device、reset mask、每环境 episode／clock、固定 action／obs schema 与图像布局。选择并公开支持的一种 auto-reset 语义，正确保存终止 obs 与新 episode 首帧。
+- **检查：**布局／排序／mask 正反例、错环境写入、借用 buffer 生命周期、无效 Controller 规格和未知并行能力拒绝；Recorder 可区分同批不同 episode。
+- **交付／出口：**标量语义可映射到 batch，设备数据路径明确；不强迫所有状态 CPU copy，不静默改变旧 vector caller 语义。
+
+<a id="6b"></a>
+## 6b：多个后端真实并行
+
+- **输入／依赖：**6a；冻结的实现范围、少量环境数、相机规格及 RAM／VRAM 预算。
+- **工作：**至少两个物理后端实际构建／reset／step／render／obs，至少一条 native batch；优先核实 GeoPhys 和 Isaac 的既有路线，有缺口则在本范围扩展既有 owner。
+- **检查：**环境间隔离、动作对应、状态／图像的 env ID 与时间、终止／部分 reset 相关行为；记录原生批量或进程并行，实际工作进程和设备数据传输。
+- **交付／出口：**两后端完整小批量证据，不用 N 个串行调用冒充 native batch；吞吐量可描述，不新增大规模性能或多 GPU 门。
+
+<a id="6c"></a>
+## 6c：部分 reset 与配置切换整批重建
+
+- **输入／依赖：**6b、3c、5c。
+- **工作：**不改配置时支持所声明路线的部分 reset；更换 backend／renderer 时关闭并重建整个原生 batch，初始化新 episode，清理旧 Controller／相机／GPU 绑定。
+- **检查：**非 reset 环境的状态、时间、Controller 历史和图像不被改变；整批重建后的旧 view／command／frame 失效；失败、重复 close、worker／共享资源回收及锁释放。
+- **交付／出口：**显式声明 reset 粒度，不偷偷重置其他 slot；不能在单个 native batch 中替某个 slot 换后端。整批 A→B→A 的固定 obs 和动作规格正确。
+
+## 范围和阻塞
+
+本版不要求异构资产任意混批、每 slot 不同维度 Controller 或所有 autoreset 模式。并行方式必须显式，数量／能力下调须维护者决定；1a 的实际核实不能自动把“至少两个”改为单后端。图像若只支持选定 env 或拼图，需区分窗口展示与每 env 的 Agent observation，不能互相替代。

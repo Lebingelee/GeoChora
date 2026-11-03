@@ -6,12 +6,13 @@
 - [Ownership and change boundaries](global/ownership.md)
 - [Roadmap](roadmap/README.md)
 - [TaskEnv versions](module/task_env/README.md)
+- [TaskEnv v2.1.1 planning — protocols and seven-stage route](module/task_env/v2.1.1/README.md)
 
 ## Release records
 
 - [v1.1.0 published release](releases/v1.1/README.md)
 - [v2.0.0 frozen source snapshot](releases/v2.0.0/README.md)
-- [v2.1.0 local draft candidate](releases/v2.1.0/README.md)
+- [v2.1.0 source-version release-preparation records](releases/v2.1.0/README.md): original candidate closeout context; local tag and later planning status are distinguished in the TaskEnv version index.
 
 ## Maintenance
 

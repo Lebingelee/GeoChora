@@ -1,0 +1,570 @@
+{
+  "schema_version": "geochora-v211-orchestration-plan-v1",
+  "updated_date": "2026-11-03",
+  "status": "PLANNING",
+  "route_approval": "maintainer_confirmed_7_stages_22_substages",
+  "protocol_status": "DRAFT_FOR_DISCUSSION",
+  "documentation_authorized": true,
+  "implementation_packages_dispatched": false,
+  "execution_goals_started": false,
+  "source_baseline": {
+    "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
+    "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+    "branch": "develop"
+  },
+  "branch_plan": {
+    "reuse_existing_checkout": true,
+    "additional_branches": 0,
+    "additional_worktrees": 0,
+    "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
+  },
+  "active_packages": [],
+  "next_candidate": "1a",
+  "next_action": "Review documentation, then discuss and freeze stage-1 contracts; no automatic implementation dispatch.",
+  "window_policy": {
+    "ordinary_attempt_limit_per_substage": 3,
+    "attempt_is_execution_window": true,
+    "runs_are_counted_separately": true,
+    "default_one_writer": true,
+    "default_one_native_window": true,
+    "reassessment_before_attempt_3": true
+  },
+  "stages": [
+    {
+      "id": "1",
+      "goal_document": "../goals/01-protocols.md",
+      "substages": [
+        {
+          "id": "1a",
+          "planning_anchor": "../goals/01-protocols.md#1a",
+          "dependencies": [],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "1b",
+          "planning_anchor": "../goals/01-protocols.md#1b",
+          "dependencies": [
+            "1a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "1c",
+          "planning_anchor": "../goals/01-protocols.md#1c",
+          "dependencies": [
+            "1b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "1d",
+          "planning_anchor": "../goals/01-protocols.md#1d",
+          "dependencies": [
+            "1b",
+            "1c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "goal_document": "../goals/02-pickcube-solution.md",
+      "substages": [
+        {
+          "id": "2a",
+          "planning_anchor": "../goals/02-pickcube-solution.md#2a",
+          "dependencies": [
+            "1a",
+            "1d"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "2b",
+          "planning_anchor": "../goals/02-pickcube-solution.md#2b",
+          "dependencies": [
+            "2a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "2c",
+          "planning_anchor": "../goals/02-pickcube-solution.md#2c",
+          "dependencies": [
+            "2b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "goal_document": "../goals/03-backends.md",
+      "substages": [
+        {
+          "id": "3a",
+          "planning_anchor": "../goals/03-backends.md#3a",
+          "dependencies": [
+            "1c",
+            "1d",
+            "2c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "3b",
+          "planning_anchor": "../goals/03-backends.md#3b",
+          "dependencies": [
+            "3a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "3c",
+          "planning_anchor": "../goals/03-backends.md#3c",
+          "dependencies": [
+            "3b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "goal_document": "../goals/04-control.md",
+      "substages": [
+        {
+          "id": "4a",
+          "planning_anchor": "../goals/04-control.md#4a",
+          "dependencies": [
+            "1c",
+            "2c",
+            "3c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "4b",
+          "planning_anchor": "../goals/04-control.md#4b",
+          "dependencies": [
+            "4a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "4c",
+          "planning_anchor": "../goals/04-control.md#4c",
+          "dependencies": [
+            "4b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "goal_document": "../goals/05-rendering.md",
+      "substages": [
+        {
+          "id": "5a",
+          "planning_anchor": "../goals/05-rendering.md#5a",
+          "dependencies": [
+            "1d",
+            "3c",
+            "4c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "5b",
+          "planning_anchor": "../goals/05-rendering.md#5b",
+          "dependencies": [
+            "5a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "5c",
+          "planning_anchor": "../goals/05-rendering.md#5c",
+          "dependencies": [
+            "5b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "6",
+      "goal_document": "../goals/06-parallel.md",
+      "substages": [
+        {
+          "id": "6a",
+          "planning_anchor": "../goals/06-parallel.md#6a",
+          "dependencies": [
+            "3c",
+            "4c",
+            "5c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "6b",
+          "planning_anchor": "../goals/06-parallel.md#6b",
+          "dependencies": [
+            "6a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "6c",
+          "planning_anchor": "../goals/06-parallel.md#6c",
+          "dependencies": [
+            "6b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "goal_document": "../goals/07-integration.md",
+      "substages": [
+        {
+          "id": "7a",
+          "planning_anchor": "../goals/07-integration.md#7a",
+          "dependencies": [
+            "4c",
+            "5c",
+            "6c"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "7b",
+          "planning_anchor": "../goals/07-integration.md#7b",
+          "dependencies": [
+            "7a"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        },
+        {
+          "id": "7c",
+          "planning_anchor": "../goals/07-integration.md#7c",
+          "dependencies": [
+            "7b"
+          ],
+          "status": "PLANNED",
+          "attempt_count": 0,
+          "attempts": [],
+          "assigned_agent": null,
+          "package_path": null,
+          "package_sha256": null,
+          "input_head": null,
+          "output_head": null,
+          "expected_duration_minutes": null,
+          "execution_budget": null,
+          "last_observation": null,
+          "evidence_refs": [],
+          "commits": [],
+          "review_decision": null,
+          "blockers": []
+        }
+      ]
+    }
+  ]
+}

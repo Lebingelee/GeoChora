@@ -2,7 +2,7 @@
 
 ## Versioned baseline
 
-v1.1.0 is the published Core baseline. v2.0.0 is a frozen source tag at commit `3759f917b80adb0b7df361c0928d6aff2e4cf1ec`; publication and acceptance are not inferred from the tag. v2.1.0 is a local draft candidate whose bounded integration evidence and limitations are recorded in its [capability matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json). None of these records grants a new formal Qualification.
+v1.1.0 is the published Core consolidation baseline. v2.0.0 is a frozen source tag at commit `3759f917b80adb0b7df361c0928d6aff2e4cf1ec`; publication and acceptance are not inferred from the tag. v2.1.0 is the source baseline for the next plan; its local tag resolves to `fd03817c9f6ef8ce9fd68c1db30125efda68e1c8`. Its [capability matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) preserves the original candidate context, bounded evidence and limitations. Remote publication was not rechecked in this documentation change. None of these records grants a new formal Qualification.
 
 ## Dependency direction
 
@@ -25,6 +25,10 @@ person / script / CI / external Agent
 Selected PickCube and NutAssembly references use one `SelectedReferenceEnv` lifecycle owner and public `RuntimeSession` routes. Task-specific reset, evaluation, source composition, and solution policy remain in their task owners. The v2.1 candidate adds configuration precedence and explicit renderer selection facts; selected-task rendering remains state-only unless a separately documented route admits a renderer. A general Physics × Renderer matrix is not established.
 
 The v2.1 integration records a bounded intersection across the merged F/R implementation and GeoPhys P=`67da1165149486d3ae3e779c13ce31af49e17d50`. The current scope and evidence boundaries are described in the [v2.1.0 TaskEnv docs](../module/task_env/v2.1.0/README.md). The full phase history remains under that version’s `history/` and `maintenance/`; historical plans alone do not establish current capability.
+
+## v2.1.1 planning boundary
+
+The [v2.1.1 route](../module/task_env/v2.1.1/planning/roadmap.md) makes Core/physics/render protocols its first delivery. The proposed unified representation, provider translation, common effort, reset rebuilding, synchronized RGB and batch behavior are [draft contracts](../module/task_env/v2.1.1/README.md), not current capability. They extend the existing lifecycle and public provider boundaries; task semantics stay task-owned and shared native resources have a single owner. Protocol review and implementation evidence must precede any expanded support claim.
 
 ## Evidence and task state
 

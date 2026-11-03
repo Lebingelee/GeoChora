@@ -21,6 +21,6 @@ Before adding behavior, identify its owner and public API, find the existing imp
 
 ## Capability and publishing
 
-The [v2.1.0 matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) records exact bounded task/provider/source/backend intersections. `IMPLEMENTED`, `TESTED_BOUNDED`, `PARTIAL`, `NOT_RUN`, and `DEFERRED` are not interchangeable. The v1.1.0 release matrix and historical decisions remain version-scoped. v2.1.0 is a local candidate; it is not a tag, formal release, or Qualification.
+The [v2.1.0 matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) records exact bounded task/provider/source/backend intersections. `IMPLEMENTED`, `TESTED_BOUNDED`, `PARTIAL`, `NOT_RUN`, and `DEFERRED` are not interchangeable. The v1.1.0 release matrix and historical decisions remain version-scoped. The v2.1.0 local tag is now verified as a source baseline; original candidate-state records remain scoped to their closeout time. Tag existence does not establish remote publication or new Qualification. The [v2.1.1 plan](../module/task_env/v2.1.1/README.md) proposes ownership-preserving protocol extensions; its draft contracts and NOT_RUN targets do not change current provider capability.
 
 The GeoChora and GeoPhys project code licenses are currently undeclared by the maintainer. Third-party code, dependencies, and assets have separate terms. See the [v2.1.0 asset and distribution record](../releases/v2.1.0/third-party-assets.md). No release decision may infer a license from team authorship or a dependency notice.

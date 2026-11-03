@@ -7,6 +7,8 @@ description: Use GeoChora TaskEnv public construction, task/provider execution, 
 
 Read repository [`AGENTS.md`](../../../AGENTS.md), the [TaskEnv version index](../../../docs/module/task_env/README.md), and the [v2.1.0 candidate overview](../../../docs/module/task_env/v2.1.0/README.md). `task_env/` is the sole GeoChora Core owner. Use its public APIs and the exact versioned capability matrix; plans and imports do not establish runtime support.
 
+For v2.1.1 development, read the [confirmed route and draft protocols](../../../docs/module/task_env/v2.1.1/README.md), [execution table](../../../docs/module/task_env/v2.1.1/planning/execution-and-acceptance.md) and [recovery page](../../../docs/module/task_env/v2.1.1/maintenance/recovery.md). They plan seven stages/twenty-two substages around Core/physics/render protocols, Solution, control, reset switching, RGB and parallel execution. They do not change the implemented behavior below. No implementation package or native run follows from document creation alone.
+
 ## Current construction route
 
 `task_env.make_env(uid, config=...)` is the public registered single-environment factory. The selected references are `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`; retired selected UIDs fail explicitly. `TaskArtifactDeclarationV1` declares task semantics and `ReferenceTaskDeclarationV1` binds source references and an optional pure Controller. Compilation does not start a provider. The selected mutable lifecycle has one `SelectedReferenceEnv → RuntimeSession → provider adapter` route.
@@ -31,7 +33,7 @@ Use [USD delivery and source identity](../../../docs/module/task_env/v2.1.0/cont
 
 ## Capability and evidence boundary
 
-The v2.1.0 matrix is the single current TaskEnv table. F06 has 9/9 runtime-valid runs but 0/9 task success. A123's six exact replay runs ended `external_stop` with task success false; task2 GeoPhys's accepted exception remains scoped. Task1 GeoPhys fluid projection is `NOT_MEASURED`; GP07 reuses historical renderer evidence and is not a current-P renderer run. Natural Kit destruction is not claimed fixed; strict DG03 remains unresolved. None of this grants Qualification.
+The v2.1.0 matrix is the single source-baseline TaskEnv table. The separate [v2.1.1 matrix](../../../docs/module/task_env/v2.1.1/capabilities/README.md) initially contains only NOT_RUN targets; do not use it as runtime evidence. F06 has 9/9 runtime-valid runs but 0/9 task success. A123's six exact replay runs ended `external_stop` with task success false; task2 GeoPhys's accepted exception remains scoped. Task1 GeoPhys fluid projection is `NOT_MEASURED`; GP07 reuses historical renderer evidence and is not a current-P renderer run. Natural Kit destruction is not claimed fixed; strict DG03 remains unresolved. None of this grants Qualification.
 
 Use [troubleshooting](../../../docs/module/task_env/v2.1.0/guides/troubleshooting.md) to stop at the earliest failure boundary. Do not weaken an oracle, use mock evidence as a native pass, or infer support from registration.
 
