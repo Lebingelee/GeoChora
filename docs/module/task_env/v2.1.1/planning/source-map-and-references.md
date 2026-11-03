@@ -99,3 +99,40 @@ Isaac Lab Scene Data Provider／Actuator 页面当前为其最新文档版本，
 | [SOFA Mapping](https://sofa-framework.github.io/doc/simulation-principles/multi-model-representation/mapping/) | 机械、碰撞和视觉表示之间的映射 | 只准备资产表示边界，不实施 SOFA 后端或非刚体自动适配 |
 
 实施记录须保存实际采用／拒绝方案与理由；不能把外部通用架构直接复制成重复 Runtime、manager 或大型抽象层。
+
+## G01/1c 双向 physics 协议核实（attempt001）
+
+本次只读输入 Core `develop@b0024c71614f2d2ede8d9eb1db594cfcde3e9278`、GeoPhys `67da1165149486d3ae3e779c13ce31af49e17d50`。CodeGraph 索引存在待同步文件，以下 owner/caller 事实以 on-disk 文件为准；未同步或重建索引。
+
+| Concern／owner | 当前源码和 caller | 当前契约与精确缺口 | 1c 决定／后续 owner |
+| --- | --- | --- | --- |
+| query/admission | `runtime/sessions/api.py::provider_manifest/admit_capabilities/materialize`；`runtime/sessions/control.py::materialize_control`；SelectedReferenceEnv._reset | RuntimeSession 没有通用 request-specific query；静态 provider manifest 不是 source/build-bound report，generic capability claims 不能证明 task intersection；profile-specific admission 才绑定精确输入 | query 在现有 admission owner 扩展，逐项记录 provider API、adapter、dependency、evidence 与检查阶段。3a/3b 实施；未知 required 不准入 |
+| build receipt／映射 | `RuntimeSession`、`NativeRuntimeIOMetadataV1`、各 `materialize` profile 与 `_materialize_admitted` | metadata 已绑定 source/closure/scene/Artifact/Execution/provider/build/backend/device/timebase/具名 scalar DOFs；但普通 materialize 无统一 receipt，也未一般化 host/engine/solver/coupler、转换损失和 required interaction 清单 | 在同一 session/admission owner 中 additive `ProviderMaterializationReceiptV1`；复用 ExecutionSourceReceipt、metadata、readback 和已存在的编译指纹；不得另建 manager |
+| reset／状态 identity | `api.py::RuntimeSession.reset_plan/snapshot_v1/v2`；`native_io.py::NativeResetWriteReceiptV1/NativeRuntimeReadbackV1`；`artifacts/state.py::StateBoundaryIdentity/StateSampleClock/StateRequirements/CanonicalStatePublicationV1/V2/StateViewLifetime` | 已有 ResetPlan、exact source/sample validation、named readback、typed clock/requirements/lifetime；RuntimeSession 没统一 row mask。SelectedReferenceEnv.reset 会关闭旧 session 再建新 session；GeoPhys merged batch partial reset 是不同 owner | static reset preflight 放到 destructive close 之前；after-first-effect fault 不 rollback；batch mask 仅对明确支持的 native route 开放。1c 区分两个现状，3c/6a 落地 |
+| command／feedback | `controllers/canonical/contracts.py::MixedActuatorPlanV1/MixedActuatorCommandV1/AppliedMixedActuatorCommandV1`；`RuntimeSession.apply_control/apply_mixed_actuator_command/step_mixed_actuator_interval` | name/unit/boundary/ACK 已在受限 source profile；ACK 不是 generalized-force measurement。Position target 仍是 R3/PickCube 主路线，native ctrl 不能天然解释为 effort | submitted/accepted/applied/measured 四阶段；Panda arm generalized torque＋source-mapped gripper closure force 为设计主路线；现有 position/mimic 另列 compatibility。4a/4b 实施与验证 |
+| 模型与 feedback owner | `controllers/canonical/production_r3.py::from_source/compute`；`bench_deploy/libero/controllers/source_gravity.py::MujocoSourceGravityBiasV1`；`osc.py::_SourceOSCController` | R3 从 source MJCF 建 kinematics 并生成 q_ref；LIBERO model 以 ExecutionSourceReceipt 绑 source，提供 FK/J/M/qfrc_bias，`mj_step_call_count=0`，仍是 bench owner/MuJoCo 依赖 | 在现有 ControlBindingPlan 描述 model dependency、source identity、输入/输出/frame、cadence、age、pure computation 和 close owner。不把 LIBERO controller搬入Core |
+| advance/state/fault | `NativeAdvanceReceiptV1`；`NativeIntervalEvidence`；`ExecutionFaultV1`；SelectedReferenceEnv mixed step caller | 当前 NativeAdvance 一次同步步进；RuntimeSession.step 按固定 substeps；可选 mixed physics-rate route逐步重算；ExecutionFault 可分 not/partial/advanced/unknown；没有通用 async ticket | sync completion fence 与有界 partial interval必需；只对精确支持的未来 route 声明 async ticket，不能返回正常 transition |
+| resource close | `SelectedReferenceEnv.close`、`_close_failed_native_materialization`、`IsaacSimAppOwnerV1`、adapter `close_receipt` | Env 顺序收集清理错误；session 通用 close 返回 None；Isaac app/process owner 与 NativeIO/session分离，支持 lifetime hold；source/task resources另有 owner | 对各已有 owner 返回最小 close receipt；shared App 按 lease 释放，session 不直接关共享 App；1d 才定义 renderer sharing细节 |
+| scalar/batch/worker | `vectorization/parallel.py::RemoteBatchVecEnv`、`runtime/providers/merged_scene.py::SceneBatchRuntime`；SelectedReferenceEnv | Remote batch 一个 worker可承载GeoPhys merged batch，不是每 env一进程；现无 Isaac batch adapter；physics route换配整批重建目标不同于 selected scalar route | 一个 batch identity绑定 route/device/layout与env→worker→row；partial reset须mask receipt；6a/6c实施 |
+
+### 1c 双向操作／公开 owner 对照
+
+query/build/reset/command/advance/publish/close 的字段、回执、副作用和失败见[physics-provider 协议](../contracts/physics-provider.md)。输入 owner 分别为 Artifact/Scene/source closure、ControlBindingPlan/Controller requirements、StateRequirements、reset sample/mask 和 execution route；adapter不得补造缺失的 task semantics。renderer 仅能作 query 前置需求，image/render 细节归 1d。状态 identity复用现有 StateBoundaryIdentity 和 StateSampleClock；命令复用 source-bound MixedActuator value。没有 general build receipt、request-specific capability result、async ticket与通用 close receipt的地方明确列为后续扩展，不写成已实现。
+
+### D03/D04/D06/D07 的 1c 收敛
+
+- **D03 夹爪 effort／传动：**本版建议 Panda 七臂关节用 N·m generalized torque；夹爪用一个具名 closure coordinate（m）及其共轭广义力（N），需 Scene/Execution 表示版本扩展和 compiled source transmission mapping。由于当前双指/tendon source profile没有通用 closure-effort value，未能精确映射的 provider 必须拒绝；finger position/mimic 保留为 compatibility，不称全 effort。
+- **D04 模型／反馈：**Controller 仅声明自身必须的 q/qdot/FK/J/M/bias/contact/force fields；在现有 ControlBindingPlan 绑定库依赖、source/model hash、semantic joint order、frame、cadence、max age 与纯计算/no-physics-step。LIBERO source MJCF model 是可参考实现，不是 Core ModelService；缺 required measure 不得填零。
+- **D06 数值准入：**用 source closure、单位/坐标、质量/全惯量、axis/order/limits、actuator/transmission/coupler、reset readback和 task-required contact等模型项作为具名检查表；以具体 source oracle与指标定义容差。Panda cube约5%惯量差保留待确认，不引入跨 provider万能容差；未可读项标 NOT_MEASURED。
+- **D07 command/action schema：**现有 mixed value绑定 Artifact/source closure/materialization/episode/reset/control step/revision/time，可作为 extension槽；位置 target继续兼容。physical command增加具名广义力/effort坐标映射、writer、interval与mapping receipt；action spec只在reset切换，batch保持共同布局；具体 codec/versioned value待4a。
+
+### 1c 核对的官方资料
+
+以下页面于 2026-11-03 查阅。它们支持协议术语和分层，不证明当前 Geochora adapter 或本机安装能力。
+
+| 官方来源 | 对协议的影响 | 本仓库适用边界 |
+| --- | --- | --- |
+| [Isaac Sim 6.2 Newton backend](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/physics/newton_physics.html) | Isaac Sim host 可选择 PhysX 或 Newton；Newton内还可区分 XPBD、MuJoCo、Featherstone、SemiImplicit solver | ExecutionSpec层级应区分host/engine/solver；Geochora没有Newton adapter，不得claim已接入 |
+| [MuJoCo API functions](https://mujoco.readthedocs.io/en/stable/APIreference/APIfunctions.html) | `mj_step`推进仿真一个dt，`mj_forward`仅执行forward dynamics | 支持区分physics advance与参考模型计算；不证明当前model package版本/适配 |
+| [Isaac Lab actuator concepts](https://isaac-sim.github.io/IsaacLab/main/source/concepts/actuators.html) | implicit drive由solver执行PD，explicit模型计算并提交effort；输出与limit owner不同 | 作为drive ownership和重复PD风险的概念旁证；latest页面可变，不当本仓库Isaac 6.2 API |
+| [MuJoCo Python API](https://mujoco.readthedocs.io/en/stable/python.html) | `mj_step(nstep=...)`与循环多个`mj_step`等价；切片可能是native-buffer零拷贝view | 支持批量advance/borrowed data要声明完成和有效期；本仓库具体view以本地typed contract为准 |

@@ -36,6 +36,13 @@
 - **交付／出口：**三条首批路线逐项对照协议；能力不匹配和原生构建限制有结构化拒绝；明确错误／部分执行、异步完成、公开数据有效期。不承诺所有后端提供所有量。
 - **检查／证据：**量纲／轴向／排序、数据身份、缺失反馈、solver 耦合不支持、资产不可表达和 stale command 等反例；已有事实与新目标分别记录。
 
+#### G01/1c attempt001 当前结果
+
+状态：`REPORTED_PENDING_REVIEW`；结果：PASS（仅表示双向协议设计和静态文档交付完整）。本轮扩写 [physics provider](../contracts/physics-provider.md)、[control and feedback](../contracts/control-and-feedback.md)、[lifecycle and data](../contracts/lifecycle-and-data.md)，新增 [planning cases](../planning/physics-provider-cases.json)，并在 [source map](../planning/source-map-and-references.md) 记录当前 owner/caller、D03/D04/D06/D07 与官方参考。三条路线仍受各自精确 profile/source 约束；generic capability manifest 不作 task admission 证据。Panda 主路线定义七臂 torque 加 source-bound gripper closure generalized force；现有 R3/PickCube position drive 是 compatibility，所需 effort/feedback 未实现的 route 必须拒绝。静态 query、build-time mapping、runtime measurement 三种证据分开；partial failure 不承诺 rollback；borrowed state 有效期和共享 App owner 明确。
+
+本轮不改统一表示、renderer 协议、能力矩阵、生产代码或 tests；协议全部仍 `DRAFT_FOR_DISCUSSION`。1c 待主审复核；1d 仍 `PLANNED`，不得由此摘要自动启动。完整命令、案例检查、hash、commit 与限制见外部 raw report。
+
+
 <a id="1d"></a>
 ## 1d：Core 与 render 协议及共同生命周期
 

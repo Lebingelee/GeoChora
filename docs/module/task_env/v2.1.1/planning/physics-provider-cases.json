@@ -1,0 +1,466 @@
+{
+  "schema_version": "geochora-v211-physics-provider-planning-cases-v1",
+  "document_status": "DRAFT_FOR_DISCUSSION",
+  "notice": "Planning examples only. Not a public schema, runtime input, capability validator, implementation test, or provider evidence. Context refs are checked for structural identity only.",
+  "shared_context": {
+    "task_context": {
+      "task": "PickCube P1.6 / Panda table-cube scene",
+      "entities": [
+        "panda-v1",
+        "tabletop-v1",
+        "cube-v1"
+      ],
+      "source_owner": "task_env/assembly/panda_box.py::_panda_box_reference_declaration",
+      "timebase": {
+        "physics_dt_s": 0.002,
+        "control_substeps": 5,
+        "control_dt_s": 0.01
+      },
+      "arm_dofs": [
+        "panda-v1/joint1",
+        "panda-v1/joint2",
+        "panda-v1/joint3",
+        "panda-v1/joint4",
+        "panda-v1/joint5",
+        "panda-v1/joint6",
+        "panda-v1/joint7"
+      ],
+      "gripper": "two source-bound finger joints using a source-bound tendon/mimic route; current canonical plan is not closure generalized effort",
+      "cube": {
+        "control": "passive_free_body",
+        "required_interactions": [
+          "cube-table contact",
+          "cube-gripper contact"
+        ]
+      },
+      "context_refs": [
+        "planning/representation-cases.json#P1",
+        "contracts/unified-task-representation.md"
+      ]
+    },
+    "route_contexts": [
+      {
+        "id": "mujoco_cpu",
+        "provider": "MuJoCo",
+        "host": "process",
+        "engine": "MuJoCo",
+        "solver": "configured MJCF solver",
+        "device": "cpu"
+      },
+      {
+        "id": "geophys_cpu",
+        "provider": "GeoPhys",
+        "host": "process",
+        "engine": "GeoPhys public physics boundary",
+        "solver": "source-compiled CPU route",
+        "device": "cpu"
+      },
+      {
+        "id": "isaac_physx_cuda",
+        "provider": "Isaac Sim",
+        "host": "Isaac Sim 6.2.0.0",
+        "engine": "PhysX",
+        "solver": "PhysX",
+        "device": "cuda:0",
+        "profile": "exact source-bound F06 PickCube route"
+      }
+    ],
+    "identity_fields": [
+      "artifact_identity",
+      "scene_identity",
+      "source_closure",
+      "execution_identity",
+      "materialization_id",
+      "scene_instance/env_id/row",
+      "config/topology_generation",
+      "episode_id",
+      "reset_sample_id",
+      "control_step",
+      "state_revision",
+      "sample_clock"
+    ]
+  },
+  "owner_refs": {
+    "admission": {
+      "path": "task_env/runtime/sessions/api.py",
+      "symbols": [
+        "RuntimeSession",
+        "provider_manifest",
+        "admit_capabilities",
+        "materialize"
+      ]
+    },
+    "control": {
+      "path": "task_env/runtime/sessions/control.py",
+      "symbols": [
+        "ControlBindingPlanV1",
+        "materialize_control",
+        "validate_target"
+      ]
+    },
+    "native_io": {
+      "path": "task_env/runtime/sessions/native_io.py",
+      "symbols": [
+        "NativeRuntimeIOMetadataV1",
+        "NativeRuntimeReadbackV1",
+        "NativeResetWriteReceiptV1",
+        "NativeAdvanceReceiptV1"
+      ]
+    },
+    "state": {
+      "path": "task_env/artifacts/state.py",
+      "symbols": [
+        "StateBoundaryIdentity",
+        "StateRequirements",
+        "StateViewLifetime",
+        "CanonicalStatePublicationV1",
+        "NativeIntervalEvidence"
+      ]
+    },
+    "commands": {
+      "path": "task_env/controllers/canonical/contracts.py",
+      "symbols": [
+        "MixedActuatorPlanV1",
+        "MixedActuatorCommandV1",
+        "AppliedMixedActuatorCommandV1"
+      ]
+    },
+    "env": {
+      "path": "task_env/tasks/reference_env.py",
+      "symbols": [
+        "SelectedReferenceEnv._reset",
+        "SelectedReferenceEnv._step_mixed_control",
+        "SelectedReferenceEnv.close"
+      ]
+    },
+    "batch": {
+      "path": "task_env/runtime/providers/merged_scene.py",
+      "symbols": [
+        "SceneBatchRuntime"
+      ]
+    },
+    "vector": {
+      "path": "task_env/vectorization/parallel.py",
+      "symbols": [
+        "RemoteBatchVecEnv"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "P1",
+      "kind": "positive_design",
+      "purpose": "将相同PickCube/Panda需求分别查询MuJoCo CPU、GeoPhys CPU、Isaac Sim+PhysX CUDA，报告映射、依赖、阶段和未知项。",
+      "context_refs": [
+        "shared_context.task_context",
+        "shared_context.route_contexts",
+        "owner_refs.admission",
+        "owner_refs.native_io"
+      ],
+      "input": {
+        "required": [
+          "Panda seven-joint effort",
+          "gripper closure effort mapping",
+          "q/qdot",
+          "cube-table and cube-gripper contact",
+          "reset readback"
+        ],
+        "optional": [
+          "measured actuator force"
+        ],
+        "routes": [
+          "mujoco_cpu",
+          "geophys_cpu",
+          "isaac_physx_cuda"
+        ]
+      },
+      "proposed_reply": {
+        "mujoco_cpu": "bounded source-specific mapping; compiled transmission/readback required; installation version not verified in this design window",
+        "geophys_cpu": "bounded source-specific public-boundary mapping; generalized gripper closure effort is unknown until source transmission receipt exists",
+        "isaac_physx_cuda": "exact F06 position/mimic route cannot satisfy required direct effort as currently mapped; report unsupported/extension required"
+      },
+      "owner": "existing admission + RuntimeSession/adapter owners",
+      "current_status": "design_only; no query/build executed",
+      "disposition": "conditional_build_or_reject_by_capability_row",
+      "reason": "Registration, a supported file format, or profile history cannot satisfy a missing required control/interaction capability."
+    },
+    {
+      "id": "P2",
+      "kind": "positive_design",
+      "purpose": "一个provider内部选择host/engine/solver并声明required interaction/coupler；不把表达能力当作实现或证据。",
+      "context_refs": [
+        "shared_context.task_context",
+        "shared_context.route_contexts",
+        "owner_refs.admission"
+      ],
+      "input": {
+        "route": {
+          "host": "Isaac Sim",
+          "engine": "Newton",
+          "solver": "one named solver",
+          "coupler": [
+            "explicit required Panda-cube contact path"
+          ]
+        },
+        "required_interaction": "cube-table and cube-gripper contact across mapped collision representations"
+      },
+      "proposed_reply": {
+        "decision": "unknown until exact adapter and compiled build provide a coupling/mapping receipt",
+        "if_absent": "reject required interaction before publishing session"
+      },
+      "owner": "ExecutionSpec/admission and provider adapter",
+      "current_status": "not implemented/evidenced by this repo for Isaac-hosted Newton",
+      "disposition": "requires_build_evidence_then_reject_if_missing",
+      "reason": "One provider may internally compose solvers, but this package authorizes no cross-provider coupling and no Isaac-Newton adapter."
+    },
+    {
+      "id": "P3",
+      "kind": "positive_design",
+      "purpose": "分开七个arm effort、具名夹爪closure generalized force、native actuator ACK和真实测量；显式声明参考模型。",
+      "context_refs": [
+        "shared_context.task_context",
+        "owner_refs.control",
+        "owner_refs.commands",
+        "owner_refs.state",
+        "planning/representation-cases.json#P1"
+      ],
+      "input": {
+        "command": {
+          "arm": "7 named revolute joint efforts in N*m",
+          "gripper": "one source-bound closure generalized force in N conjugate to closure coordinate in m",
+          "interval": "one 10ms control boundary; 5 x 2ms physics substeps"
+        },
+        "model": {
+          "profile": "source-bound FK/J/M/bias",
+          "no_physics_advance": true
+        },
+        "measurement": "optional typed sample bound to same materialization/episode/revision"
+      },
+      "proposed_reply": {
+        "ack": "only confirms mapped native write; measurement remains separate",
+        "mapping": "use compiled source transmission and power-consistent mapping or mark required effort unsupported",
+        "model": "may compute FK/J/M/bias on explicit source-bound model but must align live q/qdot identity and cadence"
+      },
+      "owner": "ControlBindingPlan/Controller binding and provider adapter",
+      "current_status": "arm+finger position and ACK exist only in bounded source routes; canonical closure effort and general ModelRequirement value are proposed",
+      "disposition": "accept_design; runtime admission conditional",
+      "reason": "The current one tendon route cannot represent arbitrary independent finger-joint torques; do not label position feedback or ACK as measured force."
+    },
+    {
+      "id": "P4",
+      "kind": "positive_design",
+      "purpose": "同配置native batch只重置env mask；backend/config切换整批重建并更换generation。",
+      "context_refs": [
+        "shared_context.task_context",
+        "owner_refs.env",
+        "owner_refs.batch",
+        "owner_refs.vector"
+      ],
+      "input": {
+        "batch": {
+          "env_ids": [
+            "env-0",
+            "env-1"
+          ],
+          "worker_layout": "one worker with native batch rows",
+          "reset_mask": [
+            "env-1"
+          ]
+        },
+        "route_change": null
+      },
+      "proposed_reply": {
+        "env_1": "new episode/reset-sample boundary; keep the existing materialization when the execution configuration is unchanged",
+        "env_0": "same materialization, episode, clock, per-row state revision lineage, Controller state and row mapping",
+        "on_route_change": "rebuild entire batch and issue new materialization/config/topology generation",
+        "on_unsupported_mask": "reject before native mutation"
+      },
+      "owner": "Env/Core plus batch RuntimeSession/adapter",
+      "current_status": "GeoPhys merged batch has row reset owner; selected scalar ReferenceEnv rebuilds its session; Isaac batch not implemented",
+      "disposition": "accept_only_for_explicitly_admitted_mask_route",
+      "reason": "Do not infer selected scalar behavior or uniform support from a different batch owner."
+    },
+    {
+      "id": "N1",
+      "kind": "negative_design",
+      "purpose": "格式可解析但缺少task required物理表示、material/collider或耦合语义。",
+      "context_refs": [
+        "shared_context.task_context",
+        "planning/representation-cases.json#P1",
+        "owner_refs.admission"
+      ],
+      "input": {
+        "asset": "parseable mesh/source file",
+        "missing": [
+          "required mass/inertia or collision binding",
+          "required contact interaction or transmission mapping"
+        ]
+      },
+      "proposed_reply": {
+        "phase": "preflight if source declaration exposes omission; otherwise native_build",
+        "status": "unsupported/unknown with exact object and missing field",
+        "effect": "do not publish RuntimeSession"
+      },
+      "owner": "asset declaration/compiler and provider admission",
+      "current_status": "design_only",
+      "disposition": "reject",
+      "reason": "Parseability and finite numbers do not prove physical representation or task semantics."
+    },
+    {
+      "id": "N2",
+      "kind": "negative_design",
+      "purpose": "Controller必需的feedback或required interaction缺失时用零、旧sample或fallback继续。",
+      "context_refs": [
+        "shared_context.task_context",
+        "owner_refs.control",
+        "owner_refs.state",
+        "owner_refs.admission"
+      ],
+      "input": {
+        "required_feedback": [
+          "named qdot or actuator force as declared by Controller"
+        ],
+        "provider_reply": "unavailable/stale; prior sample belongs to another revision"
+      },
+      "proposed_reply": {
+        "required": "reject before command or fault the current transition with missing/stale-field issue",
+        "optional": "UnavailableStateValue(reason=not_provided/not_measured/stale)"
+      },
+      "owner": "StateRequirements/ControlBindingPlan and RuntimeSession publication",
+      "current_status": "typed state/clock/availability exists; query intersection not generalized",
+      "disposition": "reject_required; explicit_unavailable_optional",
+      "reason": "Zero is a physical value, not a missing-data marker."
+    },
+    {
+      "id": "N3",
+      "kind": "negative_design",
+      "purpose": "将上一materialization、episode或native batch row的旧命令提交到当前session。",
+      "context_refs": [
+        "shared_context.task_context",
+        "shared_context.identity_fields",
+        "owner_refs.commands",
+        "owner_refs.env"
+      ],
+      "input": {
+        "command_identity": {
+          "materialization_id": "old",
+          "episode_id": "old",
+          "env_id": "env-0",
+          "row": 1,
+          "state_revision": 7
+        },
+        "current_boundary": {
+          "materialization_id": "new",
+          "episode_id": "new",
+          "env_id": "env-1",
+          "row": 1,
+          "state_revision": 0
+        }
+      },
+      "proposed_reply": {
+        "status": "reject-before-write",
+        "details": [
+          "exact identity mismatch",
+          "no simulation-time advance",
+          "no state mutation"
+        ]
+      },
+      "owner": "RuntimeSession command admission",
+      "current_status": "MixedActuatorCommandV1 already binds materialization/episode/reset/step/revision/time; extend with scene/env/row/config identity for batch",
+      "disposition": "reject",
+      "reason": "Matching row ordinal or channel names cannot override generation identity."
+    },
+    {
+      "id": "N4",
+      "kind": "negative_design",
+      "purpose": "外部advance interval中间第3/5个native step后失败，仍返回完整transition或零推进。",
+      "context_refs": [
+        "shared_context.task_context",
+        "owner_refs.native_io",
+        "owner_refs.env"
+      ],
+      "input": {
+        "expected_native_steps": 5,
+        "attempted_native_steps": 3,
+        "last_confirmed_step": 2,
+        "last_confirmed_sim_time_s": 0.014
+      },
+      "proposed_reply": {
+        "status": "partially_advanced",
+        "completed_native_steps": 2,
+        "attempted_native_steps": 3,
+        "simulation_time": "last_confirmed; final provider state unknown unless readback completes",
+        "transition": "not emitted; env faulted"
+      },
+      "owner": "RuntimeSession advance + Env Recorder",
+      "current_status": "NativeAdvanceReceiptV1 and ExecutionFaultV1 have bounded sync partial evidence; no generic async ticket",
+      "disposition": "fault-with-partial-evidence",
+      "reason": "Never imply a rollback or complete T→T+1 interval."
+    },
+    {
+      "id": "N5",
+      "kind": "negative_design",
+      "purpose": "step/reset/close或device fence前后继续消费过期borrowed view。",
+      "context_refs": [
+        "shared_context.identity_fields",
+        "owner_refs.state",
+        "owner_refs.native_io"
+      ],
+      "input": {
+        "view": {
+          "lifetime": "borrowed",
+          "owner": "provider session",
+          "revision": 8,
+          "expiry": "next native advance"
+        },
+        "consumer_action": "read after step at revision 9"
+      },
+      "proposed_reply": {
+        "status": "reject-stale-or-require-owned-copy",
+        "preserve": [
+          "owner",
+          "lease",
+          "device/layout",
+          "revision",
+          "expiry op",
+          "completion fence"
+        ]
+      },
+      "owner": "state publisher/session and consumer",
+      "current_status": "StateViewLifetime typed contract supports retained/alias lifetime; native readback has owned profile; not all providers offer borrowed view",
+      "disposition": "reject stale view",
+      "reason": "A borrowed native buffer is not a stable historical observation."
+    },
+    {
+      "id": "N6",
+      "kind": "negative_design",
+      "purpose": "同一DOF/interval存在两个command writer，或显式effort与native implicit PD重复施控。",
+      "context_refs": [
+        "shared_context.task_context",
+        "owner_refs.control",
+        "owner_refs.commands"
+      ],
+      "input": {
+        "writers": [
+          "explicit OSC effort",
+          "provider implicit position drive"
+        ],
+        "same_dof": "panda-v1/joint1",
+        "same_interval": "step-4"
+      },
+      "proposed_reply": {
+        "status": "reject-before-build-or-command",
+        "reason": "drive-owner conflict",
+        "must_report": [
+          "source DOF",
+          "writer ids",
+          "native drive owner/gains/limits"
+        ]
+      },
+      "owner": "ControlBindingPlan admission and compiled actuator mapping",
+      "current_status": "Mixed plan checks typed route-specific channels; universal one-writer/drive ownership admission is proposed",
+      "disposition": "reject",
+      "reason": "Changing the command label does not disable the existing solver drive."
+    }
+  ]
+}

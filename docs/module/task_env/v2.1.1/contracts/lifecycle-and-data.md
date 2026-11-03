@@ -1,49 +1,75 @@
 # 生命周期、时间与数据协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；1c/1d 共同冻结。既有环境是生命周期唯一 owner，session／adapter 对原生资源负责，Recorder 消费同一运行边界。
+状态：`DRAFT_FOR_DISCUSSION`；本节冻结 physics-side lifecycle/data contract，renderer window/image/source binding 的细节留 1d。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
 
-## 构建、reset、step、close
+## Owner 和操作状态
 
-| 时点 | 约束 |
-| --- | --- |
-| 构建 | 解析配置，汇总 physics／render／Controller 需求并准入；固定 observation 契约和 batch 布局；资源唯一归属 |
-| reset | 验证请求；必要时重建执行资源；按任务初始化新 episode；校验 realized state，清空 Controller／相机历史并发布首帧 |
-| step | 使用已选后端／solver／renderer／Controller；完成明确控制区间后发布状态、评价及同步观测 |
-| render | 只消费公开状态或受控原生绑定；窗口和图像更新不自行推进任务物理时间 |
-| close | 关闭自有资源并使数据失效；重复 close 可安全处理，失败与未释放项明确报告 |
+逻辑状态用于说明合法操作，不要求本包新增 enum：
 
-这些是行为约束，不指定新增生命周期 enum。实现前对照现有环境／session 的实际状态机，避免第二个可变 owner。
+| Env 状态 | 可做操作 | 转换 |
+| --- | --- | --- |
+| configured / unmaterialized | query、build、reset preflight、close | 完整 materialize 后进入 ready |
+| ready / running | reset preflight、唯一 command、一次 control interval、snapshot/publish、record、close | 完整 reset 进入 running；完整 interval 才发布下一正常 transition |
+| faulted | 读取 fault/cleanup receipt、明确 rebuild reset、close | 不允许再 step 或提交旧 command；不得继续产生正常 transition |
+| closed | 读取终结 receipt | 所有 state view/lease 无效，重复 close 安全 |
 
-## Reset 重建
+这是目标行为。当前 SelectedReferenceEnv._reset 在 selected path 会先关闭 camera consumer/旧 session，再创建 session；现状不保证每种配置的 pure preflight reject 保留旧 episode。协议要求以后把能静态做的验证移到 destructive close 前；超过该边界后失败记录已发生副作用，不保证恢复旧 session。
 
-切换使用任务初始化规则重新开始，不迁移上轮 q／qdot、接触、积分器、随机器内部 native state 或 GPU 图缓存。seed 由 Core sampler 与 provider randomness 分别记账；相同 seed 不保证跨 solver 轨迹完全相同。
+## 构建、reset、step、publish 与 close
 
-先验证可静态判断的配置，再按照原生资源约束释放／创建。允许保留公共 env 对象并替换后端工作进程；不要求所有原生 runtime 在同一进程反复卸载。若实现只支持跨进程重建，应在能力中公开。
+| 时点 | Core/Env | RuntimeSession/adapter | 故障边界 |
+| --- | --- | --- | --- |
+| query/build | 汇总 Artifact/Scene/source/Controller/state/batch/共享资源需求；固定 observation 契约和 batch layout；发布 binding 和 route identity | 仅构建已准入路线；记录 dependency/provider/device/compiled map/materialization receipt；native 构建失败尽力清理 | static admission failure 无原生 effect；build/cleanup 不完整则 faulted |
+| reset preflight | 验证 seed/sample、source identity、mask、配置/action spec，并为新 episode 分配 generation | 在通过前不写 state、不释放现有 session | preflight reject 保持旧 episode/Controller/state view 有效 |
+| reset effect | 绑定新 episode/reset sample；重置 Controller、filter/integrator/force latch/action histories | 按 mask 写选中 state、zero velocity/initialize targets，返回 ResetWriteReceipt、realized state 与公开 readback | 第一个 native effect 后失败就 faulted；记录已写 env rows/fields；无通用 native snapshot rollback |
+| command + advance | 每边界只由一个 writer 提交 target；记录 `submitted → accepted` | 精确映射并 ack；按固定 physics_dt/substeps 走一组公开 native advance | command 在第一 write 前 reject 可继续；写入/推进部分失败则 faulted |
+| publish/evaluate/record | 等完成 fence 后 snapshot；校验 identity/freshness；再计算 observation/evaluation 并记录完整 transition | 返回 named state, sample clock, revision/interval evidence；不把未完成 device write 暴露出去 | required state/readback 不齐，不得生成正常 observation/transition；不把 incomplete interval 写成 complete |
+| close | 终止正常 episode/Recorder（若无 fault）；依次关闭 owned consumer/session/source/task resources | 释放 session-owned native model/context/lease；返回 close receipt | 尽力清理所有资源并保留首错和附加失败；不重复 close 已被另 owner 接管的对象 |
 
-重建失败不得返回成功 reset 的 obs，也不得默认继续旧 episode。记录已完成阶段和清理结果，使环境不能 step；允许明确重新 reset 或 close。旧环境是否在纯 preflight 拒绝后仍可使用，须由 1c 明确；不承诺通用事务回滚。
+### Reset 和 batch
 
-原生批次统一配置；切换 backend／renderer 按整批重建。不换配置的部分 reset 仅对支持路线开放，保留其他环境的 episode、时间、Controller 状态与图像身份。对批内变更 Controller 的粒度，保持共同动作规格及已冻结资源约束。
+Reset 重新执行当前任务初始化，不迁移旧 episode 的 q/qdot、接触历史、provider内部 solver state、Controller integrator、随机器 state 或 GPU graph state。seed 分别记 Core sampler 与 provider RNG 身份；相同 seed 不意味着跨 solver 轨迹完全相同。
 
-## 时间与代次
+- scalar env 的 route/config reset 若必须重建 session，先做可静态判断的 query，再关闭旧 session、创建新 route、执行 reset 和 readback；新 route 成功前不得发布 success obs。失败后只可明确重建/reset 或 close，不能偷偷返回旧状态。
+- native batch 的 backend/host/engine/solver/coupler/device/action mapping 变化整批重建。只有 capability report 声明 mask-reset 的路线可 same-config partial reset；receipt 精确列受影响 env ids/rows。未选 row 的 episode id、simulation time、state revision、Controller state、terminal obs 和 action spec identity 保持不变。
+- 支持 mask reset 不代表支持批内选择不同 route。mask 不合法或不支持时必须在任何 native effect 前拒绝；不能静默升级成 full reset。
+- 当前 `ReferenceEnv` 选择路径每次 reset 重建 selected RuntimeSession；当前 GeoPhys merged batch 有按行 reset 能力，但这不是 PickCube selected session 的 partial-reset 证据。Isaac batch 尚无本仓库 adapter。
 
-公开数据至少能关联 execution／materialization、episode、reset／configuration 代次、环境编号、状态 revision 和模拟时间；控制区间、图像采样与异步完成分别说明。拓扑和对象映射变化不得复用旧索引。
+## 时间、完成与失败状态
 
-Native 控制／渲染预热与真实用户 transition 分账。部分失败不生成伪成功 transition，不把未完成步计入完整 episode。既有 T transitions／T+1 boundaries 和 native interval evidence 继续使用，不凭窗口循环次数计算模拟时间。
+每条执行绑定 Artifact timebase 的 physics `dt` 和 substep count。Core 一个外部 action/control interval 可能采用：
+1. outer Controller 算一次，target zero-order held 跨 N 个 native steps；
+2. 明示 physics-rate hook，每个 native boundary 以最新同步 state/revision 算新 command。
 
-## Observation 与缓冲区
+两种 cadence 分别准入，不由 provider 或 action 名称隐式改变。同步 `RuntimeSession.step()` 完成所有 N 个 substeps 才能 snapshot。若 route 需异步推进，adapter 返回含 materialization/episode/config generation/attempt id 的 completion ticket；调用方先 wait/device synchronize，再 read state、feedback、render snapshot 或 Recorder 数据。当前 RuntimeSession 是同步接口，Isaac App owner 不表示 step 是异步。
 
-构建后固定字段、结构、shape、dtype、单位、坐标、含义、相机标定语义以及对外数据设备约定。切换后的路线若需要改变这些约定，拒绝本 env 的该组合，或由调用方另行构建环境。
+advance fault 至少记 expected interval、attempted/completed native step indices/count、last confirmed simulation time/revision、remaining/unknown interval、command ack(s)、partial effects 和 recovery action。已确认完成区间不回滚；不能返回“未推进”的正常 result 或把部分动作记成完整 T→T+1 transition。若无法知道最终状态，标记 unknown 并只开放 reset/rebuild/close。Reset/command/write fault 同样区分 before-first-effect 与 partial native write。
 
-设备内部布局可以不同，经声明转换满足对外契约；设备转换成本和同步可查询。字段可以按需求投影，不能因统一就强制所有状态 host-copy。任何借用视图须明确只读、有效期、next step/reset/close 是否失效，以及调用方如何取得独立副本；不能悄悄改写已交付的历史 observation。
+## State identity、sample clock 与 lifetime
 
-RGB 必需字段失败时不得以零图／旧帧补齐；缺失接触力等可选字段须有明确 availability。控制器输入 action 的变更另见[控制协议](control-and-feedback.md)，与固定 observation 分开处理。
+StateBoundaryIdentity 至少联合绑定 Artifact/source closure、Execution/materialization、scene instance/env id+row、episode/reset sample、config/topology generation、control step 与 state revision。SampleClock 独立声明 evaluation boundary 或 native step/domain/index/time；各字段需说明物理单位、坐标系、reference point、joint order、batch layout 与设备。NativeIntervalEvidence 逐 control-substep 记录 measurement/availability，不从窗口循环次数推时间。
 
-## 批量终止与记录
+required/optional 由 StateRequirements 指定。required 缺值或 sample clock 不匹配时 reject；optional 以带 reason 的 UnavailableStateValue 表示。无传感器力、contact force 或不支持的动力量不能填零。published state 只含 Core 语义名称、typed values、完成凭据和映射身份；不暴露 native pointer、solver private array 或不稳定 ordinal。
 
-6a 选择并公开支持的 auto-reset 语义，区分 `terminated`、`truncated`、终止观测和新 episode 首帧。记录 reset mask／env ID，保护同批次不同 episode；不要求同时实现所有 Gymnasium autoreset 模式。
+- **owned snapshot：**adapter/Core 已复制成独立只读 storage；调用方可持有，除非共享对象另声明，否则不受下一 step 影响。
+- **borrowed view：**只读，但绑定 owner/lease、device/layout、identity、revision 和 expiry operation。下一次 write/advance/reset/close 或 lease release 后必须视为失效；API 可检测时拒绝 stale view。调用方需跨边界持有数据时显式 deep copy/retain。
+- 对 device view 必须提供 synchronization/fence；不得强制全量 CPU copy，也不得声称全部零复制。NativeRuntimeReadbackV1 当前明确为 owned named values；其他 view 不能自动沿用这个保证。
 
-每 episode 记录实际配置、任务／资产／source、provider／solver／设备、renderer、Controller／模型依赖、action／obs schema、相机参数和 seed。统一命令的接受回执与实测反馈分别存储。独立 reader 应能识别 episode 边界和输入规格变化，不为新功能新建平行 Recorder。
+Recorder 只收完整 state boundary 与对应 command/ack/measured feedback；fault interval 保存独立 fault/evidence，不伪造成功 transition。完整 observation schema 构建后固定；Renderer 具体 buffer/capture lifetime 按 1d 扩展，不改变上述 physics identity 和 synchronization 规则。
 
-## 故障验证
+## 资源与 close owner
 
-工作包覆盖构建中断、reset 部分写入、step 部分推进、相机失败、窗口关闭、跨代数据使用、重复 close 及 worker 异常退出。具体错误结构与资源观测方法在 1c/1d 冻结；不要求为每个后端伪造不具备的通用原生快照回滚。
+| 资源 | 唯一 owner | Env close/reset 的动作 |
+| --- | --- | --- |
+| Task observation/Recorder/lifecycle | Env/Core | 按现有 Recorder contract 完成或保留 fault；关闭 env-owned consumer |
+| RuntimeSession 与 native model/scene/context | provider adapter session | 调用 session.close；释放且只释放自己创建的对象，返回 close receipt |
+| Source closure receipt/task assets | task/source owner | env 结束后关闭/释放 owner receipt；不由 provider 重复删共享资产 |
+| Isaac SimulationApp | per-worker `IsaacSimAppOwnerV1` | session 获得/释放 process-lifetime lease；一个 session.close 不直接关掉仍被其他 session 使用的 App；最后 lease 后由 App owner 单独 close |
+| worker/process | vectorization/deployment owner | 先停任务、收齐 cleanup receipt，再关闭 worker；worker 崩溃需报告无法观测的资源，而非声称全部释放 |
+| renderer shared resource | renderer owner（1d 具体定义） | physics 只交付批准的 identity/lease/fence；不因 share 直接 transfer App/model/context owner |
+
+现有 Env close 有顺序清理和错误累积；部分 mixed route 有 typed/structured close receipt，而通用 RuntimeSession `close()` 目前返回 None。目标接口让每个 owner 的 close attempt 幂等且回报 failed/unreleased resources。重试只由原 owner 管理，不能由多个 consumer 重复释放。
+
+## 故障验证范围
+
+后续实现至少要验证 query/build admission mismatch、build 后半初始化清理、reset preflight 和 partial write、command stale/writer duplicate、同步/异步 advance partial failure、required/optional feedback、borrowed view expiry、partial batch reset、App shared lease 与重复 close。1c 只交付设计与静态一致性检查，不启动 App、solver、GPU 或实现测试。

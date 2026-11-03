@@ -1,51 +1,64 @@
 # 控制、effort 与反馈协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；1c 冻结语义，4a 落实既有契约与实现。统一的是底层物理命令；不同 Controller 可以接受不同输入。
+状态：`DRAFT_FOR_DISCUSSION`；1c 冻结物理命令、模型/feedback 和兼容边界，4a–4c 再实施 Controller 与迁移。下列协议是设计建议，不是新 public schema。
 
-## 控制分层
+## 控制分层与命令阶段
 
 ```text
-Controller 的输入 action
-        ↓ 公共状态／运动学／动力学模型
-参考生成与控制／执行器计算
-        ↓ 具名 canonical 物理命令
-RuntimeSession → adapter → 原生施控与物理推进
+Action / task semantics
+    → Core Controller + explicitly bound public feedback/model
+    → named physical command (one writer per DOF/resource/interval)
+    → RuntimeSession / adapter → provider control channel
+    → completed physics interval → typed state / feedback
 ```
 
-Core 调度控制和时间，adapter 执行公开物理接口。Controller 不 step／reset 原生场景，不读取 provider 私有状态；反馈必须声明需求。现有 R3 的 q_ref 生成可与共享 effort 伺服组合，direct effort 可由显式 passthrough Controller 校验后进入同一路线。
+Core 绑定唯一 Controller、命令 writer、action spec 和控制 cadence；RuntimeSession/adapter 写 provider 通道和推进 scene；provider 执行 physics。Controller 不 reset、step 或读 provider private state。command lifecycle 必须区分：
 
-## Canonical 物理语义
+| 阶段 | 意义 | receipt 能证明什么 |
+| --- | --- | --- |
+| submitted | Core 为准确 source/materialization/episode/boundary 提交请求 | 目标、writer、作用区间及输入 identity |
+| accepted | Core/adapter 校验能力、名称、单位、限制及新鲜度 | 请求可按此映射执行；还没有物理推进 |
+| applied / write acknowledged | adapter 按记录的 native mapping 写入并确认写操作 | 写入了哪些 native control 或 generalized command；不代表发生运动、力已测量或等价于另一引擎 |
+| measured / estimated | 独立 typed sample 指明传感器或估算模型、量纲、样本时钟与 identity | 实际 measurement 或明确标为 model estimate；缺失必须说明，不得由 ack 推断 |
 
-- 转动 DOF 为 torque，单位 N·m；平动 DOF 为 force，单位 N。通道绑定语义 joint／DOF、顺序、轴向、正负、作用区间和来源。
-- 区分广义驱动力、原生执行器输入和外部 body wrench。传动、gear、mimic／tendon、限幅及被动项必须在映射中说明，原生 `ctrl` 数组不天然等于 effort。
-- 每个受控资源在一个作用区间有唯一命令 writer；多种输入 Controller 不得同时重复施控。External wrench 需要对象、坐标系、作用点和叠加规则。
-- 接受、裁剪和实际写入回执与实测关节／接触力分开。不可测项说明缺失，不填零冒充测量。
-- 为节点／粒子／分布力等保留类型化扩展，不要求全部物理对象都使用 joint torque。
+现有 `AppliedMixedActuatorCommandV1` 是 target-hash/provider/channel ACK；`AppliedCanonicalControl` 是目标确认并显式不作运动声明。保持该限制。若 adapter 无法把 native ctrl 可靠映射成 canonical generalized effort，只能返回 native-channel write receipt，不能宣称 canonical effort applied。
 
-现有 `CanonicalAction`／`CanonicalControlTarget` 含位置语义；`MixedActuatorPlanV1`／Command 有具名通道、单位与身份基础，但其准入仍受 source、provider、设备、标量和 state-only 限定。迁移必须显式兼容，不能改名后宣称全部统一。
+## 首批 Panda 通道建议
 
-## Controller 的公共依赖
+- **主路线：**七个 source-bound Panda arm revolute DOF，按语义名固定排序，单位 N·m、轴和正负按源定义；一个 `panda-v1/gripper-closure` 广义坐标，坐标单位 m、共轭广义力单位 N。夹爪 opening/closing 正方向、参考点、范围和实体 binding 写进版本化 Scene/Execution 表示。
+- Adapter receipt 给出 `q_native = f(q_closure)`／其 Jacobian 和 `tau_native = J(q)^T F_closure` 的 source-bound actuator/transmission 对应；native tendon/gear/mimic 必须在有效范围内满足能量/功率关系，做不到就拒绝该 effort capability。不能把一个 tendon ctrl 直接重命名成 N，也不能把两 finger joints 的任意两路力压成一条标量。
+- 位置参考、opening＋force limit、原生 mimic/implicit PD 保留为具名 **position compatibility** profile；必须独立列能力，永不充当 unified effort completion。现有 R3 输出 arm q_ref 与 gripper position；MixedActuatorPlan 当前的 arm-torque＋finger-position/source-specific route 也是 compatibility。
+- `cube-v1` 的 free-body pose/velocity 是被动状态，不生成 cube action。外部 wrench 若日后需要，必须另有 typed body、frame、application point、unit 和叠加政策。
+- 一个 control interval 内一个 DOF/resource 只允许一个 writer。位置 servo/implicit drive、显式 PD 和 direct effort 的冲突需在 build/query 拒绝。若 direct effort route 要求引擎 drive 留存，配置须明确其 inactive/passive-only/native-owned 状态、gains、limits、friction 和被动项，避免重复 PD。
 
-每个 Controller 声明输入规格、输出通道、关节／实体需求、q／qdot／pose 等反馈、更新频率及可选 FK／Jacobian／质量矩阵／重力偏置等模型能力。缺少必需能力时拒绝该组合。
+转动 generalized effort 单位 N·m，平动 generalized effort 单位 N；body wrench 仍是作用点/坐标系绑定的 6D wrench，不得同 joint effort 混用。native actuator input 的 ctrl range/units、gear/transmission、saturation、delay、mimic/tendon 与关节轴需进入 compiled mapping；单位与符号沿 source oracle，不靠数值数组顺序推断。行动限幅要分别记录 Core clip、adapter map 和 solver/native clamp。
 
-模型计算可以依赖显式声明且可替换的机器人模型库。LIBERO 当前在 GeoPhys 执行时也可使用 MuJoCo 参考动力学且不执行其物理 step；这不等于没有 MuJoCo 软件依赖。模型／惯性来源、约定、时刻与 live state 映射须可追溯，不读取当前 provider 的私有 solver 对象。
+## Controller 输入、公共模型与反馈
 
-## 显式 effort 迁移
+Controller binding 应声明必须与可选的字段、实体和关节名/order、单位、frame/reference point、频率/cadence、时钟域、新鲜度上限、action spec 与 reset 行为。至少可表达 q/qdot/pose/FK/Jacobian/M/gravity/bias/contact/actuator-force；每种 Controller 只要求实际需要的子集。缺 required field 或 freshness 不满足时拒绝/返回 typed operation failure；optional 未测量字段以 `UnavailableStateValue(reason)` 公开，绝不置为 0。
 
-位置参考可通过公共 PD／前馈计算转为 effort：`tau = Kp*(q_ref-q) + Kd*(qd_ref-qd) + tau_ff`。具体增益、限幅、补偿和离散时间在工作包中冻结，不在协议里指定一套通用数值。
+建议在现有 `ControlBindingPlanV1`/Controller binding 增加 `ControllerModelRequirementV1`，不另建通用服务管理器。建议字段：
+- model profile、library/provider、精确 dependency/build identity 与模型 source/closure；
+- 输入 state names/order/units、sample boundary 与 model-to-live mapping；
+- 输出 quantity、单位、frame/reference point、解析版本；
+- cadence（每外部 control interval 或每 physics substep）、最大 sample age 与同步要求；
+- `pure_model_computation=true` 之类的行为承诺（不可推进执行 physics），以及 reset/integrator/filter state 和 close owner。
 
-原生隐式 PD 与显式 effort 不保证相同响应。输出完整控制 effort 时，native drive 必须处于已声明且不会重复 PD 的状态；被动阻尼、摩擦、重力及约束处理分别记录。控制更新与 sample-hold／每物理子步重算要明确。
+LIBERO 的 `MujocoSourceGravityBiasV1` 以 `ExecutionSourceReceiptV1` 绑定已验证 MJCF/closure，接受七个具名 q/qdot，使用 `mj_forward` 得 world TCP FK、Jacobian、arm mass matrix 与 `qfrc_bias`，并记 `mj_step_call_count=0`。它是可借鉴的 source-bound reference model，但属 bench_deploy，依赖 MuJoCo，也不是通用 Core Service。R3 使用 source XML 的 PandaKinematics 生成 q_ref，并非 effort model。任何参考模型须通过同一 Core boundary 的 q/qdot identity 校验；模型计算不推进 provider，也不得读 live solver field。
 
-夹爪按真实 DOF、传动和力／开度控制需求逐通道处理。1c/4a 冻结首批映射与数值依据；保留原生位置兼容路线时必须单列，不能计作全 effort 主路线完成。若本版必达 effort 在某后端确实不可实现，应上报协议／范围问题，不能偷偷换成 position。已有 F05 原生约束适配例外不自动变为严格传力等价门。
+测量、估算和控制反馈分开：
+- named q/qdot/state 的 sample clock 说明是 evaluation boundary 还是 native-step；
+- `CanonicalControlFeedback.gripper.closing_force_N` 当前可从 named finger position 推导，是 position-derived value；不能写成传感器测得夹持力；
+- `NativeControlFeedbackSampleV1` 必须绑定 provider materialization/source/episode/reset/sequence/revision/native step/phase；该能力 unavailable 时报告原因，不返回伪造零力；
+- R3 外层按 control interval 更新 q_ref；mixed physics-rate profile 可明确选择每 native substep 重算。zero-order hold 与 recalculate 不得从 route 名字猜测；
+- reset 或 action/Controller input schema 变化时清空 q_ref、积分器、滤波、force latch 与 sample history；更新 Controller/action-spec identity。已构建 observation schema 固定，不随 Controller 切换而暗改。
 
-## Reset 切换
+## Reset 时 action spec 切换
 
-Controller 实现、参数及输入规格允许在 reset 改变，episode 内保持确定。reset 清空积分器、滤波、轨迹和 q_ref 等历史；初值由本轮实际初始化状态产生。
+Controller、参数和输入规格只在 reset 边界改变；Core 先验证 Env/Batch 的 action-space policy，并发布新 binding/action spec identity。固定空间 wrapper/Agent 必须明确拒绝或由调用方重建匹配 wrapper；旧 action 不能跨 action-spec generation。
 
-动作维度、单位、含义或边界变化时更新并公布新 action spec／space 与身份。旧 Agent、Gymnasium wrapper 或 learner 未必兼容；固定空间消费者必须显式拒绝或重建匹配绑定。不能仅因底层 effort 相同就宣称它们可无缝继续。
+同一 native batch 的 action dimension 与布局保持共同。需要切换 provider/backend/solver 或 command mapping 时整批重建；只对明确支持的 profile 允许 same-config reset mask。新 episode 从 reset 实际 readback 初始化 Controller，不迁移旧积分器、力 latch 或 trajectory。完整 Gym/RL wrapper 兼容留后续 4c。
 
-Observation 仍服从[固定契约](lifecycle-and-data.md)。同一原生批次保持可批处理的动作规格；本版不承诺批内每个环境自由选择不同维度的 Controller。Recorder 按 episode 保存输入与底层命令身份，直接力输入同样适用。
+## 边界与验证
 
-## 验证边界
-
-4b 至少覆盖 R3 参考组合、关节参考和 direct effort 的代表输入；检查传动、限幅、唯一 writer 与原生驱动互斥。4c 检查 reset 切换、反馈缺失拒绝和 Solution 复核。控制层统一不自动证明 R3 失败已修复，迁移前后证据不得互相替代。
+1c 定义语义、命令值和必要回执；不选一套通用 PD 增益、不实现新 Controller、不重新研究 F05 严格传力等价。4a–4b 核对 R3 reference、joint reference 与 direct effort profile 的真实映射、唯一 writer、drive ownership、饱和、sample freshness 和闭环；4c 验证 reset/spec 变化和旧 wrapper 的明确拒绝/重建。协议 PASS 不表示现有 R3/PickCube 问题已修复，也不提升 native evidence。
