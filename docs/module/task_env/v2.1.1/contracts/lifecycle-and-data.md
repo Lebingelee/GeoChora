@@ -1,6 +1,6 @@
 # 生命周期、时间与数据协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；本节设计 physics-side lifecycle/data contract，最终冻结待维护者审阅，renderer window/image/source binding 的细节留 1d。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
+状态：`DRAFT_FOR_DISCUSSION`；本节定义 physics-side lifecycle/data contract，renderer window/image/source binding 由文末 1d 补充，最终统一冻结待维护者审阅。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
 
 ## Owner 和操作状态
 
@@ -74,3 +74,49 @@ Recorder 只收完整 state boundary 与对应 command/ack/measured feedback；f
 ## 故障验证范围
 
 后续实现至少要验证 query/build admission mismatch、build 后半初始化清理、reset preflight 和 partial write、command stale/writer duplicate、同步/异步 advance partial failure、required/optional feedback、borrowed view expiry、partial batch reset、App shared lease 与重复 close。1c 只交付设计与静态一致性检查，不启动 App、solver、GPU 或实现测试。
+
+
+## Renderer、task camera 与 shared lifecycle（1d）
+
+本节补充 render/observation 与 physics 生命周期的交界，不更改上文 1c reset、command、advance、fault、state identity 与唯一 owner 原则。renderer 协议权威字段和路线矩阵见[render-provider](render-provider.md)；本节只定义共同调度、数据有效期和资源次序。
+
+### 三方 owner 与 shared build
+
+| 对象 | 唯一 owner | 可借用者 | 不允许的动作 |
+| --- | --- | --- | --- |
+| task semantics、scene/source closure、reset sample、observation/Recorder | Core/Env/task owner | physics 与 render adapter 以 typed identity/binding 使用 | adapter 修改 task semantics、私自改变 obs schema 或增加第二 Recorder |
+| solver、physics model、published state、物理 timebase | physics RuntimeSession/provider adapter | renderer 读取 fence 后的 public named state 或 lease-scoped visual binding | renderer 推进第二物理、读取私有 solver memory、改 live state |
+| shared native scene/App/model/context/device buffer | 创建它的 provider/App/renderer owner | 经准入的 adapter 通过 generation-bound lease 只用允许操作 | 借用者关闭共享对象或向 Core/Agent 泄露裸 native/GPU handle |
+| render-only model/data、window、camera、capture target | render adapter/session | Env 提交带 identity 的 request | render-only world 获得任务物理 authority |
+| process/worker、跨进程 image transport | vectorization/deployment owner | Env/learner 以 env→worker→row map 使用 | 把一个 worker frame 冒充所有 env 独立结果 |
+
+Physics、Controller/model、state/interaction、render/camera、App/device/window/context 和 batch/worker 的 required inputs 必须在 native build 前合并到同一 request-bound admission。所有 required static checks 通过才可构建；只有明确 adapter/build oracle 的 pending 项允许 provisional build；episode ready 前所有 required build checks 必须通过。renderer 不能扩宽 physics/Controller admission。Shared-scene route 由 physics owner 持模型/scene；independent renderer route 有自己的 render-only model 与映射 receipt；两者都不创建平行 Env Runtime。
+
+### Reset/step 的 image publish barrier
+
+一次正常 reset/step transition 必须同时满足 physics 与 task-RGB 的 publish 条件：
+
+```text
+静态 preflight
+→ native build/bind receipt
+→ reset write/readback (reset) 或 command ACK + 完整 physics interval (step)
+→ public StateBoundaryIdentity + completion fence
+→ renderer consume same state revision + update fence
+→ 每个 required camera capture 完成且身份/phase 相同
+→ observation / evaluation / Recorder
+→ 向调用方发布结果
+```
+
+reset task RGB 用 `reset_initial` capture phase；step task RGB 用 `post_control_step`。当前实现将两者都描述为 `post_control_step`，这是尚未解决的 identity 区分，不视为已验证。UI `.render()` 可以独立消费最新完成状态，不是 publish barrier 的替代品。physics/control clock 只由 RuntimeSession 产生，present/fps/render/camera warmup 不递增 task clock。
+
+若 physics 已完成而 required render update/capture 未完成或失败，Env 保留真实 completed interval、clock、partial effects 与故障；不发布 normal transition，不用旧图/零图，不声称 rollback。window 单独关闭时独立 capture 可继续；若 App 生命周期让两者不可分，adapter 需在 admission 标记该限制并在故障 receipt 中通知 Core。optional camera 只有在 build 固定 schema 与 optional reason 后才可 typed unavailable。
+
+### image/view 的 lifetime 与 batch
+
+Owned image 在独立 storage 中且只读；borrowed view 带 owner/lease generation、env/worker/row/camera、完整 frame identity、layout/device、expiry operation 与同步 fence。下一次可覆写其 buffer 的 update/capture/reset/close/lease release 后 view 无效。跨 Recorder、step return 或 worker transport 存储时，接收方必须 copy 或持有明示的 retain lease 到最后消费点。异步 `pending` 图像不可进入 observation。
+
+批量顺序用 `env → worker → local row → camera → image` receipt 表示；不能把 native batch 轴与进程 worker 轴合成含糊的一个维度。same-step autoreset 在 reset 前保留 done row terminal observation/frame，在 reset 后构造新 episode reset observation/frame，并分别赋予 state/camera identity；返回值的 done row 是 reset observation，info 保留 `terminal_observation` 与 `reset_info`。未选 env 的 physics/controller/episode/clock 不变，借用共享 storage 失效需另行标识。现有 RemoteBatchVecEnv `get_images()` 复制一帧给各 slot，只能算 repeated preview，不能作为 row-specific task observation。
+
+### close 与 partially initialized renderer
+
+Env 作为协调 owner，按 renderer session → 自有 camera/output buffer/window/render-only model → 释放 physics/App borrowed lease → 原 provider/App owner → worker 的依赖顺序收集 close receipts。session close 不能直接关闭仍有其他 lease 的 per-worker Isaac App；App owner 在最后 lease 后自行 close。部分初始化失败逐项记录 acquired/released/unreleased resource；first native effect 后失败按 faulted，不承诺回到原 episode。所有 owned close 操作由唯一原 owner 执行且可重复调用；其他 consumer 仅报告 lease release。

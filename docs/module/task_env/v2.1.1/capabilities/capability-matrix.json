@@ -63,11 +63,13 @@
           "rgb_array"
         ],
         "owner": "TaskEnvRenderProvider",
-        "task_observation": false
+        "task_observation": false,
+        "ui_effect": "Presents current state through TaskEnvRenderProvider; no physics step; observer camera is separate by default."
       },
       "same_provider_camera": {
         "profile": "p1_4_native_camera_cpu_v0",
-        "scope": "static same-provider RGB/depth capture; not evidence of selected PickCube synchronization"
+        "scope": "static same-provider RGB/depth capture; not evidence of selected PickCube synchronization",
+        "consumer_status": "legacy static same-provider capture; not selected PickCube reset/step evidence"
       },
       "cross_camera": {
         "candidate": "GeoPhys CPU physics -> MuJoCo native OpenGL",
@@ -76,7 +78,8 @@
           "d04_mujoco_native_dynamic_opengl_rgbd_v1",
           "d04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1"
         ],
-        "source_constraint": "Scene-v3 scalar joints only; free_joints rejected"
+        "source_constraint": "Scene-v3 scalar joints only; free_joints rejected",
+        "current_free_joint_support": false
       },
       "isaacsim": {
         "selected_task_camera_observation": null,
@@ -87,21 +90,21 @@
           "profile": "p1_4_native_camera_cpu_v0",
           "capture": "static same-provider capture",
           "human_window": "generic TaskEnvRenderProvider only; not connected to selected PickCube",
-          "synchronized_pickcube_observation": "not implemented"
+          "synchronized_pickcube_observation": "not implemented; future 5c"
         },
         "geophys_cpu": {
           "profile": "p1_4_native_camera_cpu_v0",
           "capture": "static same-provider capture",
           "dynamic_profile": "GeoPhys CPU -> MuJoCo native OpenGL D03/D04",
           "human_window": "generic TaskEnvRenderProvider only; not evidence of task observation",
-          "synchronized_pickcube_observation": "not supported by current scalar-only dynamic projection; Position candidate only"
+          "synchronized_pickcube_observation": "not supported by current scalar-only projection; free-joint PickCube excluded"
         },
         "isaacsim_physx_cuda": {
           "profile": null,
           "capture": null,
           "human_window": null,
           "synchronized_pickcube_observation": null,
-          "reason": "No selected-task Isaac camera/render owner was found in audited source."
+          "reason": "No selected-task Isaac camera/render owner; audited app profile is headless and camera-disabled."
         }
       }
     },
@@ -134,10 +137,41 @@
       "renderer": "MuJoCo native OpenGL",
       "consumer": "Position candidate DynamicCameraObservationConsumerV1",
       "pickcube_status": "unsupported by current dynamic projection because PickCube declares a floating cube free joint",
-      "current_provider_pin_evidence": "not established; historical D05b evidence used GeoPhys a53a8cf rather than current gitlink 67da1165"
+      "current_provider_pin_evidence": "not established; historical D05b evidence used GeoPhys a53a8cf rather than current gitlink 67da1165; current dynamic source rejects free_joints",
+      "required_future_extension": "Typed floating-body/frame pose to renderer-only visual model mapping; prove exactly one GeoPhys physics advance and same-boundary RGB."
     },
-    "parallel_gap": "Only GeoPhys merged rigid batch is currently connected; current parallel registrations are Pendulum and TwoWheelBalance. CPU/CUDA device backends do not satisfy the two-physics-provider target.",
-    "reason": "Exact source candidates and limits are recorded for planning. This audit ran no native route; all v2.1.1 implementation targets remain NOT_STARTED and validation targets remain NOT_RUN."
+    "parallel_gap": "Only GeoPhys merged rigid batch is connected; current parallel registrations are Pendulum and TwoWheelBalance. Isaac TaskEnv batch adapter absent. Remote same-step autoreset preserves terminal_observation/reset_info, but RemoteBatchVecEnv.get_images repeats a single worker frame across slots; this is not row-specific task RGB.",
+    "reason": "G01/1d design is reported pending review only. No native/build/runtime/image evidence was added. All 13 implementation targets remain NOT_STARTED and all 9 final PickCube cells remain NOT_RUN.",
+    "render_protocol_resolution": {
+      "status": "DESIGN_REPORTED_PENDING_REVIEW",
+      "render_completion_targets": [
+        {
+          "id": "window_presentation",
+          "route_requirement": "Configured observer camera/window; .render() presents latest completed boundary; no physics advance"
+        },
+        {
+          "id": "offscreen_rgb_capture",
+          "route_requirement": "Real frame with camera/state identity, phase/clock, completion and owned-or-leased storage"
+        },
+        {
+          "id": "synchronized_task_rgb_observation",
+          "route_requirement": "Required task RGB on every reset initial boundary and every normal step; no extra caller .render()"
+        }
+      ],
+      "selected_pickcube_status": "renderer=none; no selected PickCube window or synchronized task-camera route is established",
+      "reset_capture_phase_gap": "Current consumer config labels reset-initial capture post_control_step; future 5c must add call-time reset_initial identity. Not implementation evidence.",
+      "shared_scene_policy": "Provider/session retains native scene/model/App ownership; renderer borrows a typed generation-bound limited lease and consumes only completed public state.",
+      "independent_renderer_policy": "Renderer-owned visual model/data may perform required kinematics but no second physics advance and no mutation of live physics state.",
+      "rgb_policy": "Canonical output must specify dimensions/layout/channel/color/range/dtype/device/completion/lifetime; owned storage by default, borrowed lease/fence explicit; zero/shape-only is not success.",
+      "batch_image_layout": "env -> worker -> local row -> camera -> image; same-step terminal frame before mask reset, reset frame after reset; preserve terminal_observation/reset_info; never broadcast one worker frame as distinct row observations.",
+      "close_policy": "Renderer stops capture/presentation and releases own resources/leases; original provider/App/worker owner closes shared resources after final lease.",
+      "future_owners": {
+        "5a": "render capability/build, route binding, visual/frame mapping incl. free-body pose",
+        "5b": "observer/window, display events, app/device/context lease",
+        "5c": "reset/step capture phase, synchronized task RGB, frame lifetime/fault/cache",
+        "6c": "batch row-to-camera image correspondence and same-step terminal/reset frames"
+      }
+    }
   },
   "targets": [
     {

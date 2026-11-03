@@ -47,7 +47,7 @@
 ## 1d：Core 与 render 协议及共同生命周期
 
 - **输入／依赖：**1b、1c。Owner 为既有 render／camera、RuntimeSession、环境生命周期和数据契约。
-- **工作：**冻结[render 协议](../contracts/render-provider.md)和[生命周期／数据](../contracts/lifecycle-and-data.md)。汇总原生构建需求，明确共享 scene、app、device、context 和 worker 的唯一 owner；确定 renderer 输入、输出及动态几何扩展。
+- **工作：**形成供维护者审阅的[render 协议草案](../contracts/render-provider.md)和[生命周期／数据补充](../contracts/lifecycle-and-data.md)。汇总原生构建需求，明确共享 scene、app、device、context 和 worker 的唯一 owner；确定 renderer 输入、输出及动态几何扩展。
 - **关键决定：**reset 首帧与 step 同步、窗口／任务相机分离、窗口关闭语义、数据设备／借用期限、相机失败；公布 batch 终止语义的设计约束。
 - **交付／出口：**五份协议草案统一审阅；确认字段／签名映射、首批 render／cross 组合和每项资源 owner。具体不可确定项须有明确后继 owner 与冻结时点，不能留下影响 3a 开工的强制未知。
 - **检查／证据：**原生共享场景和独立 renderer 两类时序图／案例；reset 后旧图、借用过期、重复 close、需求冲突等拒绝行为；明确后续最小 contract 检查。
@@ -62,3 +62,12 @@
 
 
 2026-11-03：Sol 核对 1c 的允许提交、5 项 raw hash 与源码后，作有界文档修正并接收为 `ACCEPTED_BOUNDED_1C_DESIGN`。修正夹爪 Jacobian/功率方向、opening 与 force provenance、准入阶段与初次 build/重建故障区分；补齐多 solver 案例、时间数值上下文及协议→实施阶段映射。见 [1c 主审](../maintenance/reviews/20261103_1c_sol_review.md)。这不冻结协议、不完成任何 production implementation；只准备 1d 独立包由维护者手动转发。
+
+
+#### G01/1d attempt001 当前结果
+
+状态：`REPORTED_PENDING_REVIEW`；结果：PASS（仅代表协议/生命周期设计、案例与实施追踪文档交付，等待维护者/Sol 审阅）。新增 [render-provider-cases.json](../planning/render-provider-cases.json) 5 正例＋7 反例（规划-only）及 [protocol implementation map](../planning/protocol-implementation-map.md)，更新 render、lifecycle/data、physics-provider 的共享边界与 source map/capability planning。render 三目标分别定义窗口、离屏 RGB、reset/step 同步 task RGB；shared-scene/renderer-only 两路径各有 owner；提出 request/receipt/identity、buffer lifetime、batch terminal/reset 与已推进后 capture failure 规则。
+
+源码审计确认 reset 初帧与 post-step 当前共用 `post_control_step` capture phase，GeoPhys→MuJoCo dynamic source 拒绝 `free_joints`（PickCube 浮动方块未接通），Isaac F06 camera-disabled，remote batch `get_images()` 重复单 worker 帧。因此这些均作为 5a–5c/6c gap，而非能力证据。三条 native renderer 目标及 GeoPhys×MuJoCo cross target 保留；13 targets 仍 `NOT_STARTED`、9 final cells 仍 `NOT_RUN`。协议维持 `DRAFT_FOR_DISCUSSION`，本轮未修改 unified representation 或 control 正文。
+
+本轮仅更新本包 allowlist；未改 production source/schema、tests、依赖、资产或旧 evidence；未启动 App/window/runtime/solver/model/physics/GPU，未导入有初始化副作用的后端，implementation tests=0。报告、hash、命令、检查与实际 commit 在外部 raw output；只准备手动交给 Sol/维护者审阅，不批准冻结、不启动 2a。

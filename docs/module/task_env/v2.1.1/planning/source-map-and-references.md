@@ -156,3 +156,46 @@ query/build/reset/command/advance/publish/close 的字段、回执、副作用�
 | GeoPhys/MuJoCo 声明依赖冲突 | 现有环境/依赖配置 owner，admission 记录 readiness | 3a 明确方案，任何受影响的提前 native 执行前先处理；不预定隔离进程、不擅改 pin/依赖，既有环境与安装声明分开判断 |
 
 该表是实施归属，不授权现在编码；1d 应加入完整 renderer／三方条款后形成阶段 1 最终追踪表。
+
+
+## G01/1d Core↔renderer 与三方生命周期核实（attempt001）
+
+本节限定于输入 Core `develop@8e70ee581602016932c99a257faad7aa6e5f91ea`、GeoPhys `67da1165149486d3ae3e779c13ce31af49e17d50` 的当前磁盘源码。CodeGraph 索引有待同步变更，符号定位后按 on-disk 文件核实；没有 sync/rebuild。该记录是设计依据，不升级任何 native/camera/batch 目标证据。
+
+| Concern / owner | 当前源码与 caller | 当前事实 / 缺口 | 1d 决定 / 后继 owner |
+| --- | --- | --- | --- |
+| Generic UI render | `task_env/environment/env.py::BaseTaskEnv`、`TaskEnvRenderProvider` | `render_mode` 构建时固定；metadata 含 human/rgb_array；human lazily builds window、pump events、render+present，不推进 physics；rgb_array 读取 UI visualizer frame。与 task camera observation 分离 | 保持现有 UI owner；UI `.render()` 返回不作为 task RGB；5b 对三 mode 与 close/window behavior 接 oracle |
+| Static camera sessions | `task_env/render/camera/api.py::CameraRenderSession/create_camera_session`、`mujoco.py::MuJoCoCameraSession`、`geophys.py::GeoPhysCameraSession` | legacy `ExecutionSpec`/same-provider profile `p1_4_native_camera_cpu_v0`；MuJoCo 从 static mesh 建独立 model+Renderer；GeoPhys 用 RayCamera/FrameBuffer/EnvironmentPipeline/LightingSystem/MeshPipeline/RayTraceEngine/TonemapPass 与 CPU Taichi；不证明 selected PickCube动态同步 | 准确名称写 capability matrix；5a/5c 从 public typed state 建绑定/更新，不把静态 session 写成同步 route |
+| Selected task observation | `task_env/tasks/reference_env.py::SelectedReferenceEnv._reset/observation/step/close`、`task_env/observations/capture.py::DynamicCameraObservationConsumerV1` | reset 先 close/rebuild consumer，state reset/readback 后 observation capture；step 后 capture；Position 与 mixed step 错误会 close consumer并 fault；输出当前 HWC float32 `[0,1]` | 复用 consumer/Env observation owner；5c 加 phase 与完整 identity、cache invalidation、RGB frame receipt 和错误 receipt |
+| Capture identity phase | `observations/canonical_camera/` geometry/identity/metadata 与 `capture.py` | config 的 `CameraGeometry.capture_phase` 固定 `post_control_step`；reset-first observation 也走同 consumer；validate 当前只收此 phase，不能辨认 reset 初帧 | 明确当前语义 gap；5c request/call-time phase=`reset_initial` vs `post_control_step`，为新 identity version 增 oracle；不修现有历史 evidence |
+| Dynamic cross renderer | `render/camera/source.py::DynamicCameraRenderSourceV1.from_runtime_source`、`mujoco.py::MuJoCoDynamicCameraSession` | ExecutionSpec admission 是 GeoPhys CPU→MuJoCo native OpenGL/best_effort/Scene-v3 scalar joints；free_joints 拒绝。render-only MuJoCo session 更新 scalar qpos/time、kinematics/camera/light/update/render，不调用 `mj_step`/`mj_forward`，不执行 Controller；无 PickCube free cube binding | 保留 cross target；5a typed world-frame free body visual mapping + transform update，明确 no second physics; 5c state-bound RGB。旧 D05 evidence 使用不同 GeoPhys pin |
+| Isaac app/camera | `runtime/providers/*`、`runtime/sessions/isaac_native_io.py::IsaacSimAppOwnerV1`、`UsdCoreRuntimeSession.close` | per-process/headless Isaac Sim 6.2 owner；F06 launch receipt `enable_cameras=False`；session close delegates NativeIO close/release lease，App owner最后关闭；无 selected task camera consumer | 5a/5b/5c 再定 exact 6.2 camera API、camera-enabled profile、render-only/pause update、per-worker App lease；不启动 App |
+| State / image storage | `artifacts/state.py` `StateBoundaryIdentity/StateSampleClock/StateViewLifetime`、camera sessions `copy()`、canonical observations | state owner 已定义 typed identity/lifetime；native camera 输出 copies，但无通用跨 provider buffer/fence/lifetime contract | 复用 typed identity；5c image owned by default，borrowed 明示 owner/lease/layout/device/fence/expiry，必要时 copy/retain |
+| Batch/terminal/render | `vectorization/sb3.py::_step_and_autoreset`、`vectorization/parallel.py::RemoteBatchVecEnv`、`runtime/providers/merged_scene.py::SceneBatchRuntime` | same-step done row 保存 `terminal_observation` 后 mask reset、附 `reset_info` 并返回新 reset observation；GeoPhys merged reset(mask) 另有 row semantics；Remote `get_images()` 将单 worker image list复制给每 env slot；当前 parallel tasks 只有 Pendulum/TwoWheelBalance，Isaac batch adapter absent | 6a–6c 明确 `env→worker→row→camera→image`；旧 repeated image 不冒充真实 per-row obs；done row terminal frame 需在 reset 前 copy/retain，env-0 lineage不变 |
+| Observed shared resources | RuntimeSession, task/env, renderer consumer, `IsaacSimAppOwnerV1` | RuntimeSession 是 physics boundary；Env 协调 lifecycle；Isaac per-worker App owner支撑 process lifetime/lease；renderer native shared-scene adapter当前不一般化 | 复用现有 owners，以版本化 limited binding/lease连接；没有第二 ResourceManager/Recorder；close receipt由资源原 owner发出 |
+
+### D01、D05、D07 的 1d 收敛
+
+- **D01 构建前需求：**将 renderer/camera/window/App/device/context/worker/batch 的 required/optional 需求合并进现有 admission owner，与 physics、Controller、state 一起 query；unknown required 只有明确 adapter/build check 才能 provisional build。Core/GeoPhys MuJoCo 声明区间冲突仍归 3a dependency resolution，不在此包换依赖。
+- **D05 render 组合：**保留三条物理路线及三种 render 完成目标。MuJoCo CPU、GeoPhys CPU、Isaac Sim 6.2.0.0 + PhysX/CUDA:0 的准确 camera/renderer 名称和 current gaps 见 [capability matrix](../capabilities/capability-matrix.json) 与 [render protocol](../contracts/render-provider.md)。跨组合候选仍是 GeoPhys CPU physics × MuJoCo native OpenGL renderer；现有 dynamic source free_joints rejection 与旧 pin evidence 不能算 PickCube 支持，也不减少必达 cross target。
+- **D07 frame/state identity：**state field 仍由既有 StateBoundaryIdentity/Clock owner定义；render frame 组合 env/worker/row/camera/state revision/config/topology generation/capture phase 与 device completion/lifetime。reset-initial capture phase 当前未表达；交由 5c 增版本值，不修改旧 state codec/hash。
+
+### 五协议联合设计审阅边界
+
+本包只读了 unified representation 与 control-and-feedback 正文；不修改它们。建议维护者接受统一术语：具名 entity/frame/asset visual mapping 属 representation owner；Renderer 消费 physics 已发布 boundary，不获得第二 physics authority；image/frame lease 隶属生命周期 owner；对旧 schema 只 additive/versioned 扩展。首要待确认项是 reset capture phase 新值/迁移，以及 task RGB 必需失败后 fault receipt 与现有 Env error接口如何汇总；完整条款→owner→5a–6c oracle 见 [protocol implementation map](protocol-implementation-map.md)。协议维持 draft。
+
+### 1d 核对的官方资料
+
+以下官方页面于 2026-11-03 查阅。它们只佐证外部 API/术语概念，不能证明当前 checkout 的适配器、精确依赖或运行能力；`stable/latest` 页面可能晚于本包要求的版本，实际 implementation package 必须按目标安装重核版本。
+
+| 官方来源 | 仅采用的概念 | 限制 |
+| --- | --- | --- |
+| [Gymnasium Env API](https://gymnasium.farama.org/api/env/) | 构建时 `render_mode`、metadata、human/rgb_array 与 close 的调用习惯 | 不代表 reset rebind、task observation 或任意 wrapper 兼容 |
+| [Gymnasium Vector Autoreset API](https://gymnasium.farama.org/main/api/vector/autoreset/) | same-step 模式中终止 observation 与 reset observation 是不同边界 | 本仓库具体 key 是 `terminal_observation`/`reset_info`，wrapper-specific |
+| [MuJoCo Python API](https://mujoco.readthedocs.io/en/stable/python.html) | renderer/model/data lifecycle 与 Python binding 概念 | stable 页面版本不等于 3.8.1；不宣称精确 API match |
+| [MuJoCo rendering](https://mujoco.readthedocs.io/en/latest/programming/rendering.html) | OpenGL/Filament 渲染路径、同步/readback completion 要单独处理 | latest 可能比 3.8.1 新；仅作为 completion 概念参考 |
+| [Isaac Sim 6.2 camera sensors](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/sensors/isaacsim_sensors_camera.html), [camera migration](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/migration_guides/isaac_sim_6_0/sensors_camera_to_experimental_rtx.html) | 6.2 camera sensor、tiled camera、annotator device 与实验性 RTX API 迁移 | 文档能力不等于 GeoChora adapter；未来需按 exact build 审阅 experimental API |
+| [Isaac Sim 6.2 Replicator workflow](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/replicator_tutorials/tutorial_replicator_sdg_workflows.html) | explicit render wait、frame correspondence、physics 与 capture update 可分离讨论 | 不代表当前 F06 camera-enabled，也不作为 runtime evidence |
+| [Isaac Sim 6.2 core API migration](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/migration_guides/isaac_sim_6_0/core_api_to_core_experimental.html) | SimulationManager stepping 与 RenderingManager/Replicator render owner 区分 | API迁移与精确 package generation 必须未来核验；没有导入/启动 Isaac |
+
+官方说明正文及 source facts 的分工见 [render-provider](../contracts/render-provider.md)、[lifecycle-and-data](../contracts/lifecycle-and-data.md)、[physics-provider](../contracts/physics-provider.md)。

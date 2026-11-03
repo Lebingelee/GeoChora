@@ -93,3 +93,14 @@ Renderer 仅向 physics query 声明“需借用哪类公开 scene/state/resourc
 - [MuJoCo API functions](https://mujoco.readthedocs.io/en/stable/APIreference/APIfunctions.html)：`mj_step` 推进一个时间步，`mj_forward` 仅计算前向动力学；支持 advance 与纯模型计算区分。
 - [Isaac Lab actuator concepts](https://isaac-sim.github.io/IsaacLab/main/source/concepts/actuators.html)：隐式 drive 与显式 torque 模型的 owner／限幅不同；参考概念，不作为本仓库 6.2 API 或实现证据。
 - 这些官方资料于 2026-11-03 查阅。具体版本、route 与设备仍须在未来实施包按本机元数据核验。
+
+
+## 与 renderer 的共享构建和资源边界（1d 有界补充）
+
+本补充只定义 physics 与 render 的 shared-scene、资源和构建协调，不重写 1c 的 query/build/reset/command/advance/反馈/模型/数值准入决策。render 操作、图像身份和三种完成目标以[render-provider](render-provider.md)为权威正文；共享关闭次序以[lifecycle-and-data](lifecycle-and-data.md)为准。所有相关协议继续 `DRAFT_FOR_DISCUSSION`。
+
+Physics adapter 汇报可借用的 public state、具名 entity/frame、完成 fence、scene/model generation、允许的只读或 render-only 操作与失效事件；默认不提供裸 native pointer、solver storage 或可任意变更的 provider object。renderer 如必须接触原生 scene，须由创建对象的 provider adapter 提供版本化、授权有限、owner/generation-bound 的 typed binding/access receipt；拒绝访问不在此范围内的数据。lease 不转移 scene/model/App/context/device buffer ownership。
+
+在 native build 前，现有 admission owner 一次性汇总 physics/Controller/state 与 renderer/camera/output/App/window/device/context/batch/worker 需求。静态 required 不匹配先拒绝；标记为 build-time 的 required 项只有存在精确 adapter/check 时才允许 provisional build，episode ready 前需取得成功 receipt。physics 与 renderer 若共享 native scene，由 physics owner 保留 scene/model 生命周期，renderer 只消费已完成 public boundary 并回报 update/capture completion；independent renderer model 由 renderer session 唯一拥有，允许公开 kinematics/visual lowering，但禁止第二次 physics advance 或改变 live session state。
+
+多 solver/coupler route 必须由 physics RuntimeSession 给出整场景同步 completion boundary；renderer 不能把各 solver 未同步中间状态合成单帧。state pose、frame、单位和拓扑 generation 沿用本协议既有 typed state contract；free-body/frame 与非刚体 visual mapping 的新增字段归 Scene/representation owner 以新版本表达，不由 renderer 猜 scalar qpos。App/window 关闭与共享 App lease 由 App owner 决定，physics session close 只释放自身 lease。具体实现 owner 在[protocol implementation map](../planning/protocol-implementation-map.md)。

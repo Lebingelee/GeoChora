@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "1d",
-  "next_action": "Prepare only V211_G01_1d_attempt001 for maintainer manual forwarding. Five protocols remain DRAFT_FOR_DISCUSSION; no final freeze or implementation dispatch.",
+  "next_candidate": "1d_review",
+  "next_action": "Maintainer/Sol manually reviews V211_G01_1d_attempt001. Keep all five protocols DRAFT_FOR_DISCUSSION; do not dispatch 2a until explicit review/maintainer handoff.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -238,18 +238,60 @@
             "1b",
             "1c"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "REPORTED_PENDING_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G01_1d_attempt001",
+              "package_manifest_sha256": "1e8e68502abb9ee13267a8f6b91cb53838db432c3f014d52eab809f659f9d5ee",
+              "prompt_sha256": "db366f1e82d8dee188f9502fc00a5b8aa525de33597498630a1270abd87872da",
+              "status": "REPORTED_PENDING_REVIEW",
+              "result": "PASS",
+              "input_head": "8e70ee581602016932c99a257faad7aa6e5f91ea",
+              "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+              "output_head": null,
+              "summary": "Core-render protocol, shared lifecycle, 5 positive and 7 negative design cases, and implementation map delivered; no production changes, native execution, GPU, or implementation tests.",
+              "report_ref": "../../../../../workspace/maintenance/v211_g01_1d_attempt001/report.md",
+              "review_ref": "reviews/20261103_1d_render_protocol_design.md",
+              "native_starts": 0,
+              "physics_steps": 0,
+              "gpu_starts": 0,
+              "implementation_tests": 0,
+              "evidence_refs": [
+                "../planning/render-provider-cases.json",
+                "../planning/protocol-implementation-map.md"
+              ],
+              "commits": [],
+              "review_decision": "PENDING_MAINTAINER_REVIEW"
+            }
+          ],
+          "assigned_agent": "Codex primary agent; sole writer; zero subagents",
+          "package_path": "external manual handoff package V211_G01_1d_attempt001",
+          "package_sha256": "1e8e68502abb9ee13267a8f6b91cb53838db432c3f014d52eab809f659f9d5ee",
+          "input_head": "8e70ee581602016932c99a257faad7aa6e5f91ea",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "expected_duration_minutes": "90-120 active; hard window 150",
+          "execution_budget": {
+            "window_minutes": 150,
+            "native_starts": 0,
+            "physics_steps": 0,
+            "gpu_starts": 0,
+            "implementation_tests": 0,
+            "new_output_target_mib": 128,
+            "tracked_paths": "package-allowlisted documentation only"
+          },
+          "last_observation": "1d render/shared lifecycle design and static validation delivered. Five protocols remain draft; output HEAD and hashes are canonical in external raw report to avoid self-referential commit metadata.",
+          "evidence_refs": [
+            "reviews/20261103_1d_render_protocol_design.md",
+            "../planning/render-provider-cases.json",
+            "../planning/protocol-implementation-map.md",
+            "../../../../../workspace/maintenance/v211_g01_1d_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g01_1d_attempt001/findings.json",
+            "../../../../../workspace/maintenance/v211_g01_1d_attempt001/commands.json",
+            "../../../../../workspace/maintenance/v211_g01_1d_attempt001/input_snapshot.json",
+            "../../../../../workspace/maintenance/v211_g01_1d_attempt001/output_manifest.json"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []
