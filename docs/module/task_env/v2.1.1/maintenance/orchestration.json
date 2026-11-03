@@ -1,12 +1,12 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-03",
-  "status": "G02_2A_REPORTED_PENDING_REVIEW",
+  "updated_date": "2026-11-04",
+  "status": "G02_2A_ACCEPTED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
   "implementation_packages_dispatched": false,
-  "execution_goals_started": false,
+  "execution_goals_started": true,
   "source_baseline": {
     "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
     "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "2a",
-  "next_action": "Sol/maintainer reviews V211_G02_2a_attempt001 report and local documentation commit. Stop here; keep 2b PLANNED until review and a separate maintainer-authorized package.",
+  "next_candidate": "2b",
+  "next_action": "Prepare and freeze one V211_G02_2b_attempt001 after the Sol review commit. Maintainer manually forwards; no automatic execution, 2c or stage3 continuation.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -322,7 +322,7 @@
             "1a",
             "1d"
           ],
-          "status": "REPORTED_PENDING_REVIEW",
+          "status": "ACCEPTED_BOUNDED_2A_DIAGNOSIS",
           "attempt_count": 1,
           "attempts": [
             {
@@ -330,11 +330,11 @@
               "package_id": "V211_G02_2a_attempt001",
               "package_manifest_sha256": "d4ff0b48efd942d52eb468156d591f20a0eae4c53ca4bfcc9345c26041bc6c97",
               "prompt_sha256": "75fd24e1ad33f70ca07f7d7b209560709838fffdc31cdba4da6036d9757c22a7",
-              "status": "REPORTED_PENDING_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
               "result": "PASS",
               "input_head": "fcf0700a5ddaff85e7beb190f018d9f71d94100b",
               "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
-              "output_head": null,
+              "output_head": "920944934b6dfe92971b51ec75a6fb698ac5cc16",
               "summary": "历史F06失败与当前R3/PickCube源码完成归因；当前MuJoCo CPU seed31公共Harness运行227 transitions，runtime/独立读回/close通过，任务在measured_tcp_clearance_timeout失败。trace与历史seed31逐字节相同但源码身份不同。仅2a；无生产改动、2b或三后端九格。",
               "report_ref": "../../../../../workspace/maintenance/v211_g02_2a_attempt001/report.md",
               "review_ref": "reviews/20261103_2a_pickcube_diagnosis.md",
@@ -342,14 +342,21 @@
               "physics_steps": 1135,
               "gpu_starts": 0,
               "implementation_tests": 0,
-              "review_decision": null
+              "review_decision": {
+                "status": "ACCEPTED_BOUNDED_2A_DIAGNOSIS",
+                "reviewer": "Sol",
+                "date": "2026-11-04",
+                "review_ref": "reviews/20261104_2a_sol_review.md",
+                "scope": "Original attempt001 plus maintainer-directed supplemental diagnostics; no unique-root-cause or task-success claim."
+              },
+              "sol_review_ref": "reviews/20261104_2a_sol_review.md"
             }
           ],
           "assigned_agent": "Codex primary agent; sole writer/native owner; three read-only subagents completed",
           "package_path": "external manual handoff package V211_G02_2a_attempt001",
           "package_sha256": "d4ff0b48efd942d52eb468156d591f20a0eae4c53ca4bfcc9345c26041bc6c97",
           "input_head": "fcf0700a5ddaff85e7beb190f018d9f71d94100b",
-          "output_head": null,
+          "output_head": "920944934b6dfe92971b51ec75a6fb698ac5cc16",
           "expected_duration_minutes": "90-120 active; hard window 150",
           "execution_budget": {
             "window_minutes": 150,
@@ -362,18 +369,40 @@
             "implementation_tests": 0,
             "tracked_paths": "five package-allowlisted documentation paths only"
           },
-          "last_observation": "2a归因报告、独立HDF5读回和文档摘要已提交待审。seed31近端失败机制为100个over_cube_before_descent实测TCP gate样本均不满足；更下层请求/参考/执行差异留待2b定向验证。保护hash不变，双锁与worker已释放。",
+          "last_observation": "Sol independently verified original/followup manifests, stored H5/actions/gates, current pure FK and recorded DLS math. Dynamic lag and local stagnation bounded diagnosis accepted; orientation-path repair still needs controlled intervention in2b. Original raw is immutable; no Sol native execution.",
           "evidence_refs": [
             "reviews/20261103_2a_pickcube_diagnosis.md",
             "../../../../../workspace/maintenance/v211_g02_2a_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g02_2a_attempt001/findings.json",
             "../../../../../workspace/maintenance/v211_g02_2a_attempt001/commands.json",
             "../../../../../workspace/maintenance/v211_g02_2a_attempt001/input_snapshot.json",
-            "../../../../../workspace/maintenance/v211_g02_2a_attempt001/output_manifest.json"
+            "../../../../../workspace/maintenance/v211_g02_2a_attempt001/output_manifest.json",
+            "reviews/20261104_2a_sol_review.md"
           ],
-          "commits": [],
-          "review_decision": null,
-          "blockers": []
+          "commits": [
+            "920944934b6dfe92971b51ec75a6fb698ac5cc16"
+          ],
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_2A_DIAGNOSIS",
+            "reviewer": "Sol",
+            "date": "2026-11-04",
+            "review_ref": "reviews/20261104_2a_sol_review.md",
+            "scope": "Original attempt001 plus maintainer-directed supplemental diagnostics; no unique-root-cause or task-success claim."
+          },
+          "blockers": [],
+          "sol_review_ref": "reviews/20261104_2a_sol_review.md",
+          "supplemental_diagnostics": {
+            "authorization": "Maintainer direct requests in execution chat; retained separately from the original frozen package budget.",
+            "source_head": "920944934b6dfe92971b51ec75a6fb698ac5cc16",
+            "suites": [
+              "V211_control_tracking_followup_001",
+              "V211_controller_cause_diagnosis_001",
+              "V211_controller_cross_validation_001",
+              "V211_pickcube_matched_nut_controller_planner_001",
+              "V211_pickcube_matched_nut_controller_planner_002"
+            ],
+            "limitations": "Cross/matched runs disable collisions and replay external actions; matched001 incomplete settle match is superseded only for interpretation by002. No ordinary attempt count reset or task-success evidence."
+          }
         },
         {
           "id": "2b",
