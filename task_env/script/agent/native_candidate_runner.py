@@ -29,6 +29,7 @@ if __package__:
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
         isaac_python, native_lock_path,
     )
+    from .completion_facts import validate_completion_row
     from .feasibility_probe import invalid_row
     from .harness_spec_schema import save_json
     from .provider_routes import requires_native_worker, route_for
@@ -39,6 +40,7 @@ else:
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
         isaac_python, native_lock_path,
     )
+    from completion_facts import validate_completion_row
     from feasibility_probe import invalid_row
     from harness_spec_schema import save_json
     from provider_routes import requires_native_worker, route_for
@@ -62,6 +64,28 @@ def _core_site() -> Path:
 
 def _receipt(status, **values):
     return {'schema_version': RECEIPT_SCHEMA, 'status': status, **values}
+
+
+def _wait_process_group(process):
+    for _ in range(50):
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def _stop_worker_group(process):
+    _kill_process_group(process, signal.SIGTERM)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    # The leader may have exited while a descendant still owns native state.
+    _kill_process_group(process, signal.SIGKILL)
+    process.wait(timeout=5)
+    return _wait_process_group(process)
 
 
 def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, time_limit_s=None,
@@ -138,55 +162,54 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
                               lock_path=str(lock_path))
             violation = None
             preexec = _set_child_affinity if hasattr(os, 'sched_setaffinity') else None
-            with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-                process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
-                                           start_new_session=True, preexec_fn=preexec)
-                while process.poll() is None:
-                    if time.perf_counter() - wall_start > timeout_s:
-                        violation = f'wall watchdog {timeout_s}s exceeded'
-                    else:
-                        try:
-                            available = _mem_available_bytes()
-                            rss = _proc_rss_tree(process.pid)
-                            gpu_free = _gpu_free_mib()
-                        except Exception as error:
-                            violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
+            process = None
+            try:
+                with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
+                    process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
+                                               start_new_session=True, preexec_fn=preexec)
+                    while process.poll() is None:
+                        if time.perf_counter() - wall_start > timeout_s:
+                            violation = f'wall watchdog {timeout_s}s exceeded'
                         else:
-                            if available < 1024**3:
-                                violation = f'MemAvailable below 1 GiB: {available}'
-                            elif rss > 10 * 1024**3:
-                                violation = f'process-group RSS above 10 GiB: {rss}'
-                            elif gpu_free < 256:
-                                violation = f'GPU free memory below 256 MiB: {gpu_free}'
-                            elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
-                                violation = 'worker stdout/stderr exceeded the log budget'
-                            elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
-                                violation = 'run output exceeded the evidence budget'
-                    if violation:
-                        _kill_process_group(process, signal.SIGTERM)
-                        try:
-                            process.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            _kill_process_group(process, signal.SIGKILL)
-                        break
-                    time.sleep(1.0)
-                returncode = process.wait()
-            # Retain the lock until the whole process group is gone so an abnormal
-            # Kit shutdown cannot overlap the next native run.
-            group_alive = True
-            for _ in range(50):
-                try:
-                    os.killpg(process.pid, 0)
-                except ProcessLookupError:
-                    group_alive = False
-                    break
-                time.sleep(0.1)
-            if group_alive:
-                _kill_process_group(process, signal.SIGTERM)
-                time.sleep(0.5)
-                _kill_process_group(process, signal.SIGKILL)
-                violation = violation or 'worker process group did not end after worker exit'
-            fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+                            try:
+                                available = _mem_available_bytes()
+                                rss = _proc_rss_tree(process.pid)
+                                gpu_free = _gpu_free_mib()
+                            except Exception as error:
+                                violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
+                            else:
+                                if available < 1024**3:
+                                    violation = f'MemAvailable below 1 GiB: {available}'
+                                elif rss > 10 * 1024**3:
+                                    violation = f'process-group RSS above 10 GiB: {rss}'
+                                elif gpu_free < 256:
+                                    violation = f'GPU free memory below 256 MiB: {gpu_free}'
+                                elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
+                                    violation = 'worker stdout/stderr exceeded the log budget'
+                                elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
+                                    violation = 'run output exceeded the evidence budget'
+                        if violation:
+                            _stop_worker_group(process)
+                            break
+                        time.sleep(1.0)
+                    returncode = process.wait()
+                group_alive = not _wait_process_group(process)
+                if group_alive:
+                    violation = violation or 'worker process group did not end after worker exit'
+                    group_alive = not _stop_worker_group(process)
+            except BaseException as error:
+                # An outer Oracle alarm or Ctrl-C must retire the child before
+                # unwinding the lock and deleting its dependency overlay.
+                retired = process is None or _stop_worker_group(process)
+                finish('TIMEOUT' if isinstance(error, TimeoutError) else 'INTERRUPTED',
+                       reason=f'{type(error).__name__}: {error}',
+                       interruption_type=type(error).__name__,
+                       returncode=process.returncode if process is not None else None,
+                       lock_path=str(lock_path), process_group_retired=retired,
+                       stdout=stdout_path.name, stderr=stderr_path.name)
+                raise
+            finally:
+                fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
     finally:
         overlay_owner.cleanup()
     status = 'COMPLETED' if violation is None else ('TIMEOUT' if violation.startswith('wall watchdog') else 'RESOURCE_VIOLATION')
@@ -207,11 +230,8 @@ def run_seed_native(*, spec, catalog, provider, seed, horizon, output_dir, expec
     if row_path.is_file():
         try:
             row = json.loads(row_path.read_text())
-            if row.get('seed') != seed or row.get('horizon') != horizon:
-                raise ValueError('worker row seed/horizon differ from the request')
-            if (expected_artifact_hash is not None and row.get('construction_succeeded')
-                    and row.get('artifact_hash') != expected_artifact_hash):
-                raise ValueError('worker row artifact identity differs from the parent compilation')
+            validate_completion_row(row, expected_seed=seed, expected_horizon=horizon,
+                                    expected_artifact_hash=expected_artifact_hash)
         except Exception as error:
             row = invalid_row(seed, horizon, error_type='NativeWorkerRowInvalid', message=str(error),
                               traceback_text=json.dumps(receipt, sort_keys=True),

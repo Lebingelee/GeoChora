@@ -98,6 +98,11 @@ worker and independently checks the structured-control v3 H5, requested reset,
 source, controller, solution and provider identities. Task failure remains
 failure even if the H5 storage checks pass.
 
+The parent independently validates native probe rows against the raw completion
+contract before accepting their classification. A parent timeout or interrupt
+retires and reaps the worker process group while retaining the shared native
+lock, writes a supervision receipt, and then propagates the interruption.
+
 The same interpreter and lock settings apply to the built-in example below.
 Without overrides, Core Python is the calling interpreter and Isaac Python uses
 `workspace/environments/isaacsim-6.2.0/bin/python`. All simultaneous checkouts

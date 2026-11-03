@@ -73,6 +73,9 @@ class FakeEnv:
         self.info = {'is_success': False, 'task_metrics': {'task_success': False}}
         return {}, self.info
 
+    def prepare_expert(self):
+        pass
+
     def step_expert(self):
         scenario = self.scenario
         if scenario.get('step_error'):
