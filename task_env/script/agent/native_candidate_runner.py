@@ -12,6 +12,7 @@ supervision facts.
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import signal
 import subprocess
@@ -68,6 +69,10 @@ def native_lock_path() -> Path:
 
 
 def _core_site() -> Path:
+    # A system-site-packages venv may inherit Core dependencies from its base.
+    dependency = importlib.util.find_spec('gymnasium')
+    if dependency is not None and dependency.origin:
+        return Path(dependency.origin).resolve().parent.parent
     return Path(sysconfig.get_paths()['purelib']).resolve()
 
 
