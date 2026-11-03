@@ -82,17 +82,17 @@
 
 ## 4. Scene instance、batch 与动态身份
 
-单环境、provider-native batch、process vectorization 是不同执行形态：
+物理实例布局（scalar／provider-native batch）与进程部署（同进程／独立 worker／多 worker）是两个可组合维度，不能把 remote worker 当成第二种物理批处理算法：
 
 | 形态 | 任务/Scene 描述 | 运行实例和 batch 轴 | 当前事实与限制 |
 | --- | --- | --- | --- |
 | 单环境 | 一个 Task Artifact + Scene template | 一个 `scene_instance_id`、env ID、episode/reset generation；没有 batch 轴 | selected `make_env` 构造路线；physics provider 负责整场景 |
 | native batch | 一份同构 Scene template + 多个带稳定 ID 的 Scene instances | publisher 明确 `batch_axis=env` 并逐行给 `(env_id, scene_instance_id, episode_id, reset_sample_id, state_revision)`；共享一个 provider route/config | 当前 GeoPhys merged rigid batch 是已存在实现，注册 Pendulum/TwoWheelBalance；不代表 PickCube/Isaac batch 已准入 |
-| process vectorization | 多个互相隔离的单环境 runtime/session | 每个 worker/env 独立 native state/session；vector wrapper 明确 row order、env ID 和 episode/reset 信息 | `RemoteBatchVecEnv` 是 process/vector API；当前注册集合仍是 Pendulum/TwoWheelBalance，不等于 native merged solver |
+| 进程隔离／process vectorization | worker 可持有 scalar session 或 native batch；一份任务模板按实际部署引用实例 | vector wrapper 明确 env→worker→worker-local row、episode/reset 信息；不假定一 env 一进程 | 当前 `RemoteBatchVecEnv` 是一个 child worker 持有 GeoPhys merged batch；不是每 env 独立 session。多 scalar worker 只是未来可声明的部署，当前未据此获得支持 |
 
 建议让 batch envelope 引用唯一 task/Scene template、共同 execution config 和稳定实例列表；不要把 N 份 native state 复制进 Task Artifact，也不要把 N 个同值 Scene hash 当成不同 task semantics。Scene instance identity、env identity、episode/reset generation 和 batch row mapping 是 publication/runtime identity。当前 `StateBoundaryIdentity` 已有 `episode_id`、`scene_identity_hash`、`scene_instance_id`、`provider_materialization_id`、step/revision；未来 batch publication 还需显式 `env_id` 和稳定 batch axis/row mapping。
 
-每批使用统一 provider route/config；不能把 CPU/CUDA 当作两个 physics provider 或把两类 solver 推定为可耦合。reset 可按 env ID 选择实例，但 replacement 必须用新执行实例完成，不迁移旧 native state；同一环境契约在 reset 后保持 Observation schema、shape/dtype/unit 与 camera output contract 固定。动作/controller 切换输入的完整契约留 1c/4a。render 图像沿用同一 batch row/environment ID，图像 layout 与 auto-reset detail 留 1d/6a。
+每批使用统一 provider route/config；不能把 CPU/CUDA 当作两个 physics provider 或把两类 solver 推定为可耦合。不变配置时，支持 partial reset 的路线只重新初始化选中 env，保留其他 env 的状态、时钟、Controller 历史和 episode/generation；这不要求重建整个 batch。更换执行配置时，按原生批次建立新执行实例／materialization，不迁移旧 native state。同一环境契约在 reset 后保持 Observation schema、shape/dtype/unit 与 camera output contract 固定。动作/controller 切换输入的完整契约留 1c/4a。render 图像沿用同一 batch row/environment ID，图像 layout 与 auto-reset detail 留 1d/6a。
 
 ## 5. Identity、codec 与兼容
 
@@ -107,7 +107,7 @@
 
 `Timebase` 现已位于 `TaskArtifact` 和 `TaskArtifactV1` 的 canonical mapping 中，所以改 physics `dt`/control substeps 会改当前 task artifact hash；backend/renderer 路由则由 `ExecutionSpec` 与 resolved config identity 分开绑定。**1b 保持 v0/v1 hash/codec 原义，不把“改 backend 或 dt 永不改变 task identity”写成规则。**若产品希望未来将 cadence 完全移入 Execution，需要新 Artifact/identity 版本、显式旧身份对应表、codec reader 和历史 evidence 保留；不得重签旧 Artifact 或把旧接收静默转移。
 
-Decoder 只按精确 `schema_version`；unknown core fields/enum/extension 均拒绝。类型化 extension 至少带 namespace、extension schema version、requiredness、payload/content identity 与 typed references。若 decoder 仅为保留未知 optional payload 而透传，执行 admission 仍须确认它不改变语义且不影响本路线；任何 required/physics-affecting extension 未注册、悬空引用、缺少 required representation 或未知相互作用必须在 compile/admission/materialization 的首个可知阶段，以稳定原因拒绝，不丢字段、不降级、不 silent fallback。
+Decoder 只按精确 `schema_version`；unknown core fields/enum 均拒绝。扩展仅能进入该版本显式定义的类型化 extension 槽，至少带 namespace、extension schema version、requiredness、payload/content identity 与 typed references。旧版本若没有 extension 槽，不因新设计而接受未知字段。未来 decoder 仅为保留未知 optional payload 而透传时，执行 admission 仍须确认它不改变语义且不影响本路线；任何 required/physics-affecting extension 未注册、悬空引用、缺少 required representation 或未知相互作用必须在 compile/admission/materialization 的首个可知阶段，以稳定原因拒绝，不丢字段、不降级、不 silent fallback。
 
 ## 6. 兼容矩阵
 
@@ -130,8 +130,10 @@ Decoder 只按精确 `schema_version`；unknown core fields/enum/extension 均�
 
 1. 认可 Scene-v4 在既有 Scene owner 内组合 typed physics/model reference、representation binding 和 mapping；保持 Scene-v1/v2/v3 codec 不变。若拒绝，需说明现有 owner 中哪个可严格约束这些字段，避免退回无类型字典。
 2. 认可 `ExecutionSpecV2` 在既有 execution owner 内将 provider/host/engine/solver/coupler/precision/environment constraint 分层，保留 v1 exact decoder；provider route 缺层级时标记 `not_applicable` 或 `unknown`，不是臆造层级。
-3. 选择 TaskArtifact future version 是否继续将 `Timebase` 放入 task hash；本设计建议旧 v0/v1 永久保留原行为，新语义若拆分则新版本 + 显式迁移映射。
-4. 资产 owner 核验 PickCube cube 已声明的质量、惯量、collision intent 与几何关系；现有约 5% 的均匀立方体惯量差异仍是源模型待确认，不是本设计裁决。
-5. 未来若 Task 要直接控制非关节实体，确认 entity-targeted force/torque action 的任务语义和 capability；被动 cube 不因此成为强制 action 维度。
+3. 本版保持 `Timebase` 在现有 v0/v1 Artifact hash 中的行为；未来版本是否拆分不作为本版前置。若以后拆分，必须新版本及显式迁移，不能重签旧身份。
+4. 由后续资产／provider 检查核验 PickCube 声明物理参数；约 5% 的均匀立方体惯量差异不是本设计已证明的缺陷，不要求维护者先裁决它才能推进协议。
+5. 直接施力／力矩的类型化扩展位置符合已讨论方向；具体对象、作用点、坐标系和 capability 交 1c/4a 收敛。被动 cube 仍不自动成为 action target，实体 wrench 的真实执行不由此追加为本版必达矩阵。
 
 以上决定不阻止 1b 交付；依赖它们的具体 build/reset/control/camera/batch 行为待后续协议和对应执行包确认。本文仍为 draft，维护者确认前不得标 `FROZEN` 或 `ACCEPTED`。
+
+1b 设计交付及有界文字／案例修正已由 Sol 审核，见[审核记录](../maintenance/reviews/20261103_1b_sol_review.md)；Scene-v4／ExecutionSpecV2 仍是待审阅的版本演进建议，不是已实现或批准的 schema。

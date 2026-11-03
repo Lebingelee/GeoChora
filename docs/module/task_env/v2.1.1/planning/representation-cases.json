@@ -27,6 +27,7 @@
       "purpose": "一个 Panda、静态桌面、被动 free cube 和相机的统一语义、模型、资产映射与执行描述。",
       "reuses_case": [],
       "proposal": {
+        "scene_template": {"identity_ref": "declared-scene-template-content-identity", "entity_ids": ["panda-v1", "tabletop-v1", "cube-v1"], "physics_model_ref": "P1.physics_model", "representation_bindings_ref": "P1.asset_representation"},
         "task_semantics": {
           "task_id": "pick-cube-p16-reference-v1",
           "artifact_version": "source-declared-version",
@@ -95,8 +96,9 @@
       "id": "P3",
       "kind": "positive_design",
       "purpose": "证明不同的 mechanical/collision/visual 表示、结构化外部数据和 topology generation 可被未来 Scene extension 引用，不承诺当前 provider 支持。",
-      "reuses_case": [],
+      "reuses_case": ["P1"],
       "proposal": {
+        "scene_context": {"reused_entities": ["P1.physics_model.tabletop-v1"], "additional_entity_id": "rope-v1", "reuse_policy": "Only the static tabletop context is reused; no PickCube action, success or camera capability is inherited."},
         "entity": {"entity_id": "rope-v1", "model_kind": "deformable_rope", "mechanical_representation": {"id": "rope-particles-g4", "format": "typed_particle_layout", "state_components": [{"name": "position", "shape": ["N", 3], "unit": "m", "frame": "world"}, {"name": "velocity", "shape": ["N", 3], "unit": "m/s", "frame": "world"}], "topology_generation": 4, "payload_identity": "sha256:declared-payload"}, "collision_representation": {"id": "rope-collider-g4", "format": "typed_capsule_chain", "topology_generation": 4}, "visual_representation": {"id": "rope-render-mesh-g4", "format": "mesh", "topology_generation": 4}, "mappings": [{"from": "rope-particles-g4", "to": "rope-collider-g4", "mapping_payload_identity": "sha256:declared-map", "source_generation": 4, "target_generation": 4}, {"from": "rope-particles-g4", "to": "rope-render-mesh-g4", "mapping_payload_identity": "sha256:declared-map", "source_generation": 4, "target_generation": 4}]},
         "required_interaction": {"kind": "rope-rigid-contact", "entity_ids": ["rope-v1", "tabletop-v1"], "required": true, "capability_id": "typed-rope-contact-v1"},
         "admission": "must reject at capability-admission when provider/build does not declare and evidence this state layout, collision mapping and interaction; no fallback to visual mesh"
@@ -110,10 +112,11 @@
       "purpose": "用一份同构小 batch 的 task/Scene template 表达两个环境实例和可选择 reset，而不复制 native state 或改变 task semantics。",
       "reuses_case": ["P1"],
       "proposal": {
-        "template": {"task_identity_ref": "P1.task_semantics", "scene_identity_ref": "P1.asset_representation", "execution_config_identity": "one-shared-provider-route", "batch_size": 2, "batch_axis": "env"},
+        "template": {"task_identity_ref": "P1.task_semantics", "scene_identity_ref": "P1.scene_template.identity_ref", "execution_config_identity": "one-shared-provider-route", "batch_size": 2, "batch_axis": "env"},
         "instances": [{"env_id": "env-000", "scene_instance_id": "scene-instance-000", "episode_id": "episode-000-1", "reset_sample_id": "reset-<sha256>"}, {"env_id": "env-001", "scene_instance_id": "scene-instance-001", "episode_id": "episode-001-1", "reset_sample_id": "reset-<sha256>"}],
-        "state_publication": {"leading_axis": "env", "row_identity": ["env_id", "scene_instance_id", "episode_id", "reset_sample_id", "control_step", "state_revision"], "observation_schema": "same declared key/shape/dtype/unit for every row and reset", "reset_selection": ["env-001"], "state_migration": "none; reset rebuild uses a fresh execution instance"},
-        "alternative_realizations": ["one provider-native merged batch with one shared solver/config", "process vectorization with isolated per-env runtime/session but the same declared task and route config"],
+        "state_publication": {"leading_axis": "env", "row_identity": ["env_id", "scene_instance_id", "episode_id", "reset_sample_id", "control_step", "state_revision"], "observation_schema": "same declared key/shape/dtype/unit for every row and reset", "reset_selection": ["env-001"], "state_migration": "No previous-state migration when execution config changes; same-config partial reset initializes selected rows only."},
+        "reset_semantics": {"same_config_partial_reset": "Only env-001 reinitializes; env-000 state, clock, controller history and episode/generation remain unchanged.", "configuration_switch": "Rebuild the whole native batch with new execution/materialization identities; do not migrate previous physical state."},
+        "alternative_realizations": ["one provider-native merged batch with one shared solver/config, either local or in a dedicated worker", "future process vectorization with isolated scalar sessions and explicit env-to-worker mapping; not current RemoteBatchVecEnv support"],
         "current_admission": "neither PickCube realization is established; current native batch registrations and current RemoteBatchVecEnv task registrations remain unchanged"
       },
       "owner_refs": ["state", "batch", "vector"],
