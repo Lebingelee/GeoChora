@@ -74,3 +74,30 @@ CLI `--help` 成功不验证这一执行路径。此为已存在的 implementati
 或 provider admission 失败；本次文档工作不修实现。直接公共 `make_env/reset/step/close`
 路线已完成 CPU 一步 smoke，见模块 README。future fix 应修复既有 helper 并添加缺陷敏感检测，
 不另建 task factory/runtime；实现需另行授权。
+
+## PickCube Isaac Position 路线修复验证（2026-11-04）
+
+在 v2.1.0 candidate 的 PickCube / Isaac Sim 6.2 CUDA PhysX / R3 路线上，
+高位接近时的腕部姿态可导致横向残差停在原 measured TCP gate 外；须同时核对实际
+TCP、目标、Target/Ack 与运动学，不能只因 Runtime 正常就宣布任务成功。
+task-owned Solution 已增加连续的高位腕部转动并在下降时恢复原抓取姿态；原 clearance、
+horizontal gate、任务抬升判据与动作预算保留。运动学闭环检测不包含接触物理。
+
+Position 路线的 `close_ready` 仍使用原实测闭合条件。方块阻挡手指闭合时，
+Solution 可凭双侧 pad 与方块的严格几何一致性和连续稳定读数授权一次 lift attempt。
+这不是接触力、抓牢或任务成功的证明。该路径要求公开 state boundary 身份、摘要、
+evaluation clock 与 execution boundary 一致，且来自同一 reset/episode/scene/materialization；
+读数必须具有递增 revision。缺失、陈旧或矛盾读数会中断稳定累计，reset 清除候选状态。
+首个样本不计为已过去的控制间隔；完成事件保留实际稳定时长、间隔数与所选授权条件。
+
+Oracle finalization 必须向既有 Recorder 传入 `env.stop(...).outcome.end_reason`，
+而非 Expert 的诊断 failure reason；Recorder 的严格终止语义不变。
+对应检测位于 `test_pickcube_r3_approach_reachability.py`、
+`test_pickcube_position_capture_authorization.py` 与 `test_isaac_candidate_startup.py`；
+命令、输入 HEAD 与尚未关闭的 native/EULA blocker 见
+[`20261104 Isaac PickCube Position repair attempt 2`](../maintenance/validation/f_route/20261104_isaac_pickcube_position_repair.md)。
+
+本轮离线相邻检测 59 passed、1 deselected；跳过的检测需要原生环境。
+一次原生重试在启动 Kit/物理之前因 `EULA not accepted` 退出，没有生成新的成功 Episode/H5。
+因此修复尚未获得原生物理验证，20 seed 与成功 Oracle 目标仍未完成。
+历史失败证据保持原样；后续应先验证原 spec/horizon 的代表 seed，再运行完整 campaign。

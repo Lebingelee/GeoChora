@@ -14,6 +14,7 @@ from decimal import Decimal, ROUND_CEILING
 from enum import Enum
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -22,6 +23,7 @@ import numpy as np
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
+from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
 from ...controllers.canonical.contracts import digest
 from ...objects.pick_cube import CUBE_HALF_SIZE
 from ...utils.rotation import matrix_to_quat_wxyz, quat_wxyz_to_matrix, rotvec_to_matrix
@@ -39,8 +41,12 @@ _MEASURED_CLEARANCE_COMMAND_HEADROOM = 0.020
 # singularity. Restore the grasp orientation continuously on the hover path.
 _R3_APPROACH_WRIST_PITCH_RAD = -0.20
 _CAPTURE_GEOMETRY_DWELL_S = 0.10
-_CAPTURE_PAD_GAP_MIN_M = -0.0035
-_CAPTURE_PAD_GAP_MAX_M = 0.0015
+# Source pad OBBs must agree with the measured cube within 0.1 mm. This
+# geometric tolerance is not a contact-force observation or a success gate.
+_CAPTURE_PAD_GAP_MIN_M = -0.0001
+_CAPTURE_PAD_GAP_MAX_M = 0.0001
+_CAPTURE_RELATIVE_SPEED_M_S = 0.002
+_CAPTURE_RELATIVE_ROTATION_SPEED_RAD_S = 0.05
 # Clearance is confirmed from the public measured EE pose before the preplanned
 # path is allowed to traverse over the cube or descend toward it.
 _MEASURED_CLEARANCE_TOLERANCE = 0.005
@@ -641,7 +647,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._last_public_observation = None
-        self._capture_candidate_ticks = 0
+        self._clear_capture_candidate()
+        self._capture_episode_context = None
+        self._capture_last_revision = None
         super().__init__(config=config.base)
         self.identity = self.identity_for_config(config)
 
@@ -684,7 +692,14 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._last_public_observation = observation
-        self._capture_candidate_ticks = 0
+        self._clear_capture_candidate()
+        self._capture_episode_context = None
+        self._capture_last_revision = None
+        if isinstance(execution_info, PickCubePositionExecutionInfoV1):
+            publication = self._position_publication(observation, info, execution_info)
+            if publication is not None:
+                self._capture_episode_context = self._publication_context(publication)
+                self._capture_last_revision = publication.state_revision
         super().reset(observation, info, metadata)
         if self._done:
             self._done = bool(info.get("is_success")) and float(
@@ -755,22 +770,62 @@ class PickCubeReadinessSolution(PickCubeSolution):
         policy = self.readiness_config.policies[self._segment_index]
         plan = self._segments[self._segment_index].plan
         exhausted = self._action_index >= len(plan.actions)
+        authorization = "measured_closed_gripper"
+        capture_evidence = {}
         if (policy.kind == "gripper_ready"
                 and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
             ready = execution_info.close_ready
             if not ready and exhausted:
-                capture_geometry_ready = self._position_capture_geometry_ready(
-                    observation, execution_info,
+                publication = self._position_publication(observation, info, execution_info)
+                fresh = bool(
+                    publication is not None
+                    and self._capture_episode_context is not None
+                    and self._publication_context(publication) == self._capture_episode_context
+                    and publication.state_revision > self._capture_last_revision
                 )
-                self._capture_candidate_ticks = (
-                    self._capture_candidate_ticks + 1 if capture_geometry_ready else 0
-                )
+                if fresh:
+                    self._capture_last_revision = publication.state_revision
+                candidate = self._position_capture_geometry(observation, execution_info) if fresh else None
+                stable = False
+                if candidate is not None and self._capture_previous_pose is not None:
+                    previous_position, previous_rotation = self._capture_previous_pose
+                    anchor_position, anchor_rotation = self._capture_anchor_pose
+                    position, rotation = candidate
+                    from ...utils.rotation import matrix_to_rotvec
+                    dt = self.readiness_config.control_dt
+                    stable = bool(
+                        np.linalg.norm(position - previous_position) <= _CAPTURE_RELATIVE_SPEED_M_S * dt
+                        and np.linalg.norm(matrix_to_rotvec(rotation @ previous_rotation.T))
+                        <= _CAPTURE_RELATIVE_ROTATION_SPEED_RAD_S * dt
+                        and np.linalg.norm(position - anchor_position) <= 0.0002
+                        and np.linalg.norm(matrix_to_rotvec(rotation @ anchor_rotation.T)) <= 0.005
+                    )
+                self._capture_candidate_ticks = self._capture_candidate_ticks + 1 if stable else 0
+                self._capture_previous_pose = candidate
+                if not stable:
+                    self._capture_anchor_pose = candidate
+                    self._capture_first_sample_step = self._boundary_step if candidate is not None else None
+                    self._capture_first_sample_time = self._boundary_time if candidate is not None else None
                 required_ticks = max(
                     1, int(np.ceil(_CAPTURE_GEOMETRY_DWELL_S / self.readiness_config.control_dt)),
                 )
-                ready = self._capture_candidate_ticks >= required_ticks
-            elif not ready:
-                self._capture_candidate_ticks = 0
+                dwell = (
+                    self._boundary_time - self._capture_first_sample_time
+                    if self._capture_first_sample_time is not None else 0.0
+                )
+                ready = bool(
+                    self._capture_candidate_ticks >= required_ticks
+                    and dwell >= _CAPTURE_GEOMETRY_DWELL_S - 1e-12
+                )
+                if ready:
+                    authorization = "stable_opposed_pad_capture_geometry"
+                    capture_evidence = {
+                        "capture_first_sample_step": self._capture_first_sample_step,
+                        "capture_stable_intervals": self._capture_candidate_ticks,
+                        "capture_dwell_s": dwell,
+                    }
+            else:
+                self._clear_capture_candidate()
         else:
             ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
         if policy.kind == "task_outcome" and ready:
@@ -796,10 +851,8 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self.completion_events.append({
                 "stage": self.stage, "control_step": self._boundary_step,
                 "wait_ticks": self._wait_count, "kind": policy.kind,
-                **({"authorization": (
-                    "stable_opposed_pad_capture_geometry"
-                    if self._capture_candidate_ticks else "measured_closed_gripper"
-                )} if policy.kind == "gripper_ready" else {}),
+                **({"authorization": authorization, **capture_evidence}
+                   if policy.kind == "gripper_ready" else {}),
             })
             self._segment_index += 1
             self._action_index = 0
@@ -808,32 +861,74 @@ class PickCubeReadinessSolution(PickCubeSolution):
         elif self._wait_count >= policy.hold_ticks:
             self._fail(policy.failure_reason)
 
+    def _clear_capture_candidate(self):
+        self._capture_candidate_ticks = 0
+        self._capture_previous_pose = None
+        self._capture_anchor_pose = None
+        self._capture_first_sample_step = None
+        self._capture_first_sample_time = None
+
     @staticmethod
-    def _position_capture_geometry_ready(observation, execution_info) -> bool:
+    def _publication_context(boundary):
+        return (
+            boundary.episode_id, boundary.reset_sample_id, boundary.scene_identity_hash,
+            boundary.scene_instance_id, boundary.provider_materialization_id,
+        )
+
+    @staticmethod
+    def _position_publication(observation, info, execution_info):
+        """Bind geometric readback to the same public execution boundary."""
+        try:
+            boundary = StateBoundaryIdentity.from_mapping(info["state_boundary_identity"])
+            clock = StateSampleClock.from_mapping(info["state_sample_clock"])
+            observed_digest = np.asarray(observation["state"]["boundary_identity_sha256"])
+            expected_digest = np.frombuffer(
+                bytes.fromhex(boundary.boundary_id.removeprefix("state-boundary-")), dtype=np.uint8,
+            )
+            if (boundary.control_step != execution_info.control_step
+                    or info["control_step"] != execution_info.control_step
+                    or clock.clock_domain != "evaluation_boundary"
+                    or clock.sample_index != execution_info.control_step
+                    or info["state_boundary_id"] != boundary.boundary_id
+                    or observed_digest.dtype != np.uint8
+                    or observed_digest.shape != (32,)
+                    or not np.array_equal(observed_digest, expected_digest)):
+                return None
+            for sample_time in (clock.simulation_time_s, info["simulation_time_s"]):
+                if (not math.isfinite(sample_time)
+                        or abs(sample_time - execution_info.simulation_time) > max(
+                            math.ulp(sample_time), math.ulp(execution_info.simulation_time))):
+                    return None
+            return boundary
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return None
+
+    @staticmethod
+    def _position_capture_geometry(observation, execution_info):
         """Check only a public, near-contact grasp geometry; this is not a contact claim."""
         if (execution_info.target_opening_m > 0.045
                 or abs(execution_info.measured_opening_velocity_m_s) > 0.005):
-            return False
+            return None
         state = observation.get("state", {})
         privileged = observation.get("privileged_state", {})
         if "joint_position" not in state or "hand_pose" not in state:
-            return False
+            return None
         cube_values = privileged.get("cube_v1_body_pose")
         if cube_values is None:
-            return False
+            return None
         joints = np.asarray(state["joint_position"], dtype=np.float64).reshape(-1)
         hand = np.asarray(state["hand_pose"], dtype=np.float64).reshape(-1)
         cube = np.asarray(cube_values, dtype=np.float64).reshape(-1, 7)[0]
         if (joints.size < 9 or hand.size != 7 or not np.isfinite(joints).all()
                 or not np.isfinite(hand).all() or not np.isfinite(cube).all()):
-            return False
+            return None
         if not np.allclose(hand, np.asarray(state["ee_pose"]), atol=1e-5, rtol=0.0):
-            return False
+            return None
         measured = float(joints[7] + joints[8])
         if abs(measured - execution_info.measured_opening_m) > 1e-4:
-            return False
+            return None
         if not 0.045 <= measured <= 0.060:
-            return False
+            return None
 
         hand_rotation = quat_wxyz_to_matrix(hand[3:7])
         cube_rotation = hand_rotation.T @ quat_wxyz_to_matrix(cube[3:7])
@@ -841,7 +936,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if (abs(cube_center[0]) > 0.008
                 or abs(cube_center[1]) > 0.008
                 or not 0.040 <= cube_center[2] <= 0.057):
-            return False
+            return None
 
         cube_half = np.full(3, CUBE_HALF_SIZE, dtype=np.float64)
         def separating_gap(pad_center, pad_half):
@@ -870,7 +965,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
                     center = np.asarray([sign * x, sign * (opening + 0.002), z])
                     gaps.append(separating_gap(center, half))
             side_gaps.append(min(gaps))
-        return all(_CAPTURE_PAD_GAP_MIN_M <= gap <= _CAPTURE_PAD_GAP_MAX_M for gap in side_gaps)
+        if not all(_CAPTURE_PAD_GAP_MIN_M <= gap <= _CAPTURE_PAD_GAP_MAX_M for gap in side_gaps):
+            return None
+        return cube_center, cube_rotation
 
     def _pending_measured_tcp_gate(self, segment):
         if (not self.readiness_config.measured_tcp_clearance_gate

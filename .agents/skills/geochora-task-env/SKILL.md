@@ -35,6 +35,12 @@ The v2.1.0 matrix is the single current TaskEnv table. F06 has 9/9 runtime-valid
 
 Use [troubleshooting](../../../docs/module/task_env/v2.1.0/guides/troubleshooting.md) to stop at the earliest failure boundary. Do not weaken an oracle, use mock evidence as a native pass, or infer support from registration.
 
+For the 2026-11-04 PickCube Isaac Position repair, follow the dated troubleshooting
+entry: public-boundary-bound stable pad geometry authorizes only a lift attempt;
+it does not change `close_ready` or prove contact/task success. Keep the measured
+TCP gates, reset distribution and budgets intact. Offline checks passed, but
+the new source still requires native validation before a 20-seed/Oracle claim.
+
 ## Development and migration
 
 Before proposing behavior, identify the public facade, owner, callers, tests, and limitation; classify work as fix/extend/compose/new. Use CodeGraph when the index is current. Run only the smallest affected offline/API or bounded route checks authorized by the task. The repository has no root packaging metadata; use `task_env/requirements.txt` and explicit `PYTHONPATH`, not `pip install -e .`.
