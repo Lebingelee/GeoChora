@@ -17,18 +17,16 @@ import time
 import traceback
 
 from completion_facts import COMPLETION_CONTRACT, capture_episode_facts
+from provider_routes import backend_for, requires_native_worker
 
 CLASSES = ('solved', 'invalid', 'expert_failed', 'unknown')
 
 
-def run_seed(env_class, provider, seed, horizon):
-    started = time.perf_counter()
-    env = None
-    info = {}
-    phase = 'construction'
-    row = dict(seed=seed, horizon=horizon, start_pose=None, sample_seed=None,
+def initial_row(seed, horizon):
+    """The complete raw-fact row every seed starts from; native runners reuse it verbatim."""
+    return dict(seed=seed, horizon=horizon, start_pose=None, sample_seed=None,
         artifact_hash=None, classification='unknown', steps=0, step_attempts=0,
-        phase=phase, reason='probe did not reach an outcome', stage=None,
+        phase='construction', reason='probe did not reach an outcome', stage=None,
         construction_succeeded=False, reset_attempted=False, reset_succeeded=False,
         terminated=False, truncated=False, task_success=False, task_failure=False,
         solution_done=False, solution_failed=False, expert_complete=False,
@@ -40,6 +38,23 @@ def run_seed(env_class, provider, seed, horizon):
         cleanup_traceback=None, error_phase=None, error_type=None,
         error_message=None, error_traceback=None, failure_reason=None,
         wall_time_s=0.0)
+
+
+def invalid_row(seed, horizon, *, error_type, message, traceback_text, phase='construction', wall_time_s=0.0):
+    """An invalid row for an episode that never reached Core; satisfies the completion-row contract."""
+    row = initial_row(seed, horizon)
+    row.update(classification='invalid', phase=phase, error_phase=phase, error_type=str(error_type),
+               error_message=str(message), error_traceback=str(traceback_text) or str(message),
+               reason=f'{error_type}: {message}', wall_time_s=float(wall_time_s))
+    return row
+
+
+def run_seed(env_class, provider, seed, horizon):
+    started = time.perf_counter()
+    env = None
+    info = {}
+    phase = 'construction'
+    row = initial_row(seed, horizon)
 
     def remember_error(error, error_phase):
         if row['error_type'] is not None:
@@ -58,7 +73,7 @@ def run_seed(env_class, provider, seed, horizon):
             row['reason'] = fault.message
 
     try:
-        env = env_class(provider=provider, backend='cpu', horizon=horizon)
+        env = env_class(provider=provider, backend=backend_for(provider), horizon=horizon)
         row['construction_succeeded'] = True
         row['artifact_hash'] = env.artifact.identity_hash
         phase = 'reset'
@@ -182,12 +197,22 @@ def run_candidate_probe(spec, catalog, provider, seeds, *, output=None):
         if output is not None:
             report.save(output)
         return report
+    native = requires_native_worker(provider)
+    if native and output is None:
+        raise ValueError(f'{provider} candidates run in a supervised native worker and require an output path')
     stream = None
+    native_root = None
     if output is not None:
         output = Path(output)
         output.parent.mkdir(parents=True, exist_ok=True)
         stream = output.open('x', encoding='utf-8')
+        if native:
+            native_root = output.with_name(output.stem + '.native')
+            native_root.mkdir(parents=False, exist_ok=False)
     rows, findings = [], []
+    execution = {'mode': 'native_worker' if native else 'in_process', 'backend': compiled.backend,
+                 'device': compiled.device, 'source_kind': compiled.source_kind,
+                 'native_root': str(native_root) if native_root is not None else None}
     def report_for(complete):
         totals = {key: sum(row['classification'] == key for row in rows) for key in CLASSES}
         # Unknown remains inconclusive, never relabelled as expert failure.
@@ -196,6 +221,7 @@ def run_candidate_probe(spec, catalog, provider, seeds, *, output=None):
             catalog['core_commit'], catalog['core_dirty'], 'feasibility_probe', status, list(findings),
             details={'complete': complete, 'provider': provider, 'horizon': spec.horizon,
                 'seeds': list(seeds), 'rows': list(rows), 'totals': totals,
+                'execution': execution,
                 'completion_contract': COMPLETION_CONTRACT,
                 'classification_policy': 'invalid first; solved requires task success, confirmed expert completion, no failure/flags, and successful close; then expert_failed; otherwise unknown',
                 'scope': 'Candidate reset/expert evidence only; not task infeasibility, full validation, or qualification.'})
@@ -208,8 +234,15 @@ def run_candidate_probe(spec, catalog, provider, seeds, *, output=None):
             stream.flush()
     try:
         checkpoint(report_for(False))
+        if native:
+            from native_candidate_runner import run_seed_native
         for seed in seeds:
-            row = run_seed(compiled.env_class(), provider, seed, spec.horizon)
+            if native:
+                row = run_seed_native(spec=spec, catalog=catalog, provider=provider, seed=seed,
+                                      horizon=spec.horizon, output_dir=native_root / f'seed_{seed}',
+                                      expected_artifact_hash=compiled.artifact_hash)
+            else:
+                row = run_seed(compiled.env_class(), provider, seed, spec.horizon)
             rows.append(row)
             evidence = {'seed': seed, 'row_index': len(rows)-1, 'phase': row['phase'],
                         'stage': row['stage'], 'start_pose': row['start_pose']}

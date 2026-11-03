@@ -10,12 +10,16 @@ if __package__:
     from .harness_spec_schema import CandidateSpec, CheckFinding, CheckReport, save_json
     from .catalog_query import build_catalog, core_context, CatalogProvenanceError
     from .asset_check import check_assets
+    from .provider_routes import UnknownProvider, route_for
 else:
     from harness_spec_schema import CandidateSpec, CheckFinding, CheckReport, save_json
     from catalog_query import build_catalog, core_context, CatalogProvenanceError
     from asset_check import check_assets
+    from provider_routes import UnknownProvider, route_for
 
-COMPILER_VERSION='0.1.0'
+COMPILER_VERSION='0.2.0'
+ISAAC_CONTROLLER_PROFILE='r3_continuous_v1'
+ISAAC_CONSTRUCTION_SEED=31
 
 
 class CompilationRejected(ValueError):
@@ -32,14 +36,34 @@ class CompiledTask:
     artifact_hash: str
     horizon: int
     source_xml_sha256: str
+    # Route facts bound at compile time; construction with another provider/backend is refused.
+    provider: str = 'mujoco'
+    backend: str = 'cpu'
+    device: str = 'cpu'
+    source_kind: str = 'mjcf'
+    # Isaac only: Core's precompiled selected value (ExecutionSpecV1 + exact USD RuntimeInput).
+    initial_value: object = None
+    route: dict | None = None
 
     def env_class(self):
         from task_env.tasks.reference_env import SelectedReferenceEnv
         compiled_horizon=self.horizon
-        def initialize(env, *, provider='mujoco', backend='cpu', horizon=None):
+        declared=(self.provider,self.backend)
+        binding=self.binding
+        initial=self.initial_value
+        def initialize(env, *, provider=declared[0], backend=declared[1], horizon=None):
             if horizon is not None and horizon != compiled_horizon:
                 raise ValueError('horizon override differs from compiled spec')
-            SelectedReferenceEnv.__init__(env,provider=provider,backend=backend,horizon=compiled_horizon)
+            if (provider,backend)!=declared:
+                raise ValueError(f'compiled candidate is bound to {declared}; cannot construct for {(provider,backend)}')
+            if initial is None:
+                SelectedReferenceEnv.__init__(env,provider=provider,backend=backend,horizon=compiled_horizon)
+            else:
+                # Mirror PickCubeReferenceEnv.from_resolved_config: the versioned
+                # Isaac route must declare its ExecutionSpecV1 and reuse the
+                # Core-built value; later resets rebuild it per seed via build_seeded.
+                SelectedReferenceEnv.__init__(env,provider=provider,backend=backend,horizon=compiled_horizon,
+                    _binding=binding,_execution_spec_v1=initial['execution_spec_v1'],_initial_value=initial)
         return type('CompiledCandidateEnv',(SelectedReferenceEnv,),
             {'uid':self.artifact.task_id,'binding':self.binding,'__init__':initialize})
 
@@ -228,25 +252,10 @@ def evaluate_lift(state, semantics):
     return TaskEvaluation(float(sum(terms.values())),success,False,metrics,terms)
 
 
-def compile_candidate(spec,catalog,*,provider='mujoco'):
-    # Re-validate/copy caller-owned nested dictionaries before closing over any data.
-    spec=CandidateSpec.from_dict(spec.to_dict())
-    from task_env.artifacts import (PoseWorld, RequiredCapabilitySet, SemanticDefinition, Timebase,
-        ExecutionSpec, admit_capabilities)
-    from task_env.artifacts.contracts import CapabilityAdmissionError
-    from task_env.artifacts.execution import ResetSample
-    from task_env.assembly.panda_box import (PANDA_BOX_CAPABILITIES, PandaBoxDeclaration,
-        compile_panda_box_artifact, compile_panda_box_source)
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
-    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig,PickCubeReadinessSolution
-    from task_env.tasks.reference_env import ReferenceTaskBinding
-    from task_env.objects.pick_cube import CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
-    from task_env.controllers.canonical import ProductionCanonicalPandaController
-    from task_env.planners.completion import ExpertExecutionInfo
-    from task_env.runtime.sessions import provider_manifest
-    from task_env.runtime.sessions.api import PROFILE
-    import numpy as np
-
+def _template_findings(spec,catalog):
+    """Shared pick-lift-v0 template envelope; returns the asset report, findings, external asset and a reject hook."""
+    from task_env.assembly.panda_box import PANDA_BOX_CAPABILITIES
+    from task_env.objects.pick_cube import CUBE_HALF_SIZE
     report=check_assets(spec,catalog)
     findings=list(report.findings)
     def reject(check,path,observed,expected,category='spec_invalid',locality='task_local',hint=None):
@@ -278,6 +287,144 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
                    'Move or narrow the reset envelope to fit the declared support surface.')
     missing=set(PANDA_BOX_CAPABILITIES)-set(spec.required_capabilities)
     if missing:reject('template_capabilities','required_capabilities',spec.required_capabilities,sorted(PANDA_BOX_CAPABILITIES))
+    return report,findings,external,reject
+
+
+def _compile_isaac_candidate(spec,catalog,route):
+    """Compile a pick-lift-v0 candidate onto Core's exact F06 PickCube Isaac cell.
+
+    The Isaac desktop scene is a frozen, hash-pinned USD delivery. Only the
+    fields that Core's PickCube owners derive from the task recipe (reset
+    envelope and success thresholds) may vary; scene geometry, external MJCF
+    proxies, timebase and horizons above 1000 ticks are refused with
+    provider-locality findings. Construction is delegated to the Core PickCube
+    owner (``make_reference_binding``/``build_isaac_reference``); the Harness
+    adds no provider adapter or scene editor.
+    """
+    import copy
+    from task_env.artifacts import RequiredCapabilitySet, ExecutionSpec, admit_capabilities
+    from task_env.artifacts.contracts import CapabilityAdmissionError
+    report,findings,external,reject=_template_findings(spec,catalog)
+    if findings:
+        raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings))
+    isaac_route=catalog.get('isaac_route')
+    provider_row=catalog.get('providers',{}).get('isaacsim')
+    if not isinstance(isaac_route,dict) or isaac_route.get('schema_version')!='harness-isaac-route-v1':
+        reject('isaac_route_declared','',None,'catalog isaac_route (harness-isaac-route-v1)','capability_unsupported','provider',
+               'Regenerate the catalog with --providers isaacsim --isaac-delivery-manifest <Core-pinned manifest>.')
+    elif isaac_route.get('available') is not True:
+        reject('isaac_delivery_available','',isaac_route.get('unavailable_reason'),'exact Core-pinned F06 PickCube USD delivery present',
+               'capability_unsupported','provider','Obtain the exact delivery from its owner; the Harness does not rebuild or relax it.')
+    if not isinstance(provider_row,dict) or provider_row.get('available') is not True:
+        reject('provider_manifest_available','',(provider_row or {}).get('unavailable_reason') or 'isaacsim manifest row missing',
+               'available isaacsim manifest','capability_unsupported','provider')
+    if external is not None or spec.object_config['object_uid']!=isaac_route_builtin_object(isaac_route):
+        reject('isaac_builtin_object_only','object_config.object_uid',spec.object_config['object_uid'],
+               isaac_route_builtin_object(isaac_route),'capability_unsupported','provider',
+               'The frozen Isaac desktop USD cannot consume MJCF proxy assets; use the built-in cube or escalate to the asset/provider owner.')
+    frozen_scene=_isaac_frozen_scene()
+    observed_scene={'table_top_z':float(spec.scene_config['table_top_z']),
+        'table_center_xy':[float(v) for v in spec.scene_config['table_center_xy']],
+        'table_half_size':[float(v) for v in spec.scene_config['table_half_size']]}
+    if observed_scene!=frozen_scene:
+        reject('isaac_frozen_scene','scene_config',observed_scene,frozen_scene,'capability_unsupported','provider',
+               'Isaac table geometry is baked into the pinned USD; keep scene_config equal to the frozen PickCube recipe.')
+    horizon_max=int((isaac_route or {}).get('horizon_max_control_ticks',1000))
+    if spec.horizon>horizon_max:
+        reject('isaac_horizon_envelope','horizon',spec.horizon,f'1 <= horizon <= {horizon_max}','capability_unsupported','provider',
+               'Core freezes the Isaac PickCube route at most 1000 control ticks; lower the candidate horizon.')
+    if findings:
+        raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings))
+    from task_env.runtime.sessions.api import _f06_pickcube_isaac_capability_manifest
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
+    manifest=_f06_pickcube_isaac_capability_manifest(build_artifact())
+    try:
+        admit_capabilities(RequiredCapabilitySet(tuple(spec.required_capabilities)),manifest,
+            ExecutionSpec('isaacsim',manifest.physics_profile,'none',route['backend'],0,manifest.determinism_mode))
+    except CapabilityAdmissionError as error:
+        reject('provider_admission','required_capabilities',str(error),'capabilities admitted by the Core F06 Isaac manifest',
+               'capability_unsupported','provider')
+        raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings)) from error
+
+    spec_hash=spec.spec_sha256()
+    obj=spec.object_config
+    task_config=copy.deepcopy(PickCubeReferenceEnv.selected_task_configuration())
+    recipe=task_config['recipe']
+    # TaskSourceV1 identifiers reject '/', so the Core task_uid stays; the
+    # Harness candidate identity is the spec hash carried in artifact_id/reports.
+    recipe['artifact_id']=f"{recipe['task_uid']}/harness-isaac-{COMPILER_VERSION}/spec-{spec_hash}"
+    recipe['reset']={**recipe['reset'],'center_xy':[float(v) for v in obj['initial_pos_xy']],
+        'half_extent_m':float(obj['reset_half_extent_m'])}
+    recipe['success']={'lift_height_m':float(spec.success_config['lift_height_m']),
+        'reach_distance_m':float(spec.success_config['reach_distance_m']),
+        'gripper_closed_opening_m':float(spec.success_config['gripper_closed_opening_m'])}
+    default_config=PickCubeReferenceEnv.selected_default_config(task_config)
+    resolved_config=replace(default_config,runtime=replace(default_config.runtime,backend=route['backend']),
+        episode=replace(default_config.episode,horizon=spec.horizon))
+    manifest_path=isaac_route['delivery_manifest']
+    try:
+        from task_env.tasks.pick_cube.task import build_isaac_reference, make_reference_binding
+        binding=make_reference_binding(controller_profile=ISAAC_CONTROLLER_PROFILE,source_delivery_manifest=manifest_path,
+            resolved_config=resolved_config,task_config=task_config)
+        initial=build_isaac_reference(delivery_manifest=manifest_path,task_seed=ISAAC_CONSTRUCTION_SEED,horizon=spec.horizon,
+            include_solution=False,controller_profile=ISAAC_CONTROLLER_PROFILE,resolved_config=resolved_config,
+            task_config=task_config)
+    except ImportError as error:
+        # OpenUSD (pxr) and the GeoPhys scene importer are interpreter facts, not spec defects.
+        reject('isaac_construction_dependencies','',f'{type(error).__name__}: {error}',
+               'OpenUSD and GeoPhys importers available (Isaac Python worker or a Core Python with usd-core)',
+               'capability_unsupported','provider','Compile Isaac candidates where Core\'s USD projection is importable; do not revise the spec.')
+        raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings)) from error
+    artifact=initial['artifact']
+    source=initial['source']
+    return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,source.source_closure_digest,
+        provider='isaacsim',backend=route['backend'],device=route['device'],source_kind='usd',initial_value=initial,
+        route={**route,'physics_profile':manifest.physics_profile,'controller_profile':ISAAC_CONTROLLER_PROFILE,
+            'delivery_manifest':manifest_path,'delivery_manifest_sha256':isaac_route.get('delivery_manifest_sha256'),
+            'harness_task_config_recipe_overlay':{'artifact_id':recipe['artifact_id'],'reset':recipe['reset'],'success':recipe['success']}})
+
+
+def isaac_route_builtin_object(isaac_route):
+    return (isaac_route or {}).get('builtin_object_uid','cube-v1')
+
+
+def _isaac_frozen_scene():
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    scene=PickCubeReferenceEnv.selected_task_configuration()['recipe']['scene']
+    return {'table_top_z':float(scene['table_top_z']),'table_center_xy':[float(v) for v in scene['table_center_xy']],
+        'table_half_size':[float(v) for v in scene['table_half_size']]}
+
+
+def compile_candidate(spec,catalog,*,provider='mujoco'):
+    # Re-validate/copy caller-owned nested dictionaries before closing over any data.
+    spec=CandidateSpec.from_dict(spec.to_dict())
+    try:
+        route=route_for(provider)
+    except UnknownProvider as error:
+        report=check_assets(spec,catalog)
+        finding=CheckFinding('provider_route_known','capability_unsupported','provider','',provider,sorted(('geophys','mujoco','isaacsim')),{},
+            'Select a provider the Harness routes; unknown names never fall back to another engine.')
+        raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=[*report.findings,finding])) from error
+    if provider=='isaacsim':
+        return _compile_isaac_candidate(spec,catalog,route)
+    from task_env.artifacts import (PoseWorld, RequiredCapabilitySet, SemanticDefinition, Timebase,
+        ExecutionSpec, admit_capabilities)
+    from task_env.artifacts.contracts import CapabilityAdmissionError
+    from task_env.artifacts.execution import ResetSample
+    from task_env.assembly.panda_box import (PandaBoxDeclaration,
+        compile_panda_box_artifact, compile_panda_box_source)
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig,PickCubeReadinessSolution
+    from task_env.tasks.reference_env import ReferenceTaskBinding
+    from task_env.objects.pick_cube import CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
+    from task_env.controllers.canonical import ProductionCanonicalPandaController
+    from task_env.planners.completion import ExpertExecutionInfo
+    from task_env.runtime.sessions import provider_manifest
+    from task_env.runtime.sessions.api import PROFILE
+    import numpy as np
+
+    report,findings,external,reject=_template_findings(spec,catalog)
+    scene,obj=spec.scene_config,spec.object_config
     if findings:
         raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings))
     try:
@@ -287,7 +434,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         raise CompilationRejected(replace(report,tool='harness_compiler',status='fail',findings=findings)) from error
     try:
         admit_capabilities(RequiredCapabilitySet(tuple(spec.required_capabilities)),manifest,
-            ExecutionSpec(provider,PROFILE,'none','cpu',0,'strict'))
+            ExecutionSpec(provider,PROFILE,'none',route['backend'],0,'strict'))
     except CapabilityAdmissionError as error:
         reject('provider_admission','required_capabilities',str(error),f'capabilities admitted by {provider}',
                'capability_unsupported','provider')
@@ -391,7 +538,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         object_poses=(('cube-v1','cube_v1'),),external_actions=True,interval_mode='grouped',recorder_mode='canonical',
         reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))
     return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,
-        hashlib.sha256(source.scene_source.xml.encode()).hexdigest())
+        hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        provider=provider,backend=route['backend'],device=route['device'],source_kind='mjcf',route=route)
 
 
 def main():
@@ -415,7 +563,8 @@ def main():
             compiled=compile_candidate(spec,catalog,provider=args.provider)
             report=CheckReport(compiled.spec_sha256,compiled.artifact_hash,ctx['core_commit'],ctx['core_dirty'],
                 'harness_compiler','pass',details={'artifact':compiled.artifact.to_mapping(),
-                'source_xml_sha256':compiled.source_xml_sha256,'template':spec.template,'provider':args.provider})
+                'source_xml_sha256':compiled.source_xml_sha256,'template':spec.template,'provider':args.provider,
+                'backend':compiled.backend,'device':compiled.device,'source_kind':compiled.source_kind})
         except CompilationRejected as error:
             report=error.report
         except Exception as error:

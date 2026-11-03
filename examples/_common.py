@@ -168,12 +168,12 @@ def episode_result(env, *, info: Mapping | None = None, transitions: int,
     }
 
 
-def identity_summary(env, *, provider: str) -> dict:
+def identity_summary(env, *, provider: str, backend: str = "cpu") -> dict:
     metadata = dict(getattr(env, "metadata", {}) or {})
     return {
         "env_id": metadata.get("env_id"),
         "provider": provider,
-        "backend": "cpu",
+        "backend": backend,
         "task_artifact_sha256": metadata.get("task_artifact_hash"),
         "construction_id": metadata.get("construction_id"),
         "control_dt": metadata.get("control_dt"),

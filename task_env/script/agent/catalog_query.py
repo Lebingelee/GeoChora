@@ -101,13 +101,59 @@ def attach_asset_delivery(catalog, delivery_path, *, provider_build_identities=N
     return catalog
 
 
+def isaac_route_record(delivery_manifest=None):
+    """Describe the one Core-admitted Isaac cell; ``available`` means the exact delivery bytes are present.
+
+    Core pins the F06 PickCube desktop USD delivery by manifest SHA-256, R3 and a
+    1000-tick horizon. The Harness records that pin and whether the local
+    manifest bytes match; it never relaxes the pin or claims runtime admission.
+    """
+    from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1, ISAAC_PROFILE_V1
+    from task_env.tasks.pick_cube.specialization import REFERENCE_ENV_ID
+    record={'schema_version':'harness-isaac-route-v1','provider':'isaacsim','backend':'cuda','device':'cuda:0',
+        'physics_profile':ISAAC_PROFILE_V1,'controller_profile':'r3_continuous_v1','horizon_max_control_ticks':1000,
+        'core_task_uid':REFERENCE_ENV_ID,'builtin_object_uid':'cube-v1','external_assets_admitted':False,
+        'execution':'supervised_isaac_python_worker','runtime_tested':False,
+        'pinned_delivery_manifest_sha256':ISAAC_DELIVERY_MANIFEST_SHA256_V1,
+        'delivery_manifest':None,'delivery_manifest_sha256':None,'available':False,'unavailable_reason':None}
+    if delivery_manifest is None:
+        record['unavailable_reason']='no --isaac-delivery-manifest was supplied'
+        return record
+    path=Path(delivery_manifest).resolve()
+    record['delivery_manifest']=str(path)
+    if not path.is_file():
+        record['unavailable_reason']='delivery manifest file is absent'
+        return record
+    digest=hashlib.sha256(path.read_bytes()).hexdigest()
+    record['delivery_manifest_sha256']=digest
+    if digest!=ISAAC_DELIVERY_MANIFEST_SHA256_V1:
+        record['unavailable_reason']='delivery manifest bytes differ from the Core-pinned F06 PickCube desktop delivery'
+        return record
+    record['available']=True
+    return record
+
+
+def isaac_provider_row(route):
+    """Expose Core's own artifact-bound Isaac manifest; availability follows the delivery pin."""
+    from task_env.runtime.sessions.api import _f06_pickcube_isaac_capability_manifest
+    from task_env.tasks.pick_cube.specialization import build_artifact
+    manifest=_f06_pickcube_isaac_capability_manifest(build_artifact())
+    return {'available':bool(route['available']),'manifest_available':True,'execution_tested':False,
+        'manifest_owner':'task_env/runtime/sessions/api.py',
+        'unavailable_reason':route.get('unavailable_reason'),**manifest.to_mapping()}
+
+
 def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliveries=None,
-                  asset_provider_build_identities=None, allow_synthetic_asset_deliveries=False):
+                  asset_provider_build_identities=None, allow_synthetic_asset_deliveries=False,
+                  isaac_delivery_manifest=None):
     context=core_context(core_repo)
     import task_env
     from task_env.artifacts.contracts import CAPABILITY_NAMES
     from task_env.runtime.sessions import provider_manifest
     result=dict(schema_version='harness-catalog-v0',**context,errors=[],asset_deliveries=[])
+    providers=tuple(providers or ('geophys','mujoco'))
+    if 'isaacsim' in providers or isaac_delivery_manifest is not None:
+        result['isaac_route']=isaac_route_record(isaac_delivery_manifest)
     for kind in ('env','agent','object','scene'):
         registry=getattr(task_env,kind.upper()+'_REGISTRY')
         result[kind+'_uids']=list(registry.uids())
@@ -124,8 +170,11 @@ def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliver
                 result['errors'].append({'owner':uid,'error':str(error)})
     result['capability_names']=sorted(CAPABILITY_NAMES)
     result['providers']={}
-    for provider in providers or ('geophys','mujoco'):
+    for provider in providers:
         try:
+            if provider=='isaacsim':
+                result['providers'][provider]=isaac_provider_row(result['isaac_route'])
+                continue
             result['providers'][provider]={'available':True,'manifest_available':True,'execution_tested':False,
                 **provider_manifest(provider).to_mapping()}
         except Exception as error:
@@ -202,6 +251,7 @@ def main():
     parser.add_argument('--asset-provider-build',action='append',default=[],help='provider=exact-build identity for a USD representation selection; repeatable')
     parser.add_argument('--allow-synthetic-asset-delivery',action='store_true',help='test-only opt-in for explicitly synthetic USD fixtures')
     parser.add_argument('--providers',nargs='+',default=['geophys','mujoco'],help='query manifest names; does not install or qualify providers')
+    parser.add_argument('--isaac-delivery-manifest',type=Path,help='exact Core-pinned F06 PickCube USD delivery manifest; required for isaacsim availability, never relaxed')
     args=parser.parse_args()
     provider_builds={}
     for item in args.asset_provider_build:
@@ -214,6 +264,7 @@ def main():
         asset_deliveries=args.asset_delivery,
         asset_provider_build_identities=provider_builds,
         allow_synthetic_asset_deliveries=args.allow_synthetic_asset_delivery,
+        isaac_delivery_manifest=args.isaac_delivery_manifest,
     )
     save_json(catalog,args.output)
     print(json.dumps({'output':str(args.output),'env_uids':catalog['env_uids']}))

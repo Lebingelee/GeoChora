@@ -11,6 +11,7 @@ import yaml
 from harness_spec_schema import CandidateSpec, CheckReport, save_json
 from catalog_query import core_context
 from completion_facts import validate_probe_report
+from provider_routes import backend_for, device_for
 
 
 def digest(path):
@@ -185,8 +186,10 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     require(upstream_hash==digest(u/'task.json'),'upstream task changed since construction')
     require(bundle_hash==digest(u/'asset_bundle.json'),'asset bundle changed since construction')
     bundle=json.loads((u/'asset_bundle.json').read_text())
-    asset=next(a for a in bundle['assets'] if a['uid']==spec.object_config['object_uid'])
-    require(bundle.get('synthetic') is True and digest(u/asset['path'])==asset['sha256']==spec.object_config['asset_sha256'],
+    asset=next((a for a in bundle['assets'] if a['uid']==spec.object_config['object_uid']),None)
+    require(asset is not None,'Stage-1 packaging currently requires the candidate object from the synthetic upstream '
+        'asset bundle; built-in-object candidates (for example the Isaac cube-v1 route) are not yet packageable')
+    require(bundle.get('synthetic') is True and digest(u/asset['path'])==asset['sha256']==spec.object_config.get('asset_sha256'),
         'asset bytes/bundle/spec hash mismatch')
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=False)
     relocation={}
@@ -232,7 +235,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     if historical_archive:copy_file(historical_archive,'validation/history/original_delivery.zip')
     manifest={'task_id':spec.task_id,'artifact_id':artifact.artifact_id,'artifact_version':artifact.artifact_version,
         'artifact_hash':ah,'spec_sha256':sh,'lifecycle':'candidate','stage':1,'core_commit':ctx['core_commit'],
-        'core_dirty':False,'provider':provider,'backend':'cpu','synthetic_upstream':True,
+        'core_dirty':False,'provider':provider,'backend':backend_for(provider),'device':device_for(provider),'synthetic_upstream':True,
         'original_request_uid':asset.get('source_request_uid'),'asset_uid':asset['uid'],'asset_sha256':asset['sha256'],
         'validation_ref':'validation/current','construction_ref':'validation/history/construction_log.json',
         'evidence_ref':'validation/evidence.json','judge_decision_ref':'judge_decision.yaml',
@@ -250,7 +253,7 @@ Task: `{spec.task_id}`. Lifecycle: candidate. Human decision: pending.
 Spec: `{sh}`. Artifact: `{ah}`. Core: `{ctx['core_commit']}` (clean).
 
 Current assets/compile/semantic checks pass. Feasibility: 20 or more declared distinct seeds, all solved; see current/feasibility.json for exact sample set.
-Physics execution: real {provider} CPU. Upstream assets and semantic endpoints: explicitly synthetic.
+Physics execution: real {provider} {backend_for(provider).upper()} ({device_for(provider)}). Upstream assets and semantic endpoints: explicitly synthetic.
 
 | Oracle seed | Transitions | Boundaries | Completion + storage |
 |---|---|---|---|
