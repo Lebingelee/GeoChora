@@ -37,12 +37,107 @@
       "1a",
       "1d"
     ],
-    "runtime_versions": null,
-    "renderer_names": null,
-    "parallel_backend_list": null,
-    "parallel_modes": null,
+    "runtime_versions": {
+      "mujoco_cpu": {
+        "candidate": "MuJoCo 3.8.1 / CPU",
+        "task_env_requirement": "mujoco>=3.8.1,<3.9.0",
+        "historical_f06_version": "3.8.1",
+        "geophys_requirement": "mujoco>=3.15.0",
+        "shared_environment_status": "CONFLICTING_DECLARED_RANGES"
+      },
+      "geophys_cpu": {
+        "candidate": "GeoPhys CPU",
+        "provider_gitlink": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "taichi_forge_requirement": "taichi-forge==0.6.3"
+      },
+      "isaacsim_physx_cuda": {
+        "candidate": "Isaac Sim 6.2.0.0 / PhysX / CUDA",
+        "cuda_device": "cuda:0",
+        "source_requirement": "F06 admission requires explicit source delivery manifest"
+      }
+    },
+    "renderer_names": {
+      "generic_ui": {
+        "modes": [
+          "human",
+          "rgb_array"
+        ],
+        "owner": "TaskEnvRenderProvider",
+        "task_observation": false
+      },
+      "same_provider_camera": {
+        "profile": "p1_4_native_camera_cpu_v0",
+        "scope": "static same-provider RGB/depth capture; not evidence of selected PickCube synchronization"
+      },
+      "cross_camera": {
+        "candidate": "GeoPhys CPU physics -> MuJoCo native OpenGL",
+        "profiles": [
+          "d03_mujoco_native_dynamic_opengl_v1",
+          "d04_mujoco_native_dynamic_opengl_rgbd_v1",
+          "d04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1"
+        ],
+        "source_constraint": "Scene-v3 scalar joints only; free_joints rejected"
+      },
+      "isaacsim": {
+        "selected_task_camera_observation": null,
+        "reason": "No selected PickCube camera consumer route was found in the audited source."
+      },
+      "native_task_render_candidates": {
+        "mujoco_cpu": {
+          "profile": "p1_4_native_camera_cpu_v0",
+          "capture": "static same-provider capture",
+          "human_window": "generic TaskEnvRenderProvider only; not connected to selected PickCube",
+          "synchronized_pickcube_observation": "not implemented"
+        },
+        "geophys_cpu": {
+          "profile": "p1_4_native_camera_cpu_v0",
+          "capture": "static same-provider capture",
+          "dynamic_profile": "GeoPhys CPU -> MuJoCo native OpenGL D03/D04",
+          "human_window": "generic TaskEnvRenderProvider only; not evidence of task observation",
+          "synchronized_pickcube_observation": "not supported by current scalar-only dynamic projection; Position candidate only"
+        },
+        "isaacsim_physx_cuda": {
+          "profile": null,
+          "capture": null,
+          "human_window": null,
+          "synchronized_pickcube_observation": null,
+          "reason": "No selected-task Isaac camera/render owner was found in audited source."
+        }
+      }
+    },
+    "parallel_backend_list": [
+      {
+        "provider": "geophys",
+        "physics_backend": "cpu",
+        "status": "existing GeoPhys merged-scene native batch candidate"
+      },
+      {
+        "provider": "geophys",
+        "physics_backend": "cuda",
+        "status": "same physical provider on another device backend; does not count as a second physics provider"
+      },
+      {
+        "provider": "isaacsim",
+        "physics_backend": "cuda:0",
+        "status": "recommended second-provider batch candidate; no current TaskEnv batch adapter"
+      }
+    ],
+    "parallel_modes": [
+      "local / device transfer",
+      "remote / spawn / host_numpy (default)",
+      "remote / forkserver / host_numpy",
+      "fork is rejected"
+    ],
     "cross_pairing_status": "CANDIDATE_REQUIRES_CONFIRMATION",
-    "reason": "Must inspect actual public runtime / renderer / batch capabilities before freezing exact combinations; null is not a support claim."
+    "cross_pairing_candidate": {
+      "physics": "GeoPhys CPU",
+      "renderer": "MuJoCo native OpenGL",
+      "consumer": "Position candidate DynamicCameraObservationConsumerV1",
+      "pickcube_status": "unsupported by current dynamic projection because PickCube declares a floating cube free joint",
+      "current_provider_pin_evidence": "not established; historical D05b evidence used GeoPhys a53a8cf rather than current gitlink 67da1165"
+    },
+    "parallel_gap": "Only GeoPhys merged rigid batch is currently connected; current parallel registrations are Pendulum and TwoWheelBalance. CPU/CUDA device backends do not satisfy the two-physics-provider target.",
+    "reason": "Exact source candidates and limits are recorded for planning. This audit ran no native route; all v2.1.1 implementation targets remain NOT_STARTED and validation targets remain NOT_RUN."
   },
   "targets": [
     {
@@ -56,7 +151,9 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "This audit completed 1a source/caller review only; 1b/1c/1d and all implementation targets remain unstarted."
+      ]
     },
     {
       "id": "PHYS-MJ",
@@ -69,7 +166,10 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Current shared-environment dependency declarations conflict with GeoPhys: Core requires MuJoCo <3.9 while GeoPhys declares >=3.15.",
+        "The 1a audit did not start a runtime or repeat historical F06 evidence."
+      ]
     },
     {
       "id": "PHYS-GP",
@@ -82,7 +182,9 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Current GeoPhys gitlink is 67da1165149486d3ae3e779c13ce31af49e17d50; no current-pin native run was performed in 1a."
+      ]
     },
     {
       "id": "PHYS-IS",
@@ -95,7 +197,9 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Isaac Sim 6.2.0.0, PhysX, CUDA cuda:0 and explicit source delivery remain the bounded source candidate; no native run was performed in 1a."
+      ]
     },
     {
       "id": "RESET",
@@ -134,7 +238,10 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Selected PickCube admits only renderer=none. Generic human/rgb_array UI rendering is a separate owner and does not populate task observations.",
+        "No synchronized selected PickCube native-renderer observation route was verified."
+      ]
     },
     {
       "id": "RENDER-GP",
@@ -147,7 +254,10 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "The existing p1_4 camera path is static and same-provider. The state-bound dynamic camera consumer is currently limited to the Position candidate and cross-renders through MuJoCo OpenGL.",
+        "Current dynamic projection rejects free joints, excluding PickCube's floating cube."
+      ]
     },
     {
       "id": "RENDER-IS",
@@ -160,7 +270,9 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "No selected PickCube synchronized task-camera observation owner was identified; viewport availability is not capture evidence."
+      ]
     },
     {
       "id": "RENDER-CROSS",
@@ -173,7 +285,10 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Dynamic candidate is GeoPhys CPU -> MuJoCo native OpenGL, best_effort, scalar joints only. PickCube has a free joint and is rejected by current projection.",
+        "Historical bounded evidence is tied to an older GeoPhys pin; current-pin reproducibility is not established."
+      ]
     },
     {
       "id": "BATCH",
@@ -186,7 +301,11 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Only GeoPhys merged rigid batch is connected; registered tasks are Pendulum and TwoWheelBalance. MuJoCo and Isaac Sim TaskEnv batch adapters were not found.",
+        "GeoPhys CPU/CUDA are device variants of one provider, not two physics providers.",
+        "Remote autoreset is same-step and exposes terminal_observation/reset_info; the mode is not explicitly advertised in vector metadata. Merged-scene construction disables its render source; remote get_images repeats the worker's single returned frame for each slot."
+      ]
     },
     {
       "id": "REUSE",

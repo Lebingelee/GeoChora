@@ -15,6 +15,8 @@
 - **交付／出口：**更新源码映射、能力矩阵的目标组合和 D01/D05/D06；有依据地区分支持、实现缺口、依赖缺失及未验证，不减少已确认的必达数量。
 - **检查／证据：**源码／生产 caller／已有证据核对；只有决策确实依赖且获得后续包授权时才做最小原生探针。审计不默认运行整矩阵，不无限展开全项目盘点。
 
+**attempt001 审计结果：**1a 源码与 caller 审计已交付，状态 `REPORTED_PENDING_REVIEW`。明确了 MuJoCo CPU、GeoPhys CPU、Isaac Sim 6.2.0.0/PhysX/CUDA:0 三条 physics 候选；未把 provider capability 或历史 F06 运行升级为新验证。PickCube 的 free cube 不满足当前 scalar-joint-only dynamic camera admission；Core 与 GeoPhys 的 MuJoCo 依赖区间冲突；现有 native batch 只有 GeoPhys provider，Pendulum／TwoWheelBalance 注册，尚无第二 physics-provider batch。具体资产 oracle、缺失能力、来源及后续 owner 见[本次审计摘要](../maintenance/reviews/20261103_1a_scope_audit.md)和[源码映射](../planning/source-map-and-references.md)。本次未启动原生 runtime 或实现测试；1b、1c、1d 未执行。
+
 <a id="1b"></a>
 ## 1b：统一任务表示
 

@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "1a",
-  "next_action": "Review documentation, then discuss and freeze stage-1 contracts; no automatic implementation dispatch.",
+  "next_candidate": "1b",
+  "next_action": "Maintainer/Sol review the completed 1a report and docs-only commit; only after review may a complete 1b package be dispatched. No automatic continuation.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -38,20 +38,48 @@
           "id": "1a",
           "planning_anchor": "../goals/01-protocols.md#1a",
           "dependencies": [],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "REPORTED_PENDING_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G01_1a_attempt001",
+              "package_manifest_sha256": "c254b8b0252e26d79075da203c8dc728a0c4cea755051cd251584be2809a4ab8",
+              "prompt_sha256": "4a897dcf71e2935098d4c12895045ce88a9e3df9edb51a4f2cbaedf2a4a951d9",
+              "status": "REPORTED_PENDING_REVIEW",
+              "result": "PASS",
+              "input_head": "ba874c2d57dc9cd5e3cb710d87d3405808393967",
+              "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+              "output_head": null,
+              "output_head_reason": "Recorded in the ignored final report after the tracked docs commit; not self-embedded.",
+              "summary": "Source/caller, candidate route, batch, and asset numerical audit. No native or implementation tests.",
+              "report_ref": "../../../../../workspace/maintenance/v211_g01_1a_attempt001/report.md",
+              "review_ref": "reviews/20261103_1a_scope_audit.md",
+              "native_starts": 0,
+              "implementation_tests": 0
+            }
+          ],
+          "assigned_agent": "Codex primary agent; sole writer; zero subagents",
+          "package_path": "external manual handoff package V211_G01_1a_attempt001",
+          "package_sha256": "c254b8b0252e26d79075da203c8dc728a0c4cea755051cd251584be2809a4ab8",
+          "input_head": "ba874c2d57dc9cd5e3cb710d87d3405808393967",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "expected_duration_minutes": "60-90",
+          "execution_budget": {
+            "window_minutes": 120,
+            "native_starts": 0,
+            "implementation_tests": 0,
+            "tracked_paths": "allowlisted documentation only"
+          },
+          "last_observation": "PASS for bounded source/caller audit; final output HEAD and commit are recorded in the ignored external report to avoid self-reference in this tracked index.",
+          "evidence_refs": [
+            "reviews/20261103_1a_scope_audit.md",
+            "../../../../../workspace/maintenance/v211_g01_1a_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g01_1a_attempt001/findings.json",
+            "../../../../../workspace/maintenance/v211_g01_1a_attempt001/commands.json"
+          ],
           "commits": [],
-          "review_decision": null,
+          "review_decision": "PENDING_REVIEW",
           "blockers": []
         },
         {
