@@ -1,6 +1,10 @@
-# Core ↔ render adapter 协议草案
+# Core ↔ render adapter 协议
 
-状态：`DRAFT_FOR_DISCUSSION`；本文件是 1d 的 render-side 权威设计正文，待维护者统一审阅，不是已实现 API、冻结协议或接通证据。协议沿用 Env、RuntimeSession、render/camera、observation 与 batch 的现有 owner；不引入第二个 Runtime、Recorder、RenderManager 或可变 SceneDataManager。Depth、segmentation、Flora 和完整非刚体运行验收不属于本包。
+状态：`APPROVED_IMPLEMENTATION_BASELINE`，2026-11-03 维护者确认；见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。本文是后续实施的语义基线；新类型名称和字段仍须由所属子阶段工作包映射到现有 owner，不代表生产 schema、API 或运行能力已经实现。
+
+沿用Env、RuntimeSession、render/camera、observation与batch owner，不新建第二Runtime／Recorder／RenderManager；Depth、segmentation、Flora及非刚体实际运行不在本版必达。
+
+同一 public Env 在 reset 上切换已准入 renderer；内部可重建 render session、worker/App 与资源 lease，窗口／RGB／同步 task RGB 的固定输出契约保持。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。
 
 ## 三项独立完成目标
 
@@ -124,7 +128,7 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 - 共享与独立两路径各校验 owner/close receipt；重复 close 不重复释放共享 App/scene；无第二 physics step。
 
 
-## 1d 主审兼容与数据持有建议（待维护者最终冻结）
+## 已确认的兼容与数据持有规则
 
 现有 BaseTaskEnv.render 仍接受兼容参数 mode，未配置 UI 时会抛 RenderUnavailableError；上述无参数render和mode=None返回None是统一入口的建议行为。5b须为旧caller保留明确兼容/迁移，不静默改变旧BaseTaskEnv或所有wrapper语义。
 

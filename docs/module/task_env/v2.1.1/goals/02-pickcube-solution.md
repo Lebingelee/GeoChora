@@ -1,6 +1,6 @@
 # G02：PickCube 归因与成功参考
 
-规划标识：`V211_G02_PICKCUBE_REFERENCE`。3 个子阶段；具体依赖和出口见[执行表](../planning/execution-and-acceptance.md)。本阶段先修复现有控制链，不以新 effort 架构假定替代根因分析。
+规划标识：`V211_G02_PICKCUBE_REFERENCE`。3 个子阶段；具体依赖和出口见[执行表](../planning/execution-and-acceptance.md)。本阶段先修复现有控制链，不以新 effort 架构假定替代根因分析。采用[已确认协议基线](../maintenance/20261103_protocol_baseline_confirmation.md)，不在2a提前实施7＋2 effort／BodyWrench／后端与渲染重建。
 
 ## Owner 与事实
 
@@ -9,10 +9,10 @@
 <a id="2a"></a>
 ## 2a：以失败证据定位根因
 
-- **输入／依赖：**1a、1d；旧失败原件、当前任务与 R3 配置、实际资产和已确认时间／控制语义。
+- **输入／依赖：**1a、1d；旧失败原件、当前任务与 R3 配置／高层输入和实际position-command边界、实际资产和已确认时间／控制语义。
 - **工作：**核对 TCP／参考点、关节／夹爪映射、目标轨迹、clearance、阶段切换、保持时间、控制频率和 horizon；区分控制、Solution、物理／导入和任务判定问题。
 - **检查：**先复用历史日志与离线轨迹，再做包内批准的最小 MuJoCo 复现；只读取公开状态和回执，保存失败而不改 oracle。
-- **交付／出口：**有证据的根因、仍待验证的假设、最小修复 owner 与受影响路线。无变化重试不构成进展。
+- **交付／出口：**有证据的根因、仍待验证的假设、最小修复 owner 与受影响路线。无变化重试不构成进展；2a只归因与最小复现，不提交生产修复。诊断脚本／观察量若确有需要，仅在冻结包授权的diagnostics owner或ignored目录增加，不绕过公共状态。
 
 <a id="2b"></a>
 ## 2b：修复当前控制与 Solution

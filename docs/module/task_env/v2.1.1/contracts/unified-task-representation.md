@@ -1,6 +1,6 @@
-# 统一任务表示协议草案
+# 统一任务表示协议
 
-状态：`DRAFT_FOR_DISCUSSION`。1b 统一表示设计已提交，待维护者确认；不代表协议冻结、能力准入或 1c 开始。本文只确定现有 owner 的语义映射和必要的后续 schema 演进边界，不增加生产代码或可调用 public schema。
+状态：`APPROVED_IMPLEMENTATION_BASELINE`，2026-11-03 维护者确认；见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。本文是后续实施的语义基线；新类型名称和字段仍须由所属子阶段工作包映射到现有 owner，不代表生产 schema、API 或运行能力已经实现。
 
 ## 1. 结论与边界
 
@@ -16,7 +16,7 @@
 
 ## 2. 四类信息的字段与 owner
 
-表内“已有”说明当前实现的真实边界；“建议”是待维护者确认的下一版设计，不表示生产 schema 已实现。
+表内“已有”说明当前实现的真实边界；“扩展”是维护者确认的后续版本设计，不表示生产 schema 已实现。
 
 ### 2.1 任务语义
 
@@ -25,7 +25,7 @@
 | `task_id`、Artifact ID、Artifact version | 稳定任务身份和显式版本；不得由 native 名称或对象地址推导 | 必需 | `TaskArtifactDeclarationV1` → `TaskArtifact`／`TaskArtifactV1`；registry、selected task、recording identity | **FIX/COMPOSE**：留在现有 Artifact/compiler；版本变化显式迁移 |
 | Entity、Frame、Joint 语义引用 | Entity ID 在 Scene 内唯一；Frame/Joint 使用 entity-qualified `FrameReference`／`JointReference` | 有场景关系时必需 | `TaskSourceV1.roles`、`SceneDefinition`、`TaskArtifactV1` bindings；assembly compiler、task source resolver、runtime source | **COMPOSE**：新边界用类型化引用；旧字符串 binding 仅由现有 bridge 显式映射 |
 | 目标、奖励、success/failure、metrics、Solution 与终止策略 | 任务判据及评估采样语义；Solution 行为由任务 owner 决定 | 任务定义所需 | `SemanticDefinition`、`TaskDefinitionBase`／`TaskEvaluation`／`TaskBatchEvaluation`、任务 specialization 与 Solution | **FIX**：扩展原 Task Artifact／TaskDefinition；Execution 不拥有成功判据 |
-| Action intent／Controller target | 几何目标与参考系、旋转表示，或具名关节/对象动作；Action 输入和 effort 不是 Joint position 的别名 | 有控制时必需 | `ActionIntent`、Controller contracts、Task-specific control adapter；当前 Panda-box 为 arm joint position + gripper | **COMPOSE**：动作目标与实体/Frame/Joint 类型化绑定；对象 wrench 若成为任务需求须另有 entity、作用点、坐标系、单位和采样语义 |
+| Action intent／Controller target | 几何目标与参考系、旋转表示，或具名关节/对象动作；Action 输入和 effort 不是 Joint position 的别名 | 有控制时必需 | `ActionIntent`、Controller contracts、Task-specific control adapter；当前 Panda-box 为 arm joint position + gripper | **COMPOSE**：动作目标与实体/Frame/Joint 类型化绑定；JointEffort／BodyWrench 与 typed load extension 按[控制协议](control-and-feedback.md)具名绑定；嵌套 Robot／组件声明通道与 Controller，维度不硬编码在 Core |
 | 初态、reset envelope、随机化、settle、episode policy | SI 世界约定；当前 `PoseWorld` 为 m 与 normalized quaternion `wxyz`，关节值由关节定义确定 | reset 依赖项必需 | `InitializationContract`、`TaskInitializationV1`、reset sampler/plan；selected reset caller | **FIX/COMPOSE**：初始刚体 pose 可复用；自由实体状态不能硬塞入 scalar joint action |
 | Observation／state requirements | field、subject、unit、reference frame、sample domain、required/optional；缺值必须标 unavailable + reason | 按 consumer 声明 | `observation_requirements`、`StateRequirements`／`StateFieldRequirement`、`TaskStateView`、`CanonicalStateViewV1`；task、controller、observation、renderer | **COMPOSE**：复用 StateRequirements 与 typed state；维持每个 consumer 独立要求 |
 | `Timebase` | physics `dt`、control substeps/`dt`、hold 和采样边界 | 动力学任务必需 | `TaskArtifact`／`TaskArtifactV1.timebase`、runtime config、session 与 identity callers | **FIX**：保留现有字段和历史 hash 语义；改变 timebase 会改变当前 Artifact identity |
@@ -63,7 +63,7 @@
 | Host / engine / solver family + algorithm / coupler | 可区分独立 Newton、Isaac Sim host + PhysX、Isaac Sim host + Newton；只填写该路径实际适用的层级。多个 solver 不自动组成 coupler | 路由需要该区分时条件必需 | 当前 `ExecutionSpecV1` 只有 `physics_provider/profile/backend/device`，把 host/engine/solver 层次压在字符串/外部 config 中；无通用 coupler value | **EXTEND**：建议在原 Artifact/execution owner 中引入严格版本化 `ExecutionSpecV2` 的分层字段；v1 codec 不接受未知字段，不能原地重解释 |
 | backend/device/precision/determinism | CPU/CUDA 等设备 backend、明确 device ID、数值精度/浮点模式、确定性要求；不得由 device 字符串推测可用性 | provider 有该维度时必需 | `ExecutionSpecV1`、ResolvedEnvConfig、ProviderCapabilityManifest、runtime identity | **COMPOSE**：保留既有 renderer selection/override；新精度字段缺省须注明 provider default 或 unknown |
 | Timebase / workload batch layout | physics `dt`、控制 tick、substeps、batch mode/axis，provider/solver 对这些值的限制 | physics 执行必需 | Task Artifact Timebase、ResolvedEnvConfig、batch adapter | **FIX/EXTEND**：Timebase 暂留 TaskArtifact 以保护旧 hash；执行 receipt 同时绑定实际生效值 |
-| dependency/environment constraints | runtime/OS/Python/package lock or environment identity、外部许可/资产资源前置条件 | 路线依赖时必需 | TaskEnv requirements、provider package/environment facts、source map | **COMPOSE**：记录环境 profile/lock identity 与约束，不在本设计选择隔离策略或升级依赖 |
+| dependency/environment constraints | runtime/OS/Python/package lock or environment identity、外部许可/资产资源前置条件 | 路线依赖时必需 | TaskEnv requirements、provider package/environment facts、source map | **COMPOSE**：记录环境 profile/lock identity 与约束，由 3a 冻结隔离／依赖方案；内部可用 worker 隔离，公共 Env 不因依赖冲突被替换 |
 | Renderer route | 与 physics provider 分开的 renderer、backend/device/profile；camera-specific override 和 capture modalities | 若任务/observation 要图像时必需 | `RendererSelectionV1`／camera override、render provider/camera source/observation consumer | **FIX/COMPOSE**：继续独立选择并按完整组合 admission；selected PickCube 当前仍只接受 `renderer=none` |
 
 当前 `ExecutionSpecV1.identity_hash` 对其声明的 provider/backend/profile/seed/determinism/renderer selection 计算 identity；`reference_task_identity_fields` 还将 resolved runtime config、source XML hash、Controller identity 和 named Source bindings 放进 route facts。它没有独立表达 host/engine/solver/coupler/precision/environment。建议新版本保留这些旧字段的精确解释，并给可选层次明确区分“not applicable”“unknown”和“required but unsupported”，不可用空字符串或缺键让含义漂移。
@@ -78,7 +78,7 @@
 - Spherical：4 个 quaternion 位置分量和 3 个角速度分量，不是 4 个 effort。
 - Floating/free：7 个位置分量（xyz 米 + `wxyz` quaternion）和 6 个 twist 分量（线速度 xyz + 角速度 xyz）；typed state 同时给速度表达 Frame 和 twist reference point。free root pose 可通过 Entity 的 runtime Frame 作为 world pose 发布。
 - PickCube 的被动物理 cube 需要 source free-joint binding 与 reset pose；这不表示 Controller 对它发 7 个 effort、7 个 velocity 或 7 个动作值。当前 `TaskArtifactV1.validate_scene` 对“required joint” reset/state bridge 明确只接受 scalar joints；Scene-v3/typed-state 支持 floating 布局不能抹掉这个 caller 边界。PickCube pose 可复用 Frame/state owner；若 task/controller/renderer 要求其浮动速度，则需 typed `StateRequirements`、明确 twist frame/point，并在对应 publisher/admission 中核验。
-- 将来如有直接施力需求，action 必须绑定 Entity、作用 Frame/point、坐标系、力/力矩单位、duration/sample domain 和执行能力；不能把 free-body `qpos` 冒充 joint action。具体 action/command/reply 生命周期留 1c/4a。
+- 本版 BodyWrench 是独立命令类型；显式直接施力的请求必须绑定 Entity、作用 Frame/point、坐标系、力/力矩单位、duration/sample domain 和执行能力；不能把 free-body `qpos` 冒充 joint action。具体 command/reply 按[控制协议](control-and-feedback.md)，4a/4b 落地。
 
 ## 4. Scene instance、batch 与动态身份
 
@@ -126,14 +126,14 @@ Decoder 只按精确 `schema_version`；unknown core fields/enum 均拒绝。扩
 
 [`planning/representation-cases.json`](../planning/representation-cases.json) 是可审阅的 planning JSON，声明本身就是唯一意图：**设计例子，不是生产 codec/API，不导入 runtime，不模拟 capability validator。**它包含 P1–P4 与 N1–N5：刚体/相机+free cube、同任务不同 Newton route、非刚体可表达但 provider 未准入、实例化 batch；以及错误维数、视觉推断物理、身份/映射冲突、忽略未知扩展/假设耦合、reset 后改变固定 observation/camera contract 五类反例。
 
-## 8. 维护者待确认项
+## 8. 已确认的版本演进与实施边界
 
-1. 认可 Scene-v4 在既有 Scene owner 内组合 typed physics/model reference、representation binding 和 mapping；保持 Scene-v1/v2/v3 codec 不变。若拒绝，需说明现有 owner 中哪个可严格约束这些字段，避免退回无类型字典。
-2. 认可 `ExecutionSpecV2` 在既有 execution owner 内将 provider/host/engine/solver/coupler/precision/environment constraint 分层，保留 v1 exact decoder；provider route 缺层级时标记 `not_applicable` 或 `unknown`，不是臆造层级。
-3. 本版保持 `Timebase` 在现有 v0/v1 Artifact hash 中的行为；未来版本是否拆分不作为本版前置。若以后拆分，必须新版本及显式迁移，不能重签旧身份。
-4. 由后续资产／provider 检查核验 PickCube 声明物理参数；约 5% 的均匀立方体惯量差异不是本设计已证明的缺陷，不要求维护者先裁决它才能推进协议。
-5. 直接施力／力矩的类型化扩展位置符合已讨论方向；具体对象、作用点、坐标系和 capability 交 1c/4a 收敛。被动 cube 仍不自动成为 action target，实体 wrench 的真实执行不由此追加为本版必达矩阵。
+Scene 及 Execution 扩展继续归既有 owner；Scene-v4／ExecutionSpecV2 是建议版本名，具体最小类型／字段由 3a/3b 对照真实 caller 冻结。Scene-v1–v3、Artifact-v0/v1、Execution-v1 exact codec 与历史 hash 不改。非刚体只保留 typed representation/state/load 槽；实际 coupling 缺证仍拒绝。
 
-以上决定不阻止 1b 交付；依赖它们的具体 build/reset/control/camera/batch 行为待后续协议和对应执行包确认。本文仍为 draft，维护者确认前不得标 `FROZEN` 或 `ACCEPTED`。
+任务控制／观测 cadence 与 native integration dt/substeps 概念分开。v2.1.1 优先沿用当前共享 Timebase 并核对三条路线；不能静默改 dt。若真实路线必须使用不同 native dt，由 3a 明确版本化 execution/identity 映射、逻辑任务对应关系与旧 reader 兼容，不把旧 Artifact identity 重签成相同；无法满足时提出具体依赖决定。
 
-1b 设计交付及有界文字／案例修正已由 Sol 审核，见[审核记录](../maintenance/reviews/20261103_1b_sol_review.md)；Scene-v4／ExecutionSpecV2 仍是待审阅的版本演进建议，不是已实现或批准的 schema。
+Robot 嵌套、Controller binding、7＋2 Panda profile、JointEffort／BodyWrench 与未来 typed loads 的语义以[控制协议](control-and-feedback.md)为准；不能把九个具名输出解释为九个独立输入。原生约束和可实现力域必须保留。被动 free cube 不会因支持 BodyWrench 而默认受控。
+
+资产准入必须区分输入物理合法性、native mapping/readback 与 reset/短程数值行为，具体 oracle/容差由 3b 冻结；required 未测量不得判为通过。约 5% cube 惯量差仍是待核对模型意图，不是已证明缺陷。
+
+历史 1b 交付／审核见[原审核](../maintenance/reviews/20261103_1b_sol_review.md)；其中 draft 和待维护者措辞是当时状态，本次[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)确定当前基线。生产 schema 与能力状态仍按真实实现维护。

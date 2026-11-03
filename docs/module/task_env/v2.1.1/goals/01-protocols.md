@@ -1,6 +1,8 @@
 # G01：统一任务表示与三方协议
 
-规划标识：`V211_G01_PROTOCOLS`，不是已启动 Goal。4 个子阶段，默认顺序 1a→1b→1c→1d；依赖及接收统一见[执行表](../planning/execution-and-acceptance.md)。本阶段以现有 owner 的契约收敛为主，具体 API 与协议经讨论后冻结。
+规划标识：`V211_G01_PROTOCOLS`。当前：四个设计子阶段已审阅并获维护者确认；五协议为 APPROVED_IMPLEMENTATION_BASELINE，未实现生产接口。4 个子阶段，默认顺序 1a→1b→1c→1d；依赖及接收统一见[执行表](../planning/execution-and-acceptance.md)。本阶段以现有 owner 的契约收敛为主，具体 API 与协议经讨论后冻结。
+
+以下 attempt 摘要保留各次交付时点状态；其中 draft、7＋1 closure effort、未进入后继等历史措辞由[当前确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)及权威协议修订取代，不作为当前派包要求。
 
 ## Owner 与当前基础
 
@@ -74,3 +76,7 @@
 
 
 2026-11-03：Sol 完成 1d 独立审阅与有界文档修正，接收为 `ACCEPTED_BOUNDED_1D_DESIGN`；见 [1d 主审](../maintenance/reviews/20261103_1d_sol_review.md)。修正公共render/close返回与内部receipt的分工、相机/时钟/terminal retain案例、部分reset参照时刻、App owner与first-effect failure，补充控制/资产/记录实施追踪。G01 四个子阶段的设计交付均已审核；五协议仍 draft，等待维护者最终确认，不自动派发2a或实施代码。
+
+## 维护者确认后的当前出口
+
+2026-11-03：五份协议获确认为实施基线，Panda 改为8维Controller输入→7臂力矩＋2手指关节力；嵌套Robot、JointEffort／BodyWrench、typed load扩展、显式力贡献组合、可替换公共模型、同一Env切换与Core随机流规则均写回权威正文。见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。此修订不新开1c/1d attempt，不改原始报告与历史接收；下一候选是2a，仍由维护者手动转发单阶段包。

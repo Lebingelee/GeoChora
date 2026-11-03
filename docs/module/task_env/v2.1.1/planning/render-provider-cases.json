@@ -1,6 +1,6 @@
 {
   "schema_version": "geochora-v211-render-provider-cases-v1",
-  "status": "PLANNING_ONLY_NOT_EXECUTABLE",
+  "status": "APPROVED_IMPLEMENTATION_BASELINE",
   "package": "V211_G01_1d_attempt001",
   "purpose": "静态设计反例与正例；不代表运行、adapter、renderer 或 native capability 已验证。",
   "identity_fields_required": [

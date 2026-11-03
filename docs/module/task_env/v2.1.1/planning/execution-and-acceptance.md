@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-状态：规划，执行包未派发。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 `contracts/`，子阶段详细目标在对应 Goal。此页是依赖、完成条件和编排的统一入口。
+状态：G01 已有界审阅并获维护者确认；2a 为下一候选，实施包仍由维护者手动转发。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 `contracts/`，子阶段详细目标在对应 Goal。此页是依赖、完成条件和编排的统一入口。
 
 ## 顺序与最小出口
 
@@ -17,9 +17,9 @@
 | 2c | 2b | 成功参考、冻结配置和剩余问题可复现；不提前要求九格重复矩阵 |
 | 3a | 1c、1d、2c | [03](../goals/03-backends.md)：配置解析、能力交集、拒绝与配置回执接通 |
 | 3b | 3a | 三后端公开构建／reset／step／state／close，含资产映射与数值检查 |
-| 3c | 3b | 代表性 A→B→A、故障重建、旧数据失效和资源回收 |
-| 4a | 1c、2c、3c | [04](../goals/04-control.md)：具名 effort、反馈／模型、时间与唯一 writer 落地 |
-| 4b | 4a | R3 组合、关节参考、direct effort 与原生驱动互斥在三后端成立 |
+| 3c | 3b | 同一 public Env 的代表性 A→B→A、Core随机流连续、故障重建、旧数据失效和资源回收 |
+| 4a | 1c、2c、3c | [04](../goals/04-control.md)：typed JointEffort／BodyWrench、嵌套主体、反馈／模型、时间及组合后唯一提交落地 |
+| 4b | 4a | R3／关节参考／direct effort 的7＋2映射在三后端成立；有界BodyWrench、显式叠加和驱动冲突检查 |
 | 4c | 4b | reset 切 Controller，输入契约可识别，observation 固定，Solution 重新复核 |
 | 5a | 1d、3c、4c | [05](../goals/05-rendering.md)：公开 scene data／原生绑定接入既有 renderer |
 | 5b | 5a | 首批路线窗口和离屏 RGB 分别验收，相机可配置，render 不推进物理 |
@@ -31,7 +31,7 @@
 | 7b | 7a | 冻结输入下 PickCube 三后端×三 seed 任务成功与独立记录检查；切换／render／batch 组合分别收口 |
 | 7c | 7b | API／指南／矩阵／Skills／恢复页与实际证据一致；版本未决项明确 |
 
-全部 22 项初始为 `PLANNED`，attempt 为 0；实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
+初建时全部 22 项为 `PLANNED`、attempt 为 0；现 1a–1d 均有 attempt001 交付和审阅，维护者已确认五协议实施基线，后续 18 项未运行；实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
 
 阶段 2 若证明必需修复属于后续公共协议 owner，先记录根因、最小提前实施范围和依赖影响，经维护者确认后更新执行表；可复用修复不重复实施。不得以无变化重试、私有状态或更改任务判定跨过阻塞。
 
@@ -44,7 +44,7 @@
 - 主动工作时长估计、attempt timebox、单次运行及累计墙钟／RAM／VRAM／磁盘预算、共享 native 资源约束。
 - 输出目录、报告／独立 reader、允许本地提交、失败／清理／窗口释放要求。
 
-派包前补齐具体方法和调用者，不能拿目录名或本页顺序替代可实施工作包。协议草案没有定稿之前，不臆造可执行 API 示例。
+派包前补齐具体方法和调用者，不能拿目录名或本页顺序替代可实施工作包。五协议采用 APPROVED_IMPLEMENTATION_BASELINE；生产类型／签名仍需按现有 owner 实施，未实现前不提供伪可执行 API。工作包必须引用当前基线确认收据，不能沿用历史 1c 的 closure-effort 提案。
 
 ## 证据与终验
 

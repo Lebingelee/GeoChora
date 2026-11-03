@@ -35,3 +35,5 @@
 先核实原生 App update 是否会推进物理，是否可控制其采样／显示更新；必须显式处理预热。若 renderer 换成另一种会改变固定 obs 规格或 camera 语义，应拒绝该 env 的组合。
 
 首跨组合候选为 GeoPhys physics×MuJoCo renderer；若不可行，在派包前按 D01 提出替代并确认，不自行减少该必达项。不同 renderer 无需像素逐点相同，各自须满足公开状态、标定、场景可辨识和同步 oracle。
+
+实施共同约束：同一public Env在reset完成renderer往返切换，内部lease／session／worker重建由Core协调；用户仅配置renderer与相机。窗口／capture不调用Controller或推进physics；同步RGB沿用已确认state boundary与既定obs契约。

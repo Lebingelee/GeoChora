@@ -1,9 +1,9 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-03",
-  "status": "PLANNING",
+  "status": "PROTOCOL_BASELINE_CONFIRMED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
-  "protocol_status": "DRAFT_FOR_DISCUSSION",
+  "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
   "implementation_packages_dispatched": false,
   "execution_goals_started": false,
@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": "2a",
-  "next_action": "Await maintainer final confirmation of the reviewed five-protocol design; then prepare one 2a package. No automatic dispatch, native execution or implementation; protocols remain draft until that decision.",
+  "next_action": "Prepare one V211_G02_2a_attempt001 diagnostic package against the confirmed protocol baseline; maintainer forwards manually. No automatic execution or 2b continuation.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -755,5 +755,12 @@
       ]
     }
   ],
-  "g01_design_review_status": "ALL_FOUR_BOUNDED_DELIVERIES_REVIEWED_PENDING_MAINTAINER_PROTOCOL_CONFIRMATION"
+  "g01_design_review_status": "ALL_FOUR_BOUNDED_DELIVERIES_REVIEWED_AND_MAINTAINER_CONFIRMED_WITH_CONTROL_AMENDMENT",
+  "protocol_baseline_confirmation": {
+    "date": "2026-11-03",
+    "source": "Maintainer confirmed the reviewed design and 8D -> 7 arm torque + 2 finger force clarification in this conversation.",
+    "receipt": "20261103_protocol_baseline_confirmation.md",
+    "input_review_head": "11b1e6c5bf8011acdc39f10449e2eb25764da92d",
+    "implementation_complete": false
+  }
 }

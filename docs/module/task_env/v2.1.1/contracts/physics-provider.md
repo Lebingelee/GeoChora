@@ -1,6 +1,6 @@
-# Core ↔ physics provider 协议草案
+# Core ↔ physics provider 协议
 
-状态：`DRAFT_FOR_DISCUSSION`；本节为 1c 设计交付，已由 Sol 有界审核修正；协议最终接受/冻结仍待维护者。扩展现有 RuntimeSession／admission／adapter owner；不创建平行 ProviderManager、Runtime 或 Recorder。下列版本化值是建议，不代表生产 schema 已实现。
+状态：`APPROVED_IMPLEMENTATION_BASELINE`，2026-11-03 维护者确认；见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。本文是后续实施的语义基线；新类型名称和字段仍须由所属子阶段工作包映射到现有 owner，不代表生产 schema、API 或运行能力已经实现。
 
 ## Owner、现有入口与证据层级
 
@@ -30,7 +30,7 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 | 能力 query／准入 | Artifact/Scene/source closure；分层 route；Controller 输入／输出和模型需求；required/optional state、interaction、device、timebase、scalar/batch 与 renderer 共享前置需求 | 按能力逐行报告 provider API、adapter、依赖、证据等级；列检查阶段、缺项、可执行的下一检查和可选 availability；静态 required 全部通过、其余 required 已明确安排本次 native_build 检查且存在 adapter 时，才可进行 provisional build；最终准入必须等所有 required 检查通过 | query 无原生副作用；Core 汇总需求，admission owner 对结果负责 | 现在只有静态 manifest 与精确 profile 特判；为 admission 加受请求 identity 绑定的结果，不由 renderer 自行放宽 physics admission。render 细节留 1d |
 | 原生构建／materialize | 已校验的统一 Scene/Asset/ExecutionSpec，source closure receipt，具名 entity/frame/joint/DOF/actuator／representation binding，配置、设备、solver/coupler 与 Controller 依赖 | 成功后公开真实 host/provider/build/dependency/device/timebase、对象语义映射、输入到原生表示的转换／丢失／限制、编译期 readback 和资源 owner | adapter 建立模型和 session；source receipt 保持 task/source owner；环境只发布完整 session | 当前 `materialize()` 返回 session，无 universal receipt；建议给现有 RuntimeSession 扩 `ProviderMaterializationReceiptV1`。复用 NativeRuntimeIOMetadata、ExecutionSourceReceipt、已测指纹；只公开语义名称和摘要，不公开 provider ordinal |
 | 初始化／reset | Core 持有 seed/sample/reset-plan；env mask（仅声明支持时）；reset 配置／generation 与 source-bound tolerance | 返回新 episode/reset identity、sample id、请求和 realized named state、写入范围／被清零速度、公开 readback、偏差及 reset receipt；不暗中重采样 | 环境／Core 创建新 episode 与 Controller 初态；adapter 只改授权的 native scene/row | 现有 `reset_plan` 无通用 mask；ReferenceEnv selected reset 会关闭并重建 session。纯静态 preflight 拒绝必须在释放旧 session 前发生且不改变现 episode；第一次释放／写入后失败则保留部分事实并 fault，不能回滚。部分 reset 必须保持未选 row 的 state/clock/controller/episode 不变 |
-| 命令接受／施控 | source-bound、step/revision-bound具名物理命令、writer、区间、单位／axis／frame、饱和及限幅策略 | 分别报告 submitted、accepted、native write ack、effective generalized effort（仅在有映射证据时）和 measured/estimated feedback；拒绝 stale／duplicate／无映射命令 | Core Binding/Controller 是唯一 command writer；adapter 写 native channels | 现有 CanonicalControlTarget 仍为位置；MixedActuatorCommand/Applied Ack 只覆盖受限 source profile。Ack 证明目标按映射写入，不证明发生运动、力已实测或跨引擎等效 |
+| 命令接受／施控 | source-bound、step/revision-bound具名物理命令、writer、区间、单位／axis／frame、饱和及限幅策略 | 分别报告 submitted、accepted、native write ack、effective generalized effort（仅在有映射证据时）和 measured/estimated feedback；拒绝 stale／duplicate／无映射命令 | Core 按声明汇总多个 Controller／外力贡献，组合后唯一提交；adapter 写 native channels | 现有 CanonicalControlTarget 仍为位置；MixedActuatorCommand/Applied Ack 只覆盖受限 source profile。Ack 证明目标按映射写入，不证明发生运动、力已实测或跨引擎等效 |
 | advance／step | 要求的控制 interval、physics dt × substeps、Controller cadence（interval hold 或每 native substep 重算）、所需同步边界 | 同步路由返回完成 native steps、实际结束时间、final revision/state boundary；可选逐 substep 记录。若准确 adapter 是异步，则返回绑定 session/generation 的 completion ticket，必须 wait/synchronize 后才能读状态 | session/adapter 推进唯一场景；Controller 仅按明确 cadence 计算命令 | 当前 `step()` 同步循环 `control_substeps`；没有通用 async ticket。中途失败报告 attempted/completed native interval、实际时钟及未知部分；不得输出正常 transition。异步只对明确支持的 route 声明 |
 | state／feedback publish | `StateRequirements`、Consumer 和需求 sample clock；所需 names/units/frames/reference points、device/layout、copy/lifetime | CanonicalStatePublication/typed availability、StateBoundaryIdentity、sample clock/revision、完成 fence、owned/borrowed lifetime；required 缺项报错，optional 缺项带 reason | adapter 只读其拥有的公开 provider view；Core 发布对外 state；Consumer 管理 retained copy | 复用 StateRequirements、StateSampleClock、StateBoundaryIdentity、CanonicalStatePublicationV1/V2、NativeIntervalEvidence。绝不把旧 revision、未完成 async 写入或借用的 native array当当前状态 |
 | close／failure | env/session/app/worker 的 owner 身份及已分配资源 receipt | 每个 owner 返回一次 cleanup attempt/status、关闭资源列表、失败／仍存活持有者；调用重复安全，不能双重释放共享资源 | env 统筹 Recorder、session、source receipt 和 task resources；session 释放自身 model/context；process App/worker 独立 owner | 现有 `close()` 在 RuntimeSession 为 None；部分路线另有 close receipt。增补 typed receipt 并保留全部清理失败。session close 释放自己的 App lease，不直接关闭仍被其他 session 持有的 process App |
@@ -51,6 +51,8 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 ## 资产、数值与路线准入
 
 对每种 required physical representation 分开核对 source closure/依赖、长度／质量／时间单位和坐标、刚体质量与完整惯量、joint/axis/limits、actuator/transmission 与有效力域、约束及 required interactions、reset realization 与 public readback。source 声明作为 oracle；可读回量应绑定准确 build/source。只有有限数值或“无 NaN”不是正确性证据；容差按量纲和具体 source oracle/指标给出。Panda/PickCube 的惯量解析值与声明值约 5% 的历史差异保持为待资产 owner 确认，不在本协议自动修正。跨 solver 容差不设万能数值。
+
+数值准入分三层：输入的单位／质量／完整惯量等物理合法性；实际 native mapping、传动／约束和公开 readback；reset 与必要短程行为的 quantity-specific oracle／容差。Source 参数一致不等于数值有效。Required 检查 unknown/NOT_MEASURED 不能通过；optional 才可带原因保留未测量。检查条件、时长与容差由 3b 包冻结，不以无 NaN 或统一百分比代替。
 
 | 首批 route | 当前 adapter／host／engine 与实现面 | 可公开核实的边界 | 1c 设计结论／缺口 |
 | --- | --- | --- | --- |
@@ -73,17 +75,21 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 
 ## Panda effort、反馈与模型依赖的协议边界
 
-建议 physical action 主路径使用 source-bound **七个 Panda arm generalized joint effort**（每个具名 revolute DOF，N·m）与一个**具名 gripper-closure generalized effort coordinate**（N，coordinate 为夹爪开度/闭合距离 m）。Scene/Execution 的建议版本化 extension 要提供轴、符号、joint order、有效范围、native actuator/transmission 映射、约束关系和传动矩阵；compiled receipt 验证 native write 与 `F dx = Σ τᵢ dqᵢ` 的 source-bound 映射关系。平动 DOF effort 为 N。Cube 是被动 free body，不增加 action 维数。
+physical action 主路线按[控制协议](control-and-feedback.md)区分 JointEffort、BodyWrench 和未来 TypedLoadExtension。Robot／嵌套组件声明具名通道和 Controller binding；Panda 一类 8 维输入经 Controller 得七个 arm torque（N·m）与两个 finger joint force（N），九项输出不是九个独立输入，closure 标量只可留作 Controller 内部中间量。Core 不硬编码 Panda 维度。
 
-当前 Panda source 具有 7 arm actuators 和 1 tendon gripper route、两个 finger joints。现有 mixed plan 不能通用表达 closure generalized effort；一个 tendon channel也不等价于任意两个 finger torque。无法证明 command 在源定义的约束子空间内可表示时必须拒绝 effort admission。Finger opening/force-limit 位置伺服只列为明确的 compatibility route。R3 当前给出 q_ref＋gripper position、由 native servo 施控；不是 canonical effort。Isaac F06 的 mimic/position ACK 也不是 effort。显式 effort route 禁止同一 DOF 同时由 position/implicit-PD drive 和外部 effort writer 施控；若引擎必须保留 drive，则其 policy/gains/被动力需入 receipt，重复 PD 为拒绝条件。
+Adapter 报告 source-bound axis、符号、DOF/actuator、gear/tendon/mimic、可实现力域、限幅与虚功核对；请求的双指力必须处于源约束可表达子空间，不能移除传动／约束以通过。当前七臂 actuator＋一条 tendon gripper route 不保证任意独立双指力。R3 q_ref＋gripper position、mixed finger-position、Isaac F06 position/mimic ACK 都仍是 compatibility，不等于 canonical effort。
 
-Controller 的 q/qdot、pose、FK/Jacobian、M/gravity/bias、contact/actuator-force 是按实现声明的需求，不要求所有 route 提供全部字段。建议在现有 ControlBindingPlan/Controller binding 内声明 `ControllerModelRequirementV1`：模型 profile/library 与依赖版本、source/closure identity、输入 DOF names/order/units、输出 quantities/frame/reference point、纯计算/不推进 physics 标记、刷新 cadence、StateBoundaryIdentity/revision 与 max-age、reset/close owner。Model adapter 可以是明确声明的外部模型库，但不读 provider 私有 solver state，不创建第二套 physics step。
+BodyWrench 绑定 body（含 Robot body）、表达 Frame、作用点／力矩参考点、force/torque、区间及组合身份；分别查询 body force、torque、offset point、Frame、hold/clear/reapply、batch 与测量能力，不能用一个 effort bool 掩盖限制。其他 typed load 扩展缺 required 能力则拒绝。Core 可显式组合多项力贡献，adapter 只有一个提交 authority；冲突覆盖、重复贡献、同一 wrench 与 J^T 投影重复施加、未协调的双重 PD 都须拒绝。持续载荷不能每子步意外累加；reset 清旧 episode 贡献。
+
+Controller 的 q/qdot、pose、FK/Jacobian、M/gravity/bias、contact/actuator-force 是按实现声明的需求，不要求所有 route 提供全部字段。建议在现有 ControlBindingPlan/Controller binding 内声明 `ControllerModelRequirementV1`：模型 profile/library 与依赖版本、source/closure identity、输入 DOF names/order/units、输出 quantities/frame/reference point、纯计算/不推进 physics 标记、刷新 cadence、StateBoundaryIdentity/revision 与 max-age、reset/close owner。Controller 仅依赖 Core public model/state 接口，模型实现可替换；不能在 Controller 中直接绑定 live SDK 或按 provider 分支计算。Model adapter 可显式使用外部库，但不读 provider 私有 solver state，不创建第二套 physics step。
 
 当前 R3 用 source MJCF 构造 PandaKinematics 得 q_ref；LIBERO 的 `MujocoSourceGravityBiasV1` 用 source receipt 绑定 MJCF，计算 FK/Jacobian/M/bias 并调用 `mj_forward`，记录 `mj_step_call_count=0`。它说明 source-bound 公共参考动力学可与 GeoPhys live physics 分离，但目前是 benchmark owner 和 MuJoCo 软件依赖，不能称为通用 Core ModelService。必须明确模型来源／profile、对齐的 live q/qdot 与边界、调用频率和数值偏差检查。真实 actuator/contact force sample 缺失时标 unavailable；command ack 不是测量。
 
 ## batch 与共享资源
 
 native batch 和 process vectorization 是可组合部署维度。每个 native batch 声明统一 provider/host/engine/solver/coupler/device/timebase/action-observation layout 和 env-row mapping；RemoteBatchVecEnv 一 worker 搭载 GeoPhys merged batch 不等于每 env 一进程。配置切换整批重建；同配置 partial reset 只有对应 adapter 提供 mask-scoped receipt 时开放，未选 env 的 episode、clock、Controller/action spec 和 state identity 必须不变。现存 selected scalar reset 关闭／重建 session，不能当成 native partial reset 证据。Isaac batch 尚无本仓库 adapter。
+
+已声明可切换的三路线必须由同一个 public Env 在 reset 上完成 A→B→A；内部 session/worker/App 可以重建，依赖可隔离。不能要求调用者 close/make_env，也不能以拒绝所有跨路线请求满足该目标。协议的有限验证组合不是永久 provider 白名单，能力查询应以具体任务／资产／控制／渲染需求求交。
 
 Renderer 仅向 physics query 声明“需借用哪类公开 scene/state/resource lease”；窗口、RGB、capture、renderer 更新、image layout 与 close 的具体契约属于 1d。physics session 不暴露私有 stage/context/solver handle；App/worker 只共享显式 lease/identity，不把 lease 当 renderer 已接通。
 
@@ -97,7 +103,7 @@ Renderer 仅向 physics query 声明“需借用哪类公开 scene/state/resourc
 
 ## 与 renderer 的共享构建和资源边界（1d 有界补充）
 
-本补充只定义 physics 与 render 的 shared-scene、资源和构建协调，不重写 1c 的 query/build/reset/command/advance/反馈/模型/数值准入决策。render 操作、图像身份和三种完成目标以[render-provider](render-provider.md)为权威正文；共享关闭次序以[lifecycle-and-data](lifecycle-and-data.md)为准。所有相关协议继续 `DRAFT_FOR_DISCUSSION`。
+本补充只定义 physics 与 render 的 shared-scene、资源和构建协调，不重写 1c 的 query/build/reset/command/advance/反馈/模型/数值准入决策。render 操作、图像身份和三种完成目标以[render-provider](render-provider.md)为权威正文；共享关闭次序以[lifecycle-and-data](lifecycle-and-data.md)为准。所有相关协议采用已确认实施基线；不表示共享资源 API 已实现。
 
 Physics adapter 汇报可借用的 public state、具名 entity/frame、完成 fence、scene/model generation、允许的只读或 render-only 操作与失效事件；默认不提供裸 native pointer、solver storage 或可任意变更的 provider object。renderer 如必须接触原生 scene，须由创建对象的 provider adapter 提供版本化、授权有限、owner/generation-bound 的 typed binding/access receipt；拒绝访问不在此范围内的数据。lease 不转移 scene/model/App/context/device buffer ownership。
 

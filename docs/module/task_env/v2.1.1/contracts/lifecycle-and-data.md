@@ -1,6 +1,6 @@
-# 生命周期、时间与数据协议草案
+# 生命周期、时间与数据协议
 
-状态：`DRAFT_FOR_DISCUSSION`；本节定义 physics-side lifecycle/data contract，renderer window/image/source binding 由文末 1d 补充，最终统一冻结待维护者审阅。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
+状态：`APPROVED_IMPLEMENTATION_BASELINE`，2026-11-03 维护者确认；见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。本文是后续实施的语义基线；新类型名称和字段仍须由所属子阶段工作包映射到现有 owner，不代表生产 schema、API 或运行能力已经实现。
 
 ## Owner 和操作状态
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | configured / unmaterialized | query、build、reset preflight、close | 完整 materialize 后进入 ready |
 | ready（已构建，未成功 reset） | query、reset preflight/reset、close；不可提交 episode command、step 或正常 state/obs | reset/readback 门通过后进入 running |
-| running | reset preflight、唯一 command、一次 control interval、snapshot/publish、record、close | 完整 reset 开始新 episode；完整 interval 才发布下一正常 transition |
+| running | reset preflight、组合后唯一提交 command、一次 control interval、snapshot/publish、record、close | 完整 reset 开始新 episode；完整 interval 才发布下一正常 transition |
 | faulted | 读取 fault/cleanup receipt、明确 rebuild reset、close | 不允许再 step 或提交旧 command；不得继续产生正常 transition |
 | closed | 读取终结 receipt | 所有 state view/lease 无效，重复 close 安全 |
 
@@ -23,13 +23,17 @@
 | query/build | 汇总 Artifact/Scene/source/Controller/state/batch/共享资源需求；固定 observation 契约和 batch layout；发布 binding 和 route identity | 仅构建已准入路线；记录 dependency/provider/device/compiled map/materialization receipt；native 构建失败尽力清理 | static admission failure 无原生 effect；初次 build 失败且清理完整可回未物化；reset/rebuild 过 first effect 后失败或 cleanup 不完整则 faulted |
 | reset preflight | 验证 seed/sample、source identity、mask、配置/action spec，并为新 episode 分配 generation | 在通过前不写 state、不释放现有 session | preflight reject 保持旧 episode/Controller/state view 有效 |
 | reset effect | 绑定新 episode/reset sample；重置 Controller、filter/integrator/force latch/action histories | 按 mask 写选中 state、zero velocity/initialize targets，返回 ResetWriteReceipt、realized state 与公开 readback | 第一个 native effect 后失败就 faulted；记录已写 env rows/fields；无通用 native snapshot rollback |
-| command + advance | 每边界只由一个 writer 提交 target；记录 `submitted → accepted` | 精确映射并 ack；按固定 physics_dt/substeps 走一组公开 native advance | command 在第一 write 前 reject 可继续；写入/推进部分失败则 faulted |
+| command + advance | 每边界由 Core 按声明组合贡献后唯一提交；拒绝重复或未协调覆盖；记录 `submitted → accepted` | 精确映射并 ack；按固定 physics_dt/substeps 走一组公开 native advance | command 在第一 write 前 reject 可继续；写入/推进部分失败则 faulted |
 | publish/evaluate/record | 等完成 fence 后 snapshot；校验 identity/freshness；再计算 observation/evaluation 并记录完整 transition | 返回 named state, sample clock, revision/interval evidence；不把未完成 device write 暴露出去 | required state/readback 不齐，不得生成正常 observation/transition；不把 incomplete interval 写成 complete |
 | close | 终止正常 episode/Recorder（若无 fault）；依次关闭 owned consumer/session/source/task resources | 释放 session-owned native model/context/lease；返回 close receipt | 尽力清理所有资源并保留首错和附加失败；不重复 close 已被另 owner 接管的对象 |
 
 ### Reset 和 batch
 
-Reset 重新执行当前任务初始化，不迁移旧 episode 的 q/qdot、接触历史、provider内部 solver state、Controller integrator、随机器 state 或 GPU graph state。seed 分别记 Core sampler 与 provider RNG 身份；相同 seed 不意味着跨 solver 轨迹完全相同。
+Reset 重新执行当前任务初始化，不迁移旧 episode 的 q/qdot、接触历史、provider 内部 solver state、Controller integrator、pending force contribution 或 GPU graph state。**Core sampler 的受控随机流不随物理重建丢弃**：显式 `reset(seed=x)` 重置该流，`seed=None` 延续现有流。Provider 私有 RNG 不跨后端迁移，每 episode 采用记录的派生 seed 重新初始化；同 seed 不承诺跨 solver 轨迹相同。
+
+Core 的 seed/sample 准备与提交须有明确消费边界：可用候选 RNG 状态准备样本，纯 preflight 拒绝时不提交候选或推进现有流；一旦提交／发生 effect，记录样本与消耗，即使后续失败也不伪装从未消费。只操作 sampler 自己的 RNG，不要求复制 provider 私有 RNG。
+
+Backend／renderer／Controller 切换由**同一个 public Env 对象**在 reset 上处理；可重建内部 session/worker/App 和隔离运行环境。已准入切换不能要求用户 close 后再次 make_env；内部复杂度由 Core/adapters 管理。用户只提供 backend/renderer/controller/camera 等配置，不需手写 receipt hash、lease ID 或 generation。
 
 - scalar env 的 route/config reset 若必须重建 session，先做可静态判断的 query，再关闭旧 session、创建新 route、执行 reset 和 readback；新 route 成功前不得发布 success obs。失败后只可明确重建/reset 或 close，不能偷偷返回旧状态。
 - native batch 的 backend/host/engine/solver/coupler/device/action mapping 变化整批重建。只有 capability report 声明 mask-reset 的路线可 same-config partial reset；receipt 精确列受影响 env ids/rows。未选 row 的 episode id、simulation time、state revision、Controller state、terminal obs 和 action spec identity 保持不变。
@@ -38,7 +42,7 @@ Reset 重新执行当前任务初始化，不迁移旧 episode 的 q/qdot、接�
 
 ## 时间、完成与失败状态
 
-每条执行绑定 Artifact timebase 的 physics `dt` 和 substep count。Core 一个外部 action/control interval 可能采用：
+每条执行绑定 Artifact timebase 的 physics `dt` 和 substep count；task control/observation cadence 与 native integration cadence 语义分开，当前旧 codec/hash 保持。不同路线若必须不同 native dt，由 3a 冻结显式版本化执行映射，不静默改 task/timebase identity。Core 一个外部 action/control interval 可能采用：
 1. outer Controller 算一次，target zero-order held 跨 N 个 native steps；
 2. 明示 physics-rate hook，每个 native boundary 以最新同步 state/revision 算新 command。
 
@@ -73,7 +77,7 @@ Recorder 只收完整 state boundary 与对应 command/ack/measured feedback；f
 
 ## 故障验证范围
 
-后续实现至少要验证 query/build admission mismatch、build 后半初始化清理、reset preflight 和 partial write、command stale/writer duplicate、同步/异步 advance partial failure、required/optional feedback、borrowed view expiry、partial batch reset、App shared lease 与重复 close。1c 只交付设计与静态一致性检查，不启动 App、solver、GPU 或实现测试。
+后续实现至少要验证 query/build admission mismatch、build 后半初始化清理、reset preflight 和 partial write、command stale/未协调 writer 冲突／重复 force contribution／持续力错误累加、同步/异步 advance partial failure、required/optional feedback、borrowed view expiry、partial batch reset、App shared lease 与重复 close。1c 只交付设计与静态一致性检查，不启动 App、solver、GPU 或实现测试。
 
 
 ## Renderer、task camera 与 shared lifecycle（1d）

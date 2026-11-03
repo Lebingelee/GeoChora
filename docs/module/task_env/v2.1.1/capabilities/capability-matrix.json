@@ -187,7 +187,7 @@
       "evidence_refs": [],
       "result": null,
       "limitations": [
-        "This audit completed 1a source/caller review only; 1b/1c/1d and all implementation targets remain unstarted."
+        "G01 bounded designs reviewed and maintainer-confirmed as APPROVED_IMPLEMENTATION_BASELINE. Production protocol APIs remain unimplemented; documentation approval is not native evidence."
       ]
     },
     {
@@ -247,7 +247,9 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Same public Env must perform admitted route switching; internal session/worker/environment rebuild allowed. Core sampler continues on seed=None; private provider RNG is not migrated."
+      ]
     },
     {
       "id": "CONTROL",
@@ -260,7 +262,10 @@
       "resolved_configuration": null,
       "evidence_refs": [],
       "result": null,
-      "limitations": []
+      "limitations": [
+        "Current R3/native position compatibility is not canonical effort. Planned Panda controller maps 8D input to seven arm torques plus two named finger forces; preserve source coupling and verify representability.",
+        "JointEffort and BodyWrench are separate capabilities; nested Robot bindings and explicit contribution composition are required. Minimum BodyWrench runtime intersection/oracles freeze in 4a; no automatic all-pairings matrix."
+      ]
     },
     {
       "id": "RENDER-MJ",

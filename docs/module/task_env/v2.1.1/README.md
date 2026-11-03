@@ -1,6 +1,6 @@
 # TaskEnv v2.1.1 — 协议与实施规划
 
-日期：2026-11-03。状态：`PLANNING`。维护者已确认实施路线并授权构建本目录文档；协议具体字段、API 签名和执行包仍待分阶段讨论、冻结。本次没有启动实现 Goal、派发执行任务或运行仿真。
+日期：2026-11-03。状态：`PROTOCOL_BASELINE_CONFIRMED`。G01/1a–1d 已审核，维护者确认五份协议及施控修订为后续实施基线；见[确认收据](maintenance/20261103_protocol_baseline_confirmation.md)。下一步准备 2a 单子阶段包，手动转发后执行；本次只修改文档，不运行实现／仿真。
 
 ## 版本目标
 
@@ -13,7 +13,7 @@
 - [范围与七阶段路线](planning/roadmap.md)：7 个阶段、22 个 a/b/c/d 子阶段及延期事项。
 - [执行顺序与验收](planning/execution-and-acceptance.md)：依赖、阶段出口、工作包、证据及分支约束。
 - [源码 owner 与外部参考](planning/source-map-and-references.md)：当前基础、缺口、待讨论事项和官方项目链接。
-- 协议草案：[统一任务表示](contracts/unified-task-representation.md)、[physics provider](contracts/physics-provider.md)、[render provider](contracts/render-provider.md)、[控制与反馈](contracts/control-and-feedback.md)、[生命周期与数据](contracts/lifecycle-and-data.md)。
+- 协议实施基线：[统一任务表示](contracts/unified-task-representation.md)、[physics provider](contracts/physics-provider.md)、[render provider](contracts/render-provider.md)、[控制与反馈](contracts/control-and-feedback.md)、[生命周期与数据](contracts/lifecycle-and-data.md)。
 - 阶段 Goal：[01 协议](goals/01-protocols.md)、[02 Solution](goals/02-pickcube-solution.md)、[03 后端](goals/03-backends.md)、[04 控制](goals/04-control.md)、[05 渲染](goals/05-rendering.md)、[06 并行](goals/06-parallel.md)、[07 集成](goals/07-integration.md)。
 - [API 迁移入口](api/README.md)、[指南交付要求](guides/README.md)、[单一能力矩阵](capabilities/README.md)。
 - [恢复页](maintenance/recovery.md)、[编排索引](maintenance/orchestration.json)、[本轮文档收据](maintenance/20261103_documentation_receipt.md)。
@@ -28,4 +28,4 @@ F06 历史 9/9 runtime-valid、0/9 task-success，R07 A123 的有界接收与例
 
 ## 文档边界
 
-本目录拥有 v2.1.1 的规划及待冻结协议；v2.1.0 保留来源版本行为。每项协议只在对应 `contracts/` 页面维护，Goal 引用它并记录具体实施与验收。实现后再更新 API、指南和矩阵，不能把草案当成现有可调用 API。系统归属仍服从[架构](../../../global/architecture.md)与[ownership](../../../global/ownership.md)。
+本目录拥有 v2.1.1 的规划及已确认语义协议；v2.1.0 保留来源版本行为。每项协议只在对应 `contracts/` 页面维护，Goal 引用它并记录具体实施与验收。实现后再更新 API、指南和矩阵，不能把设计基线当成现有可调用 API。系统归属仍服从[架构](../../../global/architecture.md)与[ownership](../../../global/ownership.md)。

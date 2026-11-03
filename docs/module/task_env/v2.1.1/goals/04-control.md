@@ -1,33 +1,35 @@
-# G04：统一施控和 Controller reset 切换
+# G04：统一物理命令与 Controller reset 切换
 
-规划标识：`V211_G04_CONTROL`。3 个子阶段，依据[控制与反馈协议](../contracts/control-and-feedback.md)，复用 canonical contracts、ControlBinding、R3 和现有 session。2c 的成功参考是比较输入，迁移后不自动继承成功。
+规划标识：`V211_G04_CONTROL`。3 个子阶段，依据[控制协议](../contracts/control-and-feedback.md)及[已确认基线](../maintenance/20261103_protocol_baseline_confirmation.md)，扩展既有 Robot／Scene／ControlGroup、canonical contracts、ControlBinding、R3 和 session。2c 成功参考不自动成为迁移后成功。
 
 <a id="4a"></a>
-## 4a：底层 effort 与公共反馈／模型能力
+## 4a：控制主体、typed 命令、公共反馈与模型
 
-- **输入／依赖：**1c、2c、3c，尤其 D03/D04 的夹爪／模型服务决定。
-- **工作：**扩展具名物理命令和映射，覆盖 torque N·m／force N、控制区间、范围、唯一 writer 和回执。明确公共 q／qdot／FK／Jacobian 等能力及 Controller 依赖，按需提供模型计算。
-- **检查：**joint／DOF 轴向、量纲、原生 gear／传动／约束、身份／过期／重复 writer、缺反馈拒绝；submitted command 和 measured effort 分开。
-- **交付／出口：**原生 `ctrl` 与 canonical effort 的映射可解释；arm／gripper 逐通道语义确定。模型库来源、软件依赖和 live provider 依赖分别记录。
+- **输入／依赖：**1c、2c、3c；当前协议取代历史7＋1 closure-effort提案。
+- **工作：**在既有owner内落地嵌套Robot／组件的具名受控通道和Controller binding、JointEffort与BodyWrench版本值／capability／回执、TypedLoadExtension槽、显式贡献组合和单一提交入口。Core不固定Panda维度；Panda profile明确定义8维输入→7臂力矩＋2手指关节力。
+- **映射：**记录axis/sign/unit、原生actuator/gear/tendon/mimic、可实现力域、约束与限幅。Closure可在Controller内部存在；双指独立控制不从两路输出推定，不能移除原生约束。BodyWrench明确body/frame/point/moment reference/duration；普通物体与Robot body均可声明。
+- **检查：**结构化[控制案例](../planning/control-command-cases.json)、source映射、stale/duplicate、未协调覆盖与重复PD拒绝；声明sum允许叠加，同一wrench与J^T投影不重复；hold/reapply不错误累加。ACK、估算与实测分开。
+- **模型：**Controller只依赖Core公共state/model接口；FK/J/M/bias库可替换，依赖版本/source/clock/cadence/freshness明确。无live SDK分支或第二physics step；required缺反馈拒绝。
+- **交付／出口：**命令、嵌套主体及公开模型边界落地；三后端7＋2 effort实际验证计划和BodyWrench最小真实样例的目标／路线／frame／作用点／oracle／预算冻结。BodyWrench不能整体延后，也不自动增加全矩阵。
 
 <a id="4b"></a>
-## 4b：复用 R3 参考与共享 effort 伺服
+## 4b：Controller 组合、直接 effort 与外力执行
 
-- **输入／依赖：**4a，三后端原生施控的公开能力。
-- **工作：**组合 R3 q_ref 与已有／扩展的共享伺服；增加或复用关节参考输入及 direct effort 校验路径。原生 drive 与完整显式 PD 互斥，明确被动项、限幅、反馈采样和 hold／子步重算。
-- **检查：**三后端真实执行共同命令语义；覆盖位置／末端参考和 direct effort 的代表输入、夹爪映射及饱和。数值依据按输入／执行频率重新冻结，不能把隐式 PD 当成显式 PD 等价。
-- **交付／出口：**主路线支持多种 Controller 输入进入共同物理命令；保留的 native position 兼容路线单列，不计为全 effort 已完成。
+- **输入／依赖：**4a，三后端原生施控公开能力和冻结BodyWrench子集。
+- **工作：**复用R3参考与共享effort伺服、关节参考和direct effort输入；由Controller输出同一typed命令。真实完成三后端Panda7＋2语义及源约束映射；实现4a冻结的物体／Robot body外力样例。
+- **检查：**末端／关节参考、direct joint effort、BodyWrench坐标／偏置力矩、joint effort＋外力有意组合、持续载荷clear/reapply、饱和／采样／cadence及重复PD拒绝。Controller实现不依赖provider；不要求不同输入产生同数值轨迹，也不将native implicit drive当显式PD等价。
+- **交付／出口：**三后端共同effort主路线与最小外力代表例有真实证据；position compatibility单列。源约束不支持的任意独立双指力如实拒绝，不能代替应完成的成对力profile。
 
 <a id="4c"></a>
 ## 4c：reset 更换 Controller 与 Solution 复核
 
-- **输入／依赖：**4b、2c，Recorder／调用方动作规格边界。
-- **工作：**reset 选择 Controller 实现／参数／输入规格，按 realized state 清空历史；action spec／space／identity 更新可查询和记录。Fixed-space wrapper 明确拒绝不兼容改变；同批动作规格保持一致。
-- **检查：**至少两种输入规格的 reset 切换、相同底层命令、旧 command 拒绝、obs 不变、episode 内切换拒绝；独立记录读回及 PickCube 成功复核。
-- **交付／出口：**切换不会遗留 q_ref／积分器等状态，调用方知道新输入要求；保留迁移前后差异和有效成功，不声称旧 Agent 自动兼容。
+- **输入／依赖：**4b、2c，Recorder和调用方动作规格边界。
+- **工作：**同一Env在reset选择Controller／参数／input spec，按realized state重置；action spec／space／generation可查可记。清空嵌套各binding的q_ref、积分器、滤波、pending contribution、force latch和反馈历史。同批action布局共同。
+- **检查：**至少两种input spec往返切换、同一物理命令协议、旧命令／载荷拒绝、obs固定、episode内切换拒绝；fixed-space wrapper明确拒绝不兼容变更。独立读回与PickCube成功复核，不沿用迁移前成功。
+- **交付／出口：**切换无旧episode控制残留，调用者可识别新action要求；保留迁移差异、真实成功和未支持项。
 
 ## Owner 与失败处理
 
-公共模型／控制功能留在既有 Core owner，task-specific gains／Solution 及 LIBERO benchmark 配置留在任务目录。若公共 feedback 需要 provider 扩展，通过正式公开接口完成。夹爪某路线不可实现时报告具体 blocker，不能把 position 通道改标签为 effort，也不自动重开 F05 严格源柔顺研究。
+公共控制／模型留在既有Core owner；task-specific gains／Solution和LIBERO benchmark配置留任务目录。Provider扩展须正式公开接口和冻结范围。夹爪路线无法表达请求则报告具体blocker，不把position重命名为effort，不重开F05严格源柔顺／传力研究。
 
-阶段 4 只做与修复相关的检查及代表成功；完整三 seed 验收在 7b，不因每次调 gain 重跑九格。
+阶段4做相关检查和代表成功；最终三seed九格在7b，非刚体载荷只保留typed接口。

@@ -7,8 +7,8 @@
 1. 查询某任务／资产的能力和拒绝原因，选择三个首批 physics 路线之一，查看解析配置。
 2. state-only 构建、reset、step、记录和 close，独立读回同次运行；不要求安装 renderer 才能使用 state-only。
 3. 配置窗口观察相机并 render；另配任务相机，采集离屏 RGB，并证明无需额外 render 即从 reset／step 获取同步图像。
-4. reset 切换已支持 backend／renderer，按任务初始化新 episode，观察旧数据失效和失败后的恢复操作。
-5. reset 切换 Controller，读取新的 action spec／space；展示关节／末端参考及 direct effort 输入的语义差别。
+4. 同一个public Env通过reset切换已支持 backend／renderer，按任务初始化新 episode，观察旧数据失效和失败后的恢复操作。
+5. reset 切换 Controller，读取新的 action spec／space；展示Robot／组件binding、关节／末端参考、direct joint effort及有界BodyWrench组合的语义差别。
 6. 在已验证的两个以上后端建立小 batch；展示部分 reset、终止帧、固定动作规格及整批切换。
 7. 用 NutAssembly 复用上述公共配置，明确实际支持的子集。
 

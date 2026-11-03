@@ -1,6 +1,6 @@
 # v2.1.1 能力与验收矩阵
 
-[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。当前为规划矩阵：所有新目标 `NOT_RUN`，实现状态为 `NOT_STARTED`，证据引用为空。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
+[capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。当前为规划矩阵：所有新目标 `NOT_RUN`，实现状态为 `NOT_STARTED`，证据引用为空。五协议已获维护者确认为实施基线，设计批准与实现／运行状态分列；本次不提升targets或最终cells状态。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
 
 当前已存在的实现和有界结果继续查询 [v2.1.0 matrix](../../v2.1.0/capabilities/capability-matrix.json)。新目标 NOT_RUN 不否认那些历史结果，也不把历史 native 结果升级为当前 renderer／控制／并行证据。
 

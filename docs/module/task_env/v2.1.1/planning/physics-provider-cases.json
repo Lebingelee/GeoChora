@@ -1,6 +1,6 @@
 {
   "schema_version": "geochora-v211-physics-provider-planning-cases-v1",
-  "document_status": "DRAFT_FOR_DISCUSSION",
+  "document_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "notice": "Planning examples only. Not a public schema, runtime input, capability validator, implementation test, or provider evidence. Context refs are checked for structural identity only.",
   "shared_context": {
     "task_context": {
@@ -25,7 +25,7 @@
         "panda-v1/joint6",
         "panda-v1/joint7"
       ],
-      "gripper": "two source-bound finger joints using a source-bound tendon/mimic route; current canonical plan is not closure generalized effort",
+      "gripper": "two named prismatic finger-joint efforts in N; controller 8D input -> seven arm torques plus two finger forces; native tendon/mimic representability remains required",
       "cube": {
         "control": "passive_free_body",
         "required_interactions": [
@@ -172,7 +172,7 @@
       "input": {
         "required": [
           "Panda seven-joint effort",
-          "gripper closure effort mapping",
+          "two named finger joint forces with source-bound representability mapping",
           "q/qdot",
           "cube-table and cube-gripper contact",
           "reset readback"
@@ -188,7 +188,7 @@
       },
       "proposed_reply": {
         "mujoco_cpu": "bounded source-specific mapping; compiled transmission/readback required; installation version not verified in this design window",
-        "geophys_cpu": "bounded source-specific public-boundary mapping; generalized gripper closure effort is unknown until source transmission receipt exists",
+        "geophys_cpu": "bounded public-boundary mapping; requested paired finger forces must be proven representable by exact source transmission; arbitrary independent forces not assumed",
         "isaac_physx_cuda": "exact F06 position/mimic route cannot satisfy required direct effort as currently mapped; report unsupported/extension required"
       },
       "owner": "existing admission + RuntimeSession/adapter owners",
@@ -277,7 +277,7 @@
     {
       "id": "P3",
       "kind": "positive_design",
-      "purpose": "分开七个arm effort、具名夹爪closure generalized force、native actuator ACK和真实测量；显式声明参考模型。",
+      "purpose": "区分8维Controller输入、七臂力矩＋两路手指关节力、native ACK与测量；源约束与公共模型实现独立。",
       "context_refs": [
         "shared_context.task_context",
         "owner_refs.control",
@@ -288,25 +288,26 @@
       "input": {
         "command": {
           "arm": "7 named revolute joint efforts in N*m",
-          "gripper": "one source-bound closure generalized force in N conjugate to closure coordinate in m",
+          "gripper": "two named prismatic finger-joint forces in N, per source joint axes; no implied independent 2-DOF actuation",
           "interval": "one 10ms control boundary; 5 x 2ms physics substeps"
         },
         "model": {
           "profile": "source-bound FK/J/M/bias",
           "no_physics_advance": true
         },
-        "measurement": "optional typed sample bound to same materialization/episode/revision"
+        "measurement": "optional typed sample bound to same materialization/episode/revision",
+        "controller_input": "8 dimensions, semantics declared by selected controller action spec"
       },
       "proposed_reply": {
         "ack": "only confirms mapped native write; measurement remains separate",
-        "mapping": "For q_native=f(s), A=df/ds is n x 1 and F_closure=A^T*tau_native. Native force allocation needs an explicit source-bound actuator/transmission and constraint policy; no automatic inverse.",
-        "model": "may compute FK/J/M/bias on explicit source-bound model but must align live q/qdot identity and cadence",
+        "mapping": "Controller allocates two named forces; adapter verifies source transmission, constraint subspace, axis/sign/limits and power. Closure is an optional controller-internal intermediate; no automatic inverse or constraint removal.",
+        "model": "Controller uses public Core model/state interfaces; explicitly bound model library is replaceable and never advances live physics",
         "feedback": "opening_m is position-derived; force-admitted profiles use separately sourced actuator force. ACK or positions cannot become a force measurement."
       },
       "owner": "ControlBindingPlan/Controller binding and provider adapter",
-      "current_status": "arm+finger position and ACK exist only in bounded source routes; canonical closure effort and general ModelRequirement value are proposed",
+      "current_status": "current R3 q_ref+finger position and bounded mixed ACK are compatibility only; 7+2 canonical effort remains unimplemented",
       "disposition": "accept_design; runtime admission conditional",
-      "reason": "The current one tendon route cannot represent arbitrary independent finger-joint torques; do not label position feedback or ACK as measured force."
+      "reason": "Named physical channels are not input dimensions or native actuator count; tendon coupling does not imply arbitrary independent finger forces."
     },
     {
       "id": "P4",

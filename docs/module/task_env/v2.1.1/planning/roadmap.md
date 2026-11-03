@@ -1,22 +1,22 @@
 # v2.1.1 范围与实施路线
 
-状态：`ROUTE_CONFIRMED`，2026-11-03。确认的是路线和目标；协议细节按阶段 1 讨论，实施与 native 执行由后续冻结工作包承接。
+状态：`ROUTE_CONFIRMED`，2026-11-03。确认的是路线和目标；五协议语义已由维护者确认，具体生产值映射在所属工作包冻结，实施与 native 执行由后续冻结工作包承接。
 
 ## 必达范围
 
 1. 统一 Core、physics adapter、render adapter 的责任、值契约、生命周期和能力准入。
 2. 首批真实物理路线为 MuJoCo／CPU、GeoPhys／CPU、Isaac Sim＋PhysX／CUDA，限定具体任务和资产。
 3. 修复 PickCube Solution，先有当前控制链的成功参考，再迁移和复核；NutAssembly 检查复用。
-4. 以具名关节广义驱动力为统一施控主路线，公共状态／模型支持 Controller；reset 可切 Controller 输入规格。
+4. 以具名关节广义驱动力为统一施控主路线，Robot／嵌套组件声明受控通道和 Controller，公共状态／可替换模型支持 Controller；BodyWrench 独立类型和未来 typed loads 有明确边界；reset 可切 Controller 输入规格。
 5. 窗口、离屏 RGB、RGB 同步进入 observation 全部实现；相机可配置，`.render()` 不额外推进任务物理时间。
 6. 在至少两个确实支持并行的物理后端上验证，至少包含一条原生 batch；记录进程并行与原生批量的区别。
-7. 构建／reset 可选择执行组合；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
+7. 同一 public Env 构建／reset 可选择执行组合；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
 8. observation 构建后保持结构、shape、dtype、单位、坐标及字段语义；为非刚体表示和设备数据保留扩展边界。
 
 ## 已确定的架构边界
 
 - 一个 physics provider 负责整场景，可内部组合多个求解器；跨 provider 力学协同仿真另行规划。
-- 同一原生批次使用共同执行配置，切换时整批重建；reset 不做旧状态迁移。
+- 同一原生批次使用共同执行配置，切换时整批重建；reset 不做旧物理／Controller 状态迁移；Core sampler 的 seed=None 随机流继续。
 - 任务语义、奖励、成功条件与 Solution 属于任务／既有 Core owner；adapter 负责原生翻译和公开反馈。
 - 配置优先级继续为 Core → 任务类 → YAML → 调用方；不新增平行 factory、Runtime 或 Recorder。
 - 资产由任务提供已准备表示；原生导入、单位变换和声明的构建步骤可由 adapter 完成，重新网格化／替换物理模型等须有明确产物和身份。
@@ -26,10 +26,10 @@
 
 | 阶段 | 数量 | 子阶段 | 主交付 |
 | --- | --- | --- | --- |
-| 1 协议 | 4 | 1a 现状与范围；1b 统一表示；1c physics 协议；1d render 与共享资源 | 待实施协议及其适用边界获得确认 |
+| 1 协议 | 4 | 1a 现状与范围；1b 统一表示；1c physics 协议；1d render 与共享资源 | 已确认实施基线；具体实现不由设计 PASS 代替 |
 | 2 PickCube | 3 | 2a 归因；2b 修复；2c 成功参考 | 现有控制链的有效参考与差异记录 |
 | 3 后端 | 3 | 3a 路由与准入；3b 三后端翻译；3c reset 重建 | 统一协议驱动真实初始化与步进 |
-| 4 控制 | 3 | 4a effort／反馈；4b Controller 组合；4c 切换与复核 | 多种输入进入同一施控主路线 |
+| 4 控制 | 3 | 4a typed 命令／反馈；4b Controller／外力组合；4c 切换与复核 | 多种输入进入同一施控主路线 |
 | 5 渲染 | 3 | 5a 场景数据；5b 窗口与采集；5c 同步 observation／切换 | 三个渲染完成目标分别成立 |
 | 6 并行 | 3 | 6a 批量契约；6b 多后端；6c 部分 reset／整批重建 | 状态、动作、图像与 episode 正确对应 |
 | 7 集成 | 3 | 7a 任务复用；7b 最终矩阵；7c 文档收口 | 有证据的版本交付与未决项 |
