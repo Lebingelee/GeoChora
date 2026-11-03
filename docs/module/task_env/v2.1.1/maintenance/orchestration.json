@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "1c",
-  "next_action": "Maintainer/Sol reviews V211_G01_1c_attempt001; protocols remain DRAFT_FOR_DISCUSSION. Do not dispatch 1d or stage 2 automatically.",
+  "next_candidate": "1d",
+  "next_action": "Prepare only V211_G01_1d_attempt001 for maintainer manual forwarding. Five protocols remain DRAFT_FOR_DISCUSSION; no final freeze or implementation dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -164,7 +164,7 @@
           "dependencies": [
             "1b"
           ],
-          "status": "REPORTED_PENDING_REVIEW",
+          "status": "ACCEPTED_BOUNDED_1C_DESIGN",
           "attempt_count": 1,
           "attempts": [
             {
@@ -172,11 +172,11 @@
               "package_id": "V211_G01_1c_attempt001",
               "package_manifest_sha256": "9f8554eedd5f1e66a8426a5053c82be74d9a6e18fd64ccc014c1d6fac2610da7",
               "prompt_sha256": "c0bf1ec99591b51ba2ba9a14d8f36fc8e8963f4e5a35218323d006729293d20e",
-              "status": "REPORTED_PENDING_REVIEW",
+              "status": "REVIEWED_ACCEPTED_WITH_DOC_CORRECTIONS",
               "result": "PASS",
               "input_head": "b0024c71614f2d2ede8d9eb1db594cfcde3e9278",
               "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
-              "output_head": null,
+              "output_head": "4c3894df74f1946417b360e76fe3440b0551805d",
               "summary": "Bidirectional Core↔physics provider protocol design; planning cases only. No production changes, tests, native runtime, physics, GPU or qualification.",
               "report_ref": "../../../../../workspace/maintenance/v211_g01_1c_attempt001/report.md",
               "review_ref": "reviews/20261103_1c_physics_protocol_design.md",
@@ -184,15 +184,15 @@
               "physics_steps": 0,
               "gpu_starts": 0,
               "implementation_tests": 0,
-              "sol_review_ref": null,
-              "review_decision": null
+              "sol_review_ref": "reviews/20261103_1c_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_1C_DESIGN"
             }
           ],
           "assigned_agent": "Codex primary agent; sole writer; zero subagents",
           "package_path": "external manual handoff package V211_G01_1c_attempt001",
           "package_sha256": "9f8554eedd5f1e66a8426a5053c82be74d9a6e18fd64ccc014c1d6fac2610da7",
           "input_head": "b0024c71614f2d2ede8d9eb1db594cfcde3e9278",
-          "output_head": null,
+          "output_head": "4c3894df74f1946417b360e76fe3440b0551805d",
           "expected_duration_minutes": "90-120 active; hard window 150",
           "execution_budget": {
             "window_minutes": 150,
@@ -203,7 +203,7 @@
             "new_output_target_mib": 128,
             "tracked_paths": "package-allowlisted documentation only"
           },
-          "last_observation": "2026-11-03: Sole-writer 1c bidirectional protocol design documented with operation contracts, three-route mapping, effort/feedback semantics, lifecycle/failure/lifetime, and planning-only P1-P4/N1-N6. Pending independent review; no protocol freeze/implementation approval.",
+          "last_observation": "2026-11-03 Sol verified input/allowed diff/raw manifests and source facts; accepted bounded 1c after recorded corrections to force mapping/provenance, phased admission/lifecycle, planning contexts and implementation traceability. All protocols remain draft.",
           "evidence_refs": [
             "contracts/physics-provider.md",
             "contracts/control-and-feedback.md",
@@ -215,10 +215,20 @@
             "../../../../../workspace/maintenance/v211_g01_1c_attempt001/findings.json",
             "../../../../../workspace/maintenance/v211_g01_1c_attempt001/commands.json",
             "../../../../../workspace/maintenance/v211_g01_1c_attempt001/input_snapshot.json",
-            "../../../../../workspace/maintenance/v211_g01_1c_attempt001/output_manifest.json"
+            "../../../../../workspace/maintenance/v211_g01_1c_attempt001/output_manifest.json",
+            "reviews/20261103_1c_sol_review.md"
           ],
-          "commits": [],
-          "review_decision": null,
+          "commits": [
+            "4c3894df74f1946417b360e76fe3440b0551805d"
+          ],
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_1C_DESIGN",
+            "reviewer": "Sol",
+            "date": "2026-11-03",
+            "review_ref": "reviews/20261103_1c_sol_review.md",
+            "bounded_doc_corrections": true,
+            "protocol_freeze_or_implementation_approval": false
+          },
           "blockers": []
         },
         {

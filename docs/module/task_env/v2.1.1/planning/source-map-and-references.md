@@ -132,7 +132,27 @@ query/build/reset/command/advance/publish/close 的字段、回执、副作用�
 
 | 官方来源 | 对协议的影响 | 本仓库适用边界 |
 | --- | --- | --- |
-| [Isaac Sim 6.2 Newton backend](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/physics/newton_physics.html) | Isaac Sim host 可选择 PhysX 或 Newton；Newton内还可区分 XPBD、MuJoCo、Featherstone、SemiImplicit solver | ExecutionSpec层级应区分host/engine/solver；Geochora没有Newton adapter，不得claim已接入 |
+| [Isaac Sim 6.2 Newton backend](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/physics/newton_physics.html) | Isaac Sim host 可选择 PhysX 或 Newton；Newton engine/SDK 的 solver family 与宿主插件实际暴露的 solver 必须分开核实 | ExecutionSpec层级应区分host/engine/solver；Geochora没有Newton adapter，不得claim已接入 |
 | [MuJoCo API functions](https://mujoco.readthedocs.io/en/stable/APIreference/APIfunctions.html) | `mj_step`推进仿真一个dt，`mj_forward`仅执行forward dynamics | 支持区分physics advance与参考模型计算；不证明当前model package版本/适配 |
 | [Isaac Lab actuator concepts](https://isaac-sim.github.io/IsaacLab/main/source/concepts/actuators.html) | implicit drive由solver执行PD，explicit模型计算并提交effort；输出与limit owner不同 | 作为drive ownership和重复PD风险的概念旁证；latest页面可变，不当本仓库Isaac 6.2 API |
 | [MuJoCo Python API](https://mujoco.readthedocs.io/en/stable/python.html) | `mj_step(nstep=...)`与循环多个`mj_step`等价；切片可能是native-buffer零拷贝view | 支持批量advance/borrowed data要声明完成和有效期；本仓库具体view以本地typed contract为准 |
+
+
+### 1c 主审补充：复杂路线与实施责任
+
+独立 Newton、Isaac 内 Newton、Isaac＋PhysX、Genesis 多 solver 和 SAPIEN 的表达边界见 [physics 协议](../contracts/physics-provider.md)；P2 改为 rigid＋FEM 及 required coupling 的明确设计例。仅表达扩展，不增加本版运行后端。参考 [Genesis v1.4.5 coupling](https://genesis-world.readthedocs.io/en/v1.4.5/user_guide/theory/coupling/index.html) 的 scene/solver/coupler 分工，不能将该官方能力当成本仓库能力。
+
+夹爪力映射遵守明确 Jacobian 方向的虚功关系；参考 [MuJoCo actuation/transmission](https://mujoco.readthedocs.io/en/stable/computation/index.html#actuation-model)。若 q_native=f(s)，共轭关系为 F_s=(df/ds)^T*tau_native，不能据此唯一反解 native effort。当前 `control.py::feedback_value` 将 native force 投影为 closing magnitude，位置只决定 opening；不能把已存在的受限力读回写成位置估算。这些来源于 2026-11-03 核对，只用于设计及源码事实。
+
+| 协议要求 | 现有代码 owner／需要修改 | 实施／验证位置 |
+| --- | --- | --- |
+| 分层 execution、能力结果及旧配置兼容 | `environment/configuration.py`、`artifacts/contracts.py` execution codec、`runtime/admission.py`／sessions admission | 3a：新值与旧 decoder 兼容、层级冲突／缺依赖／未实现拒绝；最终字段先经维护者冻结 |
+| Scene 物理/资产表示、映射与兼容 codec | 既有 Scene/Asset contracts、declaration/assembly compiler、source owner；版本号仍为建议 | 3b：首批刚体必要字段、旧 Scene 解码/hash 和 native translation/readback；非刚体保留有类型扩展位置 |
+| build/reset/advance/public state/close receipt | RuntimeSession、各 provider adapter、typed state owner | 3b/3c：真实 lifecycle、partial failure、旧状态失效、清理与重建 |
+| Panda effort／传动与模型/反馈值 | canonical contracts、ControlBindingPlan、公开 provider 控制与 model binding | 4a/4b：验证符号／传动／力分配、反馈 provenance 和唯一 writer；Isaac position compatibility 不能充当 effort 完成 |
+| Controller/action spec reset 切换 | Controller binding、SelectedReferenceEnv、wrapper/caller | 4c：action identity 更新、旧动作拒绝、obs 固定、Solution 复核 |
+| 公开 scene/render 绑定、采样及数据生命周期 | render/camera owner、RuntimeSession 公开数据和 Env 调度 | 1d 设计；5a–5c 实施窗口/RGB/同步 obs／跨组合，不能另建 physics runtime |
+| batch row/mask/整批配置重建 | vectorization、merged_scene 与各 batch adapter | 6a–6c：两个以上 physics provider，单独记录原生 batch/进程部署 |
+| GeoPhys/MuJoCo 声明依赖冲突 | 现有环境/依赖配置 owner，admission 记录 readiness | 3a 明确方案，任何受影响的提前 native 执行前先处理；不预定隔离进程、不擅改 pin/依赖，既有环境与安装声明分开判断 |
+
+该表是实施归属，不授权现在编码；1d 应加入完整 renderer／三方条款后形成阶段 1 最终追踪表。

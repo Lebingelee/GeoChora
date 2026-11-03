@@ -1,6 +1,6 @@
 # Core ↔ physics provider 协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；本节为 1c 设计交付，尚未接受或冻结。扩展现有 RuntimeSession／admission／adapter owner；不创建平行 ProviderManager、Runtime 或 Recorder。下列版本化值是建议，不代表生产 schema 已实现。
+状态：`DRAFT_FOR_DISCUSSION`；本节为 1c 设计交付，已由 Sol 有界审核修正；协议最终接受/冻结仍待维护者。扩展现有 RuntimeSession／admission／adapter owner；不创建平行 ProviderManager、Runtime 或 Recorder。下列版本化值是建议，不代表生产 schema 已实现。
 
 ## Owner、现有入口与证据层级
 
@@ -27,7 +27,7 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 
 | 操作 | Core 输入 | Adapter 输出／保证 | 修改资源与 owner | 失败／现有映射及最小扩展 |
 | --- | --- | --- | --- | --- |
-| 能力 query／准入 | Artifact/Scene/source closure；分层 route；Controller 输入／输出和模型需求；required/optional state、interaction、device、timebase、scalar/batch 与 renderer 共享前置需求 | 按能力逐行报告 provider API、adapter、依赖、证据等级；列检查阶段、缺项、可执行的下一检查和可选 availability；只有 required 全部通过才 build | query 无原生副作用；Core 汇总需求，admission owner 对结果负责 | 现在只有静态 manifest 与精确 profile 特判；为 admission 加受请求 identity 绑定的结果，不由 renderer 自行放宽 physics admission。render 细节留 1d |
+| 能力 query／准入 | Artifact/Scene/source closure；分层 route；Controller 输入／输出和模型需求；required/optional state、interaction、device、timebase、scalar/batch 与 renderer 共享前置需求 | 按能力逐行报告 provider API、adapter、依赖、证据等级；列检查阶段、缺项、可执行的下一检查和可选 availability；静态 required 全部通过、其余 required 已明确安排本次 native_build 检查且存在 adapter 时，才可进行 provisional build；最终准入必须等所有 required 检查通过 | query 无原生副作用；Core 汇总需求，admission owner 对结果负责 | 现在只有静态 manifest 与精确 profile 特判；为 admission 加受请求 identity 绑定的结果，不由 renderer 自行放宽 physics admission。render 细节留 1d |
 | 原生构建／materialize | 已校验的统一 Scene/Asset/ExecutionSpec，source closure receipt，具名 entity/frame/joint/DOF/actuator／representation binding，配置、设备、solver/coupler 与 Controller 依赖 | 成功后公开真实 host/provider/build/dependency/device/timebase、对象语义映射、输入到原生表示的转换／丢失／限制、编译期 readback 和资源 owner | adapter 建立模型和 session；source receipt 保持 task/source owner；环境只发布完整 session | 当前 `materialize()` 返回 session，无 universal receipt；建议给现有 RuntimeSession 扩 `ProviderMaterializationReceiptV1`。复用 NativeRuntimeIOMetadata、ExecutionSourceReceipt、已测指纹；只公开语义名称和摘要，不公开 provider ordinal |
 | 初始化／reset | Core 持有 seed/sample/reset-plan；env mask（仅声明支持时）；reset 配置／generation 与 source-bound tolerance | 返回新 episode/reset identity、sample id、请求和 realized named state、写入范围／被清零速度、公开 readback、偏差及 reset receipt；不暗中重采样 | 环境／Core 创建新 episode 与 Controller 初态；adapter 只改授权的 native scene/row | 现有 `reset_plan` 无通用 mask；ReferenceEnv selected reset 会关闭并重建 session。纯静态 preflight 拒绝必须在释放旧 session 前发生且不改变现 episode；第一次释放／写入后失败则保留部分事实并 fault，不能回滚。部分 reset 必须保持未选 row 的 state/clock/controller/episode 不变 |
 | 命令接受／施控 | source-bound、step/revision-bound具名物理命令、writer、区间、单位／axis／frame、饱和及限幅策略 | 分别报告 submitted、accepted、native write ack、effective generalized effort（仅在有映射证据时）和 measured/estimated feedback；拒绝 stale／duplicate／无映射命令 | Core Binding/Controller 是唯一 command writer；adapter 写 native channels | 现有 CanonicalControlTarget 仍为位置；MixedActuatorCommand/Applied Ack 只覆盖受限 source profile。Ack 证明目标按映射写入，不证明发生运动、力已实测或跨引擎等效 |
@@ -42,7 +42,7 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 跨操作至少绑定：Artifact/Scene identity、source id 与 closure digest、ExecutionSpec identity、provider materialization、Scene instance/env row、topology/config generation、episode/reset sample、Controller/action spec、control step、state revision 和带 domain 的 sample clock。批内一次 template 用显式 env id → worker id → local row mapping，不以 native ordinal 作为跨 API 身份。
 
 - query 或纯 preflight 拒绝：不得取得原生 lease、关旧 session 或改变 episode；现 session 仍可继续。
-- build 失败：adapter 尽力关闭已创建资源并返回 cleanup facts；只有清理成功才回到未物化，清理不完整则 env faulted。
+- 初次 build 失败：adapter 尽力关闭新建资源并返回 cleanup facts；清理成功可回到未物化，清理不完整则 env faulted。reset/rebuild 若已经关闭旧 session 或发生其他 first effect，即使新资源清理成功也仍属 faulted，不能假装旧 episode 仍可继续。
 - reset/command 在第一次 native effect 前拒绝：状态不变。开始写入后出错：注明实际写入／partial，环境 faulted，不允许正常 step。
 - advance 部分推进：记录已完成和尝试的 interval，不能合成完整 transition 或声称未推进。后续只允许明确 reset/rebuild 或 close；不承诺把 solver state 回滚到 step 前。
 - publish 发现 required 字段、revision 或同步 fence 不符：不得交付正常 observation／transition；optional 数据以 UnavailableStateValue 和原因发布。
@@ -59,6 +59,17 @@ Core 拥有任务／资产语义、执行需求汇总、初始化采样、生命
 | Isaac Sim 6.2.0.0 + PhysX CUDA | 精确 F06 PickCube admission 创建 Isaac native IO，再由 UsdCoreRuntimeSession 驱动；独立 IsaacSimAppOwnerV1 是每 worker process 的 headless App owner | exact metadata 绑定 source/scene/artifact/execution/provider build/backend/device/timebase/named scalar DOFs；具名 position write/readback/reset/advance receipt；App lease 可延迟 process close | 当前不是通用 physics query/build；F06 的 native position/mimic drive 不是 direct generalized effort，也未证明 PickCube 同步 camera obs、任意 Isaac batch 或任意 asset。Effort 未实现则拒绝所需 route，不将 PhysX drive Ack 记成实测 effort |
 
 独立 Isaac-hosted Newton 与 standalone Newton 是不同的 host/engine/solver 路线；Isaac Sim 6.2 官方文档确认这类层级可存在，但本仓库没有相应 adapter admission。一个 provider 可在自身内部组合多个 solver/coupler；本版只表示一个整场景 owner，跨 provider 力学耦合不在范围。若 required interaction 明确要求耦合而 adapter/build 无 public coupling receipt，则 query 为 unknown、build 拒绝，不从“同一场景包含两类材质”推断已耦合。
+
+## 复杂路线的表达检查（设计，不是新增接入）
+
+| 具名情况 | 必须能区分的值和拒绝边界 |
+| --- | --- |
+| 独立 Newton 与 Isaac 内 Newton | provider/adapter 路由、standalone process 与 Isaac host、engine/library build、solver family/algorithm、source importer 和 App/worker owner 分别记录。两种宿主不共享准入结论 |
+| Isaac＋PhysX 与 Isaac＋Newton | host 相同不代表资产、drive、solver option、公开反馈或 renderer 绑定兼容；只选准确宿主版本公开的 solver。Newton SDK 中有某 solver，不等于 Isaac 插件暴露该 solver |
+| Genesis rigid＋FEM | 同一 scene provider、两个 representation→solver binding、明确 required contact/momentum interaction、coupler/精度/依赖及子步完成边界；只有单项 solver 支持而 coupling 未证实则不准入，具体设计见 P2 |
+| SAPIEN | 由现有 adapter 和准确公开 API/依赖/设备声明真实 solver、控制、反馈、batch 与原生 renderer 绑定；不因其同样有 Scene 接口而套用其他 provider 的能力 |
+
+这些例子只检查协议是否能表达不同层级，不引入新的物理 DSL 或运行承诺。后端是否开源不作为 solver 选择轴；可用公开 API/插件及其版本、依赖和实际实现决定准入。原生 API 可获得而 adapter 尚未实现，也必须单独报告。
 
 ## Panda effort、反馈与模型依赖的协议边界
 

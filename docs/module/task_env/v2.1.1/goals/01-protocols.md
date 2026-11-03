@@ -59,3 +59,6 @@
 2026-11-03：Sol 核对 attempt001 的实际 diff、9 项输出 hash、JSON／依赖和关键源码后，接收 **1a** 为 `ACCEPTED_BOUNDED_1A_AUDIT`。证据 pin、R3 默认和 horizon 范围澄清见[独立审核](../maintenance/reviews/20261103_1a_sol_review.md)。仅开放准备 1b 单子阶段包，不批准后续协议或自动执行。
 
 2026-11-03：Sol 核对 1b 提交与 7 项输出 hash，并收紧并行维度、partial reset、案例 context／Scene 引用及 extension 槽描述后，接收 **1b** 为 `ACCEPTED_BOUNDED_1B_DESIGN`。见[1b 审核](../maintenance/reviews/20261103_1b_sol_review.md)。这是设计交付接收，五份协议仍 draft；只准备 1c 独立包，由维护者转发。
+
+
+2026-11-03：Sol 核对 1c 的允许提交、5 项 raw hash 与源码后，作有界文档修正并接收为 `ACCEPTED_BOUNDED_1C_DESIGN`。修正夹爪 Jacobian/功率方向、opening 与 force provenance、准入阶段与初次 build/重建故障区分；补齐多 solver 案例、时间数值上下文及协议→实施阶段映射。见 [1c 主审](../maintenance/reviews/20261103_1c_sol_review.md)。这不冻结协议、不完成任何 production implementation；只准备 1d 独立包由维护者手动转发。

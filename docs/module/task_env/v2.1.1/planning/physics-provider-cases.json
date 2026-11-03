@@ -44,25 +44,28 @@
         "provider": "MuJoCo",
         "host": "process",
         "engine": "MuJoCo",
-        "solver": "configured MJCF solver",
-        "device": "cpu"
+        "solver": "source/build-bound solver algorithm; exact selection unresolved until receipt",
+        "device": "cpu",
+        "solver_family": "rigid/articulated"
       },
       {
         "id": "geophys_cpu",
         "provider": "GeoPhys",
         "host": "process",
-        "engine": "GeoPhys public physics boundary",
-        "solver": "source-compiled CPU route",
-        "device": "cpu"
+        "engine": "GeoPhys",
+        "solver": "source/build-bound solver algorithm; exact selection unresolved until receipt",
+        "device": "cpu",
+        "solver_family": "rigid/articulated"
       },
       {
         "id": "isaac_physx_cuda",
         "provider": "Isaac Sim",
         "host": "Isaac Sim 6.2.0.0",
         "engine": "PhysX",
-        "solver": "PhysX",
+        "solver": "source/build-bound solver algorithm; exact selection unresolved until receipt",
         "device": "cuda:0",
-        "profile": "exact source-bound F06 PickCube route"
+        "profile": "exact source-bound F06 PickCube route",
+        "solver_family": "rigid/articulated"
       }
     ],
     "identity_fields": [
@@ -78,7 +81,16 @@
       "control_step",
       "state_revision",
       "sample_clock"
-    ]
+    ],
+    "batch_context": {
+      "batch_id": "batch-example",
+      "materialization_id": "batch-materialization-example",
+      "env_to_row": {
+        "env-0": 0,
+        "env-1": 1
+      },
+      "notice": "Planning context only; not current PickCube batch support."
+    }
   },
   "owner_refs": {
     "admission": {
@@ -187,31 +199,80 @@
     {
       "id": "P2",
       "kind": "positive_design",
-      "purpose": "一个provider内部选择host/engine/solver并声明required interaction/coupler；不把表达能力当作实现或证据。",
+      "purpose": "一个Genesis provider负责刚体机器人与FEM物体整场景；两个solver及required coupling必须分别核实。",
       "context_refs": [
         "shared_context.task_context",
-        "shared_context.route_contexts",
-        "owner_refs.admission"
+        "owner_refs.admission",
+        "contracts/physics-provider.md"
       ],
       "input": {
         "route": {
-          "host": "Isaac Sim",
-          "engine": "Newton",
-          "solver": "one named solver",
-          "coupler": [
-            "explicit required Panda-cube contact path"
-          ]
+          "provider": "Genesis",
+          "host": "standalone process",
+          "engine": "Genesis",
+          "solver_bindings": {
+            "panda-v1": "rigid",
+            "tabletop-v1": "rigid",
+            "soft-block-v1": "fem"
+          },
+          "coupler": "explicit source/version-bound rigid-FEM coupler; implementation and numeric policy must be declared"
         },
-        "required_interaction": "cube-table and cube-gripper contact across mapped collision representations"
+        "required_interactions": [
+          {
+            "pair": [
+              "panda-v1",
+              "soft-block-v1"
+            ],
+            "semantics": "two-way rigid-FEM contact and momentum exchange"
+          },
+          {
+            "pair": [
+              "tabletop-v1",
+              "soft-block-v1"
+            ],
+            "semantics": "rigid-FEM support contact"
+          }
+        ],
+        "required_fields": {
+          "rigid": [
+            "joint state",
+            "rigid poses"
+          ],
+          "fem": [
+            "declared deformable state and visual representation mapping"
+          ]
+        }
       },
       "proposed_reply": {
-        "decision": "unknown until exact adapter and compiled build provide a coupling/mapping receipt",
-        "if_absent": "reject required interaction before publishing session"
+        "decision": "do not admit until both representation/solver bindings and each required interaction are implemented and verified for the exact route",
+        "if_adapter_missing": "reject as not_implemented before native build",
+        "if_only_coupling_unresolved": "provisional build only if that adapter has an explicit build-time check; reject and clean up if required coupling remains unknown"
       },
       "owner": "ExecutionSpec/admission and provider adapter",
-      "current_status": "not implemented/evidenced by this repo for Isaac-hosted Newton",
-      "disposition": "requires_build_evidence_then_reject_if_missing",
-      "reason": "One provider may internally compose solvers, but this package authorizes no cross-provider coupling and no Isaac-Newton adapter."
+      "current_status": "future design only; no Geochora rigid-FEM adapter/runtime evidence established",
+      "disposition": "reject_current_route; preserves multi-solver extension boundary",
+      "reason": "Separate solver support does not prove coupled interaction; no cross-provider co-simulation or new nonrigid runtime scope is authorized.",
+      "scene_context": {
+        "entities": [
+          {
+            "id": "panda-v1",
+            "physical_representation": "rigid articulated robot",
+            "solver_binding": "rigid"
+          },
+          {
+            "id": "tabletop-v1",
+            "physical_representation": "static rigid fixture",
+            "solver_binding": "rigid"
+          },
+          {
+            "id": "soft-block-v1",
+            "physical_representation": "FEM deformable body; prepared volume mesh/material/boundary references",
+            "solver_binding": "fem"
+          }
+        ],
+        "reuse": "Panda/table semantic names only; no PickCube action, success, asset or batch admission inherited",
+        "notice": "Future mixed-scene design example, not executable asset declaration."
+      }
     },
     {
       "id": "P3",
@@ -238,8 +299,9 @@
       },
       "proposed_reply": {
         "ack": "only confirms mapped native write; measurement remains separate",
-        "mapping": "use compiled source transmission and power-consistent mapping or mark required effort unsupported",
-        "model": "may compute FK/J/M/bias on explicit source-bound model but must align live q/qdot identity and cadence"
+        "mapping": "For q_native=f(s), A=df/ds is n x 1 and F_closure=A^T*tau_native. Native force allocation needs an explicit source-bound actuator/transmission and constraint policy; no automatic inverse.",
+        "model": "may compute FK/J/M/bias on explicit source-bound model but must align live q/qdot identity and cadence",
+        "feedback": "opening_m is position-derived; force-admitted profiles use separately sourced actuator force. ACK or positions cannot become a force measurement."
       },
       "owner": "ControlBindingPlan/Controller binding and provider adapter",
       "current_status": "arm+finger position and ACK exist only in bounded source routes; canonical closure effort and general ModelRequirement value are proposed",
@@ -254,7 +316,8 @@
         "shared_context.task_context",
         "owner_refs.env",
         "owner_refs.batch",
-        "owner_refs.vector"
+        "owner_refs.vector",
+        "shared_context.batch_context"
       ],
       "input": {
         "batch": {
@@ -339,7 +402,8 @@
         "shared_context.task_context",
         "shared_context.identity_fields",
         "owner_refs.commands",
-        "owner_refs.env"
+        "owner_refs.env",
+        "shared_context.batch_context"
       ],
       "input": {
         "command_identity": {
@@ -347,14 +411,16 @@
           "episode_id": "old",
           "env_id": "env-0",
           "row": 1,
-          "state_revision": 7
+          "state_revision": 7,
+          "scene_instance": "old-env-0-instance"
         },
         "current_boundary": {
           "materialization_id": "new",
           "episode_id": "new",
           "env_id": "env-1",
           "row": 1,
-          "state_revision": 0
+          "state_revision": 0,
+          "scene_instance": "current-env-1-instance"
         }
       },
       "proposed_reply": {
@@ -373,16 +439,22 @@
     {
       "id": "N4",
       "kind": "negative_design",
-      "purpose": "外部advance interval中间第3/5个native step后失败，仍返回完整transition或零推进。",
+      "purpose": "外部advance interval尝试第3/5个native step时失败；已确认2步，不能返回完整transition或零推进。",
       "context_refs": [
         "shared_context.task_context",
         "owner_refs.native_io",
         "owner_refs.env"
       ],
       "input": {
+        "interval_start_native_step": 5,
+        "interval_start_sim_time_s": 0.01,
+        "physics_dt_s": 0.002,
         "expected_native_steps": 5,
+        "expected_end_native_step": 10,
+        "expected_end_sim_time_s": 0.02,
         "attempted_native_steps": 3,
-        "last_confirmed_step": 2,
+        "attempted_end_native_step": 8,
+        "last_confirmed_native_step": 7,
         "last_confirmed_sim_time_s": 0.014
       },
       "proposed_reply": {

@@ -4,7 +4,7 @@
 
 ## 输入与输出
 
-- 包：`V211_G01_1c_attempt001`；完整报告：[raw report](../../../../../workspace/maintenance/v211_g01_1c_attempt001/report.md)。
+- 包：`V211_G01_1c_attempt001`；完整报告：[raw report](../../../../../../workspace/maintenance/v211_g01_1c_attempt001/report.md)。
 - Core 输入：`develop@b0024c71614f2d2ede8d9eb1db594cfcde3e9278`；GeoPhys pin/检出：`67da1165149486d3ae3e779c13ce31af49e17d50`。
 - Output commit/HEAD、manifest hash、保护项和验证结果见 raw report；[orchestration](../orchestration.json)记录 1c 的 pending-review 状态。
 - 只改本包 allowlist 内的协议、规划案例、source map、Goal、recovery、orchestration 与本摘要。production code、tests、dependencies、provider、matrix、unified representation 和 render-provider 未改。

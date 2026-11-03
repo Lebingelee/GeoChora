@@ -1,6 +1,6 @@
 # 生命周期、时间与数据协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；本节冻结 physics-side lifecycle/data contract，renderer window/image/source binding 的细节留 1d。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
+状态：`DRAFT_FOR_DISCUSSION`；本节设计 physics-side lifecycle/data contract，最终冻结待维护者审阅，renderer window/image/source binding 的细节留 1d。环境仍是唯一 public lifecycle owner；不得增加第二个可变 Runtime/Recorder。
 
 ## Owner 和操作状态
 
@@ -9,7 +9,8 @@
 | Env 状态 | 可做操作 | 转换 |
 | --- | --- | --- |
 | configured / unmaterialized | query、build、reset preflight、close | 完整 materialize 后进入 ready |
-| ready / running | reset preflight、唯一 command、一次 control interval、snapshot/publish、record、close | 完整 reset 进入 running；完整 interval 才发布下一正常 transition |
+| ready（已构建，未成功 reset） | query、reset preflight/reset、close；不可提交 episode command、step 或正常 state/obs | reset/readback 门通过后进入 running |
+| running | reset preflight、唯一 command、一次 control interval、snapshot/publish、record、close | 完整 reset 开始新 episode；完整 interval 才发布下一正常 transition |
 | faulted | 读取 fault/cleanup receipt、明确 rebuild reset、close | 不允许再 step 或提交旧 command；不得继续产生正常 transition |
 | closed | 读取终结 receipt | 所有 state view/lease 无效，重复 close 安全 |
 
@@ -19,7 +20,7 @@
 
 | 时点 | Core/Env | RuntimeSession/adapter | 故障边界 |
 | --- | --- | --- | --- |
-| query/build | 汇总 Artifact/Scene/source/Controller/state/batch/共享资源需求；固定 observation 契约和 batch layout；发布 binding 和 route identity | 仅构建已准入路线；记录 dependency/provider/device/compiled map/materialization receipt；native 构建失败尽力清理 | static admission failure 无原生 effect；build/cleanup 不完整则 faulted |
+| query/build | 汇总 Artifact/Scene/source/Controller/state/batch/共享资源需求；固定 observation 契约和 batch layout；发布 binding 和 route identity | 仅构建已准入路线；记录 dependency/provider/device/compiled map/materialization receipt；native 构建失败尽力清理 | static admission failure 无原生 effect；初次 build 失败且清理完整可回未物化；reset/rebuild 过 first effect 后失败或 cleanup 不完整则 faulted |
 | reset preflight | 验证 seed/sample、source identity、mask、配置/action spec，并为新 episode 分配 generation | 在通过前不写 state、不释放现有 session | preflight reject 保持旧 episode/Controller/state view 有效 |
 | reset effect | 绑定新 episode/reset sample；重置 Controller、filter/integrator/force latch/action histories | 按 mask 写选中 state、zero velocity/initialize targets，返回 ResetWriteReceipt、realized state 与公开 readback | 第一个 native effect 后失败就 faulted；记录已写 env rows/fields；无通用 native snapshot rollback |
 | command + advance | 每边界只由一个 writer 提交 target；记录 `submitted → accepted` | 精确映射并 ack；按固定 physics_dt/substeps 走一组公开 native advance | command 在第一 write 前 reject 可继续；写入/推进部分失败则 faulted |

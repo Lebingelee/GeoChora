@@ -1,6 +1,6 @@
 # 控制、effort 与反馈协议草案
 
-状态：`DRAFT_FOR_DISCUSSION`；1c 冻结物理命令、模型/feedback 和兼容边界，4a–4c 再实施 Controller 与迁移。下列协议是设计建议，不是新 public schema。
+状态：`DRAFT_FOR_DISCUSSION`；1c 设计物理命令、模型/feedback 和兼容边界，最终冻结待维护者审阅，4a–4c 再实施 Controller 与迁移。下列协议是设计建议，不是新 public schema。
 
 ## 控制分层与命令阶段
 
@@ -26,7 +26,7 @@ Core 绑定唯一 Controller、命令 writer、action spec 和控制 cadence；R
 ## 首批 Panda 通道建议
 
 - **主路线：**七个 source-bound Panda arm revolute DOF，按语义名固定排序，单位 N·m、轴和正负按源定义；一个 `panda-v1/gripper-closure` 广义坐标，坐标单位 m、共轭广义力单位 N。夹爪 opening/closing 正方向、参考点、范围和实体 binding 写进版本化 Scene/Execution 表示。
-- Adapter receipt 给出 `q_native = f(q_closure)`／其 Jacobian 和 `tau_native = J(q)^T F_closure` 的 source-bound actuator/transmission 对应；native tendon/gear/mimic 必须在有效范围内满足能量/功率关系，做不到就拒绝该 effort capability。不能把一个 tendon ctrl 直接重命名成 N，也不能把两 finger joints 的任意两路力压成一条标量。
+- Adapter receipt 明确映射方向和维数：若 `q_native = f(s)`、`s=q_closure`，则 `A=df/ds` 为 n×1，`qdot_native=A*sdot`，功率共轭关系是 `F_closure=A^T*tau_native`、`tau_native^T*qdot_native=F_closure*sdot`。这不能唯一反推出 n 路 native effort。若另有已声明的 `s=g(q_native)`，可按其 1×n Jacobian `J_s=dg/dq_native` 定义一种 `tau_native=J_s^T*F_closure` 的力分配；只有在源约束子空间、native actuator/gear/tendon/mimic、符号、限幅与功率关系均通过编译核对时才准入。其他分配需给出同样明确的 source-bound 证明，不能直接求逆或把 tendon ctrl 重命名成 N。两个 finger 的任意独立力也不能无损压成一条标量。
 - 位置参考、opening＋force limit、原生 mimic/implicit PD 保留为具名 **position compatibility** profile；必须独立列能力，永不充当 unified effort completion。现有 R3 输出 arm q_ref 与 gripper position；MixedActuatorPlan 当前的 arm-torque＋finger-position/source-specific route 也是 compatibility。
 - `cube-v1` 的 free-body pose/velocity 是被动状态，不生成 cube action。外部 wrench 若日后需要，必须另有 typed body、frame、application point、unit 和叠加政策。
 - 一个 control interval 内一个 DOF/resource 只允许一个 writer。位置 servo/implicit drive、显式 PD 和 direct effort 的冲突需在 build/query 拒绝。若 direct effort route 要求引擎 drive 留存，配置须明确其 inactive/passive-only/native-owned 状态、gains、limits、friction 和被动项，避免重复 PD。
@@ -48,7 +48,7 @@ LIBERO 的 `MujocoSourceGravityBiasV1` 以 `ExecutionSourceReceiptV1` 绑定已�
 
 测量、估算和控制反馈分开：
 - named q/qdot/state 的 sample clock 说明是 evaluation boundary 还是 native-step；
-- `CanonicalControlFeedback.gripper.closing_force_N` 当前可从 named finger position 推导，是 position-derived value；不能写成传感器测得夹持力；
+- `opening_m` 来自 named finger position 之和；`closing_force_N` 不能由位置推导。现有 MuJoCo/GeoPhys 的受限 force-admitted profile 经 `control.py::feedback_value` 将有效 native actuator force 按符号投影为 closing magnitude，`NativeControlFeedbackSampleV1` 另校验样本来源/时间。该量是具名 actuator-force 读回，不自动等于接触传感器测得的夹持力；其他 position-only profile 若无该测量则明确 unavailable，不能抹去已有 force profile 或伪造估计；
 - `NativeControlFeedbackSampleV1` 必须绑定 provider materialization/source/episode/reset/sequence/revision/native step/phase；该能力 unavailable 时报告原因，不返回伪造零力；
 - R3 外层按 control interval 更新 q_ref；mixed physics-rate profile 可明确选择每 native substep 重算。zero-order hold 与 recalculate 不得从 route 名字猜测；
 - reset 或 action/Controller input schema 变化时清空 q_ref、积分器、滤波、force latch 与 sample history；更新 Controller/action-spec identity。已构建 observation schema 固定，不随 Controller 切换而暗改。
