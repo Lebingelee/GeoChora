@@ -102,6 +102,10 @@ The parent independently validates native probe rows against the raw completion
 contract before accepting their classification. A parent timeout or interrupt
 retires and reaps the worker process group while retaining the shared native
 lock, writes a supervision receipt, and then propagates the interruption.
+If group retirement cannot be confirmed, a `.unretired.json` guard beside the
+shared lock blocks candidate and built-in launches. Inspect its recorded process
+group and remove the guard only after confirming the group has ended; the
+Harness never clears it automatically.
 
 The same interpreter and lock settings apply to the built-in example below.
 Without overrides, Core Python is the calling interpreter and Isaac Python uses

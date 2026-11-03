@@ -65,8 +65,46 @@ def test_parent_rejects_invalid_worker_completion_facts(tmp_path, defect):
     assert result['error_type'] == (None if defect is None else 'NativeWorkerRowInvalid')
 
 
-@pytest.mark.parametrize('interruption', [TimeoutError, KeyboardInterrupt])
-def test_parent_interruption_retires_worker_before_releasing_lock(tmp_path, monkeypatch, interruption):
+def test_builtin_launch_refuses_unconfirmed_native_retirement(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+    from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+
+    spec = BuiltinPickCubeExampleV1.from_dict({
+        'schema_version': 'harness-builtin-pickcube-example-v1',
+        'example_id': 'pickcube-harness-example-v1', 'task_uid': 'pick-cube-p16-reference-v1',
+        'provider': 'mujoco', 'backend': 'cpu', 'device': 'cpu',
+        'controller_profile': 'r3_continuous_v1', 'seeds': [31, 32, 33],
+        'horizon_control_ticks': 1000, 'physics_dt_s': .002, 'control_substeps': 5,
+        'source_delivery_manifest': None,
+    })
+    spec_path, catalog_path, scope_path = (tmp_path / name for name in ('spec.json', 'catalog.json', 'scope.json'))
+    spec_path.write_text(json.dumps(spec.to_dict()))
+    catalog_path.write_text('{}')
+    scope_path.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', (),
+    ).to_dict()))
+    lock_path = tmp_path / 'native.lock'
+    validation.native_cleanup_blocker_path(lock_path).write_text('{}')
+    monkeypatch.setattr(validation, 'native_lock_path', lambda: lock_path)
+    monkeypatch.setattr(validation, 'core_python', lambda: Path(sys.executable))
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 12 * 1024**3)
+    with patch.object(validation.subprocess, 'Popen') as popen:
+        receipt = validation._run_one(spec_path, catalog_path, scope_path, 31,
+                                       tmp_path / 'run', provider='mujoco')
+    assert receipt['status'] == 'BLOCKED_NATIVE_LOCK'
+    popen.assert_not_called()
+
+
+@pytest.mark.parametrize('interruption,location,cleanup_failure', [
+    (TimeoutError, 'sleep', None),
+    (KeyboardInterrupt, 'sleep', None),
+    (TimeoutError, 'spawn', None),
+    (TimeoutError, 'monitor', None),
+    (TimeoutError, 'sleep', 'unretired'),
+    (TimeoutError, 'sleep', 'wait_error'),
+])
+def test_parent_interruption_retires_worker_before_releasing_lock(
+        tmp_path, monkeypatch, interruption, location, cleanup_failure):
     import fcntl
 
     lock_path = tmp_path / 'native.lock'
@@ -79,6 +117,8 @@ def test_parent_interruption_retires_worker_before_releasing_lock(tmp_path, monk
     def launch(_command, **kwargs):
         child = real_popen([sys.executable, '-c', 'import time; time.sleep(30)'], **kwargs)
         children.append(child)
+        if location == 'spawn':
+            os.kill(os.getpid(), signal.SIGALRM)
         return child
 
     def kill_while_locked(process, sig):
@@ -93,38 +133,65 @@ def test_parent_interruption_retires_worker_before_releasing_lock(tmp_path, monk
     def interrupt_once(seconds):
         nonlocal sleeps
         sleeps += 1
-        if sleeps == 1:
+        if sleeps == 1 and location == 'sleep':
             raise interruption('parent interruption sentinel')
         real_sleep(seconds)
+
+    def monitor(_pid):
+        if location == 'monitor':
+            os.kill(os.getpid(), signal.SIGALRM)
+        return 1024
+
+    def alarm_handler(*_args):
+        raise TimeoutError('parent interruption sentinel')
 
     monkeypatch.setattr(runner, 'isaac_python', lambda: Path(sys.executable))
     monkeypatch.setattr(runner, 'native_lock_path', lambda: lock_path)
     monkeypatch.setattr(runner, '_mem_available_bytes', lambda: 12 * 1024**3)
     monkeypatch.setattr(runner, '_gpu_free_mib', lambda: 7000)
-    monkeypatch.setattr(runner, '_proc_rss_tree', lambda _pid: 1024)
+    monkeypatch.setattr(runner, '_proc_rss_tree', monitor)
     monkeypatch.setattr(runner, '_core_site', lambda: tmp_path)
     monkeypatch.setattr(runner, '_populate_isaac_core_site_overlay', lambda *_: {})
     monkeypatch.setattr(runner, '_set_child_affinity', lambda: None)
     monkeypatch.setattr(runner, '_kill_process_group', kill_while_locked)
     monkeypatch.setattr(runner.subprocess, 'Popen', launch)
     monkeypatch.setattr(runner.time, 'sleep', interrupt_once)
+    if cleanup_failure == 'unretired':
+        monkeypatch.setattr(runner, '_wait_process_group', lambda _process: False)
+    elif cleanup_failure == 'wait_error':
+        monkeypatch.setattr(runner, '_stop_worker_group', lambda _process: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired('injected child wait', 5)))
     output = tmp_path / 'run'
     spec = SimpleNamespace(save=lambda path: path.write_text('{}'))
+    previous_mask = signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGALRM, signal.SIGINT})
+    previous_handler = signal.signal(signal.SIGALRM, alarm_handler)
     try:
         with pytest.raises(interruption, match='parent interruption sentinel'):
             runner.launch_worker(mode='oracle', spec=spec, catalog={}, provider='isaacsim',
                                  seed=0, horizon=5, output_dir=output, time_limit_s=30)
-        assert children[0].poll() is not None
-        with pytest.raises(ProcessLookupError):
-            os.killpg(children[0].pid, 0)
-        assert kill_signals[0] == signal.SIGTERM
+        if cleanup_failure != 'wait_error':
+            assert children[0].poll() is not None
+            with pytest.raises(ProcessLookupError):
+                os.killpg(children[0].pid, 0)
+            assert kill_signals[0] == signal.SIGTERM
         receipt = json.loads((output / 'native_run_receipt.json').read_text())
         assert receipt['status'] == ('TIMEOUT' if interruption is TimeoutError else 'INTERRUPTED')
-        assert receipt['process_group_retired'] is True
+        assert receipt['process_group_retired'] is (cleanup_failure is None)
         assert receipt['interruption_type'] == interruption.__name__
+        if cleanup_failure is not None:
+            blocker = runner.native_cleanup_blocker_path(lock_path)
+            assert blocker.is_file()
+            next_receipt = runner.launch_worker(
+                mode='probe', spec=spec, catalog={}, provider='isaacsim', seed=1,
+                horizon=5, output_dir=tmp_path / 'next', time_limit_s=30)
+            assert next_receipt['status'] == 'BLOCKED_NATIVE_LOCK'
+            assert len(children) == 1
+        assert signal.pthread_sigmask(signal.SIG_BLOCK, set()).isdisjoint({signal.SIGALRM, signal.SIGINT})
         with lock_path.open('a') as contender:
             fcntl.flock(contender.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     finally:
+        signal.signal(signal.SIGALRM, previous_handler)
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
         for child in children:
             real_kill(child, signal.SIGKILL)
             child.wait(timeout=5)

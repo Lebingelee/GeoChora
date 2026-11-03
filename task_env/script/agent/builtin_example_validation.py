@@ -59,6 +59,11 @@ def native_lock_path() -> Path:
     return path
 
 
+def native_cleanup_blocker_path(lock_path) -> Path:
+    lock_path = Path(lock_path)
+    return lock_path.with_name(lock_path.name + '.unretired.json')
+
+
 def _write_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -328,6 +333,12 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             })
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': 'another process owns the shared native execution lock'}
+        blocker = native_cleanup_blocker_path(lock_path)
+        if blocker.exists():
+            if isaac_core_site_owner is not None:
+                isaac_core_site_owner.cleanup()
+            return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
+                    'reason': f'unconfirmed native process retirement; inspect {blocker}'}
         _write_json(output / 'run_preflight.json', {
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
             'status': 'READY', 'mem_available_start_bytes': mem_start,

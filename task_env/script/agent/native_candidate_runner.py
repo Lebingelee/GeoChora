@@ -27,7 +27,7 @@ if __package__:
         MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
         _directory_bytes, _gpu_free_mib, _kill_process_group, _mem_available_bytes,
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
-        isaac_python, native_lock_path,
+        isaac_python, native_cleanup_blocker_path, native_lock_path,
     )
     from .completion_facts import validate_completion_row
     from .feasibility_probe import invalid_row
@@ -38,7 +38,7 @@ else:
         MAX_WORKER_LOG_BYTES, MAX_RUN_EVIDENCE_BYTES,
         _directory_bytes, _gpu_free_mib, _kill_process_group, _mem_available_bytes,
         _populate_isaac_core_site_overlay, _proc_rss_tree, _set_child_affinity, _write_json,
-        isaac_python, native_lock_path,
+        isaac_python, native_cleanup_blocker_path, native_lock_path,
     )
     from completion_facts import validate_completion_row
     from feasibility_probe import invalid_row
@@ -74,6 +74,26 @@ def _wait_process_group(process):
             return True
         time.sleep(0.1)
     return False
+
+
+def _launch_process(command, *, environment, stdout, stderr):
+    # Defer parent alarms/Ctrl-C until the child handle has been assigned.
+    old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM, signal.SIGINT})
+
+    def child_setup():
+        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+        if hasattr(os, 'sched_setaffinity'):
+            _set_child_affinity()
+
+    try:
+        process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
+                                   start_new_session=True, preexec_fn=child_setup)
+        # Return the mask separately: the caller must assign the process before
+        # restoring it, since restoring may immediately deliver a pending alarm.
+        return process, old_mask
+    except BaseException:
+        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
+        raise
 
 
 def _stop_worker_group(process):
@@ -160,13 +180,18 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
             except BlockingIOError:
                 return finish('BLOCKED_NATIVE_LOCK', reason='another process owns the shared native execution lock',
                               lock_path=str(lock_path))
+            blocker = native_cleanup_blocker_path(lock_path)
+            if blocker.exists():
+                return finish('BLOCKED_NATIVE_LOCK', reason=f'unconfirmed native process retirement; inspect {blocker}',
+                              lock_path=str(lock_path), cleanup_blocker=str(blocker))
             violation = None
-            preexec = _set_child_affinity if hasattr(os, 'sched_setaffinity') else None
             process = None
+            group_alive = False
             try:
                 with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-                    process = subprocess.Popen(command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
-                                               start_new_session=True, preexec_fn=preexec)
+                    process, old_mask = _launch_process(command, environment=environment,
+                                                        stdout=stdout, stderr=stderr)
+                    signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
                     while process.poll() is None:
                         if time.perf_counter() - wall_start > timeout_s:
                             violation = f'wall watchdog {timeout_s}s exceeded'
@@ -175,6 +200,8 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
                                 available = _mem_available_bytes()
                                 rss = _proc_rss_tree(process.pid)
                                 gpu_free = _gpu_free_mib()
+                            except TimeoutError:
+                                raise
                             except Exception as error:
                                 violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
                             else:
@@ -200,15 +227,36 @@ def launch_worker(*, mode, spec, catalog, provider, seed, horizon, output_dir, t
             except BaseException as error:
                 # An outer Oracle alarm or Ctrl-C must retire the child before
                 # unwinding the lock and deleting its dependency overlay.
-                retired = process is None or _stop_worker_group(process)
-                finish('TIMEOUT' if isinstance(error, TimeoutError) else 'INTERRUPTED',
-                       reason=f'{type(error).__name__}: {error}',
-                       interruption_type=type(error).__name__,
-                       returncode=process.returncode if process is not None else None,
-                       lock_path=str(lock_path), process_group_retired=retired,
-                       stdout=stdout_path.name, stderr=stderr_path.name)
+                cleanup_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM, signal.SIGINT})
+                try:
+                    cleanup_error = None
+                    try:
+                        retired = process is None or _stop_worker_group(process)
+                    except BaseException as cleanup:
+                        retired = False
+                        cleanup_error = f'{type(cleanup).__name__}: {cleanup}'
+                    group_alive = not retired
+                    if not retired:
+                        # A filesystem guard preserves exclusion across parent
+                        # exit when the kernel cannot confirm group retirement.
+                        _write_json(blocker, {'schema_version': 'harness-native-cleanup-blocker-v1',
+                                              'process_group_id': process.pid if process is not None else None,
+                                              'output_dir': str(output), 'cleanup_error': cleanup_error})
+                    finish('TIMEOUT' if isinstance(error, TimeoutError) else 'INTERRUPTED',
+                           reason=f'{type(error).__name__}: {error}',
+                           interruption_type=type(error).__name__, cleanup_error=cleanup_error,
+                           returncode=process.returncode if process is not None else None,
+                           lock_path=str(lock_path), process_group_retired=retired,
+                           cleanup_blocker=str(blocker) if not retired else None,
+                           stdout=stdout_path.name, stderr=stderr_path.name)
+                finally:
+                    signal.pthread_sigmask(signal.SIG_SETMASK, cleanup_mask)
                 raise
             finally:
+                if process is not None and group_alive:
+                    _write_json(blocker, {'schema_version': 'harness-native-cleanup-blocker-v1',
+                                          'process_group_id': process.pid, 'output_dir': str(output),
+                                          'cleanup_error': 'process group retirement was not confirmed'})
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
     finally:
         overlay_owner.cleanup()
