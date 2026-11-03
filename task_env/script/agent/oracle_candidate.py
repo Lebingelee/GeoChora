@@ -59,10 +59,27 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
         env = compiled.env_class()(provider=provider, backend=compiled.backend)
         _, reset_info = env.reset(seed=seed)
         if requires_native_worker(provider):
-            metadata = env.get_record_metadata()
+            # Bind expected H5 identities to the reset Core value; the public
+            # get_record_metadata hook only serves mixed-control environments.
+            runtime_input = env.value['f06_pickcube_isaac_input']
+            reset_plan = env.value['reset_plan']
+            source = env.value['source']
+            execution = runtime_input.execution
+            if reset_plan.reset_sample.task_seed != seed:
+                raise ValueError('native Oracle reset seed differs from the requested seed')
             facts['recording_identity'] = {
-                'seed': env.value['reset_plan'].reset_sample.task_seed,
-                'profile': metadata['env_metadata']['reference_profile'],
+                'seed': reset_plan.reset_sample.task_seed,
+                'profile': {
+                    'execution_identity_sha256': execution.identity_hash,
+                    'reset_plan_identity_hash': reset_plan.identity_hash,
+                    'reset_sample_id': reset_plan.reset_sample.sample_id,
+                    'source_id': source.source_id,
+                    'source_closure_digest': source.source_closure_digest,
+                    'delivery_manifest_sha256': runtime_input.delivery_manifest_sha256,
+                    'provider': execution.physics_provider,
+                    'backend': execution.physics_backend,
+                    'device': execution.physics_device,
+                },
             }
         env.start_recording(h5)
         facts['recording_started'] = True

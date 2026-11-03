@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import sys
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -113,3 +114,60 @@ def test_supervisor_preserves_worker_compilation_identity(tmp_path, monkeypatch)
     assert row['compiled'] == compiled
     assert row['runtime_valid'] is True
     assert row['worker_process_group_ended'] is True
+
+
+@pytest.mark.parametrize('actual_seed', (31, 32))
+def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path, actual_seed):
+    import oracle_candidate as oracle
+
+    events = []
+    execution = SimpleNamespace(identity_hash='execution', physics_provider='isaacsim',
+                                physics_backend='cuda', physics_device='cuda:0')
+    sample = SimpleNamespace(task_seed=actual_seed, sample_id='sample')
+    source = SimpleNamespace(source_id='source', source_closure_digest='closure')
+
+    class Env:
+        def __init__(self, **_kwargs):
+            self.value = {'f06_pickcube_isaac_input': SimpleNamespace(
+                execution=execution, delivery_manifest_sha256='manifest'),
+                'reset_plan': SimpleNamespace(identity_hash='reset', reset_sample=sample),
+                'source': source}
+            self.controller = SimpleNamespace(identity='controller')
+            self.solution = SimpleNamespace(identity='solution')
+            self.execution_fault = None
+
+        def reset(self, **_kwargs):
+            events.append('reset')
+            return {}, {}
+
+        def get_record_metadata(self):
+            raise AssertionError('mixed-control metadata called on a Position route')
+
+        def start_recording(self, _path):
+            events.append('record')
+
+        def finish_recording(self, _reason):
+            return {'transition_count': 1}
+
+        def close(self):
+            events.append('close')
+
+    compiled = SimpleNamespace(env_class=lambda: Env, backend='cuda', device='cuda:0')
+    with patch('examples._common.run_expert', return_value={'status': 'FAIL', 'transitions': 1}), \
+         patch('examples._common.identity_summary', return_value={}):
+        facts = oracle.record_episode(compiled, SimpleNamespace(horizon=5), provider='isaacsim',
+                                      seed=31, h5=tmp_path / 'episode.h5', deadline=time.perf_counter() + 10)
+    assert facts['close_succeeded'] is True
+    if actual_seed == 31:
+        assert facts['errors'] == []
+        assert events == ['reset', 'record', 'close']
+        assert facts['recording_identity']['seed'] == 31
+        assert facts['recording_identity']['profile'] == {
+            'execution_identity_sha256': 'execution', 'reset_plan_identity_hash': 'reset',
+            'reset_sample_id': 'sample', 'source_id': 'source', 'source_closure_digest': 'closure',
+            'delivery_manifest_sha256': 'manifest', 'provider': 'isaacsim', 'backend': 'cuda', 'device': 'cuda:0',
+        }
+    else:
+        assert facts['recording_started'] is False
+        assert events == ['reset', 'close']
+        assert 'seed' in facts['errors'][0]['message'].lower()
