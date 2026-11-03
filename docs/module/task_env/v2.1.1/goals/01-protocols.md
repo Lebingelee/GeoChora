@@ -71,3 +71,6 @@
 源码审计确认 reset 初帧与 post-step 当前共用 `post_control_step` capture phase，GeoPhys→MuJoCo dynamic source 拒绝 `free_joints`（PickCube 浮动方块未接通），Isaac F06 camera-disabled，remote batch `get_images()` 重复单 worker 帧。因此这些均作为 5a–5c/6c gap，而非能力证据。三条 native renderer 目标及 GeoPhys×MuJoCo cross target 保留；13 targets 仍 `NOT_STARTED`、9 final cells 仍 `NOT_RUN`。协议维持 `DRAFT_FOR_DISCUSSION`，本轮未修改 unified representation 或 control 正文。
 
 本轮仅更新本包 allowlist；未改 production source/schema、tests、依赖、资产或旧 evidence；未启动 App/window/runtime/solver/model/physics/GPU，未导入有初始化副作用的后端，implementation tests=0。报告、hash、命令、检查与实际 commit 在外部 raw output；只准备手动交给 Sol/维护者审阅，不批准冻结、不启动 2a。
+
+
+2026-11-03：Sol 完成 1d 独立审阅与有界文档修正，接收为 `ACCEPTED_BOUNDED_1D_DESIGN`；见 [1d 主审](../maintenance/reviews/20261103_1d_sol_review.md)。修正公共render/close返回与内部receipt的分工、相机/时钟/terminal retain案例、部分reset参照时刻、App owner与first-effect failure，补充控制/资产/记录实施追踪。G01 四个子阶段的设计交付均已审核；五协议仍 draft，等待维护者最终确认，不自动派发2a或实施代码。

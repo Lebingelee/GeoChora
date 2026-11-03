@@ -141,9 +141,9 @@
       "required_future_extension": "Typed floating-body/frame pose to renderer-only visual model mapping; prove exactly one GeoPhys physics advance and same-boundary RGB."
     },
     "parallel_gap": "Only GeoPhys merged rigid batch is connected; current parallel registrations are Pendulum and TwoWheelBalance. Isaac TaskEnv batch adapter absent. Remote same-step autoreset preserves terminal_observation/reset_info, but RemoteBatchVecEnv.get_images repeats a single worker frame across slots; this is not row-specific task RGB.",
-    "reason": "G01/1d design is reported pending review only. No native/build/runtime/image evidence was added. All 13 implementation targets remain NOT_STARTED and all 9 final PickCube cells remain NOT_RUN.",
+    "reason": "G01/1a-1d bounded design deliveries independently reviewed; all five protocols remain draft pending maintainer confirmation. No native/build/runtime/image evidence added; 13 implementation targets NOT_STARTED and 9 final cells NOT_RUN.",
     "render_protocol_resolution": {
-      "status": "DESIGN_REPORTED_PENDING_REVIEW",
+      "status": "BOUNDED_DESIGN_REVIEWED_PENDING_MAINTAINER_CONFIRMATION",
       "render_completion_targets": [
         {
           "id": "window_presentation",
@@ -170,7 +170,8 @@
         "5b": "observer/window, display events, app/device/context lease",
         "5c": "reset/step capture phase, synchronized task RGB, frame lifetime/fault/cache",
         "6c": "batch row-to-camera image correspondence and same-step terminal/reset frames"
-      }
+      },
+      "public_api_policy": "Env.render returns ndarray or None by construction-fixed mode; internal presentation/capture/close receipts remain on adapter-Core/diagnostic paths. Keep existing configured RGB dtype/range; no implicit global uint8 migration."
     }
   },
   "targets": [

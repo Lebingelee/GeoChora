@@ -57,7 +57,7 @@
         {
           "t": "render",
           "input": "observer camera orbit at same state boundary",
-          "reply": "presentation receipt; task-front identity unchanged",
+          "reply": "public human render returns None; internal presentation receipt is queryable; task-front identity unchanged",
           "disposition": "no physics advance and no task camera mutation"
         },
         {
@@ -79,10 +79,14 @@
         "env": "env-0",
         "worker": "worker-0",
         "row": 0,
-        "entity": "cube",
-        "frame": "cube_world",
+        "entity": "cube-v1",
+        "frame": "cube-v1/body-origin (case-local Frame ID; native mapping is proposed)",
         "physics_owner": "GeoPhys RuntimeSession",
-        "renderer_owner": "MuJoCoDynamicCameraSession (render-only model)"
+        "renderer_owner": "MuJoCoDynamicCameraSession (render-only model)",
+        "world_frame": "world; right-handed z-up",
+        "pose_convention": "T_world_from_body_origin; quaternion wxyz; position meters; not COM",
+        "camera": "task-front",
+        "frame_declaration": "cube-v1/body-origin belongs to the floating cube visual body; this is planning context, not a claim about compiled IDs"
       },
       "timeline": [
         {
@@ -94,7 +98,7 @@
         {
           "t": "step",
           "input": "state boundary step=8, revision=19; cube pose position=(0.20,0.10,0.04) m and quaternion=(1,0,0,0) in declared order/frame",
-          "reply": "renderer writes named visual transform, updates camera, completes without mj_step/mj_forward",
+          "reply": "renderer applies named visual pose and permitted render-only kinematics without mj_step/solver integration, live Controller callbacks or mutation of GeoPhys state",
           "disposition": "same state identity; physics advances exactly once in GeoPhys"
         },
         {
@@ -118,26 +122,61 @@
         "row": 0,
         "camera": "front-0",
         "camera_config_revision": 4,
-        "episode": "episode-12"
+        "episode": "episode-12",
+        "observer_camera": "observer-0",
+        "render_mode": "human",
+        "timebase": {
+          "physics_dt_s": 0.002,
+          "control_substeps": 5,
+          "control_dt_s": 0.01
+        }
       },
       "timeline": [
         {
           "t": "reset",
-          "input": "reset_sample=5; physics readback boundary control_step=0,state_revision=31",
-          "reply": "capture_phase=reset_initial, sample_clock=(episode-12,0,31), frame=F0",
+          "input": {
+            "reset_sample": 5,
+            "control_step": 0,
+            "state_revision": 0,
+            "physics_simulation_time_s": 0.0
+          },
+          "reply": {
+            "capture_phase": "reset_initial",
+            "sample_clock": {
+              "clock_domain": "evaluation_boundary",
+              "sample_index": 0,
+              "simulation_time_s": 0.0,
+              "schema_version": "state-sample-clock-v1"
+            },
+            "frame": "F0"
+          },
           "disposition": "returned reset observation contains F0"
         },
         {
           "t": "step",
-          "input": "one completed control interval",
-          "reply": "control_step=1,state_revision=32,capture_phase=post_control_step,frame=F1",
+          "input": {
+            "completed_control_intervals": 1,
+            "completed_native_steps": 5
+          },
+          "reply": {
+            "control_step": 1,
+            "state_revision": 1,
+            "capture_phase": "post_control_step",
+            "sample_clock": {
+              "clock_domain": "evaluation_boundary",
+              "sample_index": 1,
+              "simulation_time_s": 0.01,
+              "schema_version": "state-sample-clock-v1"
+            },
+            "frame": "F1"
+          },
           "disposition": "returned normal transition contains F1; F1 identity differs from F0"
         },
         {
           "t": "render",
-          "input": "capture again without stepping",
-          "reply": "frame F1b has same state clock/revision; camera/config generation still 4",
-          "disposition": "render does not advance physics; cache reuse or a new render must preserve boundary identity"
+          "input": "human render observer-0 twice without stepping; task camera remains front-0 config revision 4",
+          "reply": "both calls return None; internal presentation receipts retain physics time .010/control_step 1/state_revision 1; task frame F1 and task camera config unchanged",
+          "disposition": "no physics advance; observer presentation is distinct from task capture/cache"
         }
       ],
       "acceptance": "proposed_contract",
@@ -174,16 +213,16 @@
           "disposition": "terminal frames captured before mask reset"
         },
         {
-          "t": "autoreset",
-          "input": "reset mask selects only env-1",
-          "reply": "env-1 reset episode-C reset_sample=0 revision=1, reset frames for both cameras; env-0 episode/clock/controller unchanged",
-          "disposition": "return observations use env-0 step frame and env-1 reset frame; info env-1 holds terminal_observation + reset_info"
+          "t": "retain-before-autoreset",
+          "input": "terminal frames must survive the next shared batch buffer overwrite",
+          "reply": "before mask reset or any overwrite, terminal owner copies or retains both env-1 camera images and their old episode-B terminal identities",
+          "disposition": "no stale borrow; no cross-episode join"
         },
         {
-          "t": "retain",
-          "input": "terminal frames outlive shared batch buffer overwrite",
-          "reply": "terminal owner copies or retains both images until Recorder/learner completes",
-          "disposition": "no stale borrow; no cross-episode join"
+          "t": "autoreset",
+          "input": "reset mask selects only env-1",
+          "reply": "env-1 reset episode-C reset_sample=0 control_step=0 revision=0, reset frames for both cameras; env-0 stays at its post-step/pre-reset episode-A step=5 revision=51 with the same clock/Controller state",
+          "disposition": "return observations use env-0 step frame and env-1 reset frame; info env-1 holds terminal_observation + reset_info"
         }
       ],
       "acceptance": "proposed_contract",
@@ -195,34 +234,36 @@
       "context": {
         "env": "env-0",
         "worker": "worker-0",
-        "observation": "fixed RGB HWC uint8 (H=96,W=128), one task camera",
+        "observation": "fixed task RGB HWC float32 [0,1] (H=96,W=128), one task camera",
         "routes": [
-          "A: MuJoCo CPU + renderer A",
-          "B: Isaac Sim 6.2.0.0/PhysX/CUDA:0 + renderer B"
-        ]
+          "A: GeoPhys CPU physics + future dynamic native GeoPhys RayTraceEngine renderer",
+          "B: same GeoPhys CPU physics + future MuJoCo native OpenGL render-only renderer"
+        ],
+        "physics_route": "GeoPhys CPU unchanged across A/B/A; scalar environment example",
+        "lifetime_policy": "example reuses physics materialization P7 and resets physics from the task initializer each time; renderer generation changes 1/2/3; no old episode state migration"
       },
       "timeline": [
         {
           "t": "episode A",
-          "input": "episode-A, route generation 1, camera config revision 1",
+          "input": "episode-A, physics materialization P7, renderer generation 1, camera config revision 1",
           "reply": "capture A1 bound to A/state revision 10",
           "disposition": "owned/retained image may remain in its owning record"
         },
         {
           "t": "reset B",
-          "input": "static preflight B then destructive close/rebind",
-          "reply": "generation 2; new episode B reset/readback then B image; old A leases/cache invalidated",
+          "input": "preflight renderer B, release only old render-owned resources/lease, replace renderer, then reset task physics from new initializer",
+          "reply": "same GeoPhys physics route/materialization P7; renderer generation 2 and new episode B/reset sample/state; capture B initial image; old A borrowed leases/cache invalidated",
           "disposition": "state is initialized anew; no old-state migration"
         },
         {
           "t": "reset A",
           "input": "static preflight A then rebuild",
-          "reply": "generation 3; new episode A2 image; observation shape/dtype/meaning unchanged",
+          "reply": "same GeoPhys physics route/materialization P7; renderer generation 3; new episode A2 from fresh task reset; observation schema unchanged",
           "disposition": "A1 cannot satisfy A2 capture"
         }
       ],
       "acceptance": "proposed_after_each_route_admitted",
-      "current_evidence": "selected PickCube has renderer=none; Isaac task camera not implemented; routes are candidates only"
+      "current_evidence": "Both selected dynamic renderers and PickCube cross capture need implementation; this does not establish current renderer-only reset support. Combined physics+renderer switches remain future 3c/5c integration checks."
     }
   ],
   "negative_cases": [
@@ -266,7 +307,11 @@
         "env": "env-0",
         "route": "Isaac Sim candidate",
         "clock_before": 17,
-        "clock_after": 18
+        "clock_after": 18,
+        "clock_domain": "native_physics_step",
+        "physics_dt_s": 0.002,
+        "simulation_time_before_s": 0.034,
+        "simulation_time_after_s": 0.036
       },
       "input": "render/present/camera warmup invokes App update",
       "reply": "physics clock delta detected or public render-only/pause path is proven",
@@ -304,7 +349,7 @@
         "completion": "pending"
       },
       "input": "Recorder/vector return reads image before fence or after next buffer write",
-      "reply": "wait completion or copy/retain under explicit lease; stale lease raises/rejects",
+      "reply": "pending completion must be waited on before access; a still-valid completed lease may be copied/retained before expiry; an expired lease is rejected and cannot be repaired by reading the overwritten buffer",
       "disposition": "no incomplete/stale data published",
       "current_owner": "renderer buffer owner + batch transport",
       "check_stage": "future 5c lifetime oracle"
@@ -343,7 +388,7 @@
       },
       "input": "single worker image duplicated to both rows or terminal frame assigned new episode",
       "reply": "row/camera/state identity mismatch rejected; terminal frame retained before mask reset",
-      "disposition": "env-0 remains unchanged; env-1 returned obs is reset frame, info stores terminal_observation and reset_info",
+      "disposition": "env-0 advances in the batched interval and remains unchanged only during the following mask reset; env-1 returned obs is reset frame, info stores old terminal_observation and reset_info",
       "current_owner": "RemoteBatchVecEnv/batch camera adapter/Recorder",
       "check_stage": "future 6c plus 5c camera contract"
     }

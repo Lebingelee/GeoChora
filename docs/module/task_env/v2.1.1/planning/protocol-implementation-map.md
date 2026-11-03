@@ -32,10 +32,20 @@
 | RGB layout/color/device/lifetime/copy/fence 与 cache invalidation | render-provider CapturedFrame；lifecycle data | `CanonicalCameraObservation`、camera sessions `.copy()`、Recorder/Env publication | 固定输出 schema；owned snapshot 默认；借用 lease/fence explicit；cache 加 route/env/episode/state/camera/topology generation | 5c；channel/range/dtype/device oracle；过期后访问拒绝；无 shape-only/zero success |
 | renderer/App update 不推进 physics | render-provider present/warmup；physics clock authority | `TaskEnvRenderProvider.render_human`；Isaac `SimulationManager`/RenderingManager boundary；`IsaacSimAppOwnerV1` | 用公开 render-only/pause route；无法分离则 admission reject；warmup 先于正式 reset/readback 且记账 | 5b–5c；capture/render 前后 physics clock 不变或明确拒绝 |
 | 已推进后 required image fail 不伪造成功 | physics-provider partial effects；lifecycle-and-data fault; render-provider failure | SelectedReferenceEnv mixed step fault latch、camera close、RuntimeSession advance receipt | structured capture issue 并挂到现有 execution fault；completed interval 和真实 state 保留；不做通用 rollback | 3c + 5c；强制 capture failure 后没有 normal transition/旧帧/零图 |
-| same-step autoreset terminal/reset image分离；未选 row 不动 | lifecycle-and-data batch；render-provider batch | `vectorization/sb3.py::_step_and_autoreset`、`RemoteBatchVecEnv.get_images`、`SceneBatchRuntime.reset(mask)` | typed env→worker→local row map + 每camera image identity；保留 `terminal_observation`/`reset_info`；旧 get_images 重复帧只作 preview | 6a–6c + 5c；两 env×两 camera，env-1 terminal/reset identities 分离，env-0 lineage 不变 |
+| same-step autoreset terminal/reset image分离；未选 row 不动 | lifecycle-and-data batch；render-provider batch | `vectorization/parallel.py::_step_and_autoreset`、`vectorization/sb3.py::TaskEnvSB3VecAdapter.step_wait`、`RemoteBatchVecEnv.get_images`、`SceneBatchRuntime.reset(mask)` | typed env→worker→local row map + 每camera image identity；保留 `terminal_observation`/`reset_info`；旧 get_images 重复帧只作 preview | 6a–6c + 5c；两 env×两 camera，env-1 terminal/reset identities 分离，env-0 lineage 不变 |
 | 三 native routes 与 cross route 精确而不降目标 | capability-matrix `target_resolution`；render-provider route table | MuJoCo/GeoPhys camera sessions；Isaac app/session owner；admission | 继续保留 MuJoCo CPU、GeoPhys CPU、Isaac Sim 6.2 PhysX/CUDA 三行及 GeoPhys×MuJoCo cross target；按 provider API/adapter/dependency/evidence 拆列 | 5a–5c；各完成目标分别检查；官方 API 不代替本仓库证据 |
 | 现有依赖/历史证据 pin 与规范边界 | source-map；capability matrix | Core/GeoPhys manifests、历史 D05 evidence | 当前 Core MuJoCo `<3.9` 与 GeoPhys `>=3.15` 冲突作为 3a dependency blocker；旧 pin cross evidence 不升格为当前 pin；不自动换隔离进程或依赖 | 3a 先确定；native 之前 exact environment receipt |
 | protocol draft/decision trace/旧 caller compatibility | 五份 contracts + `goals/01-protocols.md` | declarations, public APIs, Env, Recorder, vector wrappers | additive typed value version；迁移 caller 有 compatibility note；统一表示/control read-only，本轮建议交维护者 | 阶段1 review后由维护者决定冻结；不得自动启动2a |
+
+## 五协议实施追踪补充
+
+| 关键要求 | 权威协议 | 现有 owner / 最小修改 | 子阶段 / 未来 oracle |
+| --- | --- | --- | --- |
+| 具名 arm joint effort 与 source-bound gripper transmission/力分配 | control-and-feedback；physics-provider | canonical command/ack、ControlBindingPlan、各 adapter 的 public drive/actuation；明示 q/qdot 与 effort/ctrl 区别、Jacobian 方向、writer/drive 互斥；不把 position compatibility 算 effort 完成 | 4a/4b；单位/轴/符号/功率、限幅/传动及三后端实际共同命令，非严格 F05 等价研究 |
+| Controller 公共模型与测量 provenance/cadence | control-and-feedback | 现有 binding 声明 q/qdot/FK/J/M/bias/contact 等 required/optional 与可替换模型依赖；源/状态 identity、sample age、模型无 physics advance；ACK 不当测量 | 4a/4b；missing required 拒绝、freshness/model-to-live 映射及 actuator force readback |
+| reset 更换 Controller/action spec、obs 固定、旧调用方适配 | control-and-feedback；lifecycle-and-data | binding/Env/wrapper 发布 action-space generation、清积分器/滤波/历史；同批布局一致，固定 action wrapper 对不兼容更换显式拒绝 | 4c；旧动作拒绝、新输入可查询、obs schema 不变及 PickCube 修复后复核 |
+| 资产数值与语义准入、非刚体预留 | unified-task-representation；physics-provider | 同一 Scene/Asset/compiler/source owner 的版本化字段与 oracle；质量/全惯量/单位/frame/constraint/interaction/reset readback；缺必需表示不静默改资产；非刚体只保留扩展 | 3b；具名模型/readback/容差来源与 NOT_MEASURED；旧 codec/hash不变 |
+| 初始/正常/terminal/reset 边界与记录读回 | lifecycle-and-data；render-provider | 一个既有 Recorder；T transitions/T+1 boundaries、frame identity 与 episode/config；terminal frame在mask reset覆写前保留 | 5c/6c；7a/7b 集成复用及独立读回，不用图像 shape 代替真实场景/时序验证 |
 
 ## 阶段 1 联合审阅建议（无写入 control/representation 正文）
 

@@ -42,7 +42,7 @@ Identity 必须能连接 artifact、source closure、execution/materialization�
 
 ### 两种 scene 接入路径
 
-1. **Native shared-scene binding：**Physics adapter 是 model/scene/App 的唯一 owner；renderer 获得限权的 typed binding/lease，只能读取已同步发布的 visual state，或调用经批准的公开 render-only 更新。共享不 transfer ownership。Core/Agent 从不拿 native pointer。若厂商只提供私有 scene access，则该组合在公开 adapter/access protocol 前保持 unsupported。
+1. **Native shared-scene binding：**Physics adapter 保持 physics model/scene 的 owner；App/context 由其原独立 owner 持有（如 per-process IsaacSimAppOwnerV1），renderer 获得限权的 typed binding/lease，只能读取已同步发布的 visual state，或调用经批准的公开 render-only 更新。共享不 transfer ownership。Core/Agent 从不拿 native pointer。若厂商只提供私有 scene access，则该组合在公开 adapter/access protocol 前保持 unsupported。
 2. **Independent renderer-only model：**renderer owner 从相同 source closure 构建 visual model/data，按公开 named pose/state 更新；必要 kinematics 可运行，但不得调用第二个 solver/physics step。比如 GeoPhys→MuJoCo 路线应把 MuJoCo model/data 明确标记为 render-only，写入公开 floating-body transform；不对其进行 `mj_step`，也不修改 live GeoPhys state。当前动态 projection 只支持 scalar joints 并拒绝 free joint，所以 PickCube 浮动方块须在 5a 扩展 typed Frame pose 与 mapping 后才进入候选。
 
 renderer 与 physics 的共享 binding、同一 capture frame 和 batch image buffer 各只有一个明确 owner。lease 需含 generation、可用操作、device/layout、expiry event/fence；不能把原始 GPU/native handle泄露给 Agent。跨 worker/process 传输若不能延长原 buffer，则在发送前 copy 到明示 transport-owned storage。
@@ -55,12 +55,12 @@ Camera 固定字段至少包括稳定命名、mount entity/frame、相对 transf
 
 ```text
 Env(render_mode: "human" | "rgb_array" | null, observer_camera: CameraRequestV1?, task_cameras: tuple[CameraGeometry, ...]?)
-render() -> PresentationReceiptV1 | OwnedRGBFrame | None
+render() -> numpy.ndarray | None
 reset(seed?, options={"renderer": route, "controller": selection, ...}) -> (observation, info)
-close() -> EnvCloseReceiptV1
+close() -> None
 ```
 
-`render_mode` 在构建时固定，沿用 metadata 声明；`human` 的 `.render()` 呈现最新已完成状态并泵 UI 事件，`rgb_array` 返回 observer view 的真实 RGB owned copy/明示 lease，`None` 不承诺 UI 输出。没有 renderer 的 state-only route 若仍接受 `None`，显式查询窗口/RGB 不可用；构建时请求 required output 则拒绝。renderer reset 不能改变已有 observation schema/shape/dtype。reset options 的 route/controller 是项目明确扩展，不能宣称所有 Gymnasium/RL wrapper 兼容。Gymnasium 参考定义了构建时 render mode、metadata 与 close 的惯用边界；项目需要另外定义 reset/rebind 与同步 task sensor。
+`render_mode` 在构建时固定，沿用 metadata 声明；`human` 的 `.render()` 呈现最新已完成状态并泵 UI 事件，返回 None；`rgb_array` 返回 observer view 的独立 NumPy RGB 数组，dtype/range 按构建契约声明；mode=None 返回 None。PresentationReceipt/CapturedFrame/close receipt 是 adapter↔Core 的内部类型，通过既有诊断/receipt 查询通道提供，不直接替换 Env.render()/close() 的公共返回。显式 device/borrowed frame API 与标准 render 返回分开，不强制 task observation 或全部状态回 CPU。没有 renderer 的 state-only route 若仍接受 `None`，显式查询窗口/RGB 不可用；构建时请求 required output 则拒绝。renderer reset 不能改变已有 observation schema/shape/dtype。reset options 的 route/controller 是项目明确扩展，不能宣称所有 Gymnasium/RL wrapper 兼容。Gymnasium 参考定义了构建时 render mode、metadata 与 close 的惯用边界；项目需要另外定义 reset/rebind 与同步 task sensor。
 
 **强制 task-RGB cadence：**每一次成功 reset 的 observation 取该 reset 初始化/readback 后的边界；每个正常 step 的图像对应该 interval 完成后的新状态；所有 required cameras 对齐同一 `StateBoundaryIdentity` 与 capture phase/clock。不得以未声明的一帧延迟、降采样或调用方另行 `.render()` 满足要求。physics/control cadence 与 UI FPS 分离。Recorder 记录图像时使用同一 identity，评价可以并行计算，但在所需 state 与图像都完成前不能发布完整 transition。
 
@@ -77,7 +77,7 @@ close() -> EnvCloseReceiptV1
 
 ## RGB、缓存与失败语义
 
-Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linear 约定、`uint8 [0,255]` 或指定浮点归一化契约、HWC/CHW、device、连续性要求、capture phase、state/camera identity 和 storage lifetime。不同 renderer 通过同一个 CanonicalCameraObservation owner 归一；未定颜色/数值转换属于 5a 决策，不可用默认隐式转换。现有 Dynamic consumer 输出 HWC `float32 [0,1]`；协议不据此推断所有 provider 都满足。
+Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linear 约定、`uint8 [0,255]` 或指定浮点归一化契约、HWC/CHW、device、连续性要求、capture phase、state/camera identity 和 storage lifetime。不同 renderer 通过同一个 CanonicalCameraObservation owner 归一；未定颜色/数值转换属于 5a 决策，不可用默认隐式转换。现有 consumer 默认 HWC `float32 [0,1]`，CameraGeometry/normalize_rgb 同时支持构建时选择 uint8 和 CHW。主审建议保留该默认与已声明旧调用配置，不将所有新 route 强制改为 uint8；某任务可显式选 uint8 `[0,255]`，选择后跨 route/reset 保持固定，由同一 owner 转换。dtype/range 不证明 sRGB/linear；新 required route 的颜色空间须在配置解析/5a admission 明确，旧缺少颜色声明的 profile 不自动获得新保证。
 
 缓存键必须联合 route/materialization、env/row、episode/reset sample、state revision/control boundary、camera config/extrinsics revision、topology/config generation 和 output format。下一步/重置/renderer rebind/topology 改变会使旧项失效。借用帧跨下一次 write/advance/reset/close/lease release 立即失效；Recorder、vector return 或远端 consumer 需保留时明确 copy/retain owner，并等待 device fence。异步返回值在 completion 之前不是图像。
 
@@ -85,7 +85,7 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 | --- | --- | --- | --- |
 | 静态 query/build 不匹配，尚无 native effect | reject | 若独立可继续 | admission failure；无 transition |
 | initial partial build/cleanup | 无可见状态 | 未呈现 | 保留 cleanup receipt；不能报 ready |
-| reset/step 后 required update/capture 失败 | physics 若未推进可拒；已推进时保留完成 interval/clock 与 fault | 不得拿 UI 帧替 task RGB | faulted；不得返回 normal transition、旧帧、零图，也不承诺 rollback |
+| reset/step 后 required update/capture 失败 | 只有尚无任何资源/状态/episode 副作用的纯 preflight 可无损拒绝；reset 已写状态、rebind 已释放旧资源或 physics 已推进后均保留实际效果与 fault | 不得拿 UI 帧替 task RGB | faulted；不得返回 normal transition、旧帧、零图，也不承诺 rollback |
 | optional camera 不可用 | typed unavailable + reason，且 only if schema declared optional | 独立 | 不补零；required/optional 在 build 固定 |
 | 用户关闭窗口/display lost | 不影响独立 task capture | 停止 present；记录 display event | physics/episode 可继续，除非此路线公开 App/window 生命周期无法分离，此时以 typed route fault 明确通知 |
 | borrowed/async completion 未就绪 | 不得消费 | 不得 present incomplete | 等 fence 或返回 pending/error；不能伪造成功 |
@@ -105,11 +105,11 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 
 图像语义的外层维度固定为 `env → worker → local row → camera → image`。定义逻辑 env 顺序与 worker/row 映射的 typed receipt；native merged batch 与 process deployment 是独立可组合轴。每行 image identity 必须匹配它自己的 state boundary；worker 只有单帧时不得复制该帧标成所有 env 的新 observation。用户 `.render()` 选某个 env 只影响 observer view。
 
-沿用现有 same-step autoreset：一个 step 中先取得 done row 的 terminal state/frame；保存 `terminal_observation`；再只 reset done rows，产生新的 reset obs/frame 与 `reset_info`；返回给 learner 的 done row observation 是新 episode reset observation。terminal frame/state 属旧 episode，reset frame 属新 episode；Recorder 用各自真实 identity。`env-0` 未 done 时 state/clock/controller/episode lineage 不变。若终止帧要越过下一次 batch buffer 写入保留，先 copy/retain 到明确 owner。storage view 失效不意味着未选 row 物理状态变了。
+沿用现有 same-step autoreset：一个 step 中先取得 done row 的 terminal state/frame；保存 `terminal_observation`；再只 reset done rows，产生新的 reset obs/frame 与 `reset_info`；返回给 learner 的 done row observation 是新 episode reset observation。terminal frame/state 属旧 episode，reset frame 属新 episode；Recorder 用各自真实 identity。`env-0` 未 done 时仍随该 batched step 正常推进；仅后续 mask reset 保持它在 post-step/pre-reset 时刻的 state/clock/controller/episode lineage 不变。若终止帧要越过下一次 batch buffer 写入保留，先 copy/retain 到明确 owner。storage view 失效不意味着未选 row 物理状态变了。
 
-当前 `_step_and_autoreset` 已按 done row 保存 `terminal_observation`、调用 mask reset 并返回 reset obs + `reset_info`；`RemoteBatchVecEnv.get_images()` 会把一个 worker render frame 重复给各 env slots，不能代表 per-row task camera。未来 `get_images`/observation 只能由明确 per-row camera adapter 提供，不要重用复制帧为真实性证据。
+当前 `parallel.py::_step_and_autoreset` 与 `sb3.py::TaskEnvSB3VecAdapter.step_wait` 已通过 tree_index 的独立 NumPy copy 按 done row 保存 `terminal_observation`、调用 mask reset 并返回 reset obs + `reset_info`；`RemoteBatchVecEnv.get_images()` 会把一个 worker render frame 重复给各 env slots，不能代表 per-row task camera。未来 `get_images`/observation 只能由明确 per-row camera adapter 提供，不要重用复制帧为真实性证据。
 
-关闭顺序：停止新 capture/present 和异步提交 → wait/cancel 且记录 in-flight ticket → 使该 route 的 frame/cache/binding lease 失效 → renderer 关闭自有 window/buffer/render-only model/context → 释放 physics/App 的借用 lease → 原 owner 按引用计数决定关闭共享 scene/App → worker owner 等清理回执再退出。重复 close 安全且只由原 owner close 自有资源。App/worker loss 时报告无法观测的资源；不声称全清理成功。partial construction 与 first-effect rebuild failure 沿用 lifecycle-and-data fault 边界。
+关闭顺序：停止新 capture/present 和异步提交 → wait/cancel 且记录 in-flight ticket → 使该 route 的 frame/cache/binding lease 失效 → renderer 关闭自有 window/buffer/render-only model/context → 释放 physics/App 的借用 lease → 原 owner 按引用计数决定关闭共享 scene/App → worker owner 等清理回执再退出。重复 close 安全且只由原 owner close 自有资源。App/worker loss 时报告无法观测的资源；不声称全清理成功。初次 partial construction 清理完整可回未物化、清理不完整则 faulted；reset/rebuild 一旦释放旧资源或写入状态后失败，即使新资源清理成功也仍 faulted，沿用 1c 边界。
 
 ## 1d 后续实施 oracle
 
@@ -122,3 +122,14 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 - required capture 在 physics completed 后故障时保存 partial-progress fault，不返回 normal transition；borrowed buffer expiry 后拒绝 stale access。
 - 两 env/两 camera same-step terminal/reset case 校验四组独立 identity；未选 env lineage 不变；A→B→A 校验 resource generation 和旧帧失效。
 - 共享与独立两路径各校验 owner/close receipt；重复 close 不重复释放共享 App/scene；无第二 physics step。
+
+
+## 1d 主审兼容与数据持有建议（待维护者最终冻结）
+
+现有 BaseTaskEnv.render 仍接受兼容参数 mode，未配置 UI 时会抛 RenderUnavailableError；上述无参数render和mode=None返回None是统一入口的建议行为。5b须为旧caller保留明确兼容/迁移，不静默改变旧BaseTaskEnv或所有wrapper语义。
+
+内部 capture/update/present/close 必须有结构化回执；公共 Env API 保持 mode 对应数组/None、close 返回 None 的调用习惯。若宣称完整 Gymnasium human 自动展示，还须由兼容包装层在 reset/step 调度 present；现有显式 `.render()` 调用继续可用，不能让 task sensor 依赖手工 render。
+
+对公共 reset/step observation 与 Recorder，默认独立、只读、可跨下次调用保留的数据；owned 指 storage 生命周期独立，不等于必须 CPU 化或每个 consumer 重复复制。GPU/native batch 若声明显式 leased device view，必须有稳定租约/retain/fence 协议与支持它的 caller；普通 Gym/NumPy 调用方不应意外拿到下一 step 会被覆写的数组。跨进程 transport 由其 owner 保留同样的 identity/lifetime。
+
+窗口关闭默认只停展示，独立 task capture 继续；若需重新开窗由明确 UI 操作触发，不隐式重建 task camera。required camera 在已有 reset/step effect 后失败则 faulted；App 无法分离显示与采样的路线在 admission 与 fault 中明确限制。这些建议进入实施包前仍经维护者确认，三路线/跨组合/三项渲染目标不减少。

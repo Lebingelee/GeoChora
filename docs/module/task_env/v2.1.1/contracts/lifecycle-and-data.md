@@ -94,7 +94,7 @@ Physics、Controller/model、state/interaction、render/camera、App/device/wind
 
 ### Reset/step 的 image publish barrier
 
-一次正常 reset/step transition 必须同时满足 physics 与 task-RGB 的 publish 条件：
+reset 初始 observation/boundary 与正常 step transition 必须分别满足 physics 与 task-RGB 的 publish 条件；reset 本身不是 step transition：
 
 ```text
 静态 preflight
@@ -115,8 +115,8 @@ reset task RGB 用 `reset_initial` capture phase；step task RGB 用 `post_contr
 
 Owned image 在独立 storage 中且只读；borrowed view 带 owner/lease generation、env/worker/row/camera、完整 frame identity、layout/device、expiry operation 与同步 fence。下一次可覆写其 buffer 的 update/capture/reset/close/lease release 后 view 无效。跨 Recorder、step return 或 worker transport 存储时，接收方必须 copy 或持有明示的 retain lease 到最后消费点。异步 `pending` 图像不可进入 observation。
 
-批量顺序用 `env → worker → local row → camera → image` receipt 表示；不能把 native batch 轴与进程 worker 轴合成含糊的一个维度。same-step autoreset 在 reset 前保留 done row terminal observation/frame，在 reset 后构造新 episode reset observation/frame，并分别赋予 state/camera identity；返回值的 done row 是 reset observation，info 保留 `terminal_observation` 与 `reset_info`。未选 env 的 physics/controller/episode/clock 不变，借用共享 storage 失效需另行标识。现有 RemoteBatchVecEnv `get_images()` 复制一帧给各 slot，只能算 repeated preview，不能作为 row-specific task observation。
+批量顺序用 `env → worker → local row → camera → image` receipt 表示；不能把 native batch 轴与进程 worker 轴合成含糊的一个维度。same-step autoreset 在 reset 前保留 done row terminal observation/frame，在 reset 后构造新 episode reset observation/frame，并分别赋予 state/camera identity；返回值的 done row 是 reset observation，info 保留 `terminal_observation` 与 `reset_info`。未选 env 随先前 batched step 正常推进；只有 mask reset 阶段保持其 post-step/pre-reset physics/controller/episode/clock 不变，借用共享 storage 失效需另行标识。现有 RemoteBatchVecEnv `get_images()` 复制一帧给各 slot，只能算 repeated preview，不能作为 row-specific task observation。
 
 ### close 与 partially initialized renderer
 
-Env 作为协调 owner，按 renderer session → 自有 camera/output buffer/window/render-only model → 释放 physics/App borrowed lease → 原 provider/App owner → worker 的依赖顺序收集 close receipts。session close 不能直接关闭仍有其他 lease 的 per-worker Isaac App；App owner 在最后 lease 后自行 close。部分初始化失败逐项记录 acquired/released/unreleased resource；first native effect 后失败按 faulted，不承诺回到原 episode。所有 owned close 操作由唯一原 owner 执行且可重复调用；其他 consumer 仅报告 lease release。
+Env 作为协调 owner，按 renderer session → 自有 camera/output buffer/window/render-only model → 释放 physics/App borrowed lease → 原 provider/App owner → worker 的依赖顺序收集 close receipts。session close 不能直接关闭仍有其他 lease 的 per-worker Isaac App；App owner 在最后 lease 后自行 close。部分初始化失败逐项记录 acquired/released/unreleased resource；初次构建且清理完整可回未物化，清理不完整则 faulted。reset/rebuild 释放旧资源或写状态后失败按 faulted，不承诺回到原 episode；是否已经推进时间不是唯一判断条件。所有 owned close 操作由唯一原 owner 执行且可重复调用；其他 consumer 仅报告 lease release。
