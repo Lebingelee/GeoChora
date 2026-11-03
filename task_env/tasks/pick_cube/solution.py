@@ -24,6 +24,7 @@ from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
 from ...controllers.canonical.contracts import digest
 from ...objects.pick_cube import CUBE_HALF_SIZE
+from ...utils.rotation import matrix_to_quat_wxyz, quat_wxyz_to_matrix, rotvec_to_matrix
 
 
 _ABOVE_CLEARANCE = 0.12
@@ -34,6 +35,12 @@ _APPROACH_CLEARANCE = 0.10
 # planned high waypoint extra headroom so the measured clearance interlock is
 # reachable without relaxing its physical threshold.
 _MEASURED_CLEARANCE_COMMAND_HEADROOM = 0.020
+# A small outward wrist pitch avoids the high, fully extended R3 approach
+# singularity. Restore the grasp orientation continuously on the hover path.
+_R3_APPROACH_WRIST_PITCH_RAD = -0.20
+_CAPTURE_GEOMETRY_DWELL_S = 0.10
+_CAPTURE_PAD_GAP_MIN_M = -0.0035
+_CAPTURE_PAD_GAP_MAX_M = 0.0015
 # Clearance is confirmed from the public measured EE pose before the preplanned
 # path is allowed to traverse over the cube or descend toward it.
 _MEASURED_CLEARANCE_TOLERANCE = 0.005
@@ -394,23 +401,36 @@ class PickCubeSolution:
             gripper=1.0,
             settle_steps=0,
         )
+        rotation_actions = np.empty((0, 8), dtype=np.float32)
+        if clearance_headroom:
+            pitched = clear.copy()
+            pitched[3:7] = matrix_to_quat_wxyz(
+                rotvec_to_matrix(np.asarray([0.0, _R3_APPROACH_WRIST_PITCH_RAD, 0.0]))
+                @ quat_wxyz_to_matrix(clear[3:7])
+            )
+            rotation_actions = self._planner.plan_to_pose(
+                current_pose=clear, goal_pose=pitched, gripper=1.0, settle_steps=0,
+            )
+            transit[3:7] = pitched[3:7]
+        else:
+            pitched = clear
         lateral_actions = self._planner.plan_translation_only(
-            current_pose=clear,
+            current_pose=pitched,
             target_position=transit[:3],
             gripper=1.0,
             settle_steps=0,
         )
-        descend_actions = self._planner.plan_translation_only(
+        descend_actions = self._planner.plan_to_pose(
             current_pose=transit,
-            target_position=target[:3],
+            goal_pose=target,
             gripper=1.0,
             settle_steps=0,
         )
-        action_segments = (vertical_actions, lateral_actions, descend_actions)
+        action_segments = (vertical_actions, rotation_actions, lateral_actions, descend_actions)
         actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
         minimum_height = _ABOVE_CLEARANCE + _APPROACH_CLEARANCE - _MEASURED_CLEARANCE_TOLERANCE
         vertical_end = len(vertical_actions)
-        lateral_end = vertical_end + len(lateral_actions)
+        lateral_end = vertical_end + len(rotation_actions) + len(lateral_actions)
         return SegmentPlan(
             actions=actions,
             target_pose=target,
@@ -621,6 +641,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._last_public_observation = None
+        self._capture_candidate_ticks = 0
         super().__init__(config=config.base)
         self.identity = self.identity_for_config(config)
 
@@ -663,6 +684,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._last_public_observation = observation
+        self._capture_candidate_ticks = 0
         super().reset(observation, info, metadata)
         if self._done:
             self._done = bool(info.get("is_success")) and float(
@@ -736,6 +758,19 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if (policy.kind == "gripper_ready"
                 and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
             ready = execution_info.close_ready
+            if not ready and exhausted:
+                capture_geometry_ready = self._position_capture_geometry_ready(
+                    observation, execution_info,
+                )
+                self._capture_candidate_ticks = (
+                    self._capture_candidate_ticks + 1 if capture_geometry_ready else 0
+                )
+                required_ticks = max(
+                    1, int(np.ceil(_CAPTURE_GEOMETRY_DWELL_S / self.readiness_config.control_dt)),
+                )
+                ready = self._capture_candidate_ticks >= required_ticks
+            elif not ready:
+                self._capture_candidate_ticks = 0
         else:
             ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
         if policy.kind == "task_outcome" and ready:
@@ -761,6 +796,10 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self.completion_events.append({
                 "stage": self.stage, "control_step": self._boundary_step,
                 "wait_ticks": self._wait_count, "kind": policy.kind,
+                **({"authorization": (
+                    "stable_opposed_pad_capture_geometry"
+                    if self._capture_candidate_ticks else "measured_closed_gripper"
+                )} if policy.kind == "gripper_ready" else {}),
             })
             self._segment_index += 1
             self._action_index = 0
@@ -768,6 +807,70 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._refresh_current_segment(observation, info)
         elif self._wait_count >= policy.hold_ticks:
             self._fail(policy.failure_reason)
+
+    @staticmethod
+    def _position_capture_geometry_ready(observation, execution_info) -> bool:
+        """Check only a public, near-contact grasp geometry; this is not a contact claim."""
+        if (execution_info.target_opening_m > 0.045
+                or abs(execution_info.measured_opening_velocity_m_s) > 0.005):
+            return False
+        state = observation.get("state", {})
+        privileged = observation.get("privileged_state", {})
+        if "joint_position" not in state or "hand_pose" not in state:
+            return False
+        cube_values = privileged.get("cube_v1_body_pose")
+        if cube_values is None:
+            return False
+        joints = np.asarray(state["joint_position"], dtype=np.float64).reshape(-1)
+        hand = np.asarray(state["hand_pose"], dtype=np.float64).reshape(-1)
+        cube = np.asarray(cube_values, dtype=np.float64).reshape(-1, 7)[0]
+        if (joints.size < 9 or hand.size != 7 or not np.isfinite(joints).all()
+                or not np.isfinite(hand).all() or not np.isfinite(cube).all()):
+            return False
+        if not np.allclose(hand, np.asarray(state["ee_pose"]), atol=1e-5, rtol=0.0):
+            return False
+        measured = float(joints[7] + joints[8])
+        if abs(measured - execution_info.measured_opening_m) > 1e-4:
+            return False
+        if not 0.045 <= measured <= 0.060:
+            return False
+
+        hand_rotation = quat_wxyz_to_matrix(hand[3:7])
+        cube_rotation = hand_rotation.T @ quat_wxyz_to_matrix(cube[3:7])
+        cube_center = hand_rotation.T @ (cube[:3] - hand[:3])
+        if (abs(cube_center[0]) > 0.008
+                or abs(cube_center[1]) > 0.008
+                or not 0.040 <= cube_center[2] <= 0.057):
+            return False
+
+        cube_half = np.full(3, CUBE_HALF_SIZE, dtype=np.float64)
+        def separating_gap(pad_center, pad_half):
+            axes = [*np.eye(3), *cube_rotation.T]
+            axes.extend(np.cross(a, b) for a in np.eye(3) for b in cube_rotation.T)
+            maximum_gap = -np.inf
+            for axis in axes:
+                length = float(np.linalg.norm(axis))
+                if length < 1e-9:
+                    continue
+                unit = axis / length
+                gap = (
+                    abs(float(np.dot(cube_center - pad_center, unit)))
+                    - float(np.dot(np.abs(cube_rotation.T @ unit), cube_half))
+                    - float(np.dot(np.abs(unit), pad_half))
+                )
+                maximum_gap = max(maximum_gap, gap)
+            return maximum_gap
+
+        side_gaps = []
+        for sign, opening in zip((1.0, -1.0), joints[7:9], strict=True):
+            gaps = []
+            for x in (-0.0055, 0.0055):
+                for z in (0.0395, 0.0500):
+                    half = np.asarray([0.003, 0.002, 0.0035 if z < 0.045 else 0.003])
+                    center = np.asarray([sign * x, sign * (opening + 0.002), z])
+                    gaps.append(separating_gap(center, half))
+            side_gaps.append(min(gaps))
+        return all(_CAPTURE_PAD_GAP_MIN_M <= gap <= _CAPTURE_PAD_GAP_MAX_M for gap in side_gaps)
 
     def _pending_measured_tcp_gate(self, segment):
         if (not self.readiness_config.measured_tcp_clearance_gate

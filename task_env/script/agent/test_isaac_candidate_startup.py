@@ -171,3 +171,49 @@ def test_oracle_binds_position_recording_without_mixed_control_metadata(tmp_path
         assert facts['recording_started'] is False
         assert events == ['reset', 'close']
         assert 'seed' in facts['errors'][0]['message'].lower()
+
+
+@pytest.mark.parametrize('outcome_reason', ['horizon_reached', 'task_terminal', 'external_stop'])
+def test_oracle_finalizes_position_with_the_public_lifecycle_reason(tmp_path, outcome_reason):
+    import oracle_candidate as oracle
+
+    requested = []
+    summary = {'status': 'FAIL', 'failure_reason': 'episode_truncated', 'transitions': 1}
+
+    class Env:
+        position_profile = True
+        controller = SimpleNamespace(identity='controller')
+        solution = SimpleNamespace(identity='solution')
+        execution_fault = None
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def reset(self, **_kwargs):
+            return {}, {}
+
+        def start_recording(self, _path):
+            pass
+
+        def stop(self, reason):
+            requested.append(reason)
+            return SimpleNamespace(outcome=SimpleNamespace(end_reason=outcome_reason))
+
+        def finish_recording(self, reason):
+            if reason != outcome_reason:
+                raise ValueError('recording finalization reason disagrees with EpisodeOutcome')
+            return {'outcome': {'end_reason': outcome_reason}, 'transition_count': 1}
+
+        def close(self):
+            pass
+
+    compiled = SimpleNamespace(env_class=lambda: Env, backend='cpu', device='cpu')
+    with patch('examples._common.run_expert', return_value=summary), \
+         patch('examples._common.identity_summary', return_value={}):
+        facts = oracle.record_episode(compiled, SimpleNamespace(horizon=1), provider='mujoco',
+                                      seed=0, h5=tmp_path / 'episode.h5', deadline=time.perf_counter() + 10)
+    assert facts['errors'] == []
+    assert requested == ['episode_truncated']
+    assert facts['episode'] == summary
+    assert facts['verification']['outcome']['end_reason'] == outcome_reason
+    assert facts['close_succeeded'] is True

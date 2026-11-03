@@ -105,6 +105,8 @@ def record_episode(compiled, spec, *, provider, seed, h5, deadline):
                     if deadline - time.perf_counter() <= 0:
                         raise TimeoutError('no budget remains for recording finalization')
                     reason = (facts['episode'] or {}).get('failure_reason') or ('pass' if not facts['errors'] else 'execution_error')
+                    if getattr(env, 'position_profile', False):
+                        reason = env.stop(reason).outcome.end_reason
                     facts['verification'] = env.finish_recording(reason)
                 except Exception as error:
                     facts['errors'].append({'phase': 'finalize', 'type': type(error).__name__, 'message': str(error)})
