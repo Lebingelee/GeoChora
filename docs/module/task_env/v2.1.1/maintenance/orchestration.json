@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": "1b",
-  "next_action": "Maintainer/Sol review the completed 1a report and docs-only commit; only after review may a complete 1b package be dispatched. No automatic continuation.",
+  "next_action": "Prepare V211_G01_1b_attempt001 for manual maintainer forwarding. 1b remains PLANNED; no automatic dispatch or protocol approval.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -38,7 +38,7 @@
           "id": "1a",
           "planning_anchor": "../goals/01-protocols.md#1a",
           "dependencies": [],
-          "status": "REPORTED_PENDING_REVIEW",
+          "status": "ACCEPTED_BOUNDED_1A_AUDIT",
           "attempt_count": 1,
           "attempts": [
             {
@@ -46,24 +46,25 @@
               "package_id": "V211_G01_1a_attempt001",
               "package_manifest_sha256": "c254b8b0252e26d79075da203c8dc728a0c4cea755051cd251584be2809a4ab8",
               "prompt_sha256": "4a897dcf71e2935098d4c12895045ce88a9e3df9edb51a4f2cbaedf2a4a951d9",
-              "status": "REPORTED_PENDING_REVIEW",
+              "status": "REVIEWED_ACCEPTED",
               "result": "PASS",
               "input_head": "ba874c2d57dc9cd5e3cb710d87d3405808393967",
               "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
-              "output_head": null,
-              "output_head_reason": "Recorded in the ignored final report after the tracked docs commit; not self-embedded.",
+              "output_head": "eb64b89f1dbceb6c7dbd10bef400846f8ab91ec9",
               "summary": "Source/caller, candidate route, batch, and asset numerical audit. No native or implementation tests.",
               "report_ref": "../../../../../workspace/maintenance/v211_g01_1a_attempt001/report.md",
               "review_ref": "reviews/20261103_1a_scope_audit.md",
               "native_starts": 0,
-              "implementation_tests": 0
+              "implementation_tests": 0,
+              "sol_review_ref": "reviews/20261103_1a_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_1A_AUDIT"
             }
           ],
           "assigned_agent": "Codex primary agent; sole writer; zero subagents",
           "package_path": "external manual handoff package V211_G01_1a_attempt001",
           "package_sha256": "c254b8b0252e26d79075da203c8dc728a0c4cea755051cd251584be2809a4ab8",
           "input_head": "ba874c2d57dc9cd5e3cb710d87d3405808393967",
-          "output_head": null,
+          "output_head": "eb64b89f1dbceb6c7dbd10bef400846f8ab91ec9",
           "expected_duration_minutes": "60-90",
           "execution_budget": {
             "window_minutes": 120,
@@ -71,15 +72,24 @@
             "implementation_tests": 0,
             "tracked_paths": "allowlisted documentation only"
           },
-          "last_observation": "PASS for bounded source/caller audit; final output HEAD and commit are recorded in the ignored external report to avoid self-reference in this tracked index.",
+          "last_observation": "2026-11-03 Sol verified docs-only diff, 9 raw-file hashes, protection, JSON/dependencies and key source facts; bounded 1a audit accepted with evidence-pin/default-config clarifications.",
           "evidence_refs": [
             "reviews/20261103_1a_scope_audit.md",
             "../../../../../workspace/maintenance/v211_g01_1a_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g01_1a_attempt001/findings.json",
-            "../../../../../workspace/maintenance/v211_g01_1a_attempt001/commands.json"
+            "../../../../../workspace/maintenance/v211_g01_1a_attempt001/commands.json",
+            "reviews/20261103_1a_sol_review.md"
           ],
-          "commits": [],
-          "review_decision": "PENDING_REVIEW",
+          "commits": [
+            "eb64b89f1dbceb6c7dbd10bef400846f8ab91ec9"
+          ],
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_1A_AUDIT",
+            "reviewer": "Sol",
+            "date": "2026-11-03",
+            "review_ref": "reviews/20261103_1a_sol_review.md",
+            "implementation_or_qualification_approval": false
+          },
           "blockers": []
         },
         {

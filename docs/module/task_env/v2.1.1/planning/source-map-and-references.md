@@ -39,7 +39,7 @@ provider 实现公开能力的 owner 仍在其项目内。Core 不访问 solver�
 
 | 路径／owner | 当前事实与边界 | 后续 owner |
 | --- | --- | --- |
-| `task_env.registry.make_env` → `configuration._resolve_selected_config` → task factory | `make_env` 是单环境公开入口；显式 task config 按配置优先级解析后调用选中 task 的 `from_resolved_config`／`from_reference_config`。Selected PickCube 固定 P1.6、R3、GeoPhys CPU 默认；renderer 仅接受 none。 | 1b/1c：统一表示和 admission；3a/3b：精确配置及 route |
+| `task_env.registry.make_env` → `configuration._resolve_selected_config` → task factory | `make_env` 是单环境公开入口；显式 task config 按配置优先级解析后调用选中 task 的 `from_resolved_config`／`from_reference_config`。Selected PickCube 使用 P1.6 路线，默认 R3／GeoPhys CPU，仍允许显式 R1；renderer 仅接受 none。 | 1b/1c：统一表示和 admission；3a/3b：精确配置及 route |
 | `SelectedReferenceEnv._reset`／`step`／`close` | reset 关闭旧 camera consumer／RuntimeSession，再按绑定的 provider/backend 重建；没有 episode 内切换或旧状态迁移。Position observation 使用公开 `CanonicalStateViewV1` 与同一 boundary/clock，consumer 校验 capture identity。close 依次尽力关闭 consumer、session、runtime owner、source receipt 和 task resources。 | 1d、3c、5c |
 | `task_env.render.providers.single.TaskEnvRenderProvider` | `human` 窗口和 `rgb_array` 是 UI renderer 的独立调用；`rgb_array` 是显式 readback，不参与 task observation。Generic visualizer 可从既有 RenderSource 构造；不要把窗口画面当作同步相机 observation。 | 1d、5a/5b |
 | `PositionCandidateEnv` → `DynamicCameraObservationConsumerV1` | Position candidate 限 GeoPhys scalar CPU，允许 opt-in `camera_observation`。consumer 只接收 `CanonicalStateViewV1`，要求两个 camera 的 RGB、optical-Z depth、Entity mask 与 state boundary/clock 一致；reset/step 调用时捕获。此为 Position candidate 路径，不是 PickCube P1.6 配置。 | 1d、5b/5c |
@@ -55,6 +55,8 @@ provider 实现公开能力的 owner 仍在其项目内。Core 不访问 solver�
 - **PickCube D06 锚点**：P1.6 使用 2 ms physics tick × 5 substeps = 10 ms control tick（100 Hz），horizon 6000；世界位置为 m、旋转 quaternion wxyz，Panda 关节以 rad/rad·s⁻¹，重力 z=-9.81 m·s⁻²。Cube half-size 0.025 m、mass 0.08 kg、声明对角惯量 `(3.5e-5, 3.5e-5, 3.5e-5) kg·m²`、free-joint damping 0.8、armature 0.01、contact margin 0.001 m；模型还声明 table/cube/gripper friction、7 arm joints、2 finger joints、8 actuators（7 arm generalized actuators + 1 tendon gripper route）。固体均匀 0.05 m 立方体按声明质量的解析对角惯量为 `3.333…e-5 kg·m²`，与现有数值约差 5%；将既有数值保留为 source oracle，先由资产 owner 确认模型意图，不在本审计改写。跨 provider 需比较变换、单位、质量/惯量、joint 顺序/限制、tendon/transmission、驱动/限幅、接触、reset 与稳定性；仅当 source oracle/公开模型读回提供依据时才定容差。
 
 Isaac Lab Scene Data Provider／Actuator 页面当前为其最新文档版本，不能当成本仓库 `isaacsim==6.2.0.0` 的可直接调用 API；它们只支持公开数据 freshness、资源 owner 和 explicit/implicit drive 语义的协议讨论。详见下表官方链接。
+
+主审已接收该有界审计，见 [1a Sol 审核](../maintenance/reviews/20261103_1a_sol_review.md)。其中澄清：v2.1.0 矩阵已有当前 GeoPhys pin 的短程 state-only F06 证据；旧 pin 限制针对特定 cross-render receipt，不能混淆。上述 horizon 6000 是当前 YAML 默认，历史或调用方覆盖的运行按各自 identity／配置解释。
 
 ## 官方参考与采用边界
 
