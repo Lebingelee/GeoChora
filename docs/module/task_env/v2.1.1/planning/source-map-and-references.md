@@ -200,6 +200,21 @@ query/build/reset/command/advance/publish/close 的字段、回执、副作用�
 
 官方说明正文及 source facts 的分工见 [render-provider](../contracts/render-provider.md)、[lifecycle-and-data](../contracts/lifecycle-and-data.md)、[physics-provider](../contracts/physics-provider.md)。
 
+## G02/2a PickCube 失败归因（attempt001，待主审）
+
+输入 Core `develop@fcf0700a5ddaff85e7beb190f018d9f71d94100b`、GeoPhys `67da1165149486d3ae3e779c13ce31af49e17d50`。本记录基于当前源码、旧 F06 原始公开轨迹和一条当前 MuJoCo CPU seed31 运行；旧原件只读。完整逐样本映射、执行资源和 hash 见[诊断报告](../../../../../workspace/maintenance/v211_g02_2a_attempt001/report.md)与[历史对齐表](../../../../../workspace/maintenance/v211_g02_2a_attempt001/historical_time_alignment.json)。
+
+| 链路位置 | 当前事实／本次样本 | 归因边界与 owner |
+| --- | --- | --- |
+| Task action → R3 | `SelectedReferenceEnv.step_expert` 将 task-owned Solution 的 8D world absolute pose/quaternion-wxyz 请求传给 `controller.compute`；R3 生成 `q_ref` 与 position-servo target，速度上限 4 rad/s。 | 这是当前 R3 位置兼容路径；不是已批准的 7+2 effort 实现。任务策略留在 PickCube owner。 |
+| R3/adapter → public state | seed31 attempt 227 请求 TCP `(0.635134,-0.086464,0.753000) m`；控制器诊断 position error 为 `(+0.034243,-0.004555,+0.036945) m`。末样本 `q_ref_next` 与实测 arm q 的最大绝对分量差约 `0.00821 rad`，实测 qdot 已接近零，但公开 EE site 仍在 `(0.600891,-0.081910,0.716055) m`。 | 末样本不支持“只因关节速度还高、仍在快速追赶”的解释；仍未区分目标/reference/TCP site、IK/ref dynamics 与 native servo 的贡献。不得把关节 q_ref 接近误写为 TCP 到位。 |
+| Public state → measured gate | cube center `(0.635134,-0.086464,0.487628) m`，顶面 z=`0.512628 m`；末样本 TCP 高于顶面 `0.203427 m`（需 `0.215 m`）且 XY 误差 `0.034545 m`（需 `≤0.010 m`）。100 个连续 gate-hold 样本全未通过；高度样本范围约 `0.194860–0.210789 m`，XY 误差范围约 `0.025405–0.067145 m`。 | `PickCubeReadinessSolution` 在 `over_cube_before_descent` 等待上游 measured state，hold 到 100 tick 后失败。0.215 m 来自当前 `0.12+0.10−0.005 m` waypoint/headroom 几何；XY 门限来自当前任务 gate。 |
+| Gate → Expert/task result | attempt 227、仿真 `2.26→2.27 s`，报 `measured_tcp_clearance_timeout:over_cube_before_descent`；未进入下降/关爪。Cube lift `0.000628 m`、opening `0.0799995 m`、grasp/lift/task-success/Expert-complete 均 false；runtime、记录、close 成功。 | **近端根因**是本 seed 的 measured-TCP gate 未满足导致 Solution timeout。夹爪 grouped interval 对 `inner_gripper_step` 的静态缺口是后续风险，但本次失败发生在它相关的关爪阶段之前，不能作为本次根因。 |
+
+本次 run 的 trace SHA-256 `7d1b30b1ae51f05dbedfd8e87c06d89323a4af17c8b14e350ddaa755b5ba9325` 与 F06 MuJoCo seed31 trace 字节级相同；artifact 相同，但源码身份不同：当前/F06 `solution.py` SHA 分别为 `4543df1cdc6f89ca99c300923a90e360ae19e4cab4762702b98e9f86eb1b1266` / `9d7e8d24961a2253585a2eb3b995f21183f34c64a7d65da2666d64f22e8e61c1`，`production_r3.py` 为 `e14532c684dd14488d8f040cbd9188acc7cd1cd754eeb55f27c5aced30022c72` / `8364b5424419946f778e12255d2519ab966e1fe7f9091ec54035090c2d30bc56`，`task.py` 为 `80cccad2944401d13bbffbdcf5284ac68fad60b1371a155f29c020b068cc08aa` / `35e7b4f592b81314e966623230a9155252aa6c11862da53700a11f86431a3902`。因此它支持 seed31 失败机制在当前输入上的重现，不能证明旧新实现完全相同，也不把 R3 版本相关性当因果。F06 seed33 在 attempt 192→193 通过 clearance gate，是对“所有 seed 均无法过 gate”的反证；seed32/33 后续未抓取发生在不同的 close/horizon 阶段。
+
+2b 最小候选归属 `task_env/tasks/pick_cube`：对 requested world TCP、R3 reference、`panda-v1/ee` 公开 site 和 cube-frame 的逐控制边界差值作定向比对；据结果仅改必要的任务 hover/侧移 waypoint 或推进时序，保持 measured gate、lift oracle、碰撞、reset/source 和 public lifecycle。代表 seed 固定31；当且仅当 gate 推进到关爪，才单独检验 `servo_opening_m`、finger q/qd、readiness 与每个 2 ms 子步内环调用。此为 2b 方案，不授权本次实施。
+
 
 ### 1d 主审核对与建议
 

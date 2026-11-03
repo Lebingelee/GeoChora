@@ -14,6 +14,16 @@
 - **检查：**先复用历史日志与离线轨迹，再做包内批准的最小 MuJoCo 复现；只读取公开状态和回执，保存失败而不改 oracle。
 - **交付／出口：**有证据的根因、仍待验证的假设、最小修复 owner 与受影响路线。无变化重试不构成进展；2a只归因与最小复现，不提交生产修复。诊断脚本／观察量若确有需要，仅在冻结包授权的diagnostics owner或ignored目录增加，不绕过公共状态。
 
+### 2a attempt001 结果（待主审）
+
+状态：`PASS（2a诊断交付）/ REPORTED_PENDING_REVIEW`。输入为 Core `develop@fcf0700a5ddaff85e7beb190f018d9f71d94100b`、GeoPhys `67da1165149486d3ae3e779c13ce31af49e17d50`。历史 F06 seed31 的 MuJoCo 公开轨迹在当前 HEAD 上以同一字节级 `step_trace.json` SHA-256 再现；当前的 Solution、Controller 与 task 源码身份已变化，因此这是失败行为复现，不是源码身份相同。
+
+本次 CPU MuJoCo seed31 经当前公共 Harness 完成 227 个 control transitions（5×2 ms/substep，约 2.27 s），runtime、记录、独立 HDF5 读回、close 均通过；任务仍失败。Solution 在 `over_cube_before_descent` 连续 100 个等待样本未满足 measured TCP clearance gate，随后以 `measured_tcp_clearance_timeout:over_cube_before_descent` 失败。请求 TCP 为 `(0.635134, -0.086464, 0.753000) m`；最后一条 gate 样本（attempt 227，2.26→2.27 s）中，公共实测 TCP 为 `(0.600891, -0.081910, 0.716055) m`，相对 cube 顶面的高度 `0.203427 m < 0.215 m`，水平误差 `0.034545 m > 0.010 m`。运行没有进入下降或关爪；lift `0.000628 m`，task success、Expert complete 均为 false。G2 通过不代表任务成功或 Qualification。
+
+**已定位的近端根因**是任务 Solution 的 over-cube measured-TCP readiness gate 在本次 seed31 运行中持续不满足并触发超时。证据把请求动作、R3 参考、公开测量状态、gate 数值和最终失败原因连接起来；它尚未区分“为何实测 TCP 未到请求位姿”的更下层原因。R3 改动与失败存在版本相关性，不据此判定 R3 是根因。源码中 grouped R3 关爪路径没有推进 `inner_gripper_step()` 是待证伺服风险，但本次运行失败在关爪之前，不能将其归因于本次失败。历史 F06 seed33 曾在 attempt 192→193 通过同类 over-cube gate，反证“此 gate 对所有 seed 都不可达”的泛化说法。
+
+最小 2b 候选是 **FIX（任务级 PickCube target/reference/gate 形成路径）**：由 `task_env/tasks/pick_cube` owner 先用公开量定位请求 TCP、参考 TCP 与 `panda-v1/ee` 实测 site 的偏差来源，再只调整必要的 hover/侧移 waypoint 或其时序；保持当前 clearance gate、cube lift 成功判据、碰撞和 reset 分布不变。代表 seed 先固定 31；验证应保留逐 control boundary 的请求 pose、q_ref/target、实测 TCP/cube pose、R3 clipping/lead 诊断、gate、gripper servo/实测 finger state、阶段与结束原因，并完成同 run 独立读回。只有当失败被推进到 close 段后，才以一个有明确假设的短检查验证夹爪内环。详见[2a 完整报告](../../../../../workspace/maintenance/v211_g02_2a_attempt001/report.md)；2b 需独立审阅与新工作包授权。
+
 <a id="2b"></a>
 ## 2b：修复当前控制与 Solution
 
