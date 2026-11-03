@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": "1b",
-  "next_action": "Prepare V211_G01_1b_attempt001 for manual maintainer forwarding. 1b remains PLANNED; no automatic dispatch or protocol approval.",
+  "next_action": "Maintainer manually forwards the completed V211_G01_1b_attempt001 report for Sol review. Keep 1c PLANNED; no automatic next package or protocol approval.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -98,18 +98,50 @@
           "dependencies": [
             "1a"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "REPORTED_PENDING_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G01_1b_attempt001",
+              "package_manifest_sha256": "ff6156eb22ce5ace2f29030c7e2bcc867be82670fab880c42cafbf98aa8789ab",
+              "prompt_sha256": "067c572094d6e16ba2dfa5c76cdff37f84a46c7d3e39aff6b6f4dea9ad69568c",
+              "status": "REPORTED_PENDING_REVIEW",
+              "result": "PASS",
+              "input_head": "498f03b55b3f557af962f98d2f7b5c9f543262c2",
+              "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+              "output_head": null,
+              "summary": "Unified task representation design and docs; P1-P4/N1-N5 are planning-only examples. No schema implementation, native execution, physics, GPU, or implementation tests.",
+              "report_ref": "../../../../../workspace/maintenance/v211_g01_1b_attempt001/report.md",
+              "review_ref": "reviews/20261103_1b_representation_design.md",
+              "native_starts": 0,
+              "implementation_tests": 0
+            }
+          ],
+          "assigned_agent": "Codex primary agent; sole writer; zero subagents",
+          "package_path": "external manual handoff package V211_G01_1b_attempt001",
+          "package_sha256": "ff6156eb22ce5ace2f29030c7e2bcc867be82670fab880c42cafbf98aa8789ab",
+          "input_head": "498f03b55b3f557af962f98d2f7b5c9f543262c2",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "expected_duration_minutes": "90-120 active; hard window 150",
+          "execution_budget": {
+            "window_minutes": 150,
+            "native_starts": 0,
+            "physics_steps": 0,
+            "gpu_starts": 0,
+            "implementation_tests": 0,
+            "new_output_target_mib": 128,
+            "tracked_paths": "package-allowlisted documentation only"
+          },
+          "last_observation": "2026-11-03: manifest and all 69 input, 2 protected, and 10 prior-output hashes matched; design/docs, planning JSON, validator and status checks complete; report pending Sol review; writer released; 1c not started.",
+          "evidence_refs": [
+            "reviews/20261103_1b_representation_design.md",
+            "../../../../../workspace/maintenance/v211_g01_1b_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g01_1b_attempt001/findings.json",
+            "../../../../../workspace/maintenance/v211_g01_1b_attempt001/commands.json",
+            "../../../../../workspace/maintenance/v211_g01_1b_attempt001/input_snapshot.json",
+            "../../../../../workspace/maintenance/v211_g01_1b_attempt001/output_manifest.json"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []

@@ -1,0 +1,168 @@
+{
+  "schema_version": "geochora-v211-representation-design-examples-v1",
+  "document_status": "DRAFT_FOR_DISCUSSION",
+  "notice": "Design examples only. This file is not a production codec, public API, runtime input, capability validator, or implementation test fixture.",
+  "shared_conventions": {
+    "world": "SI_right_handed_z_up_wxyz",
+    "pose": "translation in meters and normalized quaternion_wxyz",
+    "task_identity": "semantic IDs and explicit Artifact version; never native object identity, GPU pointer, or provider ordinal",
+    "provider_admission": "must be checked separately against exact provider/build, host/engine/solver, assets, required interactions, device, timebase, renderer, and environment",
+    "unknown_required_fields": "reject at the earliest decoder, compile, or admission phase that can identify the missing owner; preserve the reason"
+  },
+  "owner_refs": {
+    "task": {"path": "task_env/environment/task_source.py", "symbols": ["TaskArtifactDeclarationV1", "TaskSourceV1"]},
+    "artifact": {"path": "task_env/artifacts/contracts.py", "symbols": ["TaskArtifactV1", "SceneDefinition", "AssetDefinition", "JointDefinition", "ExecutionSpecV1"]},
+    "source": {"path": "task_env/assembly/compiler.py", "symbols": ["ReferenceTaskDeclarationV1", "CompiledReferenceTaskV1"]},
+    "state": {"path": "task_env/artifacts/state.py", "symbols": ["StateRequirements", "CanonicalStateViewV1", "TypedJointStateValue", "StateBoundaryIdentity"]},
+    "runtime_source": {"path": "task_env/runtime/sessions/source.py", "symbols": ["RuntimeSource"]},
+    "camera": {"path": "task_env/render/camera/source.py", "symbols": ["DynamicCameraRenderSourceV1", "RenderVisualInstanceBindingV1"]},
+    "selected_task": {"path": "task_env/assembly/panda_box.py", "symbols": ["_panda_box_reference_declaration", "compile_panda_box_task"]},
+    "batch": {"path": "task_env/runtime/providers/merged_scene.py", "symbols": ["SceneBatchRuntime"]},
+    "vector": {"path": "task_env/vectorization/parallel.py", "symbols": ["make_parallel_env", "RemoteBatchVecEnv"]}
+  },
+  "cases": [
+    {
+      "id": "P1",
+      "kind": "positive_design",
+      "purpose": "一个 Panda、静态桌面、被动 free cube 和相机的统一语义、模型、资产映射与执行描述。",
+      "reuses_case": [],
+      "proposal": {
+        "task_semantics": {
+          "task_id": "pick-cube-p16-reference-v1",
+          "artifact_version": "source-declared-version",
+          "entity_ids": ["panda-v1", "tabletop-v1", "cube-v1"],
+          "action": {"target": "panda-v1/arm", "kind": "joint_position_and_gripper", "cube_action": null},
+          "success_owner": "PickCube TaskDefinition/Solution; predicate content is referenced, not copied into the route",
+          "observation_requirements": ["task-state", "overhead-rgb"],
+          "timebase": {"physics_dt_s": 0.002, "control_substeps": 5, "control_dt_s": 0.01},
+          "world": "SI_right_handed_z_up_wxyz"
+        },
+        "physics_model": {
+          "tabletop-v1": {"motion": "static", "collision_representation": "table-collider-v1"},
+          "panda-v1": {"motion": "articulated", "joint_profile": "declared-seven-arm-and-gripper-route"},
+          "cube-v1": {
+            "motion": "floating_rigid_body",
+            "root_pose": {"position_rule": "tabletop-v1/top_z + declared cube half-size + declared contact margin", "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]},
+            "velocity_layout": {"position": "xyz_meter_quaternion_wxyz", "position_size": 7, "velocity": "linear_xyz_meter_per_second_angular_xyz_radian_per_second", "velocity_size": 6},
+            "control": "passive; gravity/contact evolve state; no cube effort action required",
+            "required_interactions": ["cube-table contact", "cube-gripper contact"]
+          }
+        },
+        "asset_representation": {
+          "cube-v1": {
+            "representations": [
+              {"id": "cube-mechanical-v1", "role": "mechanical", "source": "asset://geochora/cube-v1", "frame": "cube-v1/root", "unit": "SI"},
+              {"id": "cube-collider-v1", "role": "collision", "source": "asset://geochora/cube-collider-v1", "frame": "cube-v1/root", "unit": "SI", "collision_approximation": "explicit-cube-profile"},
+              {"id": "cube-visual-v1", "role": "visual", "source": "asset://geochora/cube-visual-v1", "frame": "cube-v1/root", "unit": "SI"}
+            ],
+            "mappings": [{"from": "cube-mechanical-v1", "to": "cube-collider-v1", "kind": "declared_rigid_frame_and_shape_correspondence", "topology_generation": null}, {"from": "cube-mechanical-v1", "to": "cube-visual-v1", "kind": "declared_rigid_frame_and_entity_correspondence", "topology_generation": null}],
+            "dynamics": {"mass_kg": 0.08, "inertia_diagonal_kg_m2": [0.000035, 0.000035, 0.000035], "source_oracle": "current task source values; any physical-intent review remains separate"}
+          },
+          "camera": {"id": "overhead-camera-v1", "mount_frame": "panda-v1/ee", "modalities": ["rgb"], "scene_instance_binding": "cube-v1 visual frame pose"}
+        },
+        "execution_configuration": {
+          "provider_route": {"provider": "candidate-provider-reference", "host": "provider-defined", "engine": "provider-defined", "solver": "provider-defined", "coupler": "single-provider-owned; required contacts must be declared"},
+          "timebase_s": {"physics_dt": 0.002, "control_substeps": 5},
+          "renderer": {"selection": "explicit-camera-route-required", "current_selected_pickcube": "renderer-none", "camera_admission": "requires a provider route that publishes free-body visual pose"},
+          "environment": {"dependency_identity": "bind exact environment profile/lock when selected", "status": "unresolved_for_cross-provider_combination"}
+        },
+        "build_binding_publication": {
+          "build_description": "semantic Entity/Frame/Joint IDs, typed source/asset refs, task requirements and route selection",
+          "compiled_binding": "Task Artifact + canonical Scene + named Source bindings; native indices are runtime-private",
+          "dynamic_publication": "state-bound cube Frame pose and optional typed floating Joint twist with expression frame/reference point; capture binds same state boundary"
+        }
+      },
+      "owner_refs": ["task", "artifact", "source", "runtime_source", "state", "camera", "selected_task"],
+      "expected": {"design": "ACCEPT_AS_REPRESENTATION", "runtime": "NOT_ESTABLISHED", "reason": "The representation is coherent, but current selected PickCube admits renderer-none and current dynamic cross-camera rejects free_joints; no runtime route is added by this example."}
+    },
+    {
+      "id": "P2",
+      "kind": "positive_design",
+      "purpose": "复用 P1 的任务/Scene/资产语义，仅切换两个可区分的 Newton 执行描述，暴露 host、engine 和 solver 层级。",
+      "reuses_case": ["P1"],
+      "proposal": {
+        "execution_variants": [
+          {"id": "independent-newton-example", "provider_adapter": "standalone-newton-adapter-reference", "host": {"kind": "independent-runtime", "product": "Newton", "version": "environment-bound"}, "engine": "Newton", "solver": {"family": "XPBD", "algorithm": "explicit-or-version-bound"}, "coupler": "one-provider-owned; contacts must be admitted"},
+          {"id": "isaac-host-newton-example", "provider_adapter": "isaac-sim-adapter-reference", "host": {"kind": "Isaac Sim", "version": "6.2.0"}, "engine": "Newton", "solver": {"family": "Newton solver family", "algorithm": "explicit Isaac/Newton build-bound"}, "coupler": "one-provider-owned; contacts must be admitted"}
+        ],
+        "invariants": ["task_id, Artifact source, Scene template, asset/source identities and task success owner remain shared", "each variant has its own execution identity, dependency environment, materialization identity and evidence", "solver family count does not establish a usable coupler", "not-applicable and unknown layers are explicit and distinct"],
+        "environment_constraints": ["Isaac Sim 6.2 bundles a release-pinned Newton/MuJoCo/Warp set", "Core and GeoPhys MuJoCo requirements currently have no common version interval", "environment compatibility/admission must reject unresolved package sets"]
+      },
+      "owner_refs": ["artifact", "runtime_source"],
+      "expected": {"design": "ACCEPT_AS_ROUTE_DESCRIPTION", "runtime": "NOT_ADMITTED_BY_THIS_DOCUMENT", "reason": "Isaac Sim 6.2 documents Newton and PhysX as backend choices, but this does not create a GeoChora Newton adapter, validate this PickCube model, resolve dependencies, or prove contact/camera capability."}
+    },
+    {
+      "id": "P3",
+      "kind": "positive_design",
+      "purpose": "证明不同的 mechanical/collision/visual 表示、结构化外部数据和 topology generation 可被未来 Scene extension 引用，不承诺当前 provider 支持。",
+      "reuses_case": [],
+      "proposal": {
+        "entity": {"entity_id": "rope-v1", "model_kind": "deformable_rope", "mechanical_representation": {"id": "rope-particles-g4", "format": "typed_particle_layout", "state_components": [{"name": "position", "shape": ["N", 3], "unit": "m", "frame": "world"}, {"name": "velocity", "shape": ["N", 3], "unit": "m/s", "frame": "world"}], "topology_generation": 4, "payload_identity": "sha256:declared-payload"}, "collision_representation": {"id": "rope-collider-g4", "format": "typed_capsule_chain", "topology_generation": 4}, "visual_representation": {"id": "rope-render-mesh-g4", "format": "mesh", "topology_generation": 4}, "mappings": [{"from": "rope-particles-g4", "to": "rope-collider-g4", "mapping_payload_identity": "sha256:declared-map", "source_generation": 4, "target_generation": 4}, {"from": "rope-particles-g4", "to": "rope-render-mesh-g4", "mapping_payload_identity": "sha256:declared-map", "source_generation": 4, "target_generation": 4}]},
+        "required_interaction": {"kind": "rope-rigid-contact", "entity_ids": ["rope-v1", "tabletop-v1"], "required": true, "capability_id": "typed-rope-contact-v1"},
+        "admission": "must reject at capability-admission when provider/build does not declare and evidence this state layout, collision mapping and interaction; no fallback to visual mesh"
+      },
+      "owner_refs": ["artifact", "state", "camera"],
+      "expected": {"design": "ACCEPT_AS_EXTENSIBLE_REFERENCE", "runtime": "REJECT_UNLESS_CAPABILITY_EVIDENCED", "reason": "Typed references preserve extension location and topology boundaries; they do not invent a solver or provider capability."}
+    },
+    {
+      "id": "P4",
+      "kind": "positive_design",
+      "purpose": "用一份同构小 batch 的 task/Scene template 表达两个环境实例和可选择 reset，而不复制 native state 或改变 task semantics。",
+      "reuses_case": ["P1"],
+      "proposal": {
+        "template": {"task_identity_ref": "P1.task_semantics", "scene_identity_ref": "P1.asset_representation", "execution_config_identity": "one-shared-provider-route", "batch_size": 2, "batch_axis": "env"},
+        "instances": [{"env_id": "env-000", "scene_instance_id": "scene-instance-000", "episode_id": "episode-000-1", "reset_sample_id": "reset-<sha256>"}, {"env_id": "env-001", "scene_instance_id": "scene-instance-001", "episode_id": "episode-001-1", "reset_sample_id": "reset-<sha256>"}],
+        "state_publication": {"leading_axis": "env", "row_identity": ["env_id", "scene_instance_id", "episode_id", "reset_sample_id", "control_step", "state_revision"], "observation_schema": "same declared key/shape/dtype/unit for every row and reset", "reset_selection": ["env-001"], "state_migration": "none; reset rebuild uses a fresh execution instance"},
+        "alternative_realizations": ["one provider-native merged batch with one shared solver/config", "process vectorization with isolated per-env runtime/session but the same declared task and route config"],
+        "current_admission": "neither PickCube realization is established; current native batch registrations and current RemoteBatchVecEnv task registrations remain unchanged"
+      },
+      "owner_refs": ["state", "batch", "vector"],
+      "expected": {"design": "ACCEPT_AS_BATCH_IDENTITY_EXAMPLE", "runtime": "NOT_ESTABLISHED_FOR_PICKCUBE", "reason": "Template/instance/env/episode identities are distinct and one config is shared; this does not implement batch methods, images, or a new provider adapter."}
+    },
+    {
+      "id": "N1",
+      "kind": "negative_design",
+      "purpose": "拒绝把 floating position 坐标长度误当作 action/effort 或 velocity 维数。",
+      "reuses_case": ["P1"],
+      "invalid_fragment": {"joint_kind": "floating", "qpos_size": 7, "velocity_size": 7, "effort_size": 7, "controller_action": "raw-qpos-as-effort"},
+      "owner_refs": ["artifact", "state", "selected_task"],
+      "expected": {"design": "REJECT", "phase": "schema-or-action-binding", "reason": "Floating Joint is 7-position/6-twist under its declared layout; effort/control needs an independently declared actuator or entity-targeted action."}
+    },
+    {
+      "id": "N2",
+      "kind": "negative_design",
+      "purpose": "拒绝仅凭可读 visual mesh 推断 collider、离散物理模型、质量或材料正确。",
+      "reuses_case": [],
+      "invalid_fragment": {"entity_id": "cube-v1", "visual_mesh": "asset://cube-render-only", "inferred_collision": "same-mesh-with-no-declaration", "inferred_mass_kg": null, "inferred_material": null},
+      "owner_refs": ["artifact", "runtime_source"],
+      "expected": {"design": "REJECT_REQUIRED_PHYSICS_REPRESENTATION", "phase": "capability-admission", "reason": "Visual readability supplies no physical discretization, collision approximation, mass, inertia or material evidence."}
+    },
+    {
+      "id": "N3",
+      "kind": "negative_design",
+      "purpose": "拒绝重复语义 ID、悬空表示映射或目标属于错误 Entity 的引用。",
+      "reuses_case": ["P1", "P3"],
+      "invalid_fragment": {"duplicate_entity_id": "cube-v1", "mapping": {"from": "rope-particles-g4", "to": "missing-representation", "entity_id": "panda-v1"}},
+      "owner_refs": ["artifact", "source"],
+      "expected": {"design": "REJECT", "phase": "decode-or-compile", "reason": "IDs must be unique; all representation, frame, entity and mapping endpoints must resolve within one declared scene/asset identity."}
+    },
+    {
+      "id": "N4",
+      "kind": "negative_design",
+      "purpose": "拒绝吞掉未知 required extension，或仅凭声明了两类 solver 就推断存在有效耦合。",
+      "reuses_case": ["P2", "P3"],
+      "invalid_fragment": {"extension": {"namespace": "vendor.unknown-physics", "required": true, "affects_physics": true}, "solver_families": ["PhysX", "Newton"], "coupler": null, "action": "ignore-unknown-and-run"},
+      "owner_refs": ["artifact"],
+      "expected": {"design": "REJECT", "phase": "decode-or-capability-admission", "reason": "Unknown physics-affecting extensions are not ignorable; a coupler and endpoint support must be explicitly declared and admitted."}
+    },
+    {
+      "id": "N5",
+      "kind": "negative_design",
+      "purpose": "拒绝在同一个已构建环境 identity 中 reset 后改变固定 Observation schema 或 camera output。",
+      "reuses_case": ["P1", "P4"],
+      "invalid_fragment": {"before_reset": {"observation": ["state", "rgb"], "rgb": {"shape": [128, 128, 3], "dtype": "uint8"}}, "after_reset": {"observation": ["state", "rgb", "depth"], "rgb": {"shape": [256, 256, 3], "dtype": "float32"}}, "environment_identity": "unchanged"},
+      "owner_refs": ["state", "camera", "batch"],
+      "expected": {"design": "REJECT_OR_REQUIRE_NEW_BUILD_IDENTITY", "phase": "reset-preflight", "reason": "Observation and camera output schema are fixed for a built environment; a changed contract requires a new explicit execution/capture identity before reset."}
+    }
+  ]
+}

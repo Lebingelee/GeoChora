@@ -26,7 +26,7 @@ provider 实现公开能力的 owner 仍在其项目内。Core 不访问 solver�
 | 编号 | 待冻结问题 | 负责子阶段 | 当前建议／约束 |
 | --- | --- | --- | --- |
 | D01 | 首批三个物理路线的精确 renderer、资产和版本 | 1a、1d | Physics 候选为 MuJoCo CPU、GeoPhys CPU、Isaac Sim 6.2/PhysX/CUDA:0。GeoPhys→MuJoCo OpenGL 仅有 scalar-joint Position camera 路径；PickCube free cube 不兼容。逐后端 native window／RGB／同步 observation 仍须 1d/5a–5c 接通与核验。 |
-| D02 | 统一表示映射到哪些现有 schema，保留哪些兼容输入 | 1b | 优先扩展现有 owner，不凭讨论新建完整物理语言 |
+| D02 | 统一表示映射到哪些现有 schema，保留哪些兼容输入 | 1b | 本轮建议 Task Artifact/TaskDefinition 持有语义、现有 Scene/Asset 持有实体与来源；Scene-v4 在同一 owner 内补 typed 物理模型/表示映射，ExecutionSpec-v2 分层 provider/host/engine/solver/coupler。v0/v1 与 Scene-v1–v3 精确 codec/hash 保留，不建平行 TaskIR；维护者待确认项见[1b设计摘要](../maintenance/reviews/20261103_1b_representation_design.md)和[权威协议](../contracts/unified-task-representation.md)。 |
 | D03 | 夹爪 effort、传动、mimic／tendon 和现有 native 兼容路由 | 1c、4a | 逐通道声明；不能把 arm torque＋finger position 称为全 effort，不重开 F05 严格等价研究 |
 | D04 | 模型服务的库依赖、反馈频率和缺失能力 | 1c、4a | Controller 不依赖 live provider 私有状态；可替换参考模型依赖需显式记录 |
 | D05 | batch 的具体两个以上后端、auto-reset 及图像布局 | 1a、1d、6a | 当前 native batch 是 GeoPhys merged rigid；CPU/CUDA 不算两个 physics provider。Isaac Sim/PhysX/CUDA 是建议第二 provider 候选，需新增 batch adapter；现有 remote vector 是 same-step，图像布局尚未接通 |
@@ -55,6 +55,32 @@ provider 实现公开能力的 owner 仍在其项目内。Core 不访问 solver�
 - **PickCube D06 锚点**：P1.6 使用 2 ms physics tick × 5 substeps = 10 ms control tick（100 Hz），horizon 6000；世界位置为 m、旋转 quaternion wxyz，Panda 关节以 rad/rad·s⁻¹，重力 z=-9.81 m·s⁻²。Cube half-size 0.025 m、mass 0.08 kg、声明对角惯量 `(3.5e-5, 3.5e-5, 3.5e-5) kg·m²`、free-joint damping 0.8、armature 0.01、contact margin 0.001 m；模型还声明 table/cube/gripper friction、7 arm joints、2 finger joints、8 actuators（7 arm generalized actuators + 1 tendon gripper route）。固体均匀 0.05 m 立方体按声明质量的解析对角惯量为 `3.333…e-5 kg·m²`，与现有数值约差 5%；将既有数值保留为 source oracle，先由资产 owner 确认模型意图，不在本审计改写。跨 provider 需比较变换、单位、质量/惯量、joint 顺序/限制、tendon/transmission、驱动/限幅、接触、reset 与稳定性；仅当 source oracle/公开模型读回提供依据时才定容差。
 
 Isaac Lab Scene Data Provider／Actuator 页面当前为其最新文档版本，不能当成本仓库 `isaacsim==6.2.0.0` 的可直接调用 API；它们只支持公开数据 freshness、资源 owner 和 explicit/implicit drive 语义的协议讨论。详见下表官方链接。
+
+## G01/1b 表示设计的源码映射
+
+本节只映射当前实现及建议 owner，不表示示例 JSON 是 public schema，也不把未迁移调用方写成已迁移。
+
+| 设计内容 | 当前声明／schema owner | 已核实 caller／消费边界 | 决定 |
+| --- | --- | --- | --- |
+| Task semantics/build description | `TaskArtifactDeclarationV1`；`TaskSourceV1` identity/roles/init/hooks；`TaskArtifact` v0、`TaskArtifactV1`；`TaskDefinitionBase`／`TaskEvaluation` | `compile_declared_artifact` 纯值编译；`compile_task_artifact_v1` 连接 source、Scene 与 v0 semantic bridge；`ReferenceTaskDeclarationV1.compile` 返回 artifact/source/可选纯 controller，不 materialize provider | 复用 task-owned Artifact、TaskDefinition 和 Core compiler；奖励/success/Solution 不搬入 execution |
+| Scene/physical topology/state | `EntityInstance`、`FrameDefinition`、`ArticulationDefinition`、`JointDefinition`、`SceneDefinition` v1–v3；`StateRequirements`、`TypedJointStateValue`、`CanonicalStateViewV1` | Scene codec 按版本拒绝未知字段；v3 有结构/robot/control group；typed state 已支持 floating 7-position/6-velocity，但 TaskArtifact-v1 `validate_scene` 仅允许 scalar required Joint | 旧 schema 不补字段；需 physics/material/collider/visual mapping 时同 Scene owner 新增显式版本及小型 typed refs |
+| Asset/source/representation | `AssetDefinition`、USD delivery closure、`ProviderRepresentationSelectionV1`、`TaskSourceV1`／`TaskSceneSource` | selection 只记录 source/format/recipe 决定且 `runtime_admitted=false`；`RenderVisualInstanceBindingV1` 是 camera-specific source binding，不是通用机械/碰撞/视觉映射 | 同一 Entity 可多表示，但 mapping、frame、单位、源/output identity 和拓扑代次须显式；asset harness 派生与无损 native importer lowering 分开 |
+| Execution route | `ExecutionSpecV1`、`ResolvedEnvConfig`、Provider manifest/admission、RuntimeSource | v1 有 provider/backend/profile/seed/determinism/renderer selection；`reference_task_identity_fields` 另含 resolved config、source XML hash、controller ID 与具名 source bindings。当前字段不能区分 host/engine/solver/coupler/precision/environment | 建议同 owner 的严格 `ExecutionSpecV2`；Newton standalone 与 Isaac-hosted Newton 为不同可表达 route，均不代表 GeoChora adapter |
+| Free-body 与 camera | `RuntimeSource.free_joints`、Scene floating Joint、`InitializationContract.poses_world`、`TypedJointStateValue`／`TypedFrameStateValue`、`DynamicCameraRenderSourceV1` | `panda_box._panda_box_reference_declaration` 将 cube 绑定到 `PickCube_joint`；dynamic camera `from_runtime_source` 拒绝非空 `free_joints`；camera visual binding 需要 entity/frame/native-body/geometry 名映射 | 被动 free cube 以 Entity/Frame pose 表达，不要求 joint action；camera admission 要有对应 floating-state publisher 和 visual mapping，现有 selected PickCube 保持 renderer none |
+| Batch/instance identity | `StateBoundaryIdentity`、`TaskStateView`／`BatchTaskStateView`、`SceneBatchRuntime`、`RemoteBatchVecEnv` | State boundary 有 episode/reset sample/Scene instance/materialization/step/revision；native GeoPhys merged batch 与 process-vector wrapper 是不同实现。`make_parallel_env` 目前只注册 Pendulum/TwoWheelBalance | 一个 template 对应多个带 env/scene-instance/episode ID 的实例；未来 batch publication 明示 leading env axis 与 row mapping，保持一份语义和统一 execution config |
+
+主要 caller 入口包括 `task_env/assembly/panda_box.py::_panda_box_reference_declaration`／`compile_panda_box_task`、`task_env/tasks/pick_cube/specialization.py`、`task_env/tasks/nut_assembly/specialization.py` 和 `bench_deploy/libero/environment/selected_reference.py`。LIBERO 可复用 declaration/compiler，但公共通用构造迁移仍未完成，benchmark semantics 继续留在 `bench_deploy/libero`。设计示例与逐项拒绝理由在[representation-cases.json](representation-cases.json)。
+
+### 1b 新增核对的官方参考
+
+以下页面于 2026-11-03 核对。固定版 Isaac Sim 6.2 仅用来核对 host/backend/solver 路由真实存在与其 dependency boundary；`latest`／`release` 页面只用于一般概念，实施前仍需按确切安装重查。
+
+| 官方来源 | 核对内容 | 本设计采用边界 |
+| --- | --- | --- |
+| [Isaac Sim 6.2 Newton backend](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/physics/newton_physics.html) | Isaac Sim 可选 PhysX/Newton backend；Newton 有 XPBD、MuJoCo、Featherstone、SemiImplicit solver families；host 内 engine 和 solver 可分层 | 证明 execution vocabulary 有具体对应；GeoChora 无 Isaac-Newton adapter 的证据，不宣称实现 |
+| [Isaac Sim 6.2 release notes](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/overview/release_notes.html) | 6.2 捆绑 Newton 1.6.1、MuJoCo/MuJoCo Warp 3.12.0 与 Warp 1.17.0 | 每条路线须 bind exact environment/dependency identity；不能与 Core/GeoPhys 声明的 MuJoCo 区间冲突混为一谈 |
+| [MuJoCo XML reference](https://mujoco.readthedocs.io/en/latest/XMLreference.html) | 文档将 runtime `qpos` 和 `qvel` 分开描述；free Joint 对 body topology 有单独限制 | 作为 position/velocity 不可互推的旁证；Canonical size 仍由本仓库 `JointDefinition` 决定 |
+| [OpenUSD UsdPhysics schemas](https://openusd.org/release/api/usd_physics_page_front.html) 与 [MassAPI](https://openusd.org/release/api/class_usd_physics_mass_a_p_i.html) | collision approximation 与图形网格可分开定义，mass API 与 collider/rigid body 分离 | 支持把 mechanical/collision/visual representations 分离建模；OpenUSD 字段不是 GeoChora schema |
 
 主审已接收该有界审计，见 [1a Sol 审核](../maintenance/reviews/20261103_1a_sol_review.md)。其中澄清：v2.1.0 矩阵已有当前 GeoPhys pin 的短程 state-only F06 证据；旧 pin 限制针对特定 cross-render receipt，不能混淆。上述 horizon 6000 是当前 YAML 默认，历史或调用方覆盖的运行按各自 identity／配置解释。
 

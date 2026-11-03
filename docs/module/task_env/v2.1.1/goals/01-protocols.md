@@ -25,6 +25,8 @@
 - **交付／出口：**形成字段与 owner 对照、复用／扩展理由、版本与不支持规则。刚体、关节和相机可实际落地；非刚体保留有意义的接口位置，不设计完整未来语言。
 - **检查／证据：**结构化正例及未知字段、身份／映射冲突、缺失必需物理表示的拒绝案例；可先使用静态说明，实际检查代码由冻结包授权，不以文档示例代替实现。
 
+**attempt001 设计交付：**统一表示正文已扩展四类字段/owner/caller、兼容 codec/identity、free/scalar layout、资产映射、execution 层级和 batch identity；新增 planning-only 的 P1–P4/N1–N5 JSON 案例。结论 `PASS`（设计交付），状态 `REPORTED_PENDING_REVIEW`，待 Sol 独立审阅。未改生产 schema/code，不运行 implementation tests/native/physics/GPU；protocol 仍 `DRAFT_FOR_DISCUSSION`，1c 继续 `PLANNED`。摘要及待维护者确认项见[1b 设计交付摘要](../maintenance/reviews/20261103_1b_representation_design.md)，逐项依据见[权威协议](../contracts/unified-task-representation.md)。
+
 <a id="1c"></a>
 ## 1c：Core 与 physics provider 双向协议
 
