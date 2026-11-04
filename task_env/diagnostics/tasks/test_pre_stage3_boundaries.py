@@ -351,3 +351,20 @@ def test_artifact_digest_never_reuses_a_replaced_mutable_nested_mapping():
     mutable[key] = float(mutable[key]) + 1.0
     assert artifact.identity_hash != original_hash
     assert '_immutable_identity_hash' not in artifact.__dict__
+
+
+def test_artifact_digest_distinguishes_signed_zero_after_frozen_field_tampering():
+    from dataclasses import replace
+    from types import MappingProxyType
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    original = build_artifact()
+    artifact = replace(original, semantics=replace(original.semantics))
+    values = dict(artifact.semantics.parameters_si)
+    key = next(iter(values))
+    values[key] = -0.0
+    object.__setattr__(artifact.semantics, 'parameters_si', MappingProxyType(dict(values)))
+    negative = artifact.identity_hash
+    values[key] = 0.0
+    object.__setattr__(artifact.semantics, 'parameters_si', MappingProxyType(dict(values)))
+    assert artifact.identity_hash != negative

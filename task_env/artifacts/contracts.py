@@ -149,7 +149,11 @@ def _immutable_contract_snapshot(value):
     mutation through Python's low-level dataclass bypasses. It avoids repeated
     JSON encoding and hashing, not traversal of the static value tree.
     """
-    if value is None or type(value) in (str, bool, int, float):
+    if type(value) is float:
+        # Python compares -0.0 and 0.0 equal, but canonical JSON distinguishes
+        # their encodings, so equality of numeric values is insufficient here.
+        return ('float', value.hex())
+    if value is None or type(value) in (str, bool, int):
         return (type(value).__name__, value)
     if type(value) is tuple:
         values = tuple(_immutable_contract_snapshot(item) for item in value)
