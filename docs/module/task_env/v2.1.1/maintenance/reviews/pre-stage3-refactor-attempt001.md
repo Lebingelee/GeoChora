@@ -16,7 +16,7 @@
 - 唯一环境实现、三个旧任务迁移、完整当前文档与启动路线均尚未完成；G1、G2、G3 未通过。本页不代表 Sol 接收，也不把旧证据重标为新实现证据。
 - 维护者追加的任务目录收敛决定及 staged 规划由 Sol 在本窗口释放后与实际输出整合；当前三个共享 task 根模块、Marker 中间层／包装、PickCube 的 `isaac.py` 和 Nut 的 trusted source manifest 尚未按该决定迁移，当前 Marker 教程仍需同步。该决定不改变此窗口预算，也不表示阶段3已启动；详细路径与真实调用者见本次工作报告。
 
-## 实际门状态与移交
+## 原窗口门状态与移交（续作前）
 
 | 门 | 结果 | 说明 |
 | --- | --- | --- |
@@ -28,3 +28,16 @@
 | G5 | PASS | 本地提交、工作报告、文档校验及此待复审记录已准备；状态仅为 `REPORTED_PENDING_REVIEW`，不是接受或整体通过。 |
 
 本次工作报告位于 Core 的 `workspace/maintenance/v211_pre_stage3_refactor_attempt001/report.md`，索引和逐次监督／读回结果同目录；此前旧 raw 与受保护 untracked 未重写。维护者追加的 `V211_PRE_STAGE3_scope_decision_20261104` 明确由 Sol 在当前 writer 释放后依据实际 HEAD 合并 staged 规划与未完成范围，维护者手动转发；本窗口不叠加该后继执行、不进入阶段3。Sol 应独立检查 Nut caller 动作／反馈、录制与 provenance，及上述 G0/G1/G2/G3/G4 缺口。
+
+
+## 维护者确认人工转交后的续作（2026-11-04）
+
+维护者确认已经人工转交并要求按目标继续；同时提供 Sol 的范围确认原文。该原文说明对实际返包的复审在返包后进行，本记录不将范围确认伪装为对本次输出的最终验收。冻结交接包和先前报告保留。
+
+- Marker 使用 `task_env.make_env(uid, config=...)`，任务声明、重置与评价留示例，原中间环境及创建包装删除；PandaBox 声明编译继续由 assembly 拥有。新来源摘要反映示例路径。provider-free FakeSession 的公开 factory／seed／step／close 检查通过，不证明 native。
+- Nut guard 的样本间隔校验归 `planners/completion.py`，任务阶段授权与终段完成规则归 `nut_assembly/solution.py`；共享 Solution 完成／失败状态与 checkpoint 恢复归既有 planner 完成支持。来源生成、诊断调用与重放构造同步。Nut trusted source manifest 字节未变，移至 `assembly`；runtime 与独立 reader 更新路径。
+- PickCube 的场景投影与绑定归 `specialization.py`；source-bound USD runtime input 归 `runtime/sessions/source.py`，原 F06 固定 delivery、source map 与执行准入检查归既有 runtime admission。native IO 改用该准入边界，来源摘要包括新 owner。未启动 Isaac；完整 task projection 合成测试因 `scene` 引擎导入隔离未运行成功。
+- 两任务目录各为 `task.py`、`specialization.py`、`solution.py`、`config.yaml` 与薄 `__init__.py`。三个旧 tasks 根模块和 PickCube `isaac.py` 不再被活跃源码导入。当前文档和规划已相应更新。
+- 续作最终合成检查：88 passed／1 deselected（旧候选测试依赖缺失的历史模块）；Isaac 相关 31 passed／1 skipped／2 deselected（一个被引擎隔离阻止，另一个断言已过时的 R3 配置）；manifest 与独立 reader 4 passed。首次失败原样保留在工作输出，不视作通过。两个受保护文件与两个 submodule pin 未变。
+
+门状态：G0 PARTIAL（原 P99 cwd 违规保留）；G1 FAIL（classic `BaseTaskEnv` 仍是独立生命周期，Empty／Pendulum／TwoWheel 未迁移）；G2 PARTIAL（当前源码缺物理回归和完整 Isaac 构建验证）；G3 PARTIAL（完整安装及统一后接口未验证）；G4 PARTIAL（当前 native 与独立物理 reader 未完成）；G5 为本地报告与提交交付，待 Sol 独立复审。不得从目录形态或合成测试推断 G1/G2 通过。续作详细命令、失败、预算和 writer/native 释放记录在 `workspace/maintenance/v211_pre_stage3_refactor_attempt001/resumed_after_manual_forwarding/report.md`。

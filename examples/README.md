@@ -47,9 +47,10 @@ runtime imports.
 
 For a small new-task declaration, see [`declared_marker.py`](tasks/declared_marker.py).
 It supplies a distinct task/Entity identity, reset sampler and evaluator while
-reusing Core's shared Panda/table/box construction. `make_marker_env(config=...)` enters
-through the public `make_env` path; its bounded MuJoCo CPU example is described
-in the [current TaskEnv public API](../docs/module/task_env/v2.1.0/api/public-api.md).
+reusing Core's shared Panda/table/box construction. Import the example to register
+it, then use `task_env.make_env('marker-height-example-v1', config=...)`. The
+[current guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
+describes the setup; the modified Marker route has synthetic checks only.
 
 ## Workflow matrix
 

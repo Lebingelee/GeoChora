@@ -186,8 +186,8 @@ def restore(value, state, provider, record):
         if any(type(v['present']) is not bool or (not v['present'] and k not in optional) for k,v in payload['fields'].items()):
             raise ValueError('missing required owner state: ' + name)
         if name == 'coordinator' and hasattr(owner, '_lifecycle'):
-            from ....tasks.canonical_solution_lifecycle import CanonicalSolutionLifecycle
-            lifecycle_probe = CanonicalSolutionLifecycle(owner._lifecycle.completion_policy)
+            from ....tasks.nut_assembly.solution import NutAssemblySolutionLifecycle
+            lifecycle_probe = NutAssemblySolutionLifecycle(owner._lifecycle.completion_policy)
             lifecycle_probe.restore_state(decoded[name]['lifecycle_state'][1])
             if hasattr(owner, '_transition_guard_state'):
                 guard_state = decoded[name]['_transition_guard_state'][1]

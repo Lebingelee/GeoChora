@@ -46,4 +46,4 @@ Isaac 现有 PickCube harness 的静态参数路由示例如下，**本轮未运
 
 ## 基于示例开发
 
-阅读 [`examples/tasks/declared_marker.py`](../../../../../examples/tasks/declared_marker.py)：它声明 UID、Panda/table/box 组合、reset 范围与 `evaluate_task`，再通过 `make_marker_env` 调用 public `make_env`。`DeclaredPandaBoxEnv` 是内部 adapter，不是稳定扩展 API。修改自己的 UID、声明和评价后，先通过同一 public factory 检查 reset、action/observation 和 close；需要 Expert 时将 Solution 留在任务 owner。当前自定义任务说明仍在迁移，最终规范 Env 扩展点以完成迁移后的源码和文档为准。
+阅读 [`examples/tasks/declared_marker.py`](../../../../../examples/tasks/declared_marker.py)：它声明 UID、Panda/table/box 组合、reset 范围与 `evaluate_task`，导入示例完成注册，再直接使用 public `task_env.make_env(uid, config=...)`。示例中的接线属于内部实现，不是稳定扩展 API。修改自己的 UID、声明和评价后，先通过同一 public factory 检查 reset、action/observation 和 close；需要 Expert 时将 Solution 留在任务 owner。当前自定义任务说明仍在迁移，最终规范 Env 扩展点以完成迁移后的源码和文档为准。

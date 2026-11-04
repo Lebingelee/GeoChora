@@ -1491,3 +1491,45 @@ def test_removed_task_plan_and_private_recorder_exports_are_not_active():
     assert recorder.__all__==['main']
     assert not hasattr(trajectory, '_build_plan')
     assert not hasattr(recorder, '_pick_cube_config')
+
+
+def test_marker_public_factory_reset_step_and_source_provenance(fake):
+    # Import registers the example; construction uses the same public factory
+    # as a normal application. This is a synthetic session, not native proof.
+    import examples.tasks.declared_marker  # noqa: F401
+
+    env = make_env('marker-height-example-v1', config={'provider': 'mujoco', 'horizon': 2})
+    try:
+        obs, _ = env.reset(seed=31)
+        first = env.state.pose_world['marker-v1']
+        assert env.observation_space.contains(obs)
+        assert 'examples/tasks/declared_marker.py' in env.value['source_sha256']
+        assert 'task_env/tasks/declarative_reference.py' not in env.value['source_sha256']
+        ee = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*ee.position, *ee.quaternion_wxyz, 0.0), dtype=np.float32)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        assert env.observation_space.contains(obs)
+        assert (reward, terminated, truncated) == (0.0, False, False)
+        assert env.state.control_step == 1
+        env.reset(seed=31)
+        assert env.state.pose_world['marker-v1'] == first
+    finally:
+        env.close()
+
+
+def test_nut_solution_lifecycle_restores_then_requires_final_task_success():
+    from task_env.tasks.nut_assembly.solution import (
+        NutAssemblySolutionLifecycle, SolutionCompletionPolicy,
+    )
+
+    policy = SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE
+    original = NutAssemblySolutionLifecycle(policy)
+    assert not original.observe_task_outcome(task_success=True, control_step=1, simulation_time_s=.01)
+    restored = NutAssemblySolutionLifecycle(policy)
+    restored.restore_state(original.to_mapping())
+    assert not restored.complete_expert(terminal_stage_completed=True, final_task_success=False,
+                                        control_step=2, simulation_time_s=.02)
+    assert restored.expert_failed and restored.failure_reason == 'final_task_success_not_valid'
+    assert original.complete_expert(terminal_stage_completed=True, final_task_success=True,
+                                    control_step=2, simulation_time_s=.02)
+    assert original.expert_complete and not original.expert_failed

@@ -17,7 +17,7 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 
 ## 阶段3前维护检查点
 
-attempt001 状态为 `REPORTED_PENDING_REVIEW`：已提交有界职责收敛、SHA、启动／文档及 Nut caller-driven Solution 等修改；环境统一、当前源码完整物理回归和新范围下任务目录收敛均未完成。详见[交付与待复审](reviews/pre-stage3-refactor-attempt001.md)。维护者追加的范围决定要求 Sol 在当前 writer 释放后合并实际输出，准备后继包；此记录不改变阶段2决定或授权阶段3。
+attempt001 在维护者确认已人工转交后续作，状态仍为 `REPORTED_PENDING_REVIEW`。已落实 Marker 公共创建入口、两个任务目录四文件收敛及相关 guard／Solution／USD 来源接线；本轮只有 provider-free 合成验证，Isaac 投影完整构建和当前源码完整物理回归未验证。classic 单环境统一仍未完成，G1 仍未通过；详见[交付与待复审](reviews/pre-stage3-refactor-attempt001.md)。此记录不改变阶段2决定或授权阶段3。
 
 ## 阶段3前待办
 

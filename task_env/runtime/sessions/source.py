@@ -532,3 +532,39 @@ class UsdRuntimeSourceV1:
     def assert_fresh(self) -> None:
         self.validate()
         self.scene_source.assert_fresh()
+
+
+@dataclass(frozen=True)
+class UsdRuntimeInputV1:
+    """Source-bound USD session inputs; admission policy remains in runtime."""
+    schema_version: str
+    task_source: object
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: object
+    reset_plan: object
+    controller_profile: str
+    horizon: int
+    delivery_manifest_sha256: str
+
+    def validate(self):
+        from ...artifacts import ExecutionSpecV1
+        from ...artifacts.execution import EpisodeResetPlanV1
+        from ...environment.task_source import TaskSourceV1
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1):
+            raise TypeError("USD RuntimeInput requires exact TaskSource/Artifact/USD/Execution/reset contracts")
+        self.artifact.validate()
+        self.runtime_source.validate()
+        self.execution.validate()
+        self.reset_plan.validate()
+        if self.runtime_source.task_artifact is not self.artifact:
+            raise ValueError("USD RuntimeSource must reference the exact TaskArtifact")
+        if (self.runtime_source.scene_source.task_source_identity_sha256
+                != self.task_source.identity_hash
+                or self.runtime_source.scene_source.scene_identity_sha256
+                != self.runtime_source.scene_definition.identity_hash):
+            raise ValueError("USD RuntimeSource must bind the exact TaskSource and Scene")

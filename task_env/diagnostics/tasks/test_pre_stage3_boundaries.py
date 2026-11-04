@@ -361,8 +361,10 @@ def test_selected_source_identity_includes_action_and_artifact_contract_bytes():
         expected = hashlib.sha256((root / relative).read_bytes()).hexdigest()
         assert pick_files[relative] == expected
         assert nut_files[relative] == expected
-    relative = 'task_env/tasks/guarded_transition.py'
-    assert nut_files[relative] == hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    relative = 'task_env/planners/completion.py'
+    expected = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    assert nut_files[relative] == expected
+    assert pick_files[relative] == expected
 
 
 def test_artifact_digest_detects_low_level_frozen_field_tampering():

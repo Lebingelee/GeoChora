@@ -154,7 +154,7 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
              'artifact': _artifact(), 'construction_id': 'f06', 'recipe_identity': 'a' * 64,
              'controller': SimpleNamespace(identity='b' * 64),
              'solution_identity': 'c' * 64, 'source_revision': 'commit',
-             'source_sha256': {'task_env/tasks/pick_cube/isaac.py': 'd' * 64},
+             'source_sha256': {'task_env/runtime/sessions/source.py': 'd' * 64},
              'source': SimpleNamespace(
                  scene_source=SimpleNamespace(source_id='f06-source'),
                  source_closure_digest='e' * 64,

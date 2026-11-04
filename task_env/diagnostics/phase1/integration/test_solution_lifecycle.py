@@ -3,8 +3,8 @@
 import copy
 
 import numpy as np
-from task_env.tasks.canonical_solution_lifecycle import (
-    CanonicalSolutionLifecycle,
+from task_env.tasks.nut_assembly.solution import (
+    NutAssemblySolutionLifecycle as CanonicalSolutionLifecycle,
     SolutionCompletionPolicy,
 )
 

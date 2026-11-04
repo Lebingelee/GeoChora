@@ -2,7 +2,7 @@
 
 import pytest
 
-from task_env.tasks.pick_cube.isaac import compile_pickcube_isaac_task_artifact
+from task_env.tasks.pick_cube.specialization import compile_pickcube_isaac_task_artifact
 from task_env.tasks.pick_cube.task import _configuration, build_artifact
 
 
@@ -10,9 +10,9 @@ def test_session_admission_dispatch_uses_exact_pickcube_runtime_input_type():
     from types import SimpleNamespace
 
     from task_env.runtime.sessions.api import _session_admission_input_route
-    from task_env.tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
 
-    runtime_input = object.__new__(PickCubeIsaacRuntimeInputV1)
+    runtime_input = object.__new__(UsdRuntimeInputV1)
     assert _session_admission_input_route(runtime_input) == 'f06_pickcube'
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(SimpleNamespace())
@@ -446,3 +446,47 @@ def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
             'native-advance-receipt-v1', 1, 1, 0.002,
             native_adaptation_application=non_finite_projection,
         ).validate(1, 0.002)
+
+
+def test_f06_runtime_admission_keeps_exact_delivery_and_task_bindings(monkeypatch):
+    """Exercise F06-specific rejection independently of native/USD loading."""
+    from types import SimpleNamespace as NS
+    from task_env.runtime.sessions import api
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
+
+    monkeypatch.setattr(api, '_validate_exact_admission_binding', lambda *args: None)
+    joints = {**{f'panda-v1/joint{i}': f'joint{i}' for i in range(1, 8)},
+              'panda-v1/finger_joint1': 'finger_joint1', 'panda-v1/finger_joint2': 'finger_joint2'}
+    delivery = NS(manifest_bytes_sha256=api._F06_DELIVERY_MANIFEST_SHA256_V1,
+                  delivery=NS(representation_id=api._F06_REPRESENTATION_V1),
+                  locally_validated=True, source_verified=False)
+    representation = NS(provider='isaacsim', provider_build_identity='isaacsim-6.2.0.0',
+                        representation_format='usd', runtime_admitted=False, source_verified=False)
+    scene = NS(loaded_delivery=delivery, representation=representation,
+               locally_validated=True, source_verified=False)
+    source = NS(scene_source=scene, joints=joints, joint_targets=joints,
+                bodies={'panda-v1/base': '/F06Scene/panda/Geometry/link0', 'cube-v1': '/F06Scene/cube_v1'},
+                frames={'panda-v1/ee': '/F06Scene/panda/Geometry/link0/link1/link2/link3/link4/link5/link6/link7/hand/ee',
+                        'tabletop-v1/top': '/F06Scene/tabletop_v1/top'},
+                free_joints={'cube-v1': '/F06Scene/cube_v1'})
+    execution = NS(physics_provider='isaacsim', physics_backend='cuda', physics_device='cuda:0',
+                   physics_profile=api.F06_PICKCUBE_ISAAC_PROFILE, provider_seed=31,
+                   determinism_mode='best_effort', render_default=NS(provider='none'), camera_overrides=())
+    value = object.__new__(UsdRuntimeInputV1)
+    for name, item in dict(schema_version='pick-cube-isaac-runtime-input-v1', runtime_source=source,
+                           execution=execution, reset_plan=NS(reset_sample=NS(task_seed=31)),
+                           controller_profile='r3_continuous_v1', horizon=1000,
+                           delivery_manifest_sha256=delivery.manifest_bytes_sha256).items():
+        object.__setattr__(value, name, item)
+    api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    object.__setattr__(value, 'horizon', 1001)
+    with pytest.raises(ValueError, match='frozen R3'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    object.__setattr__(value, 'horizon', 1000)
+    delivery.manifest_bytes_sha256 = '0' * 64
+    with pytest.raises(ValueError, match='exact locally validated'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    delivery.manifest_bytes_sha256 = value.delivery_manifest_sha256
+    source.bodies['cube-v1'] = '/wrong'
+    with pytest.raises(ValueError, match='binding map'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)

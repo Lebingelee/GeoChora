@@ -13,7 +13,7 @@ import numpy as np
 
 CANONICAL_XML_SHA256 = '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
 TRUSTED_SOURCE_MANIFEST = (
-    Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
+    Path(__file__).resolve().parents[2] / 'assembly'
     / 'r05b_trusted_execution_source_manifest.json'
 )
 

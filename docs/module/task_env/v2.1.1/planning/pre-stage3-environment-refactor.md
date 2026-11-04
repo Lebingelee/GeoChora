@@ -1,6 +1,6 @@
 # 阶段3前环境代码重构方案
 
-日期：2026-11-04。状态：**维护要求已补入规划，尚未实施**。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。本轮只更新文档，未修改生产代码、运行pytest或启动native；两个既有保护untracked保留。
+日期：2026-11-04。状态：**维护者确认已人工转交并要求续作；追加任务目录收敛要求已明确，最终输出尚待复审**。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。上述日期与基线用于解释初次审计；当前实施进度见[维护检查点](../maintenance/reviews/pre-stage3-refactor-attempt001.md)，不能把初次审计表当成最新源码状态。两个既有保护untracked保留。
 
 维护者提出：整理tasks、隔离诊断、统一BaseTaskEnv与SelectedReferenceEnv，减少冗余诊断和SHA开销，并补齐新手安装、路径复用、启动脚本及基于example的二次开发指引。本次先完成单环境规范路线，Pendulum并行适配延期至G06。本项作为阶段3前的独立维护工作，不修改七阶段／22子阶段编号，不重开已接收的阶段2，也不表示阶段3已经启动。实施要求和验收以本仓库开发文档为准，GPT工作文档只作交接入口。
 
@@ -35,6 +35,37 @@
 | `diagnostics/` | 明确opt-in的实验入口、方法包装、对照分析、说明文档 | 只为某轮排查新增的构造参数／任务名字判断／特殊探针 |
 
 `position_candidate`不能整包当作诊断删除：当前RuntimeSession、CLI和benchmark仍消费其中的输入与构建逻辑。应按实际消费者分成共享表示／正式运行能力／实验入口，分别归入已有artifacts、runtime及diagnostics owner，并保留必要旧导出。不能把runtime对tasks的依赖简单替换成对diagnostics的依赖。
+
+### 2.1 共享任务支持文件的明确归类
+
+维护者在2026-11-04追加要求：减少阅读与二次开发层次。`tasks/guarded_transition.py`、`tasks/canonical_solution_lifecycle.py`、`tasks/declarative_reference.py`必须按通用功能、任务特定功能和诊断功能拆分归位，不能只凭已有生产引用保留现状，也不能整包当作诊断删除。
+
+| 原文件（范围决定时） | 通用职责去向 | 任务特定职责及移除要求 |
+| --- | --- | --- |
+| `guarded_transition.py` | 必需的连续时间／样本连续性／截止判断，复用现有planner／completion或时间owner | Nut的阶段名、关爪／抓取条件、优先级与阈值回到Nut的Solution和config，接线归specialization；移除tasks根目录原实现 |
+| `canonical_solution_lifecycle.py` | Solution通用完成／失败结果优先归既有planners完成支持；Env生命周期仍由environment拥有 | Nut专属终段策略／流程归Solution与config；诊断事件展示归diagnostics；移除tasks根目录原实现，不增加第二Env状态机 |
+| `declarative_reference.py` | 声明／source编译归assembly，必要规范Env接线归environment | 具体PandaBox声明／reset／评价留任务或example；取消DeclaredPandaBoxEnv专用中间模板并移除原模块 |
+
+示例和新手教程统一通过`task_env.make_env(uid, config=...)`创建环境，移除`make_marker_env()`额外包装；不新增其他`make_<task>_env`或替代专用模板。Marker可保留必要任务声明和正常注册，使用既有Core组件完成最短组合。
+
+抽取通用功能必须有实际稳定职责，不能为未来可能复用制造新抽象。不得只把三个文件完整换目录或将所有旧逻辑塞进specialization来充数。正式反馈／任务与Expert完成区别／时钟和错源检查继续保留，诊断专用采样和展示移出默认路径。
+
+### 2.2 PickCube与NutAssembly的任务目录
+
+两个任务各自只有四个业务文件，职责为：
+
+| 文件 | 应保留内容 |
+| --- | --- |
+| `task.py` | UID／声明、reset规则、任务评价和成功／失败语义、必要注册 |
+| `specialization.py` | task与既有Core、资产／source、Controller及执行配置的绑定 |
+| `solution.py` | 任务动作规划、阶段推进、特定条件和完成策略 |
+| `config.yaml` | 任务默认配置与阈值；重构保持原数值语义 |
+
+若Python包导出确需`__init__.py`，仅保留最薄必要导出，不容纳业务、构造或诊断逻辑。不得再增加task内lifecycle／guard／candidate／diagnostic等实现文件。通用模块与诊断按各自owner维护。
+
+当前额外的PickCube `isaac.py`须拆分到既有assembly／runtime通用能力和任务specialization；同步runtime/native IO/tests的引用，消除通用runtime对task专用实现文件的反向依赖。Nut的trusted execution source manifest迁到既有资产／source元数据owner，保持原始内容、来源与校验并更新读取路径。冻结历史／raw原件不改写。
+
+复审逐项核对功能去向、调用者／checkpoint／source provenance迁移、两个最终目录及当前task_env/doc与examples；不能只凭目录行数或新增说明认定完成。
 
 ## 三、统一环境类的完成标准
 
@@ -93,7 +124,7 @@
 - Core声明`mujoco>=3.8.1,<3.9.0`，当前GeoPhys声明`mujoco>=3.15.0`，无交集。安装说明必须说明现有依赖冲突和已核实的准备方式；不能承诺两组依赖直接混装。修改公共依赖／pin仍归明确的依赖实施范围，不能借写指南任意升级。
 - 仓库没有root packaging metadata，不写`pip install -e .`。SDK和资产缺失时给出配置方法，不自动下载、修改依赖、切换旧源码或静默换provider。
 
-二次开发按“选一个已有闭环example→理解task声明／组装／reset／评价／Solution→修改自己的task→经公开Env验证”展开；优先引用`examples/tasks/declared_marker.py`等实际入口。排查说明指向专用diagnostics工作区，禁止把为一次排查增加Core探针作为开发教程。并行章节明确尚未适配，Pendulum新手路线默认单环境。
+二次开发按“选一个已有闭环example→理解task声明／组装／reset／评价／Solution→修改自己的task→经统一make_env验证”展开；同步改写`examples/tasks/declared_marker.py`，移除make_marker_env包装和DeclaredPandaBoxEnv专用模板，教程不能继续推荐旧中间层。排查说明指向专用diagnostics工作区，禁止把为一次排查增加Core探针作为开发教程。并行章节明确尚未适配，Pendulum新手路线默认单环境。
 
 ## 七、实施顺序与验证边界
 
@@ -113,4 +144,4 @@
 - 不可变输入语义hash一致；动态输入变化、错误回执、篡改和过期边界仍被拒绝。用诊断侧调用次数／文件读取统计证明减少重复计算，不先许诺吞吐百分比。
 - 在实施包另行冻结预算后，保留必要的MuJoCo PickCube31和Nut19代表回归，以及迁移旧任务的短检查；不重复根因研究、不跑三后端九格，不追修seed32或GPU驱动。
 
-当前只形成方案，尚未派发重构执行包；native和测试预算为0。实施前再冻结实际HEAD、允许路径、必要运行预算和回归基线，继续维护者手动转发／Sol主审流程。阶段3仍未开始。
+原维护包V211_PRE_STAGE3_REFACTOR_attempt001已由维护者转发Terra执行，尚未Sol接收。维护者确认已人工转交并要求按当前目标续作；追加目录收敛要求与原包未完项一并落实，原冻结prompt不覆写。本页不新增运行预算。继续维护者手动转发／Sol主审流程，阶段3仍未开始。

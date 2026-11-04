@@ -24,7 +24,7 @@ from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, NativeControlFeedbackSampleV1,
 )
 from ...controllers.canonical.contracts import MixedActuatorCommandV1
-from .source import RuntimeSource, UsdRuntimeSourceV1
+from .source import RuntimeSource, UsdRuntimeSourceV1, UsdRuntimeInputV1
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
@@ -34,6 +34,8 @@ F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
+_F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
+_F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -366,17 +368,54 @@ def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source)
 
 def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) -> None:
     """Admit the exact locally validated PickCube desktop USD F06 input."""
-    from ...tasks.pick_cube.isaac import (
-        ISAAC_PROFILE_V1, PickCubeIsaacRuntimeInputV1,
-    )
-
-    if type(input_v1) is not PickCubeIsaacRuntimeInputV1:
+    if type(input_v1) is not UsdRuntimeInputV1:
         raise TypeError('F06 Isaac materialization requires its exact PickCube RuntimeInputV1')
     _validate_exact_admission_binding(input_v1, artifact, execution, source,
                                       'F06 materialization differs from its exact Task/Scene/Execution identities')
+    if input_v1.schema_version != 'pick-cube-isaac-runtime-input-v1':
+        raise ValueError('unsupported PickCube Isaac RuntimeInput schema')
+    delivery = input_v1.runtime_source.scene_source.loaded_delivery
+    if (delivery.manifest_bytes_sha256 != input_v1.delivery_manifest_sha256
+            or input_v1.delivery_manifest_sha256 != _F06_DELIVERY_MANIFEST_SHA256_V1
+            or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
+            or not delivery.locally_validated or delivery.source_verified):
+        raise ValueError("F06 requires its exact locally validated, non-upstream Isaac desktop USD")
+    expected_joints = {
+        **{f"panda-v1/joint{index}": f"joint{index}" for index in range(1, 8)},
+        "panda-v1/finger_joint1": "finger_joint1",
+        "panda-v1/finger_joint2": "finger_joint2",
+    }
+    if (dict(input_v1.runtime_source.joints) != expected_joints
+            or dict(input_v1.runtime_source.joint_targets) != expected_joints
+            or dict(input_v1.runtime_source.bodies) != {
+                "panda-v1/base": "/F06Scene/panda/Geometry/link0",
+                "cube-v1": "/F06Scene/cube_v1",
+            }
+            or dict(input_v1.runtime_source.frames) != {
+                "panda-v1/ee": (
+                    "/F06Scene/panda/Geometry/link0/link1/link2/link3/link4/"
+                    "link5/link6/link7/hand/ee"
+                ),
+                "tabletop-v1/top": "/F06Scene/tabletop_v1/top",
+            }
+            or dict(input_v1.runtime_source.free_joints) != {
+                "cube-v1": "/F06Scene/cube_v1",
+            }):
+        raise ValueError("F06 RuntimeSource differs from its exact Panda/PickCube USD binding map")
+    if (input_v1.controller_profile != "r3_continuous_v1"
+            or type(input_v1.horizon) is not int or not 1 <= input_v1.horizon <= 1000):
+        raise ValueError("F06 PickCube Isaac requires frozen R3 and at most 1000 control ticks")
+    if (input_v1.execution.physics_provider, input_v1.execution.physics_backend,
+            input_v1.execution.physics_profile, input_v1.execution.physics_device,
+            input_v1.execution.provider_seed, input_v1.execution.determinism_mode) != (
+            "isaacsim", "cuda", F06_PICKCUBE_ISAAC_PROFILE, "cuda:0",
+            input_v1.reset_plan.reset_sample.task_seed, "best_effort"):
+        raise ValueError("F06 ExecutionSpec differs from its frozen Isaac provider/seed profile")
+
+
     if (execution.physics_provider, execution.physics_backend, execution.physics_device,
             execution.physics_profile, execution.determinism_mode) != (
-            'isaacsim', 'cuda', 'cuda:0', ISAAC_PROFILE_V1, 'best_effort'):
+            'isaacsim', 'cuda', 'cuda:0', F06_PICKCUBE_ISAAC_PROFILE, 'best_effort'):
         raise ValueError('unsupported F06 PickCube Isaac CUDA/PhysX execution intersection')
     representation = source.scene_source.representation
     if (representation.provider, representation.provider_build_identity,
@@ -417,7 +456,6 @@ def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
 
 def _f06_pickcube_isaac_capability_manifest(artifact):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
-    from ...tasks.pick_cube.isaac import ISAAC_PROFILE_V1
 
     names = sorted(set(artifact.required_capabilities.names) | {
         'articulated_robot', 'joint_position_actuation', 'joint_state_query',
@@ -425,7 +463,7 @@ def _f06_pickcube_isaac_capability_manifest(artifact):
     })
     return ProviderCapabilityManifest(
         'provider-capability-v0', 'isaacsim', '6.2.0.0',
-        'f06-pickcube-desktop-native-mimic-v1', 'cuda', ISAAC_PROFILE_V1,
+        'f06-pickcube-desktop-native-mimic-v1', 'cuda', F06_PICKCUBE_ISAAC_PROFILE,
         'none', 'best_effort',
         tuple(CapabilityClaim(name, 'implemented', 'F06-exact-PickCube-desktop-source-bound-cell')
               for name in names),
@@ -501,9 +539,7 @@ def _session_admission_input_route(input_v1) -> str | None:
     for input_type, route in routes:
         if type(input_v1) is input_type:
             return route
-    from ...tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
-
-    if type(input_v1) is PickCubeIsaacRuntimeInputV1:
+    if type(input_v1) is UsdRuntimeInputV1:
         return 'f06_pickcube'
     raise TypeError('Session admission requires one exact supported task runtime input')
 
@@ -564,7 +600,7 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
         raise ValueError('R05b admission requires the versioned immutable execution source receipt')
     receipt.validate_snapshot()
     trusted_path = (
-        Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
+        Path(__file__).resolve().parents[2] / 'assembly'
         / 'r05b_trusted_execution_source_manifest.json'
     )
     trusted = json.loads(trusted_path.read_text(encoding='utf-8'))

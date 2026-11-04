@@ -1703,11 +1703,12 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                 or dg04_native_input.runtime_source is not source):
             raise ValueError('DG04 Isaac adapter candidate differs from the exact artifact/execution/source')
     if f06_pickcube:
-        from ...tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+        from .source import UsdRuntimeInputV1
+        from .api import _validate_f06_pickcube_isaac_input
 
-        if type(f06_pickcube_input) is not PickCubeIsaacRuntimeInputV1:
+        if type(f06_pickcube_input) is not UsdRuntimeInputV1:
             raise TypeError('F06 Isaac adapter requires exact PickCubeIsaacRuntimeInputV1')
-        f06_pickcube_input.validate()
+        _validate_f06_pickcube_isaac_input(f06_pickcube_input, artifact, execution, source)
         if (f06_pickcube_input.artifact is not artifact
                 or f06_pickcube_input.execution.identity_hash != execution.identity_hash
                 or f06_pickcube_input.runtime_source is not source):
