@@ -6,6 +6,12 @@
 
 MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次独立运行均成功；PickCube seed32 在 1000 个控制 tick 后仍未达到 lift predicate。GeoPhys 已定位到 PickCube Solution 的 stale execution time guard；Isaac delivery closure 匹配，但当前 GPU gate 不稳定且没有 native run。原2b在用户暂停时G5未完成；之后由独立2c包整理历史和成功参考，旧G2/G3/G5结果不变。2c文档封存经[Sol主审](../maintenance/reviews/20261104_2c_sol_review.md)有界接收，G02收尾并停在阶段2；阶段3未开始。详见[2b中止记录](../maintenance/reviews/20261104_2b_closeout.md)和[2c参考冻结页](../maintenance/reviews/20261104_2c_reference_freeze.md)。
 
+## 阶段3前维护项
+
+维护者要求先完成[环境重构与新手交付](pre-stage3-environment-refactor.md)：归整tasks、隔离诊断、统一Env与旧别名、优化静态摘要，并同步README、`task_env/doc`、本版指南及轻量启动入口。新手流程区分新克隆安装与复用既有安装，包含基于example的二次开发；详见[指南清单](../guides/README.md)。
+
+本次先迁移Pendulum等任务的单环境规范路线，并行适配留G06；不将其作为本项验收门。维护项仍待实施／派包，不增加第23个子阶段，不重开G02或提前启动G03/G06，不改变下表的七阶段出口。
+
 ## 顺序与最小出口
 
 默认按表逐项推进；依赖列描述技术前置。必要的协议跨页审阅不另算子阶段。

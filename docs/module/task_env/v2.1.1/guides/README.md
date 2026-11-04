@@ -2,7 +2,23 @@
 
 当前阶段尚无本版可运行 quickstart；安装和现有命令参照 [v2.1.0 installation](../../v2.1.0/guides/installation.md)及[quickstart](../../v2.1.0/guides/quickstart.md)，不从本目录推断 selected RGB 已接通。仓库当前无 root packaging metadata，不使用 `pip install -e .`。
 
-## 实现后必须提供的操作路线
+## 阶段3前必须补齐的新手路线
+
+本节属于[阶段3前维护要求](../planning/pre-stage3-environment-refactor.md)，随环境重构交付，不等到阶段7。以下仍为待实施清单，不能当作已有安装脚本或已验证命令。
+
+| 路线 | 必须说明与交付 |
+| --- | --- |
+| 新克隆后安装 | 从仓库／submodule准备开始，列出所选路线的Python环境、simulator、renderer及资产需求、安装来源与兼容版本；给出最小单环境启动步骤 |
+| 复用已有安装 | 明确解释器、SDK根、renderer根、资产／manifest及Core／GeoPhys源码路径如何传入；支持checkout外安装，不依赖复制ignored目录 |
+| 启动脚本 | 转调既有examples／公开factory，显式选择provider／backend及可选renderer；复用现有bootstrap和路径配置，错误指出缺哪项，不自动安装或换路线 |
+| 基于example开发 | 从已存在的声明式任务example出发，解释UID、资产组合、reset、观测／评价与Solution的修改位置，按规范Env完成reset／step／close与结果检查 |
+| 诊断与边界 | 诊断脚本和说明放专用目录，通过正式接口引用模块；说明当前不支持的组合和Pendulum单环境范围，不教用户向Core添加专用探针 |
+
+安装／路径表分别覆盖MuJoCo、GeoPhys、Isaac及rasterizer／Flora；区分所选路线必需项与可选渲染项。其他provider仅标明现有状态与来源，不扩大为本次必须安装的范围。ISAAC解释器不得固定为某一worktree内部路径；Flora复用已有`FLORA_ROOT`／`runtime_root`。Core与GeoPhys的MuJoCo声明区间冲突必须明确说明，不能给出未经核实的混装指令。具体当前缺口见维护方案。
+
+交付导航同时落在根README、`task_env/README.md`及`task_env/doc/index.md`，更新新手与自定义任务指南中的旧构造示例。安装细节以本版指南为权威，其他入口链接它。验收同时检查新安装与外部安装路径的说明、脚本参数、错误提示和真实调用入口；未运行的步骤明确标注，不将文档检查算作native成功。当前不宣称统一Env并行已适配，Pendulum首先提供单环境流程。
+
+## 阶段3–6实现后必须提供的操作路线
 
 1. 查询某任务／资产的能力和拒绝原因，选择三个首批 physics 路线之一，查看解析配置。
 2. state-only 构建、reset、step、记录和 close，独立读回同次运行；不要求安装 renderer 才能使用 state-only。
@@ -18,4 +34,4 @@
 
 能力未实现、依赖不可用、资产不可表达、数值／reset 检查失败、缺少 Controller feedback、原生构建失败、图像过期／采样失败、固定 obs 不兼容、worker 故障及资源回收。给出失败阶段和下一行动；不能建议读取私有状态或关闭必要检查。
 
-示例和指南随阶段 3–6 的真实实现添加，7a/7c 检查调用者可用性。本次只有交付要求，没有运行示例、训练或仿真结果。
+新增后端／切换／控制／render／batch示例随阶段3–6的真实实现添加，7a/7c检查调用者可用性；不据此延期前述新手基础交付。本页当前只有交付要求，没有新增运行示例、训练或仿真结果。

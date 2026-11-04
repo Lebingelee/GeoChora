@@ -240,7 +240,9 @@ PickCube/NutAssembly 使用共享 R3 arm/execution wrapper 与 planner profile�
 
 ## 阶段3前环境代码重构建议
 
-维护者提出先整理tasks、隔离诊断、统一BaseTaskEnv／SelectedReferenceEnv并减少冗余SHA开销。基线2fb903aa上的源码审计与目标职责见[重构讨论稿](pre-stage3-environment-refactor.md)。该项尚未实施／派包，不改变阶段2冻结参考，不表示阶段3已启动。
+维护者提出先整理tasks、隔离诊断、统一BaseTaskEnv／SelectedReferenceEnv并减少冗余SHA开销；另补充新克隆安装、复用外部安装、启动脚本和基于example二次开发的指引。要求同时落在README、`task_env/doc`和本版开发文档。初次源码审计及3dd27bd1上的新手／并行入口补充核对见[维护方案](pre-stage3-environment-refactor.md)与[指南交付清单](../guides/README.md)。
+
+本次先完成旧任务单环境迁移，Pendulum并行适配留G06。上文列出的既有注册、factory和batch owner只是源码／历史事实，不表示新统一路线已适配；不以单slot示例宣称并行。该维护项尚未实施／派包，不改变阶段2冻结参考，不表示阶段3或阶段6已启动。
 
 ## 当前协议基线与后继实施
 

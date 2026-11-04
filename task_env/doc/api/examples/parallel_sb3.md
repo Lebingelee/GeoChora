@@ -1,5 +1,7 @@
 # Parallel environment and SB3 boundary
 
+The commands below describe the existing route before v2.1.1 environment unification. Parallel adaptation of the unified Env is pending and is deferred to stage 6; the pre-stage-3 Pendulum work covers a single environment. Retained registrations, scripts, or old smoke results do not establish support on the unified route. See the [maintenance scope](../../../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md).
+
 The current generic learning example is Pendulum on the registered
 `merged_scene` batch route. The root example delegates the training loop to
 the existing runner; it fixes a small CPU configuration and requires a fresh

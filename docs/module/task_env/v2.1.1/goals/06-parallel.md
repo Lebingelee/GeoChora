@@ -2,6 +2,12 @@
 
 规划标识：`V211_G06_PARALLEL`。3 个子阶段；复用既有 batch runtime、vector 调用、parallel render 和 Recorder。由[数据协议](../contracts/lifecycle-and-data.md)规定身份与时序，不为 batch 新建第二套任务生命周期。
 
+## 当前边界与阶段3前维护的衔接
+
+维护者已明确：统一环境路线的并行适配尚未完成，阶段3前重构先完成Pendulum等旧任务的单环境迁移。现存并行注册、factory、脚本及历史证据保留，但不能证明统一路线已适配；`num_env=1`也不构成多环境验证。未适配的并行调用须明确声明或拒绝，不静默降级。
+
+G06承接Pendulum及其他受影响旧vector caller的适配和真实多环境验证。上述延期不改变下列6a–6c依赖、至少两个后端及至少一条native batch的目标，也不表示G06已启动。参见[阶段3前维护方案](../planning/pre-stage3-environment-refactor.md)。
+
 <a id="6a"></a>
 ## 6a：批量契约接通
 
