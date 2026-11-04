@@ -1,6 +1,6 @@
 # v2.1.1 API 与迁移入口
 
-状态：设计目标，尚无本版实现。当前可调用 API 以 [v2.1.0 来源版本](../../v2.1.0/api/public-api.md)、当前源码及其有界矩阵为准。此页不提供尚未实现的函数参数示例。
+状态：阶段3前维护正在实施。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。旧 `BaseTaskEnv` 和三个 classic-control 任务尚未统一迁移。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。
 
 ## 需形成的公共体验
 

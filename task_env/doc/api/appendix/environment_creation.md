@@ -20,7 +20,7 @@
 
 **Kind**：function / registry object；**Stability**：Public API；**Defined in**：`registry.py`
 
-`make_env(uid: str, config=None) -> TaskEnvironmentComponent`，`make_agent`、`make_object`、`make_scene` 分别创建对应组件。`ENV_REGISTRY`、`AGENT_REGISTRY`、`OBJECT_REGISTRY`、`SCENE_REGISTRY` 是公开 registry 实例。未知 UID 的行为以 `ComponentRegistry.get()` 的 `KeyError` 为准。
+`make_env(uid: str, *, config=None, render_mode=None, **kwargs) -> TaskEnvironmentComponent`；`make_agent`、`make_object`、`make_scene` 分别创建对应组件。`ENV_REGISTRY`、`AGENT_REGISTRY`、`OBJECT_REGISTRY`、`SCENE_REGISTRY` 是 registry 实例。未知 UID 抛 `KeyError`；已退休的 PickCube、NutAssembly 和 Go2 旧 UID 抛带迁移提示的 `ValueError`。selected 与 classic-control 当前使用不同的配置解析和生命周期，详见 [API 入口](../index.md)。
 
 最小用户调用顺序如下；配置只使用声明的公共 section，task topology 与 task-owned reward 不从脚本侧重写：
 
@@ -42,7 +42,7 @@ finally:
 ## Optional homogeneous parallel factory
 
 `from task_env import make_parallel_env` 的 `make_parallel_env(uid, env_config=None, num_env=1, backend="cuda", execution="remote")` 是可选的并行入口。
-它只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
+这是旧并行路线，统一 Env 尚未适配；登记本身不是当前多环境运行证据。它只为通过 `@register_parallel_env()` 显式登记 framework batch capability 的任务创建同构 batch；没有 batch backend 的
 task 会明确抛出 `task uid has no homogeneous parallel backend`，不会退化为 `num_env` 个 single env。
 
 `execution="local"` 返回同进程 raw vector/SB3 adapter，适合契约 smoke；`execution="remote"` 使用
@@ -68,7 +68,7 @@ runtime；具体依赖在真正选择 local/remote parallel execution 后才导�
 The current selected manipulation UIDs are `pick-cube-p16-reference-v1` and
 `nut-assembly-outcome-reference-v1`. Construct both through
 `from task_env import make_env` with an explicit `provider`, `backend="cpu"`,
-and bounded `horizon`. They admit the current scalar CPU GeoPhys/MuJoCo
+and bounded `horizon`, using the selected `execution` and `episode` configuration sections. They admit the current scalar CPU GeoPhys/MuJoCo
 intersection. NutAssembly requires `step_expert()`; it rejects unguarded
 external actions. The root [developer examples](../../../../examples/README.md)
 show task execution and canonical H5 recording without introducing another

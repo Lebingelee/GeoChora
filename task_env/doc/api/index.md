@@ -2,7 +2,7 @@
 
 当前模块使用与能力治理入口：[TaskEnv canonical docs](../../../docs/module/task_env/README.md)。符号级细节继续在 API reference 维护。
 
-本文记录 TaskEnv 的稳定公开入口和数据契约。快速运行请看 [README Quickstart](../../README.md)；训练、采集、任务和资产开发入口见 [文档入口](../index.md)。
+本文导航当前调用入口；可 import 或登记并不单独构成稳定 API 或端到端能力承诺。快速运行请看 [README Quickstart](../../README.md)；训练、采集、任务和资产开发入口见 [文档入口](../index.md)。
 
 ## 公开数据流
 
@@ -27,10 +27,10 @@ optional SB3/RSL-RL learner or H5 recorder
 | 领域 | 入口 | 说明 |
 | --- | --- | --- |
 | 单环境 | task_env.make_env | 创建 Gymnasium 风格环境 |
-| 并行环境 | task_env.make_parallel_env | 创建同构 local/remote batch 环境 |
+| 旧并行环境 | task_env.make_parallel_env | 已登记路线的独立入口；统一 Env 并行尚未适配，不能由登记推断运行支持 |
 | 单环境 registry | task_env.ENV_REGISTRY | 查询 UID 和 component |
 | 并行 registry | task_env.PARALLEL_ENV_REGISTRY | 查询已声明的并行能力 |
-| 配置 | task_env.resolve_env_config | 校验并冻结 public config |
+| 配置构造 | task_env.resolve_env_config | 使用 task_uid、scene_uid 等关键字构造配置；并非任意配置字典的统一解析器 |
 | 记录 | task_env.script.trajectory.record / TransitionRecordWrapper | 保存公开 transition/H5 |
 | SB3 | task_env.utils.SB3FlattenVecWrapper | 在 learner 边界 flatten tree |
 | RSL-RL | task_env.script.rl.rsl_ppo | 统一 PPO 训练 CLI |
@@ -42,7 +42,7 @@ optional SB3/RSL-RL learner or H5 recorder
 - [Planning index](planning/index.md)：public motion primitives 和 task-owned solution。
 - [Recording index](recording/index.md)：wrapper、trajectory lifecycle 和 H5 schema。
 
-单环境路径从 make_env 进入 BaseTaskEnv；并行路径从 PARALLEL_ENV_REGISTRY 进入 task-owned parallel capability，再由 vectorization 负责 batch lifecycle、masked reset、local/remote 和 SB3 protocol。并行不会静默退化为多个单环境。
+单环境通过 `make_env(uid, *, config=None, render_mode=None, **kwargs)` 创建。PickCube 和 NutAssembly 的 selected 实现现由 `task_env.environment.reference_env.SelectedReferenceEnv` 拥有，旧 `task_env.tasks.reference_env` 路径兼容；Empty、Pendulum 和 TwoWheel 仍使用独立 `BaseTaskEnv`，统一迁移尚未完成。selected 目前不接受 render mode，classic-control 的有效 render 路线独立于此。旧并行入口和 registry 保留；登记、历史运行或单 slot 示例不证明新统一 Env 支持 batch。
 
 ## 内置任务
 
@@ -56,7 +56,7 @@ pick-cube-p16-reference-v1
 two-wheel-balance-v1
 ~~~
 
-其中 Pendulum 和 TwoWheel 已声明并行能力；PickCube、NutAssembly 等没有 parallel capability 的任务继续通过单环境入口使用。旧 Go2 UID 已显式退休，不映射到其他 task。
+Pendulum 和 TwoWheel 的旧并行能力有登记，当前维护项只验收单环境。PickCube 和 NutAssembly 使用 selected 单环境入口；旧 `pick-cube-v1`、`nut-assembly-square-v1` 及 Go2 UID 在当前 factory 明确退休，不映射到其他 task。
 
 ## Appendix
 
