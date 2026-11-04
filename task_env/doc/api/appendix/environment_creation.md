@@ -69,10 +69,9 @@ The current selected manipulation UIDs are `pick-cube-p16-reference-v1` and
 `nut-assembly-outcome-reference-v1`. Construct both through
 `from task_env import make_env` with an explicit `provider`, `backend="cpu"`,
 and bounded `horizon`, using the selected `execution` and `episode` configuration sections. They admit the current scalar CPU GeoPhys/MuJoCo
-intersection. The retained NutAssembly example uses the guarded compatibility
-`step_expert()` route; it rejects unguarded ordinary external actions. A bounded
-caller-owned Solution route also exists, but does not establish the standard
-external `act → step(action)` separation. The root [developer examples](../../../../examples/README.md)
+intersection. The NutAssembly example uses caller-owned `act → step(action) → observe`;
+the source-bound action includes the required control request and unguarded
+ordinary arrays remain rejected. The root [developer examples](../../../../examples/README.md)
 show task execution and canonical H5 recording without introducing another
 environment or recording API.
 

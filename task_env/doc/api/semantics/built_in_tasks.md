@@ -27,10 +27,10 @@ no policy-checkpoint inference or new P1.6 qualification is implied.
 Public construction uses `make_env("nut-assembly-outcome-reference-v1",
 config=...)`. The registered class is `NutAssemblyReferenceEnv` in
 `nut_assembly/task.py`; the task owns one selected guarded expert and
-Outcome Completion V1. The ordinary example uses retained compatibility
-`step_expert()`, which is not the standard Env API; the bounded caller-owned
-Solution route has separate validation and must not be confused with
-unrestricted external action stepping or the intended external `act → step` loop.
+Outcome Completion V1. The ordinary example uses a caller-owned Solution and
+`act → step(action) → observe`, with a source-bound action and five native
+feedback samples. Arbitrary unguarded arrays remain unsupported; full physical
+success on this new route has not yet been verified.
 
 Its canonical artifact remains
 `nut-assembly-square-v1/p1_8_e/nominal-v1` with identity

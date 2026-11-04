@@ -31,11 +31,9 @@ does not apply the CPU process `RLIMIT_AS` option. Genesis/SAPIEN Harness
 commands write `NOT_RUN_DEPENDENCY` without starting a worker when their engine
 module is absent, and report `UNSUPPORTED_CAPABILITY` when the Core provider
 manifest is unavailable. Use fresh output directories. NutAssembly selects
-`nut-assembly-outcome-reference-v1`; this example advances through the guarded
-`step_expert()` compatibility path. That method is not the target standard Env
-API: the intended design has an external Solution produce actions for
-`env.step(action)`. Some bounded caller-owned Solution routes also exist;
-they are not unrestricted ordinary action stepping. Both examples report task success separately from expert completion.
+`nut-assembly-outcome-reference-v1`; this example owns the Solution and calls
+`act()`, `env.step(action)`, then `observe()`. The action carries the required
+source boundary and controller request; arbitrary arrays are not admitted. Both examples report task success separately from expert completion.
 NutAssembly must complete its planned stages and retreat to return success; a
 short horizon is an incomplete run and exits nonzero.
 
@@ -62,7 +60,7 @@ in the [current TaskEnv public API](../docs/module/task_env/v2.1.0/api/public-ap
 | F06 built-in Harness, GeoPhys CPU | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider geophys --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --harness-output-dir workspace/examples/pick_cube/harness-geophys-seed31-run01` | Same Core task owner and R3 profile; runtime validity and task outcome are reported separately. |
 | F06 PickCube on Isaac Sim | `OMNI_KIT_ACCEPT_EULA=YES PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --execution harness --seed 31 --horizon 1000 --controller-profile r3_continuous_v1 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json --harness-output-dir workspace/examples/pick_cube/harness-isaac-seed31-run01` | After accepting the NVIDIA Omniverse EULA, passes the non-interactive acceptance setting to the supervised CUDA PhysX worker; task outcome remains separate from runtime evidence. |
 | Optional Genesis/SAPIEN preflight | Same command with `--provider genesis` or `--provider sapien` and `--execution harness` | Optional only. Missing engine dependency is recorded as `NOT_RUN_DEPENDENCY` without a worker; provider manifest gaps are `UNSUPPORTED_CAPABILITY`. |
-| Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI uses retained `step_expert()` compatibility; incomplete route exits nonzero. Separately, the bounded caller-owned task Solution route invokes that instance through the Env and has MuJoCo CPU S2/S3 plus a diagnostic GeoPhys CPU/CUDA × 100/500 Hz S2/S3 comparison. It is not the target external `act → step(action)` API. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/C_Development_Record.md#c05c). |
+| Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI drives the caller-owned Solution with `act → step(action) → observe`; incomplete route exits nonzero. Its new path has provider-free synthetic checks; full physical success remains unverified. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/v2.0.0/maintenance/validation/phase_ii/C_Development_Record.md#c05c). |
 | Canonical expert recording | `PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 --output workspace/examples/pickcube-mujoco.h5` | Requires a fresh output path; finalizes the existing canonical H5 recorder and checks transitions, T+1 boundaries, provenance, and storage roundtrip. |
 | Offline H5 inspection | `PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/examples/pickcube-mujoco.h5` | Reads the existing canonical schema and validates logical/numeric integrity and T+1 boundaries. It does not replay the task or claim D0. |
 | Generic batch environment smoke | `PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline --env-id pendulum-v1 --backend cpu --num-env 2 --steps 1` | Existing generic `make_parallel_env` Pendulum path; not a task or learner qualification. |

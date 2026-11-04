@@ -7,7 +7,7 @@
 > 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
 > Phase C 的标准方向是外部 Solution 产生 action 并交给 `env.step(action)`；
 > 下方历史 `step_expert()` 用法现仅是迁移前的受限兼容，不是标准 Env API。
-> NutAssembly 另有受限 caller-owned Solution 路线，但不表示普通外部 action 已不受限制。
+> NutAssembly 现有调用方驱动的 `act → step(action) → observe`，只接收带来源边界与控制请求的 `ExpertAction`；裸数组仍受限，完整物理验证待做。
 
 **Import path**：不适用  
 **任务域**：Appendix  
