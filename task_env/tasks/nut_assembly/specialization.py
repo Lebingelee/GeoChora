@@ -324,7 +324,7 @@ def _source_identity_files():
         "task_env/recorders/reference_provenance.py",
         "task_env/recorders/position_metadata.py",
         "task_env/observations/selected_reference.py",
-        "task_env/tasks/canonical_solution_lifecycle.py",
+        "task_env/tasks/canonical_solution_lifecycle.py", "task_env/tasks/guarded_transition.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
         "task_env/planners/cartesian.py", "task_env/planners/contracts.py",
