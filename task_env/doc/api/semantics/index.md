@@ -5,7 +5,7 @@
 **稳定性**：Public API / Extension API  
 **职责**：把同一组物理元素定义为明确任务并运行 Gym lifecycle。  
 **调用者/消费者**：Gym 用户、task implementer、recorder。  
-**源码**：`task_env/environment/env.py`、`tasks/`
+**源码**：`task_env/environment/env.py`、`task_env/environment/reference_env.py`、`tasks/`
 
 - [Task environment](task_environment.md)
 - [Task definition](task_definition.md)
