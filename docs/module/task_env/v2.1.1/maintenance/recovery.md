@@ -23,6 +23,8 @@ attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-
 
 ### 2026-11-05 生命周期续作
 
+后续职责去向、原功能调用者及当前文档处置见[职责与文档清单](reviews/20261105_pre_stage3_owner_and_document_map.md)；该清单是待复审检查点，不表示整体维护已接受。
+
 维护者授权更长的三个单环境修复，提交为 `4840152530e55fb8a3e77517c3b187e99647b5b7`。Sol 已作[独立复审](reviews/20261105_lifecycle_unification_sol_review.md)，决定 `ACCEPTED_BOUNDED_LIFECYCLE_UNIFICATION`：R1 的真实源码迁移与无引擎契约有限接收。四个 `BaseTaskEnv` 出口与 `SelectedReferenceEnv` 为同一类对象，三个组件任务及 selected 路线通过共同 episode owner 执行 reset、step、stop 和 close；组件 RuntimeBoundary 和 selected RuntimeSession 保持各自物理接口。Sol 独立复跑171 passed／3 deselected和12 passed；真实 provider、物理和独立物理 reader 未运行。整体维护仍为 PARTIAL，R2/R3等后续项和阶段3均未获本次整体验收。原[Terra 交付记录](reviews/20261105_lifecycle_unification_terra.md)及历史30分钟结果保留。
 
 2026-11-05后续goal在上述复审之后继续实施，至 `f37dec92` 的源码与文档检查点均待Sol复审：Marker公共组装、F06受信声明、部分task／recorder职责、Nut cadence诊断隔离和R05b源码身份准入均有实现。PickCube普通CPU、Position/F06、内建与通用candidate的调用方动作接线已迁移；Position/F06新路线仅有合成证据，真实Isaac未运行。通用candidate合成oracle预检因两份保护untracked触发clean-check，尚未通过。完整记录及失败边界见[续作检查点](reviews/20261105_pre_stage3_continuation.md)。
