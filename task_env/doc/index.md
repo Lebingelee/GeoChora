@@ -4,17 +4,17 @@
 
 从[安装与启动指南](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)选择新克隆或已有安装路径，并查看解释器、simulator／renderer、资产与启动脚本的要求。该指南标明尚未验证的新安装和 native 路线；[实施要求](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)中的环境统一与完整文档仍在进行。
 
-Env统一实施时同步更新下列新手和自定义任务文档中的旧BaseTaskEnv构造示例。Pendulum本次默认单环境；旧并行API、注册和脚本保留，不代表统一路线已适配。并行适配和真实多环境验证留待阶段6，不以单slot或静默降级代替。
+下列新手和自定义任务文档已按当前接口重写。Empty、Pendulum 和 TwoWheel 仍使用独立的 classic 生命周期；selected 与 classic 的统一尚未完成。Pendulum 本次验收范围为单环境；旧并行 API、注册和脚本保留，不代表统一路线已适配。并行适配和真实多环境验证留待阶段6，不以单 slot 或静默降级代替。
 
 TaskEnv现有文档按使用场景导航：
 
 | 读者 | 文档 | 适合解决的问题 |
 | --- | --- | --- |
 | 使用者 | [安装与启动](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md) | 单环境、已有路径和未验证的安装缺口 |
-| 训练/采集使用者 | [训练与采集](新手使用训练与采集.md) | RL、SB3、RSL-RL、轨迹和 H5 数据 |
-| 任务开发者 | [自定义任务构建指南](自定义任务构建指南.md) | 创建 task family、reset、observation、reward 和 parallel capability |
+| 训练/采集使用者 | [训练与采集](新手使用训练与采集.md) | 单环境、Solution、轨迹与 H5 数据；训练限制 |
+| 任务开发者 | [自定义任务构建指南](自定义任务构建指南.md) | 从声明式示例理解任务、reset、评价与 Solution |
 | 资产开发者 | [资产导入与二次开发指南](资产导入与二次开发指南.md) | 注册 world、robot、object 并接入 assembly |
-| API 使用者 | [API Reference](api/index.md) | 查找稳定的公开接口和数据契约 |
+| API 使用者 | [API Reference](api/index.md) | 查找公开、扩展、兼容和内部接口的适用范围 |
 
 ## 推荐阅读顺序
 
