@@ -4,7 +4,7 @@ Use this page to locate the current owner; the versioned public API and capabili
 
 ## Public construction and selected config
 
-- Facade/factory/registries: `task_env/__init__.py`, `task_env/registry.py`; `make_env(uid, config=None, render_mode=None, **kwargs)` is the single-environment entry.
+- Facade/factory/registries: `task_env/__init__.py`, `task_env/registry.py`; `make_env(uid, *, config=None, render_mode=None, **kwargs)` is the single-environment entry.
 - Config declarations and normalization: `task_env/environment/config.py`, `task_env/environment/configuration.py`; selected precedence and state-only render validation are resolved once here.
 - Task Artifact declaration `TaskArtifactDeclarationV1` is defined in `task_env/environment/task_source.py`.
 - Shared task/source compiler `ReferenceTaskDeclarationV1` is defined in `task_env/assembly/compiler.py`; its Controller factory is optional and identity records `null` when omitted.
@@ -13,8 +13,8 @@ Use this page to locate the current owner; the versioned public API and capabili
 
 ## Lifecycle, recording, and evidence
 
-- Selected lifecycle class `SelectedReferenceEnv` is defined in `task_env/tasks/reference_env.py`; it delegates execution to `task_env/runtime/sessions/` and one provider adapter.
-- Record metadata and canonical storage: `task_env/recorders/h5.py`; independent reader examples live under `examples/recording/`.
+- Selected lifecycle class `SelectedReferenceEnv` is defined in `task_env/environment/reference_env.py`; `task_env/tasks/reference_env.py` retains compatibility exports. It delegates execution to `task_env/runtime/sessions/` and one provider adapter. The three classic-control tasks still use the independent `BaseTaskEnv` route; unification is incomplete.
+- Position recording metadata and selected coordinator provenance: `task_env/recorders/position_metadata.py` and `task_env/recorders/reference_provenance.py`; canonical H5 storage is in `task_env/recorders/h5.py`, and independent reader examples live under `examples/recording/`.
 - Public TaskEnv contracts: `docs/module/task_env/v2.1.0/api/` and `contracts/`.
 - Versioned capability evidence: `docs/module/task_env/v2.1.0/capabilities/capability-matrix.json`. Provider status is an exact source × provider × backend × control intersection.
 
