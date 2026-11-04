@@ -779,11 +779,10 @@ def materialize_control(
         )
         from ...controllers.canonical.contracts import digest
         expected_controller_identity = {
-            # Pin the current source-bound R3 identity after the v2.1 shared
-            # construction migration; the field-level controller contract
-            # below remains independently checked.
-            100: 'fc305c8e0b4e784ef32a4c3a8d54330ccb493d50e0561d2ab204df9200ec5eb8',
-            500: '927eb0ac7e09a9787a8577e84488be905896e3c6a1d3f786202d0a6e0cfadad1',
+            # Pin the post-refactor source-bound identities. The independent
+            # field, source, provider and resource checks remain mandatory.
+            100: 'cb0587780036a783be872beb44f9757586d35a6c5e753863f3f96f1e023d4d5b',
+            500: '2f4292e6e2b15d4ae2947164e9766f5c185d0e4fe64bd1355afcc91ac5b9a4b5',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
@@ -814,7 +813,7 @@ def materialize_control(
                     (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
                 or actual_controller.gripper_config.force_limit_N != 10.0
                 or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
-                or selected_solution.identity != 'f8478e2810955389c1a6e65bfe6ba66e5e4281bb01684c0cc007325a360065ad'
+                or selected_solution.identity != '2db224bced2156e691276c6eaedf7468a87e6e07b90c205f5a2df208c0da8f07'
                 or selected_solution.require_native_feedback_contract is not True
                 or digest(asdict(selected_solution.config)) !=
                     '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'

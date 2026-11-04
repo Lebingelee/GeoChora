@@ -259,6 +259,19 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
                 )
         finally:
             actual_controller.config = original_config
+        original_solution_identity = value['solution'].identity
+        value['solution'].identity = '0' * 64
+        try:
+            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
+                materialize_control(
+                    value['artifact'], _execution(), source=source,
+                    binding=ControlBinding('panda-v1/gripper', .08),
+                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
+                    selected_controller=controller, selected_solution=value['solution'],
+                    native_feedback_gripper_control_hz=500,
+                )
+        finally:
+            value['solution'].identity = original_solution_identity
         original_solution_config = value['solution'].config
         value['solution'].config = replace(
             original_solution_config,

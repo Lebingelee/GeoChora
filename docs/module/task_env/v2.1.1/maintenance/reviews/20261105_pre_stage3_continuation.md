@@ -43,3 +43,9 @@ PickCube通过已有task binding选择其版本化runtime输入；通用Env使�
 Nut cadence的100／500 Hz检查和专用构建移到既有 `diagnostics/tasks/c05c_geophys_gripper_cadence.py` 的显式binding构造；诊断调用者使用同一个Nut Env。通用Env不再包含cadence参数、速率列表或Nut诊断分支，只传递显式diagnostic profile到现有runtime准入；普通native feedback保留原独立路径。旧 `for_gripper_cadence_diagnostic` 内部诊断入口已删除，仓库调用者同步迁移；不新增task专用环境factory。无引擎诊断／消费者／边界组 **115 passed**，覆盖不支持速率／provider拒绝、100 Hz五样本和普通selected路径。
 
 较宽R05b检查 **101 passed、8 failed**：其中5项被无引擎guard拦截GeoPhys来源查找；另外3项在原严格Controller/Solution身份准入处被拒绝。恢复源码至本轮输入 `59b082d1` 后单独重跑这3项，仍全部以相同准入错误失败，说明问题先于本轮诊断隔离；日志 `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/r05b-baseline.log`。检查发现当前Controller和Solution身份绑定真实源码SHA，原R05b allowlist仍固定旧身份；试验性更新身份后这3项前进到GeoPhys来源检查并被guard阻止，不能由此认定物理或完整准入成功，试验修改已撤销。现有固定身份及所有其他严格检查保持不变；需在最终源码稳定后核对源码来源、冻结语义和负例，再明确更新或保留此有限准入的决定，不可伪造旧SHA或仅为绿灯放宽。
+
+## R05b当前源码身份与严格准入（续作，待复审）
+
+`80179561` 曾将R05b controller／Solution准入固定为当时的源码绑定身份；其后调用方驱动Solution、feedback完整性以及任务／生命周期归属迁移改变了源码与身份。当前Nut specialization SHA-256为 `f5f1ff2abc7d49a71df1327e02dc22122a313da3e292b3c379105a977efb727e`，Solution及guard所在文件SHA-256为 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a14c3a320386`。本次将受限R05b allowlist更新为这份源码真实构造的100／500 Hz Controller与Solution身份；不保留旧身份作为当前源码别名，不更改Artifact、物理参数、provider pin、source manifest或逐字段准入。后续修改这些身份来源须重新审查并刷新，不能把旧run重标。
+
+无引擎guard只允许 `PathFinder` 对本工作树 GeoPhys及其同级源码进行真实路径spec查询；仍拦截这些模块的实际import，版本、Git修订、dirty状态和origin由现有provider provenance真实读取。R05b **14 passed、1 deselected**：覆盖CPU/CUDA两个来源准入、100／500 Hz假provider五样本、来源／映射／dirty／controller／Solution篡改拒绝以及同次synthetic H5独立reader；普通真实provider reset/step项排除。完整argv与输出见ignored `r05b-origin-final.json`及相邻文件。此结果不证明GeoPhys物理或GPU执行；需要Sol审核本次新源码身份及必要真实回归。
