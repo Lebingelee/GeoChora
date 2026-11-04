@@ -15,9 +15,13 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 
 完整人工阶段2时间线存于主工作区 `/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_manual_analysis_stage2_summary_001/report.md`；用户暂停时的进度报告为 `/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_stage2_progress_report_20261104.md`。这些是工作区外于Core checkout的文件，特以原路径列出。attempt002原始H5、trace、失败记录与helper留在ignored `workspace/maintenance/v211_g02_2b_attempt002/`；不恢复、搬迁或覆盖旧运行。
 
+## 阶段3前维护检查点
+
+attempt001 已提交有界 replay、记录身份与解释器路径修改，但环境统一和新手文档交付尚未完成；详见[检查点](reviews/pre-stage3-refactor-attempt001.md)。此记录不改变阶段2决定或授权阶段3。
+
 ## 阶段3前待办
 
-[维护方案](../planning/pre-stage3-environment-refactor.md)已补入环境归整、诊断隔离、Env统一、静态SHA优化，以及新手安装／已有路径复用／启动脚本／example二次开发指引。交付位置包括README、`task_env/doc`和本版[指南](../guides/README.md)，不能只更新GPT工作文档。当前只更新要求，代码和新手脚本尚未实施。
+[维护方案](../planning/pre-stage3-environment-refactor.md)涵盖环境归整、诊断隔离、Env统一、静态SHA优化，以及新手安装／已有路径复用／启动脚本／example二次开发指引。交付位置包括README、`task_env/doc`和本版[指南](../guides/README.md)，不能只更新GPT工作文档。已有部分代码检查点；完整重构和新手脚本尚未交付。
 
 Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交G06后续实施。旧并行注册／脚本及历史证据不改写，不因此要求本次追加并行native或训练检查。阶段3–7状态保持不变。
 
