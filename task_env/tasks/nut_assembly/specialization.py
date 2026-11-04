@@ -320,6 +320,7 @@ def _source_identity_files():
         "task_env/assembly/compiler.py", "task_env/environment/task_source.py",
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
         "task_env/environment/reference_env.py", "task_env/environment/reference_binding.py",
+        "task_env/artifacts/contracts.py",
         "task_env/recorders/reference_provenance.py",
         "task_env/recorders/position_metadata.py",
         "task_env/observations/selected_reference.py",

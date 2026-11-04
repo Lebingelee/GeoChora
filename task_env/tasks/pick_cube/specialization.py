@@ -186,6 +186,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
+             Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/recorders/position_metadata.py",
              root / "task_env/observations/selected_reference.py",
