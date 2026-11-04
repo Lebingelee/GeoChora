@@ -88,8 +88,12 @@ def test_execution_boundary_reuses_xml_digest_but_invalidates_on_replacement(mon
             xml_inputs.append(data)
         return original_sha256(data)
     monkeypatch.setattr(hashlib, 'sha256', counting_sha256)
+    class BoundaryEnv(SimpleNamespace):
+        _source_xml_sha256 = SelectedReferenceEnv._source_xml_sha256
+        _execution_boundary = SelectedReferenceEnv._execution_boundary
+
     scene = SimpleNamespace(source_id='scene', xml='<scene/>')
-    env = SimpleNamespace(
+    env = BoundaryEnv(
         value={'source': SimpleNamespace(scene_source=scene, source_closure_digest=None)},
         _selected_episode_id='episode', artifact=SimpleNamespace(identity_hash='a' * 64),
         session=SimpleNamespace(provider_materialization_id='materialization'),
@@ -98,14 +102,14 @@ def test_execution_boundary_reuses_xml_digest_but_invalidates_on_replacement(mon
         sample=SimpleNamespace(sample_id='reset'),
     )
     info = SimpleNamespace(control_step=0, simulation_time=0.0)
-    first = SelectedReferenceEnv._execution_boundary(env, info)
+    first = env._execution_boundary(info)
     info.control_step = 1
     info.simulation_time = 0.01
-    second = SelectedReferenceEnv._execution_boundary(env, info)
+    second = env._execution_boundary(info)
     assert first['identity_hash'] != second['identity_hash']
     assert first['source_xml_sha256'] == second['source_xml_sha256']
     scene.xml = '<scene changed="yes"/>'
-    third = SelectedReferenceEnv._execution_boundary(env, info)
+    third = env._execution_boundary(info)
     assert third['source_xml_sha256'] != second['source_xml_sha256']
     assert third['identity_hash'] != second['identity_hash']
     assert xml_inputs == [b'<scene/>', b'<scene changed="yes"/>']
