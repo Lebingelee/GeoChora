@@ -179,3 +179,9 @@ selected scalar录制在开始边界对绑定实际使用的动作转换／space
 F05三条Session准入、DG04合成IO上下文和GeoPhys／Isaac native adapter复用同一个现有精确类型分类，adapter不再分别导入候选类；保留每条路线的原错误、精确类型（包括拒绝子类）、输入验证和身份绑定。F06的通用USD输入先于F05候选导入完成分类，不再为F06分类加载无关Position构造器。这个分类只决定后续准入路径，不授予provider／source／delivery许可。Session的唯一分类点仍依赖三个任务候选类型；完整解除runtime对任务类型的依赖尚未完成。
 
 无引擎selected／R05b／F06投影／Harness组 **170 passed、1 skipped、2 deselected**；F04合成adapter及DG02无效输入 **11 passed、3 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。新增检查覆盖不同路线／子类拒绝、无效输入在native provider初始化前拒绝，以及F06分类不导入Position任务。首次另外尝试的两项F05测试依赖真实 `scene`，被禁止引擎guard拒绝，未计为通过。完整argv、输出与diff摘要见ignored `session-route-selected.json`、`session-route-f04.json`、`session-route-lifecycle.json`和 `session-route-mixed.json`；本次未运行真实引擎、Isaac、GPU或物理reader。
+
+## Recorder初始边界原子准备（续作，待复审）
+
+`TransitionRecorder.begin_episode()` 先完成初始观测与元数据复制、容量核对，再替换原recorder状态。初始观测超出容量或元数据复制异常时，不再丢弃上一条已冻结轨迹或错误留下active状态；修正输入后可重新开始。该行为覆盖直接使用Recorder的调用方，不只依赖Env此前新增的局部初始化保护。
+
+受监督、禁止引擎导入的selected／R05b／录制组 **145 passed、2 deselected**，最大进程树RSS 214175744 bytes；leaf／mixed假provider组 **13 passed**，最大RSS 127586304 bytes。命令、退出码、资源采样及输出保存在ignored `atomic-begin-selected/`和 `atomic-begin-mixed/`。排除真实provider／scene，未运行真实引擎、Isaac、GPU或物理reader。

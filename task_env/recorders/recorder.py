@@ -98,28 +98,25 @@ class TransitionRecorder:
     def begin_episode(self, initial_obs: Any, reset_info: dict[str, Any], record_metadata: dict[str, Any]) -> None:
         if self._active:
             raise RuntimeError("recording is already active")
+        # Prepare the entire first boundary before replacing a frozen episode.
+        # A copy or capacity failure must leave the recorder retryable.
+        reset_copy = copy_tree(reset_info)
+        metadata_copy = copy_tree(record_metadata)
+        observation_copy = _recording_copy(initial_obs)
+        observation_bytes = tree_nbytes(observation_copy)
+        if observation_bytes > self.config.max_buffer_bytes:
+            raise MemoryError("recording buffer exceeds max_buffer_bytes")
         self._active = True
         self._frozen = None
-        self._bytes = 0
-        self._observations = []
+        self._bytes = observation_bytes
+        self._observations = [observation_copy]
         self._actions = []
         self._universal_actions = []
         self._rewards, self._successes, self._terminated, self._truncated, self._infos = [], [], [], [], []
-        self._reset_info, self._record_metadata = copy_tree(reset_info), copy_tree(record_metadata)
+        self._reset_info, self._record_metadata = reset_copy, metadata_copy
         self._structured_controls = []
         self._boundary_events = []
         self._outcome = None
-        self._append_observation(initial_obs)
-
-    def _append_observation(self, observation: Any) -> None:
-        copied = _recording_copy(observation)
-        self._reserve(tree_nbytes(copied))
-        self._observations.append(copied)
-
-    def _reserve(self, count: int) -> None:
-        if self._bytes + count > self.config.max_buffer_bytes:
-            raise MemoryError("recording buffer exceeds max_buffer_bytes")
-        self._bytes += count
 
     def append_transition(
         self,

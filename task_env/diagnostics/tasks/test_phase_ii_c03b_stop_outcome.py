@@ -343,6 +343,24 @@ def test_recorder_finalization_is_exactly_once_and_validates_event_before_mutati
         recorder.end_episode("external_stop", outcome=end.outcome, end_event=end.boundary_event)
 
 
+def test_recording_begin_capacity_failure_preserves_previous_episode_and_can_retry():
+    recorder = TransitionRecorder(RecorderConfig(max_buffer_bytes=8))
+    recorder.begin_episode(np.zeros(1, dtype=np.float32), {'seed': 1}, {})
+    previous = recorder.end_episode('finished')
+    with pytest.raises(MemoryError, match='max_buffer_bytes'):
+        recorder.begin_episode(np.zeros(3, dtype=np.float32), {'seed': 2}, {})
+    assert not recorder.active and recorder.frozen is previous
+    assert recorder.transition_count == 0 and recorder.observation_count == 1
+    class BrokenMapping(dict):
+        def items(self):
+            raise ValueError('injected metadata copy failure')
+    with pytest.raises(ValueError, match='metadata copy failure'):
+        recorder.begin_episode(np.ones(1, dtype=np.float32), {}, BrokenMapping())
+    assert not recorder.active and recorder.frozen is previous
+    recorder.begin_episode(np.ones(1, dtype=np.float32), {'seed': 2}, {})
+    assert recorder.active and recorder.frozen is None and recorder.observation_count == 1
+
+
 @pytest.mark.parametrize('position', (False, True))
 def test_structured_finalizer_rejects_wrong_reason_and_boundary_before_mutation(tmp_path, position):
     from task_env.recorders.recorder import finalize_structured_recording
