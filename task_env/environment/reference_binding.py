@@ -59,6 +59,8 @@ class ReferenceTaskBinding:
     action_schema: dict | None = None
     action_space_factory: Callable = reference_pose_action_space
     prepare_action: Callable = reference_pose_action
+    position_execution_info: Callable | None = None
+    position_execution_info_key: str | None = None
 
     def __post_init__(self):
         if not callable(self.action_space_factory) or not callable(self.prepare_action):
@@ -69,6 +71,12 @@ class ReferenceTaskBinding:
             raise ValueError("unknown selected control-interval requirement")
         if self.recorder_mode not in {"canonical", "execution"}:
             raise ValueError("unknown selected recording requirement")
+        if ((self.position_execution_info is None) != (self.position_execution_info_key is None)
+                or (self.position_execution_info is not None
+                    and (not callable(self.position_execution_info)
+                         or not isinstance(self.position_execution_info_key, str)
+                         or not self.position_execution_info_key))):
+            raise ValueError('position execution info requires a callable and nonempty result key')
         if (self.build_external is None) != (self.validate_external_solution is None):
             raise ValueError('external Solution construction and validation must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):

@@ -1830,8 +1830,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..recorders.position_metadata import position_record_reset_info
                 self._position_reset_info = position_record_reset_info(self)
                 self.info.update(self._position_reset_info)
-                if self.value.get('f06_pickcube_isaac_input') is not None:
-                    self._publish_pickcube_position_execution_info(self.info)
+                self._publish_task_position_execution_info(self.info)
                 if previous_episode_end is not None:
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if self.state.control_step != 0 or self.state.simulation_time != 0:
@@ -1905,11 +1904,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def expert_execution_info(self):
         """Return the required, validated R1 readiness at the current boundary."""
-        if (getattr(self, 'position_profile', False)
-                and self.value.get('f06_pickcube_isaac_input') is not None):
-            from ..tasks.pick_cube.specialization import position_execution_info
-
-            return position_execution_info(self.state, self.last_position_transition)
+        if getattr(self, 'position_profile', False):
+            binding = getattr(self, 'binding', None)
+            project = getattr(binding, 'position_execution_info', None)
+            result = project(self) if project is not None else None
+            if result is not None:
+                return result
         if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
                 or getattr(self, 'position_profile', False)):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
@@ -1920,9 +1920,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         result.validate()
         return result
 
-    def _publish_pickcube_position_execution_info(self, info):
-        value = self.expert_execution_info()
-        info['pickcube_position_execution_info_v1'] = value.to_mapping()
+    def _publish_task_position_execution_info(self, info):
+        binding = getattr(self, 'binding', None)
+        project = getattr(binding, 'position_execution_info', None)
+        if project is not None:
+            value = project(self)
+            if value is not None:
+                info[binding.position_execution_info_key] = value.to_mapping()
 
     # Kept for existing in-module callers while public callers use the named
     # expert_execution_info() contract.
@@ -2831,8 +2835,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
             self._last_position_request = request
-            if self.value.get('f06_pickcube_isaac_input') is not None:
-                self._publish_pickcube_position_execution_info(self.info)
+            self._publish_task_position_execution_info(self.info)
             if proposal is not None:
                 publication_phase = 'position_solution_observation'
                 solution_owner = self.solution if observer_solution is None else observer_solution

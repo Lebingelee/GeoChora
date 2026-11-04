@@ -25,3 +25,7 @@ F06的固定body/frame/joint映射、controller profile与horizon范围由PickCu
 Position终止时待确认切换的记录投影归入既有 `recorders.position_metadata`：区分未尝试、未确认和target/applied ack已见但transition未记录，Env继续拥有生命周期状态及最终提交时序。无引擎synthetic组 **13 passed**，含原leaf/mixed故障与新投影正负例；未将ack提升为已提交transition，也验证未确认分支不读取运行时边界。
 
 尝试运行三个现有Position切换集成测试时，均在 `scene` import被禁止引擎guard拦截（3 failed，未执行到断言）；真实场景集成及物理仍为NOT_RUN，不以synthetic结果替代。完整命令与当前检查输出在ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/receipt-check.json`及相邻日志。
+
+## PickCube位置执行反馈归位（续作，待复审）
+
+PickCube特有的夹爪执行信息、输出字段及适用条件由任务specialization通过已有 `ReferenceTaskBinding` 声明；规范Env只调用可选投影并发布其结果，不再直接导入PickCube实现或根据任务名称决定该反馈。非F06 route不产生该字段，既有错误与量值验证保留。无引擎配置／消费者／F06组合 **131 passed、1 deselected**；反馈增加后针对测量值及发布的2项检查通过，leaf/mixed synthetic组 **13 passed**。真实F06 USD和Isaac未运行，本结果待Sol复审。

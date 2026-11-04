@@ -366,6 +366,8 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
     def env_for_opening(opening_m):
         env = object.__new__(SelectedReferenceEnv)
         env.position_profile = True
+        from task_env.tasks.pick_cube.specialization import make_reference_binding
+        env.binding = make_reference_binding()
         env.value = {'f06_pickcube_isaac_input': object()}
         env.state = SimpleNamespace(
             control_step=52,
@@ -383,10 +385,18 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
         env.last_position_transition = (None, SimpleNamespace(target=target), None)
         return env
 
-    info = env_for_opening(-5.300285010889638e-7).expert_execution_info()
+    env = env_for_opening(-5.300285010889638e-7)
+    info = env.expert_execution_info()
     assert info.measured_opening_m == 0.0
     assert info.target_opening_m == 0.08
     assert not info.close_ready
+    output = {}
+    env._publish_task_position_execution_info(output)
+    assert output['pickcube_position_execution_info_v1'] == info.to_mapping()
+    env.value = {}
+    output = {}
+    env._publish_task_position_execution_info(output)
+    assert output == {}
 
     with pytest.raises(ValueError, match='measured_opening_m=-1.000001e-06'):
         env_for_opening(-1.000001e-6).expert_execution_info()
