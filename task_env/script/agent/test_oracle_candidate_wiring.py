@@ -77,6 +77,7 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                 self._closed = self._stopped = False
                 self._execution_fault = None
                 self._position_episode_end = None
+                self._mixed_episode_end = None
                 self.position_profile = False
                 self.recorder = None
                 self.recording_path = None
