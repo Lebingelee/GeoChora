@@ -1330,6 +1330,21 @@ def test_nutassembly_planning_rollout_uses_caller_solution(fake, monkeypatch):
         env.close()
 
 
+def test_nutassembly_feasibility_probe_uses_caller_solution(fake, monkeypatch):
+    from pathlib import Path
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / 'script' / 'agent'))
+    from feasibility_probe import run_seed
+    from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+    class CallerOnlyNutAssembly(NutAssemblyReferenceEnv):
+        def step_expert(self):
+            raise AssertionError('feasibility probe must drive Nut actions externally')
+
+    row = run_seed(CallerOnlyNutAssembly, 'mujoco', 19, 3)
+    assert row['steps'] == 3 and row['truncated']
+    assert row['classification'] == 'expert_failed' and row['close_succeeded']
+
+
 def test_retired_phase_i_and_grouped_trajectory_commands_fail_explicitly(capsys):
     from task_env.script import stage11, stage11_socket
     from task_env.script.trajectory.commands import main as trajectory_main
