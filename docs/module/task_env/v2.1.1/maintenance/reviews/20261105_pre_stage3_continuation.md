@@ -49,3 +49,9 @@ Nut cadence的100／500 Hz检查和专用构建移到既有 `diagnostics/tasks/c
 `80179561` 曾将R05b controller／Solution准入固定为当时的源码绑定身份；其后调用方驱动Solution、feedback完整性以及任务／生命周期归属迁移改变了源码与身份。当前Nut specialization SHA-256为 `f5f1ff2abc7d49a71df1327e02dc22122a313da3e292b3c379105a977efb727e`，Solution及guard所在文件SHA-256为 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a14c3a320386`。本次将受限R05b allowlist更新为这份源码真实构造的100／500 Hz Controller与Solution身份；不保留旧身份作为当前源码别名，不更改Artifact、物理参数、provider pin、source manifest或逐字段准入。后续修改这些身份来源须重新审查并刷新，不能把旧run重标。
 
 无引擎guard只允许 `PathFinder` 对本工作树 GeoPhys及其同级源码进行真实路径spec查询；仍拦截这些模块的实际import，版本、Git修订、dirty状态和origin由现有provider provenance真实读取。R05b **14 passed、1 deselected**：覆盖CPU/CUDA两个来源准入、100／500 Hz假provider五样本、来源／映射／dirty／controller／Solution篡改拒绝以及同次synthetic H5独立reader；普通真实provider reset/step项排除。完整argv与输出见ignored `r05b-origin-final.json`及相邻文件。此结果不证明GeoPhys物理或GPU执行；需要Sol审核本次新源码身份及必要真实回归。
+
+## 当前源码 classic CPU短检查（续作，待复审）
+
+对 `develop@fa885280`，通过公共 `examples/start.py`／`make_env` 在GeoPhys CPU各运行一次 seed73 reset、1个零动作transition与close：Empty、Pendulum、TwoWheel均退出码0，观察符合各自space，动作shape分别0／1／2、dtype float32；Pendulum／TwoWheel观测shape分别3／7，reward分别0.9779344970878069／0.9996657105631644，均未终止或截断。每个worker在独立输出cwd运行，分别耗时5.780／18.323／19.949秒、进程组退出且有序释放两把共享锁；具体argv、资源采样、日志及锁收据见ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/native/{empty,pendulum,two-wheel-balance}/`。启动参数显式指向本工作树Core及GeoPhys src；本次未另作运行时模块origin打印，因此只记录已传递的路径。两个保护文件SHA与原快照一致，GeoPhys及Menagerie gitlink未变。
+
+这是受限单步CPU检查，不证明任务成功、多环境、render或其他provider；PickCube／Nut物理及独立物理reader仍未运行。原attempt001累计预留约105107／120000步，本轮三个任务各1个control interval，按其配置的substeps计入后续统一总账；不得将旧run或本次结果重标到后续改动的源码。
