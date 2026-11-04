@@ -149,6 +149,7 @@ def test_geophys_reset_v1_validates_source_and_applies_explicit_fixture_pose():
     session._reset_plan_evidence = None
     session._mixed_consumed_boundaries = set()
     session._native_steps = 0
+    session._reset_count = 0
     session._mixed_pending_target = None
     session._mixed_fault = None
     session._last_reset_readback_v1 = None
@@ -173,6 +174,7 @@ def test_geophys_reset_v1_validates_source_and_applies_explicit_fixture_pose():
 
     assert session.reset(sample) == "realized"
     assert session._boundary.reset_calls == 1
+    assert session._reset_count == 1
     assert session._boundary.state.qpos[0] == 0.25
     assert np.array_equal(session._boundary.state.qvel, np.zeros(7))
     assert set(session._boundary.static_world_child_poses) == {0}
@@ -193,3 +195,4 @@ def test_geophys_reset_v1_validates_source_and_applies_explicit_fixture_pose():
     with pytest.raises(ValueError, match="ResetSampleV1 source/closure identity mismatch"):
         session.reset(wrong_source)
     assert session._boundary.reset_calls == 1
+    assert session._reset_count == 1

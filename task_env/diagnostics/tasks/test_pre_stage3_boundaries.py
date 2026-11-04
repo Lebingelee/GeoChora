@@ -194,3 +194,36 @@ def test_static_boundary_skips_unavailable_articulated_pose_reader_and_rejects_o
     with pytest.raises(StageUnavailableError, match='static world-child reset overrides'):
         boundary.apply_reset_state(state, static_world_child_poses={0: (np.zeros(3), np.ones(4))})
     assert physics.restores == restores
+
+
+def test_articulated_boundary_still_restores_static_world_children():
+    import numpy as np
+    from task_env.environment import EpisodePhysicsState
+    from task_env.runtime.boundary import GeoPhysRuntimeBoundary
+
+    class ArticulatedPhysics:
+        n_actuators = 0
+        def __init__(self):
+            self.writes = []
+        def read_static_world_child_body_poses(self):
+            return np.array([3], dtype=np.int32), np.array([[1., 2., 3.]]), np.array([[1., 0., 0., 0.]])
+        def write_static_world_child_body_poses(self, ids, positions, orientations):
+            self.writes.append((np.array(ids), np.array(positions), np.array(orientations)))
+        def snapshot(self):
+            return {'marker': np.array([1.0])}
+        def restore(self, _state):
+            pass
+        def synchronize_kinematic_state(self, **_kwargs):
+            pass
+
+    physics = ArticulatedPhysics()
+    empty = np.zeros(0, dtype=np.float32)
+    state = EpisodePhysicsState(empty, empty, empty, empty, empty)
+    boundary = GeoPhysRuntimeBoundary(physics=physics, scheduler=SimpleNamespace(),
+                                     physics_dt=0.002, ctrl_range=np.empty((0, 2)),
+                                     initial_state=state)
+    assert len(physics.writes) == 1
+    boundary.apply_reset_state(state)
+    assert len(physics.writes) == 2
+    assert physics.writes[-1][0].tolist() == [3]
+    assert physics.writes[-1][1].tolist() == [[1., 2., 3.]]
