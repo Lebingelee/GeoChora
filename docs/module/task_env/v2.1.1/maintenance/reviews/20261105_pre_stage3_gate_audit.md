@@ -1,6 +1,16 @@
 # 阶段3前维护：当前验收门核对草稿
 
-本页核对源码基线 `8416ef49e3af32f197fe13e847bfe4f02b7b98b5`，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
+本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
+
+## 后续源码检查：`a55ccac3`
+
+在 tracked clean 的 `a55ccac34b27f2813258e4ceb27fed402b2ce932` 重跑下方原离线审计范围，禁用外部pytest插件并禁止引擎导入：**284 passed、1 skipped、5 deselected**，15.433秒，进程树最大RSS 169377792 bytes。skip为冻结Isaac解释器未安装的生成器help检查；排除真实Pendulum两项、真实F06场景、真实selected provider reset／step及真实Position close。完整argv、退出码、资源采样、stdout／stderr和源提交及日志摘要在ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/audit-a55ccac3-offline/`。该结果不覆盖真实物理或独立物理reader，也不取代Sol审查。
+
+后续部分已提交的实现包括selected外部Solution轨迹重执行、控制反馈／Position状态绑定及记录来源归位、Marker来源owner自动收集。旧Nut专家录制因诊断契约不同被当前外部Solution重执行明确拒绝；缺少任务源码清单的旧记录无法通过该清单核对证明完整同源。Marker仍显式组装binding与配置，`SelectedReferenceEnv` 当前3745行，F05 Session分类仍导入任务候选类型。两任务目录各有 `task.py`、`specialization.py`、`solution.py`、`config.yaml` 和必要的 `__init__.py`；目录形态不能代替职责验收。综合判断 **G0–G5 仍为 PARTIAL**：当前源码代表性物理回归、独立物理reader、新手原生闭环、剩余职责收敛和Sol复审尚未完成。原120000步保守账本及新增Nut预算待确认的边界不变。
+
+## 早期核对：`8416ef49`
+
+以下表格及其相关说明保留源码基线 `8416ef49e3af32f197fe13e847bfe4f02b7b98b5` 的原始判断，不把旧证据重标到后续提交。
 
 | 门 | 当前判断 | 证据与缺口 |
 | --- | --- | --- |
