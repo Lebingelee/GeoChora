@@ -3333,46 +3333,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if typed is None or state is None:
             raise RuntimeError('Position Stop requires a successfully returned reset boundary')
         boundary = typed.view.boundary
-        details = {
-            'control_step': int(state.control_step),
-            'simulation_time_s': float(state.simulation_time),
-            'state_boundary_id': boundary.boundary_id,
-            'source_closure_digest': self.value['source'].source_closure_digest,
-        }
-        if getattr(self, 'leaf_position_profile', False):
-            details.update({
-                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-                'leaf_writers': tuple({
-                    'writer_id': entry.binding.writer_id,
-                    'binding_identity_sha256': entry.binding.identity_hash,
-                    'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-                } for entry in self.leaf_plan.leaves),
-            })
-        else:
-            details.update({
-                'controller_identity': self.controller.identity,
-                'profile_id': self.controller.profile_id,
-            })
-        if self.dual_entity_position:
-            details['position_writers'] = tuple({
-                'entity_id': profile.entity_id,
-                'writer_id': profile.writer_id,
-                'controller_identity': profile.identity,
-            } for profile in self.position_profiles)
-        if self._position_controller_switch_fault_receipt is not None:
-            details['controller_switch_fault_receipt'] = dict(
-                self._position_controller_switch_fault_receipt,
-            )
-        if self._pending_position_switch is not None:
-            from ..recorders.position_metadata import pending_controller_switch_receipt
-            details['pending_controller_switch_application'] = pending_controller_switch_receipt(
-                self._pending_position_switch, published_step=state.control_step,
-                execution_fault=self._execution_fault,
-                last_transition=getattr(self, 'last_position_transition', None),
-                runtime_step=lambda: self.state.control_step,
-            )
-        details.update(dict(payload or {}))
+        from ..recorders.position_metadata import position_episode_end_payload
+        leaf = getattr(self, 'leaf_position_profile', False)
+        details = position_episode_end_payload(
+            state=state, boundary=boundary,
+            source_closure_digest=self.value['source'].source_closure_digest,
+            controller=None if leaf else self.controller,
+            leaf_plan=self.leaf_plan if leaf else None,
+            leaf_receipt=self.session.leaf_materialization_receipt if leaf else None,
+            position_profiles=self.position_profiles if self.dual_entity_position else None,
+            switch_fault_receipt=self._position_controller_switch_fault_receipt,
+            pending_switch=self._pending_position_switch,
+            execution_fault=self._execution_fault if self._pending_position_switch is not None else None,
+            last_transition=getattr(self, 'last_position_transition', None),
+            runtime_step=lambda: self.state.control_step, payload=payload,
+        )
         if task_success is _INFER_POSITION_TASK_SUCCESS:
             success = (None if self._published_position_evaluation is None
                        else bool(self._published_position_evaluation.success))

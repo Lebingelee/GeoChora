@@ -7,6 +7,49 @@ import numpy as np
 from ..environment.reference_binding import position_input_kind
 
 
+def position_episode_end_payload(*, state, boundary, source_closure_digest,
+                                 controller=None, leaf_plan=None, leaf_receipt=None,
+                                 position_profiles=None, switch_fault_receipt=None,
+                                 pending_switch=None, execution_fault=None,
+                                 last_transition=None, runtime_step=None, payload=None):
+    """Project the last published Position boundary and control facts for recording."""
+    details = {
+        'control_step': int(state.control_step),
+        'simulation_time_s': float(state.simulation_time),
+        'state_boundary_id': boundary.boundary_id,
+        'source_closure_digest': source_closure_digest,
+    }
+    if leaf_plan is not None:
+        details.update({
+            'effective_leaf_plan_identity_sha256': leaf_plan.identity_sha256,
+            'leaf_materialization_identity_sha256': leaf_receipt.identity_sha256,
+            'leaf_writers': tuple({
+                'writer_id': entry.binding.writer_id,
+                'binding_identity_sha256': entry.binding.identity_hash,
+                'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+            } for entry in leaf_plan.leaves),
+        })
+    else:
+        details.update({'controller_identity': controller.identity,
+                        'profile_id': controller.profile_id})
+    if position_profiles is not None:
+        details['position_writers'] = tuple({
+            'entity_id': profile.entity_id,
+            'writer_id': profile.writer_id,
+            'controller_identity': profile.identity,
+        } for profile in position_profiles)
+    if switch_fault_receipt is not None:
+        details['controller_switch_fault_receipt'] = dict(switch_fault_receipt)
+    if pending_switch is not None:
+        details['pending_controller_switch_application'] = pending_controller_switch_receipt(
+            pending_switch, published_step=state.control_step,
+            execution_fault=execution_fault, last_transition=last_transition,
+            runtime_step=runtime_step,
+        )
+    details.update(dict(payload or {}))
+    return details
+
+
 def position_control_binding_provenance(binding, selector):
     """Snapshot the materialized Position binding and selector file for this recording."""
     from .reference_provenance import callable_source_snapshot

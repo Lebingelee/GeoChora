@@ -259,3 +259,35 @@ def test_optional_controller_identity_is_explicit_and_bound_identity_is_preserve
         compiled.artifact, compiled.source, SimpleNamespace(identity="controller-v1"),
     )
     assert bound.identity_fields()["controller_identity"] == "controller-v1"
+
+
+def test_position_end_payload_preserves_published_boundary_and_switch_status():
+    from task_env.recorders.position_metadata import position_episode_end_payload
+
+    state = SimpleNamespace(control_step=4, simulation_time=0.04)
+    boundary = SimpleNamespace(boundary_id='published-boundary')
+    controller = SimpleNamespace(identity='current-controller', profile_id='position-profile')
+    pending = {'effective_control_step': 4, 'controller_identity': 'next-controller',
+               'effective_boundary_id': 'published-boundary'}
+    common = dict(state=state, boundary=boundary, source_closure_digest='source-digest',
+                  controller=controller, position_profiles=(), pending_switch=pending,
+                  runtime_step=lambda: 5)
+    result = position_episode_end_payload(**common)
+    assert result['state_boundary_id'] == 'published-boundary'
+    assert result['control_step'] == 4 and result['simulation_time_s'] == 0.04
+    assert result['controller_identity'] == 'current-controller'
+    assert result['position_writers'] == ()
+    assert result['pending_controller_switch_application']['status'] == 'not_attempted_before_episode_end'
+    assert 'status' not in pending
+
+    target = SimpleNamespace(identity_hash='target-hash')
+    transition = (None, SimpleNamespace(controller_identity='next-controller', target=target,
+                                      source_boundary=boundary),
+                  SimpleNamespace(target_hash='target-hash'))
+    result = position_episode_end_payload(**common, execution_fault=object(),
+                                          last_transition=transition,
+                                          switch_fault_receipt={'result': 'record_failed'})
+    switch = result['pending_controller_switch_application']
+    assert switch['status'] == 'target_ack_observed_but_transition_not_recorded'
+    assert switch['observed_runtime_boundary'] == 5
+    assert result['controller_switch_fault_receipt'] == {'result': 'record_failed'}

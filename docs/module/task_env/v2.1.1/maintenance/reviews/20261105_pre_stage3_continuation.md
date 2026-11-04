@@ -284,3 +284,10 @@ Nut的原生反馈样本、interval receipt和Solution观察参数接线从任�
 按实际新源码重新构造，R05b的100／500 Hz Controller身份分别为 `43c75b446d10e41dbbb55cacd0cdd397ab7345b09bce1da5a9d25d1350f5001e`／`c35796e4068ffb4f3fd95245f5173eb07a6a471a05fca2330ae24c953275400f`；Solution身份不变。严格身份值随源码更新，其他来源、参数、provider和反馈准入未放宽。当前Nut specialization SHA为 `1b82836f0d5aad2ab2d0053309e7c46e31b5c03fdc06c4eb045fa5d00052773b`。
 
 受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **182 passed、2 deselected**，最大进程树RSS 164868096 bytes；完整argv、退出码、资源采样见ignored `nut-feedback-owner-regression/`。没有运行真实引擎、Isaac、GPU或物理reader；先前物理证据不重标。
+
+
+## Position结束记录投影归位（续作，待复审）
+
+Position结束记录的controller／leaf writer、来源、故障回执和未完成controller切换的payload投影归入既有 `recorders.position_metadata`；Env仍选择最后成功发布的state／boundary、计算最终success及事件序号，并调用既有episode-end构造。未完成切换继续区分尚未尝试、未形成完整transition以及已收到target ack但未记录transition，不能将内部推进误报为已发布边界。无引擎测试新增了上述状态和空双writer列表的检查。
+
+受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制及合成attached H5读回组合 **184 passed、2 deselected**，最大进程树RSS 177483776 bytes；假provider leaf／mixed故障与记录组 **5 passed**，最大RSS 160563200 bytes。完整argv、退出码与资源采样见ignored `position-end-owner-final/`、`position-end-owner-mixed-final/`。首次组合误加入要求真实Scene的切换用例，保护器拒绝 `scene` 导入而出现15项失败；这些用例未运行物理。首次把独立H5读回放进含synthetic MuJoCo占位模块的mixed组，读回的无provider检查正确拒绝该占位，后单独在严格无引擎组通过。合成H5读回不替代最终源码的独立物理reader。未运行真实引擎、Isaac或GPU，旧物理证据不重标。
