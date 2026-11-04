@@ -32,13 +32,6 @@ _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
 
 
-def _versioned_position_input_kind(input_v1):
-    if input_v1 is None:
-        return None
-    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
-    return _versioned_position_candidate_kind(input_v1)
-
-
 def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
                                        physics_dt_s, native_steps):
     """Bound binary clock drift from native increments plus boundary subtraction."""
@@ -980,7 +973,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._last_position_truncated = False
             self._last_position_request = None
             if self.position_profile:
-                self._position_reset_info = self._position_record_reset_info()
+                from ..recorders.position_metadata import position_record_reset_info
+                self._position_reset_info = position_record_reset_info(self)
                 self.info.update(self._position_reset_info)
                 if self.value.get('f06_pickcube_isaac_input') is not None:
                     self._publish_pickcube_position_execution_info(self.info)
@@ -3087,46 +3081,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'scope': 'canonical-v0 outer boundary; no native-substep or D0 claim'}
         save_streaming(self.recording_path, value)
         return verify_roundtrip(self.recording_path, value)
-
-    def _position_record_reset_info(self):
-        plan = self.value['reset_plan']
-        boundary = self.typed_state.view.boundary
-        info = {
-            'seed': int(plan.reset_sample.task_seed),
-            'options': {},
-            'reset_sample_id': plan.reset_sample.sample_id,
-            'reset_plan_identity_hash': plan.identity_hash,
-            'role_binding_identity_hash': plan.role_binding.identity_hash,
-            'state_boundary_identity': boundary.to_mapping(),
-            'state_boundary_id': boundary.boundary_id,
-            'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
-            'source_closure_digest': self.value['source'].source_closure_digest,
-            **({
-                # Persist the public snapshot used to produce the reset
-                # observation. Generic H5 v3 consumes this only for the
-                # bounded versioned typed-state witness extension.
-                'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-            } if _versioned_position_input_kind(
-                self.value.get('versioned_position_input'),
-            ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
-            **({
-                'camera_observation_v1': self.info['camera_observation_v1'],
-            } if self.camera_observation_config is not None else {}),
-        }
-        if getattr(self, 'leaf_position_profile', False):
-            info.update({
-                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-                'leaf_configuration_revision': self.session.leaf_configuration_revision,
-            })
-            if self.fixed_attachment_leaf_position_profile:
-                info.update({
-                    'fixed_attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
-                    'fixed_attachment_receipt_identity_sha256': self.session.fixed_attachment_receipt[
-                        'receipt_identity_sha256'
-                    ],
-                })
-        return info
 
     def get_record_metadata(self):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""

@@ -727,3 +727,44 @@ def record_dual_position_transition(self, request, position_records, *, terminat
         bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
         structured_control=control,
     )
+
+
+def position_record_reset_info(self):
+    plan = self.value['reset_plan']
+    boundary = self.typed_state.view.boundary
+    info = {
+        'seed': int(plan.reset_sample.task_seed),
+        'options': {},
+        'reset_sample_id': plan.reset_sample.sample_id,
+        'reset_plan_identity_hash': plan.identity_hash,
+        'role_binding_identity_hash': plan.role_binding.identity_hash,
+        'state_boundary_identity': boundary.to_mapping(),
+        'state_boundary_id': boundary.boundary_id,
+        'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
+        'source_closure_digest': self.value['source'].source_closure_digest,
+        **({
+            # Persist the public snapshot used to produce the reset
+            # observation. Generic H5 v3 consumes this only for the
+            # bounded versioned typed-state witness extension.
+            'canonical_state_view_v1': self.info['canonical_state_view_v1'],
+        } if _versioned_position_input_kind(
+            self.value.get('versioned_position_input'),
+        ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
+        **({
+            'camera_observation_v1': self.info['camera_observation_v1'],
+        } if self.camera_observation_config is not None else {}),
+    }
+    if getattr(self, 'leaf_position_profile', False):
+        info.update({
+            'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+            'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+            'leaf_configuration_revision': self.session.leaf_configuration_revision,
+        })
+        if self.fixed_attachment_leaf_position_profile:
+            info.update({
+                'fixed_attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
+                'fixed_attachment_receipt_identity_sha256': self.session.fixed_attachment_receipt[
+                    'receipt_identity_sha256'
+                ],
+            })
+    return info
