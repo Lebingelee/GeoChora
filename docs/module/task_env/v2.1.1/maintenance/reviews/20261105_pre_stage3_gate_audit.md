@@ -2,6 +2,10 @@
 
 本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
 
+## 后续源码检查：`e8ad4484`
+
+Marker指南的公共factory路线已在本机已有MuJoCo 3.8.1 CPU上完成一次reset、space采样动作、step与close；详细来源、预算和锁收据见[续作记录](20261105_pre_stage3_continuation.md)。这不证明新安装、任务成功或其他provider。Marker构造仍有内部binding接线，当前源码PickCube／Nut代表性物理回归及独立物理reader仍未完成；整体维护继续为 **PARTIAL**。
+
 ## 后续源码检查：`7d15d1e1`
 
 使用冻结F06 delivery和当前Core／GeoPhys Scene importer构造实际F06输入并验证原准入；TaskSource、Scene及reset Artifact三种身份错配均在provider创建前拒绝。导入器报告一个保留的灯光扩展，详见[续作记录](20261105_pre_stage3_continuation.md)。本检查不启动Isaac或执行物理步，不是F06物理验收；该源码的PickCube／Nut代表性物理回归和独立物理reader仍为NOT_RUN。整体维护仍为 **PARTIAL**，以下旧源码证据保留原身份。

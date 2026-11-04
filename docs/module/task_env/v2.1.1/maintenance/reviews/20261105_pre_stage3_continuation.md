@@ -269,3 +269,9 @@ selected scalar／execution的native回执完整性检查、`TransitionRecord`�
 对 tracked clean `7d15d1e14d1ca48c73cfe4b044df9336debaedba`，以当前Core及GeoPhys Scene importer、seed 31和horizon 1000，从旧位置只读的冻结F06 delivery构造实际 `UsdRuntimeInputV1` 并通过当前完整F06输入校验；manifest SHA为 `6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2`。在该实际输入上分别替换reset的TaskSource、Scene或Artifact身份，均经 `materialize` 在provider创建前拒绝。此为真实来源／声明构造检查，不是Isaac session、native物理、任务成功或Qualification。
 
 worker核验实际导入的Core和GeoPhys路径，并检查未导入 `isaacsim`／`omni`；按序非阻塞持有并释放两把native锁，运行1.379秒、最大进程树RSS 190402560 bytes、进程组退出，未执行物理步。Scene importer日志报告一个保留的 `extension.light`（`/mjcf/worldbody/light[top]`），无拒绝项；本检查不验证渲染或该扩展的执行语义。完整命令、身份、三项拒绝、原始日志与资源／锁收据见ignored `f06-current-input-7d15d1e1/`。本次未启动Isaac、GPU或物理reader，原物理步预留不增加。
+
+## Marker新手单步真实入口（续作，待复审）
+
+对 tracked clean `e8ad4484`，按 `task_env/doc/自定义任务构建指南.md` 的嵌套配置，通过示例注册和公共 `make_env` 在已有 MuJoCo 3.8.1 CPU上执行 `reset(seed=31) → action_space.sample() → step → close`，额外设置 action-space seed为31。reset／step观测及采样动作通过space检查，动作shape为8、dtype为float64，单transition后control step为1、simulation time为0.01 s、reward为0、未终止或截断，close返回。该检查证明此源码和本机已有依赖上的一次单步入口，不证明任务成功、全新安装、其他provider、训练或渲染。
+
+worker在独立ignored cwd中核验Core与MuJoCo模块来源，按序非阻塞持有并释放两把共享锁；耗时0.832秒、最大进程树RSS 167399424 bytes，进程组退出。完整脚本、源提交、预算、argv、结果、资源采样及锁收据在ignored `marker-guide-e8ad4484/`。按声明horizon 10及5个substeps保守预留50步，累计保守预留 **115757／120000**；实际只执行一个control interval。未运行Isaac、GPU或物理reader，后续源码变化不重标本证据。
