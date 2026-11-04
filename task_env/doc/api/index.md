@@ -22,6 +22,8 @@ optional SB3/RSL-RL learner or H5 recorder
 
 用户通过 public environment、Gymnasium spaces 和 metadata 访问数据；runtime、solver、Taichi field、contact workspace、actuator ctrl 和 qpos private layout 不属于通用用户契约。
 
+标准交互方向是外部 Solution 从 observation 推理 action，再由调用方交给 `env.step(action)`；`step_expert()` 是旧 selected 任务尚未完成迁移时保留的受限兼容，不是标准 Env API。PickCube 与 NutAssembly 的当前差异见[Solution 接口](planning/task_owned_solutions.md)。
+
 ## 最短入口
 
 | 领域 | 入口 | 说明 |
