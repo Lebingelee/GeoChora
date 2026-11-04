@@ -13,6 +13,28 @@ def digest(value):
 
 CANONICAL_PANDA_ARM_ORDER_V1 = tuple(f'panda-v1/joint{i}' for i in range(1, 8))
 
+REFERENCE_POSE_ACTION_SCHEMA = {
+    'schema_id': 'selected-reference-absolute-pose-v1', 'schema_version': 1,
+    'controller_kind': 'absolute_pose', 'reference': 'world',
+    'rotation_representation': 'quaternion_wxyz', 'dimension': 8,
+}
+
+
+def reference_pose_action_space():
+    """Action space for the retained reference pose controller."""
+    import numpy as np
+    from gymnasium.spaces import Box
+    return Box(-np.inf, np.inf, (8,), dtype=np.float64)
+
+
+def reference_pose_action(action):
+    """Interpret the retained world-pose reference controller action."""
+    import numpy as np
+    vector = np.asarray(action, dtype=float)
+    if vector.shape != (8,) or not np.isfinite(vector).all():
+        raise ValueError('finite eight-dimensional absolute pose action required')
+    return RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
+
 
 @dataclass(frozen=True)
 class RequestedAction(Contract):

@@ -677,6 +677,8 @@ class _PendulumSceneComposer:
 class PendulumEnv(BaseTaskEnv):
     """GeoPhys-native single Pendulum environment."""
 
+    uses_component_task_config = True
+
     uid = PENDULUM_ENV_ID
     task_uid = PENDULUM_TASK_UID
     scene_uid = PENDULUM_SCENE_UID

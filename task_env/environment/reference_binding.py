@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Callable
+from ..controllers.canonical.contracts import reference_pose_action, reference_pose_action_space
 
 
 def _identity_seed(seed):
@@ -55,14 +56,19 @@ class ReferenceTaskBinding:
     pre_reset_session_validator: Callable | None = None
     post_reset_session_validator: Callable | None = None
     close_task_resources: Callable | None = None
+    action_schema: dict | None = None
+    action_space_factory: Callable = reference_pose_action_space
+    prepare_action: Callable = reference_pose_action
 
     def __post_init__(self):
+        if not callable(self.action_space_factory) or not callable(self.prepare_action):
+            raise TypeError('selected action space and action preparation must be callable')
+        if self.action_schema is not None and not isinstance(self.action_schema, dict):
+            raise TypeError('selected task action schema must be a dictionary')
         if self.interval_mode not in {"grouped", "native"}:
             raise ValueError("unknown selected control-interval requirement")
         if self.recorder_mode not in {"canonical", "execution"}:
             raise ValueError("unknown selected recording requirement")
-        if not self.object_poses:
-            raise ValueError("selected task binding requires an observation pose")
         if (self.build_external is None) != (self.validate_external_solution is None):
             raise ValueError('external Solution construction and validation must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):

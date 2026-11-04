@@ -6,6 +6,7 @@ from .base import BaseTaskEnv
 
 @register_env()
 class EmptyTaskEnv(BaseTaskEnv):
+    uses_component_task_config = True
     uid = "empty-v1"
     task_uid = "empty-v1"
     scene_uid = "tabletop-v1"

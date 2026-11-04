@@ -220,9 +220,22 @@ def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
         env.close()
 
 
-def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path):
+def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path, monkeypatch):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
     from task_env.trajectory.canonical.streaming import load_streaming
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    intervals, resets = [], []
+    execute_interval = EpisodeExecutionState.execute_interval
+    execute_reset = EpisodeExecutionState.execute_reset
+    def track_interval(**kwargs):
+        intervals.append(1)
+        return execute_interval(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
+    def track_reset(state, **kwargs):
+        resets.append(1)
+        return execute_reset(state, **kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_reset', track_reset)
 
     caller = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
     legacy = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
@@ -232,6 +245,7 @@ def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path):
         obs, info = caller.reset(seed=19)
         solution.reset(obs, info, caller.metadata)
         legacy.reset_for_solution(legacy_solution, seed=19)
+        assert len(resets) == 2
         path = tmp_path / 'caller.h5'
         caller.start_recording(path)
         for _ in range(2):
@@ -248,6 +262,7 @@ def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path):
             assert info['control_application_v1']['requested_action'] == (
                 legacy_info['control_application_v1']['requested_action'])
         result = caller.finish_recording('external_stop')
+        assert len(intervals) == 4
         assert result['byte_exact']
         recorded = load_streaming(path)
         assert len(recorded['transitions']) == 2 and len(recorded['boundaries']) == 3
@@ -717,6 +732,34 @@ def test_metadata_ownership_is_per_environment():
     a.metadata['action_schema']['dimension']=999
     assert b.metadata['action_schema']['dimension']==8
     a.close();b.close()
+
+
+def test_reference_binding_owns_action_schema_and_conversion(fake, tmp_path):
+    from gymnasium.spaces import Box
+    from task_env.controllers.canonical.contracts import RequestedAction, digest
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    binding = replace(
+        PickCubeReferenceEnv.binding,
+        action_schema={'schema_id': 'synthetic-scalar-to-pose-v1', 'dimension': 1},
+        action_space_factory=lambda: Box(-1., 1., (1,), dtype=np.float64),
+        prepare_action=lambda action: RequestedAction(
+            'absolute_pose', 'world', 'quaternion_wxyz',
+            (.5, 0., .4, 1., 0., 0., 0., float(action[0])),
+        ),
+    )
+    env = SelectedReferenceEnv(provider='mujoco', horizon=2, _binding=binding)
+    try:
+        env.reset(seed=19)
+        assert env.action_space.shape == (1,)
+        assert env.metadata['action_schema']['schema_id'] == 'synthetic-scalar-to-pose-v1'
+        env.start_recording(tmp_path / 'custom-action.h5')
+        assert env.recorder.metadata.control_contract_identity == digest(
+            {'action_schema': env.metadata['action_schema']})
+        env.step(np.asarray([0.], dtype=np.float64))
+        assert env.state.control_step == 1
+    finally:
+        env.close()
 
 
 def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake):
@@ -1606,7 +1649,16 @@ def test_selected_position_stop_stores_one_published_outcome_without_stepping():
     assert first.outcome.final_boundary == 2
 
 
-def test_selected_mixed_stop_stores_one_published_outcome_without_stepping():
+@pytest.mark.parametrize(('reason', 'solution', 'end_reason', 'flags'), [
+    ('operator_request', None, 'external_stop', (False, True, True)),
+    ('horizon_reached', None, 'horizon_reached', (False, True, True)),
+    ('solution_completed', SimpleNamespace(done=True, failed=False),
+     'solution_completed', (False, False, True)),
+    ('solution_failed', SimpleNamespace(done=False, failed=True),
+     'solution_failed', (True, False, False)),
+])
+def test_selected_mixed_stop_stores_one_published_outcome_without_stepping(
+        reason, solution, end_reason, flags):
     env = object.__new__(SelectedReferenceEnv)
     env._mixed_control_candidate = True
     env.mixed_control_profile = True
@@ -1614,7 +1666,7 @@ def test_selected_mixed_stop_stores_one_published_outcome_without_stepping():
     env._stopped = False
     env._execution_fault = None
     env._mixed_episode_end = None
-    env._external_solution_owner = None
+    env._external_solution_owner = solution
     env.recorder = None
     env.session = SimpleNamespace(episode_id='mixed-episode')
     env.state = SimpleNamespace(control_step=3, simulation_time=.03)
@@ -1623,8 +1675,10 @@ def test_selected_mixed_stop_stores_one_published_outcome_without_stepping():
                                            source_closure_digest='a' * 64)}
     env.controller = SimpleNamespace(identity='b' * 64)
     env.evaluation = SimpleNamespace(success=False)
-    first = env.stop('operator_request')
+    first = env.stop(reason)
     assert env.stop('repeated_request') is first
     assert env._episode_state.episode_end is first and env._episode_state.stopped
-    assert first.outcome.end_reason == 'external_stop'
+    assert first.outcome.end_reason == end_reason
+    assert (first.outcome.terminated, first.outcome.truncated,
+            first.outcome.bootstrap_allowed) == flags
     assert first.outcome.final_boundary == 3

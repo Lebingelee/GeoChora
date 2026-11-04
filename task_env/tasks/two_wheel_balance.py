@@ -583,6 +583,8 @@ class _TwoWheelBalanceSceneComposer:
 class TwoWheelBalanceEnv(BaseTaskEnv):
     """GeoPhys-native articulated two-wheel balance environment."""
 
+    uses_component_task_config = True
+
     uid = TWO_WHEEL_BALANCE_ENV_ID
     task_uid = TWO_WHEEL_BALANCE_TASK_UID
     scene_uid = TWO_WHEEL_BALANCE_SCENE_UID

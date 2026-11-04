@@ -2,7 +2,7 @@
 
 > **v2.1.1 当前边界：** selected 环境的实现位于
 > `task_env.environment.reference_env`；`task_env.tasks.reference_env` 保留兼容导出。
-> `BaseTaskEnv` 仍是独立 classic 实现，三个旧任务的统一迁移尚未完成。
+> `BaseTaskEnv` 现为 `SelectedReferenceEnv` 同对象兼容导出；三个组件任务接入共同 episode owner，当前变更待 Sol 复审。
 > 下方带 P2.0-B 标题的段落保留原迁移历史和当时状态，不能当作本次维护的当前验收结论；
 > 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
 > Phase C 的标准方向是外部 Solution 产生 action 并交给 `env.step(action)`；

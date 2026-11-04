@@ -2,14 +2,14 @@
 
 **Import path**：`task_env.BaseTaskEnv`、`task_env.tasks.BaseTaskEnv`
 **任务域**：Task Semantics
-**稳定性**：旧 classic 路线及兼容入口；统一迁移尚未完成。
-**职责**：本文先描述旧 classic 生命周期；selected 路线见下文。
+**稳定性**：单环境实现已收敛，当前变更待复审；provider 能力以实际验证范围为准。
+**职责**：描述统一环境的组件组装与任务生命周期。
 **调用者/消费者**：用户、wrapper、内置 task。
-**源码**：`task_env/environment/env.py`
+**源码**：`task_env/environment/reference_env.py`、`task_env/environment/lifecycle.py`
 
 ## `task_env.tasks.BaseTaskEnv`
 
-**Kind**：class；**Defined in**：`environment/env.py`（`tasks/base.py` re-export）
+**Kind**：class；**Defined in**：`environment/reference_env.py`。`BaseTaskEnv` 是 `SelectedReferenceEnv` 的同对象兼容导出；`environment/env.py` 与 `tasks/base.py` 不再拥有独立环境类。
 
 ### Signature
 
@@ -42,6 +42,6 @@ expert/recording 入口见仓库根目录 `examples/README.md`；历史 `pick-cu
 
 ## 当前 selected 路线
 
-`task_env.environment.reference_env.SelectedReferenceEnv` 是 selected 环境的当前实现 owner；`task_env.tasks.reference_env.SelectedReferenceEnv` 为兼容导入。PickCube 和 Nut 由 `make_env` 根据其 task class 与 selected 配置构造，并非上述 `BaseTaskEnv` 类对象。普通 selected `reset()` 不传 seed 时使用 19；显式 `seed=None` 与省略并不等价。Position 候选的 seed 受固定 reset plan 约束，mixed 候选有独立明确的 reset-plan 检查。普通 selected 非空 options 不支持。
+`task_env.environment.reference_env.SelectedReferenceEnv` 是 selected 环境的当前实现 owner；`task_env.tasks.reference_env.SelectedReferenceEnv` 为兼容导入。PickCube、Nut、Empty、Pendulum 和 TwoWheel 通过各自任务配置和同一环境 owner 构造；动作、观测及运行时接线仍由具体任务决定。普通 selected `reset()` 不传 seed 时使用 19；显式 `seed=None` 与省略并不等价。Position 候选的 seed 受固定 reset plan 约束，mixed 候选有独立明确的 reset-plan 检查。普通 selected 非空 options 不支持。
 
-规范 Env 的方向是外部 Solution 根据 observation 产生 action，调用方使用 `step(action)`；`step_expert()` 不是标准 Env API。selected 保留的 `step_expert()` 是受限兼容入口，`reset_for_solution()` / `step_with_solution()` 也仍由 Env 调用 Solution。NutAssembly 已支持调用方 `act → step(action) → observe`：action 包含来源边界与控制请求，Env 返回五样本 native receipt；裸数组仍拒绝。新路径完整物理成功尚未验证；各执行模式不能在同一 episode 混用。相关 step 调用返回 observation、reward、terminated、truncated、info。执行 fault 后必须 reset；`close()` 释放环境持有的 session，重复 close 幂等。selected 普通 public 配置当前 state-only，不接受 `render_mode`。Action/observation、termination 与 success 以实际任务和其 spaces、metadata、评估为准；不将 Panda 的输入维数套到 classic-control。统一生命周期和 `BaseTaskEnv` 同对象 alias 尚未完成，见[维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
+规范 Env 的方向是外部 Solution 根据 observation 产生 action，调用方使用 `step(action)`；`step_expert()` 不是标准 Env API。selected 保留的 `step_expert()` 是受限兼容入口，`reset_for_solution()` / `step_with_solution()` 也仍由 Env 调用 Solution。NutAssembly 已支持调用方 `act → step(action) → observe`：action 包含来源边界与控制请求，Env 返回五样本 native receipt；裸数组仍拒绝。新路径完整物理成功尚未验证；各执行模式不能在同一 episode 混用。相关 step 调用返回 observation、reward、terminated、truncated、info。执行 fault 后必须 reset；`close()` 释放环境持有的 session，重复 close 幂等。selected 普通 public 配置当前 state-only，不接受 `render_mode`。Action/observation、termination 与 success 以实际任务和其 spaces、metadata、评估为准；不将 Panda 的输入维数套到 classic-control。本次统一仍待 Sol 复审；合成测试不能替代真实 provider 或物理验证。

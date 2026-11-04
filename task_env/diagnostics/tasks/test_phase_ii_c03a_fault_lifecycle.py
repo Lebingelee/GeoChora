@@ -386,6 +386,56 @@ def test_real_pendulum_scalar_env_preserves_five_tuple_clock_and_terminal_guard(
         env.close()
 
 
+def test_scalar_tasks_and_compatibility_exports_use_selected_environment_owner():
+    """All supported scalar task classes must reach the same public Env owner."""
+    import task_env
+    import task_env.tasks as tasks
+    from task_env.environment.env import BaseTaskEnv as environment_export
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.tasks.base import BaseTaskEnv as task_export
+    from task_env.tasks.empty import EmptyTaskEnv
+    from task_env.tasks.pendulum import PendulumEnv
+    from task_env.tasks.two_wheel_balance import TwoWheelBalanceEnv
+
+    assert task_env.BaseTaskEnv is SelectedReferenceEnv
+    assert tasks.BaseTaskEnv is SelectedReferenceEnv
+    assert task_export is SelectedReferenceEnv
+    assert environment_export is SelectedReferenceEnv
+    for environment_type in (EmptyTaskEnv, PendulumEnv, TwoWheelBalanceEnv):
+        assert issubclass(environment_type, SelectedReferenceEnv)
+
+
+def test_two_wheel_task_reward_success_and_fall_contract_without_engine():
+    from task_env.tasks.two_wheel_balance import TwoWheelBalanceTaskDefinition
+
+    definition = TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2)
+    upright = RuntimeSnapshot(qpos=np.zeros(3, dtype=np.float32),
+                              qvel=np.zeros(3, dtype=np.float32))
+    definition.reset(state=upright)
+    action = np.asarray([1., -1.], dtype=np.float32)
+    for step in range(1, 11):
+        result = definition.evaluate(state=upright, action=action, elapsed_steps=step)
+        assert result.success is (step == 10)
+        assert not result.failure
+        assert result.reward == pytest.approx(0.999 + (1. if step == 10 else 0.))
+    fallen = RuntimeSnapshot(qpos=np.asarray([0.8, 0., 0.], dtype=np.float32),
+                             qvel=np.zeros(3, dtype=np.float32))
+    result = definition.evaluate(state=fallen, action=action, elapsed_steps=11)
+    assert result.failure and not result.success
+
+
+@pytest.mark.parametrize('uid', ('empty-v1', 'pendulum-v1', 'two-wheel-balance-v1'))
+def test_public_scalar_factory_constructs_selected_owner_without_runtime(uid):
+    from task_env import make_env
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    env = make_env(uid, build_runtime=False)
+    try:
+        assert isinstance(env, SelectedReferenceEnv)
+    finally:
+        env.close()
+
+
 def test_classic_env_and_lifecycle_share_episode_close_state():
     from task_env.environment.env import BaseTaskEnv
     from task_env.environment.lifecycle import EpisodeExecutionState
@@ -426,6 +476,18 @@ def test_classic_public_env_lifecycle_uses_shared_episode_state_without_engine(
     from task_env.environment.lifecycle import EpisodeExecutionState
     from task_env.environment.types import EpisodePhysicsState
     import task_env.runtime as runtime_module
+
+    intervals, resets = [], []
+    execute_interval = EpisodeExecutionState.execute_interval
+    execute_reset = EpisodeExecutionState.execute_reset
+    def track_interval(**kwargs):
+        intervals.append(1)
+        return execute_interval(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
+    def track_reset(state, **kwargs):
+        resets.append(1)
+        return execute_reset(state, **kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_reset', track_reset)
 
     names = SimpleNamespace(
         joints={'pendulum_hinge': 0, 'chassis_pitch': 0,
@@ -486,6 +548,7 @@ def test_classic_public_env_lifecycle_uses_shared_episode_state_without_engine(
     action = np.zeros(actuators, dtype=np.float32)
     try:
         first, info = env.reset(seed=37)
+        assert len(resets) == 1
         assert state.episode_id == info['episode_id']
         assert env.observation_space.contains(first)
         if obs_size is not None:
@@ -493,6 +556,7 @@ def test_classic_public_env_lifecycle_uses_shared_episode_state_without_engine(
             assert first['state']['proprioception'].dtype == np.float32
         _, _, terminated, truncated, _ = env.step(action)
         assert not terminated and not truncated
+        assert len(intervals) == 1
         _, _, terminated, truncated, _ = env.step(action)
         assert not terminated and truncated and state.stopped
         with pytest.raises(RuntimeError, match='episode end'):

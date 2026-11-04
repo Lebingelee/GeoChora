@@ -135,6 +135,60 @@ class PandaAgent(BaseAgent):
             "delta_pose",
         )
 
+    def bind_runtime(self, *, references, config, boundary):
+        """Bind this robot's controller and named frames to a compiled runtime."""
+        from ..controllers import (
+            AbsoluteJointPositionActionAdapter, AbsolutePoseActionAdapter,
+            DeltaPoseActionController,
+        )
+        from ..environment.types import ActionModeSpec, StageUnavailableError
+        from .runtime import RobotControllerHandle, RobotFrameReference, RobotRuntime
+
+        controller_config = config.robot.controller
+        if controller_config is None:
+            raise StageUnavailableError('robot TaskEnv requires an explicit robot.controller config')
+        adapters = {
+            'absolute_joint': AbsoluteJointPositionActionAdapter,
+            'absolute_pose': AbsolutePoseActionAdapter,
+            'delta_pose': DeltaPoseActionController,
+        }
+        adapter_type = adapters.get(controller_config.kind)
+        if adapter_type is None:
+            raise StageUnavailableError(f'unsupported robot controller kind {controller_config.kind!r}')
+        reference_identity = {
+            None: None, 'world': 'world',
+            'base': f'body:{references.base_body_name}',
+            'ee': f'site:{references.eef_site_name}',
+        }[controller_config.reference]
+        action_spec = replace(
+            ActionModeSpec.from_controller_config(controller_config),
+            reference_identity=reference_identity,
+        )
+        gripper = self.create_gripper_controller(
+            references=references, config=config.action, kind=config.robot.gripper.kind,
+            force_limit_N=config.robot.gripper.force_limit_N,
+            opening_step_m=config.robot.gripper.opening_step_m,
+            force_deadband_N=config.robot.gripper.force_deadband_N,
+            force_adjust_step_m=config.robot.gripper.force_adjust_step_m,
+        )
+        bind_force_limit = getattr(gripper, 'bind_force_limit', None)
+        if callable(bind_force_limit):
+            bind_force_limit(boundary)
+        adapter_kwargs = {'references': references, 'config': config.action, 'gripper': gripper}
+        if controller_config.kind in {'absolute_pose', 'delta_pose'}:
+            adapter_kwargs.update(controller_config=controller_config, action_spec=action_spec)
+        controller = RobotControllerHandle(
+            adapter=adapter_type(**adapter_kwargs), kind=controller_config.kind,
+            reference=controller_config.reference, action_spec=action_spec,
+        )
+        runtime = RobotRuntime(
+            uid=self.uid, references=references, controller=controller, gripper=gripper,
+            world=RobotFrameReference('world', 'world', None, 'world'),
+            base=RobotFrameReference('base', 'body', references.base_body_id, references.base_body_name),
+            ee=RobotFrameReference('ee', 'site', references.eef_site_id, references.eef_site_name),
+        )
+        return runtime, action_spec
+
     def create_gripper_controller(
         self,
         *,

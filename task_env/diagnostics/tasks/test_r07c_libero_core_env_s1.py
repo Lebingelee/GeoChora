@@ -665,7 +665,8 @@ def _pose_hold_action(observation, gripper=0.0):
     return np.asarray([*observation["state"]["ee_pose"], gripper], dtype=np.float64)
 
 
-def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfast"):
+def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfast",
+                               object_poses=(("payload", "payload"),)):
     """Build a different-name, different-dimension candidate through production owners."""
     import hashlib
     from gymnasium.spaces import Box, Dict
@@ -1041,7 +1042,7 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfa
             task_artifact, seed, {}, active["value"]["source"],
         ),
         evaluate=lambda _evidence, _semantics: None,
-        object_poses=(("payload", "payload"),), external_actions=True,
+        object_poses=object_poses, external_actions=True,
         interval_mode="grouped", recorder_mode="canonical", reset_seed=lambda seed: seed,
         runtime_episode_identity=True, build_mixed_control_profile=build_value,
         reset_sample_with_options=reset_sample_with_options,
@@ -1073,6 +1074,64 @@ def test_generic_mixed_actuator_admits_source_bound_cpu_integrators(
     finally:
         env.close()
     assert env.close_receipt["session_closed"] is True
+
+
+def test_mixed_task_without_object_pose_projection_uses_task_owned_spaces(monkeypatch):
+    """Object-free observations need neither a pose projection nor Panda spaces."""
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    from task_env.observations import selected_reference
+
+    def reject_panda_spaces(_env):
+        raise AssertionError("mixed task must not construct Panda observation spaces")
+
+    monkeypatch.setattr(selected_reference, "selected_reference_observation_spaces", reject_panda_spaces)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=1, object_poses=())
+    try:
+        observation, _ = env.reset(seed=51)
+        assert env.observation_space.contains(observation)
+        _, _, _, truncated, _ = env.step(np.asarray([0.0, 0.0, 0.03]))
+        assert truncated
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('failure_stage', ('control', 'record'))
+def test_synthetic_mixed_interval_fault_keeps_execution_boundary(
+        monkeypatch, tmp_path, failure_stage):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=3)
+    try:
+        env.reset(seed=51)
+        if failure_stage == 'control':
+            def fail_control(_target):
+                raise RuntimeError('injected mixed control failure')
+            monkeypatch.setattr(env.session, 'apply_mixed_actuator_command', fail_control)
+        else:
+            env.start_recording(tmp_path / 'mixed_failure.h5')
+            def fail_record(*_args, **_kwargs):
+                raise RuntimeError('injected mixed recorder failure')
+            monkeypatch.setattr(env.recorder, 'append_transition', fail_record)
+        before = _FAKE_WORLD.calls['step']
+        with pytest.raises(RuntimeError, match='injected mixed'):
+            env.step(np.asarray([0.0, 0.0, 0.03]))
+        fault = env.execution_fault
+        if failure_stage == 'control':
+            assert fault.phase == 'mixed_control_application'
+            assert not fault.interval_completed
+            assert _FAKE_WORLD.calls['step'] == before
+        else:
+            assert fault.phase == 'mixed_recorder_append'
+            assert fault.interval_completed
+            assert _FAKE_WORLD.calls['step'] > before
+            assert env.recorder.transition_count == 0
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step(np.asarray([0.0, 0.0, 0.03]))
+    finally:
+        env.close()
 
 
 def test_generic_mixed_actuator_rejects_unadmitted_source_integrator(monkeypatch):
@@ -1131,6 +1190,13 @@ def _read_synthetic_mixed_h5(path: Path):
 
 def test_generic_three_channel_candidate_uses_shared_core_runtime_and_recorder(tmp_path, monkeypatch):
     global _FAKE_WORLD
+    from task_env.environment.lifecycle import EpisodeExecutionState
+    intervals = []
+    execute_interval = EpisodeExecutionState.execute_interval
+    def track_interval(**kwargs):
+        intervals.append(1)
+        return execute_interval(**kwargs)
+    monkeypatch.setattr(EpisodeExecutionState, 'execute_interval', staticmethod(track_interval))
     _FAKE_WORLD = _World()
     _fake_api(monkeypatch)
     env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
@@ -1152,6 +1218,7 @@ def test_generic_three_channel_candidate_uses_shared_core_runtime_and_recorder(t
                     "torque_orchid", "torque_cobalt", "slide_fern",
                 }
             assert truncated is True
+            assert len(intervals) == 2 * (len(rows) + 1)
             final = env.finish_recording("horizon_reached")
             assert final["transition_count"] == 2
             assert final["observation_count"] == 3

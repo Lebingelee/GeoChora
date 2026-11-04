@@ -1,10 +1,51 @@
 """Observation and task-evaluation projection for selected scalar routes."""
 
+from collections import OrderedDict
 from collections.abc import Mapping
 
 import numpy as np
+from gymnasium.spaces import Box, Dict
 
 from ..artifacts import CanonicalStateView
+
+
+def selected_reference_observation_spaces(env):
+    """Build the existing Panda reference projection; mixed tasks own their spaces."""
+    keys = [key for _, key in env.binding.object_poses]
+    state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
+    if env.position_profile:
+        state_spaces.update({
+            'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
+            'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
+        })
+        if env.dual_entity_position:
+            state_spaces['entities'] = Dict({
+                profile.entity_id: Dict({
+                    'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
+                    'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                })
+                for profile in env.position_profiles
+            })
+        elif env.fixed_attachment_leaf_position_profile and env.leaf_plan is not None:
+            state_spaces['entities'] = Dict({
+                'panda-arm': Dict({
+                    'joint_position': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                    'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                }),
+                'panda-hand': Dict({
+                    'joint_position': Box(-np.inf, np.inf, (2,), dtype=np.float32),
+                    'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                }),
+            })
+    observation_spaces = OrderedDict((
+        ('state', Dict(state_spaces)),
+        ('privileged_state', Dict({
+            k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
+            for k in keys
+        })),
+    ))
+    return observation_spaces
 
 
 def _versioned_position_input_kind(input_v1):

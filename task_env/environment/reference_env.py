@@ -4,7 +4,11 @@ This adapter owns one scalar CPU session. It defines no TaskArtifact or task
 success predicate. Expert execution and external-action execution cannot be
 mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
+from __future__ import annotations
+
 from collections import OrderedDict
+from dataclasses import asdict, is_dataclass, replace
+from typing import Any
 from collections.abc import Mapping
 from pathlib import Path
 import hashlib
@@ -17,18 +21,22 @@ from gymnasium.spaces import Box, Dict
 
 from ..artifacts import ExecutionSpec
 from ..observations.selected_reference import _position_task_evaluation_state
-from ..controllers.canonical.contracts import RequestedAction, digest
+from ..controllers.canonical.contracts import RequestedAction, REFERENCE_POSE_ACTION_SCHEMA, digest
 from .protocols import TaskEnvironmentComponent
+from .gym_compat import GymEnvBase
+from .configuration import resolve_env_config, resolve_execution_plan
+from .config import ResolvedEnvConfig
+from .metadata import TaskEnvMetadata, build_stage0_metadata, gym_metadata_dict, validate_task_info
+from ..registry import AGENT_REGISTRY, OBJECT_REGISTRY, SCENE_REGISTRY
 from .reference_binding import ReferenceTaskBinding
 from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
-from .lifecycle import EpisodeExecutionState
+from .lifecycle import EpisodeExecutionState, SingleTaskLifecycleAdapter, TaskLifecycleAdapter
+from .types import ControlCommand, SnapshotRequest, TaskCompositionSpec, TaskEvaluation
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 
-METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1',
-    'schema_version': 1, 'controller_kind': 'absolute_pose', 'reference': 'world',
-    'rotation_representation': 'quaternion_wxyz', 'dimension': 8}}
+METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
 _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
 
@@ -73,9 +81,580 @@ def _artifact_for_reset(current_artifact, rebuilt_value):
     return exact_artifact
 
 
-class SelectedReferenceEnv(TaskEnvironmentComponent):
-    """Advanced reference API. No legacy Gym configuration compatibility claim."""
+def _json_value(value: Any) -> Any:
+    """Copy public metadata into JSON-compatible builtin values."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, dict):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_json_value(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
+    """Scalar task environment assembled from task and runtime components."""
     binding: ReferenceTaskBinding | None = None
+    uid = 'base-task-env'
+    task_uid = 'base-task-v1'
+    scene_uid = 'tabletop-v1'
+    agent_uids: tuple[str, ...] = ()
+    object_uids: tuple[str, ...] = ()
+    success_definition = 'none'
+    supports_structured_control_recording = False
+    metadata = {'render_modes': [], 'stage': 'stage4_gym_contract'}
+    render_mode = None
+    action_space = None
+    observation_space = None
+
+    @property
+    def _last_episode_end(self):
+        return self._episode_execution_state().episode_end
+
+    @_last_episode_end.setter
+    def _last_episode_end(self, value):
+        self._episode_execution_state().episode_end = value
+
+    def _build_runtime_with_rollback(self) -> None:
+        try:
+            from ..runtime import bootstrap_task_runtime
+
+            self._reset_sampler = self.create_reset_sampler()
+            self._runtime_assembly = bootstrap_task_runtime(
+                config=self.config,
+                composition=self._composition_spec,
+                scene=self.scene,
+                agents=self.agents,
+                objects=self.objects,
+                scene_composer=self.create_scene_composer(),
+                reset_sampler=self._reset_sampler,
+                create_render_source=self.render_mode is not None,
+            )
+            self._runtime = self._runtime_assembly.boundary
+            compiled_scene = self._runtime_assembly.compiled_scene
+            # Task definitions are created before action/observation binding so
+            # the three task extension points are the only task-owned factories.
+            self._task_definition = self.create_task_definition(compiled_scene)
+            if self.config.render.camera_obs:
+                from ..observations import CameraObservationProvider, CameraSensor
+
+                self._camera_sensors = tuple(
+                    CameraSensor(
+                        spec=spec,
+                        references=self._runtime_assembly.compiled_scene.references,
+                    )
+                    for spec in self.config.render.cameras
+                )
+                self._sensor_provider = CameraObservationProvider(
+                    render_source=self._runtime_assembly.render_source,
+                    config=self.config.render,
+                    camera_sensors=self._camera_sensors,
+                )
+            resolved_agents = compiled_scene.references.agents
+            if len(resolved_agents) > 1:
+                raise StageUnavailableError(
+                    "Stage 10b supports env.robot only for a single resolved robot; "
+                    "multi-robot controller ownership is not implemented."
+                )
+            resolved_agent = next(
+                (agent for agent in self.agents if agent.uid in resolved_agents), None,
+            )
+            bind_runtime = getattr(resolved_agent, 'bind_runtime', None)
+            if callable(bind_runtime):
+                self._robot, action_spec = bind_runtime(
+                    references=resolved_agents[resolved_agent.uid], config=self.config,
+                    boundary=self._runtime_assembly.boundary,
+                )
+                self._env_metadata = replace(self._env_metadata, external_action=action_spec)
+                self.action_space = self._robot.controller.action_space
+            else:
+                task_action_factory = getattr(
+                    self._task_definition,
+                    "create_action_adapter",
+                    None,
+                )
+                if callable(task_action_factory):
+                    self._action_adapter = task_action_factory(compiled_scene)
+                else:
+                    self._action_adapter = self.create_action_adapter(compiled_scene)
+                if self._action_adapter is not None:
+                    self.action_space = self._action_adapter.action_space
+                    action_contract = getattr(self._action_adapter, "action_contract", None)
+                    if action_contract is None:
+                        raise StageUnavailableError(
+                            "non-robot action adapters must expose action_contract"
+                        )
+                    self._env_metadata = replace(
+                        self._env_metadata,
+                        external_action=action_contract,
+                    )
+                else:
+                    self.action_space = Box(
+                        low=-1.0,
+                        high=1.0,
+                        shape=(0,),
+                        dtype=np.float32,
+                    )
+
+            if self._action_adapter is None and not self.config.agents.agent_uids:
+                self.action_space = Box(
+                    low=-1.0,
+                    high=1.0,
+                    shape=(0,),
+                    dtype=np.float32,
+                )
+            task_observation_factory = getattr(
+                self._task_definition,
+                "create_observation_builder",
+                None,
+            )
+            if callable(task_observation_factory):
+                self._observation_builder = task_observation_factory(
+                    compiled_scene,
+                    observation_config=self.config.observation,
+                    render_config=self.config.render,
+                )
+            else:
+                self._observation_builder = self.create_observation_builder(
+                    compiled_scene
+                )
+            self.observation_space = self._observation_builder.observation_space
+            self.metadata = gym_metadata_dict(
+                self._env_metadata,
+                observation_schema=self._observation_builder.schema,
+                stage="stage4_gym_contract",
+            )
+            self._configure_render_metadata()
+            reference_profile = _json_value(self.reference_profile())
+            if reference_profile:
+                self.metadata["reference_profile"] = reference_profile
+            self._task_lifecycle = SingleTaskLifecycleAdapter(
+                runtime=self._runtime,
+                episode_state=self._episode_execution_state(),
+                task_definition=self._task_definition,
+                control_substeps=self.config.runtime.control_substeps,
+                expected_control_dt_s=(
+                    self.config.runtime.physics_dt
+                    * self.config.runtime.control_substeps
+                ),
+                horizon=self.config.episode.horizon,
+                ignore_done=self.config.episode.ignore_done,
+                sample_reset_state=self._sample_episode_reset_state_for_lifecycle,
+                snapshot_request=self._snapshot_request,
+                reset_components=self._reset_episode_components,
+                convert_action=self._convert_action,
+                observation_fallback=self._build_observation_fallback,
+                episode_limits=lambda: (
+                    self.config.episode.horizon,
+                    self.config.episode.ignore_done,
+                ),
+            )
+        except BaseException as construction_error:
+            attach_execution_fault(
+                construction_error,
+                ExecutionFaultV1.from_exception(
+                    "runtime_construction",
+                    construction_error,
+                ),
+            )
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                add_note = getattr(construction_error, "add_note", None)
+                if callable(add_note):
+                    add_note(f"construction rollback also failed: {cleanup_error!r}")
+            raise
+
+    @classmethod
+    def default_config(cls) -> ResolvedEnvConfig:
+        return resolve_env_config(
+            task_uid=cls.task_uid,
+            scene_uid=cls.scene_uid,
+            agent_uids=cls.agent_uids,
+            object_uids=cls.object_uids,
+            success_definition=cls.success_definition,
+        )
+
+    @classmethod
+    def default_config_path(cls) -> Path | None:
+        """Return the task-owned public default YAML, when the task has one."""
+
+        task_dir = cls.task_uid.rsplit("-v", 1)[0].replace("-", "_")
+        candidate = Path(__file__).resolve().parents[1] / "tasks" / task_dir / "default.yaml"
+        return candidate if candidate.is_file() else None
+
+    def placement_notes(self) -> tuple[str, ...]:
+        return ()
+
+    def reference_profile(self) -> dict[str, Any]:
+        """Return the versioned task physics/semantic profile for metadata.
+
+        The base task has no reference profile.  Non-arm classic-control tasks
+        override this hook so the profile travels with Gym metadata and H5
+        ``env_meta`` without adding task-specific branches to the base class.
+        """
+
+        return {}
+
+    def create_scene_composer(self):
+        return None
+
+    def create_reset_sampler(self):
+        return None
+
+    def create_action_adapter(self, compiled_scene):
+        """Create a neutral native-action adapter for non-robot tasks."""
+
+        del compiled_scene
+        return None
+
+    def create_observation_builder(self, compiled_scene):
+        """Create the task observation builder after scene references resolve."""
+
+        from ..observations import StateObservationBuilder
+
+        return StateObservationBuilder(
+            references=compiled_scene.references,
+            config=self.config.observation,
+            render_config=self.config.render,
+        )
+
+    def create_task_definition(self, compiled_scene):
+        del compiled_scene
+        return None
+
+    @property
+    def execution_plan(self):
+        """Return the static plan resolved before provider construction."""
+
+        return self._execution_plan
+
+    @property
+    def robot(self):
+        """The single resolved robot owned by this environment runtime."""
+
+        self._require_runtime()
+        if self._robot is None:
+            raise StageUnavailableError(
+                "This environment does not expose a single resolved robot."
+            )
+        return self._robot
+
+    def get_env_metadata(self) -> TaskEnvMetadata:
+        return self._env_metadata
+
+    def create_ui_render_provider(self):
+        """Create the optional UI backend without involving camera sensors."""
+
+        if self.render_mode is None:
+            return None
+        if self._ui_render_provider is None:
+            render_source = getattr(self._runtime_assembly, "render_source", None)
+            if render_source is None:
+                raise StageUnavailableError(
+                    "UI rendering was requested but the runtime did not expose a render source"
+                )
+            from ..render import TaskEnvRenderProvider
+
+            self._ui_render_provider = TaskEnvRenderProvider(
+                render_source=render_source,
+                config=self.config.render,
+            )
+        return self._ui_render_provider
+
+    def _configure_render_metadata(self) -> None:
+        if self.render_mode is None:
+            self.metadata["render_modes"] = []
+            self.metadata.pop("render_mode", None)
+            return
+        self.metadata["render_modes"] = ["human", "rgb_array"]
+        self.metadata["render_mode"] = self.render_mode
+        self.metadata["render_backend"] = self.config.render.backend
+        self.metadata["render_resolution"] = (
+            int(self.config.render.width),
+            int(self.config.render.height),
+        )
+
+    def render(self, mode: str | None = None):
+        """Render the configured single-environment UI frame.
+
+        This intentionally does not return a camera observation. RGB/depth policy
+        observations are captured by ``task_env.observations`` during reset/step.
+        """
+
+        from ..render import RenderUnavailableError, normalize_render_mode
+
+        requested_mode = mode
+        if requested_mode is None:
+            requested_mode = self.render_mode or "human"
+        normalized_mode = normalize_render_mode(requested_mode)
+        if self.render_mode is not None and normalized_mode.value != self.render_mode:
+            raise ValueError(
+                "TaskEnv render mode is fixed at construction: "
+                f"{self.render_mode!r}, got {normalized_mode.value!r}"
+            )
+        provider = self.create_ui_render_provider()
+        if provider is None:
+            raise RenderUnavailableError(
+                "UI rendering is not configured for this TaskEnv; camera observations "
+                "are available through observation/sensor configuration instead."
+            )
+        return provider.render(mode=normalized_mode, snapshot=self._last_snapshot)
+
+    @property
+    def task_references(self):
+        self._require_runtime()
+        return self._runtime_assembly.compiled_scene.references
+
+    def _require_runtime(self):
+        if self._runtime is None:
+            raise StageUnavailableError(
+                "TaskEnv runtime was not built; construct with build_runtime=True."
+            )
+        return self._runtime
+
+    def _require_task_lifecycle(self) -> SingleTaskLifecycleAdapter:
+        if self._task_lifecycle is None:
+            raise StageUnavailableError(
+                "TaskEnv scalar lifecycle was not built; construct with build_runtime=True."
+            )
+        return self._task_lifecycle
+
+    @property
+    def episode_end(self):
+        """Return the most recent immutable Event/Outcome finalizer result."""
+
+        lifecycle = getattr(self, '_task_lifecycle', None)
+        if lifecycle is not None and lifecycle.episode_end is not None:
+            return lifecycle.episode_end
+        return self._last_episode_end
+
+    def _snapshot_request(self) -> SnapshotRequest:
+        return SnapshotRequest(
+            site_jacobians=self._robot is not None,
+            actuator_force=(
+                self._robot is not None
+                and self.config.robot.gripper.kind == "experimental_rate_limited"
+            ),
+            contact_summary=bool(
+                getattr(self._task_definition, "requires_contact_summary", False)
+            ),
+            simulation_time=True,
+        )
+
+    def _reset_episode_components(self, snapshot) -> None:
+        if self._robot is not None:
+            self._robot.controller.reset(snapshot)
+            reset_gripper = getattr(self._robot.gripper, "reset", None)
+            if callable(reset_gripper):
+                reset_gripper(snapshot)
+        if self._action_adapter is not None:
+            self._action_adapter.reset(snapshot)
+        if self._sensor_provider is not None:
+            self._sensor_provider.reset()
+
+    def _convert_action(self, action, snapshot):
+        if self._robot is None and self._action_adapter is None and self.config.agents.agent_uids:
+            raise StageUnavailableError(
+                "This environment has no Stage 2 ActionAdapter."
+            )
+        if self._action_adapter is not None:
+            return self._action_adapter.convert(action, snapshot)
+        if self._robot is None:
+            requested = np.asarray(action, dtype=np.float32)
+            if requested.shape != (0,):
+                raise ValueError(f"action shape must be {(0,)}, got {requested.shape}")
+            if not np.isfinite(requested).all():
+                raise ValueError("action must contain only finite values")
+            ctrl = (
+                np.zeros(0, dtype=np.float32)
+                if snapshot.ctrl is None
+                else np.asarray(snapshot.ctrl, dtype=np.float32).copy()
+            )
+            return ControlCommand(
+                actuator_ctrl=ctrl,
+                external_action=requested,
+                requested_action=requested,
+                controller_target=ctrl,
+                universal_action=np.zeros(0, dtype=np.float32),
+                mode="no_op",
+            )
+        return self._robot.controller.convert(action, snapshot)
+
+    def _build_observation_fallback(self, snapshot):
+        if self._observation_builder is None:
+            raise StageUnavailableError("This environment has no Stage 3 ObservationBuilder.")
+        self._last_camera_metadata = {}
+        sensor_observation = None
+        if self._sensor_provider is not None:
+            sensor_observation = self._sensor_provider.capture(snapshot)
+            self._last_camera_metadata = dict(sensor_observation.camera_metadata)
+        return self._observation_builder.build(snapshot, sensor_observation)
+
+    @staticmethod
+    def _require_simulation_time_s(snapshot) -> float:
+        value = getattr(snapshot, "simulation_time", None)
+        if value is None or not np.isfinite(float(value)):
+            raise ValueError("TaskEnv info requires finite simulation_time_s from RuntimeSnapshot")
+        return float(value)
+
+    def _camera_capture_info(self, *, elapsed_steps: int, simulation_time_s: float):
+        if not self._last_camera_metadata:
+            return None
+        cameras = {
+            str(name): _json_value(asdict(value) if is_dataclass(value) else value)
+            for name, value in self._last_camera_metadata.items()
+        }
+        return {
+            "source": "SensorObservation.camera_metadata",
+            "observation_boundary": {
+                "elapsed_steps": int(elapsed_steps),
+                "simulation_time_s": float(simulation_time_s),
+            },
+            "cameras": cameras,
+        }
+
+    def _format_step_result(self, lifecycle, result):
+        snapshot = result.snapshot
+        evaluation = result.evaluation
+        command = result.command
+        applied = result.applied
+        self._last_snapshot = snapshot
+        self._elapsed_steps = result.elapsed_steps
+        action_info = {
+            "requested": command.requested_action,
+            "external": command.external_action,
+            "controller_target": command.controller_target,
+            "requested_ctrl": applied.requested_ctrl,
+            "applied_ctrl": applied.applied_ctrl,
+            "mode": command.mode,
+        }
+        if self.config.observation.include_diagnostics:
+            action_info.update(
+                {
+                    "clipped": bool(command.action_clipped or applied.clipped),
+                    "action_clipped": command.action_clipped,
+                    "ctrl_clipped": applied.clipped,
+                }
+            )
+        simulation_time_s = self._require_simulation_time_s(snapshot)
+        info = {
+            "is_success": evaluation.success,
+            "elapsed_steps": self._elapsed_steps,
+            "task_metrics": evaluation.metrics,
+            "reward_terms": evaluation.reward_terms,
+            "task_reward": evaluation.reward,
+            "task_failure": evaluation.failure,
+            "action": action_info,
+            "success_definition": self.config.task.success_definition,
+            "requested_action": command.requested_action,
+            "external_action": command.external_action,
+            "controller_target": command.controller_target,
+            "requested_ctrl": applied.requested_ctrl,
+            "applied_ctrl": applied.applied_ctrl,
+            "observation_schema": self._observation_builder.schema,
+            "simulation_time_s": simulation_time_s,
+        }
+        if result.episode_end is not None:
+            self._last_episode_end = result.episode_end
+            info["episode_end_v1"] = result.episode_end.to_mapping()
+        if self.config.observation.include_diagnostics:
+            info["action_clipped"] = command.action_clipped
+            info["ctrl_clipped"] = applied.clipped
+        # ``universal_action`` is the one canonical action after the
+        # controller/native adapter boundary.  Its schema is task-family
+        # specific: Panda keeps its historical eight-dimensional layout,
+        # while native non-arm tasks expose their runtime actuator vector.
+        info["universal_action"] = command.universal_action
+        action_info["universal_action"] = command.universal_action
+        camera_capture = self._camera_capture_info(
+            elapsed_steps=self._elapsed_steps,
+            simulation_time_s=simulation_time_s,
+        )
+        if camera_capture is not None:
+            info["camera_capture"] = camera_capture
+        validate_task_info(info, phase="step")
+        return result.observation, evaluation.reward, result.terminated, result.truncated, info
+
+    def _placeholder_evaluation(self) -> TaskEvaluation:
+        return TaskLifecycleAdapter.placeholder_evaluation()
+
+    def _reset_task_evaluation(self, snapshot) -> TaskEvaluation:
+        if self._task_lifecycle is None:
+            return self._placeholder_evaluation()
+        evaluation = self._task_lifecycle.reset_task(
+            state=snapshot,
+            reset_mask=np.ones(1, dtype=np.bool_),
+            legacy_snapshot=snapshot,
+        )
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    def _sample_episode_reset_state_for_lifecycle(
+        self,
+        seed: int | None,
+        rng: np.random.Generator,
+    ):
+        return self._sample_episode_reset_state(seed=seed, rng=rng)
+
+    def _sample_episode_reset_state(
+        self,
+        *,
+        seed: int | None,
+        rng: np.random.Generator | None = None,
+    ):
+        """Resolve one episode reset without changing the compiled baseline.
+
+        A task sampler may opt into per-episode state sampling with
+        ``sample_episode_state``.  The hook is deliberately at the public
+        reset boundary: it receives only the immutable compiled scene and the
+        Gym RNG, returns a value-object state, and cannot advance physics.
+        Existing task samplers that only implement construction-time
+        ``resolve_initial_state`` keep their original deterministic behavior.
+        """
+
+        runtime = self._require_runtime()
+        sampler = self._reset_sampler
+        reset_rng = self.np_random if rng is None else rng
+        sample_state = getattr(sampler, "sample_episode_state", None)
+        if not callable(sample_state):
+            return runtime.initial_state, {}
+        state, parameters = sample_state(
+            compiled_scene=self._runtime_assembly.compiled_scene,
+            initial_state=runtime.initial_state,
+            rng=reset_rng,
+            seed=seed,
+        )
+        if not isinstance(parameters, dict):
+            raise TypeError("episode reset sampler must return a dict of parameters")
+        return state, _json_value(parameters)
+
+    def _evaluate_task(self, previous_snapshot, action, snapshot) -> TaskEvaluation:
+        if self._task_lifecycle is None:
+            return self._placeholder_evaluation()
+        evaluation = self._task_lifecycle.evaluate_task(
+            state=snapshot,
+            action=action,
+            elapsed_steps=int(self._elapsed_steps),
+            previous_state=previous_snapshot,
+            legacy_previous_snapshot=previous_snapshot,
+            legacy_current_snapshot=snapshot,
+        )
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    @staticmethod
+    def _coerce_scalar_evaluation(evaluation: Any) -> TaskEvaluation:
+        return TaskLifecycleAdapter.coerce_scalar_evaluation(evaluation)
+
+    def _build_observation(self, snapshot):
+        if self._task_lifecycle is None:
+            raise StageUnavailableError("This environment has no task lifecycle adapter.")
+        return self._task_lifecycle.build_observation(
+            snapshot,
+            fallback=lambda: self._build_observation_fallback(snapshot),
+        )
+
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
@@ -99,7 +678,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
 
         candidate_type = cls
-        if not hasattr(cls, 'uid'):
+        if getattr(cls, 'uid', None) == 'base-task-env':
             candidate_type = type(
                 'PositionCandidateSelectedReferenceEnv', (cls,),
                 {'uid': 'c02b-position-servo-candidate-v1'},
@@ -142,7 +721,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                                   {'uid': 'r03c-attached-entity-leaf-candidate-v1'})
         else:
             candidate_type = cls
-        if not fixed_attachment and not hasattr(cls, 'uid'):
+        if not fixed_attachment and getattr(cls, 'uid', None) == 'base-task-env':
             candidate_type = type('LeafPositionSelectedReferenceEnv', (cls,),
                                   {'uid': 'r02c-independent-position-leaf-candidate-v1'})
         env = candidate_type(provider=provider, backend=backend, horizon=horizon,
@@ -170,7 +749,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 or binding.mixed_record_metadata is None):
             raise TypeError('binding does not own the complete mixed-control lifecycle hooks')
         candidate_type = cls
-        if not hasattr(cls, 'uid'):
+        if getattr(cls, 'uid', None) == 'base-task-env':
             candidate_type = type(
                 'MixedControlSelectedReferenceEnv', (cls,),
                 {'uid': 'selected-reference-mixed-control-v1'},
@@ -304,13 +883,210 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _execution_fault(self, value):
         self._episode_execution_state().fault = value
 
-    def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
+    def _format_component_reset(self, lifecycle, result, seed):
+        snapshot = result.snapshot
+        evaluation = result.evaluation
+        reset_parameters = result.reset_parameters
+        self._last_snapshot = snapshot
+        self._elapsed_steps = lifecycle.elapsed_steps
+        self._last_episode_end = None
+        try:
+            simulation_time_s = self._require_simulation_time_s(snapshot)
+            info = {
+                "seed": seed,
+                "reset_parameters": reset_parameters,
+                "task_uid": self.config.task.task_uid,
+                "stage": "stage4_gym_contract",
+                "is_success": evaluation.success,
+                "elapsed_steps": self._elapsed_steps,
+                "task_metrics": evaluation.metrics,
+                "reward_terms": evaluation.reward_terms,
+                "task_reward": evaluation.reward,
+                "task_failure": evaluation.failure,
+                "success_definition": self.config.task.success_definition,
+                "resolved_control_metadata": self.metadata["action_schema"],
+                "observation_schema": self._observation_builder.schema,
+                "simulation_time_s": simulation_time_s,
+                "episode_id": lifecycle.episode_id,
+                "termination_policy": lifecycle.termination_policy.to_mapping(),
+            }
+            if result.previous_episode_end is not None:
+                info["previous_episode_end_v1"] = result.previous_episode_end.to_mapping()
+            camera_capture = self._camera_capture_info(
+                elapsed_steps=self._elapsed_steps,
+                simulation_time_s=simulation_time_s,
+            )
+            if camera_capture is not None:
+                info["camera_capture"] = camera_capture
+            validate_task_info(info, phase="reset")
+            return result.observation, info
+        except BaseException as error:
+            lifecycle._latch_fault(
+                "gymnasium_reset_result",
+                error,
+                after_snapshot=snapshot,
+                control_step_before=0,
+                control_step_after=0,
+            )
+            raise
+
+    def _format_component_step(self, lifecycle, result):
+        try:
+            return self._format_step_result(lifecycle, result)
+        except BaseException as error:
+            lifecycle.revoke_unpublished_step(result)
+            lifecycle._latch_fault(
+                "gymnasium_result",
+                error,
+                before_snapshot=result.previous_snapshot,
+                after_snapshot=result.snapshot,
+                control_step_before=max(0, result.elapsed_steps - 1),
+                control_step_after=result.elapsed_steps,
+                interval_attempted=True,
+                interval_completed=True,
+            )
+            self._last_snapshot = result.snapshot
+            self._elapsed_steps = result.elapsed_steps
+            raise
+
+    def _component_record_metadata(self) -> dict[str, Any]:
+        """Return the JSON-compatible public projection used by recorders only."""
+        metadata = {
+            "env_metadata": _json_value(self.metadata),
+            "resolved_config": _json_value(asdict(self.config)),
+        }
+        metadata["universal_action_schema"] = _json_value(
+            self.metadata.get("universal_action_schema", {})
+        )
+        return metadata
+
+    def _close_component_resources(self) -> None:
+        # Runtime lifecycle may already be closed independently.  The Env
+        # still owns auxiliary UI/sensor resources and must release them once.
+        if getattr(self, "_resources_closed", False):
+            return
+        ui_provider = getattr(self, "_ui_render_provider", None)
+        sensor_provider = getattr(self, "_sensor_provider", None)
+        lifecycle = getattr(self, "_task_lifecycle", None)
+        runtime = getattr(self, "_runtime", None)
+        self._ui_render_provider = None
+        self._sensor_provider = None
+        self._task_lifecycle = None
+        self._runtime = None
+        self._runtime_assembly = None
+
+        owners = [ui_provider, sensor_provider]
+        # SingleTaskLifecycleAdapter is the sole closer of the RuntimeBoundary.
+        # Before it exists (including partial construction), the environment
+        # falls back to closing a boundary that was already returned by bootstrap.
+        owners.append(lifecycle if lifecycle is not None else runtime)
+        first_error: BaseException | None = None
+        for owner in owners:
+            close = getattr(owner, "close", None)
+            if not callable(close):
+                continue
+            try:
+                close()
+            except BaseException as exc:
+                if first_error is None:
+                    first_error = exc
+        episode_end = getattr(lifecycle, "episode_end", None)
+        if episode_end is not None:
+            self._last_episode_end = episode_end
+        self._resources_closed = True
+        if first_error is not None:
+            raise first_error
+
+    def _has_component_assembly(self):
+        return getattr(self, '_uses_component_assembly',
+                       getattr(type(self), 'uses_component_task_config', False)
+                       or '_task_lifecycle' in self.__dict__)
+
+    def _initialize_components(
+        self,
+        config: ResolvedEnvConfig | None = None,
+        *,
+        render_mode=None,
+        build_runtime: bool = True,
+    ) -> None:
+        self._closed = False
+        self._last_episode_end = None
+        self.config = config if config is not None else self.default_config()
+        # Import only the lightweight render contract during environment
+        # construction. Concrete renderer backends stay out of the physics
+        # bootstrap.
+        from ..render.base.contracts import normalize_render_mode
+
+        self.render_mode = (
+            None
+            if render_mode is None
+            else normalize_render_mode(render_mode).value
+        )
+        self._ui_render_provider = None
+        self.scene = SCENE_REGISTRY.create(self.config.scene.scene_uid)
+        self.agents = tuple(
+            AGENT_REGISTRY.create(uid) for uid in self.config.agents.agent_uids
+        )
+        self.objects = tuple(
+            OBJECT_REGISTRY.create(uid) for uid in self.config.objects.object_uids
+        )
+        self._composition_spec = TaskCompositionSpec(
+            task_uid=self.config.task.task_uid,
+            scene_uid=self.config.scene.scene_uid,
+            agent_uids=self.config.agents.agent_uids,
+            object_uids=self.config.objects.object_uids,
+            placement_notes=self.placement_notes(),
+            success_definition=self.config.task.success_definition,
+        )
+        self._execution_plan = resolve_execution_plan(
+            type(self),
+            self.config,
+            agents=self.agents,
+            render_mode=self.render_mode,
+        )
+        self._env_metadata = build_stage0_metadata(self.uid, self.config)
+        self._runtime_assembly = None
+        self._runtime = None
+        self._reset_sampler = None
+        self._robot = None
+        self._action_adapter = None
+        self._observation_builder = None
+        self._task_definition = None
+        self._task_lifecycle = None
+        self._camera_sensors = ()
+        self._sensor_provider = None
+        self._last_camera_metadata = {}
+        self._last_snapshot = None
+        self._elapsed_steps = 0
+        self.metadata = gym_metadata_dict(self._env_metadata, stage="stage4_gym_contract")
+        reference_profile = _json_value(self.reference_profile())
+        if reference_profile:
+            self.metadata["reference_profile"] = reference_profile
+        self._configure_render_metadata()
+        if build_runtime:
+            self._build_runtime_with_rollback()
+
+
+    def __init__(self, config=None, *, render_mode=None, build_runtime=True,
+                 provider='geophys', backend='cpu', horizon=6000,
                  _binding=None, _diagnostic_gripper_control_hz=None,
                  _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
                  _execution_spec_v1=None, _mixed_control_candidate=False,
                  _initial_value=None):
+        self._uses_component_assembly = bool(
+            getattr(type(self), 'uses_component_task_config', False)
+            or config is not None
+            or (_binding is None and self.binding is None
+                and getattr(type(self).from_reference_config, '__func__', None)
+                is SelectedReferenceEnv.from_reference_config.__func__)
+        )
+        if self._uses_component_assembly:
+            self._initialize_components(config, render_mode=render_mode, build_runtime=build_runtime)
+            return
+        if render_mode is not None or build_runtime is not True:
+            raise ValueError('selected reference rendering and component runtime options require a component task')
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if camera_observation_config is not None:
@@ -436,7 +1212,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.camera_observation_config = camera_observation_config
         self._camera_consumer = None
         self._camera_session_factory = None
-        self.metadata = {**METADATA, 'action_schema': dict(METADATA['action_schema']), 'env_id': self.uid,
+        action_schema = self.binding.action_schema or METADATA['action_schema']
+        self.metadata = {**METADATA, 'action_schema': dict(action_schema), 'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
@@ -451,41 +1228,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.action_space is None or self.observation_space is None:
                 raise TypeError('mixed-control task binding must supply task-owned spaces')
         else:
-            self.action_space = Box(-np.inf, np.inf, (8,), dtype=np.float64)
+            self.action_space = self.binding.action_space_factory()
         keys = [key for _, key in self.binding.object_poses]
-        state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
-        if self.position_profile:
-            state_spaces.update({
-                'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-                'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
-            })
-            if self.dual_entity_position:
-                state_spaces['entities'] = Dict({
-                    profile.entity_id: Dict({
-                        'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                    })
-                    for profile in self.position_profiles
-                })
-            elif self.fixed_attachment_leaf_position_profile and self.leaf_plan is not None:
-                state_spaces['entities'] = Dict({
-                    'panda-arm': Dict({
-                        'joint_position': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                    }),
-                    'panda-hand': Dict({
-                        'joint_position': Box(-np.inf, np.inf, (2,), dtype=np.float32),
-                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                    }),
-                })
-        observation_spaces = OrderedDict((
-            ('state', Dict(state_spaces)),
-            ('privileged_state', Dict({
-                k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
-                for k in keys
-            })),
-        ))
+        if not _mixed_control_candidate:
+            from ..observations.selected_reference import selected_reference_observation_spaces
+            observation_spaces = selected_reference_observation_spaces(self)
         if camera_observation_config is not None:
             from ..observations.state import camera_observation_field_specs
             from .types import ObservationFieldSpec, ObservationSchema
@@ -633,6 +1380,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     @property
     def composition_spec(self):
+        if self._has_component_assembly():
+            return self._composition_spec
         return self.value['source'].composition
 
     def _position_requirements(self):
@@ -661,7 +1410,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         )
 
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
-        return self._reset(seed=seed, options=options)
+        self._episode_execution_state().require_open('environment is closed')
+        component_lifecycle = None
+        if self._has_component_assembly():
+            seed = None if seed is _RESET_SEED_UNSET else seed
+            GymEnvBase.reset(self, seed=seed)
+            self._last_camera_metadata = {}
+            component_lifecycle = self._require_task_lifecycle()
+            operations = component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
+        else:
+            operations = self._prepare_reference_reset(seed=seed, options=options)
+        result = self._episode_execution_state().execute_reset(**operations)
+        if component_lifecycle is not None:
+            return self._format_component_reset(component_lifecycle, result, seed)
+        return result
 
     def reset_for_solution(self, solution, *, seed=_RESET_SEED_UNSET, options=None):
         """Reset this selected route for one caller-owned Solution instance.
@@ -674,9 +1436,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
         self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
-        return self._reset(seed=seed, options=options, external_solution=solution)
+        operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
+        return self._episode_execution_state().execute_reset(**operations)
 
-    def _reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
+    def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
         mixed_reset_plan = None
         if self._mixed_control_candidate:
@@ -755,21 +1518,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self._mixed_control_candidate:
             # Publish a candidate reset plan only after the replacement begins.
             self._mixed_reset_plan = mixed_reset_plan
-        self._episode_execution_state().begin_reset()
         previous_session, self.session = self.session, None
         previous_value = self.value
         previous_session_close_attempted = False
-        phase = 'camera_reset_close'
-        try:
+        failure_phase = 'camera_reset_close'
+
+        def prepare():
+            nonlocal seed, previous_session_close_attempted, failure_phase
             self._close_camera_consumer()
-            phase = 'reset_close'
+            failure_phase = 'reset_close'
             if previous_session is not None:
                 previous_session_close_attempted = True
                 previous_session.close()
                 if self._mixed_control_candidate:
                     self._mixed_close_receipt = previous_session.close_receipt
             previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
-            phase = 'selected_reconstruction'
+            failure_phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
             if self._mixed_control_candidate and self._mixed_initial_value_pending:
                 self._mixed_initial_value_pending = False
@@ -806,14 +1570,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.artifact = _artifact_for_reset(self.artifact, self.value)
             if external_solution is not None:
                 self.binding.validate_external_solution(self.value, external_solution)
-            phase = 'reset_seed'
+            failure_phase = 'reset_seed'
             if not getattr(self, 'position_profile', False):
                 seed = self.binding.reset_seed(seed)
             self.solution = self.value.get('solution')
             self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
             self.dual_entity_position = len(self.position_profiles) == 2
-            phase = 'reset_sample'
+            failure_phase = 'reset_sample'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 if reset_plan is None:
@@ -851,7 +1615,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if self._declared_execution_spec_v1 is not None:
                     raise ValueError('SelectedReferenceEnv rebuild dropped its declared ExecutionSpecV1')
                 self.execution = ExecutionSpec(self.provider, PROFILE, 'none', self.backend, 0, 'strict')
-            phase = 'session_materialization'
+
+        def materialize_runtime():
+            nonlocal failure_phase
+            failure_phase = 'session_materialization'
             if self.position_profile:
                 from ..runtime.sessions.control import (
                     ControlBindingPlanV1,
@@ -945,7 +1712,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         self.value['resolved_configuration'].get('gripper_control_hz')
                         if self._native_feedback_profile is not None else None
                     ))
-            phase = 'runtime_reset'
+
+        def reset_runtime():
+            nonlocal failure_phase
+            failure_phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 self.realized = self.session.reset_plan(reset_plan)
@@ -962,7 +1732,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 # Native task samples and the published Solution boundary
                 # must share the RuntimeSession's actual episode identity.
                 self._selected_episode_id = self.session.episode_id
-            phase = 'snapshot_readback'
+
+        def read_state():
+            nonlocal failure_phase
+            failure_phase = 'snapshot_readback'
             self.state = self.session.snapshot()
             if self.position_profile:
                 self.typed_state = self.session.snapshot_v1(
@@ -981,10 +1754,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.feedback = None
                 self.controller.reset(self.state)
             else:
-                phase = 'controller_feedback'
+                failure_phase = 'controller_feedback'
                 self.feedback = self.session.control_feedback(self.state)
                 self.controller.reset(self.state, self.feedback)
-            phase = 'reset_observation'
+            return self.state
+
+        def observe(_state):
+            nonlocal failure_phase
+            failure_phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
             if self.mixed_control_profile:
@@ -1046,10 +1823,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise ValueError('reference reset must not advance physics')
             reset_solution = external_solution if external_solution is not None else self.solution
             if reset_solution is not None:
-                phase = 'solution_reset'
+                failure_phase = 'solution_reset'
                 reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
-            phase = 'arm_schedule_reset'
+            return self.obs
+
+        def publish(_state, _observation):
+            nonlocal failure_phase
+            failure_phase = 'arm_schedule_reset'
             if self.mixed_control_profile:
                 self.arm_schedule = None
             elif all(callable(getattr(self.controller, name, None))
@@ -1069,13 +1850,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_info = dict(self.info)
             self._published_position_evaluation = self.evaluation
             self.recorder = None
-            self._episode_execution_state().finish_reset()
             if external_solution is not None:
                 # The caller's instance is the only active mutable Solution
                 # owner for this episode; the task value has no active copy.
                 self.solution = None
             return self.obs, self.info
-        except BaseException as error:
+
+        def on_failure(_phase, error):
+            nonlocal previous_session_close_attempted
             self._external_solution_owner = None
             try:
                 self._close_camera_consumer()
@@ -1099,8 +1881,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
-            self._latch_fault(phase, error)
-            raise
+            self._latch_fault(failure_phase, error)
+
+        return dict(
+            prepare=prepare, materialize=materialize_runtime, reset_runtime=reset_runtime,
+            read_state=read_state, observe=observe, publish=publish, on_failure=on_failure,
+        )
 
     def expert_execution_info(self):
         """Return the required, validated R1 readiness at the current boundary."""
@@ -1248,6 +2034,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             consumer.close()
 
     def step(self, action):
+        component_lifecycle = None
+        if self._has_component_assembly():
+            self._episode_execution_state().require_open("environment is closed")
+            component_lifecycle = self._require_task_lifecycle()
+            self._last_camera_metadata = {}
+            operations = component_lifecycle.prepare_step(action)
+        else:
+            operations = self._prepare_selected_step(action)
+        result = self._episode_execution_state().execute_interval(**operations)
+        if component_lifecycle is not None:
+            return self._format_component_step(component_lifecycle, result)
+        return result
+
+    def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(
             closed_message='environment is closed',
             fault_prefix='selected execution is faulted; reset() is required',
@@ -1265,13 +2065,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise ValueError('Solution action boundary is stale or mismatched')
             if action.control_request is None:
                 raise ValueError('Solution action requires its versioned control request')
-            return self._step(action.action, proposal=action, caller_driven=True)
+            return self._prepare_reference_step(action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
         if getattr(self, 'mixed_control_profile', False):
-            return self._step_mixed_control(action)
+            return self._prepare_mixed_control(action)
         from ..controllers.canonical.contracts import StructuredActionRequestV1
         if getattr(self, 'position_profile', False):
             if self._stopped or self.session is None:
@@ -1289,20 +2089,24 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if type(action) is not action_set_type:
                     raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
                 action.structured_request(self.position_scene, self.leaf_plan)
-                return self._step_leaf_position(action)
+                return self._prepare_leaf_position(action)
             if not isinstance(action, StructuredActionRequestV1):
                 raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
             from ..runtime.sessions.control import prepare_structured_action
             # Reject bad action and plan identities before changing episode mode,
             # Controller memory, Recorder state, or the Provider.
             prepare_structured_action(self.position_plan, action)
-            return self._step_position_profile(action)
+            return self._prepare_position_profile(action)
         if isinstance(action, StructuredActionRequestV1):
             raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
-        return self._step(action)
+        return self._prepare_reference_step(action)
 
     def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
+        operations = self._prepare_mixed_control(action, proposal=proposal, observer_solution=observer_solution)
+        return self._episode_execution_state().execute_interval(**operations)
+
+    def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
         """Run one task-prepared named command through the existing RuntimeSession."""
         from ..controllers.canonical.contracts import (
             AppliedMixedActuatorCommandV1, MixedActuatorCommandV1, StructuredActionRequestV1,
@@ -1367,11 +2171,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         stepwise_receipt = None
         interval_attempted = False
         interval_completed = False
-        phase = 'mixed_control_application'
-        try:
+        failure_phase = 'mixed_control_application'
+
+        def apply_control():
+            nonlocal interval_attempted, interval_completed, applied
+            nonlocal applied_payload, stepwise_receipt, failure_phase
             interval_attempted = True
             if stepwise:
-                phase = 'mixed_physics_substep_interval'
+                failure_phase = 'mixed_physics_substep_interval'
                 stepwise_session = getattr(self.session, 'step_mixed_actuator_interval', None)
                 if not callable(stepwise_session):
                     raise StageUnavailableError(
@@ -1422,10 +2229,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if type(applied) is not AppliedMixedActuatorCommandV1:
                     raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
                 applied_payload = applied.to_mapping()
-                phase = 'mixed_physics_step'
+            return applied_payload
+
+        def advance(_applied):
+            nonlocal failure_phase, interval_completed
+            if not stepwise:
+                failure_phase = 'mixed_physics_step'
                 self.state = self.session.step()
                 interval_completed = True
-            phase = 'mixed_observation'
+
+        def evaluate(_state):
+            nonlocal failure_phase
+            failure_phase = 'mixed_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info.update({
                 'provider': self.provider,
@@ -1436,8 +2251,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             })
             if stepwise_receipt is not None:
                 self.info['physics_rate_control_v1'] = stepwise_receipt
+            return self.evaluation
+
+        def publish(_control, _state, _evaluation, _observation):
+            nonlocal failure_phase
             if proposal is not None:
-                phase = 'mixed_solution_observation'
+                failure_phase = 'mixed_solution_observation'
                 extra = self.binding.observe_expert_kwargs(self, ())
                 if not isinstance(extra, Mapping):
                     raise TypeError('mixed Solution observation kwargs must be a mapping')
@@ -1486,15 +2305,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'structured-control-transition-v1', request, (writer_row,),
                 )
             transition.validate()
-            terminated = bool(self.evaluation.failure) if proposal is not None else False
-            truncated = self.state.control_step >= self.horizon
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=bool(self.evaluation.failure) if proposal is not None else False,
+                task_truncated=False, control_step=self.state.control_step, horizon=self.horizon,
+            )
             if proposal is not None and observer_solution.done:
                 terminated = False
                 truncated = False
             if proposal is not None and observer_solution.failed and not truncated:
                 terminated = True
             if self.recorder is not None and getattr(self.recorder, 'active', False):
-                phase = 'mixed_recorder_append'
+                failure_phase = 'mixed_recorder_append'
                 self.recorder.append_transition(
                     action_values, universal_action, self.obs, float(self.evaluation.reward),
                     bool(self.evaluation.success), terminated, truncated, self.info,
@@ -1511,7 +2332,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.stop('horizon_reached')
                 self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-        except BaseException as error:
+
+        def on_failure(_phase, error):
             after = None
             readback_error = None
             if interval_attempted:
@@ -1521,13 +2343,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 except BaseException as snapshot_error:
                     readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
             self._latch_fault(
-                phase, error, before_state=before, after_state=after,
+                failure_phase, error, before_state=before, after_state=after,
                 interval_attempted=interval_attempted,
                 interval_completed=interval_completed,
                 native_substeps_expected=self.artifact.timebase.control_substeps,
                 transition_status='not_recorded', readback_error=readback_error,
             )
-            raise
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            read_state=lambda: self.state, evaluate=evaluate,
+            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+        )
 
     def step_with_solution(self, solution):
         """Run one caller-owned Solution action through the selected lifecycle.
@@ -1772,6 +2599,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return event
 
     def _step_leaf_position(self, action):
+        operations = self._prepare_leaf_position(action)
+        return self._episode_execution_state().execute_interval(**operations)
+
+    def _prepare_leaf_position(self, action):
         """Dispatch one real R02b two-leaf interval through the selected lifecycle."""
         if not getattr(self, 'leaf_position_profile', False) or self.session is None:
             raise RuntimeError('R02c leaf plan and RuntimeSession are required')
@@ -1799,26 +2630,36 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         before_state = self.state
         transition_counts_before = self._recording_counts(self.recorder)
         append_attempted = False
-        phase = 'leaf_control_preflight'
         completed = False
-        try:
-            result = dispatch_leaf_control_interval(
+
+        def apply_control():
+            return dispatch_leaf_control_interval(
                 self.leaf_plan, leaf_request, scene=self.position_scene, runtime=self.session,
             )
+
+        def advance(result):
+            nonlocal completed
             self.state = self.session.snapshot()
             self.typed_state = result.next_publication
             completed = True
             self.feedback = None
             self.last_leaf_transition = (action, result)
-            phase = 'leaf_observation'
-            self.obs, self.info, self.evaluation = self.observation(self.state)
+
+        def evaluate(state):
+            self.obs, self.info, self.evaluation = self.observation(state)
             self.info.update({
                 'provider': self.provider,
                 'leaf_effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
                 'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
             })
-            terminated = bool(self.evaluation.failure)
-            truncated = self.state.control_step >= self.horizon
+            return self.evaluation
+
+        def publish(result, state, evaluation, observation):
+            nonlocal append_attempted
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=evaluation.failure, task_truncated=False,
+                control_step=state.control_step, horizon=self.horizon,
+            )
             self._episode_execution_state().finish_step(
                 terminated=terminated, truncated=truncated,
             )
@@ -1827,17 +2668,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._last_position_truncated = truncated
             self._last_position_request = request
             if self.recorder is not None:
-                phase = 'record_leaf_transition'
                 append_attempted = True
                 from ..recorders.position_metadata import record_leaf_position_transition
                 record_leaf_position_transition(
                     self, action, request, result, terminated=terminated, truncated=truncated,
                 )
-            self._published_position_state = self.state
+            self._published_position_state = state
             self._published_position_typed_state = self.typed_state
-            self._published_position_obs = self.obs
+            self._published_position_obs = observation
             self._published_position_info = dict(self.info)
-            self._published_position_evaluation = self.evaluation
+            self._published_position_evaluation = evaluation
             if terminated or truncated:
                 self._position_episode_end = self._make_position_episode_end(
                     'task_terminal' if terminated else 'horizon_reached',
@@ -1845,8 +2685,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     bootstrap_allowed=not terminated,
                 )
                 self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
-            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-        except BaseException as error:
+            return observation, float(evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(phase, error):
+            nonlocal completed
+            if append_attempted:
+                phase = 'record_leaf_transition'
             after_state = None
             readback_error = None
             try:
@@ -1866,7 +2710,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ), readback_error=readback_error,
             )
             self._stopped = True
-            raise
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            read_state=lambda: self.state, evaluate=evaluate,
+            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+            phases=('leaf_control_preflight', 'leaf_control_preflight',
+                    'leaf_control_preflight', 'leaf_observation',
+                    'leaf_observation', 'leaf_observation'),
+        )
 
     def _record_leaf_position_transition(self, action, request, result, *, terminated, truncated):
         # Retained for diagnostic consumers of the historical internal method.
@@ -1876,6 +2728,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         )
 
     def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
+        operations = self._prepare_position_profile(request, proposal=proposal, observer_solution=observer_solution)
+        return self._episode_execution_state().execute_interval(**operations)
+
+    def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None):
         """Run one source-bound Position interval through the selected lifecycle latch."""
         if self._execution_fault is not None:
             fault = self._execution_fault
@@ -1903,10 +2759,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         interval_completed = False
         transition_counts_before = self._recording_counts(self.recorder)
         record_append_attempted = False
-        phase = 'position_control_preflight'
-        try:
+        publication_phase = 'position_observation'
+
+        def apply_control():
+            nonlocal interval_attempted
             interval_attempted = True
-            phase = 'position_control_compute_apply_step'
             profiles = tuple(getattr(self, 'position_profiles', (self.controller,)))
             controller_profiles = profiles if len(profiles) == 2 else profiles[0]
             requirements = (
@@ -1914,13 +2771,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if hasattr(self, 'position_profiles')
                 else getattr(self.controller, 'requirements', None)
             )
-            result = execute_position_control_interval(
+            return execute_position_control_interval(
                 self.session, controller_profiles, self.position_plan, request, self.typed_state,
                 scene=self.position_scene,
                 joint_bindings=self.position_joint_bindings,
                 frame_bindings=self.position_frame_bindings,
                 requirements=requirements,
             )
+
+        def advance(result):
+            nonlocal interval_completed
             if self.dual_entity_position:
                 position_records, self.state, self.typed_state = result
                 canonical = target = applied = None
@@ -1932,10 +2792,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.last_position_transition = (
                 position_records if self.dual_entity_position else (canonical, target, applied)
             )
-            phase = 'position_observation'
-            self.obs, self.info, self.evaluation = self.observation(self.state)
-            terminated = bool(self.evaluation.failure)
-            truncated = self.state.control_step >= self.horizon
+
+        def evaluate(state):
+            self.obs, self.info, self.evaluation = self.observation(state)
+            return self.evaluation
+
+        def publish(result, state, evaluation, observation):
+            nonlocal record_append_attempted, publication_phase
+            if self.dual_entity_position:
+                position_records = result[0]
+                canonical = target = applied = None
+            else:
+                canonical, target, applied = result[:3]
+                position_records = ((canonical, target, applied),)
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=evaluation.failure, task_truncated=False,
+                control_step=state.control_step, horizon=self.horizon,
+            )
             self._episode_execution_state().finish_step(
                 terminated=terminated, truncated=truncated,
             )
@@ -1946,11 +2819,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.value.get('f06_pickcube_isaac_input') is not None:
                 self._publish_pickcube_position_execution_info(self.info)
             if proposal is not None:
-                phase = 'position_solution_observation'
+                publication_phase = 'position_solution_observation'
                 solution_owner = self.solution if observer_solution is None else observer_solution
                 extra = self.binding.observe_expert_kwargs(self, None)
                 solution_owner.observe(
-                    self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra,
+                    observation, evaluation.reward, terminated, truncated, self.info, **extra,
                 )
                 if hasattr(solution_owner, 'outcome_report'):
                     self.info.update(solution_owner.outcome_report())
@@ -1962,7 +2835,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._stopped = bool(solution_owner.done or solution_owner.failed
                                      or terminated or truncated)
             if self.recorder is not None:
-                phase = 'record_position_transition'
+                publication_phase = 'record_position_transition'
                 record_append_attempted = True
                 if self.dual_entity_position:
                     from ..recorders.position_metadata import record_dual_position_transition
@@ -1975,14 +2848,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         request, canonical, target, applied,
                         terminated=terminated, truncated=truncated,
                     )
-            # Publish the boundary only after the complete step and any active
-            # recorder append have succeeded. A partially advanced fault is
-            # diagnostic evidence, never a synthetic T transition.
-            self._published_position_state = self.state
+            # No boundary is published until the active recorder append succeeds.
+            self._published_position_state = state
             self._published_position_typed_state = self.typed_state
-            self._published_position_obs = self.obs
+            self._published_position_obs = observation
             self._published_position_info = dict(self.info)
-            self._published_position_evaluation = self.evaluation
+            self._published_position_evaluation = evaluation
             if terminated or truncated:
                 self._position_episode_end = self._make_position_episode_end(
                     'task_terminal' if terminated else 'horizon_reached',
@@ -1991,8 +2862,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     bootstrap_allowed=not bool(terminated),
                 )
                 self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
-            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-        except BaseException as error:
+            return observation, float(evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(phase, error):
+            nonlocal interval_completed
+            if phase == 'position_publication':
+                phase = publication_phase
             after_state = None
             readback_error = None
             try:
@@ -2021,7 +2896,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ),
                 readback_error=readback_error,
             )
-            raise
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            read_state=lambda: self.state, evaluate=evaluate,
+            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+            phases=('position_control_compute_apply_step', 'position_control_compute_apply_step',
+                    'position_control_compute_apply_step', 'position_observation',
+                    'position_observation', 'position_publication'),
+        )
 
     def prepare_expert(self):
         """Create and reset the task Solution on demand after an environment reset."""
@@ -2112,6 +2995,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
 
     def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
+        operations = self._prepare_reference_step(action, proposal=proposal, observer_solution=observer_solution, caller_driven=caller_driven)
+        return self._episode_execution_state().execute_interval(**operations)
+
+    def _prepare_reference_step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         if self._execution_fault is not None:
             fault = self._execution_fault
             raise RuntimeError(
@@ -2121,14 +3008,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self._stopped or self.session is None:
             raise RuntimeError('reset required or episode already stopped')
         try:
-            vector = np.asarray(action, dtype=float)
-            if vector.shape != (8,) or not np.isfinite(vector).all():
-                raise ValueError('finite eight-dimensional absolute pose action required')
+            request = self.binding.prepare_action(action)
+            if not isinstance(request, RequestedAction):
+                raise TypeError('selected action binding must return RequestedAction')
+            request.validate()
         except BaseException as error:
             if proposal is not None:
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
             raise
-        request = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
         if proposal is not None and observer_solution is None and not caller_driven:
             observer_solution = self.solution
         requested_mode = (
@@ -2153,11 +3040,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         substeps = []
         before_state = self.state
         transition_counts_before = self._recording_counts(self.recorder)
-        phase = 'recorder_interval_begin'
+        failure_phase = 'recorder_interval_begin'
         interval_attempted = False
         interval_completed = False
         record_append_attempted = False
-        try:
+        canonical = target = applied = request_boundary = interval_receipt = None
+
+        def apply_control():
+            nonlocal failure_phase, interval_attempted, interval_completed
+            nonlocal canonical, target, applied, request_boundary
             request_boundary = (
                 self._execution_boundary(self.expert_execution_info())
                 if not self.position_profile else None
@@ -2166,7 +3057,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     and not callable(getattr(self.session, 'native_control_feedback_sample', None))):
                 raise RuntimeError('selected Provider RuntimeSession does not expose the required native feedback sample contract')
             if self.binding.control_request_required:
-                phase = 'controller_control_request_validation'
+                failure_phase = 'controller_control_request_validation'
                 if proposal is None or proposal.control_request is None:
                     raise ValueError('selected NutAssembly control requires its versioned arm execution request')
                 validate_request = getattr(self.controller, 'validate_arm_execution_request', None)
@@ -2179,13 +3070,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     raise ValueError('selected Controller does not admit this Solution control request')
                 validate_request(proposal.control_request)
             if self.recorder is not None and self.binding.recorder_mode == 'execution':
-                phase = 'recorder_interval_begin'
+                failure_phase = 'recorder_interval_begin'
                 self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
                                     self.artifact.timebase.control_substeps)
             if proposal is not None and getattr(proposal, 'control_request', None) is not None:
-                phase = 'controller_control_request'
+                failure_phase = 'controller_control_request'
                 self.controller.request_arm_execution(proposal.control_request)
-            phase = 'controller_compute'
+            failure_phase = 'controller_compute'
             canonical, target = self.controller.compute(self.state, self.feedback, request)
 
             def observe(index, state, feedback, effective, applied, diag,
@@ -2207,7 +3098,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.recorder.applied_substep(index, state, feedback, effective, applied,
                                                    observed_diagnostics)
             if self.binding.interval_mode == 'native':
-                phase = 'physics_step'
+                failure_phase = 'physics_step'
                 interval_attempted = True
                 self.state, target, applied, _ = self.session.step_control_interval(
                     target, self.controller, interval_observer=observe, arm_schedule=self.arm_schedule)
@@ -2215,15 +3106,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 # Preserve historical P1.6 grouped control-interval stepping,
                 # including the provider's boundary clock accumulation.
-                phase = 'control_application'
+                failure_phase = 'control_application'
                 applied = self.session.apply_control(target)
-                phase = 'physics_step'
+            return applied
+
+        def advance(_applied):
+            nonlocal failure_phase, interval_attempted, interval_completed
+            if self.binding.interval_mode != 'native':
+                failure_phase = 'physics_step'
                 interval_attempted = True
                 self.state = self.session.step()
                 interval_completed = True
-            phase = 'control_feedback'
+
+        def evaluate(_state):
+            nonlocal failure_phase, interval_receipt
+            failure_phase = 'control_feedback'
             self.feedback = self.session.control_feedback(self.state)
-            phase = 'observation'
+            failure_phase = 'observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
             if not self.position_profile:
@@ -2244,7 +3143,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         })
             interval_receipt = None
             if self.binding.native_interval_receipt_factory is not None:
-                phase = 'native_interval_receipt'
+                failure_phase = 'native_interval_receipt'
                 evaluation_boundary = self._execution_boundary(self.expert_execution_info())
                 interval_receipt = self.binding.native_interval_receipt_factory(
                     self, request_boundary, evaluation_boundary, tuple(native_samples), tuple(substeps),
@@ -2252,10 +3151,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 interval_receipt.validate()
                 self._active_native_interval_receipt = interval_receipt
                 self.info['native_interval_receipt_v1'] = interval_receipt.to_mapping()
-            terminated = bool(self.evaluation.failure)
-            truncated = self.state.control_step >= self.horizon
+            return self.evaluation
+
+        def publish(_control, _state, _evaluation, _observation):
+            nonlocal failure_phase, record_append_attempted
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=self.evaluation.failure, task_truncated=False,
+                control_step=self.state.control_step, horizon=self.horizon,
+            )
             if proposal is not None and not caller_driven:
-                phase = 'solution_observation'
+                failure_phase = 'solution_observation'
                 extra = (self.binding.observe_expert_kwargs(self, native_samples, interval_receipt)
                          if interval_receipt is not None
                          else self.binding.observe_expert_kwargs(self, native_samples))
@@ -2274,12 +3179,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 terminated=terminated, truncated=truncated, preserve_stop=True,
             )
             if self.recorder is not None:
-                phase = 'record_interval'
+                failure_phase = 'record_interval'
                 record_append_attempted = True
                 self._record_interval(request, canonical, target, applied, stage, diagnostics,
                                       terminated, truncated, substeps)
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-        except BaseException as error:
+
+        def on_failure(_phase, error):
             after_state = None
             readback_error = None
             if interval_attempted:
@@ -2300,7 +3206,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.recorder, transition_counts_before
             )
             self._latch_fault(
-                phase,
+                failure_phase,
                 error,
                 before_state=before_state,
                 after_state=after_state,
@@ -2325,7 +3231,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     if callable(add_note):
                         add_note(f'expert abort after execution fault also failed: {abort_error!r}')
             # An incomplete interval cannot be finalized as a valid trajectory.
-            raise
+
+        return dict(
+            apply_control=apply_control, advance=advance,
+            read_state=lambda: self.state, evaluate=evaluate,
+            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+        )
 
     @staticmethod
     def _recording_counts(recorder):
@@ -2384,8 +3295,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return None
 
     def close(self):
-        if self._closed:
-            return
+        component = self._has_component_assembly()
+        cleanup = self._close_component_resources if component else self._close_reference_resources
+        return self._episode_execution_state().execute_close(
+            cleanup, stop=not component,
+            allow_closed=component and not getattr(self, '_resources_closed', False),
+        )
+
+    def _close_reference_resources(self):
         if getattr(self, 'mixed_control_profile', False):
             first_error = None
             try:
@@ -2484,7 +3401,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         'type': type(task_resource_error).__name__,
                         'message': str(task_resource_error),
                     }
-            self._episode_execution_state().finish_close(stop=True)
             if first_error is not None:
                 raise first_error
             return
@@ -2533,7 +3449,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._mixed_close_receipt = dict(self._mixed_close_receipt)
                 if task_resource_receipt is not None:
                     self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
-            self._episode_execution_state().finish_close(stop=True)
             if first_error is not None:
                 raise first_error
             return
@@ -2561,25 +3476,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             first_error = retain_cleanup_error(
                 first_error, 'camera consumer close after Position finalization', error,
             )
-        try:
-            session, self.session = self.session, None
-            if session is not None:
-                try:
-                    session.close()
-                except BaseException as error:
-                    first_error = retain_cleanup_error(
-                        first_error, 'RuntimeSession close after Position finalization', error,
-                    )
-                try:
-                    close_owner = getattr(session, 'close_runtime_owner', None)
-                    if callable(close_owner):
-                        close_owner()
-                except BaseException as error:
-                    first_error = retain_cleanup_error(
-                        first_error, 'Runtime owner close after Position finalization', error,
-                    )
-        finally:
-            self._episode_execution_state().finish_close(stop=True)
+        session, self.session = self.session, None
+        if session is not None:
+            try:
+                session.close()
+            except BaseException as error:
+                first_error = retain_cleanup_error(
+                    first_error, 'RuntimeSession close after Position finalization', error,
+                )
+            try:
+                close_owner = getattr(session, 'close_runtime_owner', None)
+                if callable(close_owner):
+                    close_owner()
+            except BaseException as error:
+                first_error = retain_cleanup_error(
+                    first_error, 'Runtime owner close after Position finalization', error,
+                )
         if first_error is not None:
             raise first_error
 
@@ -2672,114 +3584,119 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         )
 
     def stop(self, reason='external_stop'):
-        """Finish the Position candidate at its last fully returned boundary."""
-
+        """Finish once at the last fully published boundary."""
         state = self._episode_execution_state()
-        state.require_open('cannot stop a closed selected environment')
+        state.require_open('cannot stop a closed environment')
+        component_lifecycle = None
+        if self._has_component_assembly():
+            component_lifecycle = self._require_task_lifecycle()
+            operations = component_lifecycle.prepare_stop(reason)
+        else:
+            operations = self._prepare_reference_stop(reason)
+        result = state.execute_stop(reason, **operations)
+        if component_lifecycle is not None:
+            self._last_episode_end = result
+        return result
+
+    def _prepare_reference_stop(self, reason):
+        state = self._episode_execution_state()
         if getattr(self, 'mixed_control_profile', False):
-            state.validate_stop_reason(reason)
-            if self._mixed_episode_end is not None:
+            def ensure_boundary():
+                if self.session is None or getattr(self, 'state', None) is None:
+                    raise RuntimeError('mixed-control reset must complete before Stop')
+
+            def create_end():
+                from ..trajectory.canonical.episode import make_episode_end_v1
+                fault = self._execution_fault
+                solution = self._external_solution_owner
+                solution_done = bool(getattr(solution, 'done', False)) if solution is not None else None
+                solution_failed = bool(getattr(solution, 'failed', False)) if solution is not None else None
+                if reason == 'solution_completed' and solution_done is not True:
+                    raise ValueError('solution_completed requires the active caller-owned Solution to be done')
+                if reason == 'solution_failed' and solution_failed is not True:
+                    raise ValueError('solution_failed requires the active caller-owned Solution to be failed')
+                end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
+                    reason, selected_reasons=True,
+                )
+                success = None if fault is not None else bool(self.evaluation.success)
+                event_sequence = 0
+                if self.recorder is not None and getattr(self.recorder, 'active', False):
+                    event_sequence = self.recorder.next_boundary_event_sequence(int(self.state.control_step))
+                payload = {
+                    'requested_reason': reason,
+                    'control_step': int(self.state.control_step),
+                    'simulation_time_s': float(self.state.simulation_time),
+                    'source_id': self.value['source'].scene_source.source_id,
+                    'source_closure_digest': self.value['source'].source_closure_digest,
+                    'reset_sample_id': self.sample.sample_id,
+                    'controller_identity': self.controller.identity,
+                    'task_evaluation_success': success,
+                }
+                if solution is not None:
+                    payload['solution_identity'] = getattr(solution, 'identity', None)
+                    payload['solution_done'] = solution_done
+                    payload['solution_failed'] = solution_failed
+                    payload['solution_failure_reason'] = getattr(solution, 'failure_reason', None)
+                if fault is not None:
+                    payload['fault'] = fault.to_mapping()
+                self._mixed_episode_end = make_episode_end_v1(
+                    episode_id=self.session.episode_id,
+                    final_boundary=int(self.state.control_step),
+                    end_reason=end_reason,
+                    terminated=terminated,
+                    truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    source='task_env.selected_reference.mixed_control_v1',
+                    payload=payload,
+                    event_sequence=event_sequence,
+                    task_success=(None if fault is not None else success),
+                    solution_completed=(
+                        None if solution is None else
+                        bool(solution_done and not solution_failed)
+                    ),
+                )
                 return self._mixed_episode_end
-            if self.session is None or getattr(self, 'state', None) is None:
-                raise RuntimeError('mixed-control reset must complete before Stop')
-            from ..trajectory.canonical.episode import make_episode_end_v1
-            fault = self._execution_fault
-            solution = self._external_solution_owner
-            solution_done = bool(getattr(solution, 'done', False)) if solution is not None else None
-            solution_failed = bool(getattr(solution, 'failed', False)) if solution is not None else None
-            if reason == 'solution_completed' and solution_done is not True:
-                raise ValueError('solution_completed requires the active caller-owned Solution to be done')
-            if reason == 'solution_failed' and solution_failed is not True:
-                raise ValueError('solution_failed requires the active caller-owned Solution to be failed')
-            if fault is not None:
-                end_reason = 'execution_fault'
-                terminated, truncated, bootstrap_allowed = False, True, False
-            elif reason == 'solution_completed':
-                end_reason = 'solution_completed'
-                terminated, truncated, bootstrap_allowed = False, False, True
-            elif reason == 'solution_failed':
-                end_reason = 'solution_failed'
-                terminated, truncated, bootstrap_allowed = True, False, False
-            elif reason == 'horizon_reached':
-                end_reason = 'horizon_reached'
-                terminated, truncated, bootstrap_allowed = False, True, True
-            else:
-                end_reason = 'external_stop'
-                terminated, truncated, bootstrap_allowed = False, True, True
-            success = None if fault is not None else bool(self.evaluation.success)
-            event_sequence = 0
-            if self.recorder is not None and getattr(self.recorder, 'active', False):
-                event_sequence = self.recorder.next_boundary_event_sequence(int(self.state.control_step))
-            payload = {
-                'requested_reason': reason,
-                'control_step': int(self.state.control_step),
-                'simulation_time_s': float(self.state.simulation_time),
-                'source_id': self.value['source'].scene_source.source_id,
-                'source_closure_digest': self.value['source'].source_closure_digest,
-                'reset_sample_id': self.sample.sample_id,
-                'controller_identity': self.controller.identity,
-                'task_evaluation_success': success,
-            }
-            if solution is not None:
-                payload['solution_identity'] = getattr(solution, 'identity', None)
-                payload['solution_done'] = solution_done
-                payload['solution_failed'] = solution_failed
-                payload['solution_failure_reason'] = getattr(solution, 'failure_reason', None)
-            if fault is not None:
-                payload['fault'] = fault.to_mapping()
-            self._mixed_episode_end = make_episode_end_v1(
-                episode_id=self.session.episode_id,
-                final_boundary=int(self.state.control_step),
-                end_reason=end_reason,
-                terminated=terminated,
-                truncated=truncated,
-                bootstrap_allowed=bootstrap_allowed,
-                source='task_env.selected_reference.mixed_control_v1',
-                payload=payload,
-                event_sequence=event_sequence,
-                task_success=(None if fault is not None else success),
-                solution_completed=(
-                    None if solution is None else
-                    bool(solution_done and not solution_failed)
-                ),
-            )
-            self._episode_execution_state().finish_episode()
-            return self._mixed_episode_end
+
+            return dict(closed_message='cannot stop a closed selected environment',
+                        ensure_boundary=ensure_boundary, create_end=create_end)
         if not getattr(self, 'position_profile', False):
             raise StageUnavailableError(
                 'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
                 'legacy selected production-r1 behavior is unchanged'
             )
-        state.validate_stop_reason(reason)
-        if self._position_episode_end is not None:
-            return self._position_episode_end
-        if self.session is None or self._published_position_typed_state is None:
-            raise RuntimeError('reset() must complete before Stop')
-        if self._execution_fault is not None:
-            fault = self._execution_fault
-            self._position_episode_end = self._make_position_episode_end(
-                'execution_fault', terminated=False, truncated=True,
-                bootstrap_allowed=False,
-                task_success=_INFER_POSITION_TASK_SUCCESS,
-                payload={
-                    'requested_reason': reason,
-                    'fault': fault.to_mapping(),
-                    'observed_runtime_clock': {
-                        'control_step': int(self.state.control_step),
-                        'simulation_time_s': float(self.state.simulation_time),
+
+        def ensure_boundary():
+            if self.session is None or self._published_position_typed_state is None:
+                raise RuntimeError('reset() must complete before Stop')
+
+        def create_end():
+            end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(reason)
+            if self._execution_fault is not None:
+                fault = self._execution_fault
+                self._position_episode_end = self._make_position_episode_end(
+                    end_reason, terminated=terminated, truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    task_success=_INFER_POSITION_TASK_SUCCESS,
+                    payload={
+                        'requested_reason': reason,
+                        'fault': fault.to_mapping(),
+                        'observed_runtime_clock': {
+                            'control_step': int(self.state.control_step),
+                            'simulation_time_s': float(self.state.simulation_time),
+                        },
                     },
-                },
-            )
-        else:
-            self._position_episode_end = self._make_position_episode_end(
-                'external_stop',
-                terminated=False,
-                truncated=True,
-                bootstrap_allowed=True,
-                payload={'requested_reason': reason},
-            )
-        self._episode_execution_state().finish_episode()
-        return self._position_episode_end
+                )
+            else:
+                self._position_episode_end = self._make_position_episode_end(
+                    end_reason, terminated=terminated, truncated=truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    payload={'requested_reason': reason},
+                )
+            return self._position_episode_end
+
+
+        return dict(closed_message='cannot stop a closed selected environment',
+                    ensure_boundary=ensure_boundary, create_end=create_end)
 
     def _boundary(self):
         from ..trajectory.canonical.contracts import BoundaryRecord
@@ -2907,7 +3824,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             {'build': str(provider_build_identity(self.provider))},
             source_provenance,
             self.artifact.timebase, self.controller.identity, solution_identity,
-            digest({'readiness': solution_identity}), digest(METADATA), self.sample.task_seed, 'regression')
+            digest({'readiness': solution_identity}),
+            digest({'action_schema': dict(self.metadata['action_schema'])}),
+            self.sample.task_seed, 'regression')
         owners = self._owners()
         recipe = {'factory': type(self).__module__ + '.' + type(self).__name__,
             'artifact': self.artifact.to_mapping(), 'resolved_configuration': config,
@@ -3076,6 +3995,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def get_record_metadata(self):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
+        if self._has_component_assembly():
+            return self._component_record_metadata()
         if not getattr(self, 'mixed_control_profile', False):
             raise StageUnavailableError('selected reference recording metadata is unavailable on this route')
         value = self._mixed_record_metadata

@@ -44,7 +44,7 @@ optional SB3/RSL-RL learner or H5 recorder
 - [Planning index](planning/index.md)：public motion primitives 和 task-owned solution。
 - [Recording index](recording/index.md)：wrapper、trajectory lifecycle 和 H5 schema。
 
-单环境通过 `make_env(uid, *, config=None, render_mode=None, **kwargs)` 创建。PickCube 和 NutAssembly 的 selected 实现现由 `task_env.environment.reference_env.SelectedReferenceEnv` 拥有，旧 `task_env.tasks.reference_env` 路径兼容；Empty、Pendulum 和 TwoWheel 仍使用独立 `BaseTaskEnv`，统一迁移尚未完成。selected 目前不接受 render mode，classic-control 的有效 render 路线独立于此。旧并行入口和 registry 保留；登记、历史运行或单 slot 示例不证明新统一 Env 支持 batch。
+单环境通过 `make_env(uid, *, config=None, render_mode=None, **kwargs)` 创建。Empty、Pendulum、TwoWheel、PickCube 和 NutAssembly 的单环境由 `task_env.environment.reference_env.SelectedReferenceEnv` 拥有；`BaseTaskEnv` 和 `task_env.tasks.reference_env` 为兼容导出。组件任务使用 RuntimeBoundary，selected 任务使用 RuntimeSession；两者由共同 episode owner 协调，动作、观测和支持的 render 以任务配置为准。当前变更待 Sol 复审，真实 provider 回归未运行。旧并行入口和 registry 保留；登记、历史运行或单 slot 示例不证明新统一 Env 支持 batch。
 
 ## 内置任务
 

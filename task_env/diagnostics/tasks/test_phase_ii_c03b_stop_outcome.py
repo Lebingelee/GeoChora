@@ -145,6 +145,23 @@ def test_termination_policy_defaults_and_external_stop_constraints():
     assert policy.external_stop_terminated is True
 
 
+def test_scalar_stop_uses_the_task_termination_policy():
+    runtime = FaultInjectingRuntime()
+    policy = EpisodeTerminationPolicyV1(
+        external_stop_terminated=True, bootstrap_on_external_stop=False,
+    )
+    lifecycle = _lifecycle(runtime, policy=policy)
+    try:
+        lifecycle.reset(seed=7, options=None, rng=np.random.default_rng(7))
+        outcome = lifecycle.stop('operator_request').outcome
+        assert outcome.end_reason == 'external_stop'
+        assert (outcome.terminated, outcome.truncated, outcome.bootstrap_allowed) == (
+            True, False, False,
+        )
+    finally:
+        lifecycle.close()
+
+
 def test_close_finalizes_the_active_episode_once_before_runtime_teardown():
     runtime = FaultInjectingRuntime()
     lifecycle = _lifecycle(runtime)

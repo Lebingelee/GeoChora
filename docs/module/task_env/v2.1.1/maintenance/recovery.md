@@ -21,13 +21,17 @@ attempt001及维护者授权续作已返包，最终执行HEAD为`656ef136`。So
 
 attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-refactor-attempt002.md)：scalar episode 部分状态与准入已共用，classic／selected 的完整生命周期和 Env 类仍未统一，RW1 为 FAIL；原生验证未运行，仍待 Sol 复审。
 
+### 2026-11-05 生命周期续作
+
+维护者授权更长的三个单环境修复。当前工作将 `BaseTaskEnv` 兼容出口指向 `SelectedReferenceEnv`，三个组件任务通过共同 episode owner 执行 reset、step、stop 和 close；组件 RuntimeBoundary 和 selected RuntimeSession 保持各自物理接口。证据限于禁止引擎导入的合成回归；真实 provider、物理和独立 reader 未运行。本次结果等待 Sol 复审，不代表 R2/R3 或阶段3已经接受；详见[Terra 交付记录](reviews/20261105_lifecycle_unification_terra.md)。
+
 ## 阶段3前待办
 
 [维护方案](../planning/pre-stage3-environment-refactor.md)涵盖环境归整、诊断隔离、Env统一、静态SHA优化，以及新手安装／已有路径复用／启动脚本／example二次开发指引。交付位置包括README、`task_env/doc`和本版[指南](../guides/README.md)，不能只更新GPT工作文档。已有部分代码与启动入口检查点；完整重构、新安装及启动入口的 native 验证尚未完成。
 
 Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交G06后续实施。旧并行注册／脚本及历史证据不改写，不因此要求本次追加并行native或训练检查。阶段3–7状态保持不变。
 
-## 当前返工范围：30分钟
+## 历史返工范围：30分钟
 
 维护者已指定30分钟硬窗口。本轮只优先修复生命周期统一R1；Marker简化、F06职责整理及不受影响的文档诊断优化延期，不因这些事项继续延长窗口。见[规划优先级](../planning/pre-stage3-environment-refactor.md#24-维护者指定的30分钟返工优先级)。本轮无native／GPU／完整物理reader预算，现有物理证据边界不变；新包为`V211_PRE_STAGE3_REFACTOR_attempt002`，准备后由维护者转发，不自动启动或进入阶段3。
 
@@ -36,4 +40,4 @@ Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交
 - `MUJOCO_LOG.TXT` SHA-256 `dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b`。
 - `docs/maintenance/20261030_runtime_route_diagnostic_handoff.md` SHA-256 `18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61`。
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
-- 阶段2及本维护writer窗口已释放；attempt001完成Sol复审，当前等待整合返工包，尚未派发新窗口。执行者自己的进程组退出收据已核对；他人锁不干扰。本项不授权新的三后端九格、2b attempt3、Isaac native或阶段3。
+- attempt001和attempt002窗口已释放；2026-11-05较长续作的实际完成和窗口释放以本次报告为准。不得干扰其他用户的原生运行。本项不授权新的三后端九格、2b attempt3、Isaac native或阶段3。
