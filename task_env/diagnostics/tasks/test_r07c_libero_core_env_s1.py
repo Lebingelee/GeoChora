@@ -1097,6 +1097,30 @@ def test_mixed_task_without_object_pose_projection_uses_task_owned_spaces(monkey
         env.close()
 
 
+def test_mixed_recording_start_failure_leaves_no_recorder_and_can_retry(monkeypatch, tmp_path):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    from task_env.recorders import TransitionRecorder
+
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        env.reset(seed=51)
+        original = TransitionRecorder.begin_episode
+        def fail_begin(*_args, **_kwargs):
+            raise ValueError('injected initial recording failure')
+        monkeypatch.setattr(TransitionRecorder, 'begin_episode', fail_begin)
+        with pytest.raises(ValueError, match='initial recording failure'):
+            env.start_recording(tmp_path / 'mixed.h5')
+        assert env.recorder is None and env.recording_path is None
+        assert not (tmp_path / 'mixed.h5').exists()
+        monkeypatch.setattr(TransitionRecorder, 'begin_episode', original)
+        env.start_recording(tmp_path / 'mixed.h5')
+        assert env.recorder.active and env.recorder.observation_count == 1
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('damage', ('stale_revision', 'nonfinite_action', 'unknown_field'))
 def test_mixed_preparation_rejects_bad_input_before_runtime_write(monkeypatch, damage):
     global _FAKE_WORLD

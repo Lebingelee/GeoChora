@@ -155,3 +155,9 @@ Nut specialization SHA由 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d732
 新增一个明确标记的provider-free测试：使用当前Core commit和显式 `core_dirty=True` 的合成catalog，先确认正式 `validate_catalog` 拒绝，再仅在测试中替换asset checker的catalog准入，实际执行 `compile_candidate`、规范Env构造、reset、外部Solution `act → step → observe` 和close。任务动作／观测binding、Panda scalar控制绑定及source记录经此调用链执行；provider session为替身。该测试不调用Judge、不写正式报告或证据包、不声称dirty catalog通过，不能替代此前失败的严格Oracle／Judge预检或任何物理回归。
 
 禁止引擎导入的selected／R05b／Harness组合 **153 passed、1 skipped、1 deselected**；完整argv、输出与当时diff摘要见ignored `synthetic-candidate-current.json`。skip为缺少冻结Isaac解释器，排除真实provider reset／step；两份保护untracked及严格clean-check均保留。未运行真实引擎、Isaac、GPU或物理reader。
+
+## Structured录制终结与初始化原子性（续作，待复审）
+
+Position与mixed共享既有recorder owner的v3终止原因、最终boundary、T/T+1和H5回读校验；保留Position的 `horizon` 别名、leaf／camera专用读回以及各路线原有错误信息。mixed录制开始改为先成功 `begin_episode` 再发布recorder和路径；合成故障注入确认初始化失败后环境无活动recorder、无输出文件且可重试。新增两路线的错误终止原因和不完整boundary检查，确认拒绝前录制状态不变。
+
+无引擎selected／R05b／recorder组合 **164 passed、1 skipped、1 deselected**；lifecycle组 **183 passed、3 deselected**；leaf／mixed假provider组合 **13 passed**，日志及diff摘要见ignored `record-finalize-v2-selected.json`、`record-finalize-v2-lifecycle.json`、`record-finalize-v2-mixed.json`。附加严格禁引擎的attached-leaf合成H5及reader／篡改检查 **1 passed**（64 transitions／65 boundaries，不是物理reader）。首次完整lifecycle尝试中的一项candidate测试因严格guard拒绝查询MuJoCo spec而失败；已将该测试的provider身份明确替换为合成值后重跑。attached-leaf读回首次误用会预置假MuJoCo模块的mixed guard，reader按其禁止provider模块契约拒绝；改用严格guard后通过。未运行真实引擎、Isaac、GPU或物理reader。

@@ -180,6 +180,8 @@ def test_synthetic_candidate_compiles_and_drives_caller_solution_without_judge_c
         assert value is catalog and value['core_dirty'] is True
         return {'core_repo': value['core_repo'], 'core_commit': value['core_commit'], 'core_dirty': True}
     monkeypatch.setattr(asset_check, 'validate_catalog', synthetic_catalog_only)
+    monkeypatch.setattr('task_env.runtime.sessions.api.provider_build_identity',
+                        lambda _provider: {'manifest_version': 'synthetic-provider-no-qualification'})
     spec = CandidateSpec.from_dict({
         'schema_version': 'harness-candidate-spec-v0', 'task_id': 'synthetic/pick-lift-v1',
         'template': 'pick-lift-v0',

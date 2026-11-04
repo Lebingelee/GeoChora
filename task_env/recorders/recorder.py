@@ -277,4 +277,53 @@ class TransitionRecorder:
         return output
 
 
+def finalize_structured_recording(recorder, path, episode_end, reason, *, position, leaf=False, camera=False):
+    """Finalize and verify the existing v3 stream against its episode boundary."""
+    from .h5 import (load_camera_observations_h5, load_leaf_control_records_h5,
+                     load_structured_control_records_h5)
+
+    outcome = episode_end.outcome
+    allowed_reasons = {
+        outcome.end_reason,
+        str(episode_end.boundary_event.payload.get('requested_reason', '')),
+    }
+    if position and outcome.end_reason == 'horizon_reached':
+        allowed_reasons.add('horizon')
+    if str(reason) not in allowed_reasons:
+        raise ValueError(
+            'recording finalization reason disagrees with EpisodeOutcome' if position else
+            'mixed-control recording finalization reason disagrees with EpisodeOutcome'
+        )
+    if recorder.transition_count != outcome.final_boundary:
+        raise RuntimeError(
+            'recording T does not match the last complete Position boundary; '
+            'an incomplete interval cannot be finalized' if position else
+            'mixed-control H5 T does not match the final complete control boundary'
+        )
+    trajectory = recorder.end_episode(
+        outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
+    )
+    output = recorder.save_h5(path.parent, path.name)
+    loaded = (load_leaf_control_records_h5(output) if leaf
+              else load_structured_control_records_h5(output))
+    if (loaded['transition_count'] != trajectory.transition_count
+            or loaded['observation_count'] != len(trajectory.observations)
+            or loaded['outcome'] != outcome):
+        raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch' if position else
+                         'mixed-control Generic H5 v3 structured-control readback mismatch')
+    camera_result = None
+    if camera:
+        camera_result = load_camera_observations_h5(output)
+        if camera_result['observation_count'] != len(trajectory.observations):
+            raise ValueError('Position camera metadata reader T/T+1 count mismatch')
+    return {
+        'schema_id': 'task-env-h5', 'schema_version': 'v3',
+        'transition_count': loaded['transition_count'],
+        'observation_count': loaded['observation_count'],
+        **({'camera_observation_schema': camera_result['schema_version']}
+           if camera_result is not None else {}),
+        'outcome': outcome.to_mapping(), 'path': str(output),
+    }
+
+
 __all__ = ["TransitionRecorder"]

@@ -341,3 +341,22 @@ def test_recorder_finalization_is_exactly_once_and_validates_event_before_mutati
     assert not recorder.active
     with pytest.raises(RuntimeError, match="no active recording"):
         recorder.end_episode("external_stop", outcome=end.outcome, end_event=end.boundary_event)
+
+
+@pytest.mark.parametrize('position', (False, True))
+def test_structured_finalizer_rejects_wrong_reason_and_boundary_before_mutation(tmp_path, position):
+    from task_env.recorders.recorder import finalize_structured_recording
+
+    recorder = TransitionRecorder(RecorderConfig(schema_version='v3'))
+    recorder.begin_episode(np.zeros(1), {'seed': 1}, {'universal_action_schema': {'dimension': 8}})
+    end = make_episode_end_v1(
+        episode_id='episode', final_boundary=1, end_reason='external_stop',
+        terminated=False, truncated=True, bootstrap_allowed=True, source='test',
+    )
+    path = tmp_path / 'not-created.h5'
+    with pytest.raises(ValueError, match='reason disagrees'):
+        finalize_structured_recording(recorder, path, end, 'wrong', position=position)
+    with pytest.raises(RuntimeError, match='complete.*boundary'):
+        finalize_structured_recording(recorder, path, end, 'external_stop', position=position)
+    assert recorder.active and recorder.transition_count == 0 and recorder.observation_count == 1
+    assert not path.exists()

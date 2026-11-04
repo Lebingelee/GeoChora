@@ -3686,11 +3686,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 path = path.with_name(path.name + '.h5')
             if path.exists():
                 raise FileExistsError(path)
-            self.recorder = TransitionRecorder(RecorderConfig(
+            recorder = TransitionRecorder(RecorderConfig(
                 schema_version='v3', max_transitions=max(self.horizon, 1),
             ))
+            recorder.begin_episode(self.obs, dict(self.info), self.get_record_metadata())
             self.recording_path = path
-            self.recorder.begin_episode(self.obs, dict(self.info), self.get_record_metadata())
+            self.recorder = recorder
             return
         if getattr(self, 'position_profile', False):
             from ..recorders import RecorderConfig, TransitionRecorder
@@ -3803,89 +3804,25 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def finish_recording(self, reason):
         if getattr(self, 'mixed_control_profile', False):
-            from ..recorders import load_structured_control_records_h5
+            from ..recorders.recorder import finalize_structured_recording
 
             if self.recorder is None or not getattr(self.recorder, 'active', False):
                 raise RuntimeError('no active mixed-control recording')
             if self._mixed_episode_end is None:
                 self.stop(str(reason))
-            episode_end = self._mixed_episode_end
-            outcome = episode_end.outcome
-            allowed_reasons = {
-                outcome.end_reason,
-                str(episode_end.boundary_event.payload.get('requested_reason', '')),
-            }
-            if str(reason) not in allowed_reasons:
-                raise ValueError('mixed-control recording finalization reason disagrees with EpisodeOutcome')
-            if self.recorder.transition_count != outcome.final_boundary:
-                raise RuntimeError('mixed-control H5 T does not match the final complete control boundary')
-            trajectory = self.recorder.end_episode(
-                outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
+            return finalize_structured_recording(
+                self.recorder, self.recording_path, self._mixed_episode_end, reason, position=False,
             )
-            output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
-            loaded = load_structured_control_records_h5(output)
-            if (loaded['transition_count'] != trajectory.transition_count
-                    or loaded['observation_count'] != len(trajectory.observations)
-                    or loaded['outcome'] != outcome):
-                raise ValueError('mixed-control Generic H5 v3 structured-control readback mismatch')
-            return {
-                'schema_id': 'task-env-h5', 'schema_version': 'v3',
-                'transition_count': loaded['transition_count'],
-                'observation_count': loaded['observation_count'],
-                'outcome': outcome.to_mapping(), 'path': str(output),
-            }
         if getattr(self, 'position_profile', False):
-            from ..recorders import (
-                load_leaf_control_records_h5, load_structured_control_records_h5,
-            )
+            from ..recorders.recorder import finalize_structured_recording
             if self.recorder is None or not getattr(self.recorder, 'active', False):
                 raise RuntimeError('no active recording')
             if self._position_episode_end is None:
                 self.stop(str(reason))
-            episode_end = self._position_episode_end
-            outcome = episode_end.outcome
-            allowed_reasons = {
-                outcome.end_reason,
-                str(episode_end.boundary_event.payload.get('requested_reason', '')),
-            }
-            if outcome.end_reason == 'horizon_reached':
-                allowed_reasons.add('horizon')
-            if str(reason) not in allowed_reasons:
-                raise ValueError('recording finalization reason disagrees with EpisodeOutcome')
-
-            transition_count = self.recorder.transition_count
-            if transition_count != outcome.final_boundary:
-                raise RuntimeError(
-                    'recording T does not match the last complete Position boundary; '
-                    'an incomplete interval cannot be finalized'
-                )
-            trajectory = self.recorder.end_episode(
-                outcome.end_reason,
-                outcome=outcome,
-                end_event=episode_end.boundary_event,
+            return finalize_structured_recording(
+                self.recorder, self.recording_path, self._position_episode_end, reason, position=True,
+                leaf=self.leaf_position_profile, camera=self.camera_observation_config is not None,
             )
-            output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
-            loaded = (load_leaf_control_records_h5(output) if self.leaf_position_profile
-                      else load_structured_control_records_h5(output))
-            if (loaded['transition_count'] != trajectory.transition_count
-                    or loaded['observation_count'] != len(trajectory.observations)
-                    or loaded['outcome'] != outcome):
-                raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch')
-            camera_result = None
-            if self.camera_observation_config is not None:
-                from ..recorders import load_camera_observations_h5
-
-                camera_result = load_camera_observations_h5(output)
-                if camera_result['observation_count'] != len(trajectory.observations):
-                    raise ValueError('Position camera metadata reader T/T+1 count mismatch')
-            return {
-                'schema_id': 'task-env-h5', 'schema_version': 'v3',
-                'transition_count': loaded['transition_count'],
-                'observation_count': loaded['observation_count'],
-                **({'camera_observation_schema': camera_result['schema_version']}
-                   if camera_result is not None else {}),
-                'outcome': outcome.to_mapping(), 'path': str(output),
-            }
         from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')
