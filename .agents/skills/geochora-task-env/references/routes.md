@@ -15,12 +15,13 @@ Use this page to locate the current owner; the versioned public API and capabili
 
 - Selected lifecycle class `SelectedReferenceEnv` is defined in `task_env/environment/reference_env.py`; `task_env/tasks/reference_env.py` retains compatibility exports. It delegates execution to `task_env/runtime/sessions/` and one provider adapter. The three classic-control tasks still use the independent `BaseTaskEnv` route; unification is incomplete.
 - Position recording metadata and selected coordinator provenance: `task_env/recorders/position_metadata.py` and `task_env/recorders/reference_provenance.py`; canonical H5 storage is in `task_env/recorders/h5.py`, and independent reader examples live under `examples/recording/`.
+- Selected observation projection: `task_env/observations/selected_reference.py`; task-specific evaluation and Solution hooks remain with their tasks. Legacy scalar observation components retain their existing owners pending lifecycle unification.
 - Public TaskEnv contracts: `docs/module/task_env/v2.1.0/api/` and `contracts/`.
 - Versioned capability evidence: `docs/module/task_env/v2.1.0/capabilities/capability-matrix.json`. Provider status is an exact source × provider × backend × control intersection.
 
 ## Current examples and focused tests
 
-- Scalar public route: `examples/README.md` and `examples/tasks/pick_cube.py`.
+- Scalar public route: `examples/start.py`, `examples/README.md` and `examples/tasks/pick_cube.py`; the new launcher has offline argument coverage but no native result in this maintenance checkpoint.
 - Declarative construction example: `examples/tasks/declared_marker.py`; it demonstrates existing shared composition, but its adapter class is internal.
 - Selected-config and optional-Controller regressions: `task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py`.
 - Existing construction/consumer regressions: `task_env/diagnostics/tasks/test_reference_construction.py` and `test_selected_consumers.py`.
