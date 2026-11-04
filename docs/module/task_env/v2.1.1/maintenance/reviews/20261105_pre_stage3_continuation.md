@@ -326,3 +326,10 @@ PickCube与Nut的构造来源清单此前包含RuntimeSource及环境，但遗�
 ## 完整离线门重跑与边界测试修复（续作，待复审）
 
 在 `e1db3204` 重跑此前完整离线门发现一个测试替身缺少已提取的 `_source_xml_sha256` 方法；其余289项通过，1项跳过、5项排除。以 `7756812f` 修正测试替身绑定，先对边界与Nut五样本缓存定向检查，再对tracked clean源码重跑完整离线门，结果为 **290 passed、1 skipped、5 deselected**。具体排除、命令、资源和原始输出见[门核对](20261105_pre_stage3_gate_audit.md)及ignored `audit-e1db3204-offline/`、`audit-7756812f-offline/`。该修复未改变运行时代码，测试不证明物理结果；整体维护仍为PARTIAL。
+
+
+## 当前Marker通用接线的真实指南单步（续作，待复审）
+
+对tracked clean `bc190964a2aaf6ef2039c7b1122e4cbb89dd0479`，按当前 `task_env/doc/自定义任务构建指南.md` 的嵌套配置，使用已安装MuJoCo 3.8.1 CPU执行 `make_env → reset(seed=31) → action_space.sample() → step → close`，action-space seed为31。reset／step观测和采样动作通过space检查，动作shape为8、dtype为float64，单transition后control step为1、simulation time为0.01 s、reward为0、未终止或截断，close返回。确认实际Core和MuJoCo导入路径；此为一次单步入口，不证明任务成功、全新安装、其他provider、训练或渲染。
+
+worker在独立ignored cwd运行，按序非阻塞持有并释放两把共享native锁；耗时0.837秒、最大进程树RSS 175464448 bytes、进程组退出。完整脚本、源码HEAD、脚本摘要、argv、结果及资源／锁收据见ignored `marker-guide-bc190964/`。按horizon 10及5 substeps保守预留50步，累计保守预留 **115807／120000**，剩4193；实际只推进一个control interval。本次未启动Isaac、GPU或物理reader，不扩大或重标其他任务的物理证据。
