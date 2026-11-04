@@ -235,3 +235,11 @@ Marker不再逐项枚举reset、评价、观测等源码owner；已有assembly�
 上一检查点的Marker构造闭包持有创建时的binding：如果环境在重建前替换binding，该闭包可能继续把旧binding交给来源收集。现有 `ReferenceTaskBinding` 增加显式opt-in的普通构造调用方式，在初次构造和reset重建时将当前binding传给构造函数；未opt-in的调用方仍使用原单参数调用，seeded、native-feedback及mixed的专用构造路径不变。Marker使用该能力，合成测试在构造后替换观测回调并reset，确认实际新回调的源码摘要进入重建值。该检查不消除已记录的间接依赖和运行中代码／磁盘字节限制。
 
 受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **163 passed、2 deselected**，最大RSS 205631488 bytes；attached-leaf／mixed假provider组合 **14 passed**，最大RSS 165675008 bytes。完整argv、退出码和资源采样见ignored `current-binding-selected/`与 `current-binding-mixed/`。未运行真实引擎、Isaac、GPU或物理reader；Marker剩余通用组装和最终R2判断仍待后续工作及Sol复审。
+
+## Nut调用方动作的Solution身份（续作，待复审）
+
+Nut native反馈Solution生成的 `ExpertAction` 除来源边界及控制请求外也携带自身Solution身份；Solution在生成动作时核对公开边界中的身份，Env在推进前核对动作身份与任务声明。缺失或错误身份不推进物理、不改变episode模式；此前自行构造且未填写该字段的外部动作需要迁移。该身份是来源内容一致性检查，并非调用者身份认证。旧专家兼容入口保留；旧Nut专家录制和新调用方录制的模式、诊断及记录时序不同，当前重执行继续明确拒绝旧契约，不通过修改原记录或忽略差异冒充逐项一致。
+
+Nut Solution源码SHA由 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a14c3a320386` 变为 `80465facdd34958a4f609290f8fb895bd5bf492208636155d6031b2bc084c294`。按实际新源码构建，R05b的100／500 Hz Controller身份分别为 `4c651dac344500685f920cc519f904f67cb93a18db1bd56d3229f6bc740b7208`／`9b1d022a7abe77dea274a6d43409105bfb13e7c3220f0f407e1864a56d1d046c`，Solution身份为 `ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b`；仅刷新这些精确source-bound准入值，其他控制参数、来源、provider及反馈校验不放宽。
+
+受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165126144 bytes；覆盖Nut错误边界和身份拒绝、调用方五样本反馈、两种R05b律的合成准入及一次interval。完整argv、退出码和资源采样见ignored `nut-caller-identity-selected/`。本次未运行真实引擎、Isaac、GPU或物理reader，旧物理证据不重标。

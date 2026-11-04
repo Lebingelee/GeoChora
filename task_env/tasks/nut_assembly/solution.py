@@ -1210,6 +1210,7 @@ class NutAssemblyOutcomeSolutionV1:
             if (boundary.get("episode_id") != self._episode_id
                     or boundary.get("reset_sample_id") != self._reset_sample_id
                     or boundary.get("controller_identity") != self._controller_identity
+                    or boundary.get("solution_identity") != self.identity
                     or boundary.get("control_step") != self._emitted):
                 raise ValueError("native Solution action boundary is stale or belongs to another episode")
             self._pending_boundary = deepcopy(dict(boundary))
@@ -1221,7 +1222,8 @@ class NutAssemblyOutcomeSolutionV1:
                 "completion_policy_id": OUTCOME_POLICY_ID,
                 "readiness_warning_count": len(self._readiness_warnings)},
             control_request=control_request,
-            request_boundary=self._pending_boundary if self.require_native_feedback_contract else None)
+            request_boundary=self._pending_boundary if self.require_native_feedback_contract else None,
+            solution_identity=self.identity if self.require_native_feedback_contract else None)
         if planned: self._index += 1
         else: self._hold_ticks += 1
         self._emitted += 1

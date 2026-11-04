@@ -461,6 +461,12 @@ def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
         obs, info = env.reset(seed=19)
         solution.reset(obs, info, env.metadata)
         assert env.solution is None and env._external_solution_owner is None
+        bad_info = {**info, 'expert_execution_boundary_v1': {
+            **info['expert_execution_boundary_v1'], 'solution_identity': 'wrong-solution',
+        }}
+        with pytest.raises(ValueError, match='boundary'):
+            solution.act(obs, bad_info)
+        assert solution._emitted == 0 and env.state.control_step == 0
         action = solution.act(obs, info)
         stale = replace(action, request_boundary={**action.request_boundary, 'episode_id': 'stale'})
         with pytest.raises(ValueError, match='boundary'):
@@ -468,6 +474,11 @@ def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
         assert env.state.control_step == 0 and env._episode_mode is None
         with pytest.raises(ValueError, match='control request'):
             env.step(replace(action, control_request=None))
+        with pytest.raises(ValueError, match='Solution action identity'):
+            env.step(replace(action, solution_identity='wrong-solution'))
+        with pytest.raises(ValueError, match='Solution action identity'):
+            env.step(replace(action, solution_identity=None))
+        assert env.state.control_step == 0 and env._episode_mode is None
         obs, reward, terminated, truncated, info = env.step(action)
         receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
         assert len(receipt.samples) == 5

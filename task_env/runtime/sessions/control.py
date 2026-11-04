@@ -838,8 +838,8 @@ def materialize_control(
         expected_controller_identity = {
             # Pin the post-refactor source-bound identities. The independent
             # field, source, provider and resource checks remain mandatory.
-            100: '6282ca640c7a7d33c011f94f63e72c6decbf6310e55efec64a19ea004a62aca4',
-            500: 'ca0af8368bfe799599eff974242aae3d5d9dd97811291f52c83545daf34870e3',
+            100: '4c651dac344500685f920cc519f904f67cb93a18db1bd56d3229f6bc740b7208',
+            500: '9b1d022a7abe77dea274a6d43409105bfb13e7c3220f0f407e1864a56d1d046c',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
@@ -870,7 +870,7 @@ def materialize_control(
                     (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
                 or actual_controller.gripper_config.force_limit_N != 10.0
                 or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
-                or selected_solution.identity != '2db224bced2156e691276c6eaedf7468a87e6e07b90c205f5a2df208c0da8f07'
+                or selected_solution.identity != 'ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b'
                 or selected_solution.require_native_feedback_contract is not True
                 or digest(asdict(selected_solution.config)) !=
                     '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
