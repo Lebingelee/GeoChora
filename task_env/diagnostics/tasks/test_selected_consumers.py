@@ -1106,7 +1106,8 @@ def test_reexecution_rejects_changed_task_source_inventory(fake, tmp_path, monke
     def changed_source(*args, **kwargs):
         rebuilt = original_make_env(*args, **kwargs)
         sources = dict(rebuilt.value['source_sha256'])
-        name = next(iter(sources))
+        name = 'task_env/runtime/sessions/control.py'
+        assert name in sources
         if change == 'modified': sources[name] = '0' * 64
         elif change == 'missing': del sources[name]
         else: sources['unexpected/new/source.py'] = '0' * 64
@@ -2043,6 +2044,20 @@ def test_removed_task_plan_and_private_recorder_exports_are_not_active():
     assert recorder.__all__==['main']
     assert not hasattr(trajectory, '_build_plan')
     assert not hasattr(recorder, '_pick_cube_config')
+
+
+@pytest.mark.parametrize('uid', IDS)
+def test_selected_task_source_inventory_includes_runtime_admission(fake, uid):
+    import hashlib
+    from pathlib import Path
+
+    env = make_env(uid, config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        root = Path(__file__).resolve().parents[3]
+        for name in ('task_env/runtime/sessions/api.py', 'task_env/runtime/sessions/control.py'):
+            assert env.value['source_sha256'][name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
+    finally:
+        env.close()
 
 
 def test_marker_public_factory_reset_step_and_source_provenance(fake):

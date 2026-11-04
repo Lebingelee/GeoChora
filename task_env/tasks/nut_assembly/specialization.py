@@ -400,6 +400,7 @@ def _source_identity_files():
         "task_env/recorders/position_metadata.py",
         "task_env/observations/selected_reference.py",
         "task_env/planners/completion.py",
+        "task_env/runtime/sessions/api.py", "task_env/runtime/sessions/control.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
         "task_env/planners/cartesian.py", "task_env/planners/contracts.py",

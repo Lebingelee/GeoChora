@@ -314,3 +314,10 @@ PickCube／Nut的源码清单增加共同路径工具以如实记录新的直接
 物理频率混合控制的逐子步Controller返回类型、原生回执数量、Controller回执配对及首个target一致性检查归入既有 `runtime.sessions.control`；Env继续调用RuntimeSession、在原时间点接收状态、判断interval完成、锁存故障并发布transition。没有改变控制律、任务语义、推进次数或对部分推进的拒绝策略。新增无引擎检查覆盖缺字段、回执数量错误和首个target不一致。
 
 受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **185 passed、2 deselected**，最大进程树RSS 165765120 bytes；使用现有task1 source-composed输入与明示synthetic MuJoCo fixture的mixed正常执行、部分控制写入／物理推进故障及回执检查 **7 passed**，最大RSS 332865536 bytes。完整argv与资源采样见ignored `mixed-substep-owner-selected/`、`mixed-substep-owner-v3/`。首次mixed组使用旧 `r07c_composed_fixture`，其plan状态不符合当前源码所要求的 `SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED`，两个测试在构造前被拒绝；未修改旧fixture，改用当前格式的task1来源重跑。合成fixture未执行真实物理，不证明LIBERO任务成功或Qualification；本轮未运行真实引擎、Isaac、GPU或物理reader。
+
+
+## Runtime准入来源清单补全（续作，待复审）
+
+PickCube与Nut的构造来源清单此前包含RuntimeSource及环境，但遗漏实际参与selected物化准入的 `runtime.sessions.api` 与 `runtime.sessions.control`。现将这两个文件纳入两任务的构造摘要；新增检查分别比较当前磁盘字节，已有PickCube外部Solution录制／重执行检查改为专门篡改或移除control模块摘要并确认在输出前拒绝。清单仍不是完整的Python调用图或运行中代码字节证明，provider实现与间接依赖须按各自证据核对。已包含旧源码清单的历史记录因清单精确匹配而可能拒绝在新源码上重执行；不补写旧记录或把它称为同源。
+
+由于Nut specialization源码变化，R05b 100／500 Hz Controller身份重新计算为 `ff8581c54a2a182f01a460413f742605c1217740a14e7d2e4412d1d6bf668b5e`／`03d7b779743d6d78685bbcca891a4353295768c9092dd9499e6cc601f8b010f9`，仅刷新严格身份值，其他准入不放宽；Nut specialization SHA为 `10c06fbf7f310735d34075774b6b1dfabb70e509bc39528c2277042b382b9707`。受监督、禁止引擎导入的完整selected／配置／R05b／F06投影／录制组合 **187 passed、2 deselected**，最大RSS 165576704 bytes；将已有重执行测试改为针对control模块后，相关定向组 **5 passed**。完整argv、退出码及资源采样见ignored `runtime-source-inventory/`、`runtime-source-replay/`。未运行真实引擎、Isaac、GPU或物理reader。

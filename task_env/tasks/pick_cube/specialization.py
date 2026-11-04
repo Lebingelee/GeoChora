@@ -192,6 +192,8 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
              root / "task_env/environment/lifecycle.py",
+             root / "task_env/runtime/sessions/api.py",
+             root / "task_env/runtime/sessions/control.py",
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/utils/_paths.py",

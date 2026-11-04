@@ -878,8 +878,8 @@ def materialize_control(
         expected_controller_identity = {
             # Pin the post-refactor source-bound identities. The independent
             # field, source, provider and resource checks remain mandatory.
-            100: 'a06a48987cbb1e778e194965ac725ae0e213baee3ccabfddc679b9ec52d36f03',
-            500: '28544311bf0e8eaf4bcaa9e35eb8a2d7f3faaaa73741bbad4e27c32253b400ac',
+            100: 'ff8581c54a2a182f01a460413f742605c1217740a14e7d2e4412d1d6bf668b5e',
+            500: '03d7b779743d6d78685bbcca891a4353295768c9092dd9499e6cc601f8b010f9',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
