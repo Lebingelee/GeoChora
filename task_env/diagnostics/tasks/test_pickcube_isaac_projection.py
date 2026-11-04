@@ -218,7 +218,7 @@ def test_position_reset_uses_artifact_frame_alias_for_single_segment_semantics()
 
 
 def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
-    from dataclasses import dataclass
+    from dataclasses import dataclass, replace
     from types import SimpleNamespace
     from unittest.mock import patch
 
@@ -226,6 +226,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     from task_env.runtime.sessions.control import ControlBindingPlanV1
     from task_env.runtime.sessions.api import F06_PICKCUBE_ISAAC_PROFILE
     from task_env.tasks.reference_env import SelectedReferenceEnv
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     @dataclass(frozen=True)
     class Artifact:
@@ -266,6 +267,18 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         'controller_binding_plan': plan,
         'solution': None,
     }
+    binding = make_reference_binding(source_delivery_manifest='fixture')
+    assert binding.reconcile_reset_artifact(initial_artifact, rebuilt_value) is rebuilt_artifact
+    with pytest.raises(ValueError, match='identical to its exact RuntimeInput'):
+        binding.reconcile_reset_artifact(initial_artifact, {
+            **rebuilt_value, 'artifact': initial_artifact,
+        })
+    binding.validate_seeded_execution(execution, execution, 31, rebuilt_value)
+    with pytest.raises(ValueError, match='exact route or requested seed'):
+        binding.validate_seeded_execution(replace(execution, provider_seed=32), execution, 31, rebuilt_value)
+    binding.validate_seeded_execution(execution, execution, 31, {})
+    with pytest.raises(ValueError, match='changed its declared ExecutionSpecV1'):
+        binding.validate_seeded_execution(replace(execution, provider_seed=32), execution, 31, {})
 
     env = object.__new__(SelectedReferenceEnv)
     env._closed = False
@@ -281,6 +294,8 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     env.binding = SimpleNamespace(
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
+        reconcile_reset_artifact=binding.reconcile_reset_artifact,
+        validate_seeded_execution=binding.validate_seeded_execution,
     )
     env._diagnostic_profile = None
     env._native_feedback_profile = None
