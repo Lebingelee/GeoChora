@@ -7,6 +7,35 @@ from task_env.environment.config import ResolvedEnvConfig
 from task_env.environment.configuration import resolve_task_env_config
 
 
+@pytest.mark.parametrize("provider,backend,device,profile", [
+    ("isaacsim", "cuda", "cuda:0", "isaac-gpu-physx-f04-position-v1"),
+    ("geophys", "cpu", "cpu", "geophys-usd-position-f05-s1-v1"),
+    ("geophys", "cpu", "cpu", "geophys-usd-position-f05-native-v1"),
+    ("geophys", "cpu", "cpu", "geophys-usd-position-f05-dg02-core-v1"),
+    ("isaacsim", "cuda", "cuda:0", "isaac-gpu-physx-f05-dg04-native-mimic-v1"),
+    ("isaacsim", "cuda", "cuda:0", "isaac-gpu-physx-pickcube-f06-v1"),
+])
+def test_selected_position_route_rejects_each_execution_identity_drift(provider, backend, device, profile):
+    from dataclasses import replace
+    from task_env.artifacts import ExecutionSpecV1
+    from task_env.runtime.sessions.api import validate_selected_position_route
+
+    spec = ExecutionSpecV1(
+        "execution-spec-v1", provider, backend, profile, 17, "best_effort",
+        RendererSelectionV1("renderer-selection-v1", "none", "cpu", "none", None),
+        device, (),
+    )
+    validate_selected_position_route(spec)
+    changes = (
+        {"physics_provider": "mujoco"}, {"physics_backend": "other"},
+        {"physics_device": "other"}, {"determinism_mode": "strict"},
+        {"physics_profile": "unknown-profile"},
+    )
+    for change in changes:
+        with pytest.raises(ValueError, match="unsupported provider execution route"):
+            validate_selected_position_route(replace(spec, **change))
+
+
 def _resolver_target(*, class_defaults=None, task_defaults=None):
     class Target:
         uid = "resolver-target-v1"

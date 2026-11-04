@@ -1135,21 +1135,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if (provider, backend) != (
                     _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
                 raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
-            execution_route = (
-                _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend,
-                _execution_spec_v1.physics_device, _execution_spec_v1.determinism_mode,
-                _execution_spec_v1.physics_profile,
-            )
-            allowed_versioned_routes = {
-                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f04-position-v1'),
-                ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
-                ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
-                ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-dg02-core-v1'),
-                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg04-native-mimic-v1'),
-                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-pickcube-f06-v1'),
-            }
-            if execution_route not in allowed_versioned_routes:
-                raise ValueError('versioned Position construction has an unsupported provider execution route')
+            from ..runtime.sessions.api import validate_selected_position_route
+            validate_selected_position_route(_execution_spec_v1)
         self._declared_execution_spec_v1 = _execution_spec_v1
         diagnostic_profile = self.binding.diagnostic_profile
         if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):

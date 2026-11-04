@@ -34,6 +34,28 @@ F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
+
+
+def validate_selected_position_route(execution):
+    """Check the bounded construction envelope, before source-specific admission.
+
+    Passing this check does not admit a source, delivery, provider build, or
+    native session; those retain their independent materialization checks.
+    """
+    route = (execution.physics_provider, execution.physics_backend,
+             execution.physics_device, execution.determinism_mode,
+             execution.physics_profile)
+    if route not in {
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE),
+        ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
+        ('geophys', 'cpu', 'cpu', 'best_effort', F05_GEOPHYS_NATIVE_POSITION_PROFILE),
+        ('geophys', 'cpu', 'cpu', 'best_effort', F05_DG02_GEOPHYS_USD_PROFILE),
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F05_DG04_ISAAC_NATIVE_PROFILE),
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F06_PICKCUBE_ISAAC_PROFILE),
+    }:
+        raise ValueError('versioned Position construction has an unsupported provider execution route')
+
+
 _F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
 _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
 # Digest of the task-owned USD binding and limits admitted with this delivery.

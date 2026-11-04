@@ -97,3 +97,9 @@ PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投�
 将已存在于环境中的pending native interval完整性校验归到canonical execution recorder，并在 `ExecutionRecorder.append` 准备完边界、修改存储前自行执行；环境仍在自己的发布边界调用同一校验，覆盖受限合成recorder及原有故障分类。缺失样本、计数／索引／timebase被篡改均拒绝，新增测试确认拒绝时pending、transitions、boundaries和blobs不变。保留边界序列化异常原有优先顺序：首次扩展测试暴露先读未序列化boundary导致异常类型变化，修正顺序后复验通过。
 
 禁止引擎导入的selected、structured recorder及R05b组 **119 passed、1 deselected**，排除真实provider reset/step；streaming组 **34 passed、2 deselected**。两项被排除的旧诊断测试原始尝试因 `nut_assembly.assets` 迁移后路径不存在而导入失败，尚未修复，不能计为通过；另一次扩展尝试包含需要真实 `scene` 的position／camera测试，被引擎guard拒绝，不计为通过。完整最终argv、stdout、退出码与当时未提交diff摘要保存在ignored `recorder-final-evidence.json`及 `recorder-stream-evidence.json`。以上均为离线／合成验证，未运行native、Isaac或GPU，也不将历史物理结果重标到新源码。
+
+## Position执行路线构造准入归位（续作，待复审）
+
+六条既有versioned Position构造路线的provider／backend／device／determinism／profile组合从环境构造收回现有runtime sessions admission owner，复用该owner已有profile常量；原准入集合和错误语义不变。该预检不授予source、delivery、provider build或native session准入，后续各自的精确检查仍然保留。新增测试逐路线检查五项身份偏移均拒绝；禁止引擎导入的selected／R05b／PickCube组 **133 passed、2 deselected**，排除真实provider reset／step及真实场景投影。
+
+F04合成adapter在显式独立输出目录下 **10 passed、3 deselected**；被排除的三项依赖本checkout不存在的历史attempt003 worker。首次尝试未设置 `F04_S1_OUTPUT`，另两项因输出目录环境变量缺失而失败；后续已设置并重跑。完整argv、输出及源码diff摘要见ignored `route-owner-evidence.json`和 `route-f04-evidence.json`。未启动真实引擎、Isaac或GPU，历史物理结果仍绑定原提交。
