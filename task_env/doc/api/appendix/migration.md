@@ -1,10 +1,10 @@
 # Migration
 
-> **Current release planning (2026-10-17):** GeoChora v1.1.0 is the selected
-> release-candidate target under the project-specific versioning policy. It is
-> a Core consolidation release with documented breaking API changes and is
-> not claimed to follow strict SemVer. The sections below describe current
-> migration behavior; the immutable v1.0.0 release documents remain unchanged.
+> **v2.1.1 当前边界：** selected 环境的实现位于
+> `task_env.environment.reference_env`；`task_env.tasks.reference_env` 保留兼容导出。
+> `BaseTaskEnv` 仍是独立 classic 实现，三个旧任务的统一迁移尚未完成。
+> 下方带 P2.0-B 标题的段落保留原迁移历史和当时状态，不能当作本次维护的当前验收结论；
+> 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
 
 **Import path**：不适用  
 **任务域**：Appendix  
@@ -22,8 +22,8 @@
 | `task_env.observation` | `task_env.observations` |
 | `task_env.planning` | `task_env.planners` |
 | `task_env.recording` | `task_env.recorders` |
-| `task_env.rendering` | `task_env.renderers` |
-| `task_env.experts` | `task_env.solutions` |
+| `task_env.rendering` | `task_env.render`（具体 renderer 以实际后端支持为准） |
+| `task_env.experts` | 任务拥有各自的 Solution；通用 `ExpertAction` 等契约在 `task_env.planners` |
 | `task_env.utils` | 按实际公开子包替换 |
 
 以上旧路径不保留 compatibility shim。迁移时使用顶层 `task_env.__all__` 或目标子包 `__all__` 核验导入名。
