@@ -5,6 +5,9 @@
 > `BaseTaskEnv` 仍是独立 classic 实现，三个旧任务的统一迁移尚未完成。
 > 下方带 P2.0-B 标题的段落保留原迁移历史和当时状态，不能当作本次维护的当前验收结论；
 > 当前状态见 [API 入口](../index.md) 和 [维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
+> Phase C 的标准方向是外部 Solution 产生 action 并交给 `env.step(action)`；
+> 下方历史 `step_expert()` 用法现仅是迁移前的受限兼容，不是标准 Env API。
+> NutAssembly 另有受限 caller-owned Solution 路线，但不表示普通外部 action 已不受限制。
 
 **Import path**：不适用  
 **任务域**：Appendix  

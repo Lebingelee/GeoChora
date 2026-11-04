@@ -22,9 +22,11 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py \
 
 The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
-Construct them through `from task_env import make_env`; NutAssembly advances
-through its guarded `step_expert()` route by default. The separate advanced
-R05b profile below uses the existing task-owned external Solution route.
+Construct them through `from task_env import make_env`; the current examples
+use the guarded `step_expert()` compatibility route. It is not the standard
+Env API: the target has an external Solution produce actions for `env.step(action)`.
+The separate advanced R05b profile below uses a bounded caller-owned Solution
+route, which still invokes that Solution through the Env and is transitional.
 Task success and Expert lifecycle completion remain separate.
 
 An advanced bounded GeoPhys native-feedback profile is available through

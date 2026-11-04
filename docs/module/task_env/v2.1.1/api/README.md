@@ -2,6 +2,8 @@
 
 状态：阶段3前维护正在实施。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。旧 `BaseTaskEnv` 和三个 classic-control 任务尚未统一迁移。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。
 
+Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是 PickCube/NutAssembly 迁移前的受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 的普通外部动作及 guard 完整迁移尚不能宣称已完成。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
+
 ## 需形成的公共体验
 
 | 操作 | v2.1.1 目标 | 责任与边界 |

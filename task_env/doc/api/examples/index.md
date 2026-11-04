@@ -52,9 +52,10 @@ finally:
     env.close()
 ```
 
-Selected PickCube and NutAssembly routes use task-owned `step_expert()` and
-their current public provider configuration. NutAssembly does not admit
-arbitrary external actions. A successful physical task outcome, a completed
+The current selected examples use the retained `step_expert()` compatibility
+route and their public provider configuration; it is not the target standard
+Env API. Some caller-owned Solution routes are also available with explicit
+guards. NutAssembly does not admit arbitrary ordinary external actions. A successful physical task outcome, a completed
 expert lifecycle, and a finalized recording are reported separately.
 
 ## Batch and learning boundary

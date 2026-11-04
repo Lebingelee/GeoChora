@@ -17,4 +17,6 @@
 
 PickCube 的 `PickCubeReadinessSolution` 和 NutAssembly 的 `NutAssemblyOutcomeSolutionV1` 属于各自任务模块；它们的配置、readiness 与完成条件并不通用。
 
-对内置 selected Expert，使用公共 `make_env` 构造任务，`env.reset(seed=...)` 后调用 `env.step_expert()`；该路径负责 proposal、执行和 observe，返回 observation、reward、terminated、truncated、info。NutAssembly 不接受未受保护的外部 action，因此不能把其 proposal 简化为直接 `env.step(action)`。调用方拥有的 Solution 仅在任务支持并验证时使用 `reset_for_solution(solution, ...)` 和 `step_with_solution(solution)`；不能在同一 episode 混用外部 action 与 Solution。完整循环和关闭方式见 [Expert 录制示例](../../../../examples/recording/record_expert.py) 与[当前环境接口](../semantics/task_environment.md)。
+规范方向是外部 Solution 从 observation/privileged state 推理动作，再由调用方交给 `env.step(action)`；`step_expert()` **不是标准 Env API**。当前 PickCube/NutAssembly 的旧 Expert 路线尚未完成这种迁移：为保留已验证行为，现有 [Expert 录制示例](../../../../examples/recording/record_expert.py) 仍使用受限兼容方法 `step_expert()`。
+
+当前还有部分任务和配置支持调用方持有 Solution，经 `reset_for_solution(solution, ...)` 和 `step_with_solution(solution)` 执行；后者由 Env 调用该 Solution 的 `act`/`observe`，所以也是受限的过渡接线，并不等于外部独立 `act → env.step(action)` 已对所有任务实现。NutAssembly 当前拒绝未受保护的普通外部 action，不能删去其 guard、readiness 或 native feedback 来强行迁移；不同执行模式不能在同一 episode 混用。具体状态见[当前环境接口](../semantics/task_environment.md)与 [Phase C 契约](../../../../docs/module/task_env/v2.0.0/goals/phase_ii/03_Phase_C_Execution_Lifecycle.md)。

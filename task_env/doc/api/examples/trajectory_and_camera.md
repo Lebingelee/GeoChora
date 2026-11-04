@@ -9,7 +9,8 @@ PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py \
 ```
 
 The command resets through public `make_env`, starts the canonical recorder at
-the reset boundary, steps only the selected task-owned expert, finalizes H5,
+the reset boundary, steps the selected task-owned expert through the retained
+`step_expert()` compatibility path, finalizes H5,
 and checks the logical/numeric storage representation and `T`/`T+1` counts.
 It returns nonzero if the task or expert is incomplete or the recording check
 fails. Task outcome, expert lifecycle, and recording validity are reported as

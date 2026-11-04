@@ -31,8 +31,11 @@ does not apply the CPU process `RLIMIT_AS` option. Genesis/SAPIEN Harness
 commands write `NOT_RUN_DEPENDENCY` without starting a worker when their engine
 module is absent, and report `UNSUPPORTED_CAPABILITY` when the Core provider
 manifest is unavailable. Use fresh output directories. NutAssembly selects
-`nut-assembly-outcome-reference-v1` and advances only through guarded
-`step_expert()`. Both report task success separately from expert completion.
+`nut-assembly-outcome-reference-v1`; this example advances through the guarded
+`step_expert()` compatibility path. That method is not the target standard Env
+API: the intended design has an external Solution produce actions for
+`env.step(action)`. Some bounded caller-owned Solution routes also exist;
+they are not unrestricted ordinary action stepping. Both examples report task success separately from expert completion.
 NutAssembly must complete its planned stages and retreat to return success; a
 short horizon is an incomplete run and exits nonzero.
 
