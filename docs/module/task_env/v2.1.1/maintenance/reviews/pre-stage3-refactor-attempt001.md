@@ -9,5 +9,7 @@
 - `b1e9f2a7` 与 `d542b635` 修正新手、任务开发、配置、reset 和当前语义说明；`5c9b2bf7`、`ff894102` 移除 classic Env 中无读取者的状态副本。仍须在真正统一生命周期后重新核对这些页面和调用者。
 - `12cc64e1` 修复已有 GeoPhys 零 DOF、无 reset sampler 场景中不适用的 articulated 静态位姿读取；显式静态位姿覆盖会被拒绝，articulated 原有恢复路径有正例。Empty 单环境重试在该提交 reset/step/close 成功，原失败保留。`a1727403` 之后复用不可变 Artifact 的 canonical 摘要，`c77e7838`、`9b78b50b` 补齐低层篡改与 signed-zero 失效检查；不能将此后代码混同于早期 native 结果。
 - MuJoCo CPU PickCube seed31 和 Nut seed19 在 `a1727403` 分别完成 960 和 2377 transitions、task/Expert success 和同 run 独立 reader；这不是后续源码或完整维护的验收。`f6e4e70c` 将 LIBERO benchmark 接入现行 Core `TaskCompositionSpec`，冻结资产的 provider-free 31 项检查通过，不改任务判据或数据。
+- 当前源码另有同方案的 PickCube/Nut MuJoCo CPU 代表运行与独立读回：分别 960/2377 transitions，任务和兼容 Expert 完成；三个 classic 任务各有 GeoPhys CPU 最短 reset/step/close 检查。详见工作报告的 run、提交和限制；classic 尚未迁入统一生命周期，这些结果不满足 G1。
+- Phase C 的标准方向是外部 Solution 基于 observation 产生 action，再由调用方 `env.step(action)`；`step_expert()` 是迁移前的受限兼容而非标准 Env API。现有 `step_with_solution()` 路线虽由调用方持有 Solution，Env 仍调用其 act/observe，不能称通用外部 action 迁移完成。Nut guard、native feedback、控制请求与记录顺序需要保护；当前普通外部 action 拒绝信息只提 `step_expert()`，未列出另一受限过渡路线。
 - 有界离线检查确认摘要重用、内容替换及解释器选择；较宽历史测试有失败，具体命令与结果见 ignored 工作报告 `workspace/maintenance/v211_pre_stage3_refactor_attempt001/report.md`。上面所列代表性 native 与独立 reader 属于当时的源码提交，尚不覆盖最新源码，不能从静态检查推断最新源码运行成功。
 - 唯一环境实现、三个旧任务迁移、完整当前文档与启动路线均尚未完成；G1、G2、G3 未通过。本页不代表 Sol 接收，也不把旧证据重标为新实现证据。
