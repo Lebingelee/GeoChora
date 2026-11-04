@@ -4,6 +4,45 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.mark.parametrize(('joint_data', 'sampler', 'capture'), [
+    ({'n_dof': 0}, None, False),
+    ({'n_dof': 1}, None, True),
+    ({}, None, True),
+    ({'n_dof': 0}, object(), True),
+])
+def test_bootstrap_skips_static_capture_only_for_known_empty_scene(monkeypatch, joint_data, sampler, capture):
+    import sys
+    from types import ModuleType
+    from task_env.runtime import bootstrap
+
+    def module(name, **attributes):
+        result = ModuleType(name)
+        result.__dict__.update(attributes)
+        monkeypatch.setitem(sys.modules, name, result)
+        return result
+
+    module('geophys', __path__=[])
+    module('geophys.demo_runtime', assemble_mjcf_articulated_runtime=lambda *a, **k:
+           SimpleNamespace(solver=object(), simulator=object(), render_source=None, render_options=None))
+    module('geophys.test_runtime', init_test_backend=lambda backend: None)
+    module('solvers', __path__=[])
+    module('solvers.rigid', RigidGroundConfig=lambda **kwargs: object())
+    compiled = SimpleNamespace(imported_scene=object(), scene_model=SimpleNamespace(joint_data=joint_data),
+                               initial_state=object())
+    monkeypatch.setattr(bootstrap, 'compile_task_scene', lambda **kwargs: compiled)
+    observed = {}
+    monkeypatch.setattr(bootstrap, 'GeoPhysRuntimeBoundary', lambda **kwargs:
+                        observed.update(kwargs) or object())
+    runtime = SimpleNamespace(backend='cpu', physics_dt=0.01, gravity=(0, 0, -9.81),
+                              integrator='default', broadphase='default',
+                              rigid_solver_backend=None, body_contact_solver_iterations=None,
+                              prewarm=False)
+    config = SimpleNamespace(runtime=runtime, render=SimpleNamespace(camera_obs=False))
+    bootstrap.bootstrap_task_runtime(config=config, composition=object(), scene=object(),
+                                     agents=(), objects=(), reset_sampler=sampler)
+    assert observed['capture_static_world_children'] is capture
+
+
 def test_historical_pickcube_rejection_is_available_without_diagnostics_dependency():
     from task_env.environment._historical import make_replay_env
     from task_env.diagnostics.historical_tasks import make_historical_env

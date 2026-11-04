@@ -91,7 +91,7 @@ def bootstrap_task_runtime(
         # articulated placement. Its baseline is the public snapshot; the
         # provider's articulated body-pose reader is unavailable there.
         capture_static_world_children=(
-            int(compiled.scene_model.joint_data.get("n_dof", 0)) > 0
+            compiled.scene_model.joint_data.get("n_dof") != 0
             or reset_sampler is not None
         ),
     )
