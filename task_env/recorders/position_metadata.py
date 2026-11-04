@@ -2,6 +2,8 @@
 
 import hashlib
 
+import numpy as np
+
 
 def _versioned_position_input_kind(input_v1):
     if input_v1 is None:
@@ -570,3 +572,158 @@ def position_record_metadata(self):
         env_metadata['resolved_config']['controller_profiles'] = tuple(
             item.profile_id for item in position_profiles
         )
+
+
+def record_position_transition(self, request, canonical, target, applied, *, terminated, truncated):
+    from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+    schema = self.controller.controller_binding().action_schema
+    groups = {(group.entity_id, group.group_id): group for group in request.groups}
+    entity_id = self.controller.entity_id
+    arm = groups[(entity_id, 'arm')]
+    gripper = groups[(entity_id, 'gripper')]
+    action_values = np.asarray((*arm.values, *gripper.values), dtype=np.float32)
+    target_payload = target.target.to_mapping()
+    target_hash = target.target.identity_hash
+    applied_payload = applied.to_mapping()
+    versioned_position_input = self.value.get('versioned_position_input')
+    versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+    f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
+    f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
+    if (f04_input is not None or versioned_input_kind == 'f05_native'
+            or f05_dg02_input is not None
+            or versioned_input_kind == 'dg04_isaac_native'
+            or self.value.get('f06_pickcube_isaac_input') is not None):
+        native_ack = getattr(self.session, '_last_native_position_ack', None)
+        native_advances = getattr(self.session, '_last_interval_advances', ())
+        advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
+        if native_ack is None or len(native_advances) != self.artifact.timebase.control_substeps:
+            raise ValueError('versioned USD recording requires a complete native Position Ack and interval receipts')
+        applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
+        applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
+        applied_payload['native_interval_advance_attempts'] = advance_attempts
+        if (f04_input is not None or versioned_input_kind == 'f05_native'
+                or f05_dg02_input is not None
+                or versioned_input_kind == 'dg04_isaac_native'
+                or self.value.get('f06_pickcube_isaac_input') is not None):
+            native_io = getattr(self.session, '_native_io', None)
+            provenance = getattr(native_io, 'execution_provenance_kind', None)
+            if provenance == 'native_runtime':
+                execution_class = 'native_runtime_accepted_physics'
+            elif provenance == 'synthetic_fixture':
+                execution_class = 'synthetic_fixture_no_physics'
+            else:
+                raise ValueError(
+                    'F04 Position recording requires an explicit native-I/O execution provenance'
+                )
+        else:
+            execution_class = 'synthetic_fixture_no_physics'
+        applied_payload['native_io_execution_class'] = execution_class
+    canonical_action = {
+        **canonical.to_mapping(),
+        'position_target_v1': target.to_mapping(),
+        'position_target_identity_hash': target.identity_hash,
+    }
+    pending_switch = self._pending_position_switch
+    if pending_switch is not None:
+        if (target.controller_identity != pending_switch['controller_identity']
+                or target.source_boundary.boundary_id != pending_switch['effective_boundary_id']):
+            raise ValueError('first post-switch target does not match the committed Controller/boundary')
+        canonical_action['controller_switch_application'] = {
+            'switch_id': pending_switch['switch_id'],
+            'status': 'target_and_applied_ack_recorded',
+            'controller_identity': target.controller_identity,
+            'effective_boundary_id': pending_switch['effective_boundary_id'],
+            'target_identity_hash': target.target.identity_hash,
+            'applied_target_hash': applied.target_hash,
+        }
+    control = StructuredControlTransitionV1(
+        'structured-control-transition-v1', request, ({
+            'writer_id': self.controller.writer_id,
+            'action_schema_id': schema.schema_id,
+            'components': tuple(schema.components),
+            'groups': (
+                {'entity_id': entity_id, 'group_id': 'arm',
+                 'action_components': tuple(schema.components[:7])},
+                {'entity_id': entity_id, 'group_id': 'gripper',
+                 'action_components': (schema.components[7],)},
+            ),
+            'requested_action': canonical.requested.to_mapping(),
+            'canonical_action': canonical_action,
+            'controller_target': {
+                'schema_version': target.target.schema_version,
+                'payload': target_payload, 'identity_hash': target_hash,
+            },
+            'applied_control': {
+                'schema_version': applied.schema_version,
+                'payload': applied_payload, 'target_hash': applied.target_hash,
+            },
+        },),
+    )
+    control.validate()
+    self.recorder.append_transition(
+        action_values, action_values, self.obs, float(self.evaluation.reward),
+        bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+        structured_control=control,
+    )
+    if pending_switch is not None:
+        self._pending_position_switch = None
+
+def record_dual_position_transition(self, request, position_records, *, terminated, truncated):
+    """Store both Entity writers in the existing Generic H5 v3 transition."""
+    from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+    groups = {(group.entity_id, group.group_id): group for group in request.groups}
+    expected_groups = {
+        (profile.entity_id, group_id)
+        for profile in self.position_profiles for group_id in ('arm', 'gripper')
+    }
+    if set(groups) != expected_groups or len(position_records) != 2:
+        raise ValueError('dual Position recording requires both groups for both admitted Entities')
+    action_values = np.asarray(tuple(
+        value
+        for group_key in sorted(groups)
+        for value in groups[group_key].values
+    ), dtype=np.float32)
+    records_by_writer = {target.writer_id: (canonical, target, applied)
+                         for canonical, target, applied in position_records}
+    writer_controls = []
+    for profile in self.position_profiles:
+        canonical, bound_target, applied = records_by_writer[profile.writer_id]
+        schema = profile.controller_binding().action_schema
+        writer_controls.append({
+            'writer_id': profile.writer_id,
+            'action_schema_id': schema.schema_id,
+            'components': tuple(schema.components),
+            'groups': (
+                {'entity_id': profile.entity_id, 'group_id': 'arm',
+                 'action_components': tuple(schema.components[:7])},
+                {'entity_id': profile.entity_id, 'group_id': 'gripper',
+                 'action_components': (schema.components[7],)},
+            ),
+            'requested_action': canonical.requested.to_mapping(),
+            'canonical_action': {
+                **canonical.to_mapping(),
+                'position_target_v1': bound_target.to_mapping(),
+                'position_target_identity_hash': bound_target.identity_hash,
+            },
+            'controller_target': {
+                'schema_version': bound_target.target.schema_version,
+                'payload': bound_target.target.to_mapping(),
+                'identity_hash': bound_target.target.identity_hash,
+            },
+            'applied_control': {
+                'schema_version': applied.schema_version,
+                'payload': applied.to_mapping(),
+                'target_hash': applied.target_hash,
+            },
+        })
+    control = StructuredControlTransitionV1(
+        'structured-control-transition-v1', request, tuple(writer_controls),
+    )
+    control.validate()
+    self.recorder.append_transition(
+        action_values, action_values, self.obs, float(self.evaluation.reward),
+        bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+        structured_control=control,
+    )
