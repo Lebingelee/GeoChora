@@ -14,3 +14,4 @@
 - Position 单／双 Entity 与 leaf 录制投影及 reset 录制 metadata 已归入现有 recorder owner；F04 和 attached leaf 合成 H5 验证通过，部分依赖真实 scene 或缺历史 fixture 的检查未通过／未运行，具体见工作报告。
 - 有界离线检查确认摘要重用、内容替换及解释器选择；较宽历史测试有失败，具体命令与结果见 ignored 工作报告 `workspace/maintenance/v211_pre_stage3_refactor_attempt001/report.md`。上面所列代表性 native 与独立 reader 属于当时的源码提交，尚不覆盖最新源码，不能从静态检查推断最新源码运行成功。
 - 唯一环境实现、三个旧任务迁移、完整当前文档与启动路线均尚未完成；G1、G2、G3 未通过。本页不代表 Sol 接收，也不把旧证据重标为新实现证据。
+- 维护者追加的任务目录收敛决定及 staged 规划由 Sol 在本窗口释放后与实际输出整合；当前三个共享 task 根模块、Marker 中间层／包装、PickCube 的 `isaac.py` 和 Nut 的 trusted source manifest 尚未按该决定迁移，当前 Marker 教程仍需同步。该决定不改变此窗口预算，也不表示阶段3已启动；详细路径与真实调用者见本次工作报告。
