@@ -90,4 +90,4 @@ PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投�
 
 通用pick-lift candidate binding、oracle和feasibility probe已改为调用方 `Solution.act → env.step → Solution.observe`；Solution factory身份不匹配、缺少caller action route均在step前报错，不再将旧 `step_expert()` 作为回退。`examples/_common.py` 中无调用者的旧helper已删除；Env内旧方法仍作为兼容保留。legacy `--env`也须提供caller route与Solution factory，故不兼容的旧输入明确失败。
 
-无引擎Harness与selected组合 **139 passed、1 skipped、29 subtests passed**；skip为本checkout没有冻结Isaac Python，未运行Isaac。首次试运行candidate的真实编译／H5合成预检被catalog clean-check拒绝：两份原保护untracked仍存在，源码有本轮未提交修改；未隐藏或更改这些文件，也未伪造clean provenance。该合成预检仍未通过，以上结果不能替代它或任何物理验证。本轮测试中的fixture缺少 `SimpleNamespace` 导致首次失败，已补齐并重跑；unsupported与错误身份分类明确为invalid。
+无引擎Harness与selected组合 **139 passed、1 skipped、29 subtests passed**；skip为本checkout没有冻结Isaac Python，未运行Isaac。首次试运行candidate的真实编译／H5合成预检被catalog clean-check拒绝：两份原保护untracked仍存在，源码有本轮未提交修改；未隐藏或更改这些文件，也未伪造clean provenance。本轮源码提交后在 `257e5573`、tracked clean且仅余两个保护untracked时再次执行，仍被相同clean-check拒绝，确认不能仅靠提交本轮改动通过。该合成预检仍未通过，以上结果不能替代它或任何物理验证。本轮测试中的fixture缺少 `SimpleNamespace` 导致首次失败，已补齐并重跑；unsupported与错误身份分类明确为invalid。
