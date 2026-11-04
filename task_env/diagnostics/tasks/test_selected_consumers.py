@@ -874,12 +874,17 @@ def test_current_source_reexecution_uses_selected_factory(uid, fake, tmp_path):
     env.reset(seed=19);env.start_recording(tmp_path/'source.h5')
     while not env._stopped:env.step_expert()
     env.finish_recording('bounded_truncation');env.close()
+    if uid == IDS[1]:
+        with pytest.raises(ValueError, match='legacy Nut expert recording'):
+            reexecute_selected(tmp_path/'source.h5',output=tmp_path/'reexecution.h5')
+        assert not (tmp_path/'reexecution.h5').exists()
+        return
     report=reexecute_selected(tmp_path/'source.h5',output=tmp_path/'reexecution.h5')
     assert report['status']=='PASS' and report['transitions']==3
     assert report['D0']=='NOT_ASSESSED'
 
 
-def test_nutassembly_caller_recording_same_source_reexecution(fake, tmp_path):
+def test_nutassembly_caller_recording_same_source_reexecution(fake, tmp_path, monkeypatch):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
     from task_env.trajectory.reference_replay import reexecute_selected
 
@@ -896,9 +901,63 @@ def test_nutassembly_caller_recording_same_source_reexecution(fake, tmp_path):
         env.finish_recording('bounded_truncation')
     finally:
         env.close()
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    monkeypatch.setattr(SelectedReferenceEnv, 'step_expert', lambda *args: pytest.fail('legacy expert route used'))
     report = reexecute_selected(tmp_path / 'source-caller.h5', output=tmp_path / 'reexecution-caller.h5')
     assert report['status'] == 'PASS' and report['transitions'] == 3
     assert report['D0'] == 'NOT_ASSESSED'
+
+
+def test_pickcube_caller_recording_same_source_reexecution(fake, tmp_path, monkeypatch):
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        obs, info = env.reset(seed=19)
+        solution = env.value['solution_factory']()
+        solution.reset(obs, info, env.metadata)
+        env.start_recording(tmp_path / 'source-pickcube-caller.h5')
+        for _ in range(3):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        env.finish_recording('bounded_truncation')
+    finally:
+        env.close()
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    monkeypatch.setattr(SelectedReferenceEnv, 'step_expert', lambda *args: pytest.fail('legacy expert route used'))
+    report = reexecute_selected(tmp_path / 'source-pickcube-caller.h5',
+                                output=tmp_path / 'reexecution-pickcube-caller.h5')
+    assert report['status'] == 'PASS' and report['transitions'] == 3
+
+
+@pytest.mark.parametrize('attribute,source_name', [
+    ('observation_projection', 'observation_source'),
+    ('observation_space_factory', 'observation_space_source'),
+    ('prepare_action', 'action_source'),
+    ('action_space_factory', 'action_space_source'),
+])
+def test_reexecution_rejects_changed_binding_source(fake, tmp_path, monkeypatch, attribute, source_name):
+    from task_env.recorders import reference_provenance
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 1})
+    obs, info = env.reset(seed=19)
+    solution = env.value['solution_factory']()
+    solution.reset(obs, info, env.metadata)
+    env.start_recording(tmp_path / 'source.h5')
+    action = solution.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    solution.observe(obs, reward, terminated, truncated, info)
+    env.finish_recording('bounded_truncation')
+    callback = getattr(env.binding, attribute)
+    env.close()
+    original = reference_provenance.callable_source_snapshot
+    monkeypatch.setattr(reference_provenance, 'callable_source_snapshot',
+                        lambda current: 'changed' if current is callback else original(current))
+    with pytest.raises(ValueError, match=source_name + ' identity mismatch'):
+        reexecute_selected(tmp_path / 'source.h5', output=tmp_path / 'replay.h5')
+    assert not (tmp_path / 'replay.h5').exists()
 
 
 def test_pickcube_reexecution_preserves_explicit_profile_and_task_parameter(fake, tmp_path):

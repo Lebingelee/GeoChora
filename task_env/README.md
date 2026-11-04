@@ -22,9 +22,8 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py \
 
 The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
-Construct them through `from task_env import make_env`. The NutAssembly example
-uses a caller-owned Solution and `act → step(action) → observe`; the PickCube
-example still uses the restricted `step_expert()` compatibility route.
+Construct them through `from task_env import make_env`. The NutAssembly and
+PickCube examples use a caller-owned Solution and `act → step(action) → observe`.
 The separate advanced R05b profile below uses a bounded caller-owned Solution
 route, which still invokes that Solution through the Env and is transitional.
 Task success and Expert lifecycle completion remain separate.

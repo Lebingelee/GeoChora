@@ -40,3 +40,8 @@ PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory.replay \
 Legacy replay requires the explicit `--historical` flag. Current-source
 reexecution is a separate `--selected-reexecute` operation and requires a
 fresh output path; neither route is the same as offline H5 validation.
+Selected reexecution uses the caller-owned Solution through
+`act → env.step(action) → observe` and checks recorded binding source
+identities when present. Legacy Nut recordings made through `step_expert()`
+have a different diagnostic contract and are rejected by this reexecution
+route; their original files remain historical evidence.

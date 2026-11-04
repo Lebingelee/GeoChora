@@ -185,3 +185,9 @@ F05三条Session准入、DG04合成IO上下文和GeoPhys／Isaac native adapter�
 `TransitionRecorder.begin_episode()` 先完成初始观测与元数据复制、容量核对，再替换原recorder状态。初始观测超出容量或元数据复制异常时，不再丢弃上一条已冻结轨迹或错误留下active状态；修正输入后可重新开始。该行为覆盖直接使用Recorder的调用方，不只依赖Env此前新增的局部初始化保护。
 
 受监督、禁止引擎导入的selected／R05b／录制组 **145 passed、2 deselected**，最大进程树RSS 214175744 bytes；leaf／mixed假provider组 **13 passed**，最大RSS 127586304 bytes。命令、退出码、资源采样及输出保存在ignored `atomic-begin-selected/`和 `atomic-begin-mixed/`。排除真实provider／scene，未运行真实引擎、Isaac、GPU或物理reader。
+
+## Selected轨迹调用方重执行与绑定来源校验（续作，待复审）
+
+selected轨迹重执行现由调用方执行Solution的 `act → env.step(action) → observe`，并核对构造出的Solution身份；生产调用链不再调用 `step_expert()`。重执行对记录中存在的动作转换、动作space、观测投影和观测space来源，逐项核对实际binding的源码文件摘要，旧记录中不存在的字段不补造。PickCube和新Nut调用方录制均经禁止旧入口的合成测试；旧Nut专家录制的诊断契约不同，在创建输出前明确拒绝该重执行，原记录保留，不将其重标为调用方录制。历史重执行能力因此有明确收窄，不能把拒绝视为物理差异判断。
+
+受监督、禁止引擎导入的selected／R05b／录制组 **150 passed、2 deselected**，最大进程树RSS 210403328 bytes；命令、退出码、资源采样和输出保存在ignored `caller-replay-selected/`。排除真实provider／scene，本次未运行真实引擎、Isaac、GPU或物理reader，旧物理证据不重标。

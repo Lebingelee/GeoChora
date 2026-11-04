@@ -39,6 +39,9 @@ def reexecute_selected(path, *, output):
     configuration = recipe['execution_configuration']
     if configuration['env_id'] not in SELECTED_ENV_IDS:
         raise ValueError('not a selected reference execution')
+    if (configuration['env_id'] == NA and frozen['transitions']
+            and 'arm_execution_request_v1' not in frozen['transitions'][0]['record'].get('expert_diagnostics', {})):
+        raise ValueError('legacy Nut expert recording cannot be compared using the external Solution execution contract')
     from task_env.runtime.sessions import common as session_common
     if metadata['source_provenance']['interval_source'] != hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest():
         raise ValueError('runtime interval source identity mismatch')
@@ -48,12 +51,19 @@ def reexecute_selected(path, *, output):
     coordinator_source = metadata['source_provenance'].get('coordinator_source')
     if coordinator_source is not None and coordinator_source != reference_provenance.source_snapshot(reference_provenance.__file__):
         raise ValueError('coordinator source identity mismatch; no historical identity substitution')
-    from task_env.observations import selected_reference as selected_observation
-    observation_source = metadata['source_provenance'].get('observation_source')
-    if observation_source is not None and observation_source != reference_provenance.source_snapshot(selected_observation.__file__):
-        raise ValueError('observation source identity mismatch; no historical identity substitution')
     env = make_env(configuration['env_id'], config={k:v for k,v in configuration.items() if k!='env_id'})
     try:
+        binding_sources = {
+            'observation_source': env.binding.observation_projection,
+            'observation_space_source': env.binding.observation_space_factory,
+            'action_source': env.binding.prepare_action,
+            'action_space_source': env.binding.action_space_factory,
+        }
+        recorded_sources = metadata['source_provenance']
+        for name, callback in binding_sources.items():
+            expected_source = recorded_sources.get(name)
+            if expected_source is not None and expected_source != reference_provenance.callable_source_snapshot(callback):
+                raise ValueError(f'{name} identity mismatch; no historical identity substitution')
         if digest(env.value['resolved_configuration']) != digest(recipe['resolved_configuration']):
             raise ValueError('construction source/configuration identity mismatch')
         if (env.controller.identity != metadata['controller_identity'] or
@@ -63,24 +73,14 @@ def reexecute_selected(path, *, output):
         if env.sample.to_mapping() != metadata['reset_sample']:
             raise ValueError('reset identity mismatch')
         env.start_recording(output)
-        # Native Nut records distinguish caller-driven actions by their
-        # recorded execution request. Preserve the old expert route for
-        # earlier recordings that do not contain this field.
-        caller_driven = bool(
-            configuration['env_id'] == NA and frozen['transitions']
-            and 'arm_execution_request_v1' in frozen['transitions'][0]['record'].get('expert_diagnostics', {})
-        )
-        solution = None
-        if caller_driven:
-            solution = env.value['solution_factory']()
-            solution.reset(observation, info, env.metadata)
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value['solution_identity']:
+            raise ValueError('constructed Solution identity differs from selected task')
+        solution.reset(observation, info, env.metadata)
         for index, expected in enumerate(frozen['transitions']):
-            if caller_driven:
-                action = solution.act(observation, info)
-                observation, reward, terminated, truncated, info = env.step(action)
-                solution.observe(observation, reward, terminated, truncated, info)
-            else:
-                env.step_expert()
+            action = solution.act(observation, info)
+            observation, reward, terminated, truncated, info = env.step(action)
+            solution.observe(observation, reward, terminated, truncated, info)
             if outer:
                 actual = {'record': env.recorder.transitions[-1].to_mapping()}
                 boundary = {'record': env.recorder.boundaries[-1].to_mapping()}
