@@ -209,8 +209,9 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         controller_profile='r3_continuous_v1',
         source_delivery_manifest=manifest,
     )
-    assert binding.position_gripper_binding({}) == 'panda-main/gripper'
-    assert binding.position_gripper_binding({'f06_pickcube_isaac_input': object()}) == 'panda-v1/gripper'
+    assert binding.position_control_binding({}).gripper_semantic_id == 'panda-main/gripper'
+    assert binding.position_control_binding({'f06_pickcube_isaac_input': object()}).gripper_semantic_id == 'panda-v1/gripper'
+    assert binding.position_control_binding({}).opening_range_m == 0.08
     with patch('task_env.tasks.pick_cube.specialization.build_isaac_reference',
                return_value={'construction': 'external'}) as build:
         result = binding.build_external('isaacsim')
@@ -264,13 +265,14 @@ def test_versioned_reset_rejects_distinct_or_changed_artifact():
         _artifact_for_reset(current, {'artifact': Artifact('different')})
 
 
-def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
+@pytest.mark.parametrize('binding_kind', ['valid', 'missing', 'wrong_type'])
+def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding_kind):
     from dataclasses import dataclass
     from types import SimpleNamespace
     from unittest.mock import patch
 
     from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
-    from task_env.runtime.sessions.control import ControlBindingPlanV1
+    from task_env.runtime.sessions.control import ControlBinding, ControlBindingPlanV1
     from task_env.runtime.sessions.api import F06_PICKCUBE_ISAAC_PROFILE
     from task_env.tasks.reference_env import SelectedReferenceEnv
 
@@ -329,7 +331,11 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
         reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
-        position_gripper_binding=lambda value: 'panda-v1/gripper',
+        position_control_binding=(
+            None if binding_kind == 'missing' else
+            lambda value: (ControlBinding('panda-v1/gripper', 0.08)
+                           if binding_kind == 'valid' else 'panda-v1/gripper')
+        ),
     )
     env._diagnostic_profile = None
     env._native_feedback_profile = None
@@ -353,12 +359,16 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         raise StopAtMaterialization
 
     with patch('task_env.environment.reference_env.materialize_control', capture_materialization):
-        try:
-            env.reset(seed=31)
-        except StopAtMaterialization:
-            pass
+        if binding_kind == 'valid':
+            with pytest.raises(StopAtMaterialization):
+                env.reset(seed=31)
         else:
-            raise AssertionError('the reset did not reach the materialization boundary')
+            with pytest.raises(TypeError, match='Position control'):
+                env.reset(seed=31)
+
+    if binding_kind != 'valid':
+        assert observed == {}
+        return
 
     assert observed['artifact'] is rebuilt_artifact
     assert observed['artifact'] is runtime_input.artifact

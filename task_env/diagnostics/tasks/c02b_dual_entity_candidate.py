@@ -31,7 +31,7 @@ from task_env.environment import (
     compile_task_artifact_v1,
     sample_episode_reset_plan,
 )
-from task_env.runtime.sessions.control import compile_control_binding_plan
+from task_env.runtime.sessions.control import ControlBinding, compile_control_binding_plan
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
 
@@ -261,6 +261,7 @@ def build_dual_entity_position_candidate(
         return seed
 
     binding = ReferenceTaskBinding(
+        position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,

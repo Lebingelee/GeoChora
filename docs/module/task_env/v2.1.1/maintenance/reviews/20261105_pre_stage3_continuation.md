@@ -197,3 +197,9 @@ selected轨迹重执行现由调用方执行Solution的 `act → env.step(action
 Position Controller切换事件及提交后记录失败的凭据由既有 `recorders.position_metadata` 构造；Env仍负责活跃边界准入、runtime准备和提交、事件校验／写入、指针发布及故障锁定。记录字段和提交顺序保持，合成调用覆盖提交成功与提交后记录失败，确认失败时保留已提交Controller身份、不发布pending且保留故障凭据。该改动只是职责整理的一部分，不代表环境类或runtime接线已全部归位。
 
 受监督、禁止引擎导入的selected／R05b／录制／Position切换组合 **154 passed、17 deselected**，最大进程树RSS 207585280 bytes；完整命令、退出码、资源采样和输出保存在ignored `switch-projection-selected/`。最初直接运行Position切换全组时，15项依赖真实 `scene` 的测试被禁引擎guard拦截、2项通过；随后明确排除这些依赖后运行上述组合，不能将被排除项算作通过。未运行真实引擎、Isaac、GPU或物理reader；本次源码与旧物理证据身份不同。
+
+## Position控制绑定显式声明（续作，待复审）
+
+环境不再为Position及leaf路线选择Panda夹爪名称或构造固定0.08 m映射；PickCube、普通／版本候选、双实体候选及attached-leaf各自在binding声明原有 `ControlBinding`，环境在materialization前要求selector返回精确类型。0.08 m仍是现有控制owner的唯一已审计映射，不宣称新增夹爪能力。内部 `ReferenceTaskBinding.position_gripper_binding` 改为 `position_control_binding`，原本自行构造该内部binding的调用方须迁移；仓库当前调用者已同步。
+
+PickCube specialization的源码SHA由 `101b68d9ae6876f90c2ef10a7f21cd025489f76aac5384938157a2f82ca28770` 变为 `ef9e5ddec299bac2fc00eda05cfbd11a79f58b285fb341a6aca74fc5d1d44a08`；新构造时按新源码取来源，不把旧运行重标。受监督无引擎selected／R05b／F06投影／录制组合 **151 passed、2 deselected**，包含F06 binding缺失及错误类型在runtime创建前拒绝，最大RSS 213626880 bytes；attached-leaf／mixed假provider组合 **13 passed**，最大RSS 160727040 bytes。日志及资源采样见ignored `position-binding-selected/`与 `position-binding-mixed/`。另一次直接运行F06投影时有1项因导入真实 `scene` 被guard拦截，未计通过；上述排除项包含对应真实scene测试。未运行真实引擎、Isaac、GPU或物理reader。

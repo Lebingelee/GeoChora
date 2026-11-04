@@ -35,6 +35,7 @@ from ...controllers.canonical.leaf_plan import (
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
 from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
+from ...runtime.sessions.control import ControlBinding
 from ...runtime.sessions.provenance import provider_build_identity
 from .source import _a05_scene, _artifact_and_sample, _source_input, _task_source
 from ...environment import compile_task_artifact_v1, sample_episode_reset_plan
@@ -234,6 +235,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
 
     from ...environment.reference_binding import ReferenceTaskBinding
     binding = ReferenceTaskBinding(
+        position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,

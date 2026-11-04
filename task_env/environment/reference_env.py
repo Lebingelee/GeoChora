@@ -1632,21 +1632,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.position_frame_bindings = _position_frame_bindings_from_artifact(
                     self.artifact, self.value['source'],
                 )
+                select_binding = self.binding.position_control_binding
+                if not callable(select_binding):
+                    raise TypeError('Position control requires its declared ControlBinding selector')
+                position_binding = select_binding(self.value)
+                if type(position_binding) is not ControlBinding:
+                    raise TypeError('Position control selector must return an exact ControlBinding')
                 if self.leaf_position_profile:
-                    control_binding = ('panda-hand/hand-position'
-                                       if self.fixed_attachment_leaf_position_profile
-                                       else 'panda-main/gripper')
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
-                        binding=ControlBinding(control_binding, .08),
+                        binding=position_binding,
                         leaf_plan=self.leaf_plan,
                     )
                 else:
-                    select_gripper = getattr(self.binding, 'position_gripper_binding', None)
-                    gripper = select_gripper(self.value) if select_gripper else 'panda-main/gripper'
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
-                        binding=ControlBinding(gripper, .08),
+                        binding=position_binding,
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                         session_admission_input=self.value.get('session_admission_input'),

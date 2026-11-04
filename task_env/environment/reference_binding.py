@@ -77,7 +77,7 @@ class ReferenceTaskBinding:
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
     reset_runtime_input: Callable | None = None
-    position_gripper_binding: Callable | None = None
+    position_control_binding: Callable | None = None
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
 
@@ -119,8 +119,8 @@ class ReferenceTaskBinding:
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.reset_runtime_input is not None and not callable(self.reset_runtime_input):
             raise ValueError('reset runtime input selector must be callable when supplied')
-        if self.position_gripper_binding is not None and not callable(self.position_gripper_binding):
-            raise ValueError('position gripper selector must be callable when supplied')
+        if self.position_control_binding is not None and not callable(self.position_control_binding):
+            raise ValueError('position control binding selector must be callable when supplied')
         if self.classify_position_input is not None and not callable(self.classify_position_input):
             raise ValueError('position input classifier must be callable when supplied')
         if self.diagnostic_profile is not None and (

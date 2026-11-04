@@ -30,6 +30,7 @@ from ...controllers.canonical.leaf_plan import (
 from ...environment import compile_task_artifact_v1, sample_episode_reset_plan
 from ...environment.configuration import resolve_env_config
 from ...environment.task_source import TaskInitializationV1
+from ...runtime.sessions.control import ControlBinding
 from ...runtime.sessions.provenance import provider_build_identity
 from ...runtime.sessions.source import RuntimeSource
 from .fixed_attachment_candidate import build_fixed_attachment_candidate
@@ -232,6 +233,7 @@ def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
 
     from ...environment.reference_binding import ReferenceTaskBinding
     binding = ReferenceTaskBinding(
+        position_control_binding=lambda _value: ControlBinding("panda-hand/hand-position", 0.08),
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,

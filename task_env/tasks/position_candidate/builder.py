@@ -39,7 +39,7 @@ from task_env.runtime.sessions.leaf_control import (
     GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
     IsaacNamedPositionDriveReceiptV1,
 )
-from task_env.runtime.sessions.control import compile_control_binding_plan
+from task_env.runtime.sessions.control import ControlBinding, compile_control_binding_plan
 from task_env.environment.reference_binding import ReferenceTaskBinding
 from task_env.environment.reference_env import SelectedReferenceEnv
 
@@ -830,6 +830,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         )
 
     binding = ReferenceTaskBinding(
+        position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
         classify_position_input=_versioned_position_candidate_kind,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
@@ -940,6 +941,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         return seed
 
     binding = ReferenceTaskBinding(
+        position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
