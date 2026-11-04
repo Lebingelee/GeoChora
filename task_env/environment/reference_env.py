@@ -2043,10 +2043,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
         """Run one task-prepared named command through the existing RuntimeSession."""
-        from ..controllers.canonical.contracts import (
-            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1,
+        from ..controllers.canonical.contracts import AppliedMixedActuatorCommandV1
+        from ..runtime.sessions.control import (
+            mixed_stepwise_receipt, mixed_substep_controller, validate_mixed_control_preparation,
         )
-        from ..runtime.sessions.control import validate_mixed_control_preparation
         from ..trajectory.canonical.episode import StructuredControlTransitionV1
 
         if self._stopped or self.session is None:
@@ -2089,45 +2089,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise StageUnavailableError(
                         'selected RuntimeSession does not support physics-rate mixed actuator control'
                     )
-                controller_receipts = []
-
-                def make_substep_command(state, substep_index, substep_count, state_revision):
-                    control = self.binding.prepare_mixed_control_substep(
-                        self, prepared, state, substep_index, substep_count,
-                        state_revision,
-                    )
-                    if not isinstance(control, Mapping) or set(control) != {
-                        'target', 'controller_receipt',
-                    }:
-                        raise TypeError('mixed substep Controller hook returned unknown or missing fields')
-                    substep_target = control['target']
-                    if type(substep_target) is not MixedActuatorCommandV1:
-                        raise TypeError('mixed substep Controller hook must return MixedActuatorCommandV1')
-                    substep_target.validate()
-                    receipt = control['controller_receipt']
-                    if not isinstance(receipt, Mapping):
-                        raise TypeError('mixed substep Controller receipt must be a mapping')
-                    controller_receipts.append(dict(receipt))
-                    return substep_target
-
-                self.state, stepwise_receipt = stepwise_session(
-                    make_substep_command,
+                make_substep_command, controller_receipts = mixed_substep_controller(
+                    self.binding.prepare_mixed_control_substep, self, prepared,
                 )
-                if (not isinstance(stepwise_receipt, Mapping)
-                        or not isinstance(stepwise_receipt.get('substeps'), list)
-                        or len(stepwise_receipt['substeps']) != self.artifact.timebase.control_substeps
-                        or len(controller_receipts) != self.artifact.timebase.control_substeps):
-                    raise ValueError('RuntimeSession stepwise receipt differs from the admitted substep count')
-                rows = []
-                for row, receipt in zip(stepwise_receipt['substeps'], controller_receipts, strict=True):
-                    rows.append({**dict(row), 'controller_receipt': receipt})
-                stepwise_receipt = {**dict(stepwise_receipt), 'substeps': rows}
-                first_row = rows[0]
-                applied_payload = first_row.get('applied')
-                if (not isinstance(applied_payload, Mapping)
-                        or first_row.get('target_identity_sha256') != target.identity_hash
-                        or first_row.get('target') != target.to_mapping()):
-                    raise ValueError('stepwise RuntimeSession first command differs from prepared outer target')
+                self.state, stepwise_receipt = stepwise_session(make_substep_command)
+                stepwise_receipt, applied_payload = mixed_stepwise_receipt(
+                    stepwise_receipt, controller_receipts,
+                    substeps=self.artifact.timebase.control_substeps, target=target,
+                )
                 interval_completed = True
             else:
                 applied = self.session.apply_mixed_actuator_command(target)

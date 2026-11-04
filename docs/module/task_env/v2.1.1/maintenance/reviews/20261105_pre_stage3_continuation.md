@@ -307,3 +307,10 @@ PickCube／Nut的源码清单增加共同路径工具以如实记录新的直接
 现有 `ReferenceTaskBinding` 增加可选的无provider编译组合入口：它接收任务明确选择的编译器及绑定字段，调用既有assembly构造来源和identity；不创建环境子类或替代 `make_env`。Marker删除内联的编译／来源组装闭包，继续表达声明、reset、评价、Controller选择、控制与动作／观测选择及正常注册。世界pose动作契约和selected观测契约的现有字段组合归对应已有owner，Marker与PickCube共同使用；仍可明确供应其他动作／观测字段，非Panda classic任务不隐式获得该契约。此入口不声明任意资产或provider已支持。
 
 新增无引擎检查以独立编译器函数验证源码变更会改变构造身份，已有Marker检查继续覆盖公共factory、reset／step、当前binding回调替换及来源变更；初次新测试将仓库内临时目录误判为external，第二次修正路径后遗漏 `Path` 导入，各有1项测试失败，修正后完整重跑。最终受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **184 passed、2 deselected**，最大进程树RSS 165203968 bytes，完整argv及资源采样见ignored `compiled-binding-final-v3/`。R05b 100／500 Hz Controller身份经实际构造核对保持 `a06a4898…`／`28544311…`。未运行真实引擎、Isaac、GPU或物理reader；旧源码证据不重标。Marker示例仍显式选择内部binding／配置，R2能否接收由Sol复审，整体维护和其余待办不因此标为完成。
+
+
+## 混合控制逐子步回执归位（续作，待复审）
+
+物理频率混合控制的逐子步Controller返回类型、原生回执数量、Controller回执配对及首个target一致性检查归入既有 `runtime.sessions.control`；Env继续调用RuntimeSession、在原时间点接收状态、判断interval完成、锁存故障并发布transition。没有改变控制律、任务语义、推进次数或对部分推进的拒绝策略。新增无引擎检查覆盖缺字段、回执数量错误和首个target不一致。
+
+受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **185 passed、2 deselected**，最大进程树RSS 165765120 bytes；使用现有task1 source-composed输入与明示synthetic MuJoCo fixture的mixed正常执行、部分控制写入／物理推进故障及回执检查 **7 passed**，最大RSS 332865536 bytes。完整argv与资源采样见ignored `mixed-substep-owner-selected/`、`mixed-substep-owner-v3/`。首次mixed组使用旧 `r07c_composed_fixture`，其plan状态不符合当前源码所要求的 `SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED`，两个测试在构造前被拒绝；未修改旧fixture，改用当前格式的task1来源重跑。合成fixture未执行真实物理，不证明LIBERO任务成功或Qualification；本轮未运行真实引擎、Isaac、GPU或物理reader。

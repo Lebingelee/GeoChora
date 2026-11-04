@@ -39,6 +39,46 @@ class ControlledRuntimeSession(RuntimeSession, Protocol):
 CONTROL_REQUIRED=RequiredCapabilitySet(('articulated_robot','joint_position_actuation','joint_state_query','body_pose_query','frame_pose_query'))
 
 
+def mixed_substep_controller(hook, env, prepared):
+    """Validate each task-produced native-rate command and retain its receipt."""
+    controller_receipts = []
+
+    def make_substep_command(state, substep_index, substep_count, state_revision):
+        control = hook(env, prepared, state, substep_index, substep_count, state_revision)
+        if not isinstance(control, Mapping) or set(control) != {'target', 'controller_receipt'}:
+            raise TypeError('mixed substep Controller hook returned unknown or missing fields')
+        target = control['target']
+        if type(target) is not MixedActuatorCommandV1:
+            raise TypeError('mixed substep Controller hook must return MixedActuatorCommandV1')
+        target.validate()
+        receipt = control['controller_receipt']
+        if not isinstance(receipt, Mapping):
+            raise TypeError('mixed substep Controller receipt must be a mapping')
+        controller_receipts.append(dict(receipt))
+        return target
+
+    return make_substep_command, controller_receipts
+
+
+def mixed_stepwise_receipt(receipt, controller_receipts, *, substeps, target):
+    """Bind each controller receipt to the native interval and its first target."""
+    if (not isinstance(receipt, Mapping)
+            or not isinstance(receipt.get('substeps'), list)
+            or len(receipt['substeps']) != substeps
+            or len(controller_receipts) != substeps):
+        raise ValueError('RuntimeSession stepwise receipt differs from the admitted substep count')
+    rows = [{**dict(row), 'controller_receipt': controller_receipt}
+            for row, controller_receipt in zip(receipt['substeps'], controller_receipts, strict=True)]
+    result = {**dict(receipt), 'substeps': rows}
+    first_row = rows[0]
+    applied = first_row.get('applied')
+    if (not isinstance(applied, Mapping)
+            or first_row.get('target_identity_sha256') != target.identity_hash
+            or first_row.get('target') != target.to_mapping()):
+        raise ValueError('stepwise RuntimeSession first command differs from prepared outer target')
+    return result, applied
+
+
 def validate_mixed_control_preparation(prepared, *, stepwise, source, artifact, session, sample, before):
     """Validate task-prepared mixed controls against the live RuntimeSession boundary."""
     fields = {'action_values', 'universal_action', 'request', 'target', 'writer_control'}

@@ -291,3 +291,26 @@ def test_position_end_payload_preserves_published_boundary_and_switch_status():
     assert switch['status'] == 'target_ack_observed_but_transition_not_recorded'
     assert switch['observed_runtime_boundary'] == 5
     assert result['controller_switch_fault_receipt'] == {'result': 'record_failed'}
+
+
+def test_mixed_stepwise_receipt_checks_count_and_first_target():
+    from task_env.runtime.sessions.control import mixed_stepwise_receipt, mixed_substep_controller
+
+    target = SimpleNamespace(identity_hash='target-1', to_mapping=lambda: {'value': 1})
+    row = {'target_identity_sha256': 'target-1', 'target': {'value': 1},
+           'applied': {'target_hash': 'target-1'}}
+    receipts = [{'index': 0}, {'index': 1}]
+    combined, applied = mixed_stepwise_receipt({'substeps': [row, row]}, receipts,
+                                               substeps=2, target=target)
+    assert applied == row['applied']
+    assert [item['controller_receipt'] for item in combined['substeps']] == receipts
+    assert 'controller_receipt' not in row
+    with pytest.raises(ValueError, match='substep count'):
+        mixed_stepwise_receipt({'substeps': [row]}, receipts, substeps=2, target=target)
+    with pytest.raises(ValueError, match='first command'):
+        mixed_stepwise_receipt({'substeps': [{**row, 'target_identity_sha256': 'wrong'}, row]},
+                               receipts, substeps=2, target=target)
+    callback, collected = mixed_substep_controller(lambda *_args: {'target': object()}, None, None)
+    with pytest.raises(TypeError, match='unknown or missing fields'):
+        callback(None, 0, 2, 0)
+    assert collected == []
