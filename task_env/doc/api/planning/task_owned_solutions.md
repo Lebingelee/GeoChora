@@ -41,6 +41,6 @@ finally:
     env.close()
 ```
 
-`ExpertAction` 携带绝对位姿、版本化 arm 执行请求和动作前来源边界；Env 校验边界后执行并在 `info` 发布包含五个 native 样本的 interval receipt。`observe()` 从公开 `info` 解析并校验完整 receipt 和 readiness，旧显式参数仍兼容。普通裸数组仍拒绝，过期边界和缺失控制请求在推进前拒绝，不能将此路线推广为任意外部动作。调用方负责 Solution 完成/失败和异常处理；不同模式不能混用。
+`ExpertAction` 携带绝对位姿、版本化 arm 执行请求和动作前来源边界；Env 校验边界后执行并在 `info` 发布包含五个 native 样本的 interval receipt。`observe()` 从公开 `info` 解析并校验完整 receipt、readiness、控制应用及其请求动作／阶段／模式与本次待执行计划的一致性；若调用方在 `act()` 后替换动作，该检查在物理推进后失败，调用方须将该次执行视为失败。旧显式反馈参数仍兼容。普通裸数组仍拒绝，过期边界和缺失控制请求在推进前拒绝，不能将此路线推广为任意外部动作。调用方负责 Solution 完成/失败和异常处理；不同模式不能混用。
 
 PickCube scalar CPU 的 Solution 当前返回同一 `ExpertAction`，但 `env.step(proposal.action)` 接收其中的数组，`reset`/`observe` 另需 `env.expert_execution_info()`。这两个调用方驱动路径有禁止 native import 的合成测试；新 Nut 路径的完整真实物理成功及新源码记录仍待验证，旧成功参考不能代替该证据。Position 候选及其他任务不由这些结果推及。示例：[NutAssembly](../../../../examples/tasks/nut_assembly.py)、[录制](../../../../examples/recording/record_expert.py)。

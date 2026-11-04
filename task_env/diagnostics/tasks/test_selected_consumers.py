@@ -311,6 +311,38 @@ def test_nutassembly_caller_action_cannot_cross_episode(fake):
         second.close()
 
 
+@pytest.mark.parametrize('mutation', ['values', 'stage', 'control_mode'])
+def test_nutassembly_solution_rejects_altered_executed_action(fake, mutation):
+    from dataclasses import replace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        if mutation == 'control_mode':
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        action = solution.act(obs, info)
+        if mutation == 'values':
+            values = action.action.copy()
+            values[0] += .001
+            action = replace(action, action=values)
+        elif mutation == 'stage':
+            action = replace(action, stage='other_stage')
+        else:
+            action = replace(action, control_request=replace(
+                action.control_request, mode='hold_last_applied'))
+        obs, reward, terminated, truncated, info = env.step(action)
+        with pytest.raises(ValueError, match='pending Solution action'):
+            solution.observe(obs, reward, terminated, truncated, info)
+        assert solution.failed and solution.failure_reason == 'native_feedback_invalid'
+    finally:
+        env.close()
+
+
 def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
 

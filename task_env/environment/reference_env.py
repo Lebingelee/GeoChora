@@ -2250,6 +2250,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self._publish_control_application(
                         self.info, request, canonical, target, applied, request_boundary,
                     )
+                    if self.binding.control_request_required and proposal is not None:
+                        control_request = proposal.control_request
+                        self.info['control_application_v1'].update({
+                            'solution_stage': proposal.stage,
+                            'arm_execution_request_v1': {
+                                'schema_version': control_request.schema_version,
+                                'profile_id': control_request.profile_id,
+                                'mode': control_request.mode,
+                            },
+                        })
             interval_receipt = None
             if self.binding.native_interval_receipt_factory is not None:
                 phase = 'native_interval_receipt'

@@ -928,7 +928,10 @@ class NutAssemblyOutcomeSolutionV1:
         if planned: self._index += 1
         else: self._hold_ticks += 1
         self._emitted += 1
-        self._pending_action = {"stage": proposal.stage, "planned": planned}
+        self._pending_action = {"stage": proposal.stage, "planned": planned,
+            "values": tuple(float(value) for value in proposal.action),
+            "control_request": {"schema_version": control_request.schema_version,
+                "profile_id": control_request.profile_id, "mode": control_request.mode}}
         return proposal
 
     def _evaluator(self, start_time_s):
@@ -1205,6 +1208,19 @@ class NutAssemblyOutcomeSolutionV1:
                     native_samples = native_interval_receipt.samples
                 if not isinstance(native_interval_receipt, NutAssemblyNativeIntervalReceiptV1):
                     raise ValueError("selected NutAssembly step requires a typed native interval receipt")
+                application = info.get("control_application_v1")
+                pending = self._pending_action
+                if (not isinstance(application, Mapping) or pending is None
+                        or application.get("request_boundary") != self._pending_boundary
+                        or application.get("solution_stage") != pending["stage"]
+                        or application.get("arm_execution_request_v1") != pending["control_request"]
+                        or application.get("requested_action") != {
+                            "mode": "absolute_pose", "reference": "world",
+                            "rotation_representation": "quaternion_wxyz",
+                            "values": list(pending["values"]),
+                        }
+                        or application.get("target_identity_hash") != application.get("applied_target_hash")):
+                    raise ValueError("control application does not match the pending Solution action")
                 evaluation_boundary = info.get("expert_execution_boundary_v1")
                 if (not isinstance(evaluation_boundary, Mapping)
                         or evaluation_boundary != native_interval_receipt.evaluation_boundary
