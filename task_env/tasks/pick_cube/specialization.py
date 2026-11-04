@@ -24,6 +24,9 @@ from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifa
 from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.execution import (
+    ReferenceExecutionController, StableArmTargetHold,
+)
 from ...environment import (
     RuntimeSnapshot,
     TaskCompositionSpec,
@@ -70,6 +73,9 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "schema_version": "pick-cube-r3-nut-aligned-profile-v2",
     "joint_velocity_limit_rad_s": 2.0,
     "gripper_force_limit_N": 10.0,
+    "gripper_close_transition_s": 0.3333333333333333,
+    "gripper_close_settle_s": 0.5,
+    "postclose_hold_s": 0.1,
 }
 
 from .task import semantic_definition, evaluate, sample_reset
@@ -123,20 +129,14 @@ def _nut_aligned_environment_config(config):
 def _pickcube_r3_planner_config(dynamic_profile, control_dt):
     """Convert the frozen production R3 planner profile to 100 Hz per-tick limits."""
     planner = dynamic_profile["planner"]
-    dt = float(control_dt)
-    return AbsolutePosePlannerConfig(
-        max_translation_per_step=float(planner["translation_speed_m_s"]) * dt,
-        max_translation_acceleration_per_step=(
-            float(planner["translation_acceleration_m_s2"]) * dt**2
-        ),
-        max_rotation_per_step=float(planner["rotation_speed_rad_s"]) * dt,
-        max_rotation_acceleration_per_step=(
-            float(planner["rotation_acceleration_rad_s2"]) * dt**2
-        ),
-        settle_steps=math.ceil(
-            float(planner["settle_duration_s"]) / dt - 1e-10
-        ),
-        max_steps=math.ceil(_NUT_ASSEMBLY_MAX_STAGE_PLAN_S / dt - 1e-10),
+    return AbsolutePosePlannerConfig.from_si_rates(
+        control_dt_s=float(control_dt),
+        translation_speed_m_s=float(planner["translation_speed_m_s"]),
+        translation_acceleration_m_s2=float(planner["translation_acceleration_m_s2"]),
+        rotation_speed_rad_s=float(planner["rotation_speed_rad_s"]),
+        rotation_acceleration_rad_s2=float(planner["rotation_acceleration_rad_s2"]),
+        settle_duration_s=float(planner["settle_duration_s"]),
+        max_plan_duration_s=_NUT_ASSEMBLY_MAX_STAGE_PLAN_S,
     )
 
 
@@ -182,6 +182,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(compile_declared_artifact)).resolve(),
              Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
+             Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     canonical = root / "task_env" / "controllers" / "canonical"
@@ -232,6 +233,24 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         measured_tcp_clearance_gate=is_r3_profile,
         planner=planner_config,
         posture_path_profile=posture_path_profile,
+        close_transition_steps=(
+            max(1, int(math.ceil(
+                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_transition_s"]
+                / artifact.timebase.control_dt - 1e-10
+            ))) if is_r3_profile else None
+        ),
+        close_settle_steps=(
+            max(1, int(math.ceil(
+                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_settle_s"]
+                / artifact.timebase.control_dt - 1e-10
+            ))) if is_r3_profile else 0
+        ),
+        postclose_hold_steps=(
+            max(1, int(math.ceil(
+                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["postclose_hold_s"]
+                / artifact.timebase.control_dt - 1e-10
+            ))) if is_r3_profile else 0
+        ),
     )
     if controller_profile == "r1":
         controller = ProductionCanonicalPandaController.from_source(artifact, source)
@@ -245,6 +264,45 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         )
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
+    base_controller_identity = None
+    execution_profile = None
+    if is_r3_profile:
+        # Match NutAssembly's complete selected R3 execution chain while keeping
+        # PickCube's Artifact, source, reset and Solution task-owned.
+        controller.gripper_config = replace(
+            controller.gripper_config, force_limit_N=10.0,
+        )
+        base_controller_identity = controller.identity
+        arm_hold = StableArmTargetHold(controller)
+        execution_controller = ReferenceExecutionController(
+            arm_hold, artifact.timebase.control_dt, gripper_rate_hz=500,
+        )
+        execution_support_sha256 = {
+            "arm_and_execution_wrapper": hashlib.sha256(
+                Path(inspect.getsourcefile(StableArmTargetHold)).read_bytes()
+            ).hexdigest(),
+            "execution_controller": hashlib.sha256(
+                Path(inspect.getsourcefile(ReferenceExecutionController)).read_bytes()
+            ).hexdigest(),
+            "gripper_servo": hashlib.sha256(
+                Path(inspect.getsourcefile(type(execution_controller.inner))).read_bytes()
+            ).hexdigest(),
+        }
+        execution_profile = {
+            "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+            "arm_execution_request_profile": "pickcube-r3-hold-ramp-v1",
+            "gripper_cadence": "native-gripper-500hz-v1",
+            "gripper_control_hz": 500,
+            "gripper_feedback_hz": 500,
+            "outer_controller_hz": 100,
+            "execution_support_sha256": execution_support_sha256,
+        }
+        controller.identity = digest({
+            "construction_id": recipe["construction_id"],
+            "base_controller_identity": base_controller_identity,
+            **execution_profile,
+        })
+        controller = execution_controller
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
@@ -259,6 +317,10 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         "source_revision": revision, "source_sha256": source_ids,
         "qualification": "NOT_REQUALIFIED",
     }
+    if is_r3_profile:
+        resolved["base_controller_identity"] = base_controller_identity
+        resolved.update(execution_profile)
+        resolved["controller_identity"] = controller.identity
     if controller_profile != "r1":
         resolved["controller_profile"] = controller_profile
         resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
@@ -447,7 +509,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         external_actions=True,
         interval_mode=(
             "native"
-            if interval_provider == "mujoco" and controller_profile in _PICKCUBE_R3_PROFILES
+            if interval_provider in {"mujoco", "geophys"}
+            and controller_profile in _PICKCUBE_R3_PROFILES
             else "grouped"
         ),
         recorder_mode="canonical",

@@ -9,6 +9,8 @@ from collections.abc import Mapping
 import math
 import numpy as np
 
+from .gripper_execution import EqualRateGripperServo, NativeRateGripperServo
+
 
 @dataclass(frozen=True)
 class ArmTargetExecutionRequestV1:
@@ -19,9 +21,11 @@ class ArmTargetExecutionRequestV1:
     mode: str
 
     def validate(self):
-        if (self.schema_version, self.profile_id) != (
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1",
-        ):
+        if (self.schema_version != "arm-target-execution-request-v1"
+                or self.profile_id not in {
+                    "nutassembly-r3-hold-ramp-v1",
+                    "pickcube-r3-hold-ramp-v1",
+                }):
             raise ValueError("unsupported arm target execution request")
         if self.mode not in {"track", "hold_last_applied", "ramp_from_last_applied"}:
             raise ValueError("unsupported arm target execution mode")
@@ -144,6 +148,48 @@ class StableArmTargetHold:
             self.controller.last_arm_diagnostics['experimental_joint_target_hold'] = False
         self.last_target = target
         return canonical, target
+
+
+class ReferenceExecutionController:
+    """Compose the shared R3 arm hold and gripper cadence owners."""
+
+    def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
+        self.hold = hold
+        if gripper_rate_hz == 500:
+            self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
+        elif gripper_rate_hz == 100:
+            self.inner = EqualRateGripperServo(hold.controller, 100, control_dt)
+        else:
+            raise ValueError('R3 reference gripper cadence must be 100 or 500 Hz')
+        self.gripper_rate_hz = int(gripper_rate_hz)
+
+    def __getattr__(self, name):
+        return getattr(self.hold, name)
+
+    def reset(self, state, feedback):
+        self.inner.reset()
+        return self.hold.reset(state, feedback)
+
+    def compute(self, *args):
+        return self.hold.compute(*args)
+
+    def inner_gripper_step(self, *args):
+        return self.inner.inner_gripper_step(*args)
+
+    def validate_arm_execution_request(self, request):
+        return self.hold.validate_execution_request(request)
+
+    def request_arm_execution(self, request):
+        self.hold.request_execution(request)
+
+    def begin(self, target):
+        self.hold.begin(target)
+
+    def target(self, target, index, count):
+        return self.hold.target(target, index, count)
+
+    def applied(self, acknowledgement):
+        self.hold.applied(acknowledgement)
 
 
 class PoseStabilityWindow:

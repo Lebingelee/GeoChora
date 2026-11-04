@@ -321,6 +321,7 @@ def _source_identity_files():
         "task_env/tasks/reference_env.py", "task_env/tasks/canonical_solution_lifecycle.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
+        "task_env/planners/cartesian.py",
     )
     controller = root / "task_env/controllers/canonical"
     relative = (*relative, R3_PROFILE_PATH.relative_to(root).as_posix(),

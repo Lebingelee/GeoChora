@@ -18,12 +18,13 @@ import numpy as np
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import (
     ArmTargetExecutionRequestV1, BoundaryWait, PoseStabilityWindow,
+    ReferenceExecutionController,
 )
 from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, CanonicalGripperFeedback,
     NativeControlFeedbackSampleV1,
 )
-from ...controllers.canonical.gripper_execution import EqualRateGripperServo
+from ...controllers.canonical.gripper_execution import NativeRateGripperServo
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...utils.rotation import (
     normalize_quat_wxyz, quat_angle_wxyz, quat_multiply_wxyz,
@@ -457,13 +458,14 @@ class NutAssemblyOutcomeSolutionV1:
                 self.provider, self.task_artifact_hash, self.source_id,
                 self.source_xml_sha256, self.base_controller_identity)):
             raise ValueError("native Solution requires actual provider/source/controller identity bindings")
-        self._planner = AbsolutePosePlanner(AbsolutePosePlannerConfig(
-            max_translation_per_step=self.config.translation_speed_m_s * self.control_dt,
-            max_translation_acceleration_per_step=self.config.translation_acceleration_m_s2 * self.control_dt**2,
-            max_rotation_per_step=self.config.rotation_speed_rad_s * self.control_dt,
-            max_rotation_acceleration_per_step=self.config.rotation_acceleration_rad_s2 * self.control_dt**2,
-            settle_steps=self._ticks(self.config.settle_duration_s),
-            max_steps=self._ticks(self.config.max_stage_plan_s),
+        self._planner = AbsolutePosePlanner(AbsolutePosePlannerConfig.from_si_rates(
+            control_dt_s=self.control_dt,
+            translation_speed_m_s=self.config.translation_speed_m_s,
+            translation_acceleration_m_s2=self.config.translation_acceleration_m_s2,
+            rotation_speed_rad_s=self.config.rotation_speed_rad_s,
+            rotation_acceleration_rad_s2=self.config.rotation_acceleration_rad_s2,
+            settle_duration_s=self.config.settle_duration_s,
+            max_plan_duration_s=self.config.max_stage_plan_s,
         ))
         self._lifecycle = CanonicalSolutionLifecycle(
             SolutionCompletionPolicy.ON_EXPERT_TERMINAL_STAGE)
@@ -1299,49 +1301,6 @@ class NutAssemblyOutcomeSolutionV1:
 
 
 __all__ = ["NutAssemblyOutcomeSolutionV1", "NutAssemblySolutionConfig", "OUTCOME_POLICY_ID"]
-
-
-class NativeRateGripperServo(EqualRateGripperServo):
-    version = "native-gripper-500hz-v1"
-    def reset(self):
-        self.update_count = 0
-        self._last_control_step = None
-        self._last_target = None
-        self._last_diagnostics = None
-
-    def inner_gripper_step(self, state, feedback):
-        if abs(self.controller.inner_physics_dt_s - 0.002) > 1e-12:
-            raise ValueError("Native-rate gripper requires the accepted 2 ms physics clock")
-        target, diagnostics = self._update(state, feedback)
-        self._last_control_step, self._last_target = state.control_step, target
-        self._last_diagnostics = dict(diagnostics)
-        self.update_count += 1
-        return target, {**diagnostics, "inner_update_performed": True,
-            "inner_update_period_s": 0.002, "configured_inner_rate_hz": 500}
-
-
-class ReferenceExecutionController:
-    """Existing Controller owner for the selected R3 arm and gripper execution."""
-    def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
-        self.hold = hold
-        if gripper_rate_hz == 500:
-            self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
-        elif gripper_rate_hz == 100:
-            self.inner = EqualRateGripperServo(hold.controller, 100, control_dt)
-        else:
-            raise ValueError('NutAssembly R3 diagnostic gripper cadence must be 100 or 500 Hz')
-        self.gripper_rate_hz = int(gripper_rate_hz)
-    def __getattr__(self, name): return getattr(self.hold, name)
-    def reset(self, state, feedback):
-        self.inner.reset()
-        return self.hold.reset(state, feedback)
-    def compute(self, *args): return self.hold.compute(*args)
-    def inner_gripper_step(self, *args): return self.inner.inner_gripper_step(*args)
-    def validate_arm_execution_request(self, request): return self.hold.validate_execution_request(request)
-    def request_arm_execution(self, request): self.hold.request_execution(request)
-    def begin(self, target): self.hold.begin(target)
-    def target(self, target, index, count): return self.hold.target(target, index, count)
-    def applied(self, acknowledgement): self.hold.applied(acknowledgement)
 
 
 __all__ += ["NativeRateGripperServo", "ReferenceExecutionController",

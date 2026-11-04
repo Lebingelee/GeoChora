@@ -43,7 +43,18 @@ def test_equal_rate_gripper_updates_once_and_holds_for_four_native_steps():
     assert servo.update_count == 0 and servo.held_count == 0
 
 
-def test_cadence_experiment_is_explicit_and_does_not_widen_selected_manifest():
+def test_cadence_experiment_is_explicit_and_does_not_widen_selected_manifest(monkeypatch):
+    # Keep this static manifest test independent of an installed GeoPhys
+    # checkout. Current provider availability/admission is checked separately
+    # during the locked route preflight.
+    from task_env.runtime.sessions import api
+
+    monkeypatch.setattr(api, 'provider_build_identity', lambda _provider: {
+        'provider': 'geophys', 'package_version': None,
+        'repository_revision': 'test-static-manifest', 'dirty_build_sha256': None,
+        'import_origin': '/static-test/geophys/__init__.py',
+        'origin_sha256': 'b' * 64, 'manifest_version': 'git:test-static-manifest',
+    })
     assert provider_manifest('geophys').backend == 'cpu'
     with pytest.raises(ValueError, match='scalar CPU only'):
         NutAssemblyReferenceEnv(provider='geophys', backend='cuda')

@@ -47,3 +47,25 @@ class EqualRateGripperServo:
             'inner_update_period_s':self.outer_dt_s,
             'configured_inner_rate_hz':self.rate_hz,
         }
+
+
+class NativeRateGripperServo(EqualRateGripperServo):
+    """Update the shared R3 gripper law at each native physics boundary."""
+
+    version = "native-gripper-500hz-v1"
+
+    def reset(self):
+        self.update_count = 0
+        self._last_control_step = None
+        self._last_target = None
+        self._last_diagnostics = None
+
+    def inner_gripper_step(self, state, feedback):
+        if abs(self.controller.inner_physics_dt_s - 0.002) > 1e-12:
+            raise ValueError("Native-rate gripper requires the accepted 2 ms physics clock")
+        target, diagnostics = self._update(state, feedback)
+        self._last_control_step, self._last_target = state.control_step, target
+        self._last_diagnostics = dict(diagnostics)
+        self.update_count += 1
+        return target, {**diagnostics, "inner_update_performed": True,
+            "inner_update_period_s": 0.002, "configured_inner_rate_hz": 500}

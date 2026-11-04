@@ -386,7 +386,7 @@ def test_task_bindings_declare_selected_control_and_recording_requirements():
     pickcube = make_env(IDS[0])
     nutassembly = make_env(IDS[1])
     assert (pickcube.binding.interval_mode, pickcube.binding.recorder_mode,
-            pickcube.binding.external_actions) == ('grouped', 'canonical', True)
+            pickcube.binding.external_actions) == ('native', 'canonical', True)
     assert (nutassembly.binding.interval_mode, nutassembly.binding.recorder_mode,
             nutassembly.binding.external_actions, nutassembly.binding.record_native_substeps,
             nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, False)
@@ -611,12 +611,12 @@ def test_c05b_observer_failure_latches_before_recorder_append(fake, tmp_path):
         assert env.execution_fault.phase == 'solution_observation'
         assert env.execution_fault.physical_progress == 'advanced'
         assert env.execution_fault.transition_status == 'incomplete'
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
         assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
         assert not append_calls
         with pytest.raises(RuntimeError, match='faulted'):
             env.step_with_solution(solution)
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
     finally:
         env.close()
 
@@ -642,11 +642,11 @@ def test_c05b_recorder_append_failure_latches_after_observe_without_valid_transi
         assert env.execution_fault.phase == 'record_interval'
         assert env.execution_fault.physical_progress == 'advanced'
         assert env.execution_fault.transition_status == 'rejected'
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
         assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
         with pytest.raises(RuntimeError, match='faulted'):
             env.step_with_solution(solution)
-        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert env.state.control_step == 1 and len(env.session.calls) == 5
     finally:
         env.close()
 

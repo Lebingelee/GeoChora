@@ -62,7 +62,10 @@ def test_r3_pickcube_resolution_matches_nut_controller_and_planner():
         )
         assert pick["readiness"].base.planner.settle_steps == 27
         assert pick["readiness"].base.planner.max_steps == 600
-        assert pick["readiness"].base.action_budget == 4409
+        assert pick["readiness"].base.close_transition_steps == 34
+        assert pick["readiness"].base.close_settle_steps == 50
+        assert pick["readiness"].base.postclose_hold_steps == 10
+        assert pick["readiness"].base.action_budget == 4483
         assert pick["readiness"].global_safety_cap == 5709
         assert pick["readiness"].measured_tcp_clearance_gate is True
         assert pick["artifact"].timebase.physics_dt == pytest.approx(0.002)
@@ -122,8 +125,15 @@ def test_posture_ab_changes_only_orientation_and_preserves_measured_gates():
         vertical, over_cube = plan.measured_tcp_gates
         assert vertical.name == "vertical_clearance"
         assert over_cube.name == "over_cube_before_descent"
-        assert vertical.minimum_height_above_cube_top_m == pytest.approx(0.215)
-        assert over_cube.minimum_height_above_cube_top_m == pytest.approx(0.215)
+        # R3 commands +90 mm above cube top and preserves 20 mm headroom plus
+        # the 5 mm measurement tolerance, so its measured gate is +65 mm.
+        assert vertical.minimum_height_above_cube_top_m == pytest.approx(0.065)
+        assert over_cube.minimum_height_above_cube_top_m == pytest.approx(0.065)
+        cube_top = float(observation["privileged_state"]["cube_v1_body_pose"][0, 2]) + 0.025
+        assert plan.target_pose[2] - cube_top == pytest.approx(0.080, abs=1e-6)
+        assert plan.actions[vertical.after_actions - 1, 2] - cube_top == pytest.approx(0.090, abs=1e-6)
+        assert plan.actions[over_cube.after_actions - 1, 2] - cube_top == pytest.approx(0.090, abs=1e-6)
+        assert 0.090 - vertical.minimum_height_above_cube_top_m == pytest.approx(0.020 + 0.005)
         assert over_cube.max_horizontal_error_m == pytest.approx(0.010)
         assert plan.actions[over_cube.after_actions - 1, 2] >= plan.target_pose[2]
         np.testing.assert_allclose(
@@ -141,7 +151,7 @@ def test_posture_ab_changes_only_orientation_and_preserves_measured_gates():
         )
 
 
-def test_r3_route_uses_native_five_substep_binding_only_on_mujoco():
+def test_r3_route_uses_native_five_substep_binding_on_both_scalar_providers():
     assert make_reference_binding(
         controller_profile=PROFILE_A, interval_provider="mujoco"
     ).interval_mode == "native"
@@ -150,9 +160,15 @@ def test_r3_route_uses_native_five_substep_binding_only_on_mujoco():
     ).interval_mode == "native"
     assert make_reference_binding(
         controller_profile=PROFILE_A, interval_provider="geophys"
-    ).interval_mode == "grouped"
+    ).interval_mode == "native"
+    assert make_reference_binding(
+        controller_profile=PROFILE_B, interval_provider="geophys"
+    ).interval_mode == "native"
     assert make_reference_binding(
         controller_profile="r1", interval_provider="mujoco"
+    ).interval_mode == "grouped"
+    assert make_reference_binding(
+        controller_profile="r1", interval_provider="geophys"
     ).interval_mode == "grouped"
 
 
@@ -161,11 +177,23 @@ def test_lift_uses_planner_length_instead_of_spending_remaining_solution_budget(
     solution = pick["solution"]
     plan = solution._plan_lift(_reference_observation(), {})
 
-    assert len(plan.actions) == 427
+    hold_steps = pick["readiness"].base.postclose_hold_steps
+    start = solution._ee_pose(_reference_observation())
+    expected_hold = solution._planner.hold_pose(
+        pose=start, steps=hold_steps, gripper=-1.0,
+    )
+    target = start.copy()
+    target[2] += 0.16
+    expected_plan = solution._planner.plan_translation_only(
+        current_pose=start, target_position=target[:3], gripper=-1.0,
+    )
+    assert hold_steps == 10
+    assert len(plan.actions) == hold_steps + len(expected_plan)
+    np.testing.assert_array_equal(plan.actions[:hold_steps], expected_hold)
+    np.testing.assert_array_equal(plan.actions[hold_steps:], expected_plan)
+    assert np.all(plan.actions[:, 7] == -1.0)
     assert len(plan.actions) < solution.config.action_budget
+    settle = pick["readiness"].base.planner.settle_steps
     assert np.allclose(
-        plan.actions[-pick["readiness"].base.planner.settle_steps:],
-        plan.actions[-1],
-        rtol=0.0,
-        atol=0.0,
+        plan.actions[-settle:], plan.actions[-1], rtol=0.0, atol=0.0,
     )
