@@ -78,7 +78,7 @@ class FakeSession(_SessionValues):
 
 @pytest.fixture
 def fake(monkeypatch):
-    monkeypatch.setattr('task_env.tasks.reference_env.materialize_control', FakeSession)
+    monkeypatch.setattr('task_env.environment.reference_env.materialize_control', FakeSession)
     monkeypatch.setattr('task_env.runtime.sessions.provenance.provider_build_identity', lambda provider: {'synthetic_provider':provider})
 
 

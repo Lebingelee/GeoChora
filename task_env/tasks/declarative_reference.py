@@ -24,7 +24,8 @@ from ..controllers.canonical import ProductionCanonicalPandaController
 from ..controllers.canonical.contracts import digest
 from ..environment.configuration import resolve_env_config
 from ..environment.config import ResolvedSelectedConfig
-from .reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from ..environment.reference_binding import ReferenceTaskBinding
+from ..environment.reference_env import SelectedReferenceEnv
 
 
 def _sample_box_reset(declaration, artifact, seed):

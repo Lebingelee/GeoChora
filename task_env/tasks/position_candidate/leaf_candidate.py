@@ -262,7 +262,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
             raise ValueError(f"R02c fixed ResetPlan requires seed {reset_plan.reset_sample.task_seed}")
         return seed
 
-    from ..reference_env import ReferenceTaskBinding
+    from ...environment.reference_binding import ReferenceTaskBinding
     binding = ReferenceTaskBinding(
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         evaluate=lambda _state, _semantics: SimpleNamespace(reward=0.0, success=False, failure=False, metrics={}),

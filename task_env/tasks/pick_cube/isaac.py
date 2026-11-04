@@ -132,8 +132,13 @@ def _canonical_task_recipe(task_config: dict) -> bytes:
 
 def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact):
     """Compile the existing PickCube v0 semantics against its USD Scene."""
+    if set(task_config) - {'recipe', 'environment', 'execution'}:
+        raise ValueError('unsupported PickCube task config fields')
     scene = build_pickcube_isaac_scene(task_config)
-    task_source = adapt_legacy_recipe_task_source(task_config)
+    # Execution defaults are consumed by configuration, not Task Source.
+    task_source = adapt_legacy_recipe_task_source({
+        'recipe': task_config['recipe'], 'environment': task_config['environment'],
+    })
     artifact = compile_task_artifact_v1(
         task_source, scene, legacy_artifact,
         frame_bindings={

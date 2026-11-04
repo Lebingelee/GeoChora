@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 
 from ...registry import register_env
-from ..reference_env import SelectedReferenceEnv
+from ...environment.reference_env import SelectedReferenceEnv
 
 
 @register_env()

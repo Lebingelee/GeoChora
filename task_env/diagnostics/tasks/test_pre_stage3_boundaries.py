@@ -70,3 +70,15 @@ def test_execution_boundary_reuses_xml_digest_but_invalidates_on_replacement(mon
     assert third['source_xml_sha256'] != second['source_xml_sha256']
     assert third['identity_hash'] != second['identity_hash']
     assert xml_inputs == [b'<scene/>', b'<scene changed="yes"/>']
+
+
+def test_selected_compatibility_exports_reference_the_canonical_objects():
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.tasks.reference_env import (
+        ReferenceTaskBinding as old_binding,
+        SelectedReferenceEnv as old_env,
+    )
+
+    assert old_env is SelectedReferenceEnv
+    assert old_binding is ReferenceTaskBinding

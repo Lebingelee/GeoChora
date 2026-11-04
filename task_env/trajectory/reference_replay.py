@@ -13,7 +13,7 @@ from task_env.trajectory.canonical.streaming import load_streaming
 
 def reexecute_selected(path, *, output):
     from task_env import make_env
-    from task_env.tasks.reference_env import __file__ as adapter_file
+    from task_env.environment.reference_env import __file__ as adapter_file
     from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID as PC
     from task_env.tasks.nut_assembly.task import REFERENCE_ENV_ID as NA
     SELECTED_ENV_IDS = (PC, NA)
@@ -44,6 +44,10 @@ def reexecute_selected(path, *, output):
         raise ValueError('runtime interval source identity mismatch')
     if metadata['source_provenance']['adapter'] != hashlib.sha256(Path(adapter_file).read_bytes()).hexdigest():
         raise ValueError('adapter source identity mismatch; no historical identity substitution')
+    from task_env.recorders import reference_provenance
+    coordinator_source = metadata['source_provenance'].get('coordinator_source')
+    if coordinator_source is not None and coordinator_source != reference_provenance.source_snapshot(reference_provenance.__file__):
+        raise ValueError('coordinator source identity mismatch; no historical identity substitution')
     env = make_env(configuration['env_id'], config={k:v for k,v in configuration.items() if k!='env_id'})
     try:
         if digest(env.value['resolved_configuration']) != digest(recipe['resolved_configuration']):

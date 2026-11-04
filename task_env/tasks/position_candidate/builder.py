@@ -38,7 +38,8 @@ from task_env.runtime.sessions.leaf_control import (
     IsaacNamedPositionDriveReceiptV1,
 )
 from task_env.runtime.sessions.control import compile_control_binding_plan
-from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from task_env.environment.reference_binding import ReferenceTaskBinding
+from task_env.environment.reference_env import SelectedReferenceEnv
 
 
 POSITION_CANDIDATE_TASK_ID = 'phase-ii-c02b-position-servo'

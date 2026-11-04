@@ -35,7 +35,8 @@ from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
 from task_env.environment.types import ReferenceSpec
-from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from task_env.environment.reference_binding import ReferenceTaskBinding
+from task_env.environment.reference_env import SelectedReferenceEnv
 
 from bench_deploy.libero.controllers.osc import LiberoMixedControllerV6, LiberoMixedControllerV7
 from bench_deploy.libero.tasks.predicates import (

@@ -46,7 +46,8 @@ from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource, ExecutionSourceReceiptV1
 from ...utils.rotation import quat_wxyz_to_matrix
-from ..reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from ...environment.reference_binding import ReferenceTaskBinding
+from ...environment.reference_env import SelectedReferenceEnv
 from .solution import (
     NutAssemblyNativeFeedbackSampleV1, NutAssemblyNativeIntervalReceiptV1,
     NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig,
@@ -318,7 +319,9 @@ def _source_identity_files():
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
         "task_env/assembly/compiler.py", "task_env/environment/task_source.py",
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
-        "task_env/tasks/reference_env.py", "task_env/tasks/canonical_solution_lifecycle.py",
+        "task_env/environment/reference_env.py", "task_env/environment/reference_binding.py",
+        "task_env/recorders/reference_provenance.py",
+        "task_env/tasks/canonical_solution_lifecycle.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
         "task_env/planners/cartesian.py",

@@ -300,7 +300,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         observed['artifact'] = artifact
         raise StopAtMaterialization
 
-    with patch('task_env.tasks.reference_env.materialize_control', capture_materialization):
+    with patch('task_env.environment.reference_env.materialize_control', capture_materialization):
         try:
             env.reset(seed=31)
         except StopAtMaterialization:

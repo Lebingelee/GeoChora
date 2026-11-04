@@ -46,7 +46,8 @@ from ...registry import make_agent, make_object, make_scene, register_env
 from ...planners import AbsolutePosePlannerConfig
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource
-from ..reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from ...environment.reference_binding import ReferenceTaskBinding
+from ...environment.reference_env import SelectedReferenceEnv
 from ...objects.pick_cube import (
     CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE, CUBE_MASS,
     EE_SITE_NAME, PickCubeSceneComposer,
@@ -184,6 +185,8 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
+             Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
+             root / "task_env/recorders/reference_provenance.py",
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     canonical = root / "task_env" / "controllers" / "canonical"
     files.update(path.resolve() for path in canonical.glob("*.py") if path.is_file())

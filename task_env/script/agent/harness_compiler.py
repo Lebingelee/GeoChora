@@ -34,7 +34,7 @@ class CompiledTask:
     source_xml_sha256: str
 
     def env_class(self):
-        from task_env.tasks.reference_env import SelectedReferenceEnv
+        from task_env.environment.reference_env import SelectedReferenceEnv
         compiled_horizon=self.horizon
         def initialize(env, *, provider='mujoco', backend='cpu', horizon=None):
             if horizon is not None and horizon != compiled_horizon:
@@ -239,7 +239,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         compile_panda_box_artifact, compile_panda_box_source)
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
     from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig,PickCubeReadinessSolution
-    from task_env.tasks.reference_env import ReferenceTaskBinding
+    from task_env.environment.reference_binding import ReferenceTaskBinding
     from task_env.objects.pick_cube import CUBE_HALF_SIZE,CUBE_CONTACT_MARGIN
     from task_env.controllers.canonical import ProductionCanonicalPandaController
     from task_env.planners.completion import ExpertExecutionInfo

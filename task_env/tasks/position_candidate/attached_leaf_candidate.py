@@ -268,7 +268,7 @@ def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
             raise ValueError(f"R03c fixed ResetPlan requires seed {R03C_SEED}")
         return seed
 
-    from ..reference_env import ReferenceTaskBinding
+    from ...environment.reference_binding import ReferenceTaskBinding
     binding = ReferenceTaskBinding(
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         evaluate=lambda _state, _semantics: SimpleNamespace(
