@@ -13,6 +13,8 @@ classic Gym wrapper 与 selected 环境内的 canonical recorder 是不同入口
 
 Position 与 mixed 的 v3 录制在结束时核对终止原因、最后完整边界和 T/T+1 读回；mixed 录制初始化失败时不会保留半初始化的活动 recorder，修正问题后可在同一 reset 边界重试。
 
+selected scalar 录制在开始时记录实际动作和观测绑定函数的源码文件摘要；绑定函数若无法追溯到文件，录制启动会拒绝，修正后可在该 reset 边界重试。摘要反映录制开始时的文件字节，不单独证明 provider 运行或任务成功。
+
 - [Wrapper lifecycle](wrapper_lifecycle.md)
 - [Trajectory contract](trajectory_contract.md)
 - [H5 schema](h5_schema.md)

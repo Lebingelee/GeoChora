@@ -3718,17 +3718,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         path = Path(path)
         if path.exists():
             raise FileExistsError(path)
-        self.recording_path = path
         config = self.value['resolved_configuration']
         # Provenance describes the source at recording start. Reuse that same
         # snapshot for every boundary, and take a new snapshot on a new recording.
         from ..recorders import reference_provenance
-        from ..observations import selected_reference as selected_observation
         self._recording_adapter_source_sha256 = reference_provenance.source_snapshot(__file__)
+        binding_sources = reference_provenance.callable_source_snapshots({
+            'observation_source': self.binding.observation_projection,
+            'observation_space_source': self.binding.observation_space_factory,
+            'action_source': self.binding.prepare_action,
+            'action_space_source': self.binding.action_space_factory,
+        })
         source_provenance = {
             'construction': digest(config), 'adapter': self._recording_adapter_source_sha256,
             'coordinator_source': reference_provenance.source_snapshot(reference_provenance.__file__),
-            'observation_source': reference_provenance.source_snapshot(selected_observation.__file__),
+            **binding_sources,
             'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
             'resolved_configuration_json': json.dumps(config, sort_keys=True),
             'execution_configuration_json': json.dumps(self._recorded_execution_configuration(), sort_keys=True),
@@ -3773,10 +3777,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             'owner_snapshot_scope': 'observation receipt; controller/expert restoration not implemented'}
         if self.binding.recorder_mode == 'canonical':
             from ..trajectory.canonical.contracts import CanonicalRecorder
-            self.recorder = CanonicalRecorder(metadata, self._boundary())
+            recorder = CanonicalRecorder(metadata, self._boundary())
+            self.recording_path, self.recorder = path, recorder
             return
-        self.recorder = ExecutionRecorder(metadata, recipe, content_fields=('task_outcome',))
-        self.recorder.boundary(self._boundary(), owners, 'reference', self.info['task_metrics'])
+        recorder = ExecutionRecorder(metadata, recipe, content_fields=('task_outcome',))
+        recorder.boundary(self._boundary(), owners, 'reference', self.info['task_metrics'])
+        self.recording_path, self.recorder = path, recorder
 
     def _record_interval(self, request, canonical, target, applied, stage, diagnostics,
                          terminated, truncated, substeps):

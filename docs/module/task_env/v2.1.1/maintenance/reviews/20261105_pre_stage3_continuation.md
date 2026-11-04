@@ -161,3 +161,9 @@ Nut specialization SHA由 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d732
 Position与mixed共享既有recorder owner的v3终止原因、最终boundary、T/T+1和H5回读校验；保留Position的 `horizon` 别名、leaf／camera专用读回以及各路线原有错误信息。mixed录制开始改为先成功 `begin_episode` 再发布recorder和路径；合成故障注入确认初始化失败后环境无活动recorder、无输出文件且可重试。新增两路线的错误终止原因和不完整boundary检查，确认拒绝前录制状态不变。
 
 无引擎selected／R05b／recorder组合 **164 passed、1 skipped、1 deselected**；lifecycle组 **183 passed、3 deselected**；leaf／mixed假provider组合 **13 passed**，日志及diff摘要见ignored `record-finalize-v2-selected.json`、`record-finalize-v2-lifecycle.json`、`record-finalize-v2-mixed.json`。附加严格禁引擎的attached-leaf合成H5及reader／篡改检查 **1 passed**（64 transitions／65 boundaries，不是物理reader）。首次完整lifecycle尝试中的一项candidate测试因严格guard拒绝查询MuJoCo spec而失败；已将该测试的provider身份明确替换为合成值后重跑。attached-leaf读回首次误用会预置假MuJoCo模块的mixed guard，reader按其禁止provider模块契约拒绝；改用严格guard后通过。未运行真实引擎、Isaac、GPU或物理reader。
+
+## Scalar录制绑定来源（续作，待复审）
+
+selected scalar录制在开始边界对绑定实际使用的动作转换／space、观测投影／space函数的源码文件取摘要，不再无条件把默认Panda观测模块当作实际投影来源。每次录制对同一文件只读取一次，新录制重新读取，不持久按路径缓存；文件内容变化后摘要变化。无法追溯到源码文件的callable在recorder发布前明确拒绝，修正后可重试；canonical和execution recorder均在首次boundary准备成功后才发布路径和实例。该摘要是开始时的文件字节，不单独证明运行中加载的代码与磁盘字节一致。
+
+无引擎selected／R05b／recorder／Harness组合 **168 passed、1 skipped、1 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。测试覆盖自定义观测函数的真实文件摘要、重复文件单次读取、文件替换后重新计算、无法追溯函数拒绝及重试；完整argv、输出与当时diff摘要见ignored `binding-source-selected.json`、`binding-source-lifecycle.json`和 `binding-source-mixed.json`。本次不证明物理任务成功，未运行真实引擎、Isaac、GPU或物理reader。

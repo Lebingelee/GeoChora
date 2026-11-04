@@ -1,5 +1,6 @@
 """Recording-time source snapshot and per-boundary coordinator receipt."""
 from hashlib import sha256
+import inspect
 from pathlib import Path
 
 from ..controllers.canonical.contracts import digest
@@ -8,6 +9,31 @@ from ..controllers.canonical.contracts import digest
 def source_snapshot(path):
     """Identify the file bytes at the start of one recording."""
     return sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _callable_source_path(callback):
+    if not callable(callback):
+        raise TypeError('recorded binding source must be callable')
+    owner = callback if inspect.isroutine(callback) else type(callback)
+    try:
+        source = inspect.getsourcefile(owner)
+    except (OSError, TypeError) as error:
+        raise ValueError('recorded binding callable has no traceable source file') from error
+    if source is None or not Path(source).is_file():
+        raise ValueError('recorded binding callable has no traceable source file')
+    return Path(source).resolve()
+
+
+def callable_source_snapshots(callbacks):
+    """Hash each declaring file once per recording, without a persistent path cache."""
+    paths = {name: _callable_source_path(callback) for name, callback in callbacks.items()}
+    snapshots = {path: source_snapshot(path) for path in set(paths.values())}
+    return {name: snapshots[path] for name, path in paths.items()}
+
+
+def callable_source_snapshot(callback):
+    """Identify the declaring file of one callable used for a recording."""
+    return callable_source_snapshots({'source': callback})['source']
 
 
 def coordinator_receipt(*, step, time, artifact_hash, controller_identity,

@@ -128,7 +128,8 @@ def test_scalar_action_contract_is_task_declared_and_drives_step(fake):
         env.close()
 
 
-def test_selected_observation_is_declared_by_task_and_survives_step(fake):
+def test_selected_observation_is_declared_by_task_and_survives_step(fake, tmp_path):
+    import hashlib
     from gymnasium.spaces import Box
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
@@ -149,12 +150,64 @@ def test_selected_observation_is_declared_by_task_and_survives_step(fake):
     try:
         obs, _ = env.reset(seed=19)
         assert env.observation_space.contains(obs) and obs['measurement'][0] == 0
+        env.start_recording(tmp_path / 'custom-observation.h5')
+        expected_source = hashlib.sha256(open(__file__, 'rb').read()).hexdigest()
+        provenance = env.recorder.metadata.source_provenance
+        assert provenance['observation_source'] == expected_source
+        assert provenance['observation_space_source'] == expected_source
         pose = env.state.pose_world['panda-v1/ee']
         action = np.asarray((*pose.position, *pose.quaternion_wxyz, 0.0), dtype=np.float32)
         obs, *_ = env.step(action)
         assert env.observation_space.contains(obs) and obs['measurement'][0] == 1
+        assert env.finish_recording('bounded')['logical_mapping_exact']
     finally:
         env.close()
+
+
+def test_untraceable_binding_cannot_start_recording_and_can_retry(fake, tmp_path):
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    env = PickCubeReferenceEnv(provider='mujoco')
+    try:
+        env.reset(seed=19)
+        original = env.binding
+        env.binding = replace(original, prepare_action=len)
+        with pytest.raises(ValueError, match='no traceable source file'):
+            env.start_recording(tmp_path / 'untraceable.h5')
+        assert env.recorder is None and env.recording_path is None
+        assert not (tmp_path / 'untraceable.h5').exists()
+        env.binding = original
+        env.start_recording(tmp_path / 'valid.h5')
+        assert env.recorder is not None
+        assert env.finish_recording('bounded')['logical_mapping_exact']
+    finally:
+        env.close()
+
+
+def test_callable_source_snapshot_rechecks_bytes_without_path_cache(tmp_path, monkeypatch):
+    import hashlib
+    import importlib.util
+    from task_env.recorders import reference_provenance
+
+    path = tmp_path / 'task_callbacks.py'
+    path.write_text('def project(value):\n    return value\n')
+    spec = importlib.util.spec_from_file_location('synthetic_task_callbacks', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    calls = []
+    original = reference_provenance.source_snapshot
+    def counted(source):
+        calls.append(source)
+        return original(source)
+    monkeypatch.setattr(reference_provenance, 'source_snapshot', counted)
+    snapshots = reference_provenance.callable_source_snapshots({'a': module.project, 'b': module.project})
+    assert len(calls) == 1 and snapshots['a'] == snapshots['b']
+    first = snapshots['a']
+    assert first == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def project(value):\n    return value + 1\n')
+    second = reference_provenance.callable_source_snapshot(module.project)
+    assert second == hashlib.sha256(path.read_bytes()).hexdigest() and second != first
+    assert len(calls) == 2
 
 
 def test_synthetic_candidate_compiles_and_drives_caller_solution_without_judge_claim(fake, monkeypatch):
