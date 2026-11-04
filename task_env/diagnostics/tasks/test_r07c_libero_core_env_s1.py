@@ -1097,6 +1097,39 @@ def test_mixed_task_without_object_pose_projection_uses_task_owned_spaces(monkey
         env.close()
 
 
+@pytest.mark.parametrize('damage', ('stale_revision', 'nonfinite_action', 'unknown_field'))
+def test_mixed_preparation_rejects_bad_input_before_runtime_write(monkeypatch, damage):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        env.reset(seed=51)
+        original = env.binding.prepare_mixed_control
+        def prepare(*args):
+            result = dict(original(*args))
+            if damage == 'stale_revision':
+                result['target'] = replace(result['target'], state_revision=env.session.state_revision + 1)
+            elif damage == 'nonfinite_action':
+                result['action_values'] = (float('nan'),) * len(result['action_values'])
+            else:
+                result['unexpected'] = True
+            return result
+        object.__setattr__(env.binding, 'prepare_mixed_control', prepare)
+        before = _FAKE_WORLD.calls['step']
+        revision = env.session.state_revision
+        def unexpected_write(_target):
+            raise AssertionError('invalid mixed preparation reached runtime write')
+        monkeypatch.setattr(env.session, 'apply_mixed_actuator_command', unexpected_write)
+        with pytest.raises((ValueError, TypeError), match='mixed-control'):
+            env.step(np.asarray([0.0, 0.0, 0.03]))
+        assert _FAKE_WORLD.calls['step'] == before
+        assert env.session.state_revision == revision
+        assert env.execution_fault is None
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('failure_stage', ('control', 'record'))
 def test_synthetic_mixed_interval_fault_keeps_execution_boundary(
         monkeypatch, tmp_path, failure_stage):

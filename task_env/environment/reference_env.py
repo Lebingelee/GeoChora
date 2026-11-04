@@ -2107,8 +2107,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
         """Run one task-prepared named command through the existing RuntimeSession."""
         from ..controllers.canonical.contracts import (
-            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1, StructuredActionRequestV1,
+            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1,
         )
+        from ..runtime.sessions.control import validate_mixed_control_preparation
         from ..trajectory.canonical.episode import StructuredControlTransitionV1
 
         if self._stopped or self.session is None:
@@ -2128,42 +2129,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise ValueError('mixed-control Solution proposal action was changed before preparation')
         before = self.state
         prepared = self.binding.prepare_mixed_control(self, action, before)
-        base_prepared_fields = {
-            'action_values', 'universal_action', 'request', 'target', 'writer_control',
-        }
         stepwise = self.binding.prepare_mixed_control_substep is not None
-        expected_prepared_fields = base_prepared_fields | ({'substep_context'} if stepwise else set())
-        if not isinstance(prepared, Mapping) or set(prepared) != expected_prepared_fields:
-            raise TypeError('mixed-control preparation must return the exact typed preparation fields')
-        action_values = tuple(float(value) for value in prepared['action_values'])
-        universal_action = tuple(float(value) for value in prepared['universal_action'])
-        if (not action_values or len(action_values) != len(universal_action)
-                or any(not math.isfinite(value) for value in (*action_values, *universal_action))):
-            raise ValueError('mixed-control task preparation returned invalid action values')
-        request = prepared['request']
-        target = prepared['target']
-        writer_control = prepared['writer_control']
-        if type(request) is not StructuredActionRequestV1 or type(target) is not MixedActuatorCommandV1:
-            raise TypeError('mixed-control preparation must return a StructuredActionRequest and MixedActuatorCommand')
-        request.validate()
-        target.validate()
-        if not isinstance(writer_control, Mapping) or set(writer_control) != {
-            'writer_id', 'action_schema_id', 'components', 'groups',
-            'requested_action', 'canonical_action',
-        }:
-            raise TypeError('mixed-control task writer metadata has unknown or missing fields')
-        source = self.value['source']
-        if (target.plan_identity_hash != source.mixed_actuator_plan.identity_hash
-                or target.task_artifact_hash != self.artifact.identity_hash
-                or target.source_id != source.scene_source.source_id
-                or target.source_closure_digest != source.source_closure_digest
-                or target.provider_materialization_id != self.session.provider_materialization_id
-                or target.episode_id != self.session.episode_id
-                or target.reset_sample_id != self.sample.sample_id
-                or target.control_step != self.session.snapshot().control_step
-                or target.state_revision != self.session.state_revision
-                or target.simulation_time_s != before.simulation_time):
-            raise ValueError('mixed-control target differs from the live source boundary')
+        action_values, universal_action, request, target, writer_control = validate_mixed_control_preparation(
+            prepared, stepwise=stepwise, source=self.value['source'], artifact=self.artifact,
+            session=self.session, sample=self.sample, before=before,
+        )
         applied = None
         applied_payload = None
         stepwise_receipt = None

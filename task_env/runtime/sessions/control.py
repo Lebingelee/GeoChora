@@ -1,5 +1,6 @@
 """Opt-in semantic control admission; legacy no-control materialize unchanged."""
 from dataclasses import asdict, dataclass, field
+from collections.abc import Mapping
 import hashlib
 import json
 import math
@@ -11,6 +12,7 @@ from ...controllers.canonical.contracts import (
     CanonicalControlTarget,
     RequestedAction,
     StructuredActionRequestV1,
+    MixedActuatorCommandV1,
 )
 from ...artifacts import (
     ActuatorReference,
@@ -35,6 +37,41 @@ class ControlledRuntimeSession(RuntimeSession, Protocol):
 
 
 CONTROL_REQUIRED=RequiredCapabilitySet(('articulated_robot','joint_position_actuation','joint_state_query','body_pose_query','frame_pose_query'))
+
+
+def validate_mixed_control_preparation(prepared, *, stepwise, source, artifact, session, sample, before):
+    """Validate task-prepared mixed controls against the live RuntimeSession boundary."""
+    fields = {'action_values', 'universal_action', 'request', 'target', 'writer_control'}
+    if stepwise:
+        fields.add('substep_context')
+    if not isinstance(prepared, Mapping) or set(prepared) != fields:
+        raise TypeError('mixed-control preparation must return the exact typed preparation fields')
+    action_values = tuple(float(value) for value in prepared['action_values'])
+    universal_action = tuple(float(value) for value in prepared['universal_action'])
+    if (not action_values or len(action_values) != len(universal_action)
+            or any(not math.isfinite(value) for value in (*action_values, *universal_action))):
+        raise ValueError('mixed-control task preparation returned invalid action values')
+    request, target, writer_control = prepared['request'], prepared['target'], prepared['writer_control']
+    if type(request) is not StructuredActionRequestV1 or type(target) is not MixedActuatorCommandV1:
+        raise TypeError('mixed-control preparation must return a StructuredActionRequest and MixedActuatorCommand')
+    request.validate()
+    target.validate()
+    if not isinstance(writer_control, Mapping) or set(writer_control) != {
+        'writer_id', 'action_schema_id', 'components', 'groups', 'requested_action', 'canonical_action',
+    }:
+        raise TypeError('mixed-control task writer metadata has unknown or missing fields')
+    if (target.plan_identity_hash != source.mixed_actuator_plan.identity_hash
+            or target.task_artifact_hash != artifact.identity_hash
+            or target.source_id != source.scene_source.source_id
+            or target.source_closure_digest != source.source_closure_digest
+            or target.provider_materialization_id != session.provider_materialization_id
+            or target.episode_id != session.episode_id
+            or target.reset_sample_id != sample.sample_id
+            or target.control_step != session.snapshot().control_step
+            or target.state_revision != session.state_revision
+            or target.simulation_time_s != before.simulation_time):
+        raise ValueError('mixed-control target differs from the live source boundary')
+    return action_values, universal_action, request, target, writer_control
 
 
 def _binding_identity(value):

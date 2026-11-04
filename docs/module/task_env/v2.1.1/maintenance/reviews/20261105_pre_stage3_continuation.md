@@ -143,3 +143,9 @@ Nut specialization SHA由 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d732
 禁止引擎导入的selected／R05b／Harness组 **152 passed、1 skipped、1 deselected**，F04合成adapter **10 passed、3 deselected**，lifecycle组 **180 passed、3 deselected**，leaf／mixed合成组 **12 passed**。skip为缺少冻结Isaac解释器，排除真实provider／scene和缺失历史worker；完整argv、输出和未提交diff摘要见ignored `observation-contract-evidence.json`、`observation-contract-f04.json`、`observation-contract-lifecycle.json`、`observation-contract-mixed.json`。本次未运行真实引擎、Isaac、GPU或物理reader；candidate完整合成预检的工作树限制与代表性物理验证仍待解决。
 
 上述验证后补入Marker和通用candidate的观测owner来源文件，Marker来源字节与candidate调用接线定向复验 **3 passed**；前述组合日志对应补入前的源码diff，不重标为最终diff的完整复跑。
+
+## Mixed控制准入归位（续作，待复审）
+
+将任务准备的mixed action、结构化请求、writer字段和实时source／episode／revision边界校验交给既有runtime control owner；Env继续调用该校验并协调执行、fault、记录和Solution发布。保留原字段集合、校验顺序、错误信息及推进前拒绝行为。新增合成用例覆盖过期state revision、非有限动作和多余字段，并安装runtime写入陷阱，确认拒绝前既无写入也无物理推进。
+
+禁止引擎导入的selected／R05b／Harness组 **152 passed、1 skipped、1 deselected**；lifecycle组 **180 passed、3 deselected**；leaf／mixed假provider组 **15 passed**。前述组合完整argv、输出和当时diff摘要见ignored `mixed-preflight-selected.json`、`mixed-preflight-lifecycle.json`及 `mixed-preflight-expanded.json`。其后增强runtime写入陷阱，相关mixed成功／fault和篡改用例定向 **6 passed**；不将此前组合日志重标为增强后的完整复跑。无真实引擎、Isaac、GPU或物理reader运行；先前物理结果不重标。
