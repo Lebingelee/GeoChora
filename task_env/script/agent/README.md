@@ -165,7 +165,7 @@ open issues. A passing round does not automatically resolve a prior issue.
 Ordinary task-local revisions remain supported; v1 revisions that change the
 Core/catalog/input context supply that context explicitly.
 
-Current **package preparation** supports the explicit synthetic handoff only:
+**Synthetic package input** remains unchanged:
 `task.json`, `semantic_examples.json`, `asset_bundle.json` and referenced XML
 assets in one upstream directory. The bundle requires
 `schema_version: harness-mock-asset-bundle-v0`, `synthetic: true`, and `assets`.
@@ -176,6 +176,27 @@ The XML body must be `PickCube`, with free joint `PickCube_joint`, an inertial
 mass of 0.08 kg and box geom `PickCube_collision` of half-size 0.025 m per axis.
 Treat additional asset semantics as an owner-reviewed extension, not a general
 importer contract. The tool does not invent missing upstream assets.
+
+**Built-in Isaac package input** uses the distinct
+`harness-builtin-source-bundle-v1` schema, `synthetic: false`, and one asset:
+`uid: cube-v1`, `source_kind: core-builtin-pinned-usd`, a relative
+`delivery_manifest`, and its Core-pinned `sha256`. Place the complete unchanged
+USD delivery, original source files, validation report and support files below
+the upstream directory. The existing verified USD loader checks the closure;
+this local validation is not upstream source verification. Do not pass this
+bundle to the synthetic catalog overlay or add `asset_sha256` to the built-in
+CandidateSpec. Catalog availability still uses `--isaac-delivery-manifest`.
+
+The pending package verifier dispatches Oracle checks by actual H5 schema.
+Canonical recordings retain exact logical comparison. Generic v3 recordings
+require structured-control readback, the original native worker and supervision
+receipts, reset/execution/source/controller/Expert identities, source snapshots,
+T/T+1, explicit outcome, and successful environment/App/process-group closure.
+The recorded `external_stop` outcome and loop-level Expert completion remain
+separate; v3 readback does not claim canonical equality, D0/D1/D2 or approval.
+All checks, ledger and Oracle must still bind the same clean Core commit.
+Reserve a real construction round before fresh checks; historical campaigns
+without reservations cannot be retroactively assigned a ledger.
 
 ## Scope and review
 

@@ -81,9 +81,11 @@ missing fields with success defaults or package it as a passing candidate.
 
 ## Oracle and Human review
 
-After candidate checks pass, use `oracle_candidate.py` with the same final spec/catalog/provider. It composes Core's selected recorder and completion helper, performs exact logical H5 save/load comparison and separately invokes the Core inspector. A successful recording requires the full expert route and task success, not merely an H5 file or its T+1 count.
+After candidate checks pass, use `oracle_candidate.py` with the same final spec/catalog/provider. It composes Core's selected recorder and completion helper, validates the actual schema (canonical exact comparison or v3 structured-control readback), and separately invokes the Core inspector. A successful recording requires the full expert route and task success, not merely an H5 file or its T+1 count.
 
 Before packaging, read the existing `<Core>/task_env/.agents/skills/task-env-experiment-evidence/SKILL.md`. That Skill owns Artifact/Judge procedure. Use `judge_package.py` to preserve final and historical evidence and create `judge_decision.yaml` with `decision: pending`. Record any unsupported video/render capability as a review gap. Do not create a Stage-2 Experiment from an unfrozen candidate.
+
+The exact built-in Isaac cube route may use the distinct pinned-USD source bundle documented in the CLI README. Preserve its local-validation provenance, native close receipts and v3 external-stop outcome; do not relabel it as a synthetic proxy or upstream-verified source.
 
 Completion is demonstrated by the ledger, checks, Oracle receipt and verified pending package. Report exactly what ran. One successful fresh session establishes that session's behavior only; it does not prove every Agent/LLM works. D0/D1/D2 and trajectory qualification remain independent work, and approval remains Human Judge's decision.
 

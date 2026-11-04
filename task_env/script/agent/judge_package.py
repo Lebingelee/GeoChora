@@ -70,27 +70,136 @@ def check_oracle(directory,spec_hash,artifact_hash,core_commit,provider):
         and e['solution_failed'] is False and e['task_failure'] is False
         and e['terminated'] is False and e['truncated'] is False,'Oracle completion failed')
     require(not d['errors'] and not d.get('execution_fault'),'Oracle has execution errors')
-    require(d['verification'].get('logical_mapping_exact') is True,'Oracle roundtrip missing')
     require(d['h5']['sha256']==digest(directory/'oracle.h5'),'Oracle H5 bytes changed')
     from examples._common import load_recording_summary
     actual=load_recording_summary(directory/'oracle.h5')
     for key in ('task_artifact_sha256','source_revision','transitions','boundaries','controller_identity','expert_identity'):
         require(actual[key]==d['recording'][key],f'Oracle inspected {key} mismatch')
-    require(actual['task_artifact_sha256']==artifact_hash and actual['source_revision']==core_commit,'Oracle identity mismatch')
+    require(actual['task_artifact_sha256']==artifact_hash,'Oracle artifact identity mismatch')
     require(actual['t_plus_one_valid'] and actual['transitions']==e['transitions'],'Oracle T+1/count mismatch')
-    from task_env.trajectory.canonical.h5 import load
-    trajectory=load(directory/'oracle.h5')
-    require(trajectory.metadata.task_seed==d['seed'],'Oracle seed mismatch')
-    require(trajectory.metadata.execution.physics_provider==provider,'Oracle provider mismatch')
-    config=json.loads(trajectory.metadata.source_provenance['resolved_configuration_json'])
-    require(config['spec_sha256']==spec_hash,'Oracle embedded spec mismatch')
-    require(trajectory.boundaries[-1].is_success is True,'Oracle final physical success missing')
-    for name,expected in {**config['source_sha256'],**d['tool_sha256']}.items():
-        source=directory/'source_snapshot'/name
-        require(source.is_file() and digest(source)==expected,f'Oracle source snapshot changed: {name}')
+    if actual.get('schema') == 'task-env-h5/v3':
+        check_v3_oracle(directory, d, actual, spec_hash, artifact_hash, core_commit, provider)
+    else:
+        require(d['verification'].get('logical_mapping_exact') is True,'Oracle roundtrip missing')
+        require(actual['source_revision']==core_commit,'Oracle source revision mismatch')
+        from task_env.trajectory.canonical.h5 import load
+        trajectory=load(directory/'oracle.h5')
+        require(trajectory.metadata.task_seed==d['seed'],'Oracle seed mismatch')
+        require(trajectory.metadata.execution.physics_provider==provider,'Oracle provider mismatch')
+        config=json.loads(trajectory.metadata.source_provenance['resolved_configuration_json'])
+        require(config['spec_sha256']==spec_hash,'Oracle embedded spec mismatch')
+        require(trajectory.boundaries[-1].is_success is True,'Oracle final physical success missing')
+        check_source_snapshots(directory,{**config['source_sha256'],**d['tool_sha256']})
     inspector=json.loads((directory/'inspect.json').read_text())
     require(inspector==d['recording'],'Oracle inspector receipt differs')
     return report
+
+
+def check_source_snapshots(directory, expected):
+    for name, sha in expected.items():
+        relative=Path(name)
+        require(not relative.is_absolute() and '..' not in relative.parts,'unsafe Oracle source path')
+        source=Path(directory)/'source_snapshot'/relative
+        require(source.is_file() and digest(source)==sha,f'Oracle source snapshot changed: {name}')
+
+
+def check_v3_oracle(directory, details, summary, spec_hash, artifact_hash, core_commit, provider):
+    """Validate actual v3 records and native receipts without claiming canonical equality."""
+    from task_env.recorders import load_structured_control_records_h5
+    records=load_structured_control_records_h5(Path(directory)/'oracle.h5')
+    worker=json.loads((Path(directory)/'native/worker_receipt.json').read_text())
+    native=json.loads((Path(directory)/'native/native_run_receipt.json').read_text())
+    facts=worker.get('facts') or {}
+    compiled=worker.get('compiled') or {}
+    identity=facts.get('recording_identity') or {}
+    profile=records['env_meta']['reference_profile']
+    require(worker.get('mode')=='oracle' and worker.get('provider')==provider
+        and worker.get('seed')==details['seed']==identity.get('seed'), 'Oracle native seed/provider mismatch')
+    require(worker.get('core_commit')==core_commit and worker.get('core_dirty') is False
+        and not worker.get('errors') and worker.get('exit_code')==0,'Oracle worker provenance/exit mismatch')
+    require(compiled.get('spec_sha256')==spec_hash and compiled.get('artifact_hash')==artifact_hash
+        and compiled.get('source_revision')==core_commit,'Oracle compiled identity mismatch')
+    require(details.get('worker')=={key:worker.get(key) for key in
+        ('core_commit','core_dirty','compiled','app','errors')},'Oracle embedded worker receipt mismatch')
+    require(details.get('native_run')==native and native.get('status')=='COMPLETED'
+        and native.get('returncode')==0 and native.get('process_group_retired') is True
+        and native.get('mode')=='oracle' and native.get('seed')==details['seed']
+        and native.get('provider')==provider,'Oracle native close/retirement mismatch')
+    close=(worker.get('app') or {}).get('close_receipt') or {}
+    require(close.get('close_completed') is True and close.get('closed') is True
+        and not close.get('close_failure'),'Oracle App close missing')
+    require(facts.get('close_attempted') is True and facts.get('close_succeeded') is True
+        and not facts.get('errors') and not facts.get('execution_fault'),'Oracle environment close failed')
+    for key in ('episode','verification','controller_identity','expert_identity'):
+        require(facts.get(key)==details.get(key),f'Oracle worker {key} mismatch')
+    expected=identity.get('profile') or {}
+    for key in ('execution_identity_sha256','reset_plan_identity_hash','reset_sample_id',
+                'source_id','source_closure_digest','delivery_manifest_sha256','provider','backend','device'):
+        require(bool(expected.get(key)) and profile.get(key)==expected[key],f'Oracle recorded {key} mismatch')
+    require(profile.get('provider')==provider and profile.get('backend')==backend_for(provider)
+        and profile.get('device')==device_for(provider),'Oracle recorded execution mismatch')
+    require(profile.get('controller_identity')==details['controller_identity']
+        and compiled.get('controller_identity')==details['controller_identity']
+        and compiled.get('solution_identity')==details['expert_identity'],'Oracle controller/expert mismatch')
+    verification=details.get('verification') or {}
+    require(records['transition_count']==details['episode']['transitions']==verification.get('transition_count')
+        and records['observation_count']==summary['boundaries']==verification.get('observation_count'),
+        'Oracle structured T/T+1 mismatch')
+    require(records['outcome'].to_mapping()==verification.get('outcome')
+        and records['outcome'].task_success is True,'Oracle recorded outcome mismatch')
+    expected_sources={**compiled.get('source_sha256',{}),**details['tool_sha256']}
+    identity_only=details.get('source_identity_only') or {}
+    require(all(expected_sources.get(name)==sha for name,sha in identity_only.items())
+        and set(identity_only)<={'f06_delivery_manifest_sha256','f06_delivery_source_entry_sha256'},'Oracle source-only digest mismatch')
+    check_source_snapshots(directory,{name:sha for name,sha in expected_sources.items()
+                                      if name not in identity_only})
+    require(compiled.get('source_closure_sha256')==profile.get('source_closure_digest')
+        and compiled.get('source_sha256',{}).get('f06_delivery_manifest_sha256')
+            ==profile.get('delivery_manifest_sha256'),'Oracle source closure/delivery mismatch')
+    from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1
+    require(profile.get('delivery_manifest_sha256')==ISAAC_DELIVERY_MANIFEST_SHA256_V1,
+        'Oracle recorded delivery differs from Core pin')
+    checks=details.get('storage_identity_checks') or {}
+    expected_checks={'inspector_pass','t_plus_one','artifact_identity','controller_identity','expert_identity',
+        'episode_transition_count','requested_seed','provider_provenance','source_provenance',
+        'core_identity','spec_identity','worker_artifact_identity','roundtrip_readback',
+        *('recorded_'+key for key in ('execution_identity_sha256','reset_plan_identity_hash',
+            'reset_sample_id','source_id','source_closure_digest','delivery_manifest_sha256',
+            'provider','backend','device'))}
+    require(set(checks)==expected_checks and all(value is True for value in checks.values()),
+        'Oracle storage checks missing/failed')
+    require(summary.get('storage_roundtrip')=='PASS' and summary.get('provider_provenance_present') is True
+        and summary.get('source_provenance_present') is True,'Oracle v3 readback/provenance missing')
+
+
+def check_asset_binding(spec, upstream, provider):
+    """Preserve synthetic input; separately admit the exact Core-pinned built-in USD."""
+    upstream=Path(upstream).resolve()
+    bundle=json.loads((upstream/'asset_bundle.json').read_text())
+    matches=[asset for asset in bundle.get('assets',[]) if asset.get('uid')==spec.object_config['object_uid']]
+    require(len(matches)==1,'candidate object missing or ambiguous in upstream asset binding')
+    asset=matches[0]
+    if bundle.get('schema_version')=='harness-builtin-source-bundle-v1':
+        from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1
+        from task_env.assembly.usd_delivery import load_usd_asset_delivery
+        require(provider=='isaacsim' and asset.get('uid')=='cube-v1'
+            and asset.get('source_kind')=='core-builtin-pinned-usd'
+            and bundle.get('synthetic') is False and 'asset_sha256' not in spec.object_config,
+            'unsupported built-in source binding')
+        path=(upstream/asset['delivery_manifest']).resolve()
+        require(path.is_relative_to(upstream) and digest(path)==asset.get('sha256')
+            ==ISAAC_DELIVERY_MANIFEST_SHA256_V1,'built-in USD delivery pin mismatch')
+        loaded=load_usd_asset_delivery(path)
+        require(loaded.locally_validated and not loaded.source_verified,'built-in delivery provenance mismatch')
+        return {'kind':'core-builtin-pinned-usd','asset_uid':asset['uid'],'asset_sha256':asset['sha256'],
+            'synthetic':False,'original_request_uid':None,'source_verified':False,
+            'provenance_kind':loaded.delivery.provenance_kind,'source_closure_sha256':loaded.closure_sha256}
+    path=(upstream/asset['path']).resolve()
+    require(path.is_relative_to(upstream),'asset escapes upstream directory')
+    require(bundle.get('synthetic') is True and digest(path)==asset['sha256']==spec.object_config.get('asset_sha256'),
+        'asset bytes/bundle/spec hash mismatch')
+    return {'kind':'synthetic-box-proxy','asset_uid':asset['uid'],'asset_sha256':asset['sha256'],
+        'synthetic':True,'original_request_uid':asset.get('source_request_uid')}
 
 
 def diagnostic_bindings(log,spec_paths=()):
@@ -185,12 +294,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     bundle_hash=current_inputs.get('asset_bundle',{}).get('sha256')
     require(upstream_hash==digest(u/'task.json'),'upstream task changed since construction')
     require(bundle_hash==digest(u/'asset_bundle.json'),'asset bundle changed since construction')
-    bundle=json.loads((u/'asset_bundle.json').read_text())
-    asset=next((a for a in bundle['assets'] if a['uid']==spec.object_config['object_uid']),None)
-    require(asset is not None,'Stage-1 packaging currently requires the candidate object from the synthetic upstream '
-        'asset bundle; built-in-object candidates (for example the Isaac cube-v1 route) are not yet packageable')
-    require(bundle.get('synthetic') is True and digest(u/asset['path'])==asset['sha256']==spec.object_config.get('asset_sha256'),
-        'asset bytes/bundle/spec hash mismatch')
+    binding=check_asset_binding(spec,u,provider)
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=False)
     relocation={}
     def copy_file(source,dest):
@@ -222,7 +326,8 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     portable_diagnostics=[]
     for i,pair in enumerate(diagnostics):
         entry={}
-        for kind,ref in pair.items():
+        for kind in ('report','spec'):
+            ref=pair[kind]
             dest=f'validation/history/diagnostics/{i}/{kind}.json'
             copy_file(ref['path'],dest)
             entry[kind]={'path':dest,'sha256':ref['sha256']}
@@ -235,15 +340,16 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     if historical_archive:copy_file(historical_archive,'validation/history/original_delivery.zip')
     manifest={'task_id':spec.task_id,'artifact_id':artifact.artifact_id,'artifact_version':artifact.artifact_version,
         'artifact_hash':ah,'spec_sha256':sh,'lifecycle':'candidate','stage':1,'core_commit':ctx['core_commit'],
-        'core_dirty':False,'provider':provider,'backend':backend_for(provider),'device':device_for(provider),'synthetic_upstream':True,
-        'original_request_uid':asset.get('source_request_uid'),'asset_uid':asset['uid'],'asset_sha256':asset['sha256'],
+        'core_dirty':False,'provider':provider,'backend':backend_for(provider),'device':device_for(provider),'synthetic_upstream':binding['synthetic'],
+        'original_request_uid':binding['original_request_uid'],'asset_uid':binding['asset_uid'],
+        'asset_sha256':binding['asset_sha256'],'asset_binding':binding,
         'validation_ref':'validation/current','construction_ref':'validation/history/construction_log.json',
         'evidence_ref':'validation/evidence.json','judge_decision_ref':'judge_decision.yaml',
         'video':{'status':'NOT_RECORDED','reason':'selected route has no supported render configuration'},
         'qualification':'NOT_ASSESSED','D0':'NOT_ASSESSED','D1':'NOT_ASSESSED','D2':'NOT_ASSESSED',
         'open_issues':log.get('open_issues',[]),
         'construction_rounds':history,'owner_repair_evidence':repair_index,
-        'scope':'synthetic lift candidate; no LIBERO equivalence, freeze, training readiness or replay qualification'}
+        'scope':'bounded lift candidate; no LIBERO equivalence, freeze, training readiness or replay qualification'}
     (output/'manifest.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True,sort_keys=False))
     rows='\n'.join(f"| {r.details['seed']} | {r.details['episode']['transitions']} | {r.details['recording']['boundaries']} | PASS |" for r in oracle_reports)
     (output/'validation/report.md').write_text(f'''# Stage-1 Candidate review facts
@@ -253,13 +359,14 @@ Task: `{spec.task_id}`. Lifecycle: candidate. Human decision: pending.
 Spec: `{sh}`. Artifact: `{ah}`. Core: `{ctx['core_commit']}` (clean).
 
 Current assets/compile/semantic checks pass. Feasibility: 20 or more declared distinct seeds, all solved; see current/feasibility.json for exact sample set.
-Physics execution: real {provider} {backend_for(provider).upper()} ({device_for(provider)}). Upstream assets and semantic endpoints: explicitly synthetic.
+Physics execution: real {provider} {backend_for(provider).upper()} ({device_for(provider)}). Asset provenance: {binding['kind']}; semantic endpoints: explicitly synthetic.
 
 | Oracle seed | Transitions | Boundaries | Completion + storage |
 |---|---|---|---|
 {rows}
 
-Existing selected recorder performs exact logical save/load comparison. Core inspector separately validates H5/T+1.
+Storage is validated according to each Oracle schema: canonical exact logical comparison or v3 structured-control readback.
+Core inspector separately validates H5/T+1. V3 external-stop outcome is preserved; it is not Expert-completion evidence.
 Expert completion, physical task success and termination flags are retained independently in each oracle.check.json.
 
 ## Review gaps and limits
@@ -318,6 +425,11 @@ def verify(directory,*,core_repo):
     require(manifest['spec_sha256']==data['spec_sha256'] and manifest['artifact_hash']==data['artifact_hash']
         and manifest['core_commit']==data['core_commit'] and manifest['task_id']==spec.task_id,'manifest identity mismatch')
     provider=manifest['provider']
+    binding=check_asset_binding(spec,root/'local_assets',provider)
+    if 'asset_binding' in manifest:
+        require(manifest['asset_binding']==binding and manifest['synthetic_upstream']==binding['synthetic']
+            and manifest['asset_uid']==binding['asset_uid'] and manifest['asset_sha256']==binding['asset_sha256'],
+            'manifest asset binding mismatch')
     history=json.loads((root/'validation/history/construction_log.json').read_text())
     require(manifest.get('open_issues',[])==history.get('open_issues',[]),
         'package altered historical open issues')
