@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-04",
-  "status": "G02_2C_REPORTED_PENDING_REVIEW",
+  "status": "G02_ACCEPTED_BOUNDED_STAGE2_REFERENCE",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "2c Sol复审",
-  "next_action": "2c文档冻结提交已完成；等待Sol复审。保持writer窗口释放，不启动阶段3或任何新运行。",
+  "next_candidate": null,
+  "next_action": "阶段2按MuJoCo代表成功实现与冻结参考范围有界接收；保留seed32/GeoPhys/Isaac未决。停在阶段2，等待维护者另行安排，不派发或启动阶段3。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -410,7 +410,7 @@
           "dependencies": [
             "2a"
           ],
-          "status": "INCOMPLETE_USER_PAUSED",
+          "status": "ACCEPTED_BOUNDED_MUJOCO_REFERENCE",
           "attempt_count": 2,
           "attempts": [
             {
@@ -496,7 +496,7 @@
             "test_retry_count": 6,
             "tracked_paths": "package allowlist only; source commit plus current execution documentation"
           },
-          "last_observation": "原attempt002在完整报告、validator、manifest/checksum及本地文档提交完成前由维护者暂停。保留G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。后续Sol只接受seed31成功实现与Nut回归的有界证据；不代表完整2b/阶段2已接受。中止记录和2c成功参考页由独立2c attempt001补齐，旧运行未恢复或重跑。",
+          "last_observation": "Sol主审完成：按原G02出口接收MuJoCo代表实现与Nut回归；2c补齐文档封存。原attempt002 G2 FAIL/G3 PARTIAL/G5 INCOMPLETE_USER_PAUSED及全部attempt历史不变，seed32、GeoPhys和Isaac未决保留。",
           "evidence_refs": [
             "reviews/20261104_2b_closeout.md",
             "reviews/20261104_2c_reference_freeze.md",
@@ -510,13 +510,17 @@
           "commits": [
             "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238"
           ],
-          "review_decision": null,
-          "blockers": [
-            "G2 FAIL: PickCube seed32在1000 control transitions后cube_lift=0.082619m，未达到原0.10m task predicate。",
-            "GeoPhys: ValueError stale execution time，具体sim time mismatch数值未记录。",
-            "Isaac: 当前nvidia-smi driver communication失败，App/native运行未启动。"
-          ],
-          "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_MUJOCO_REFERENCE",
+            "reviewer": "Sol",
+            "date": "2026-11-04",
+            "review_ref": "reviews/20261104_2c_sol_review.md",
+            "original_goal_exit_applied": true,
+            "historical_attempt002_gates_unchanged": true,
+            "scope": "MuJoCo CPU PickCube seed31 success, affected Nut regressions and located route differences; not acceptance of all expanded attempt002 gates."
+          },
+          "blockers": [],
+          "candidate_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
           "manual_takeover": {
             "authorization": "Maintainer direct step-by-step commands in original execution conversation; replaces old execution prompt.",
             "thread_id": "01a1a18e-cee0-7b03-8f95-2560ffc03356",
@@ -565,7 +569,14 @@
             "writer_and_native_released": true,
             "sol_native_starts": 0
           },
-          "sol_review_ref": null
+          "sol_review_ref": "reviews/20261104_2c_sol_review.md",
+          "previous_candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
+          "implementation_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
+          "remaining_issues": [
+            "G2 FAIL: PickCube seed32在1000 control transitions后cube_lift=0.082619m，未达到原0.10m task predicate。",
+            "GeoPhys: ValueError stale execution time，具体sim time mismatch数值未记录。",
+            "Isaac: 当前nvidia-smi driver communication失败，App/native运行未启动。"
+          ]
         },
         {
           "id": "2c",
@@ -573,7 +584,7 @@
           "dependencies": [
             "2b"
           ],
-          "status": "REPORTED_PENDING_REVIEW",
+          "status": "ACCEPTED_BOUNDED_2C_REFERENCE_FREEZE",
           "attempt_count": 1,
           "attempts": [
             {
@@ -582,9 +593,9 @@
               "package_manifest_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
               "prompt_sha256": "cb555eb345ba6720de21a6a0578888d72d4efbebc5aa156c2c62feda291a5f41",
               "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
-              "output_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
+              "output_head": "8abbd52fcb343cf71b87f04deb5a5483add8f6be",
               "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
-              "status": "REPORTED_PENDING_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
               "result": "DOCUMENTATION_FREEZE_COMPLETE",
               "report_ref": "reviews/20261104_2c_reference_freeze.md",
               "closeout_ref": "reviews/20261104_2b_closeout.md",
@@ -594,16 +605,32 @@
               "pytest_runs": 0,
               "independent_reader_runs": 0,
               "current_doc_validator_runs": 2,
-              "sol_review_ref": null,
-              "review_decision": null,
-              "next_action": "等待Sol复审；阶段3未授权。"
+              "sol_review_ref": "reviews/20261104_2c_sol_review.md",
+              "review_decision": {
+                "status": "ACCEPTED_BOUNDED_2C_REFERENCE_FREEZE",
+                "reviewer": "Sol",
+                "date": "2026-11-04",
+                "review_ref": "reviews/20261104_2c_sol_review.md",
+                "manifest_sha256": "7c4c515286e87b5f6495a2e44ff289839e56a986bb129abfcfd77adc59e73504",
+                "verified_manifest_files": 38,
+                "scope": "Documentation-only existing MuJoCo CPU seed31 reference and unresolved list; no new runtime or qualification."
+              },
+              "next_action": "阶段2收尾；保持窗口释放，阶段3未授权。",
+              "primary_document_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
+              "documentation_commits": [
+                "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
+                "fc8954edc5ef8e30415cf6a0db88d20f231cd20e",
+                "8abbd52fcb343cf71b87f04deb5a5483add8f6be"
+              ],
+              "verified_doc_validator_receipts": 1,
+              "executor_elapsed_ms": 1552328
             }
           ],
           "assigned_agent": "Codex primary agent; sole writer; zero subagents",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
           "package_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
           "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
-          "output_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
+          "output_head": "8abbd52fcb343cf71b87f04deb5a5483add8f6be",
           "expected_duration_minutes": "15-30; hard 30",
           "execution_budget": {
             "window_minutes": 30,
@@ -616,7 +643,7 @@
             "new_output_max_mib": 10,
             "tracked_paths": "nine-document allowlist only"
           },
-          "last_observation": "V211_G02_2c_attempt001文档封存已提交于60929971d5789b3bc2a7708ca0d64668e8e9dc4e；current doc validator 2/2、immutable-only、diff --check、allowlist、保护hash及pins通过。当前REPORTED_PENDING_REVIEW，下一步等待Sol；阶段3未开始。",
+          "last_observation": "Sol verified package/manifest, 38 referenced file hashes, nine-file documentation allowlist, source identity and preserved failures. Final executor validator receipt PASS; only invocation2 stdout retained. 2c accepted bounded, G02 closed, stage3 not started.",
           "evidence_refs": [
             "reviews/20261104_2c_reference_freeze.md",
             "reviews/20261104_2b_closeout.md"
@@ -624,10 +651,28 @@
           "commits": [
             "60929971d5789b3bc2a7708ca0d64668e8e9dc4e"
           ],
-          "review_decision": null,
-          "blockers": []
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_2C_REFERENCE_FREEZE",
+            "reviewer": "Sol",
+            "date": "2026-11-04",
+            "review_ref": "reviews/20261104_2c_sol_review.md",
+            "manifest_sha256": "7c4c515286e87b5f6495a2e44ff289839e56a986bb129abfcfd77adc59e73504",
+            "verified_manifest_files": 38,
+            "scope": "Documentation-only existing MuJoCo CPU seed31 reference and unresolved list; no new runtime or qualification."
+          },
+          "blockers": [],
+          "primary_document_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
+          "sol_review_ref": "reviews/20261104_2c_sol_review.md"
         }
-      ]
+      ],
+      "review_decision": {
+        "status": "ACCEPTED_BOUNDED_STAGE2_REFERENCE",
+        "reviewer": "Sol",
+        "date": "2026-11-04",
+        "review_ref": "reviews/20261104_2c_sol_review.md",
+        "scope": "2a bounded diagnosis; 2b MuJoCo seed31 success and affected Nut regressions under original G02 exit; 2c existing reference freeze. Historical attempt002 FAIL/PARTIAL/INCOMPLETE preserved.",
+        "stage3_authorized": false
+      }
     },
     {
       "id": "3",

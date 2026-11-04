@@ -1,10 +1,10 @@
 # v2.1.1 执行顺序与验收
 
-状态：G01/1a–1d 已审阅并获维护者确认；G02/2a 已有界接受；2b attempt002 在完整封存前由维护者暂停，保留 G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。Sol对seed31成功实现与Nut回归的窄范围接收不等于完整2b。独立2c文档封存已完成，等待Sol复审；阶段3未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
+状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；阶段3未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 
 ### 2026-11-04 G02/2b 中止与 2c 文档封存
 
-MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次独立运行均成功；PickCube seed32 在 1000 个控制 tick 后仍未达到 lift predicate。GeoPhys 已定位到 PickCube Solution 的 stale execution time guard；Isaac delivery closure 匹配，但当前 GPU gate 不稳定且没有 native run。原2b在用户暂停时G5未完成；之后由独立2c包整理历史和成功参考，旧G2/G3/G5结果不变。当前2c文档封存状态REPORTED_PENDING_REVIEW，阶段3未开始。详见[2b中止记录](../maintenance/reviews/20261104_2b_closeout.md)和[2c参考冻结页](../maintenance/reviews/20261104_2c_reference_freeze.md)。
+MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次独立运行均成功；PickCube seed32 在 1000 个控制 tick 后仍未达到 lift predicate。GeoPhys 已定位到 PickCube Solution 的 stale execution time guard；Isaac delivery closure 匹配，但当前 GPU gate 不稳定且没有 native run。原2b在用户暂停时G5未完成；之后由独立2c包整理历史和成功参考，旧G2/G3/G5结果不变。2c文档封存经[Sol主审](../maintenance/reviews/20261104_2c_sol_review.md)有界接收，G02收尾并停在阶段2；阶段3未开始。详见[2b中止记录](../maintenance/reviews/20261104_2b_closeout.md)和[2c参考冻结页](../maintenance/reviews/20261104_2c_reference_freeze.md)。
 
 ## 顺序与最小出口
 
@@ -35,7 +35,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 7b | 7a | 冻结输入下 PickCube 三后端×三 seed 任务成功与独立记录检查；切换／render／batch 组合分别收口 |
 | 7c | 7b | API／指南／矩阵／Skills／恢复页与实际证据一致；版本未决项明确 |
 
-初建时全部 22 项为 `PLANNED`、attempt 为 0；现 1a–1d 均有 attempt001 交付和审阅，维护者已确认五协议实施基线，后续 18 项未运行；实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
+初建时全部22项为 `PLANNED`、attempt为0；现1a–1d及2a–2c均有相应有界接收，维护者已确认五协议实施基线，阶段3–7的15项仍未执行；原2b扩展包失败及中止记录保留。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
 
 阶段 2 若证明必需修复属于后续公共协议 owner，先记录根因、最小提前实施范围和依赖影响，经维护者确认后更新执行表；可复用修复不重复实施。不得以无变化重试、私有状态或更改任务判定跨过阻塞。
 

@@ -1,6 +1,6 @@
 # TaskEnv v2.1.1 — 协议与实施规划
 
-日期：2026-11-04。状态：G01/1a–1d 与 G02/2a 已有界接受；原 G02/2b attempt002 在完整封存前由维护者暂停，保留 G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。独立 2c 文档封存已完成，状态 REPORTED_PENDING_REVIEW，等待 Sol 复审。
+日期：2026-11-04。状态：G01/1a–1d和G02阶段2已按各自限定范围接受；2c成功参考冻结经Sol主审通过，停在阶段2。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，阶段3未开始。详见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
 ## 版本目标
 
@@ -22,13 +22,13 @@
 
 规划输入 Core：`develop@fd03817c9f6ef8ce9fd68c1db30125efda68e1c8`；GeoPhys pin：`67da1165149486d3ae3e779c13ce31af49e17d50`。本地 `refs/tags/v2.1.0` 指向该 Core；本轮未查询远端或 GitHub Release，不能从旧候选措辞推断当前发布状态。
 
-当前实现与证据仍按 [v2.1.0 API](../v2.1.0/api/public-api.md)和[有界能力矩阵](../v2.1.0/capabilities/capability-matrix.json)理解。selected 渲染仍只准入 state-only；R3 主要输出位置参考；LIBERO 有限定的力矩＋位置混合控制。G02/2a 与 2b 有当前 MuJoCo 原生证据；PickCube seed32 有效运行但任务失败。Sol只接收了seed31成功实现和受影响Nut回归的有界证据，不代表完整2b。其余阶段按编排索引保持原状态。
+当前实现与证据仍按 [v2.1.0 API](../v2.1.0/api/public-api.md)和[有界能力矩阵](../v2.1.0/capabilities/capability-matrix.json)理解。selected 渲染仍只准入 state-only；R3 主要输出位置参考；LIBERO 有限定的力矩＋位置混合控制。G02/2a 与 2b 有当前 MuJoCo 原生证据；PickCube seed32 有效运行但任务失败。阶段2接收范围为seed31成功实现、受影响Nut回归及可复现参考，不将原2b扩展包的未过门改为PASS。其余阶段按编排索引保持原状态。
 
 F06 历史 9/9 runtime-valid、0/9 task-success，R07 A123 的有界接收与例外、F05 未决研究门均保留。不将 v2.1.1 的目标或后续结果改写进冻结证据。
 
 ## 当前 G02 证据
 
-MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与独立 HDF5 读回均通过；PickCube seed32 的 runtime/记录有效，但在 horizon 1000 时任务与 Solution 失败。GeoPhys PickCube 在执行边界时间 guard 抛出 stale execution time；Isaac delivery 文件校验通过，但 GPU admission 不稳定，本包未启动 Isaac App。详见 [2b 收尾报告](maintenance/reviews/20261104_2b_closeout.md) 与 [恢复页](maintenance/recovery.md)。2c文档封存已交Sol复审；阶段3仍未开始。
+MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与独立 HDF5 读回均通过；PickCube seed32 的 runtime/记录有效，但在 horizon 1000 时任务与 Solution 失败。GeoPhys PickCube 在执行边界时间 guard 抛出 stale execution time；Isaac delivery 文件校验通过，但 GPU admission 不稳定，本包未启动 Isaac App。详见 [2b 收尾报告](maintenance/reviews/20261104_2b_closeout.md) 与 [恢复页](maintenance/recovery.md)。2c文档封存已由Sol有界接收，阶段2收尾；阶段3仍未开始。
 
 ## 文档边界
 

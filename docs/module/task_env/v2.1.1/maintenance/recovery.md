@@ -6,8 +6,8 @@
 
 - G01/1a–1d 和 G02/2a 的既有 Sol 决定保留。
 - G02/2b attempt_count仍为2。attempt002在原验收包中为G2 FAIL、G3 PARTIAL；维护者于完整报告/manifest提交前暂停，G5为`INCOMPLETE_USER_PAUSED`。2c整理不能倒填或改写这些历史。
-- Sol另已接收MuJoCo PickCube seed31代表成功实现及受影响Nut回归的有界证据；此决定不等于完整2b或阶段2接收。细节见[2b中止记录](reviews/20261104_2b_closeout.md)和[2c成功参考冻结页](reviews/20261104_2c_reference_freeze.md)。
-- 本窗口`V211_G02_2c_attempt001`只封存现有文档和成功参考，未启动native、pytest、reader、GPU probe或provider import。当前状态待Sol复审；阶段3未开始。
+- Sol现以 `ACCEPTED_BOUNDED_STAGE2_REFERENCE` 接收2a归因、2b MuJoCo代表实现与2c成功参考冻结，阶段2收尾。此决定不把旧2b扩展包改为全通过。详见[阶段2主审](reviews/20261104_2c_sol_review.md)、[2b中止记录](reviews/20261104_2b_closeout.md)和[2c参考](reviews/20261104_2c_reference_freeze.md)。
+- 本窗口`V211_G02_2c_attempt001`只封存现有文档和成功参考，未启动native、pytest、reader、GPU probe或provider import。当前2c状态为 `ACCEPTED_BOUNDED_2C_REFERENCE_FREEZE`；阶段3未开始。
 
 ## 证据边界
 
@@ -20,4 +20,4 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 - `MUJOCO_LOG.TXT` SHA-256 `dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b`。
 - `docs/maintenance/20261030_runtime_route_diagnostic_handoff.md` SHA-256 `18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61`。
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
-- 当前writer窗口无原生执行，交付文档后释放；等待Sol复审。未授权新的诊断、三后端九格、2b attempt3或阶段3。
+- writer/native窗口均已释放；当前停在阶段2。后续由维护者另行安排，未授权新的诊断、三后端九格、2b attempt3或阶段3。
