@@ -2,6 +2,10 @@
 
 本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
 
+## 后续源码检查：`3ed14c08`
+
+本源码的selected／配置／R05b／F06投影／录制无引擎组合 **181 passed、2 deselected**；三个classic任务在GeoPhys CPU各完成一次真实reset／step／close，结果与 `fa885280` 的同条件单步结构化结果一致。命令、来源、资源、预算和锁收据见[续作记录](20261105_pre_stage3_continuation.md)。这些检查不证明完整任务成功、render、所有provider或物理reader；PickCube与Nut当前源码的代表性物理回归、独立物理reader、剩余职责收敛及Sol复审仍未完成，整体维持 **PARTIAL**。以下 `a55ccac3` 的完整离线组合只对应其原源码。
+
 ## 后续源码检查：`a55ccac3`
 
 在 tracked clean 的 `a55ccac34b27f2813258e4ceb27fed402b2ce932` 重跑下方原离线审计范围，禁用外部pytest插件并禁止引擎导入：**284 passed、1 skipped、5 deselected**，15.433秒，进程树最大RSS 169377792 bytes。skip为冻结Isaac解释器未安装的生成器help检查；排除真实Pendulum两项、真实F06场景、真实selected provider reset／step及真实Position close。完整argv、退出码、资源采样、stdout／stderr和源提交及日志摘要在ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/audit-a55ccac3-offline/`。该结果不覆盖真实物理或独立物理reader，也不取代Sol审查。

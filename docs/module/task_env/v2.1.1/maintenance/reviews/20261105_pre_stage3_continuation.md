@@ -243,3 +243,11 @@ Nut native反馈Solution生成的 `ExpertAction` 除来源边界及控制请求�
 Nut Solution源码SHA由 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a14c3a320386` 变为 `80465facdd34958a4f609290f8fb895bd5bf492208636155d6031b2bc084c294`。按实际新源码构建，R05b的100／500 Hz Controller身份分别为 `4c651dac344500685f920cc519f904f67cb93a18db1bd56d3229f6bc740b7208`／`9b1d022a7abe77dea274a6d43409105bfb13e7c3220f0f407e1864a56d1d046c`，Solution身份为 `ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b`；仅刷新这些精确source-bound准入值，其他控制参数、来源、provider及反馈校验不放宽。
 
 受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165126144 bytes；覆盖Nut错误边界和身份拒绝、调用方五样本反馈、两种R05b律的合成准入及一次interval。完整argv、退出码和资源采样见ignored `nut-caller-identity-selected/`。本次未运行真实引擎、Isaac、GPU或物理reader，旧物理证据不重标。
+
+## 当前源码三个classic单环境的最短物理检查（续作，待复审）
+
+对 tracked clean `3ed14c0884274b67af1750bcab58b3b65d9ada29`，以GeoPhys CPU、seed 73分别运行当前公共 `examples/tasks/scalar_step.py`／`make_env`：Empty、Pendulum、TwoWheel各完成reset、一个零动作transition和close，reset／step观测均通过各自space检查。动作维数分别0／1／2，Pendulum／TwoWheel观测维数3／7，reward分别为0／0.9779344970878069／0.9996657105631644；三者均未终止或截断。结构化输出逐项与 `fa885280` 原单步结果一致；这只覆盖所述单环境单步，不证明任务成功、render、并行或其他provider。
+
+每个worker在独立ignored cwd运行，依次非阻塞持有两把共享native锁；分别耗时4.380／18.295／19.922秒，最大进程树RSS约367／703／736 MB，三个进程组均退出且双锁释放。轻量运行包装器在同一worker中核验并打印实际导入的Core `task_env`及GeoPhys `scene`模块路径，再执行仓库原scalar示例；没有调用 `examples/start.py`，不把上游启动器本轮未执行的路线称为通过。完整argv、资源采样、进程／锁收据、输出、逐项对照及来源见ignored `native-3ed14c08/`。未启动Isaac、GPU或物理reader。
+
+沿用原120000物理步上限，账本保守按此前105107、两次PickCube各5000、上次三个classic合计至多300、本次三个classic合计至多300计 **115707／120000**；这不是实际推进步数，余量不能覆盖Nut horizon6000需预留的30000步。新增Nut预算仍未得到答复；旧源码结果及阶段2证据保持原身份。后续若改变受影响源码，应重新评估这些单步证据，不能重标。
