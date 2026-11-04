@@ -121,7 +121,8 @@ def main(argv=None) -> int:
         "provider": args.provider,
         "backend": "cpu",
         "seed": seed,
-        "capability_intersection": "selected task-owned expert, scalar CPU; H5 storage check is not D0 replay",
+        "capability_intersection": ("selected scalar CPU; NutAssembly uses a caller-owned Solution; "
+                                    "H5 storage check is not D0 replay"),
         "episode": episode,
         "identity": identity,
         "recording": recording,
