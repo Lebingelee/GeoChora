@@ -1239,10 +1239,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise RuntimeError('selected PositionServoV1 horizon is exhausted')
             if getattr(self, 'leaf_position_profile', False):
                 if self.fixed_attachment_leaf_position_profile:
-                    from ..tasks.position_candidate.attached_leaf_candidate import AttachedLeafActionSetV1
+                    from ..controllers.canonical.leaf_actions import AttachedLeafActionSetV1
                     action_set_type = AttachedLeafActionSetV1
                 else:
-                    from ..tasks.position_candidate.leaf_candidate import LeafPositionActionSetV1
+                    from ..controllers.canonical.leaf_actions import LeafPositionActionSetV1
                     action_set_type = LeafPositionActionSetV1
                 if type(action) is not action_set_type:
                     raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
@@ -1744,9 +1744,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             dispatch_leaf_control_interval,
         )
         if getattr(self, 'fixed_attachment_leaf_position_profile', False):
-            from ..tasks.position_candidate.attached_leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+            from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
         else:
-            from ..tasks.position_candidate.leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+            from ..controllers.canonical.leaf_actions import MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID
 
         request = action.structured_request(self.position_scene, self.leaf_plan)
         leaf_request = LeafControlIntervalRequestV1(
@@ -1830,9 +1830,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from dataclasses import asdict
         from ..trajectory.canonical.episode import StructuredControlTransitionV1
         if getattr(self, 'fixed_attachment_leaf_position_profile', False):
-            from ..tasks.position_candidate.attached_leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+            from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
         else:
-            from ..tasks.position_candidate.leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+            from ..controllers.canonical.leaf_actions import MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID
 
         groups = {(item.entity_id, item.group_id): item for item in request.groups}
         commands = {item.writer_id: item for item in result.prepared_commands}

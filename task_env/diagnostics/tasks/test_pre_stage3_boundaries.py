@@ -152,3 +152,14 @@ def test_start_passes_external_isaac_interpreter_and_manifest(monkeypatch, tmp_p
     assert command[command.index('--isaac-python') + 1] == str(__import__('pathlib').Path(sys.executable).resolve())
     assert command[command.index('--source-delivery-manifest') + 1] == str(manifest)
     assert options['env']['GEOCHORA_GEOPHYS_SRC'] == str(source)
+
+
+def test_leaf_action_compatibility_exports_use_controller_owned_types():
+    from task_env.controllers.canonical.leaf_actions import (
+        AttachedLeafActionSetV1, LeafPositionActionSetV1,
+    )
+    from task_env.tasks.position_candidate.attached_leaf_candidate import AttachedLeafActionSetV1 as old_attached
+    from task_env.tasks.position_candidate.leaf_candidate import LeafPositionActionSetV1 as old_leaf
+
+    assert old_attached is AttachedLeafActionSetV1
+    assert old_leaf is LeafPositionActionSetV1

@@ -9,9 +9,7 @@ import json
 from ...artifacts import (
     ActuatorReference, FrameReference, JointReference, PoseWorld,
 )
-from ...controllers.canonical.contracts import (
-    ControlGroupActionV1, StructuredActionRequestV1, digest,
-)
+from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.leaf_profiles import (
     ARM_POSITION_ACTION_SCHEMA, ARM_POSITION_PROFILE_ID,
     HAND_POSITION_ACTION_SCHEMA, HAND_POSITION_PROFILE_ID,
@@ -39,50 +37,12 @@ R03C_TASK_ID = "phase-ii-r03c-attached-leaf-position"
 R03C_TASK_VERSION = "candidate-v1"
 R06B_TASK_ID = "phase-ii-r06b-order-v1-attached-leaf-position"
 R03C_SEED = 31
-ARM_WRITER_ID = "panda-arm/arm-position-leaf"
-HAND_WRITER_ID = "panda-hand/hand-position-leaf"
 ARM_HOME = (0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853)
 
 
-@dataclass(frozen=True)
-class AttachedLeafActionSetV1:
-    schema_version: str
-    scene_identity_sha256: str
-    plan_identity_sha256: str
-    arm: ArmPositionActionV1
-    hand: HandPositionActionV1
-
-    def __post_init__(self):
-        if self.schema_version != "r03c-attached-leaf-action-set-v1":
-            raise ValueError("unsupported R03c attached leaf action-set schema")
-        if type(self.arm) is not ArmPositionActionV1 or type(self.hand) is not HandPositionActionV1:
-            raise TypeError("R03c action-set requires typed Arm and Hand values")
-        self.arm.validate(); self.hand.validate()
-        for value in (self.scene_identity_sha256, self.plan_identity_sha256):
-            if type(value) is not str or len(value) != 64:
-                raise ValueError("R03c action-set requires SHA-256 Scene and plan identities")
-
-    def structured_request(self, scene, plan):
-        if (scene.identity_hash, plan.identity_sha256) != (
-                self.scene_identity_sha256, self.plan_identity_sha256):
-            raise ValueError("R03c action-set belongs to another Scene/effective plan")
-        actions = {
-            ARM_WRITER_ID: (self.arm, tuple(self.arm.position_rad)),
-            HAND_WRITER_ID: (self.hand, (float(self.hand.opening_m),)),
-        }
-        groups = []
-        for entry in plan.leaves:
-            typed, values = actions[entry.binding.writer_id]
-            groups.append(ControlGroupActionV1(
-                "control-group-action-v1", entry.binding.entity_id,
-                entry.binding.control_group_id, entry.binding.action_schema_id, values,
-            ))
-        request = StructuredActionRequestV1(
-            "structured-action-request-v1", scene.identity_hash,
-            plan.identity_sha256, tuple(sorted(groups, key=lambda item: (item.entity_id, item.group_id))),
-        )
-        request.validate()
-        return request
+from ...controllers.canonical.leaf_actions import (
+    ARM_WRITER_ID, HAND_WRITER_ID, AttachedLeafActionSetV1,
+)
 
 
 @dataclass(frozen=True)

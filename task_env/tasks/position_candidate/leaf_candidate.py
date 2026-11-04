@@ -1,7 +1,7 @@
 """Task-owned construction and typed action values for the R02c leaf candidate."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
@@ -32,7 +32,7 @@ from ...controllers.canonical.leaf_plan import (
     LeafControlPresetV1, LeafProfileOverrideV1, LeafProfileSectionV1,
     compile_effective_leaf_plan, default_leaf_profile_section,
 )
-from ...controllers.canonical.contracts import StructuredActionRequestV1, ControlGroupActionV1, digest
+from ...controllers.canonical.contracts import digest
 from ...runtime.sessions.provenance import provider_build_identity
 from .source import _a05_scene, _artifact_and_sample, _source_input, _task_source
 from ...environment import compile_task_artifact_v1, sample_episode_reset_plan
@@ -41,45 +41,13 @@ from ...environment import compile_task_artifact_v1, sample_episode_reset_plan
 LEAF_CANDIDATE_TASK_ID = "phase-ii-r02c-independent-position-leaves"
 LEAF_CANDIDATE_VERSION = "candidate-v1"
 LEAF_CANDIDATE_SEED = 31
-ARM_WRITER_ID = "panda-main/arm-position-leaf"
-HAND_WRITER_ID = "panda-main/hand-position-leaf"
 _ARM_HOME = (0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853)
 
 
-@dataclass(frozen=True)
-class LeafPositionActionSetV1:
-    """One complete, typed two-writer request; the Hand value is total opening in metres."""
-
-    schema_version: str
-    scene_identity_sha256: str
-    plan_identity_sha256: str
-    arm: ArmPositionActionV1
-    hand: HandPositionActionV1
-
-    def __post_init__(self):
-        if self.schema_version != "leaf-position-action-set-v1":
-            raise ValueError("unsupported leaf Position action-set schema")
-        if type(self.arm) is not ArmPositionActionV1 or type(self.hand) is not HandPositionActionV1:
-            raise TypeError("leaf action-set requires typed Arm and Hand actions")
-        self.arm.validate(); self.hand.validate()
-        for name, value in (("Scene", self.scene_identity_sha256), ("plan", self.plan_identity_sha256)):
-            if type(value) is not str or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
-                raise ValueError(f"leaf action-set {name} identity must be SHA-256")
-
-    def structured_request(self, scene, plan):
-        if scene.identity_hash != self.scene_identity_sha256 or plan.identity_sha256 != self.plan_identity_sha256:
-            raise ValueError("leaf action-set belongs to another Scene/effective plan")
-        groups = (
-            ControlGroupActionV1("control-group-action-v1", "panda-main", "arm",
-                                 ARM_POSITION_ACTION_SCHEMA, tuple(self.arm.position_rad)),
-            ControlGroupActionV1("control-group-action-v1", "panda-main", "gripper",
-                                 HAND_POSITION_ACTION_SCHEMA, (float(self.hand.opening_m),)),
-        )
-        request = StructuredActionRequestV1(
-            "structured-action-request-v1", scene.identity_hash, plan.identity_sha256, groups,
-        )
-        request.validate()
-        return request
+from ...controllers.canonical.leaf_actions import (
+    MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID,
+    LeafPositionActionSetV1,
+)
 
 
 def _provider_build_sha256():
