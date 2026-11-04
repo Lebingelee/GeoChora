@@ -73,3 +73,9 @@ PickCube scalar CPU支持将Solution的 `ExpertAction` 直接交给 `env.step(ac
 ## PickCube调用方动作来源与身份（续作，待复审）
 
 PickCube readiness Solution在调用方提供公开info时将当前source boundary和自身identity附在 `ExpertAction`；普通scalar CPU Env在推进前核对动作边界及解析配置中的Solution identity，并继续拒绝未支持的控制请求。旧 `act()` 兼容调用可不带boundary；Nut既有guard不变。此检查是内容一致性，不是防伪或调用者身份认证。无引擎组合 **188 passed、4 deselected**，包含错误identity／过期boundary在物理推进前拒绝以及Nut caller约束。源码已改变，前述 `d61fd168` 物理结果保留其原身份，不自动重标；本次改动后的物理回归仍待执行。
+
+## 动作来源校验后的PickCube物理复验（续作，待复审）
+
+源码 `f9cb51fd5315d36ead7b8ac2c87a1c5a29389a7d`，MuJoCo CPU seed31／horizon1000／R3，调用方驱动Solution路径再次完成960个transition、task success及Solution completion；H5 SHA-256 `264b35a9f08e754287957d8d7271be072bc5c06157d3755e80b155b9a2896763`。独立reader PASS：960 transitions／961 boundaries、0.01 s control_dt及target/applied ack一致；native substep未记录，D0和Qualification未评估。worker约11.73秒，进程组退出并释放两把共享锁。输出和完整资源／锁收据在ignored `native/pickcube-boundary/`及 `native/pickcube-boundary-reader/`。此前 `d61fd168` 结果仍保留原身份。
+
+本次按horizon保守追加5000原生步，与原attempt001预留105107、上次PickCube预留5000及三个classic单步一起记账；即使不计classic，原120000步上限仅剩4893步。Nut完整horizon6000需预留30000步，已请求维护者明确新预算；未收到答复前不运行该回归。

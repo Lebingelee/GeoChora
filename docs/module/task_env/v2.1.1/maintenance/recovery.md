@@ -25,7 +25,7 @@ attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-
 
 维护者授权更长的三个单环境修复，提交为 `4840152530e55fb8a3e77517c3b187e99647b5b7`。Sol 已作[独立复审](reviews/20261105_lifecycle_unification_sol_review.md)，决定 `ACCEPTED_BOUNDED_LIFECYCLE_UNIFICATION`：R1 的真实源码迁移与无引擎契约有限接收。四个 `BaseTaskEnv` 出口与 `SelectedReferenceEnv` 为同一类对象，三个组件任务及 selected 路线通过共同 episode owner 执行 reset、step、stop 和 close；组件 RuntimeBoundary 和 selected RuntimeSession 保持各自物理接口。Sol 独立复跑171 passed／3 deselected和12 passed；真实 provider、物理和独立物理 reader 未运行。整体维护仍为 PARTIAL，R2/R3等后续项和阶段3均未获本次整体验收。原[Terra 交付记录](reviews/20261105_lifecycle_unification_terra.md)及历史30分钟结果保留。
 
-2026-11-05后续goal在上述复审提交后继续实施，当前检查点至 `eaebe344`：Marker公共组装、F06受信声明及部分task/recorder职责调整均待Sol复审；Nut cadence诊断接线迁至diagnostics。R05b旧源码身份准入失配已针对当前源码刷新，并保留精确字段及来源检查；真实源码路径核验加合成会话为14 passed／1 deselected，不是物理或GPU成功。其中 `fa885280` 已通过Empty／Pendulum／TwoWheel的GeoPhys CPU单步与close，受限于该源码和场景；完整记录及失败边界见[续作检查点](reviews/20261105_pre_stage3_continuation.md)。整体维护继续PARTIAL，`d61fd168`的PickCube MuJoCo seed31调用方驱动物理回归及同H5独立reader通过；Nut必要完整物理回归与独立物理reader仍为NOT_RUN；阶段3未开始。
+2026-11-05后续goal在上述复审提交后继续实施，当前检查点至 `eaebe344`：Marker公共组装、F06受信声明及部分task/recorder职责调整均待Sol复审；Nut cadence诊断接线迁至diagnostics。R05b旧源码身份准入失配已针对当前源码刷新，并保留精确字段及来源检查；真实源码路径核验加合成会话为14 passed／1 deselected，不是物理或GPU成功。其中 `fa885280` 已通过Empty／Pendulum／TwoWheel的GeoPhys CPU单步与close，受限于该源码和场景；完整记录及失败边界见[续作检查点](reviews/20261105_pre_stage3_continuation.md)。整体维护继续PARTIAL，`f9cb51fd`的PickCube MuJoCo seed31调用方驱动物理回归及同H5独立reader通过；Nut必要完整物理回归与独立物理reader仍为NOT_RUN；阶段3未开始。
 
 维护者计划后续从 develop 建立阶段3分支；本次仅完成复审，尚未创建新分支或 worktree，也未启动3a。正式执行前固定起点提交、独立工作目录及与后续维护的接口边界；旧编排中的零新增分支方案届时按维护者新安排更新。
 
