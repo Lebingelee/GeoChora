@@ -335,3 +335,19 @@ def test_artifact_digest_detects_low_level_frozen_field_tampering():
     assert artifact.identity_hash != first
     object.__setattr__(artifact.semantics, 'success_definition', original.semantics.success_definition)
     assert artifact.identity_hash == first
+
+
+def test_artifact_digest_never_reuses_a_replaced_mutable_nested_mapping():
+    from dataclasses import replace
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    original = build_artifact()
+    artifact = replace(original, semantics=replace(original.semantics))
+    original_hash = artifact.identity_hash
+    mutable = dict(artifact.semantics.parameters_si)
+    object.__setattr__(artifact.semantics, 'parameters_si', mutable)
+    assert artifact.identity_hash == original_hash
+    key = next(iter(mutable))
+    mutable[key] = float(mutable[key]) + 1.0
+    assert artifact.identity_hash != original_hash
+    assert '_immutable_identity_hash' not in artifact.__dict__
