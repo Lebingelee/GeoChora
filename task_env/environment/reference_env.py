@@ -1050,33 +1050,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         """Return the required, validated R1 readiness at the current boundary."""
         if (getattr(self, 'position_profile', False)
                 and self.value.get('f06_pickcube_isaac_input') is not None):
-            from ..tasks.pick_cube.solution import PickCubePositionExecutionInfoV1
+            from ..tasks.pick_cube.specialization import position_execution_info
 
-            positions = self.state.joint_position
-            velocities = self.state.joint_velocity
-            measured = float(sum(
-                float(positions[f'panda-v1/finger_joint{index}']) for index in (1, 2)
-            ))
-            # PhysX can report lower-bounded finger coordinates a fraction of
-            # a micrometer below zero at the joint limit. Normalize only this
-            # numerical residue; larger physical readback violations still
-            # fail the PickCube execution-info contract below.
-            if -1e-6 <= measured < 0.0:
-                measured = 0.0
-            measured_speed = float(sum(
-                abs(float(velocities[f'panda-v1/finger_joint{index}'])) for index in (1, 2)
-            ))
-            target = measured
-            if self.last_position_transition is not None:
-                row = self.last_position_transition
-                target = float(row[1].target.gripper.opening_m)
-            ready = bool(target <= 0.045 and measured <= 0.045 and measured_speed <= 0.005)
-            result = PickCubePositionExecutionInfoV1(
-                'pickcube-position-execution-info-v1', int(self.state.control_step),
-                float(self.state.simulation_time), measured, measured_speed, target, ready,
-            )
-            result.validate()
-            return result
+            return position_execution_info(self.state, self.last_position_transition)
         if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
                 or getattr(self, 'position_profile', False)):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
