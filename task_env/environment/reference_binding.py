@@ -59,6 +59,8 @@ class ReferenceTaskBinding:
     scalar_control_binding: object | None = None
     action_space_factory: Callable | None = None
     prepare_action: Callable | None = None
+    observation_space_factory: Callable | None = None
+    observation_projection: Callable | None = None
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
     reset_runtime_input: Callable | None = None
@@ -74,6 +76,12 @@ class ReferenceTaskBinding:
                 self.action_space_factory is not None or self.prepare_action is not None
                 or self.action_schema is not None):
             raise ValueError('mixed-control action contract is supplied by its task construction')
+        if self.build_mixed_control_profile is None and (
+                not callable(self.observation_space_factory) or not callable(self.observation_projection)):
+            raise TypeError('selected observation space and projection must be explicitly declared')
+        if self.build_mixed_control_profile is not None and (
+                self.observation_space_factory is not None or self.observation_projection is not None):
+            raise ValueError('mixed-control observation contract is supplied by its task construction')
         if self.action_schema is not None and not isinstance(self.action_schema, dict):
             raise TypeError('selected task action schema must be a dictionary')
         if self.interval_mode not in {"grouped", "native"}:

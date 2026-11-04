@@ -53,6 +53,7 @@ from ...objects.pick_cube import (
     CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE, CUBE_MASS,
     EE_SITE_NAME, PickCubeSceneComposer,
 )
+from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
 
 
 CONFIG_PATH = Path(__file__).with_name("config.yaml")
@@ -540,6 +541,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         build=build,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
+        observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         scalar_control_binding=panda_reference_control_binding(),
         build_external=build_external,
         build_seeded=build_seeded,

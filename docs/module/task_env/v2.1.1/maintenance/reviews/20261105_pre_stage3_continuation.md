@@ -133,3 +133,13 @@ Nut specialization SHA由 `d569ab5eb807318ca703207e64ee68bf0413828b88e7a277f7242
 Nut specialization SHA由 `489f2907990886877e2c00921174ba477ed05c9134dfc622e8943cd0005ac7fe` 变为 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d7322f51c3f0f9c`；实际源码构造的R05b 100／500 Hz Controller身份更新为 `fa6a2eb30c9bcefd1be8eda8b63efb89f8c7a237119b4b8121180d3a3cc243f1`／`d45a3cbe52bb45c051b00c1a652b757eac2b0cf668f051ad04c6d1bbd90613b1`，Solution身份不变。仅刷新精确源码身份；控制参数、来源／provider和反馈校验不放宽。
 
 禁止引擎导入的selected／R05b／Harness组 **151 passed、1 skipped、1 deselected**；F04合成adapter **10 passed、3 deselected**；lifecycle组 **179 passed、3 deselected**；leaf／mixed合成组 **12 passed**；PickCube F06投影离线 **13 passed、1 deselected**。skip为缺少冻结Isaac解释器；排除项为真实provider／scene或缺失历史worker。前四组完整argv、输出及未提交diff摘要见ignored `action-contract-evidence.json`、`action-contract-f04.json`、`action-contract-lifecycle.json`、`action-contract-mixed.json`。未运行真实引擎、Isaac、GPU或物理reader，旧物理结果不重标；candidate完整合成预检的工作树限制仍在。
+
+## Selected观测契约显式声明（续作，待复审）
+
+非mixed任务binding现显式提供observation space和projection，现有PickCube、Nut、Marker和Position候选选择原有Panda projection；Env不再为其无条件指定该projection。mixed路线继续使用任务提供的观测，并保留既有contact summary身份／时钟校验。合成测试使用不同的单字段space与projection检查reset和step，缺失声明拒绝；这验证组合接线，不证明任意新机器人／后端或新schema的物理能力。同步修正仓库TaskEnv skill路线图中旧BaseTaskEnv生命周期和旧阶段队列的过时描述。
+
+Nut specialization SHA由 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d7322f51c3f0f9c` 变为 `4ed30e639e938797d965406d27a3d31e2c08078c12c3adf6476d0d0e28ec4d1b`；按该源码实际构造的R05b 100／500 Hz Controller身份更新为 `6282ca640c7a7d33c011f94f63e72c6decbf6310e55efec64a19ea004a62aca4`／`ca0af8368bfe799599eff974242aae3d5d9dd97811291f52c83545daf34870e3`；Solution身份和其他控制／来源／provider约束不变。旧物理结果不重标。
+
+禁止引擎导入的selected／R05b／Harness组 **152 passed、1 skipped、1 deselected**，F04合成adapter **10 passed、3 deselected**，lifecycle组 **180 passed、3 deselected**，leaf／mixed合成组 **12 passed**。skip为缺少冻结Isaac解释器，排除真实provider／scene和缺失历史worker；完整argv、输出和未提交diff摘要见ignored `observation-contract-evidence.json`、`observation-contract-f04.json`、`observation-contract-lifecycle.json`、`observation-contract-mixed.json`。本次未运行真实引擎、Isaac、GPU或物理reader；candidate完整合成预检的工作树限制与代表性物理验证仍待解决。
+
+上述验证后补入Marker和通用candidate的观测owner来源文件，Marker来源字节与candidate调用接线定向复验 **3 passed**；前述组合日志对应补入前的源码diff，不重标为最终diff的完整复跑。

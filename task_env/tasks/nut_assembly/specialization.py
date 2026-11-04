@@ -43,6 +43,7 @@ from ...objects.nut_assembly import (
     NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X, PEG_HALF_HEIGHT, ROUND_PEG_RADIUS,
     SQUARE_PEG_HALF_WIDTH,
 )
+from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import panda_reference_control_binding
 from ...robots.panda import PandaAgent
@@ -541,6 +542,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
                                                                       lift_height_m=lift_height_m, task_config=task_config),
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action, scalar_control_binding=panda_reference_control_binding(),
+        observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=declaration.sample_reset,
         evaluate=declaration.evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),

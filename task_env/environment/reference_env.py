@@ -1230,8 +1230,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.action_space = self.binding.action_space_factory()
         keys = [key for _, key in self.binding.object_poses]
         if not _mixed_control_candidate:
-            from ..observations.selected_reference import selected_reference_observation_spaces
-            observation_spaces = selected_reference_observation_spaces(self)
+            observation_spaces = self.binding.observation_space_factory(self)
         if camera_observation_config is not None:
             from ..observations.selected_reference import position_camera_observation_declaration
 
@@ -1997,8 +1996,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.binding.validate_external_solution(self.value, solution)
 
     def observation(self, state):
-        from ..observations.selected_reference import build_selected_observation
-        return build_selected_observation(self, state)
+        if self.mixed_control_profile:
+            from ..observations.selected_reference import build_selected_observation
+            return build_selected_observation(self, state)
+        return self.binding.observation_projection(self, state)
 
     def _close_camera_consumer(self):
         consumer, self._camera_consumer = self._camera_consumer, None

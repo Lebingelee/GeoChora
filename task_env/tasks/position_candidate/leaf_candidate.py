@@ -34,6 +34,7 @@ from ...controllers.canonical.leaf_plan import (
 )
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
+from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
 from ...runtime.sessions.provenance import provider_build_identity
 from .source import _a05_scene, _artifact_and_sample, _source_input, _task_source
 from ...environment import compile_task_artifact_v1, sample_episode_reset_plan
@@ -236,6 +237,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
+        observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         evaluate=lambda _state, _semantics: SimpleNamespace(reward=0.0, success=False, failure=False, metrics={}),
         object_poses=(("square-peg-instance/peg1", "target"),), external_actions=True,
         interval_mode="grouped", recorder_mode="execution", reset_seed=fixed_seed,

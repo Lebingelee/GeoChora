@@ -11,6 +11,7 @@ from ...artifacts import (
 )
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
+from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
 from ...controllers.canonical.leaf_profiles import (
     ARM_POSITION_ACTION_SCHEMA, ARM_POSITION_PROFILE_ID,
     HAND_POSITION_ACTION_SCHEMA, HAND_POSITION_PROFILE_ID,
@@ -234,6 +235,7 @@ def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
+        observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         evaluate=lambda _state, _semantics: SimpleNamespace(
             reward=0.0, success=False, failure=False, metrics={},
         ),

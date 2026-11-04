@@ -353,7 +353,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py',
                      'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
                      'task_env/environment/task_source.py','task_env/controllers/canonical/production.py',
-                     'task_env/robots/panda.py'):
+                     'task_env/robots/panda.py','task_env/observations/selected_reference.py'):
             path=Path(catalog['core_repo'])/name
             if path.is_file():source_ids[name]=hashlib.sha256(path.read_bytes()).hexdigest()
         return dict(construction_id='harness-pick-lift-v0',artifact=artifact,source=source,
@@ -392,9 +392,11 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
     from task_env.controllers.canonical.contracts import (
         REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
     )
+    from task_env.observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
     binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA,action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
+        observation_space_factory=selected_reference_observation_spaces,observation_projection=build_selected_observation,
         scalar_control_binding=panda_reference_control_binding(),
         object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
         interval_mode='grouped',recorder_mode='canonical',

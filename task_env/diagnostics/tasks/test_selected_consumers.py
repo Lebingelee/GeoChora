@@ -128,6 +128,35 @@ def test_scalar_action_contract_is_task_declared_and_drives_step(fake):
         env.close()
 
 
+def test_selected_observation_is_declared_by_task_and_survives_step(fake):
+    from gymnasium.spaces import Box
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    base = PickCubeReferenceEnv.binding
+    with pytest.raises(TypeError, match='observation space and projection'):
+        replace(base, observation_projection=None)
+    def spaces(_env):
+        return {'measurement': Box(-np.inf, np.inf, (1,), dtype=np.float32)}
+    def project(env, state):
+        evaluation = env.binding.evaluate(state, env.artifact.semantics)
+        obs = {'measurement': np.asarray([state.control_step], dtype=np.float32)}
+        info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
+                'task_metrics': dict(evaluation.metrics), 'control_step': state.control_step,
+                'simulation_time_s': state.simulation_time}
+        return obs, info, evaluation
+    binding = replace(base, observation_space_factory=spaces, observation_projection=project)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    try:
+        obs, _ = env.reset(seed=19)
+        assert env.observation_space.contains(obs) and obs['measurement'][0] == 0
+        pose = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*pose.position, *pose.quaternion_wxyz, 0.0), dtype=np.float32)
+        obs, *_ = env.step(action)
+        assert env.observation_space.contains(obs) and obs['measurement'][0] == 1
+    finally:
+        env.close()
+
+
 def test_missing_scalar_binding_closes_constructed_source_without_materialization(fake):
     from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
 
@@ -1713,7 +1742,7 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         root = Path(__file__).resolve().parents[3]
         for name in ('examples/tasks/declared_marker.py', 'task_env/assembly/compiler.py',
                      'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py',
-                     'task_env/robots/panda.py'):
+                     'task_env/robots/panda.py', 'task_env/observations/selected_reference.py'):
             assert hashes[name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
         assert 'task_env/tasks/declarative_reference.py' not in hashes
         assert env.value['resolved_configuration']['object_id'] == 'marker-v1'
