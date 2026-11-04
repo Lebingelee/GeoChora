@@ -187,6 +187,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
+             root / "task_env/recorders/position_metadata.py",
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     canonical = root / "task_env" / "controllers" / "canonical"
     files.update(path.resolve() for path in canonical.glob("*.py") if path.is_file())

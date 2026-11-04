@@ -321,6 +321,7 @@ def _source_identity_files():
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
         "task_env/environment/reference_env.py", "task_env/environment/reference_binding.py",
         "task_env/recorders/reference_provenance.py",
+        "task_env/recorders/position_metadata.py",
         "task_env/tasks/canonical_solution_lifecycle.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
