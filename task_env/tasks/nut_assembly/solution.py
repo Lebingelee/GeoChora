@@ -1222,6 +1222,7 @@ class NutAssemblyOutcomeSolutionV1:
                         }
                         or not isinstance(application.get("target_identity_hash"), str)
                         or not application.get("target_identity_hash")
+                        or application.get("target_identity_hash") != native_interval_receipt.samples[-1].target_hash
                         or application.get("target_identity_hash") != application.get("applied_target_hash")):
                     raise ValueError("control application does not match the pending Solution action")
                 evaluation_boundary = info.get("expert_execution_boundary_v1")

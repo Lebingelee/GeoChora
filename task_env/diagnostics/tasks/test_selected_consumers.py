@@ -256,7 +256,7 @@ def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path):
         legacy.close()
 
 
-@pytest.mark.parametrize('mutation', ['sample', 'missing_target', 'evaluation_boundary'])
+@pytest.mark.parametrize('mutation', ['sample', 'missing_target', 'wrong_target', 'evaluation_boundary'])
 def test_nutassembly_caller_rejects_tampered_feedback(fake, mutation):
     from copy import deepcopy
     from task_env.tasks.nut_assembly.task import build_outcome_solution
@@ -274,6 +274,9 @@ def test_nutassembly_caller_rejects_tampered_feedback(fake, mutation):
         elif mutation == 'missing_target':
             del bad['control_application_v1']['target_identity_hash']
             del bad['control_application_v1']['applied_target_hash']
+        elif mutation == 'wrong_target':
+            bad['control_application_v1']['target_identity_hash'] = 'other-target'
+            bad['control_application_v1']['applied_target_hash'] = 'other-target'
         else:
             bad['control_application_v1']['evaluation_boundary']['episode_id'] = 'wrong'
         with pytest.raises(ValueError):
