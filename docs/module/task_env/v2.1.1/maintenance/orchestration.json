@@ -582,7 +582,7 @@
               "package_manifest_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
               "prompt_sha256": "cb555eb345ba6720de21a6a0578888d72d4efbebc5aa156c2c62feda291a5f41",
               "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
-              "output_head": "60929971a7f988a3ed21e4d211106bb41a9a1d4e",
+              "output_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
               "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
               "status": "REPORTED_PENDING_REVIEW",
               "result": "DOCUMENTATION_FREEZE_COMPLETE",
@@ -603,7 +603,7 @@
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
           "package_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
           "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
-          "output_head": "60929971a7f988a3ed21e4d211106bb41a9a1d4e",
+          "output_head": "60929971d5789b3bc2a7708ca0d64668e8e9dc4e",
           "expected_duration_minutes": "15-30; hard 30",
           "execution_budget": {
             "window_minutes": 30,
@@ -616,13 +616,13 @@
             "new_output_max_mib": 10,
             "tracked_paths": "nine-document allowlist only"
           },
-          "last_observation": "V211_G02_2c_attempt001文档封存已提交于60929971a7f988a3ed21e4d211106bb41a9a1d4e；current doc validator 2/2、immutable-only、diff --check、allowlist、保护hash及pins通过。当前REPORTED_PENDING_REVIEW，下一步等待Sol；阶段3未开始。",
+          "last_observation": "V211_G02_2c_attempt001文档封存已提交于60929971d5789b3bc2a7708ca0d64668e8e9dc4e；current doc validator 2/2、immutable-only、diff --check、allowlist、保护hash及pins通过。当前REPORTED_PENDING_REVIEW，下一步等待Sol；阶段3未开始。",
           "evidence_refs": [
             "reviews/20261104_2c_reference_freeze.md",
             "reviews/20261104_2b_closeout.md"
           ],
           "commits": [
-            "60929971a7f988a3ed21e4d211106bb41a9a1d4e"
+            "60929971d5789b3bc2a7708ca0d64668e8e9dc4e"
           ],
           "review_decision": null,
           "blockers": []
