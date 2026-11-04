@@ -48,6 +48,46 @@ def selected_reference_observation_spaces(env):
     return observation_spaces
 
 
+def position_camera_observation_declaration(binding, config):
+    """Declare the existing single-Panda Position camera observation leaves."""
+    from ..environment.types import ObservationFieldSpec, ObservationSchema
+    from .state import camera_observation_field_specs
+
+    camera_fields = camera_observation_field_specs(config)
+    groups = OrderedDict((name, OrderedDict()) for name in ('rgb', 'depth', 'entity_mask'))
+    for field in camera_fields:
+        group, camera_id = field.name.split('.', 1)
+        if group == 'rgb':
+            space = Box(0.0, 1.0, field.shape, dtype=np.float32)
+        elif group == 'depth':
+            space = Box(0.0, np.inf, field.shape, dtype=np.float32)
+        else:
+            space = Box(0, np.iinfo(np.uint32).max, field.shape, dtype=np.uint32)
+        groups[group][camera_id] = space
+    fields = [
+        ObservationFieldSpec('state.ee_pose', (7,), 'float32', 'hand-origin TCP pose',
+                             'm + unit quaternion', 'world'),
+        ObservationFieldSpec('state.joint_position', (9,), 'float32',
+                             'required Panda joint positions', 'rad + m', 'canonical joint coordinates'),
+        ObservationFieldSpec('state.hand_pose', (7,), 'float32',
+                             'provider-measured Panda hand pose', 'm + unit quaternion', 'world'),
+        ObservationFieldSpec('state.boundary_identity_sha256', (32,), 'uint8',
+                             'state boundary identity digest', 'uint8[0,255]', 'identity'),
+    ]
+    fields.extend(
+        ObservationFieldSpec(
+            f'privileged_state.{key}_body_pose', (1, 7), 'float32',
+            f'{key} measured world pose', 'm + unit quaternion', 'world',
+        ) for _, key in binding.object_poses
+    )
+    fields.extend(camera_fields)
+    schema = ObservationSchema(
+        'position-camera-observation-v1', tuple(fields),
+        groups=('state', 'privileged_state', 'rgb', 'depth', 'entity_mask'),
+    )
+    return OrderedDict((name, Dict(values)) for name, values in groups.items()), schema
+
+
 def _versioned_position_input_kind(input_v1):
     if input_v1 is None:
         return None

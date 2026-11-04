@@ -6,7 +6,6 @@ mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
 from __future__ import annotations
 
-from collections import OrderedDict
 from dataclasses import asdict, is_dataclass, replace
 from typing import Any
 from collections.abc import Mapping
@@ -1221,42 +1220,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             from ..observations.selected_reference import selected_reference_observation_spaces
             observation_spaces = selected_reference_observation_spaces(self)
         if camera_observation_config is not None:
-            from ..observations.state import camera_observation_field_specs
-            from .types import ObservationFieldSpec, ObservationSchema
+            from ..observations.selected_reference import position_camera_observation_declaration
 
-            camera_groups = OrderedDict((name, OrderedDict()) for name in ('rgb', 'depth', 'entity_mask'))
-            for field in camera_observation_field_specs(camera_observation_config):
-                group, camera_id = field.name.split('.', 1)
-                if group == 'rgb':
-                    camera_groups[group][camera_id] = Box(0.0, 1.0, field.shape, dtype=np.float32)
-                elif group == 'depth':
-                    camera_groups[group][camera_id] = Box(0.0, np.inf, field.shape, dtype=np.float32)
-                else:
-                    camera_groups[group][camera_id] = Box(
-                        0, np.iinfo(np.uint32).max, field.shape, dtype=np.uint32,
-                    )
-            observation_spaces.update((name, Dict(values)) for name, values in camera_groups.items())
-            schema_fields = [
-                ObservationFieldSpec('state.ee_pose', (7,), 'float32', 'hand-origin TCP pose',
-                                     'm + unit quaternion', 'world'),
-                ObservationFieldSpec('state.joint_position', (9,), 'float32',
-                                     'required Panda joint positions', 'rad + m', 'canonical joint coordinates'),
-                ObservationFieldSpec('state.hand_pose', (7,), 'float32',
-                                     'provider-measured Panda hand pose', 'm + unit quaternion', 'world'),
-                ObservationFieldSpec('state.boundary_identity_sha256', (32,), 'uint8',
-                                     'state boundary identity digest', 'uint8[0,255]', 'identity'),
-            ]
-            schema_fields.extend(
-                ObservationFieldSpec(
-                    f'privileged_state.{key}_body_pose', (1, 7), 'float32',
-                    f'{key} measured world pose', 'm + unit quaternion', 'world',
-                ) for _, key in self.binding.object_poses
+            camera_spaces, self.camera_observation_schema = position_camera_observation_declaration(
+                self.binding, camera_observation_config,
             )
-            schema_fields.extend(camera_observation_field_specs(camera_observation_config))
-            self.camera_observation_schema = ObservationSchema(
-                'position-camera-observation-v1', tuple(schema_fields),
-                groups=('state', 'privileged_state', 'rgb', 'depth', 'entity_mask'),
-            )
+            observation_spaces.update(camera_spaces)
             self.metadata['observation_schema'] = {
                 'schema_version': 'position-camera-observation-v1',
                 'leaf_specs': tuple({

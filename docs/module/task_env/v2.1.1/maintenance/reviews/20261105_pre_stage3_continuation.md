@@ -111,3 +111,9 @@ Nut的GeoPhys CPU/CUDA与100／500 Hz native-feedback选择和profile名称从�
 任务specialization源码SHA-256由此前 `f5f1ff2abc7d49a71df1327e02dc22122a313da3e292b3c379105a977efb727e` 变为 `d569ab5eb807318ca703207e64ee68bf0413828b88e7a277f7242a6c142026d2`。基于实际新源码构造的R05b Controller身份分别由100 Hz `cb0587780036a783be872beb44f9757586d35a6c5e753863f3f96f1e023d4d5b`、500 Hz `2f4292e6e2b15d4ae2947164e9766f5c185d0e4fe64bd1355afcc91ac5b9a4b5` 更新为 `4f6d28f5494912d2cae90769e63fe605c9dec4b0d0f8fbeb04fd45a556678a24`、`b832d4d959a1b818c02275dcb46803b458ba7c810fa6ae2dde858f288a5828d0`；Solution身份保持 `2db224bced2156e691276c6eaedf7468a87e6e07b90c205f5a2df208c0da8f07`。仅刷新精确身份，不接受旧值作为新源码别名，也不放宽原其他逐项约束。
 
 禁止引擎导入的R05b／selected／recorder组 **138 passed、1 deselected**；lifecycle组 **176 passed、3 deselected**；leaf／mixed合成组 **12 passed**。其中R05b包括两种频率、来源及反馈篡改拒绝和合成H5读回；被排除的真实provider／Pendulum／scene测试不能算通过。完整argv、输出与源码diff摘要见ignored `native-binding-evidence.json`、`native-binding-lifecycle.json`和 `native-binding-mixed.json`。无真实引擎、Isaac、GPU或物理reader运行；旧物理结果不重标。
+
+## Position相机观测声明归位（续作，待复审）
+
+既有单Panda Position相机路线的space与schema声明归入observations owner，基于同一次相机字段声明构建空间与schema；环境继续组合并发布原有metadata。字段次序、shape、dtype、语义和限定的Panda路线未扩大；新增离线检查各相机space和schema的shape／dtype一致。该调整不表示已支持任意资产或新的camera／provider组合。
+
+禁止引擎导入的selected／camera发布与故障组合 **112 passed**；F04合成adapter **10 passed、3 deselected**，排除项仍依赖本checkout缺失的历史worker。完整argv、输出与源码diff摘要见ignored `camera-declaration-evidence.json`及 `camera-f04-evidence.json`。本次未运行真实scene、Isaac、GPU或物理reader；旧物理结果不能重标。

@@ -69,6 +69,22 @@ def _config(*, width=2, height=3):
     )
 
 
+def test_position_camera_declaration_keeps_spaces_and_schema_in_agreement():
+    from types import SimpleNamespace
+    from task_env.observations.selected_reference import position_camera_observation_declaration
+
+    binding = SimpleNamespace(object_poses=(("object-v1", "object_v1"),))
+    spaces, schema = position_camera_observation_declaration(binding, _config(width=4, height=3))
+    by_name = {field.name: field for field in schema.fields}
+    assert schema.version == "position-camera-observation-v1"
+    assert by_name["privileged_state.object_v1_body_pose"].shape == (1, 7)
+    for group, cameras in spaces.items():
+        for camera_id, space in cameras.spaces.items():
+            field = by_name[f"{group}.{camera_id}"]
+            assert field.shape == space.shape
+            assert np.dtype(field.dtype) == space.dtype
+
+
 def _state(candidate, step=0, *, state_revision=None):
     revision = step if state_revision is None else state_revision
     boundary = StateBoundaryIdentity(
