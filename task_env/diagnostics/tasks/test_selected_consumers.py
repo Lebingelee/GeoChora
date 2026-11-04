@@ -291,6 +291,26 @@ def test_nutassembly_caller_actions_reject_registered_solution_owner(fake):
         env.close()
 
 
+def test_nutassembly_caller_action_cannot_cross_episode(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    first = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    second = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = first.reset(seed=19)
+        solution.reset(obs, info, first.metadata)
+        action = solution.act(obs, info)
+        second.reset(seed=19)
+        with pytest.raises(ValueError, match='boundary'):
+            second.step(action)
+        assert second.state.control_step == 0 and not second.session.calls
+        assert second._episode_mode is None
+    finally:
+        first.close()
+        second.close()
+
+
 def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
 
