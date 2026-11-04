@@ -23,7 +23,7 @@ PickCube defaults to `r3_continuous_v1`; `r1` is explicit. The bounded selected 
 
 ## Recording, Expert, and evaluation
 
-Use the [recording/learning contract](../../../docs/module/task_env/v2.1.0/contracts/recording-and-learning.md) and independent H5 inspection route. T transitions and T+1 boundaries, source identity, resolved config, close outcome, task success, Expert completion, replay validity, and Judge decisions are separate facts. Expert/Solution execution is explicit and task-owned; a constructor or one rollout does not establish task success.
+Use the [recording/learning contract](../../../docs/module/task_env/v2.1.0/contracts/recording-and-learning.md) and independent H5 inspection route. T transitions and T+1 boundaries, source identity, resolved config, close outcome, task success, Solution completion, replay validity, and Judge decisions are separate facts. The Phase C target has the external Solution produce actions for `env.step(action)`; `step_expert()` remains a restricted legacy compatibility path, not the standard Env API. The current caller-owned `step_with_solution()` route still invokes Solution from the Env and is transitional. Preserve NutAssembly's admitted guard and native feedback until actual migration; one rollout does not establish general task capability.
 
 For Artifact, Experiment, Evidence, and Judge packaging, also use the existing [`task-env-experiment-evidence` Skill](../../../task_env/.agents/skills/task-env-experiment-evidence/SKILL.md). For CLI-owned task candidates, follow the existing [Task Harness Skill](../geochora-task-harness/SKILL.md); do not confuse candidate feasibility with an accepted task.
 
