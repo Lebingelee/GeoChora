@@ -102,3 +102,53 @@ def test_example_bootstrap_accepts_explicit_geophys_source_and_rejects_missing(m
     monkeypatch.delitem(sys.modules, 'scene')
     bootstrap_imports()
     assert str(source) in sys.path
+
+
+def test_start_routes_explicit_paths_and_rejects_unsupported_without_spawning(monkeypatch, tmp_path):
+    import sys
+    from examples import start
+
+    source = tmp_path / 'geophys' / 'src'
+    (source / 'scene').mkdir(parents=True)
+    (source / 'scene' / '__init__.py').write_text('')
+    captured = []
+    monkeypatch.setattr(start.subprocess, 'run', lambda command, **kwargs: (
+        captured.append((command, kwargs)) or SimpleNamespace(returncode=0)
+    ))
+    base = ['--python', sys.executable, '--geophys-src', str(source),
+            '--uid', 'pendulum-v1', '--provider', 'geophys', '--backend', 'cpu',
+            '--renderer', 'none', '--seed', '73']
+    assert start.main(base) == 0
+    command, options = captured[0]
+    assert command[0] == str(__import__('pathlib').Path(sys.executable).resolve())
+    assert command[1].endswith('examples/tasks/scalar_step.py')
+    assert command[-2:] == ['--seed', '73']
+    assert options['env']['GEOCHORA_GEOPHYS_SRC'] == str(source)
+    assert options['env']['GEOCHORA_CORE_PYTHON'] == command[0]
+    assert options['env']['PYTHONPATH'].split(__import__('os').pathsep) == [str(start.ROOT), str(source)]
+    with pytest.raises(SystemExit):
+        start.main(base[:-4] + ['--backend', 'cuda', '--renderer', 'none'])
+    assert len(captured) == 1
+
+
+def test_start_passes_external_isaac_interpreter_and_manifest(monkeypatch, tmp_path):
+    import sys
+    from examples import start
+
+    source = tmp_path / 'src'
+    (source / 'scene').mkdir(parents=True)
+    (source / 'scene' / '__init__.py').write_text('')
+    manifest = tmp_path / 'manifest.json'
+    manifest.write_text('{}')
+    captured = []
+    monkeypatch.setattr(start.subprocess, 'run', lambda command, **kwargs: (
+        captured.append((command, kwargs)) or SimpleNamespace(returncode=0)
+    ))
+    assert start.main(['--python', sys.executable, '--geophys-src', str(source),
+                       '--uid', 'pick-cube-p16-reference-v1', '--provider', 'isaacsim',
+                       '--backend', 'cuda', '--renderer', 'none', '--isaac-python', sys.executable,
+                       '--source-delivery-manifest', str(manifest), '--seed', '31']) == 0
+    command, options = captured[0]
+    assert command[command.index('--isaac-python') + 1] == str(__import__('pathlib').Path(sys.executable).resolve())
+    assert command[command.index('--source-delivery-manifest') + 1] == str(manifest)
+    assert options['env']['GEOCHORA_GEOPHYS_SRC'] == str(source)

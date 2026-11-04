@@ -15,6 +15,14 @@ import traceback
 _CORE_ROOT = Path(__file__).resolve().parents[3]
 if str(_CORE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CORE_ROOT))
+_GEOPHYS_SRC = os.environ.get('GEOCHORA_GEOPHYS_SRC')
+if _GEOPHYS_SRC:
+    _geophys_path = Path(_GEOPHYS_SRC).expanduser().resolve()
+    if not (_geophys_path / 'scene' / '__init__.py').is_file():
+        raise ValueError(f'GEOCHORA_GEOPHYS_SRC must point to a GeoPhys src directory: {_geophys_path}')
+    # Prefer the requested source over unrelated installed modules; the
+    # filtered Core overlay below still stays behind Isaac's native packages.
+    sys.path.insert(1, str(_geophys_path))
 _CORE_SITE = os.environ.get('GEOCHORA_CORE_SITE')
 if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
     # Keep Isaac's native packages first; use the frozen Core environment only

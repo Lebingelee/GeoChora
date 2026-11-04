@@ -41,6 +41,19 @@ def _isaac_python(explicit=None):
     return Path(value).expanduser().resolve() if value else ISAAC_PYTHON
 
 
+def _core_python():
+    value = os.environ.get('GEOCHORA_CORE_PYTHON')
+    return Path(value).expanduser().resolve() if value else CPU_PYTHON
+
+
+def _geophys_source():
+    value = os.environ.get('GEOCHORA_GEOPHYS_SRC')
+    path = Path(value).expanduser().resolve() if value else CORE / 'GeoPhys/src'
+    if not (path / 'scene' / '__init__.py').is_file():
+        raise ValueError(f'GeoPhys src directory is missing scene/__init__.py: {path}')
+    return path
+
+
 def _write_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -136,11 +149,11 @@ def _cold_read_h5(output, receipt, *, provider):
         result['error'] = 'episode H5 is missing'
     else:
         environment = os.environ.copy()
-        environment['PYTHONPATH'] = f'{CORE / "GeoPhys/src"}:{CORE}'
+        environment['PYTHONPATH'] = f'{_geophys_source()}:{CORE}'
         environment['PYTHONDONTWRITEBYTECODE'] = '1'
         try:
             inspected = subprocess.run(
-                [str(CPU_PYTHON), str(CORE / 'examples/recording/inspect_h5.py'),
+                [str(_core_python()), str(CORE / 'examples/recording/inspect_h5.py'),
                  '--input', str(h5_path)],
                 cwd=CORE, env=environment, capture_output=True, text=True, timeout=30,
                 start_new_session=True,
@@ -202,7 +215,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         executable = _isaac_python(isaac_python)
         timeout_s = 1200
     else:
-        executable = CPU_PYTHON
+        executable = _core_python()
         timeout_s = 420
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     catalog = json.loads(Path(catalog_path).read_text())
@@ -269,7 +282,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
     environment.pop('PYTHONPATH', None) if provider == 'isaacsim' else None
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     if provider != 'isaacsim':
-        environment['PYTHONPATH'] = f'{CORE / "GeoPhys/src"}:{CORE}'
+        environment['PYTHONPATH'] = f'{_geophys_source()}:{CORE}'
     else:
         environment['PYTHONNOUSERSITE'] = '1'
         environment.update({
@@ -278,7 +291,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
             'TOKENIZERS_PARALLELISM': 'false',
         })
         core_site = Path(subprocess.check_output(
-            [str(CPU_PYTHON), '-c',
+            [str(_core_python()), '-c',
              'import sysconfig; print(sysconfig.get_paths()["purelib"])'],
             cwd=CORE, text=True, timeout=10,
         ).strip())

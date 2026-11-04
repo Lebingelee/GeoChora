@@ -1,10 +1,10 @@
 # v2.1.1 指南交付要求
 
-当前阶段尚无本版可运行 quickstart；安装和现有命令参照 [v2.1.0 installation](../../v2.1.0/guides/installation.md)及[quickstart](../../v2.1.0/guides/quickstart.md)，不从本目录推断 selected RGB 已接通。仓库当前无 root packaging metadata，不使用 `pip install -e .`。
+[安装与启动指南](installation-and-start.md)提供已有安装路径、轻量入口与新克隆的依赖边界；本维护版本的 native 启动和完整新安装组合尚未验证，不从本目录推断 selected RGB 已接通。仓库当前无 root packaging metadata，不使用 `pip install -e .`。
 
 ## 阶段3前必须补齐的新手路线
 
-本节属于[阶段3前维护要求](../planning/pre-stage3-environment-refactor.md)，随环境重构交付，不等到阶段7。以下仍为待实施清单，不能当作已有安装脚本或已验证命令。
+本节属于[阶段3前维护要求](../planning/pre-stage3-environment-refactor.md)，随环境重构交付，不等到阶段7。以下为验收清单；部分入口已实现，尚未运行的组合见安装指南。
 
 | 路线 | 必须说明与交付 |
 | --- | --- |

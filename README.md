@@ -11,11 +11,9 @@ GeoChora provides public task/environment APIs and supporting tools for embodied
 
 ## Start with the public API
 
-The repository has no root packaging metadata. Install the documented runtime dependencies in a prepared Python environment; do not use `pip install -e .`:
+The repository has no root packaging metadata; do not use `pip install -e .`. Start with the [installation and launch guide](docs/module/task_env/v2.1.1/guides/installation-and-start.md) to select an existing Python, provider and source paths. The following is an API illustration for an already prepared environment; it has not been rerun as part of the ongoing maintenance:
 
 ```bash
-python -m pip install -r task_env/requirements.txt
-git submodule update --init GeoPhys asset/external/mujoco_menagerie
 export PYTHONPATH=GeoPhys/src:.
 python - <<'PY'
 from task_env import make_env
@@ -30,7 +28,7 @@ finally:
 PY
 ```
 
-For TaskEnv navigation, start at the [developer documentation](task_env/doc/index.md). A complete fresh-clone or existing-installation setup flow is still a [v2.1.1 onboarding deliverable](docs/module/task_env/v2.1.1/guides/README.md); the commands above do not prepare every simulator or renderer. Core and GeoPhys currently declare incompatible MuJoCo dependency ranges, so installing both sets of requirements together is not an established setup recipe.
+For TaskEnv navigation, start at the [developer documentation](task_env/doc/index.md). The [v2.1.1 guide](docs/module/task_env/v2.1.1/guides/installation-and-start.md) records the current path selection and unverified installation gaps. Core and GeoPhys declare incompatible MuJoCo dependency ranges, so installing both sets of requirements together is not an established setup recipe.
 
 This is a basic scalar API example, not a qualification claim. Optional learning dependencies are listed separately in `task_env/requirements-rl.txt`; Isaac Sim uses a separate installed environment and is not installed by these requirements.
 

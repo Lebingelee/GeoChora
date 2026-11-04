@@ -470,3 +470,19 @@ def test_isaac_interpreter_selection_without_launch(monkeypatch, tmp_path):
     monkeypatch.setenv('ISAAC_SIM_PYTHON', str(tmp_path / 'environment-python'))
     assert _isaac_python() == tmp_path / 'environment-python'
     assert _isaac_python(tmp_path / 'explicit-python') == tmp_path / 'explicit-python'
+
+
+def test_worker_core_interpreter_and_geophys_source_overrides(monkeypatch, tmp_path):
+    import pytest
+    from builtin_example_validation import _core_python, _geophys_source
+
+    python = tmp_path / 'python'
+    source = tmp_path / 'src'
+    monkeypatch.setenv('GEOCHORA_CORE_PYTHON', str(python))
+    monkeypatch.setenv('GEOCHORA_GEOPHYS_SRC', str(source))
+    assert _core_python() == python
+    with pytest.raises(ValueError, match='GeoPhys src directory'):
+        _geophys_source()
+    (source / 'scene').mkdir(parents=True)
+    (source / 'scene' / '__init__.py').write_text('')
+    assert _geophys_source() == source

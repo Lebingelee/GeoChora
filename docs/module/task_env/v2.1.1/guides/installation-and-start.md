@@ -1,0 +1,49 @@
+# 安装、复用已有路径和启动单环境
+
+本页记录阶段3前维护中的入口；环境统一与下列组合的最终验收尚未完成。命令中的路径是占位符。仓库无根 packaging metadata，不使用 `pip install -e .`。训练和 renderer 都不是 state-only 首次启动的前提。
+
+## 新克隆与已有安装
+
+新克隆先按项目权限取得 Core，并初始化与该 Core commit 对应的 `GeoPhys` 和 `asset/external/mujoco_menagerie` 子模块；确认其 commit 与 Core 记录一致。已有安装可以在 checkout 外，显式提供其 Python、GeoPhys `src` 和所选 SDK 路径。不要让 Python 从另一份旧 Core 或 GeoPhys 导入。需要的 Python 包清单见 `task_env/requirements.txt` 和 `GeoPhys/requirements.txt`；资产还受任务和 provider 的具体声明约束。
+
+| 路线 | 所需路径与当前边界 |
+| --- | --- |
+| GeoPhys CPU | Core checkout、与其匹配的 GeoPhys `src`、该路线所需 Python 包和任务资产；classic-control 单环境当前走此路线。GeoPhys 的 rasterizer 是可选 render 路线，不是 state-only 的前提。 |
+| MuJoCo CPU | 已有 Core Python 环境中的 MuJoCo Python 绑定及任务资产；[MuJoCo 官方 Python 安装说明](https://mujoco.readthedocs.io/en/stable/python.html)说明其发行方式。当前 Core 声明 `mujoco>=3.8.1,<3.9.0`，GeoPhys 声明 `mujoco>=3.15.0`，区间无交集；不要将两份 requirements 的直接混装当成已验证方案。现有解释器中检测到 MuJoCo 3.8.1 不证明新安装组合可解析或全部路线可用。 |
+| Isaac Sim | 仅现有 PickCube Isaac harness 接受 CUDA、明确的 Isaac Python 和精确 delivery manifest；需要兼容的 Core Python、SDK 和资产。参考 [NVIDIA Isaac Sim 安装文档](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_workstation.html)及 [NVIDIA Isaac Lab 6.2 安装说明](https://docs.nvidia.com/isaaclab/3.0/isaac-lab/installation)核对版本和平台。此维护窗口没有启动 Isaac 或验证全新安装。 |
+| Flora | 可选外部 renderer，复用 `FLORA_ROOT` 或 `runtime_root`；布局与要求见 [Flora adapter](../../../../../task_env/render/flora/README.md)。本页启动器没有提供 Flora 路线，selected tasks 仍只接收 state-only。 |
+
+在选定解释器中可用 `python --version` 和 `python -m pip show mujoco taichi-forge` 检查已安装发行包元数据；找不到 `geophys` 发行包不代表源码路径不可用。GeoPhys 的实际来源由下面的 `--geophys-src` 显式指定。不要凭上述元数据推断 native 任务成功。本轮未验证新克隆后的完整安装，也没有执行下载或安装。
+
+## 启动一个已有安装的单环境
+
+`examples/start.py` 只转调现有示例或 scalar public factory，不安装依赖、不自动切 provider。脚本、解释器和 `--geophys-src` 均需指向本次希望使用的安装；`--core` 默认是脚本所在 checkout，若显式提供其他 checkout 会报错。
+
+```sh
+CORE=/absolute/path/to/GeoChora
+PY=/absolute/path/to/core-python
+GEOPHYS_SRC=/absolute/path/to/GeoPhys/src
+"$PY" "$CORE/examples/start.py" --python "$PY" --core "$CORE" \
+  --geophys-src "$GEOPHYS_SRC" --uid pendulum-v1 \
+  --provider geophys --backend cpu --renderer none --seed 73
+```
+
+此命令重置一次、执行一个零扭矩 transition 并 close；`empty-v1` 和 `two-wheel-balance-v1` 也有对应 scalar 路线。选择 `--renderer rasterizer` 仅路由到已有 Pendulum RGB 示例。选择 `pick-cube-p16-reference-v1` 或 `nut-assembly-outcome-reference-v1` 时使用现有 task-owned Expert 示例，`--provider` 可选 `geophys` 或 `mujoco`，`--backend cpu --renderer none`。这些 Expert 示例执行至完成或 horizon，而不是一 transition。当前 selected 的 `--renderer` 非 `none` 会明确拒绝。
+
+Isaac 现有 PickCube harness 的静态参数路由示例如下，**本轮未运行**：
+
+```sh
+"$PY" "$CORE/examples/start.py" --python "$PY" --core "$CORE" \
+  --geophys-src "$GEOPHYS_SRC" --uid pick-cube-p16-reference-v1 \
+  --provider isaacsim --backend cuda --renderer none --seed 31 --horizon 1000 \
+  --isaac-python /absolute/path/to/isaac-python \
+  --source-delivery-manifest /absolute/path/to/delivery_manifest.json
+```
+
+`--isaac-python` 优先于 `ISAAC_SIM_PYTHON` 和旧 checkout 默认路径；此启动器要求显式提供它。Isaac App 需要所选 SDK 的许可和环境，manifest 必须匹配既有 F06 准入。缺解释器、GeoPhys `scene` 源码、manifest 或不支持的组合会在启动器或原示例报错；不会下载或静默切换。`GEOCHORA_GEOPHYS_SRC`、`GEOCHORA_CORE_PYTHON` 由启动器传入子进程；一般直接示例也可用前者选择已有 GeoPhys `src`。如果 `scene` 已从其他路径导入，bootstrap 要求使用新解释器，避免混用。
+
+参数与错误路由已离线检查；上述启动命令和 renderer 在本维护版本的 native 运行仍待验收，不能因 `--help` 或离线测试通过而视为运行成功。
+
+## 基于示例开发
+
+阅读 [`examples/tasks/declared_marker.py`](../../../../../examples/tasks/declared_marker.py)：它声明 UID、Panda/table/box 组合、reset 范围与 `evaluate_task`，再通过 `make_marker_env` 调用 public `make_env`。`DeclaredPandaBoxEnv` 是内部 adapter，不是稳定扩展 API。修改自己的 UID、声明和评价后，先通过同一 public factory 检查 reset、action/observation 和 close；需要 Expert 时将 Solution 留在任务 owner。当前自定义任务说明仍在迁移，最终规范 Env 扩展点以完成迁移后的源码和文档为准。

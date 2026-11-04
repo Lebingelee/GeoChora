@@ -2,7 +2,7 @@
 
 当前模块使用与能力治理入口：[TaskEnv canonical docs](../docs/module/task_env/README.md)。符号级细节继续在 API reference 维护。
 
-开发中v2.1.1的[阶段3前维护方案](../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)已要求补齐新克隆安装、复用既有simulator／renderer路径、轻量启动脚本和example二次开发指引；[交付清单](../docs/module/task_env/v2.1.1/guides/README.md)尚未实施。当前下列入口不能替代完整安装教程。统一Env的并行适配待阶段6，本次Pendulum以单环境迁移和验证为范围；下列旧batch入口及历史证据不代表新路线已完成适配。
+开发中v2.1.1的[安装与启动指南](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)说明新克隆、复用已有路径与轻量入口，并标明尚未验证的组合。[阶段3前维护](../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)仍未完成；统一Env的并行适配待阶段6，本次Pendulum以单环境迁移和验证为范围。旧batch入口及历史证据不代表新路线已完成适配。
 
 `task_env/` owns GeoChora's public task/environment lifecycle, task-owned
 reference implementations, controller and observation contracts, generic

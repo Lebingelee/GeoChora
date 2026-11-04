@@ -1,11 +1,16 @@
 # GeoChora developer workflows
 
 These commands use the current TaskEnv APIs and selected task routes. The
-repository-root examples apply Linux-oriented per-process bounds; existing
-TaskEnv CLIs and interactive probes do not all apply those bounds themselves.
+some examples apply Linux-oriented per-process bounds; the scalar launcher,
+existing TaskEnv CLIs and interactive probes do not all apply those bounds.
 All results here are smoke checks, not new provider, task, learner, or renderer
 qualifications. Run them from the repository root in the GeoChora environment;
 the repository has no editable-install metadata, so set `PYTHONPATH` explicitly.
+
+For a scalar first step with explicit Python and GeoPhys paths, see the
+[installation and launch guide](../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
+and `examples/start.py`. Its argument routing has been checked offline; the
+new launcher has not yet been validated with a native run in this maintenance.
 
 ```bash
 PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --execution direct --seed 31
