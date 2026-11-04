@@ -333,3 +333,10 @@ PickCube与Nut的构造来源清单此前包含RuntimeSource及环境，但遗�
 对tracked clean `bc190964a2aaf6ef2039c7b1122e4cbb89dd0479`，按当前 `task_env/doc/自定义任务构建指南.md` 的嵌套配置，使用已安装MuJoCo 3.8.1 CPU执行 `make_env → reset(seed=31) → action_space.sample() → step → close`，action-space seed为31。reset／step观测和采样动作通过space检查，动作shape为8、dtype为float64，单transition后control step为1、simulation time为0.01 s、reward为0、未终止或截断，close返回。确认实际Core和MuJoCo导入路径；此为一次单步入口，不证明任务成功、全新安装、其他provider、训练或渲染。
 
 worker在独立ignored cwd运行，按序非阻塞持有并释放两把共享native锁；耗时0.837秒、最大进程树RSS 175464448 bytes、进程组退出。完整脚本、源码HEAD、脚本摘要、argv、结果及资源／锁收据见ignored `marker-guide-bc190964/`。按horizon 10及5 substeps保守预留50步，累计保守预留 **115807／120000**，剩4193；实际只推进一个control interval。本次未启动Isaac、GPU或物理reader，不扩大或重标其他任务的物理证据。
+
+
+## 当前独立reader对历史PickCube记录的只读验证（续作，待复审）
+
+对tracked clean `33c51a4ff42397c67a41b7c0d3369b20ec359131`，以当前Core canonical H5读取实现和独立 `independent_readback.py`，在禁止仿真引擎导入的单独进程只读检查 `f9cb51fd` 的MuJoCo PickCube物理H5。输入SHA前后均为 `264b35a9f08e754287957d8d7271be072bc5c06157d3755e80b155b9a2896763`；reader报告 **PASS**、960 transitions／961 boundaries、0.01 s间隔和target／applied身份一致，生成trace SHA `486d9c3cd0c67c04f9df842fbffd5ff4859e49a9859126738b078ab011f518d2`，与原reader trace一致。该H5没有native substep记录，未评估D0或Qualification。
+
+reader脚本SHA为 `6adb10b8659aaab43941e34dbd0c726fa57bc7cff7c9d32db122ae88cd9c1422`；受监督进程耗时1.924秒、最大RSS 128774144 bytes，进程内核对未加载native模块，原H5未修改。原始argv、guard、输出和资源采样见ignored `historical-reader-33c51a4f/`。此项只验证当前reader能读取旧源码产生的记录，不能用旧轨迹替代当前源码PickCube／Nut代表物理回归及其同次独立读回；未消耗物理步、未启动Isaac或GPU。

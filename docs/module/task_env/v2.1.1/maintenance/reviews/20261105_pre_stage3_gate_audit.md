@@ -2,6 +2,10 @@
 
 本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
 
+## 后续源码检查：`33c51a4f`
+
+当前Core在禁止仿真引擎导入的独立进程中，只读通过 `f9cb51fd` 的PickCube物理H5：960 transitions、961 boundaries、时间间隔与target／applied身份一致；原H5摘要未变。此检查支持当前reader对该历史格式和记录的兼容，不把历史rollout标成当前源码产生，也不完成当前源码物理回归／同次独立reader门。命令、输入摘要及限制见[续作记录](20261105_pre_stage3_continuation.md)。
+
 ## 后续源码检查：`bc190964`
 
 对tracked clean `bc190964a2aaf6ef2039c7b1122e4cbb89dd0479` 按任务开发指南执行Marker公共 `make_env` 在现有MuJoCo 3.8.1 CPU下的reset、采样动作、step和close，动作及两次观测均通过各自space检查；该版本已包含通用声明编译接线。执行按序持有并释放两把共享锁，完整来源、限额和收据见[续作记录](20261105_pre_stage3_continuation.md)及ignored `marker-guide-bc190964/`。此为单环境一次单步，不证明任务成功、全新安装、其他provider、render或完整物理回归；PickCube／Nut代表性物理及独立reader仍未运行，整体为 **PARTIAL**。
