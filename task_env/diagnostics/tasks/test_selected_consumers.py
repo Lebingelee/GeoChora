@@ -157,6 +157,58 @@ def test_selected_observation_is_declared_by_task_and_survives_step(fake):
         env.close()
 
 
+def test_synthetic_candidate_compiles_and_drives_caller_solution_without_judge_claim(fake, monkeypatch):
+    """Exercise real compiler/binding; the synthetic catalog is never Judge evidence."""
+    from pathlib import Path
+    from task_env.assembly.panda_box import PANDA_BOX_CAPABILITIES
+    from task_env.script.agent import asset_check, catalog_query, harness_compiler
+    from task_env.script.agent.harness_spec_schema import CandidateSpec
+
+    root = Path(__file__).resolve().parents[3]
+    actual_context = catalog_query.core_context(root)
+    catalog = {
+        'schema_version': 'harness-catalog-v0',
+        'core_repo': str(root),
+        'core_commit': actual_context['core_commit'], 'core_dirty': True,
+        'object_uids': ['cube-v1'], 'scene_uids': [], 'external_assets': {},
+    }
+    with pytest.raises(catalog_query.CatalogProvenanceError):
+        catalog_query.validate_catalog(catalog)
+    # The seam admits only this explicitly dirty synthetic catalog to the
+    # compiler test; no production catalog, report or Judge verdict is made.
+    def synthetic_catalog_only(value):
+        assert value is catalog and value['core_dirty'] is True
+        return {'core_repo': value['core_repo'], 'core_commit': value['core_commit'], 'core_dirty': True}
+    monkeypatch.setattr(asset_check, 'validate_catalog', synthetic_catalog_only)
+    spec = CandidateSpec.from_dict({
+        'schema_version': 'harness-candidate-spec-v0', 'task_id': 'synthetic/pick-lift-v1',
+        'template': 'pick-lift-v0',
+        'scene_config': {'table_top_z': 0.4, 'table_center_xy': [0.5, 0.0],
+                         'table_half_size': [0.5, 0.5, 0.05]},
+        'object_config': {'object_uid': 'cube-v1', 'initial_pos_xy': [0.5, 0.0],
+                          'reset_half_extent_m': 0.0, 'reset_z_fixed': True},
+        'success_config': {'lift_height_m': 0.08, 'reach_distance_m': 0.05,
+                           'gripper_closed_opening_m': 0.04},
+        'timebase_config': {'physics_dt': 0.002, 'control_substeps': 5},
+        'required_capabilities': list(PANDA_BOX_CAPABILITIES), 'horizon': 3,
+    })
+    compiled = harness_compiler.compile_candidate(spec, catalog, provider='mujoco')
+    env = compiled.env_class()(provider='mujoco', backend='cpu')
+    try:
+        obs, info = env.reset(seed=0)
+        solution = env.value['solution_factory']()
+        assert solution.identity == env.value['solution_identity']
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.state.control_step == 1
+        assert env.observation_space.contains(obs)
+        assert env.value['source_revision'] == actual_context['core_commit'] and catalog['core_dirty'] is True
+    finally:
+        env.close()
+
+
 def test_missing_scalar_binding_closes_constructed_source_without_materialization(fake):
     from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
 

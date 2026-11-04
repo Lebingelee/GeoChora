@@ -149,3 +149,9 @@ Nut specialization SHA由 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d732
 将任务准备的mixed action、结构化请求、writer字段和实时source／episode／revision边界校验交给既有runtime control owner；Env继续调用该校验并协调执行、fault、记录和Solution发布。保留原字段集合、校验顺序、错误信息及推进前拒绝行为。新增合成用例覆盖过期state revision、非有限动作和多余字段，并安装runtime写入陷阱，确认拒绝前既无写入也无物理推进。
 
 禁止引擎导入的selected／R05b／Harness组 **152 passed、1 skipped、1 deselected**；lifecycle组 **180 passed、3 deselected**；leaf／mixed假provider组 **15 passed**。前述组合完整argv、输出和当时diff摘要见ignored `mixed-preflight-selected.json`、`mixed-preflight-lifecycle.json`及 `mixed-preflight-expanded.json`。其后增强runtime写入陷阱，相关mixed成功／fault和篡改用例定向 **6 passed**；不将此前组合日志重标为增强后的完整复跑。无真实引擎、Isaac、GPU或物理reader运行；先前物理结果不重标。
+
+## 通用candidate编译和调用方接线合成检查（续作，待复审）
+
+新增一个明确标记的provider-free测试：使用当前Core commit和显式 `core_dirty=True` 的合成catalog，先确认正式 `validate_catalog` 拒绝，再仅在测试中替换asset checker的catalog准入，实际执行 `compile_candidate`、规范Env构造、reset、外部Solution `act → step → observe` 和close。任务动作／观测binding、Panda scalar控制绑定及source记录经此调用链执行；provider session为替身。该测试不调用Judge、不写正式报告或证据包、不声称dirty catalog通过，不能替代此前失败的严格Oracle／Judge预检或任何物理回归。
+
+禁止引擎导入的selected／R05b／Harness组合 **153 passed、1 skipped、1 deselected**；完整argv、输出与当时diff摘要见ignored `synthetic-candidate-current.json`。skip为缺少冻结Isaac解释器，排除真实provider reset／step；两份保护untracked及严格clean-check均保留。未运行真实引擎、Isaac、GPU或物理reader。
