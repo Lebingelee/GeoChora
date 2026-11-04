@@ -19,7 +19,7 @@ from ..artifacts import ExecutionSpec
 from ..observations.selected_reference import _position_task_evaluation_state
 from ..controllers.canonical.contracts import RequestedAction, digest
 from .protocols import TaskEnvironmentComponent
-from .reference_binding import ReferenceTaskBinding
+from .reference_binding import ReferenceTaskBinding, versioned_position_input_kind
 from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE, materialize
@@ -30,13 +30,6 @@ METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1'
     'rotation_representation': 'quaternion_wxyz', 'dimension': 8}}
 _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
-
-
-def _versioned_position_input_kind(input_v1):
-    if input_v1 is None:
-        return None
-    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
-    return _versioned_position_candidate_kind(input_v1)
 
 
 def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
@@ -3071,8 +3064,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 # observation. Generic H5 v3 consumes this only for the
                 # bounded versioned typed-state witness extension.
                 'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-            } if _versioned_position_input_kind(
-                self.value.get('versioned_position_input'),
+            } if versioned_position_input_kind(
+                self.binding, self.value.get('versioned_position_input'),
             ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
             **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
@@ -3121,7 +3114,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
         versioned_position_input = self.value.get('versioned_position_input')
-        versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+        versioned_input_kind = versioned_position_input_kind(self.binding, versioned_position_input)
         f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
         f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
         if (f04_input is not None or versioned_input_kind == 'f05_native'

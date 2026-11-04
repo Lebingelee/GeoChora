@@ -836,6 +836,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         ),
         external_actions=True, interval_mode='grouped', recorder_mode='execution',
         reset_seed=fixed_seed,
+        position_input_kind=_versioned_position_candidate_kind,
     )
     env = environment_type.from_position_candidate(
         binding, provider=input_v1.execution.physics_provider,

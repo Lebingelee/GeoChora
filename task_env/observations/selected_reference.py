@@ -5,13 +5,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ..artifacts import CanonicalStateView
-
-
-def _versioned_position_input_kind(input_v1):
-    if input_v1 is None:
-        return None
-    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
-    return _versioned_position_candidate_kind(input_v1)
+from ..environment.reference_binding import versioned_position_input_kind
 
 
 def _position_task_evaluation_state(state, adapted):
@@ -169,8 +163,8 @@ def build_selected_observation(self, state):
         'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
         'simulation_time_s': float(state.simulation_time)}
     if getattr(self, 'position_profile', False):
-        position_input_kind = _versioned_position_input_kind(
-            self.value.get('versioned_position_input'),
+        position_input_kind = versioned_position_input_kind(
+            self.binding, self.value.get('versioned_position_input'),
         )
         if position_input_kind == 'dg02_geophys':
             info.update({
