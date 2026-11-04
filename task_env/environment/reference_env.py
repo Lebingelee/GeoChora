@@ -982,8 +982,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.position_profile:
                 self._position_reset_info = self._position_record_reset_info()
                 self.info.update(self._position_reset_info)
-                if self.value.get('f06_pickcube_isaac_input') is not None:
-                    self._publish_pickcube_position_execution_info(self.info)
+                if self.binding.position_execution_info is not None:
+                    self._publish_position_execution_info(self.info)
                 if previous_episode_end is not None:
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if self.state.control_step != 0 or self.state.simulation_time != 0:
@@ -1049,34 +1049,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def expert_execution_info(self):
         """Return the required, validated R1 readiness at the current boundary."""
         if (getattr(self, 'position_profile', False)
-                and self.value.get('f06_pickcube_isaac_input') is not None):
-            from ..tasks.pick_cube.solution import PickCubePositionExecutionInfoV1
-
-            positions = self.state.joint_position
-            velocities = self.state.joint_velocity
-            measured = float(sum(
-                float(positions[f'panda-v1/finger_joint{index}']) for index in (1, 2)
-            ))
-            # PhysX can report lower-bounded finger coordinates a fraction of
-            # a micrometer below zero at the joint limit. Normalize only this
-            # numerical residue; larger physical readback violations still
-            # fail the PickCube execution-info contract below.
-            if -1e-6 <= measured < 0.0:
-                measured = 0.0
-            measured_speed = float(sum(
-                abs(float(velocities[f'panda-v1/finger_joint{index}'])) for index in (1, 2)
-            ))
-            target = measured
-            if self.last_position_transition is not None:
-                row = self.last_position_transition
-                target = float(row[1].target.gripper.opening_m)
-            ready = bool(target <= 0.045 and measured <= 0.045 and measured_speed <= 0.005)
-            result = PickCubePositionExecutionInfoV1(
-                'pickcube-position-execution-info-v1', int(self.state.control_step),
-                float(self.state.simulation_time), measured, measured_speed, target, ready,
-            )
-            result.validate()
-            return result
+                and self.binding.position_execution_info is not None):
+            return self.binding.position_execution_info(self)
         if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
                 or getattr(self, 'position_profile', False)):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
@@ -1087,9 +1061,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         result.validate()
         return result
 
-    def _publish_pickcube_position_execution_info(self, info):
+    def _publish_position_execution_info(self, info):
         value = self.expert_execution_info()
-        info['pickcube_position_execution_info_v1'] = value.to_mapping()
+        info[self.binding.position_execution_info_key] = value.to_mapping()
 
     # Kept for existing in-module callers while public callers use the named
     # expert_execution_info() contract.
@@ -1977,8 +1951,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
             self._last_position_request = request
-            if self.value.get('f06_pickcube_isaac_input') is not None:
-                self._publish_pickcube_position_execution_info(self.info)
+            if self.binding.position_execution_info is not None:
+                self._publish_position_execution_info(self.info)
             if proposal is not None:
                 phase = 'position_solution_observation'
                 solution_owner = self.solution if observer_solution is None else observer_solution

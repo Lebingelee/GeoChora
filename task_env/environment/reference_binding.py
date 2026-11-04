@@ -54,6 +54,8 @@ class ReferenceTaskBinding:
     pre_reset_session_validator: Callable | None = None
     post_reset_session_validator: Callable | None = None
     close_task_resources: Callable | None = None
+    position_execution_info: Callable | None = None
+    position_execution_info_key: str | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -68,6 +70,12 @@ class ReferenceTaskBinding:
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
+        if ((self.position_execution_info is None) != (self.position_execution_info_key is None)
+                or (self.position_execution_info is not None
+                    and (not callable(self.position_execution_info)
+                         or not isinstance(self.position_execution_info_key, str)
+                         or not self.position_execution_info_key))):
+            raise ValueError('position execution info requires a callable and a non-empty key')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
         mixed_hooks = (
