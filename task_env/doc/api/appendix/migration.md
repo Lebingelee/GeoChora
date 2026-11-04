@@ -53,8 +53,9 @@ Selected active task UIDs remain `pick-cube-p16-reference-v1` and `nut-assembly-
 The S4.5-A candidate adds runnable root examples under `examples/` using
 `from task_env import make_env`. Selected current commands use only
 `pick-cube-p16-reference-v1` or `nut-assembly-outcome-reference-v1`, explicit
-GeoPhys/MuJoCo providers, and CPU. NutAssembly must advance through guarded
-`step_expert()`; no external gripper action route is added. Recording continues
+GeoPhys/MuJoCo providers, and CPU. At that historical checkpoint the NutAssembly
+example used guarded `step_expert()`; no unguarded external gripper action route
+was added. Recording continues
 to use the task-owned canonical recorder and existing H5 schema. The storage
 reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 
@@ -68,7 +69,7 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 | `task_env.script.planner` | Retained as a compatibility command that delegates to selected PickCube planning; it does not preserve the historical task factory. |
 | `task_env.script.recorder` | Retained as a compatibility command that delegates to `task_env.script.trajectory.record`; it does not define another recorder or H5 schema. |
 | `task_env.script.trajectory._nut_assembly_config` and `_pick_cube_config` package exports | Removed; task-owned configuration is selected by its Task Artifact and not reconstructed by a script helper. |
-| `task_env.script.trajectory.planning.*` selected routes | Kept and now construct through `make_env`; NutAssembly calls only `step_expert()`. |
+| `task_env.script.trajectory.planning.*` selected routes | At this checkpoint the retained scripts constructed through `make_env`; the NutAssembly script called `step_expert()`. This does not describe all later bounded Solution routes. |
 | `task_env.script.env.single_*` and `parallel_*` | Kept. The single examples use public `make_env`; parallel examples remain generic registered batch workflows. |
 | `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. Its internal construction compatibility boundary is `task_env.environment._historical`, while `task_env.diagnostics.historical_tasks` remains a diagnostic compatibility entry. Retired PickCube requires the immutable historical source; legacy Nut construction is not exact historical source reconstruction. |
 
