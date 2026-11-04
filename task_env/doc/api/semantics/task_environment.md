@@ -2,7 +2,7 @@
 
 **Import path**：`task_env.BaseTaskEnv`、`task_env.tasks.BaseTaskEnv`
 **任务域**：Task Semantics
-**稳定性**：单环境实现已收敛，当前变更待复审；provider 能力以实际验证范围为准。
+**稳定性**：单环境生命周期源码和无引擎契约已有限接收，后续维护变更待复审；provider 能力以实际验证范围为准。
 **职责**：描述统一环境的组件组装与任务生命周期。
 **调用者/消费者**：用户、wrapper、内置 task。
 **源码**：`task_env/environment/reference_env.py`、`task_env/environment/lifecycle.py`
