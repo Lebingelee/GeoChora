@@ -215,3 +215,11 @@ Position materialization成功后保留实际传入的 `ControlBinding` 和selec
 Position reset对runtime snapshot所需的Scene scalar Joint、free-body reset Frame到唯一floating Joint，以及body／Frame语义到Artifact FrameReference的解析，归入既有 `runtime.sessions.source`；Env调用这些解析器并继续协调materialization和reset。保留旧内部Frame解析入口的同对象导出。定向检查验证使用Artifact与Scene关系而非provider名称选择Joint，并覆盖缺少Frame、无匹配或多个floating Joint、与scalar名称重叠的拒绝边界。此项不宣称runtime与任务候选类型的反向依赖已完全解除。
 
 受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **152 passed、2 deselected**，最大RSS 213581824 bytes；attached-leaf／mixed假provider组合 **14 passed**，最大RSS 165597184 bytes。完整命令、退出码和资源采样见ignored `source-bindings-selected/`与 `source-bindings-mixed/`。排除真实provider／scene，本次未运行真实引擎、Isaac、GPU或物理reader；旧源码物理结果不重标。
+
+## 正式控制反馈归位及重执行源码清单（续作，待复审）
+
+selected控制应用回执的target／applied、Artifact、Controller、provider、单interval边界及时钟校验和投影归入既有canonical feedback owner；Env仍取得真实评价边界、调用校验后发布结果。保留原校验次序、错误和浮点时钟容差；旧内部容差函数导出为同对象兼容入口。新增篡改检查覆盖错误target、Artifact、Controller、provider、control step与时间。
+
+selected重执行现将记录的 `source_sha256:` 任务源码路径及摘要清单与当前任务构造所得清单精确比较，修改、缺失或新增文件均在reset／写输出前拒绝；已有绑定投影／转换源码检查继续保留。旧记录没有任务源码清单时沿用原路径，但因此不能凭这一检查证明旧记录完整任务源码一致。被检查的文件摘要对应当前构造时的磁盘字节，不证明运行中代码对象与磁盘一致。
+
+最终受监督、禁止引擎导入的selected／R05b／F06投影／录制／时钟组合 **162 passed、2 deselected**，最大RSS 207974400 bytes；完整argv、退出码、资源采样见ignored `control-feedback-replay-final-v2/`。首次完整组合运行期间删除了一个不再使用的import，因此用最终源码重跑并仅以前述第二次结果为最终证据。排除真实provider／scene；未运行真实引擎、Isaac、GPU或物理reader，旧源码物理结果不重标。

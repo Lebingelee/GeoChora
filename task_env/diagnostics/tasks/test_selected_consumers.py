@@ -54,6 +54,40 @@ def test_position_runtime_source_resolves_reset_frames_to_unique_scene_joints():
         position_joint_bindings_from_artifact(overlap_scene, artifact, source)
 
 
+@pytest.mark.parametrize(('tamper', 'message'), [
+    ('target_hash', 'computed target'),
+    ('artifact', 'another TaskArtifact'),
+    ('controller', 'another Controller'),
+    ('provider', 'another Provider'),
+    ('boundary', 'exactly one completed boundary'),
+    ('clock', 'control timebase'),
+])
+def test_selected_control_application_rejects_wrong_ack_and_boundary(tamper, message):
+    from task_env.controllers.canonical.feedback import selected_control_application_receipt
+
+    def mapped(**values):
+        return SimpleNamespace(**values, to_mapping=lambda: dict(values))
+
+    artifact = SimpleNamespace(identity_hash='task', timebase=SimpleNamespace(
+        control_dt=0.01, physics_dt=0.002, control_substeps=5))
+    target = mapped(identity_hash='target', task_artifact_hash='task', controller_identity='controller')
+    applied = mapped(target_hash='target', provider_name='mujoco')
+    if tamper == 'target_hash': applied.target_hash = 'other'
+    if tamper == 'artifact': target.task_artifact_hash = 'other'
+    if tamper == 'controller': target.controller_identity = 'other'
+    if tamper == 'provider': applied.provider_name = 'other'
+    before = {'control_step': 0, 'simulation_time_s': 0.0}
+    after = {'control_step': 2 if tamper == 'boundary' else 1,
+             'simulation_time_s': 0.02 if tamper == 'clock' else 0.01}
+    with pytest.raises(ValueError, match=message):
+        selected_control_application_receipt(
+            request=mapped(), canonical=mapped(), target=target, applied=applied,
+            request_boundary=before, read_evaluation_boundary=lambda: (1, after),
+            artifact=artifact, controller_identity='controller', provider='mujoco',
+            source_id='source', reset_sample_id='sample',
+        )
+
+
 class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
     def __init__(self, artifact, execution, *, source, binding, **_diagnostic_options):
@@ -991,6 +1025,38 @@ def test_reexecution_rejects_changed_binding_source(fake, tmp_path, monkeypatch,
     monkeypatch.setattr(reference_provenance, 'callable_source_snapshot',
                         lambda current: 'changed' if current is callback else original(current))
     with pytest.raises(ValueError, match=source_name + ' identity mismatch'):
+        reexecute_selected(tmp_path / 'source.h5', output=tmp_path / 'replay.h5')
+    assert not (tmp_path / 'replay.h5').exists()
+
+
+@pytest.mark.parametrize('change', ['modified', 'missing', 'added'])
+def test_reexecution_rejects_changed_task_source_inventory(fake, tmp_path, monkeypatch, change):
+    import task_env
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 1})
+    obs, info = env.reset(seed=19)
+    solution = env.value['solution_factory']()
+    solution.reset(obs, info, env.metadata)
+    env.start_recording(tmp_path / 'source.h5')
+    action = solution.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    solution.observe(obs, reward, terminated, truncated, info)
+    env.finish_recording('bounded_truncation')
+    env.close()
+
+    original_make_env = task_env.make_env
+    def changed_source(*args, **kwargs):
+        rebuilt = original_make_env(*args, **kwargs)
+        sources = dict(rebuilt.value['source_sha256'])
+        name = next(iter(sources))
+        if change == 'modified': sources[name] = '0' * 64
+        elif change == 'missing': del sources[name]
+        else: sources['unexpected/new/source.py'] = '0' * 64
+        rebuilt.value['source_sha256'] = sources
+        return rebuilt
+    monkeypatch.setattr(task_env, 'make_env', changed_source)
+    with pytest.raises(ValueError, match='task source inventory identity mismatch'):
         reexecute_selected(tmp_path / 'source.h5', output=tmp_path / 'replay.h5')
     assert not (tmp_path / 'replay.h5').exists()
 

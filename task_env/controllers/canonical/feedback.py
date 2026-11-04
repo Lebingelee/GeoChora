@@ -5,6 +5,63 @@ from ...artifacts.contracts import Contract, _name
 from ...environment.types import ActuatorForceMeasurementV1
 
 
+def boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
+                                      physics_dt_s, native_steps):
+    """Bound binary clock drift from native increments and boundary subtraction."""
+    clock_ulp = max(
+        math.ulp(float(start_time_s)), math.ulp(float(end_time_s)),
+        math.ulp(float(expected_dt_s)), math.ulp(float(physics_dt_s)),
+    )
+    return (int(native_steps) + 2) * clock_ulp
+
+
+def selected_control_application_receipt(*, request, canonical, target, applied,
+                                         request_boundary, read_evaluation_boundary,
+                                         artifact, controller_identity,
+                                         provider, source_id, reset_sample_id):
+    """Validate and project one applied control over a completed selected interval."""
+    if target.identity_hash != applied.target_hash:
+        raise ValueError('applied acknowledgement does not match the computed target')
+    if target.task_artifact_hash != artifact.identity_hash:
+        raise ValueError('applied target belongs to another TaskArtifact')
+    if target.controller_identity != controller_identity:
+        raise ValueError('applied target belongs to another Controller')
+    if applied.provider_name != provider:
+        raise ValueError('applied acknowledgement belongs to another Provider')
+    current_step, evaluation_boundary = read_evaluation_boundary()
+    if request_boundary is None:
+        raise ValueError('control application acknowledgement requires its source boundary')
+    receipt = {
+        'schema_version': 'selected-control-application-v1',
+        'task_artifact_hash': artifact.identity_hash,
+        'source_id': source_id,
+        'controller_identity': controller_identity,
+        'reset_sample_id': reset_sample_id,
+        'request_boundary': dict(request_boundary),
+        'evaluation_boundary': evaluation_boundary,
+        'requested_action': request.to_mapping(),
+        'canonical_action': canonical.to_mapping(),
+        'target': target.to_mapping(),
+        'target_identity_hash': target.identity_hash,
+        'applied': applied.to_mapping(),
+        'applied_target_hash': applied.target_hash,
+    }
+    if (receipt['request_boundary']['control_step'] + 1 != current_step
+            or receipt['evaluation_boundary']['control_step'] != current_step):
+        raise ValueError('control acknowledgement does not span exactly one completed boundary')
+    expected_dt = artifact.timebase.control_dt
+    actual_dt = (receipt['evaluation_boundary']['simulation_time_s']
+                 - receipt['request_boundary']['simulation_time_s'])
+    tolerance = boundary_interval_clock_tolerance(
+        receipt['request_boundary']['simulation_time_s'],
+        receipt['evaluation_boundary']['simulation_time_s'],
+        expected_dt, artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+    )
+    if abs(actual_dt - expected_dt) > tolerance:
+        raise ValueError('control acknowledgement does not match the selected control timebase')
+    return receipt
+
+
 @dataclass(frozen=True)
 class CanonicalGripperFeedback(Contract):
     semantic_id: str

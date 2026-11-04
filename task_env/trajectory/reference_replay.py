@@ -60,6 +60,13 @@ def reexecute_selected(path, *, output):
             'action_space_source': env.binding.action_space_factory,
         }
         recorded_sources = metadata['source_provenance']
+        recorded_task_sources = {
+            name.removeprefix('source_sha256:'): value
+            for name, value in recorded_sources.items()
+            if name.startswith('source_sha256:')
+        }
+        if recorded_task_sources and recorded_task_sources != env.value.get('source_sha256', {}):
+            raise ValueError('task source inventory identity mismatch; no historical identity substitution')
         for name, callback in binding_sources.items():
             expected_source = recorded_sources.get(name)
             if expected_source is not None and expected_source != reference_provenance.callable_source_snapshot(callback):

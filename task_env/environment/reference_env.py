@@ -12,7 +12,6 @@ from collections.abc import Mapping
 from pathlib import Path
 import hashlib
 import json
-import math
 from types import SimpleNamespace
 from uuid import uuid4
 import numpy as np
@@ -21,6 +20,10 @@ from gymnasium.spaces import Box, Dict
 from ..artifacts import ExecutionSpec
 from ..observations.selected_reference import _position_task_evaluation_state
 from ..controllers.canonical.contracts import RequestedAction, REFERENCE_POSE_ACTION_SCHEMA, digest
+from ..controllers.canonical.feedback import (
+    boundary_interval_clock_tolerance as _boundary_interval_clock_tolerance,
+    selected_control_application_receipt,
+)
 from .protocols import TaskEnvironmentComponent
 from .gym_compat import GymEnvBase
 from .configuration import resolve_env_config, resolve_execution_plan
@@ -42,16 +45,6 @@ from ..runtime.sessions.source import (
 METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
 _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
-
-
-def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
-                                       physics_dt_s, native_steps):
-    """Bound binary clock drift from native increments plus boundary subtraction."""
-    clock_ulp = max(
-        math.ulp(float(start_time_s)), math.ulp(float(end_time_s)),
-        math.ulp(float(expected_dt_s)), math.ulp(float(physics_dt_s)),
-    )
-    return (int(native_steps) + 2) * clock_ulp
 
 
 def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
@@ -1890,49 +1883,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _publish_control_application(self, info, request, canonical, target, applied,
                                      request_boundary):
-        if target.identity_hash != applied.target_hash:
-            raise ValueError('applied acknowledgement does not match the computed target')
-        if target.task_artifact_hash != self.artifact.identity_hash:
-            raise ValueError('applied target belongs to another TaskArtifact')
-        if target.controller_identity != self.controller.identity:
-            raise ValueError('applied target belongs to another Controller')
-        if applied.provider_name != self.provider:
-            raise ValueError('applied acknowledgement belongs to another Provider')
-        current_info = ExpertExecutionInfo.from_mapping(info['expert_execution_info_v1'])
-        evaluation_boundary = self._execution_boundary(current_info)
-        if request_boundary is None:
-            raise ValueError('control application acknowledgement requires its source boundary')
-        receipt = {
-            'schema_version': 'selected-control-application-v1',
-            'task_artifact_hash': self.artifact.identity_hash,
-            'source_id': self.value['source'].scene_source.source_id,
-            'controller_identity': self.controller.identity,
-            'reset_sample_id': self.sample.sample_id,
-            'request_boundary': dict(request_boundary),
-            'evaluation_boundary': evaluation_boundary,
-            'requested_action': request.to_mapping(),
-            'canonical_action': canonical.to_mapping(),
-            'target': target.to_mapping(),
-            'target_identity_hash': target.identity_hash,
-            'applied': applied.to_mapping(),
-            'applied_target_hash': applied.target_hash,
-        }
-        if (receipt['request_boundary']['control_step'] + 1 != current_info.control_step
-                or receipt['evaluation_boundary']['control_step'] != current_info.control_step):
-            raise ValueError('control acknowledgement does not span exactly one completed boundary')
-        expected_dt = self.artifact.timebase.control_dt
-        actual_dt = (receipt['evaluation_boundary']['simulation_time_s']
-                     - receipt['request_boundary']['simulation_time_s'])
-        tolerance = _boundary_interval_clock_tolerance(
-            receipt['request_boundary']['simulation_time_s'],
-            receipt['evaluation_boundary']['simulation_time_s'],
-            expected_dt,
-            self.artifact.timebase.physics_dt,
-            self.artifact.timebase.control_substeps,
+        def read_evaluation_boundary():
+            current_info = ExpertExecutionInfo.from_mapping(info['expert_execution_info_v1'])
+            return current_info.control_step, self._execution_boundary(current_info)
+
+        info['control_application_v1'] = selected_control_application_receipt(
+            request=request, canonical=canonical, target=target, applied=applied,
+            request_boundary=request_boundary, read_evaluation_boundary=read_evaluation_boundary,
+            artifact=self.artifact,
+            controller_identity=self.controller.identity, provider=self.provider,
+            source_id=self.value['source'].scene_source.source_id,
+            reset_sample_id=self.sample.sample_id,
         )
-        if abs(actual_dt - expected_dt) > tolerance:
-            raise ValueError('control acknowledgement does not match the selected control timebase')
-        info['control_application_v1'] = receipt
 
     def _require_published_execution_info(self):
         mapping = self.info.get('expert_execution_info_v1')
