@@ -604,6 +604,8 @@ class UsdRuntimeInputV1:
         self.runtime_source.validate()
         self.execution.validate()
         self.reset_plan.validate()
+        self.reset_plan.role_binding.validate()
+        self.reset_plan.reset_sample.validate()
         if self.runtime_source.task_artifact is not self.artifact:
             raise ValueError("USD RuntimeSource must reference the exact TaskArtifact")
         if (self.runtime_source.scene_source.task_source_identity_sha256
@@ -611,3 +613,9 @@ class UsdRuntimeInputV1:
                 or self.runtime_source.scene_source.scene_identity_sha256
                 != self.runtime_source.scene_definition.identity_hash):
             raise ValueError("USD RuntimeSource must bind the exact TaskSource and Scene")
+        if (self.artifact.task_source_identity_hash != self.task_source.identity_hash
+                or self.artifact.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
+            raise ValueError("USD RuntimeInput TaskSource/Scene/Artifact/reset identities disagree")

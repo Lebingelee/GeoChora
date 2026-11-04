@@ -257,3 +257,9 @@ Nut Solution源码SHA由 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a1
 selected scalar／execution的native回执完整性检查、`TransitionRecord`投影与两类recorder的append交给既有 `recorders.reference_provenance` owner；Env仍协调生命周期、实际推进、故障及边界获取。保留先核对回执再追加的次序，canonical路线不读取execution专用owner；静默遗漏native回执仍使已推进的interval被拒绝，不生成完整transition。源码来源按本次实际变更重新记录。
 
 受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165261312 bytes；包含录制故障、native回执遗漏、T/T+1和重执行检查。完整argv、退出码和资源采样见ignored `selected-recorder-owner-selected/`。未运行真实引擎、Isaac、GPU或物理reader；`3ed14c08` 的三个classic单步保留其原源码身份，不重标为本次变更后的物理检查。
+
+## USD输入reset身份提前准入（续作，待复审）
+
+通用 `UsdRuntimeInputV1.validate()` 在materialization前复核TaskSource、Scene、Artifact与reset plan的交叉身份，并验证嵌套RoleBinding和ResetSample；此前部分错配要到RuntimeSession reset才拒绝。F06的固定delivery、任务声明摘要、provider和执行限制仍独立执行，没有放宽。测试使用现有F04本地source fixture构造通用USD输入，再通过F06 `materialize` 准入入口注入错误TaskSource／Scene／reset Artifact身份；三种均在provider创建前拒绝。该fixture不冒充真实F06完整构造或物理运行。
+
+受监督无引擎F04／F05组合 **14 passed、3 deselected**，最大RSS 457318400 bytes；selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165179392 bytes。完整argv、退出码及资源采样见ignored `usd-identity-f04-v2/`和 `usd-identity-selected/`。首次定向尝试误以为 `TaskSourceV1` 有 `validate()`，3项失败后已移除该调用并重测；首次F04组合因缺少测试输出目录环境变量2项失败，补齐独立目录后上述重跑通过。排除真实provider／scene及缺少历史worker；未运行真实引擎、Isaac、GPU或物理reader。
