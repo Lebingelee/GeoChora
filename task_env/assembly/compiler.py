@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 import hashlib
 import inspect
 import json
@@ -86,20 +86,33 @@ def reference_task_identity_fields(artifact, source, controller, *,
     return result
 
 
-def reference_construction_value(compiled, *, task_id, construction_schema, owners, metadata=None):
+def reference_construction_value(compiled, *, task_id, construction_schema, owners=(), binding=None, metadata=None):
     """Prepare a selected construction receipt from a compiled task and its owners.
 
     Source bytes are sampled for this construction, rather than cached by path.
-    The caller supplies task-specific owners; shared construction and lifecycle
-    owners are included here so their changes remain visible in provenance.
+    The caller may supply additional task-specific owners. When a selected
+    binding is supplied, collect its declared callable owners as well; shared
+    construction and lifecycle owners remain visible in provenance.
     """
     from ..controllers.canonical.contracts import digest
     from ..environment.lifecycle import EpisodeExecutionState
+    from ..environment.reference_binding import ReferenceTaskBinding
 
     if compiled.controller is None:
         raise ValueError("selected reference construction requires a controller")
     root = Path(__file__).resolve().parents[2]
-    all_owners = (*owners, *compiled.source_owners, type(compiled), ReferenceTaskDeclarationV1,
+    binding_owners = ()
+    if binding is not None:
+        if type(binding) is not ReferenceTaskBinding:
+            raise TypeError('construction binding must be an exact ReferenceTaskBinding')
+        binding_owners = (type(binding), *(
+            value if inspect.isroutine(value) or inspect.isclass(value) else type(value)
+            for descriptor in fields(binding)
+            if callable(value := getattr(binding, descriptor.name))
+        ))
+        if binding.scalar_control_binding is not None:
+            binding_owners += (type(binding.scalar_control_binding),)
+    all_owners = (*owners, *binding_owners, *compiled.source_owners, type(compiled), ReferenceTaskDeclarationV1,
                   TaskArtifactDeclarationV1, compile_reference_source,
                   reference_task_identity_fields, reference_construction_value,
                   type(compiled.controller), EpisodeExecutionState)

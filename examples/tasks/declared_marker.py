@@ -84,11 +84,9 @@ class MarkerHeightEnv(SelectedReferenceEnv):
                 compiled, task_id=declaration.task_id,
                 construction_schema='declared-panda-box-construction-v1',
                 metadata={'object_id': declaration.object_id},
-                owners=(type(declaration), cls.evaluate_task, _sample_box_reset, panda_reference_control_binding,
-                        build_selected_observation, selected_reference_observation_spaces,
-                        compile_panda_box_task, compile_panda_box_artifact),
+                binding=binding,
             )
-        return ReferenceTaskBinding(
+        binding = ReferenceTaskBinding(
             build=build, reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
             action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
             prepare_action=reference_pose_action,
@@ -97,6 +95,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
             evaluate=cls.evaluate_task, object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
             external_actions=True, interval_mode='grouped', recorder_mode='canonical',
         )
+        return binding
 
     uid = 'marker-height-example-v1'
 

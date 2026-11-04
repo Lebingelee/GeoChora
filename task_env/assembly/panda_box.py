@@ -138,4 +138,7 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
         scene_source=composer.build_source_description(), config=config,
         controller_factory=controller_factory,
     )
-    return replace(compiled, source_owners=(PickCubeSceneComposer,))
+    return replace(compiled, source_owners=(
+        PickCubeSceneComposer, PandaAgent, PandaBoxDeclaration,
+        compile_panda_box_task, compile_panda_box_artifact,
+    ))

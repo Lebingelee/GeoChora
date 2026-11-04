@@ -2009,7 +2009,10 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         root = Path(__file__).resolve().parents[3]
         for name in ('examples/tasks/declared_marker.py', 'task_env/assembly/compiler.py',
                      'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py',
-                     'task_env/robots/panda.py', 'task_env/observations/selected_reference.py'):
+                     'task_env/robots/panda.py', 'task_env/observations/selected_reference.py',
+                     'task_env/controllers/canonical/contracts.py',
+                     'task_env/runtime/sessions/control.py',
+                     'task_env/environment/reference_binding.py'):
             assert hashes[name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
         assert 'task_env/tasks/declarative_reference.py' not in hashes
         assert env.value['resolved_configuration']['object_id'] == 'marker-v1'
@@ -2024,6 +2027,40 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         assert env.state.pose_world['marker-v1'] == first
     finally:
         env.close()
+
+
+def test_marker_compiler_snapshots_supplied_binding_callback_source(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.assembly.compiler import reference_construction_value
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.controllers.canonical import ProductionCanonicalPandaController
+    from task_env.environment.configuration import resolve_task_env_config
+
+    path = tmp_path / 'custom_observation.py'
+    path.write_text('def project(env, state):\n    return state\n', encoding='utf-8')
+    spec = importlib.util.spec_from_file_location('custom_observation_for_provenance', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    binding = replace(MarkerHeightEnv.selected_binding(config), observation_projection=module.project)
+    compiled = compile_panda_box_task(
+        MarkerHeightEnv.declaration(), config=config.environment,
+        controller_factory=ProductionCanonicalPandaController.from_source,
+    )
+    value = reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                         construction_schema='test-construction-v1', binding=binding)
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3]
+    name = (path.resolve().relative_to(root).as_posix()
+            if path.resolve().is_relative_to(root) else 'external:custom_observation.py')
+    assert value['source_sha256'][name] == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def project(env, state):\n    return env, state\n', encoding='utf-8')
+    changed = reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                           construction_schema='test-construction-v1', binding=binding)
+    assert changed['source_sha256'][name] != value['source_sha256'][name]
+    assert changed['recipe_identity'] != value['recipe_identity']
 
 
 def test_common_selected_construction_rejects_wrong_uid_and_render_before_binding(monkeypatch):

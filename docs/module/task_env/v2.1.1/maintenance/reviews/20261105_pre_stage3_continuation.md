@@ -223,3 +223,9 @@ selected控制应用回执的target／applied、Artifact、Controller、provider
 selected重执行现将记录的 `source_sha256:` 任务源码路径及摘要清单与当前任务构造所得清单精确比较，修改、缺失或新增文件均在reset／写输出前拒绝；已有绑定投影／转换源码检查继续保留。旧记录没有任务源码清单时沿用原路径，但因此不能凭这一检查证明旧记录完整任务源码一致。被检查的文件摘要对应当前构造时的磁盘字节，不证明运行中代码对象与磁盘一致。
 
 最终受监督、禁止引擎导入的selected／R05b／F06投影／录制／时钟组合 **162 passed、2 deselected**，最大RSS 207974400 bytes；完整argv、退出码、资源采样见ignored `control-feedback-replay-final-v2/`。首次完整组合运行期间删除了一个不再使用的import，因此用最终源码重跑并仅以前述第二次结果为最终证据。排除真实provider／scene；未运行真实引擎、Isaac、GPU或物理reader，旧源码物理结果不重标。
+
+## Marker binding来源收集归位（续作，待复审）
+
+Marker不再逐项枚举reset、评价、观测等源码owner；已有assembly构造来源函数接收实际提供的 `ReferenceTaskBinding`，收集声明的callable及控制binding类型所在文件，PandaBox编译结果声明自身实际使用的场景、机器人和编译owner。新增合成检查确认换成独立文件的观测回调后，该文件字节变更会改变构造来源及recipe身份；旧来源摘要如实变化，不改写旧run。收集范围是显式binding、编译组件及共同owner的声明文件，不追踪闭包捕获或函数间全部间接依赖，也不证明加载代码等于磁盘字节。
+
+受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **162 passed、2 deselected**，最大RSS 201625600 bytes，完整argv、退出码和资源采样见ignored `marker-binding-owners-selected/`。Marker仍显式创建 `ReferenceTaskBinding` 和resolved配置，本项减少来源枚举，不单独宣称R2新手构造目标完成；待Sol复审。未运行真实引擎、Isaac、GPU或物理reader。
