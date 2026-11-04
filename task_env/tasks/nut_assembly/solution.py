@@ -1208,6 +1208,7 @@ class NutAssemblyOutcomeSolutionV1:
                     native_samples = native_interval_receipt.samples
                 if not isinstance(native_interval_receipt, NutAssemblyNativeIntervalReceiptV1):
                     raise ValueError("selected NutAssembly step requires a typed native interval receipt")
+                native_interval_receipt.validate()
                 application = info.get("control_application_v1")
                 pending = self._pending_action
                 if (not isinstance(application, Mapping) or pending is None

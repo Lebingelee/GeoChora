@@ -364,6 +364,26 @@ def test_nutassembly_solution_rejects_altered_executed_action(fake, mutation):
         env.close()
 
 
+def test_nutassembly_revalidates_mutated_typed_receipt(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        obs, reward, terminated, truncated, info = env.step(solution.act(obs, info))
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        object.__setattr__(receipt, 'samples', ())
+        with pytest.raises(ValueError, match='incomplete'):
+            solution.observe(obs, reward, terminated, truncated, info,
+                             native_interval_receipt=receipt, native_samples=())
+        assert solution.failed and solution.failure_reason == 'native_feedback_invalid'
+    finally:
+        env.close()
+
+
 def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
 
