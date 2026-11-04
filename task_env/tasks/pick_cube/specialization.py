@@ -188,6 +188,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              root / "task_env/planners/completion.py",
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
+             root / "task_env/environment/lifecycle.py",
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/recorders/position_metadata.py",

@@ -20,7 +20,7 @@ from .metadata import (
     validate_task_info,
 )
 from .protocols import TaskEnvironmentComponent
-from .lifecycle import SingleTaskLifecycleAdapter, TaskLifecycleAdapter
+from .lifecycle import EpisodeExecutionState, SingleTaskLifecycleAdapter, TaskLifecycleAdapter
 from .types import (
     ControlCommand,
     ExecutionFaultV1,
@@ -65,6 +65,28 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
     render_mode = None
     action_space = None
     observation_space = None
+
+    def _episode_execution_state(self):
+        state = self.__dict__.get("_episode_state")
+        if state is None:
+            state = self.__dict__["_episode_state"] = EpisodeExecutionState()
+        return state
+
+    @property
+    def _last_episode_end(self):
+        return self._episode_execution_state().episode_end
+
+    @_last_episode_end.setter
+    def _last_episode_end(self, value):
+        self._episode_execution_state().episode_end = value
+
+    @property
+    def _closed(self):
+        return self._episode_execution_state().closed
+
+    @_closed.setter
+    def _closed(self, value):
+        self._episode_execution_state().closed = value
 
     def __init__(
         self,
@@ -340,6 +362,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.metadata["reference_profile"] = reference_profile
             self._task_lifecycle = SingleTaskLifecycleAdapter(
                 runtime=self._runtime,
+                episode_state=self._episode_execution_state(),
                 task_definition=self._task_definition,
                 control_substeps=self.config.runtime.control_substeps,
                 expected_control_dt_s=(
@@ -640,8 +663,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ):
-        if self._closed:
-            raise RuntimeError("environment is closed")
+        self._episode_execution_state().require_open("environment is closed")
         super().reset(seed=seed)
         self._last_camera_metadata = {}
         lifecycle = self._require_task_lifecycle()
@@ -697,8 +719,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             raise
 
     def step(self, action):
-        if self._closed:
-            raise RuntimeError("environment is closed")
+        self._episode_execution_state().require_open("environment is closed")
         lifecycle = self._require_task_lifecycle()
         self._last_camera_metadata = {}
         result = lifecycle.step(action)
@@ -785,8 +806,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
     def stop(self, reason: str = "external_stop"):
         """Stop at the last complete public boundary without compute or step."""
 
-        if self._closed:
-            raise RuntimeError("cannot stop a closed environment")
+        self._episode_execution_state().require_open("cannot stop a closed environment")
         lifecycle = self._require_task_lifecycle()
         result = lifecycle.stop(reason)
         self._last_episode_end = result
@@ -881,9 +901,11 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def close(self) -> None:
-        if self._closed:
+        # Runtime lifecycle may already be closed independently.  The Env
+        # still owns auxiliary UI/sensor resources and must release them once.
+        if getattr(self, "_resources_closed", False) or getattr(self, "_closing", False):
             return
-        self._closed = True
+        self._closing = True
         ui_provider = getattr(self, "_ui_render_provider", None)
         sensor_provider = getattr(self, "_sensor_provider", None)
         lifecycle = getattr(self, "_task_lifecycle", None)
@@ -909,7 +931,11 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as exc:
                 if first_error is None:
                     first_error = exc
-        if lifecycle is not None and lifecycle.episode_end is not None:
-            self._last_episode_end = lifecycle.episode_end
+        episode_end = getattr(lifecycle, "episode_end", None)
+        if episode_end is not None:
+            self._last_episode_end = episode_end
+        self._episode_execution_state().finish_close(stop=False)
+        self._resources_closed = True
+        self._closing = False
         if first_error is not None:
             raise first_error

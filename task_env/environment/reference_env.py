@@ -21,6 +21,7 @@ from ..controllers.canonical.contracts import RequestedAction, digest
 from .protocols import TaskEnvironmentComponent
 from .reference_binding import ReferenceTaskBinding
 from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
+from .lifecycle import EpisodeExecutionState
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
@@ -238,6 +239,70 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.position_profiles = ()
             self.position_profile = False
             self.controller = raw
+
+    def _episode_execution_state(self):
+        state = self.__dict__.get('_episode_state')
+        if state is None:
+            state = self.__dict__['_episode_state'] = EpisodeExecutionState()
+        return state
+
+    @property
+    def _closed(self):
+        return self._episode_execution_state().closed
+
+    @_closed.setter
+    def _closed(self, value):
+        self._episode_execution_state().closed = value
+
+    @property
+    def _stopped(self):
+        return self._episode_execution_state().stopped
+
+    @_stopped.setter
+    def _stopped(self, value):
+        self._episode_execution_state().stopped = value
+
+    @property
+    def _position_episode_end(self):
+        if getattr(self, '_mixed_control_candidate', False):
+            return None
+        return self._episode_execution_state().episode_end
+
+    @_position_episode_end.setter
+    def _position_episode_end(self, value):
+        if not getattr(self, '_mixed_control_candidate', False):
+            self._episode_execution_state().episode_end = value
+        elif value is not None:
+            raise ValueError('Position episode end is not valid for mixed control')
+
+    @property
+    def _mixed_episode_end(self):
+        if not getattr(self, '_mixed_control_candidate', False):
+            return None
+        return self._episode_execution_state().episode_end
+
+    @_mixed_episode_end.setter
+    def _mixed_episode_end(self, value):
+        if getattr(self, '_mixed_control_candidate', False):
+            self._episode_execution_state().episode_end = value
+        elif value is not None:
+            raise ValueError('mixed episode end is not valid for Position control')
+
+    @property
+    def _selected_episode_id(self):
+        return self._episode_execution_state().episode_id
+
+    @_selected_episode_id.setter
+    def _selected_episode_id(self, value):
+        self._episode_execution_state().episode_id = value
+
+    @property
+    def _execution_fault(self):
+        return self._episode_execution_state().fault
+
+    @_execution_fault.setter
+    def _execution_fault(self, value):
+        self._episode_execution_state().fault = value
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
                  _binding=None, _diagnostic_gripper_control_hz=None,
@@ -562,8 +627,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             transition_status=transition_status,
             readback_error=readback_error,
         )
-        self._execution_fault = fault
-        self._stopped = True
+        self._episode_execution_state().latch_fault(fault, stop=True)
         attach_execution_fault(error, fault)
         return fault
 
@@ -608,14 +672,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         """
         if self.binding.build_external is None or self.binding.validate_external_solution is None:
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
-        if self._closed:
-            raise RuntimeError('environment is closed')
+        self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
         return self._reset(seed=seed, options=options, external_solution=solution)
 
     def _reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
-        if self._closed:
-            raise RuntimeError('environment is closed')
+        self._episode_execution_state().require_open('environment is closed')
         mixed_reset_plan = None
         if self._mixed_control_candidate:
             if options is None:
@@ -693,7 +755,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self._mixed_control_candidate:
             # Publish a candidate reset plan only after the replacement begins.
             self._mixed_reset_plan = mixed_reset_plan
-        self._stopped = True
+        self._episode_execution_state().begin_reset()
         previous_session, self.session = self.session, None
         previous_value = self.value
         previous_session_close_attempted = False
@@ -998,7 +1060,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.arm_schedule = (self.binding.schedule_factory(self)
                                      if self.binding.schedule_factory is not None else None)
             self._active_native_interval_receipt = None
-            self._stopped, self._episode_mode = False, None
+            self._episode_mode = None
             self._position_episode_end = None
             self._mixed_episode_end = None
             self._published_position_state = self.state
@@ -1007,7 +1069,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_info = dict(self.info)
             self._published_position_evaluation = self.evaluation
             self.recorder = None
-            self._execution_fault = None
+            self._episode_execution_state().finish_reset()
             if external_solution is not None:
                 # The caller's instance is the only active mutable Solution
                 # owner for this episode; the task value has no active copy.
@@ -1186,14 +1248,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             consumer.close()
 
     def step(self, action):
-        if getattr(self, '_closed', False):
-            raise RuntimeError('environment is closed')
-        if self._execution_fault is not None:
-            fault = self._execution_fault
-            raise RuntimeError(
-                'selected execution is faulted; reset() is required '
-                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
-            )
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; reset() is required',
+        )
         from ..planners.contracts import ExpertAction
         if self.binding.external_solution_actions and type(action) is ExpertAction:
             if self._episode_mode in {'expert', 'external_solution'}:
@@ -1479,14 +1537,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         canonical Recorder append. The instance remains the sole owner of its
         mutable stage state.
         """
-        if self._closed:
-            raise RuntimeError('environment is closed')
-        if self._execution_fault is not None:
-            fault = self._execution_fault
-            raise RuntimeError(
-                'selected execution is faulted; reset() is required '
-                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
-            )
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; reset() is required',
+        )
         if self._external_solution_owner is None or solution is not self._external_solution_owner:
             raise ValueError('step_with_solution requires the instance accepted by reset_for_solution')
         self._validate_external_solution(solution)
@@ -1765,7 +1819,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             })
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
-            self._stopped = bool(terminated or truncated)
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated,
+            )
             self._episode_mode = 'external'
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
@@ -1880,7 +1936,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.obs, self.info, self.evaluation = self.observation(self.state)
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
-            self._stopped = bool(terminated or truncated)
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated,
+            )
             self._episode_mode = 'expert' if proposal is not None else 'external'
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
@@ -2212,7 +2270,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     expert_failure_reason=observer_solution.failure_reason,
                 )
                 self._stopped = observer_solution.done or observer_solution.failed
-            self._stopped = bool(self._stopped or terminated or truncated)
+            self._episode_execution_state().finish_step(
+                terminated=terminated, truncated=truncated, preserve_stop=True,
+            )
             if self.recorder is not None:
                 phase = 'record_interval'
                 record_append_attempted = True
@@ -2424,7 +2484,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         'type': type(task_resource_error).__name__,
                         'message': str(task_resource_error),
                     }
-            self._closed, self._stopped = True, True
+            self._episode_execution_state().finish_close(stop=True)
             if first_error is not None:
                 raise first_error
             return
@@ -2473,7 +2533,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._mixed_close_receipt = dict(self._mixed_close_receipt)
                 if task_resource_receipt is not None:
                     self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
-            self._closed, self._stopped = True, True
+            self._episode_execution_state().finish_close(stop=True)
             if first_error is not None:
                 raise first_error
             return
@@ -2519,7 +2579,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         first_error, 'Runtime owner close after Position finalization', error,
                     )
         finally:
-            self._closed, self._stopped = True, True
+            self._episode_execution_state().finish_close(stop=True)
         if first_error is not None:
             raise first_error
 
@@ -2614,11 +2674,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def stop(self, reason='external_stop'):
         """Finish the Position candidate at its last fully returned boundary."""
 
-        if self._closed:
-            raise RuntimeError('cannot stop a closed selected environment')
+        state = self._episode_execution_state()
+        state.require_open('cannot stop a closed selected environment')
         if getattr(self, 'mixed_control_profile', False):
-            if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
-                raise ValueError('Stop reason must be a trimmed non-empty string')
+            state.validate_stop_reason(reason)
             if self._mixed_episode_end is not None:
                 return self._mixed_episode_end
             if self.session is None or getattr(self, 'state', None) is None:
@@ -2684,15 +2743,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     bool(solution_done and not solution_failed)
                 ),
             )
-            self._stopped = True
+            self._episode_execution_state().finish_episode()
             return self._mixed_episode_end
         if not getattr(self, 'position_profile', False):
             raise StageUnavailableError(
                 'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
                 'legacy selected production-r1 behavior is unchanged'
             )
-        if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
-            raise ValueError('Stop reason must be a trimmed non-empty string')
+        state.validate_stop_reason(reason)
         if self._position_episode_end is not None:
             return self._position_episode_end
         if self.session is None or self._published_position_typed_state is None:
@@ -2720,7 +2778,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 bootstrap_allowed=True,
                 payload={'requested_reason': reason},
             )
-        self._stopped = True
+        self._episode_execution_state().finish_episode()
         return self._position_episode_end
 
     def _boundary(self):

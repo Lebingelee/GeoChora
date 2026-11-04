@@ -52,11 +52,12 @@ def _compile_value(declaration, config, evaluator):
     construction_identity = reference_task_identity_fields(artifact, source, controller)
     from task_env.assembly.compiler import ReferenceTaskDeclarationV1, compile_reference_source
     from task_env.environment.task_source import TaskArtifactDeclarationV1
+    from task_env.environment.lifecycle import EpisodeExecutionState
     from task_env.objects.pick_cube import PickCubeSceneComposer
     owners = (type(declaration), evaluator, compile_panda_box_artifact, compile_panda_box_source,
               compile_panda_box_task, ReferenceTaskDeclarationV1, compile_reference_source,
               TaskArtifactDeclarationV1, reference_task_identity_fields, PickCubeSceneComposer,
-              ProductionCanonicalPandaController)
+              ProductionCanonicalPandaController, EpisodeExecutionState)
     paths = {Path(__file__).resolve(), *(Path(inspect.getsourcefile(owner)).resolve() for owner in owners)}
     root = Path(__file__).resolve().parents[2]
     source_hashes = {(path.relative_to(root).as_posix() if path.is_relative_to(root)

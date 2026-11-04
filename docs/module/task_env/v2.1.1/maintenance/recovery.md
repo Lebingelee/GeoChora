@@ -19,6 +19,8 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 
 attempt001及维护者授权续作已返包，最终执行HEAD为`656ef136`。Sol独立复审决定`REWORK_REQUIRED_PRE_STAGE3`：保留部分实现作为后继基线，G1 FAIL、G2–G4 PARTIAL，整体未接受。目录四文件及原字节manifest迁移已核对；三个classic任务真实统一、Marker通用构造回收及F06任务／runtime职责分离仍待整改。最终源码物理与独立reader未验证。见[Sol复审](reviews/20261104_pre_stage3_attempt001_sol_review.md)和[执行者交付](reviews/pre-stage3-refactor-attempt001.md)。不改变阶段2决定或启动阶段3。
 
+attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-refactor-attempt002.md)：scalar episode 部分状态与准入已共用，classic／selected 的完整生命周期和 Env 类仍未统一，RW1 为 FAIL；原生验证未运行，仍待 Sol 复审。
+
 ## 阶段3前待办
 
 [维护方案](../planning/pre-stage3-environment-refactor.md)涵盖环境归整、诊断隔离、Env统一、静态SHA优化，以及新手安装／已有路径复用／启动脚本／example二次开发指引。交付位置包括README、`task_env/doc`和本版[指南](../guides/README.md)，不能只更新GPT工作文档。已有部分代码与启动入口检查点；完整重构、新安装及启动入口的 native 验证尚未完成。

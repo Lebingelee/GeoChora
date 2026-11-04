@@ -1533,3 +1533,98 @@ def test_nut_solution_lifecycle_restores_then_requires_final_task_success():
     assert original.complete_expert(terminal_stage_completed=True, final_task_success=True,
                                     control_step=2, simulation_time_s=.02)
     assert original.expert_complete and not original.expert_failed
+
+
+def test_selected_episode_state_survives_horizon_reset_and_close(fake):
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 2})
+    assert isinstance(env._episode_state, EpisodeExecutionState)
+    state = env._episode_state
+    try:
+        env.reset(seed=31)
+        assert env._episode_state is state and not state.stopped and state.fault is None
+        assert state.episode_id == env._selected_episode_id and state.episode_id
+        ee = env.state.pose_world['panda-v1/ee']
+        action = np.asarray((*ee.position, *ee.quaternion_wxyz, 0.0), dtype=np.float32)
+        env.step(action)
+        _, _, _, truncated, _ = env.step(action)
+        assert truncated and state.stopped
+        with pytest.raises(RuntimeError):
+            env.step(action)
+        env.reset(seed=31)
+        assert env._episode_state is state and not state.stopped and state.fault is None
+    finally:
+        env.close()
+    assert state.closed
+
+
+@pytest.mark.parametrize('mixed', [False, True])
+def test_selected_exposes_one_episode_end_for_the_active_route(mixed):
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = mixed
+    end = object()
+    if mixed:
+        env._mixed_episode_end = end
+        assert env._position_episode_end is None
+    else:
+        env._position_episode_end = end
+        assert env._mixed_episode_end is None
+    assert env._episode_state.episode_end is end
+    if mixed:
+        env._mixed_episode_end = None
+    else:
+        env._position_episode_end = None
+    assert env._episode_state.episode_end is None
+
+
+def test_selected_position_stop_stores_one_published_outcome_without_stepping():
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = False
+    env.mixed_control_profile = False
+    env.position_profile = True
+    env.leaf_position_profile = False
+    env.dual_entity_position = False
+    env._closed = False
+    env._stopped = False
+    env._execution_fault = None
+    env._position_episode_end = None
+    env._position_controller_switch_fault_receipt = None
+    env._pending_position_switch = None
+    env.recorder = None
+    env.session = object()
+    env._published_position_state = SimpleNamespace(control_step=2, simulation_time=.02)
+    boundary = SimpleNamespace(boundary_id='published-boundary', episode_id='selected-episode')
+    env._published_position_typed_state = SimpleNamespace(view=SimpleNamespace(boundary=boundary))
+    env._published_position_evaluation = SimpleNamespace(success=False)
+    env.value = {'source': SimpleNamespace(source_closure_digest='a' * 64)}
+    env.controller = SimpleNamespace(identity='b' * 64, profile_id='position-test')
+    first = env.stop('operator_request')
+    assert env.stop('repeated_request') is first
+    assert env._episode_state.episode_end is first and env._episode_state.stopped
+    assert first.outcome.end_reason == 'external_stop'
+    assert first.outcome.final_boundary == 2
+
+
+def test_selected_mixed_stop_stores_one_published_outcome_without_stepping():
+    env = object.__new__(SelectedReferenceEnv)
+    env._mixed_control_candidate = True
+    env.mixed_control_profile = True
+    env._closed = False
+    env._stopped = False
+    env._execution_fault = None
+    env._mixed_episode_end = None
+    env._external_solution_owner = None
+    env.recorder = None
+    env.session = SimpleNamespace(episode_id='mixed-episode')
+    env.state = SimpleNamespace(control_step=3, simulation_time=.03)
+    env.sample = SimpleNamespace(sample_id='sample')
+    env.value = {'source': SimpleNamespace(scene_source=SimpleNamespace(source_id='scene'),
+                                           source_closure_digest='a' * 64)}
+    env.controller = SimpleNamespace(identity='b' * 64)
+    env.evaluation = SimpleNamespace(success=False)
+    first = env.stop('operator_request')
+    assert env.stop('repeated_request') is first
+    assert env._episode_state.episode_end is first and env._episode_state.stopped
+    assert first.outcome.end_reason == 'external_stop'
+    assert first.outcome.final_boundary == 3

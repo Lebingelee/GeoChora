@@ -357,7 +357,8 @@ def test_selected_source_identity_includes_action_and_artifact_contract_bytes():
     root = Path(pick.__file__).resolve().parents[3]
     pick_files = pick._source_identity_files(pick.build_artifact(), TaskArtifact)
     nut_files = nut._source_identity_files()
-    for relative in ('task_env/artifacts/contracts.py', 'task_env/planners/contracts.py'):
+    for relative in ('task_env/artifacts/contracts.py', 'task_env/planners/contracts.py',
+                     'task_env/environment/lifecycle.py'):
         expected = hashlib.sha256((root / relative).read_bytes()).hexdigest()
         assert pick_files[relative] == expected
         assert nut_files[relative] == expected
