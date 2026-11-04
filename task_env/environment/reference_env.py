@@ -1137,7 +1137,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self.binding.build_seeded is not None:
                 build_value = lambda: self.binding.build_seeded(provider, backend, 31, horizon)
             else:
-                build_value = lambda: self.binding.build(provider)
+                build_value = lambda: self.binding.build_for_provider(provider)
         else:
             if self.binding.admit_native_feedback_profile is None:
                 raise ValueError(
@@ -1501,7 +1501,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         self.provider, self.backend, seed, self.horizon,
                     )
                 else:
-                    self.value = self.binding.build(self.provider)
+                    self.value = self.binding.build_for_provider(self.provider)
             replacement_receipt = getattr(
                 self.value.get('source'), 'execution_source_receipt', None,
             )

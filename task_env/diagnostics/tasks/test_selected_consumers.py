@@ -2063,6 +2063,35 @@ def test_marker_compiler_snapshots_supplied_binding_callback_source(fake, tmp_pa
     assert changed['recipe_identity'] != value['recipe_identity']
 
 
+def test_marker_reset_rebuild_uses_current_binding_source(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from pathlib import Path
+    import examples.tasks.declared_marker  # noqa: F401
+
+    path = tmp_path / 'current_marker_observation.py'
+    path.write_text(
+        'from task_env.observations.selected_reference import build_selected_observation\n'
+        'def project(env, state):\n    return build_selected_observation(env, state)\n',
+        encoding='utf-8',
+    )
+    spec = importlib.util.spec_from_file_location('current_marker_observation', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    env = make_env('marker-height-example-v1', config={'provider': 'mujoco', 'horizon': 2})
+    try:
+        assert env.binding.build_receives_binding
+        env.binding = replace(env.binding, observation_projection=module.project)
+        obs, _ = env.reset(seed=31)
+        assert env.observation_space.contains(obs)
+        root = Path(__file__).resolve().parents[3]
+        name = (path.resolve().relative_to(root).as_posix()
+                if path.resolve().is_relative_to(root) else 'external:current_marker_observation.py')
+        assert env.value['source_sha256'][name] == hashlib.sha256(path.read_bytes()).hexdigest()
+    finally:
+        env.close()
+
+
 def test_common_selected_construction_rejects_wrong_uid_and_render_before_binding(monkeypatch):
     from dataclasses import replace
     from examples.tasks.declared_marker import MarkerHeightEnv

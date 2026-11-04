@@ -80,8 +80,11 @@ class ReferenceTaskBinding:
     position_control_binding: Callable | None = None
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
+    build_receives_binding: bool = False
 
     def __post_init__(self):
+        if type(self.build_receives_binding) is not bool:
+            raise TypeError('build_receives_binding must be a boolean')
         if self.build_mixed_control_profile is None and (
                 not callable(self.action_space_factory) or not callable(self.prepare_action)
                 or not isinstance(self.action_schema, dict) or not self.action_schema):
@@ -147,3 +150,9 @@ class ReferenceTaskBinding:
         if (self.post_reset_session_validator is not None
                 and not callable(self.post_reset_session_validator)):
             raise ValueError('post-reset session validator must be callable when supplied')
+
+    def build_for_provider(self, provider):
+        """Build with this binding when the construction owner opts into it."""
+        if self.build_receives_binding:
+            return self.build(provider, self)
+        return self.build(provider)

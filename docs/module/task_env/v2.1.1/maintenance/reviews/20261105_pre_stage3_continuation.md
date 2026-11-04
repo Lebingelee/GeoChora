@@ -229,3 +229,9 @@ selected重执行现将记录的 `source_sha256:` 任务源码路径及摘要清
 Marker不再逐项枚举reset、评价、观测等源码owner；已有assembly构造来源函数接收实际提供的 `ReferenceTaskBinding`，收集声明的callable及控制binding类型所在文件，PandaBox编译结果声明自身实际使用的场景、机器人和编译owner。新增合成检查确认换成独立文件的观测回调后，该文件字节变更会改变构造来源及recipe身份；旧来源摘要如实变化，不改写旧run。收集范围是显式binding、编译组件及共同owner的声明文件，不追踪闭包捕获或函数间全部间接依赖，也不证明加载代码等于磁盘字节。
 
 受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **162 passed、2 deselected**，最大RSS 201625600 bytes，完整argv、退出码和资源采样见ignored `marker-binding-owners-selected/`。Marker仍显式创建 `ReferenceTaskBinding` 和resolved配置，本项减少来源枚举，不单独宣称R2新手构造目标完成；待Sol复审。未运行真实引擎、Isaac、GPU或物理reader。
+
+## Marker重建时的当前binding来源（续作，待复审）
+
+上一检查点的Marker构造闭包持有创建时的binding：如果环境在重建前替换binding，该闭包可能继续把旧binding交给来源收集。现有 `ReferenceTaskBinding` 增加显式opt-in的普通构造调用方式，在初次构造和reset重建时将当前binding传给构造函数；未opt-in的调用方仍使用原单参数调用，seeded、native-feedback及mixed的专用构造路径不变。Marker使用该能力，合成测试在构造后替换观测回调并reset，确认实际新回调的源码摘要进入重建值。该检查不消除已记录的间接依赖和运行中代码／磁盘字节限制。
+
+受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **163 passed、2 deselected**，最大RSS 205631488 bytes；attached-leaf／mixed假provider组合 **14 passed**，最大RSS 165675008 bytes。完整argv、退出码和资源采样见ignored `current-binding-selected/`与 `current-binding-mixed/`。未运行真实引擎、Isaac、GPU或物理reader；Marker剩余通用组装和最终R2判断仍待后续工作及Sol复审。

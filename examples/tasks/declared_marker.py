@@ -75,7 +75,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         declaration = cls.declaration()
         if declaration.task_id != cls.uid:
             raise ValueError('registered UID and declared task identity differ')
-        def build(_provider):
+        def build(_provider, binding):
             compiled = compile_panda_box_task(
                 declaration, config=config.environment,
                 controller_factory=ProductionCanonicalPandaController.from_source,
@@ -87,7 +87,8 @@ class MarkerHeightEnv(SelectedReferenceEnv):
                 binding=binding,
             )
         binding = ReferenceTaskBinding(
-            build=build, reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
+            build=build, build_receives_binding=True,
+            reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
             action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
             prepare_action=reference_pose_action,
             observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
