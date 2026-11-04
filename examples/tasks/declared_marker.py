@@ -7,20 +7,17 @@ import numpy as np
 
 from task_env.artifacts import PoseWorld, SemanticDefinition, Timebase
 from task_env.artifacts.execution import ResetSample
-from task_env.assembly.compiler import reference_construction_value
 from task_env.assembly.panda_box import (
     PandaBoxDeclaration, compile_panda_box_artifact, compile_panda_box_task,
 )
 from task_env.controllers.canonical import ProductionCanonicalPandaController
-from task_env.controllers.canonical.contracts import (
-    REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
-)
+from task_env.controllers.canonical.contracts import reference_pose_action_binding
 from task_env.environment import TaskEvaluation
 from task_env.environment.configuration import resolve_env_config
 from task_env.environment.reference_binding import ReferenceTaskBinding
 from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.registry import register_env
-from task_env.observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
+from task_env.observations.selected_reference import selected_observation_binding
 from task_env.robots.panda import panda_reference_control_binding
 
 
@@ -77,28 +74,19 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         declaration = cls.declaration()
         if declaration.task_id != cls.uid:
             raise ValueError('registered UID and declared task identity differ')
-        def build(_provider, binding):
-            compiled = compile_panda_box_task(
-                declaration, config=config.environment,
-                controller_factory=ProductionCanonicalPandaController.from_source,
-            )
-            return reference_construction_value(
-                compiled, task_id=declaration.task_id,
-                construction_schema='declared-panda-box-construction-v1',
-                metadata={'object_id': declaration.object_id},
-                binding=binding,
-            )
-        binding = ReferenceTaskBinding(
-            build=build, build_receives_binding=True,
+        return ReferenceTaskBinding.from_provider_free_compiler(
+            partial(compile_panda_box_task, declaration, config=config.environment,
+                    controller_factory=ProductionCanonicalPandaController.from_source),
+            task_id=declaration.task_id,
+            construction_schema='declared-panda-box-construction-v1',
+            metadata={'object_id': declaration.object_id},
             reset_sample=partial(_sample_box_reset, declaration),
-            action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
-            prepare_action=reference_pose_action,
-            observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
+            evaluate=cls.evaluate_task,
+            object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
             scalar_control_binding=panda_reference_control_binding(),
-            evaluate=cls.evaluate_task, object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
             external_actions=True, interval_mode='grouped', recorder_mode='canonical',
+            **reference_pose_action_binding(), **selected_observation_binding(),
         )
-        return binding
 
     uid = 'marker-height-example-v1'
 

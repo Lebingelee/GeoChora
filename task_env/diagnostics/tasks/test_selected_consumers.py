@@ -2125,6 +2125,51 @@ def test_marker_compiler_snapshots_supplied_binding_callback_source(fake, tmp_pa
     assert changed['recipe_identity'] != value['recipe_identity']
 
 
+def test_provider_free_compiler_binding_tracks_compiler_and_current_callbacks(fake, tmp_path):
+    import hashlib
+    import importlib.util
+    from functools import partial
+    from pathlib import Path
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.controllers.canonical import ProductionCanonicalPandaController
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+
+    path = tmp_path / 'custom_compiler.py'
+    path.write_text('def compile_task(compiled):\n    return compiled\n')
+    spec = importlib.util.spec_from_file_location('custom_compiler_for_binding', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    original = MarkerHeightEnv.selected_binding(config)
+    compiled = compile_panda_box_task(
+        MarkerHeightEnv.declaration(), config=config.environment,
+        controller_factory=ProductionCanonicalPandaController.from_source,
+    )
+    binding = ReferenceTaskBinding.from_provider_free_compiler(
+        partial(module.compile_task, compiled), task_id=MarkerHeightEnv.uid,
+        construction_schema='test-custom-compiler-v1',
+        reset_sample=original.reset_sample, evaluate=original.evaluate,
+        object_poses=original.object_poses, scalar_control_binding=original.scalar_control_binding,
+        external_actions=True, interval_mode='grouped', recorder_mode='canonical',
+        action_schema=original.action_schema, action_space_factory=original.action_space_factory,
+        prepare_action=original.prepare_action, observation_space_factory=original.observation_space_factory,
+        observation_projection=original.observation_projection,
+    )
+    first = binding.build_for_provider('mujoco')
+    root = Path(__file__).resolve().parents[3]
+    key = (path.resolve().relative_to(root).as_posix()
+           if path.resolve().is_relative_to(root) else 'external:custom_compiler.py')
+    assert first['source_sha256'][key] == hashlib.sha256(path.read_bytes()).hexdigest()
+    path.write_text('def compile_task(compiled):\n    return compiled  # changed compiler source\n')
+    second = binding.build_for_provider('geophys')
+    assert second['source_sha256'][key] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert first['recipe_identity'] != second['recipe_identity']
+    with pytest.raises(TypeError, match='compiler must be callable'):
+        ReferenceTaskBinding.from_provider_free_compiler(None, task_id='test', construction_schema='test')
+
+
 def test_marker_reset_rebuild_uses_current_binding_source(fake, tmp_path):
     import hashlib
     import importlib.util

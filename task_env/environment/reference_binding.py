@@ -151,6 +151,29 @@ class ReferenceTaskBinding:
                 and not callable(self.post_reset_session_validator)):
             raise ValueError('post-reset session validator must be callable when supplied')
 
+    @classmethod
+    def from_provider_free_compiler(cls, compiler, *, task_id, construction_schema,
+                                    metadata=None, **binding_fields):
+        """Bind a provider-free task compiler to the existing selected environment.
+
+        The task still supplies its action, observation, reset, evaluation and
+        control bindings explicitly. The compiler's own source is recorded.
+        """
+        if not callable(compiler):
+            raise TypeError('selected task compiler must be callable')
+        if 'build' in binding_fields or 'build_receives_binding' in binding_fields:
+            raise ValueError('compiled binding owns its build callback')
+        metadata = None if metadata is None else dict(metadata)
+
+        def build(_provider, binding):
+            from ..assembly.compiler import reference_construction_value
+            return reference_construction_value(
+                compiler(), task_id=task_id, construction_schema=construction_schema,
+                owners=(compiler,), binding=binding, metadata=metadata,
+            )
+
+        return cls(build=build, build_receives_binding=True, **binding_fields)
+
     def build_for_provider(self, provider):
         """Build with this binding when the construction owner opts into it."""
         if self.build_receives_binding:

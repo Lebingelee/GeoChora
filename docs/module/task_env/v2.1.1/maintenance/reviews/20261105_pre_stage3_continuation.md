@@ -300,3 +300,10 @@ Position结束记录的controller／leaf writer、来源、故障回执和未完
 PickCube／Nut的源码清单增加共同路径工具以如实记录新的直接依赖。Nut specialization SHA为 `21f32180a191e42e2f2bd8fcfaa52bea4c43754f88e03ee8e96c93deab035403`，重新构造的R05b 100／500 Hz Controller身份为 `a06a48987cbb1e778e194965ac725ae0e213baee3ccabfddc679b9ec52d36f03`／`28544311bf0e8eaf4bcaa9e35eb8a2d7f3faaaa73741bbad4e27c32253b400ac`，仅更新对应精确准入值；其余验证未放宽。
 
 最终受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **183 passed、2 deselected**，最大进程树RSS 216014848 bytes，完整argv与资源采样见ignored `callable-source-partial-final-v2/`。首次组合运行期间错误地修改了Nut源码清单，导致一个R05b worker因源码身份不匹配提前拒绝，结果为182 passed、1 failed、2 deselected；此非稳定源码证据。更新精确身份后在不再修改源码的条件下完整重跑并补充不可追踪回调拒绝检查，得到上述最终结果。未运行真实引擎、Isaac、GPU或物理reader，旧物理结果不重标。
+
+
+## 通用声明编译与selected接线（续作，待复审）
+
+现有 `ReferenceTaskBinding` 增加可选的无provider编译组合入口：它接收任务明确选择的编译器及绑定字段，调用既有assembly构造来源和identity；不创建环境子类或替代 `make_env`。Marker删除内联的编译／来源组装闭包，继续表达声明、reset、评价、Controller选择、控制与动作／观测选择及正常注册。世界pose动作契约和selected观测契约的现有字段组合归对应已有owner，Marker与PickCube共同使用；仍可明确供应其他动作／观测字段，非Panda classic任务不隐式获得该契约。此入口不声明任意资产或provider已支持。
+
+新增无引擎检查以独立编译器函数验证源码变更会改变构造身份，已有Marker检查继续覆盖公共factory、reset／step、当前binding回调替换及来源变更；初次新测试将仓库内临时目录误判为external，第二次修正路径后遗漏 `Path` 导入，各有1项测试失败，修正后完整重跑。最终受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **184 passed、2 deselected**，最大进程树RSS 165203968 bytes，完整argv及资源采样见ignored `compiled-binding-final-v3/`。R05b 100／500 Hz Controller身份经实际构造核对保持 `a06a4898…`／`28544311…`。未运行真实引擎、Isaac、GPU或物理reader；旧源码证据不重标。Marker示例仍显式选择内部binding／配置，R2能否接收由Sol复审，整体维护和其余待办不因此标为完成。

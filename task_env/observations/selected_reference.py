@@ -48,6 +48,12 @@ def selected_reference_observation_spaces(env):
     return observation_spaces
 
 
+def selected_observation_binding():
+    """Expose the existing selected observation space and state projection."""
+    return {'observation_space_factory': selected_reference_observation_spaces,
+            'observation_projection': build_selected_observation}
+
+
 def position_camera_observation_declaration(binding, config):
     """Declare the existing single-Panda Position camera observation leaves."""
     from ..environment.types import ObservationFieldSpec, ObservationSchema

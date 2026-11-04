@@ -36,6 +36,13 @@ def reference_pose_action(action):
     return RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
 
 
+def reference_pose_action_binding():
+    """Expose the existing world-pose action schema, space and interpretation."""
+    return {'action_schema': REFERENCE_POSE_ACTION_SCHEMA,
+            'action_space_factory': reference_pose_action_space,
+            'prepare_action': reference_pose_action}
+
+
 @dataclass(frozen=True)
 class RequestedAction(Contract):
     mode: str
