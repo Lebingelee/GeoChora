@@ -32,6 +32,7 @@ class GeoPhysRuntimeBoundary:
         physics_dt: float,
         ctrl_range,
         initial_state: EpisodePhysicsState,
+        capture_static_world_children: bool = True,
     ) -> None:
         self._physics = physics
         self._scheduler = scheduler
@@ -59,11 +60,17 @@ class GeoPhysRuntimeBoundary:
         self._ctrl_range = np.asarray(ctrl_range, dtype=np.float32).copy()
         self._actuator_force_limit_overrides: dict[int, float] = {}
         self._simulation_time = 0.0
-        (self._static_world_child_body_ids,
-         self._baseline_static_world_child_positions,
-         self._baseline_static_world_child_orientations) = (
-            self._physics.read_static_world_child_body_poses()
-        )
+        self._capture_static_world_children = bool(capture_static_world_children)
+        if self._capture_static_world_children:
+            (self._static_world_child_body_ids,
+             self._baseline_static_world_child_positions,
+             self._baseline_static_world_child_orientations) = (
+                self._physics.read_static_world_child_body_poses()
+            )
+        else:
+            self._static_world_child_body_ids = np.empty(0, dtype=np.int32)
+            self._baseline_static_world_child_positions = np.empty((0, 3), dtype=np.float64)
+            self._baseline_static_world_child_orientations = np.empty((0, 4), dtype=np.float64)
         self._baseline = {
             name: np.asarray(value).copy()
             for name, value in self._physics.snapshot().items()
@@ -86,6 +93,10 @@ class GeoPhysRuntimeBoundary:
         refresh_actuator_force: bool = False,
         static_world_child_poses: Mapping[int, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> ActuatorForceMeasurementV1 | None:
+        if static_world_child_poses and not self._capture_static_world_children:
+            raise StageUnavailableError(
+                "static world-child reset overrides require an articulated runtime boundary"
+            )
         self._physics.restore(self._baseline)
         self._apply_actuator_force_limit_overrides()
         if self._static_world_child_body_ids.size:

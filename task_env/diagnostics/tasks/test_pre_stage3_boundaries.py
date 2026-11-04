@@ -163,3 +163,34 @@ def test_leaf_action_compatibility_exports_use_controller_owned_types():
 
     assert old_attached is AttachedLeafActionSetV1
     assert old_leaf is LeafPositionActionSetV1
+
+
+def test_static_boundary_skips_unavailable_articulated_pose_reader_and_rejects_override():
+    import numpy as np
+    from task_env.environment import EpisodePhysicsState, StageUnavailableError
+    from task_env.runtime.boundary import GeoPhysRuntimeBoundary
+
+    class StaticPhysics:
+        n_actuators = 0
+        restores = 0
+        def read_static_world_child_body_poses(self):
+            raise AssertionError('static route must not ask for articulated pose fields')
+        def snapshot(self):
+            return {'marker': np.array([1.0])}
+        def restore(self, _state):
+            self.restores += 1
+        def synchronize_kinematic_state(self, **_kwargs):
+            pass
+
+    physics = StaticPhysics()
+    empty = np.zeros(0, dtype=np.float32)
+    state = EpisodePhysicsState(empty, empty, empty, empty, empty)
+    boundary = GeoPhysRuntimeBoundary(
+        physics=physics, scheduler=SimpleNamespace(), physics_dt=0.002,
+        ctrl_range=np.empty((0, 2)), initial_state=state,
+        capture_static_world_children=False,
+    )
+    restores = physics.restores
+    with pytest.raises(StageUnavailableError, match='static world-child reset overrides'):
+        boundary.apply_reset_state(state, static_world_child_poses={0: (np.zeros(3), np.ones(4))})
+    assert physics.restores == restores

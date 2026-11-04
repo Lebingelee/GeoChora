@@ -87,6 +87,13 @@ def bootstrap_task_runtime(
         physics_dt=config.runtime.physics_dt,
         ctrl_range=compiled.scene_model.joint_data.get("actuator_ctrlrange"),
         initial_state=initial_state,
+        # A zero-DOF static scene has no task reset sampler or writable
+        # articulated placement. Its baseline is the public snapshot; the
+        # provider's articulated body-pose reader is unavailable there.
+        capture_static_world_children=(
+            int(compiled.scene_model.joint_data.get("n_dof", 0)) > 0
+            or reset_sampler is not None
+        ),
     )
     if config.runtime.prewarm:
         boundary.prewarm()
