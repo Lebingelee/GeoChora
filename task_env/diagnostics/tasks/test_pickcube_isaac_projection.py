@@ -180,8 +180,6 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         controller_profile='r3_continuous_v1',
         source_delivery_manifest=manifest,
     )
-    assert callable(binding.position_execution_info)
-    assert binding.position_execution_info_key == 'pickcube_position_execution_info_v1'
     with patch('task_env.tasks.pick_cube.specialization.build_isaac_reference',
                return_value={'construction': 'external'}) as build:
         result = binding.build_external('isaacsim')
@@ -335,11 +333,9 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
     from types import SimpleNamespace
 
     from task_env.tasks.reference_env import SelectedReferenceEnv
-    from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     def env_for_opening(opening_m):
         env = object.__new__(SelectedReferenceEnv)
-        env.binding = make_reference_binding(source_delivery_manifest='fixture-manifest')
         env.position_profile = True
         env.value = {'f06_pickcube_isaac_input': object()}
         env.state = SimpleNamespace(
@@ -362,11 +358,6 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
     assert info.measured_opening_m == 0.0
     assert info.target_opening_m == 0.08
     assert not info.close_ready
-
-    env = env_for_opening(0.04)
-    published = {}
-    env._publish_position_execution_info(published)
-    assert published['pickcube_position_execution_info_v1'] == env.expert_execution_info().to_mapping()
 
     with pytest.raises(ValueError, match='measured_opening_m=-1.000001e-06'):
         env_for_opening(-1.000001e-6).expert_execution_info()

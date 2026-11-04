@@ -464,31 +464,6 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def _position_execution_info(env):
-    """Project PickCube's measured gripper readiness at a Position boundary."""
-    from .solution import PickCubePositionExecutionInfoV1
-
-    positions = env.state.joint_position
-    velocities = env.state.joint_velocity
-    measured = float(sum(float(positions[f'panda-v1/finger_joint{index}'])
-                         for index in (1, 2)))
-    # Normalize only the submicrometer lower-limit residue observed in PhysX.
-    if -1e-6 <= measured < 0.0:
-        measured = 0.0
-    measured_speed = float(sum(abs(float(velocities[f'panda-v1/finger_joint{index}']))
-                               for index in (1, 2)))
-    target = measured
-    if env.last_position_transition is not None:
-        target = float(env.last_position_transition[1].target.gripper.opening_m)
-    ready = bool(target <= 0.045 and measured <= 0.045 and measured_speed <= 0.005)
-    result = PickCubePositionExecutionInfoV1(
-        'pickcube-position-execution-info-v1', int(env.state.control_step),
-        float(env.state.simulation_time), measured, measured_speed, target, ready,
-    )
-    result.validate()
-    return result
-
-
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None):
@@ -545,9 +520,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             else "grouped"
         ),
         recorder_mode="canonical",
-        position_execution_info=_position_execution_info if source_delivery_manifest is not None else None,
-        position_execution_info_key=("pickcube_position_execution_info_v1"
-                                     if source_delivery_manifest is not None else None),
         reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
         observe_expert_kwargs=lambda env, guard_samples: {"execution_info": env.expert_execution_info()},
     )
