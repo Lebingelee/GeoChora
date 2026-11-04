@@ -191,3 +191,9 @@ F05三条Session准入、DG04合成IO上下文和GeoPhys／Isaac native adapter�
 selected轨迹重执行现由调用方执行Solution的 `act → env.step(action) → observe`，并核对构造出的Solution身份；生产调用链不再调用 `step_expert()`。重执行对记录中存在的动作转换、动作space、观测投影和观测space来源，逐项核对实际binding的源码文件摘要，旧记录中不存在的字段不补造。PickCube和新Nut调用方录制均经禁止旧入口的合成测试；旧Nut专家录制的诊断契约不同，在创建输出前明确拒绝该重执行，原记录保留，不将其重标为调用方录制。历史重执行能力因此有明确收窄，不能把拒绝视为物理差异判断。
 
 受监督、禁止引擎导入的selected／R05b／录制组 **150 passed、2 deselected**，最大进程树RSS 210403328 bytes；命令、退出码、资源采样和输出保存在ignored `caller-replay-selected/`。排除真实provider／scene，本次未运行真实引擎、Isaac、GPU或物理reader，旧物理证据不重标。
+
+## Position切换记录投影归位（续作，待复审）
+
+Position Controller切换事件及提交后记录失败的凭据由既有 `recorders.position_metadata` 构造；Env仍负责活跃边界准入、runtime准备和提交、事件校验／写入、指针发布及故障锁定。记录字段和提交顺序保持，合成调用覆盖提交成功与提交后记录失败，确认失败时保留已提交Controller身份、不发布pending且保留故障凭据。该改动只是职责整理的一部分，不代表环境类或runtime接线已全部归位。
+
+受监督、禁止引擎导入的selected／R05b／录制／Position切换组合 **154 passed、17 deselected**，最大进程树RSS 207585280 bytes；完整命令、退出码、资源采样和输出保存在ignored `switch-projection-selected/`。最初直接运行Position切换全组时，15项依赖真实 `scene` 的测试被禁引擎guard拦截、2项通过；随后明确排除这些依赖后运行上述组合，不能将被排除项算作通过。未运行真实引擎、Isaac、GPU或物理reader；本次源码与旧物理证据身份不同。

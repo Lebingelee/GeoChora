@@ -2443,48 +2443,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             joint_bindings=self.position_joint_bindings,
             frame_bindings=self.position_frame_bindings,
         )
-        from dataclasses import asdict
-        from ..trajectory.canonical.episode import BoundaryEventV1
+        from ..recorders.position_metadata import position_switch_event
 
         switch_id = uuid4().hex
-        event = BoundaryEventV1(
-            'boundary-event-v1', boundary.episode_id, recorder.transition_count,
-            recorder.next_boundary_event_sequence(recorder.transition_count),
-            f'controller-switch-{switch_id}', 'controller_instance_switch',
-            'task_env.selected_reference.position_servo_v1',
-            {
-                'switch_id': switch_id,
-                'request': {
-                    'operation': 'replace_position_controller_instance',
-                    'requested_profile_id': candidate.profile_id,
-                    'requested_writer_id': candidate.writer_id,
-                    'requested_controller_identity': candidate.identity,
-                    'action_config': asdict(candidate.config),
-                },
-                'previous_controller': {
-                    'profile_id': current.profile_id,
-                    'writer_id': current.writer_id,
-                    'controller_identity': current.identity,
-                    'action_config': asdict(current.config),
-                },
-                'effective_controller': {
-                    'profile_id': candidate.profile_id,
-                    'writer_id': candidate.writer_id,
-                    'controller_identity': candidate.identity,
-                    'action_config': asdict(candidate.config),
-                },
-                'result': {
-                    'preparation': 'validated',
-                    'switch': 'effective',
-                    'first_control_application': 'pending_next_step',
-                },
-                'effective_boundary': {
-                    **boundary.to_mapping(), 'boundary_id': boundary.boundary_id,
-                },
-                'effective_clock': clock.to_mapping(),
-                'binding_identity_hash': self.position_plan.identity_hash,
-                'source_closure_digest': self.value['source'].source_closure_digest,
-            },
+        event = position_switch_event(
+            switch_id=switch_id, boundary=boundary, clock=clock,
+            transition_count=recorder.transition_count,
+            sequence=recorder.next_boundary_event_sequence(recorder.transition_count),
+            current=current, candidate=candidate,
+            binding_identity=self.position_plan.identity_hash,
+            source_closure=self.value['source'].source_closure_digest,
         )
         event.validate()
         recorder.validate_boundary_event(event)
@@ -2529,40 +2497,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 interval_attempted=False, interval_completed=False,
                 transition_status='not_assessed', readback_error=readback_error,
             )
-            self._position_controller_switch_fault_receipt = {
-                'switch_id': switch_id,
-                'result': 'committed_but_effective_event_record_failed',
-                'request': {
-                    'operation': 'replace_position_controller_instance',
-                    'requested_profile_id': candidate.profile_id,
-                    'requested_writer_id': candidate.writer_id,
-                    'requested_controller_identity': candidate.identity,
-                    'action_config': asdict(candidate.config),
-                },
-                'previous_controller': {
-                    'profile_id': current.profile_id,
-                    'writer_id': current.writer_id,
-                    'controller_identity': current.identity,
-                    'action_config': asdict(current.config),
-                },
-                'effective_controller': {
-                    'profile_id': candidate.profile_id,
-                    'writer_id': candidate.writer_id,
-                    'controller_identity': candidate.identity,
-                    'action_config': asdict(candidate.config),
-                },
-                'previous_controller_identity': current.identity,
-                'active_controller_identity': self.controller.identity,
-                'effective_boundary': {
-                    **boundary.to_mapping(), 'boundary_id': boundary.boundary_id,
-                },
-                'effective_clock': clock.to_mapping(),
-                'preparation_succeeded': True,
-                'switch_effective': True,
-                'effective_event_recorded': False,
-                'first_control_application': 'not_attempted',
-                'execution_fault': fault.to_mapping(),
-            }
+            from ..recorders.position_metadata import position_switch_fault_receipt
+            self._position_controller_switch_fault_receipt = position_switch_fault_receipt(
+                switch_id=switch_id, boundary=boundary, clock=clock,
+                current=current, candidate=candidate,
+                active_controller_identity=self.controller.identity, fault=fault,
+            )
             raise
         return event
 

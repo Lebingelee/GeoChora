@@ -1,9 +1,67 @@
 """Project selected Position reset and transitions into the existing recorder schema."""
 
 import hashlib
+from dataclasses import asdict
 
 import numpy as np
 from ..environment.reference_binding import position_input_kind
+
+
+def _switch_controller_payload(controller, *, requested=False):
+    prefix = 'requested_' if requested else ''
+    return {
+        f'{prefix}profile_id': controller.profile_id,
+        f'{prefix}writer_id': controller.writer_id,
+        f'{prefix}controller_identity': controller.identity,
+        'action_config': asdict(controller.config),
+    }
+
+
+def position_switch_event(*, switch_id, boundary, clock, transition_count, sequence,
+                          current, candidate, binding_identity, source_closure):
+    """Build the recorded switch event without changing runtime or recorder state."""
+    from ..trajectory.canonical.episode import BoundaryEventV1
+
+    return BoundaryEventV1(
+        'boundary-event-v1', boundary.episode_id, transition_count, sequence,
+        f'controller-switch-{switch_id}', 'controller_instance_switch',
+        'task_env.selected_reference.position_servo_v1',
+        {
+            'switch_id': switch_id,
+            'request': {'operation': 'replace_position_controller_instance',
+                        **_switch_controller_payload(candidate, requested=True)},
+            'previous_controller': _switch_controller_payload(current),
+            'effective_controller': _switch_controller_payload(candidate),
+            'result': {'preparation': 'validated', 'switch': 'effective',
+                       'first_control_application': 'pending_next_step'},
+            'effective_boundary': {**boundary.to_mapping(), 'boundary_id': boundary.boundary_id},
+            'effective_clock': clock.to_mapping(),
+            'binding_identity_hash': binding_identity,
+            'source_closure_digest': source_closure,
+        },
+    )
+
+
+def position_switch_fault_receipt(*, switch_id, boundary, clock, current, candidate,
+                                  active_controller_identity, fault):
+    """Describe a committed switch whose effective event could not be recorded."""
+    return {
+        'switch_id': switch_id,
+        'result': 'committed_but_effective_event_record_failed',
+        'request': {'operation': 'replace_position_controller_instance',
+                    **_switch_controller_payload(candidate, requested=True)},
+        'previous_controller': _switch_controller_payload(current),
+        'effective_controller': _switch_controller_payload(candidate),
+        'previous_controller_identity': current.identity,
+        'active_controller_identity': active_controller_identity,
+        'effective_boundary': {**boundary.to_mapping(), 'boundary_id': boundary.boundary_id},
+        'effective_clock': clock.to_mapping(),
+        'preparation_succeeded': True,
+        'switch_effective': True,
+        'effective_event_recorded': False,
+        'first_control_application': 'not_attempted',
+        'execution_fault': fault.to_mapping(),
+    }
 
 
 def pending_controller_switch_receipt(pending, *, published_step, execution_fault,
