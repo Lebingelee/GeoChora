@@ -347,3 +347,10 @@ reader脚本SHA为 `6adb10b8659aaab43941e34dbd0c726fa57bc7cff7c9d32db122ae88cd9c
 对既有输出进行目录占用复核时发现，attempt001与本续作目录合计 `du -sb` 10031264898 bytes（约9.34 GiB），超过交接包2 GiB总新输出上限；其中续作目录9758553641 bytes，主要为12组约740 MiB的pytest F04临时资产副本。此前没有及时执行总量核查，是本次执行的资源管理失误；目录占用不是累计写入字节的完整审计。冻结输入、历史raw、日志和临时副本均未删除，G0此项记 **FAIL**，不能通过清理将历史超限改写为合规。现已暂停大体量输出及native运行，维护者尚未决定是否调整输出预算。
 
 在发现该问题前，以tracked clean `dc95e1d9ecd994354944a9fa26de9ef408e82b53` 对PickCube seed31／horizon1000和Nut seed19／horizon6000进行不导入引擎的纯构造预检：两者控制substeps均为5，外部Solution身份与环境声明一致；预检不执行reset、物理或reader。按已登记的115807／120000步预留，两个完整回归还需35000步预留，需追加至少30807步；维护者尚未答复。预检、备选argv及来源检查脚本保存在ignored `physical-gate-preflight-dc95e1d9/`，不构成运行授权。其计划将worker的输出目录与cwd合并以覆盖H5，再对每个reader单独限额；实际执行前仍须以维护者确认的总额度和实际HEAD重新核算、锁定来源。
+
+
+## 输出构成的只读核对（等待维护者决定）
+
+未删除或改写数据，按测试目录结构核对到12组各含6个F04篡改测试目录，常规文件合计9274170371 bytes（约8.64 GiB）。测试源码 `test_f04_local_delivery_tampering_fails_core_loader` 先对冻结delivery执行 `shutil.copytree`，再在复制目标上追加篡改；抽查 `usd-identity-f04-v2-tmp` 的第一项，其副本确为原始recipe追加测试标记，所读取原件SHA为 `158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558`。该抽查未逐一比对所有副本，不把任意目录自动认定为可删除。
+
+同一组既有supervisor记录的输出峰值仅12 bytes，因为pytest `--basetemp` 位于supervisor `--output-dir` 之外；其约737 MiB临时目录未受该单次输出采样约束。这解释了此前为何未在单次监控中发现总量超限，不减轻实际G0失败。后续物理计划的受监控目录已覆盖H5，仍须维护者决定输出额度及物理步追加，执行前复核总量和当前源码；当前未启动物理。
