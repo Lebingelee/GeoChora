@@ -1196,7 +1196,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         execution_info = self.expert_execution_info() if execution_info is None else execution_info
         source = self.value['source']
         source_id = source.scene_source.source_id
-        source_xml_sha256 = hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
+        xml = source.scene_source.xml
+        cached = getattr(self, '_boundary_xml_snapshot', None)
+        if cached is None or cached[0] != xml:
+            cached = (xml, hashlib.sha256(xml.encode()).hexdigest())
+            self._boundary_xml_snapshot = cached
+        source_xml_sha256 = cached[1]
         values = {
             'schema_version': 'selected-expert-boundary-v1',
             'episode_id': self._selected_episode_id,
