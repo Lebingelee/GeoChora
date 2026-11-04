@@ -459,6 +459,27 @@ def test_metadata_ownership_is_per_environment():
     a.close();b.close()
 
 
+def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        solution = build_readiness_solution()
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata, execution_info=env.expert_execution_info())
+        proposal = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(proposal.action)
+        solution.observe(obs, reward, terminated, truncated, info,
+                         execution_info=env.expert_execution_info())
+        assert env._episode_mode == 'external'
+        assert env._external_solution_owner is None and env.solution is None
+        assert env.state.control_step == 1 and not solution.failed
+        assert info['control_application_v1']['applied_target_hash'] == (
+            info['control_application_v1']['target_identity_hash'])
+    finally:
+        env.close()
+
+
 def test_c05b_public_solution_lifecycle_and_control_ack_match_internal(fake, tmp_path):
     from task_env.planners.completion import ExpertExecutionInfo
     from task_env.tasks.pick_cube import build_readiness_solution
