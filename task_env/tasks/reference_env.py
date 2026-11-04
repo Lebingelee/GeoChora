@@ -3928,6 +3928,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'native_public_bootstrap_receipt': bootstrap,
                 'solution_identity': self._active_solution_identity(),
                 'tcp_semantic_frame': 'panda-v1/ee',
+                'recording_provenance_schema': 'pickcube-isaac-replay-provenance-v1',
+                'task_seed': f06_input.reset_plan.reset_sample.task_seed,
+                'reset_plan_v1': f06_input.reset_plan.to_mapping(),
+                'execution_spec_v1': f06_input.execution.to_mapping(),
+                'source_revision': self.value['source_revision'],
+                'source_sha256': dict(self.value['source_sha256']),
+                'task_recipe': self.value['resolved_configuration']['task_recipe'],
             })
         universal_components = tuple(action_schema.components)
         if self.dual_entity_position:

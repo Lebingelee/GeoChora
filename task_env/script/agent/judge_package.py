@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 import sys
+import subprocess
 import yaml
 
 from harness_spec_schema import CandidateSpec, CheckReport, save_json
@@ -113,6 +114,7 @@ def check_v3_oracle(directory, details, summary, spec_hash, artifact_hash, core_
     compiled=worker.get('compiled') or {}
     identity=facts.get('recording_identity') or {}
     profile=records['env_meta']['reference_profile']
+    check_v3_recorded_provenance(directory,profile,details,compiled,spec_hash,core_commit)
     require(worker.get('mode')=='oracle' and worker.get('provider')==provider
         and worker.get('seed')==details['seed']==identity.get('seed'), 'Oracle native seed/provider mismatch')
     require(worker.get('core_commit')==core_commit and worker.get('core_dirty') is False
@@ -170,6 +172,50 @@ def check_v3_oracle(directory, details, summary, spec_hash, artifact_hash, core_
         'Oracle storage checks missing/failed')
     require(summary.get('storage_roundtrip')=='PASS' and summary.get('provider_provenance_present') is True
         and summary.get('source_provenance_present') is True,'Oracle v3 readback/provenance missing')
+
+
+def check_v3_recorded_provenance(directory, profile, details, compiled, spec_hash, core_commit):
+    """Bind receipts to immutable H5 declarations and Git source bytes."""
+    from task_env.artifacts import ExecutionSpecV1
+    from task_env.artifacts.execution import EpisodeResetPlanV1
+    require(profile.get('recording_provenance_schema')=='pickcube-isaac-replay-provenance-v1',
+        'Oracle v3 recorded replay provenance missing; regenerate this historical recording')
+    plan=EpisodeResetPlanV1.from_mapping(profile['reset_plan_v1'])
+    execution=ExecutionSpecV1.from_mapping(profile['execution_spec_v1'])
+    require(type(details['seed']) is int and details['seed']>=0
+        and profile.get('task_seed')==details['seed']==plan.reset_sample.task_seed
+        ==execution.provider_seed,'Oracle recorded task seed mismatch')
+    require(plan.identity_hash==profile.get('reset_plan_identity_hash')
+        and plan.reset_sample.sample_id==profile.get('reset_sample_id')
+        and plan.reset_sample.task_artifact_hash==compiled.get('artifact_hash')
+        and plan.role_binding.scene_identity_hash==profile.get('scene_identity_hash'),
+        'Oracle recorded reset plan identity mismatch')
+    require(execution.identity_hash==profile.get('execution_identity_sha256')
+        and execution.physics_provider==profile.get('provider')
+        and execution.physics_backend==profile.get('backend')
+        and execution.physics_device==profile.get('device'), 'Oracle recorded ExecutionSpec mismatch')
+    require(profile.get('source_revision')==core_commit,'Oracle recorded Core revision mismatch')
+    require(profile.get('source_sha256')==compiled.get('source_sha256'),
+        'Oracle recorded source snapshot identity mismatch')
+    spec=CandidateSpec.load(Path(directory)/'candidate.spec.json')
+    require(spec.spec_sha256()==spec_hash,'Oracle recorded candidate spec mismatch')
+    overlay=(compiled.get('route') or {}).get('harness_task_config_recipe_overlay') or {}
+    recipe=(profile.get('task_recipe') or {}).get('recipe') or {}
+    require(overlay.get('artifact_id')==recipe.get('artifact_id')
+        and recipe.get('artifact_id','').endswith('/spec-'+spec_hash)
+        and all(recipe.get(key)==overlay.get(key) for key in ('reset','success')),
+        'Oracle recorded task recipe mismatch')
+    repo=Path(__file__).resolve().parents[3]
+    for name,sha in {**profile['source_sha256'],**details['tool_sha256']}.items():
+        if name in ('f06_delivery_manifest_sha256','f06_delivery_source_entry_sha256'):
+            continue
+        path=Path(name)
+        require(not path.is_absolute() and '..' not in path.parts,'unsafe Oracle Git source path')
+        relative=name if '/' in name else 'task_env/script/agent/'+name
+        result=subprocess.run(['git','-C',str(repo),'show',core_commit+':'+relative],
+            capture_output=True,check=False)
+        require(result.returncode==0 and hashlib.sha256(result.stdout).hexdigest()==sha,
+            f'Oracle source bytes differ from recorded Core commit: {name}')
 
 
 def check_asset_binding(spec, upstream, provider):

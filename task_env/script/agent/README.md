@@ -194,6 +194,11 @@ receipts, reset/execution/source/controller/Expert identities, source snapshots,
 T/T+1, explicit outcome, and successful environment/App/process-group closure.
 The recorded `external_stop` outcome and loop-level Expert completion remain
 separate; v3 readback does not claim canonical equality, D0/D1/D2 or approval.
+New Isaac v3 recordings also embed the actual Task seed, complete typed reset
+plan and ExecutionSpec, task recipe, Core revision and source digests in the
+existing recording metadata. The verifier recomputes typed identities and
+matches source snapshots to Git blobs at that exact commit. Earlier v3 H5 files
+remain readable but cannot be promoted without this recorded provenance.
 All checks, ledger and Oracle must still bind the same clean Core commit.
 Reserve a real construction round before fresh checks; historical campaigns
 without reservations cannot be retroactively assigned a ledger.
