@@ -7,6 +7,15 @@ import numpy as np
 from ..environment.reference_binding import position_input_kind
 
 
+def position_control_binding_provenance(binding, selector):
+    """Snapshot the materialized Position binding and selector file for this recording."""
+    from .reference_provenance import callable_source_snapshot
+    return {
+        'binding': asdict(binding),
+        'selector_source_sha256': callable_source_snapshot(selector),
+    }
+
+
 def _switch_controller_payload(controller, *, requested=False):
     prefix = 'requested_' if requested else ''
     return {

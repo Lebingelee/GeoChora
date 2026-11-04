@@ -203,3 +203,9 @@ Position Controller切换事件及提交后记录失败的凭据由既有 `recor
 环境不再为Position及leaf路线选择Panda夹爪名称或构造固定0.08 m映射；PickCube、普通／版本候选、双实体候选及attached-leaf各自在binding声明原有 `ControlBinding`，环境在materialization前要求selector返回精确类型。0.08 m仍是现有控制owner的唯一已审计映射，不宣称新增夹爪能力。内部 `ReferenceTaskBinding.position_gripper_binding` 改为 `position_control_binding`，原本自行构造该内部binding的调用方须迁移；仓库当前调用者已同步。
 
 PickCube specialization的源码SHA由 `101b68d9ae6876f90c2ef10a7f21cd025489f76aac5384938157a2f82ca28770` 变为 `ef9e5ddec299bac2fc00eda05cfbd11a79f58b285fb341a6aca74fc5d1d44a08`；新构造时按新源码取来源，不把旧运行重标。受监督无引擎selected／R05b／F06投影／录制组合 **151 passed、2 deselected**，包含F06 binding缺失及错误类型在runtime创建前拒绝，最大RSS 213626880 bytes；attached-leaf／mixed假provider组合 **13 passed**，最大RSS 160727040 bytes。日志及资源采样见ignored `position-binding-selected/`与 `position-binding-mixed/`。另一次直接运行F06投影时有1项因导入真实 `scene` 被guard拦截，未计通过；上述排除项包含对应真实scene测试。未运行真实引擎、Isaac、GPU或物理reader。
+
+## Position控制绑定的录制来源（续作，待复审）
+
+Position materialization成功后保留实际传入的 `ControlBinding` 和selector，v3录制开始时由recorder owner将绑定值及该selector声明文件的SHA-256写入 `resolved_config.position_control_binding_provenance`，经现有H5 `env_cfg` 保存。reset之后替换任务binding不会把新selector误记为当前session实际使用者；源码摘要是录制开始时磁盘字节，不单独证明加载代码或闭包内容与文件一致。摘要无法读取时在发布recorder前失败，可修复后重试。旧H5无该字段仍保留原身份，Position v3重执行仍不支持。
+
+受监督无引擎selected／R05b／F06投影／录制组合 **151 passed、2 deselected**，最大RSS 213962752 bytes；attached-leaf／mixed假provider组 **14 passed**，最大RSS 165650432 bytes，包含64步合成H5写入及独立读取。其后仅将来源投影函数归入recorder owner，相关定向检查 **1 passed**；组合日志对应归位前的源码，不重标为最终diff。日志与资源采样见ignored `position-binding-provenance-selected/`和 `position-binding-provenance-mixed/`。首次单步写回尝试被R03c reader要求64步的契约拒绝，调整为64个合成interval后通过；另一次读取尝试误用v1元数据路径，改用实际v3公开inspect入口后通过。未运行真实引擎、Isaac、GPU或物理reader。

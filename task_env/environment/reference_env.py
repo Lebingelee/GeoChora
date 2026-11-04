@@ -1652,6 +1652,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         controller_profile=self.position_profiles,
                         session_admission_input=self.value.get('session_admission_input'),
                     )
+                # Preserve what was actually materialized; the task binding can
+                # later be replaced independently of this live session.
+                self._materialized_position_control_binding = position_binding
+                self._materialized_position_control_selector = select_binding
             elif self._mixed_control_candidate:
                 self.position_profile = False
                 self.session = materialize(
@@ -3650,9 +3654,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     else RecorderConfig().max_buffer_bytes
                 ),
             ))
-            recorder.begin_episode(
-                self.obs, dict(self._position_reset_info), self._position_record_metadata(),
+            from ..recorders.position_metadata import position_control_binding_provenance
+            record_metadata = self._position_record_metadata()
+            record_metadata['resolved_config']['position_control_binding_provenance'] = (
+                position_control_binding_provenance(
+                    self._materialized_position_control_binding,
+                    self._materialized_position_control_selector,
+                )
             )
+            recorder.begin_episode(self.obs, dict(self._position_reset_info), record_metadata)
             self.recording_path = path
             self.recorder = recorder
             return
