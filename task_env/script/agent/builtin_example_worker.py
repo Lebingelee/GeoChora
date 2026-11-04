@@ -236,11 +236,7 @@ def _terminate_isaac_worker(exit_code: int) -> None:
 def _install_action_trace(env, path: Path):
     """Capture the public expert proposal and state around each step attempt."""
     capture = {'attempted': 0, 'completed': 0, 'rows': []}
-    position_route = (
-        bool(getattr(env, 'position_profile', False))
-        and getattr(env, 'value', {}).get('f06_pickcube_isaac_input') is not None
-    )
-    original_step = env._step_position_profile if position_route else env._step
+    original_step = env.step
 
     def pose(state, name):
         value = getattr(state, 'pose_world', {}).get(name)
@@ -266,18 +262,10 @@ def _install_action_trace(env, path: Path):
             'rows': capture['rows'],
         })
 
-    def observed_step(action, *, proposal=None, observer_solution=None):
+    def observed_step(proposal):
         capture['attempted'] += 1
         state = env.state
-        if position_route:
-            groups = {(group.entity_id, group.group_id): group for group in action.groups}
-            entity_id = env.position_profiles[0].entity_id
-            values = tuple(float(value) for value in (
-                *groups[(entity_id, 'arm')].values,
-                *groups[(entity_id, 'gripper')].values,
-            ))
-        else:
-            values = tuple(float(value) for value in action)
+        values = tuple(float(value) for value in proposal.action)
         proposal_diagnostics = dict(getattr(proposal, 'diagnostics', {}))
         row = {
             'attempt': capture['attempted'],
@@ -297,7 +285,7 @@ def _install_action_trace(env, path: Path):
             'task_metrics_before': dict(getattr(env, 'info', {}).get('task_metrics', {})),
         }
         try:
-            result = original_step(action, proposal=proposal, observer_solution=observer_solution)
+            result = original_step(proposal)
         except BaseException as error:
             row.update(error={'type': type(error).__name__, 'message': str(error)})
             fault = getattr(env, 'execution_fault', None)
@@ -326,15 +314,12 @@ def _install_action_trace(env, path: Path):
             write_trace()
         return result
 
-    if position_route:
-        env._step_position_profile = observed_step
-    else:
-        env._step = observed_step
+    env.step = observed_step
     return capture, write_trace
 
 
 def run_one(spec, catalog, scope, *, seed: int, output: Path):
-    from examples._common import run_expert
+    from examples._common import run_caller_solution
     from task_env.trajectory.canonical.h5 import load as load_canonical
 
     output = _prepare_output_directory(output)
@@ -412,7 +397,11 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         if app_owner is not None:
             app_owner.open()
             row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
-        _, reset_info = env.reset(seed=seed)
+        observation, reset_info = env.reset(seed=seed)
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value['solution_identity']:
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(observation, reset_info, env.metadata)
         row['reset_succeeded'] = True
         row['reset_sample'] = {
             'task_seed': env.sample.task_seed,
@@ -430,9 +419,8 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         env.start_recording(h5)
         recording_started = True
         execution_phase = 'solution_execution'
-        episode = run_expert(
-            env, seed=seed, horizon=spec.horizon_control_ticks,
-            already_reset=True, initial_info=reset_info,
+        episode = run_caller_solution(
+            env, solution, observation, reset_info, horizon=spec.horizon_control_ticks,
         )
         row['episode'] = episode
         row.update(

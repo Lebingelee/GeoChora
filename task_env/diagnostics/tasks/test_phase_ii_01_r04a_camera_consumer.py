@@ -640,7 +640,8 @@ def test_post_step_camera_observation_failure_keeps_progress_fault_and_closes_on
 
 
 @pytest.mark.parametrize('recorder_fails', [False, True])
-def test_position_interval_publishes_only_after_recorder_succeeds(monkeypatch, recorder_fails):
+@pytest.mark.parametrize('caller_driven', [False, True])
+def test_position_interval_publishes_only_after_recorder_succeeds(monkeypatch, recorder_fails, caller_driven):
     from types import SimpleNamespace
     from task_env.environment.lifecycle import EpisodeExecutionState
     from task_env.runtime.sessions import control as control_sessions
@@ -680,13 +681,24 @@ def test_position_interval_publishes_only_after_recorder_succeeds(monkeypatch, r
             raise RuntimeError('injected recorder failure')
 
     monkeypatch.setattr(position_metadata, 'record_position_transition', record)
+    if caller_driven:
+        from task_env.controllers.canonical.contracts import ControlGroupActionV1, StructuredActionRequestV1
+        monkeypatch.setattr(control_sessions, 'prepare_structured_action', lambda *_args: ())
+        group = ControlGroupActionV1('control-group-action-v1', 'robot', 'arm', 'pose-v1', (0.0,))
+        request = StructuredActionRequestV1('structured-action-request-v1', 'a' * 64, 'b' * 64, (group,))
+        def run_interval():
+            operations = env._prepare_position_profile(request, proposal=object(), caller_driven=True)
+            return env._episode_execution_state().execute_interval(**operations)
+    else:
+        def run_interval():
+            return env._step_position_profile(object())
     if recorder_fails:
         with pytest.raises(RuntimeError, match='injected recorder failure'):
-            env._step_position_profile(object())
+            run_interval()
         assert env.execution_fault.phase == 'record_position_transition'
         assert env._published_position_typed_state is old_publication
     else:
-        assert env._step_position_profile(object())[1:4] == (1.0, False, False)
+        assert run_interval()[1:4] == (1.0, False, False)
         assert env._published_position_typed_state is new_publication
     assert calls == [True]
 

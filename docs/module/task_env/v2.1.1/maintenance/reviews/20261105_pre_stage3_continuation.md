@@ -79,3 +79,9 @@ PickCube readiness Solution在调用方提供公开info时将当前source bounda
 源码 `f9cb51fd5315d36ead7b8ac2c87a1c5a29389a7d`，MuJoCo CPU seed31／horizon1000／R3，调用方驱动Solution路径再次完成960个transition、task success及Solution completion；H5 SHA-256 `264b35a9f08e754287957d8d7271be072bc5c06157d3755e80b155b9a2896763`。独立reader PASS：960 transitions／961 boundaries、0.01 s control_dt及target/applied ack一致；native substep未记录，D0和Qualification未评估。worker约11.73秒，进程组退出并释放两把共享锁。输出和完整资源／锁收据在ignored `native/pickcube-boundary/`及 `native/pickcube-boundary-reader/`。此前 `d61fd168` 结果仍保留原身份。
 
 本次按horizon保守追加5000原生步，与原attempt001预留105107、上次PickCube预留5000及三个classic单步一起记账；即使不计classic，原120000步上限仅剩4893步。Nut完整horizon6000需预留30000步，已请求维护者明确新预算；未收到答复前不运行该回归。
+
+## PickCube Position调用方动作与内建Harness（续作，待复审）
+
+PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投影为结构化请求，校验任务Solution身份、公开state boundary与当前typed state；实际控制计划继续原有完整预检。Position episode owner负责推进、故障、发布和记录，调用方负责 `Solution.observe()`；不让Env在新路径中调用Solution。内建PickCube Harness的trace改为包装公开 `env.step()`，并由调用方驱动Solution。普通scalar CPU及旧 `step_expert()` 兼容路径保留。
+
+无引擎组合 **131 passed、1 skipped、1 deselected**，包含合成Position请求与错误边界／身份／维度拒绝、调用方Position的record成功／失败发布边界及Harness trace；真实F06场景投影被排除；1项Isaac解释器help测试因本checkout未配置其冻结解释器而跳过，未启动Isaac或GPU。完整argv与输出在ignored `position-harness-final.json`及相邻日志。宽组首次 **130 passed、1 skipped、1 failed、1 deselected**：失败的旧R3测试要求4 rad/s，与维护者已接收的当前Nut对齐2 rad/s配置冲突；在本修改输入 `cb01ff45` 复跑同样失败，现根据实际版本化profile补齐全部固定参数断言后通过。合成结果不授予Isaac能力或物理成功；此源码改动后此前PickCube物理结果保留原commit身份，Sol复审与最终适用回归仍需完成。

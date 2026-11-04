@@ -780,7 +780,8 @@ def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_p
         proposal = solution.act(obs, info)
         from task_env.environment.types import StageUnavailableError
         env.position_profile = True
-        with pytest.raises(StageUnavailableError, match='unavailable on Position profiles'):
+        env.position_profiles = ()
+        with pytest.raises(StageUnavailableError, match='unavailable on this Position profile'):
             env.step(proposal)
         assert env.state.control_step == 0
         env.position_profile = False
@@ -803,6 +804,49 @@ def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_p
         assert info['control_application_v1']['applied_target_hash'] == (
             info['control_application_v1']['target_identity_hash'])
     finally:
+        env.close()
+
+
+def test_pickcube_position_caller_prepares_bound_request_without_solution_callback(fake, monkeypatch):
+    from dataclasses import replace
+    from types import SimpleNamespace as NS
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        obs, info = env.reset(seed=19)
+        solution = build_readiness_solution()
+        solution.reset(obs, info, env.metadata)
+        boundary = {'schema_version': 'synthetic-boundary', 'boundary_id': 'boundary-0'}
+        info = {**info, 'state_boundary_identity': boundary}
+        info.pop('expert_execution_boundary_v1')
+        proposal = solution.act(obs, info)
+        env.info = info
+        env.position_profile = True
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: boundary)))
+        env.position_scene = NS(identity_hash='a' * 64)
+        env.position_plan = NS(identity_hash='b' * 64)
+        env.position_profiles = (NS(entity_id='panda-v1', controller_binding=lambda: NS(
+            action_schema=NS(schema_id='pose-v1'))),)
+        captured = {}
+        def prepare(request, **kwargs):
+            captured.update(request=request, **kwargs)
+            return 'prepared'
+        monkeypatch.setattr(env, '_prepare_position_profile', prepare)
+        assert env._prepare_selected_step(proposal) == 'prepared'
+        assert captured['caller_driven'] is True and captured['proposal'] is proposal
+        request = captured['request']
+        assert request.scene_identity_hash == 'a' * 64 and request.binding_identity_hash == 'b' * 64
+        assert tuple(group.group_id for group in request.groups) == ('arm', 'gripper')
+        assert env.state.control_step == 0 and solution._awaiting_observation
+        with pytest.raises(ValueError, match='boundary is stale'):
+            env._prepare_selected_step(replace(proposal, request_boundary={'boundary_id': 'old'}))
+        with pytest.raises(ValueError, match='identity differs'):
+            env._prepare_selected_step(replace(proposal, solution_identity='other'))
+        with pytest.raises(ValueError, match='eight-dimensional'):
+            env._prepare_selected_step(replace(proposal, action=np.zeros(7)))
+    finally:
+        env.position_profile = False
         env.close()
 
 

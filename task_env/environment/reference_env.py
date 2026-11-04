@@ -2055,14 +2055,29 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         from ..planners.contracts import ExpertAction
         if self.binding.external_solution_actions and type(action) is ExpertAction:
-            if getattr(self, 'position_profile', False):
-                raise StageUnavailableError('caller-driven Solution actions are unavailable on Position profiles')
             if self._episode_mode in {'expert', 'external_solution'}:
                 raise RuntimeError('cannot mix caller actions with selected Solution execution')
             if self.solution is not None or self._external_solution_owner is not None:
                 raise RuntimeError('caller actions require reset without an Env-owned Solution')
             if self._stopped or self.session is None:
                 raise RuntimeError('reset required or episode already stopped')
+            if getattr(self, 'position_profile', False):
+                if self.binding.position_execution_info is None or len(self.position_profiles) != 1:
+                    raise StageUnavailableError('caller-driven Solution actions are unavailable on this Position profile')
+                if action.control_request is not None:
+                    raise ValueError('Position Solution action does not admit a native control request')
+                published_boundary = self.info.get('state_boundary_identity')
+                if (action.request_boundary is None or action.request_boundary != published_boundary
+                        or published_boundary != self.typed_state.view.boundary.to_mapping()):
+                    raise ValueError('Solution action boundary is stale or mismatched')
+                if action.solution_identity != self.value.get('solution_identity'):
+                    raise ValueError('Solution action identity differs from the selected task')
+                from ..runtime.sessions.control import single_position_action_request
+                request = single_position_action_request(
+                    action.action, scene=self.position_scene, plan=self.position_plan,
+                    profile=self.position_profiles[0],
+                )
+                return self._prepare_position_profile(request, proposal=action, caller_driven=True)
             self._require_published_execution_info()
             if self.binding.control_request_required:
                 if action.request_boundary != self.info['expert_execution_boundary_v1']:
@@ -2742,7 +2757,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         operations = self._prepare_position_profile(request, proposal=proposal, observer_solution=observer_solution)
         return self._episode_execution_state().execute_interval(**operations)
 
-    def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None):
+    def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None, caller_driven=False):
         """Run one source-bound Position interval through the selected lifecycle latch."""
         if self._execution_fault is not None:
             fault = self._execution_fault
@@ -2823,12 +2838,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._episode_execution_state().finish_step(
                 terminated=terminated, truncated=truncated,
             )
-            self._episode_mode = 'expert' if proposal is not None else 'external'
+            self._episode_mode = 'expert' if proposal is not None and not caller_driven else 'external'
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
             self._last_position_request = request
             self._publish_task_position_execution_info(self.info)
-            if proposal is not None:
+            if proposal is not None and not caller_driven:
                 publication_phase = 'position_solution_observation'
                 solution_owner = self.solution if observer_solution is None else observer_solution
                 extra = self.binding.observe_expert_kwargs(self, None)
@@ -2973,32 +2988,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
             raise
         if getattr(self, 'position_profile', False):
-            from ..controllers.canonical.contracts import (
-                ControlGroupActionV1, StructuredActionRequestV1,
-            )
-
-            vector = np.asarray(proposal.action, dtype=float)
-            if vector.shape != (8,) or not np.isfinite(vector).all():
-                error = ValueError('F06 Position expert requires a finite eight-dimensional planned action')
+            from ..runtime.sessions.control import single_position_action_request
+            try:
+                request = single_position_action_request(
+                    proposal.action, scene=self.position_scene, plan=self.position_plan,
+                    profile=self.position_profiles[0],
+                )
+            except BaseException as error:
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
-                raise error
-            profile = self.position_profiles[0]
-            schema_id = profile.controller_binding().action_schema.schema_id
-            request = StructuredActionRequestV1(
-                'structured-action-request-v1', self.position_scene.identity_hash,
-                self.position_plan.identity_hash,
-                (
-                    ControlGroupActionV1(
-                        'control-group-action-v1', profile.entity_id, 'arm', schema_id,
-                        tuple(float(value) for value in vector[:7]),
-                    ),
-                    ControlGroupActionV1(
-                        'control-group-action-v1', profile.entity_id, 'gripper', schema_id,
-                        (float(vector[7]),),
-                    ),
-                ),
-            )
-            request.validate()
+                raise
             return self._step_position_profile(
                 request, proposal=proposal, observer_solution=self.solution,
             )

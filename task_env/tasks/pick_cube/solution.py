@@ -899,7 +899,8 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._awaiting_observation = True
         return ExpertAction(
             action=action, stage=segment.name, diagnostics=diagnostics,
-            request_boundary=(info.get('expert_execution_boundary_v1')
+            request_boundary=((info.get('expert_execution_boundary_v1')
+                               or info.get('state_boundary_identity'))
                               if isinstance(info, Mapping) else None),
             solution_identity=self.identity,
         )

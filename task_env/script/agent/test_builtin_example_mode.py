@@ -309,14 +309,14 @@ def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
     env = SimpleNamespace(provider='mujoco', sample=SimpleNamespace(task_seed=31), state=state,
                           info={'task_metrics': {'task_success': False}}, execution_fault=None)
 
-    def fail_step(action, *, proposal=None, observer_solution=None):
+    def fail_step(action):
         raise RuntimeError('diagnostic interval failure')
 
-    env._step = fail_step
+    env.step = fail_step
     capture, _write_trace = _install_action_trace(env, tmp_path / 'step_trace.json')
-    proposal = SimpleNamespace(stage='approach')
+    proposal = SimpleNamespace(stage='approach', action=[0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04])
     with pytest.raises(RuntimeError, match='diagnostic interval failure'):
-        env._step([0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04], proposal=proposal)
+        env.step(proposal)
     trace = json.loads((tmp_path / 'step_trace.json').read_text())
     assert capture['attempted'] == 1 and capture['completed'] == 0
     assert trace['rows'][0]['control_step_before'] == 7
@@ -331,10 +331,15 @@ def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound():
     task_profile = built['resolved_configuration']['task_controller_profile']
     controller_profile = built['controller'].rate_profile_mapping()
     assert task_profile == {
-        'schema_version': 'pick-cube-r3-continuous-profile-v1',
-        'joint_velocity_limit_rad_s': 4.0,
+        'schema_version': 'pick-cube-r3-nut-aligned-profile-v2',
+        'joint_velocity_limit_rad_s': 2.0,
+        'gripper_force_limit_N': 10.0,
+        'gripper_close_transition_s': 1.0 / 3.0,
+        'gripper_close_settle_s': 0.5,
+        'postclose_hold_s': 0.1,
+        'posture_path_profile': 'original',
     }
-    assert controller_profile['joint_velocity_limit_rad_s'] == 4.0
+    assert controller_profile['joint_velocity_limit_rad_s'] == 2.0
     assert built['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'
 
 
