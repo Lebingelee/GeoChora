@@ -1,6 +1,6 @@
 # 阶段3前环境代码重构方案
 
-日期：2026-11-04。状态：**维护者确认已人工转交并要求续作；追加任务目录收敛要求已明确，最终输出尚待复审**。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。上述日期与基线用于解释初次审计；当前实施进度见[维护检查点](../maintenance/reviews/pre-stage3-refactor-attempt001.md)，不能把初次审计表当成最新源码状态。两个既有保护untracked保留。
+日期：2026-11-04。状态：**attempt001及续作已返包，Sol复审决定REWORK_REQUIRED_PRE_STAGE3；整体维护尚未接受**。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。上述日期与基线用于解释初次审计；当前实施进度见[维护检查点](../maintenance/reviews/pre-stage3-refactor-attempt001.md)，不能把初次审计表当成最新源码状态。两个既有保护untracked保留。
 
 维护者提出：整理tasks、隔离诊断、统一BaseTaskEnv与SelectedReferenceEnv，减少冗余诊断和SHA开销，并补齐新手安装、路径复用、启动脚本及基于example的二次开发指引。本次先完成单环境规范路线，Pendulum并行适配延期至G06。本项作为阶段3前的独立维护工作，不修改七阶段／22子阶段编号，不重开已接收的阶段2，也不表示阶段3已经启动。实施要求和验收以本仓库开发文档为准，GPT工作文档只作交接入口。
 
@@ -66,6 +66,16 @@
 当前额外的PickCube `isaac.py`须拆分到既有assembly／runtime通用能力和任务specialization；同步runtime/native IO/tests的引用，消除通用runtime对task专用实现文件的反向依赖。Nut的trusted execution source manifest迁到既有资产／source元数据owner，保持原始内容、来源与校验并更新读取路径。冻结历史／raw原件不改写。
 
 复审逐项核对功能去向、调用者／checkpoint／source provenance迁移、两个最终目录及当前task_env/doc与examples；不能只凭目录行数或新增说明认定完成。
+
+### 2.3 首次返包后的具体整改
+
+Sol已复审最终执行输出`656ef136`，见[独立复审](../maintenance/reviews/20261104_pre_stage3_attempt001_sol_review.md)。目录四业务文件、删除旧根模块和额外factory得到确认，但以下仍属原目标未完项：
+
+1. 三个classic单环境仍经独立BaseTaskEnv生命周期；必须先完成真实迁移，再建立同对象alias并删除旧实现。
+2. Marker把原模板的大量Controller／binding／source SHA接线内联到示例；通用构造和身份生成须归回现有owner，任务开发示例保留声明／reset／评价与正常注册，继续直接make_env。
+3. F06 PickCube固定场景映射和策略检查被搬进runtime API；须分开任务构造值与runtime精确来源／执行准入的职责，保留严格校验和原拒绝语义，不能仅靠移动文件认定完成。
+
+待上述实现稳定后做最终必要代表回归与独立读回；不将旧源码成功重标，不新增Isaac native、GPU、九格、训练或全部后端安装门。
 
 ## 三、统一环境类的完成标准
 
@@ -144,4 +154,4 @@
 - 不可变输入语义hash一致；动态输入变化、错误回执、篡改和过期边界仍被拒绝。用诊断侧调用次数／文件读取统计证明减少重复计算，不先许诺吞吐百分比。
 - 在实施包另行冻结预算后，保留必要的MuJoCo PickCube31和Nut19代表回归，以及迁移旧任务的短检查；不重复根因研究、不跑三后端九格，不追修seed32或GPU驱动。
 
-原维护包V211_PRE_STAGE3_REFACTOR_attempt001已由维护者转发Terra执行，尚未Sol接收。维护者确认已人工转交并要求按当前目标续作；追加目录收敛要求与原包未完项一并落实，原冻结prompt不覆写。本页不新增运行预算。继续维护者手动转发／Sol主审流程，阶段3仍未开始。
+原维护包与维护者授权的续作均已返包并释放writer；最终执行HEAD为656ef136，Sol复审要求返工，整体未接受。追加范围已经入库，本轮不覆盖原冻结prompt或改写原执行记录。本页不派发新窗口或增加运行预算；后继整合包按Sol复审提交后的实际HEAD另行冻结，由维护者手动转发。阶段3仍未开始。

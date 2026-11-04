@@ -17,7 +17,7 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 
 ## 阶段3前维护检查点
 
-attempt001 在维护者确认已人工转交后续作，状态仍为 `REPORTED_PENDING_REVIEW`。已落实 Marker 公共创建入口、两个任务目录四文件收敛及相关 guard／Solution／USD 来源接线；本轮只有 provider-free 合成验证，Isaac 投影完整构建和当前源码完整物理回归未验证。classic 单环境统一仍未完成，G1 仍未通过；详见[交付与待复审](reviews/pre-stage3-refactor-attempt001.md)。此记录不改变阶段2决定或授权阶段3。
+attempt001及维护者授权续作已返包，最终执行HEAD为`656ef136`。Sol独立复审决定`REWORK_REQUIRED_PRE_STAGE3`：保留部分实现作为后继基线，G1 FAIL、G2–G4 PARTIAL，整体未接受。目录四文件及原字节manifest迁移已核对；三个classic任务真实统一、Marker通用构造回收及F06任务／runtime职责分离仍待整改。最终源码物理与独立reader未验证。见[Sol复审](reviews/20261104_pre_stage3_attempt001_sol_review.md)和[执行者交付](reviews/pre-stage3-refactor-attempt001.md)。不改变阶段2决定或启动阶段3。
 
 ## 阶段3前待办
 
@@ -30,4 +30,4 @@ Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交
 - `MUJOCO_LOG.TXT` SHA-256 `dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b`。
 - `docs/maintenance/20261030_runtime_route_diagnostic_handoff.md` SHA-256 `18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61`。
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
-- 阶段2窗口已释放；阶段3前维护 attempt001 以 `REPORTED_PENDING_REVIEW` 收束，具体 writer/native 释放和其他用户占锁状态以[交付记录](reviews/pre-stage3-refactor-attempt001.md)及工作报告为准。本项不授权新的三后端九格、2b attempt3或阶段3。
+- 阶段2及本维护writer窗口已释放；attempt001完成Sol复审，当前等待整合返工包，尚未派发新窗口。执行者自己的进程组退出收据已核对；他人锁不干扰。本项不授权新的三后端九格、2b attempt3、Isaac native或阶段3。
