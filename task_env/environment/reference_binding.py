@@ -56,8 +56,6 @@ class ReferenceTaskBinding:
     close_task_resources: Callable | None = None
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
-    reconcile_reset_artifact: Callable | None = None
-    validate_seeded_execution: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -78,10 +76,6 @@ class ReferenceTaskBinding:
                          or not isinstance(self.position_execution_info_key, str)
                          or not self.position_execution_info_key))):
             raise ValueError('position execution info requires a callable and a non-empty key')
-        for name in ('reconcile_reset_artifact', 'validate_seeded_execution'):
-            value = getattr(self, name)
-            if value is not None and not callable(value):
-                raise ValueError(f'{name} must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
         mixed_hooks = (

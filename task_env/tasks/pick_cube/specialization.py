@@ -489,37 +489,6 @@ def _position_execution_info(env):
     return result
 
 
-def _reconcile_reset_artifact(current_artifact, rebuilt_value):
-    """Keep a seeded PickCube runtime input bound to its exact Artifact."""
-    rebuilt_artifact = rebuilt_value['artifact']
-    if rebuilt_artifact != current_artifact:
-        raise ValueError('selected Artifact changed between construction and reset')
-    runtime_input = rebuilt_value.get('f06_pickcube_isaac_input')
-    if runtime_input is None:
-        return current_artifact
-    if rebuilt_artifact is not runtime_input.artifact:
-        raise ValueError('F06 reset Artifact is not identical to its exact RuntimeInput artifact')
-    return runtime_input.artifact
-
-
-def _validate_seeded_execution(versioned, declared, seed, rebuilt_value):
-    runtime_input = rebuilt_value.get('f06_pickcube_isaac_input')
-    if runtime_input is None:
-        if versioned.identity_hash != declared.identity_hash:
-            raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
-        return
-    if ((versioned.physics_provider, versioned.physics_backend,
-         versioned.physics_device, versioned.physics_profile,
-         versioned.determinism_mode, versioned.render_default,
-         versioned.camera_overrides, versioned.provider_seed)
-            != (declared.physics_provider, declared.physics_backend,
-                declared.physics_device, declared.physics_profile,
-                declared.determinism_mode, declared.render_default,
-                declared.camera_overrides, seed)
-            or runtime_input.reset_plan.reset_sample.task_seed != seed):
-        raise ValueError('F06 seeded rebuild changed its exact route or requested seed')
-
-
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None):
@@ -579,9 +548,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         position_execution_info=_position_execution_info if source_delivery_manifest is not None else None,
         position_execution_info_key=("pickcube_position_execution_info_v1"
                                      if source_delivery_manifest is not None else None),
-        reconcile_reset_artifact=_reconcile_reset_artifact,
-        validate_seeded_execution=(_validate_seeded_execution
-                                   if source_delivery_manifest is not None else None),
         reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
         observe_expert_kwargs=lambda env, guard_samples: {"execution_info": env.expert_execution_info()},
     )
