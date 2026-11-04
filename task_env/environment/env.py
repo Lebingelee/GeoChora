@@ -123,7 +123,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._last_camera_metadata = {}
         self._last_snapshot = None
         self._elapsed_steps = 0
-        self._episode_finished = False
         self.metadata = gym_metadata_dict(self._env_metadata, stage="stage4_gym_contract")
         reference_profile = _json_value(self.reference_profile())
         if reference_profile:
@@ -657,7 +656,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         reset_parameters = result.reset_parameters
         self._last_snapshot = snapshot
         self._elapsed_steps = lifecycle.elapsed_steps
-        self._episode_finished = lifecycle.episode_finished
         self._last_task_evaluation = evaluation
         self._last_episode_end = None
         try:
@@ -722,7 +720,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             )
             self._last_snapshot = result.snapshot
             self._elapsed_steps = result.elapsed_steps
-            self._episode_finished = lifecycle.episode_finished
             raise
 
     def _format_step_result(self, lifecycle, result):
@@ -733,7 +730,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._last_task_evaluation = evaluation
         self._last_snapshot = snapshot
         self._elapsed_steps = result.elapsed_steps
-        self._episode_finished = lifecycle.episode_finished
         action_info = {
             "requested": command.requested_action,
             "external": command.external_action,
@@ -797,7 +793,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         lifecycle = self._require_task_lifecycle()
         result = lifecycle.stop(reason)
         self._last_episode_end = result
-        self._episode_finished = lifecycle.episode_finished
         return result
 
     def get_record_metadata(self) -> dict[str, Any]:
