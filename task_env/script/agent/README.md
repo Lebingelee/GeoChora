@@ -160,7 +160,7 @@ Isaac's `pxr` package first:
 
 ```sh
 CORE=/absolute/path/to/GeoChora
-ISAAC_PY="$CORE/workspace/environments/isaacsim-6.2.0/bin/python"
+ISAAC_PY=/absolute/path/to/isaacsim-6.2.0/bin/python
 CORE_PY=/absolute/path/to/geochora-py312/bin/python
 "$ISAAC_PY" "$CORE/task_env/diagnostics/tasks/pickcube_isaac_usd_delivery.py" \
   --help
@@ -174,6 +174,14 @@ The Core and Isaac interpreters must use the same Python major/minor ABI. An
 existing filtered `GEOCHORA_CORE_SITE` overlay may be used instead of
 `--core-python`. This operation validates and writes USD evidence only; it
 does not launch `SimulationApp` or advance physics.
+
+For the supervised PickCube example, select the Isaac worker interpreter with
+`--isaac-python /absolute/path/to/python`, or set `ISAAC_SIM_PYTHON`. The
+command-line option takes precedence; if neither is supplied, the existing
+`workspace/environments/isaacsim-6.2.0/bin/python` under Core is used. A
+missing interpreter produces a `NOT_RUN_DEPENDENCY` preflight result. This
+selection does not establish that an Isaac installation is compatible or that
+the route has run successfully.
 
 Generate a fresh catalog after each Core commit, then run the three fixed seeds
 for one provider:

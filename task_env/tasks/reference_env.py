@@ -3084,7 +3084,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'artifact_hash': self.artifact.identity_hash, 'controller_identity': self.controller.identity,
             'solution_identity': self._active_solution_identity(), 'provider': self.provider,
             'owners': {'coordinator': {'version': 'selected-reference-observation-v1',
-                'source_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                'source_sha256': self._recording_adapter_source_sha256,
                 'fields': {k: {'present': True, 'value': v} for k, v in fields.items()}}}}
         result['integrity_hash'] = digest(result)
         return result
@@ -3157,8 +3157,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise FileExistsError(path)
         self.recording_path = path
         config = self.value['resolved_configuration']
+        # Provenance describes the source at recording start. Reuse that same
+        # snapshot for every boundary, and take a new snapshot on a new recording.
+        self._recording_adapter_source_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         source_provenance = {
-            'construction': digest(config), 'adapter': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'construction': digest(config), 'adapter': self._recording_adapter_source_sha256,
             'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
             'resolved_configuration_json': json.dumps(config, sort_keys=True),
             'execution_configuration_json': json.dumps(self._recorded_execution_configuration(), sort_keys=True),

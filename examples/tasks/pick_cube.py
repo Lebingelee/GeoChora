@@ -109,7 +109,7 @@ def _run_harness(args):
     scope_path = _REPOSITORY_ROOT / "examples/tasks/pick_cube_harness_working_tree_scope.json"
     result = validate_provider(
         spec_path, catalog_path, scope_path, run_root / "result",
-        only_seed=args.seed,
+        only_seed=args.seed, isaac_python=args.isaac_python,
     )
     print(json.dumps({"provider": result["provider"], "seed": args.seed,
                       "disposition": result["disposition"],
@@ -132,6 +132,8 @@ def main(argv=None) -> int:
                         help="canonical H5 output; default workspace/examples/pick_cube/<provider>-<seed>.h5")
     parser.add_argument("--source-delivery-manifest", type=Path,
                         help="exact versioned F06 PickCube USD manifest for Isaac Sim")
+    parser.add_argument("--isaac-python", type=Path,
+                        help="Isaac interpreter; overrides ISAAC_SIM_PYTHON and checkout default")
     parser.add_argument("--harness-output-dir", type=Path,
                         help="fresh supervised Harness output directory for Isaac Sim")
     parser.add_argument("--time-limit-s", type=int, default=420)

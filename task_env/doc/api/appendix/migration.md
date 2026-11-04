@@ -68,7 +68,7 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 | `task_env.script.trajectory._nut_assembly_config` and `_pick_cube_config` package exports | Removed; task-owned configuration is selected by its Task Artifact and not reconstructed by a script helper. |
 | `task_env.script.trajectory.planning.*` selected routes | Kept and now construct through `make_env`; NutAssembly calls only `step_expert()`. |
 | `task_env.script.env.single_*` and `parallel_*` | Kept. The single examples use public `make_env`; parallel examples remain generic registered batch workflows. |
-| `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. |
+| `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. Its internal construction compatibility boundary is `task_env.environment._historical`, while `task_env.diagnostics.historical_tasks` remains a diagnostic compatibility entry. Retired PickCube requires the immutable historical source; legacy Nut construction is not exact historical source reconstruction. |
 
 Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
 [`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/v1.1.0/maintenance/recovery/p2_0_s4_5_a_source_recovery.json).

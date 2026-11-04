@@ -35,6 +35,12 @@ ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 _populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
 
 
+def _isaac_python(explicit=None):
+    """Choose an external interpreter without probing or starting Isaac."""
+    value = explicit if explicit is not None else os.environ.get('ISAAC_SIM_PYTHON')
+    return Path(value).expanduser().resolve() if value else ISAAC_PYTHON
+
+
 def _write_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + '.tmp')
@@ -189,11 +195,11 @@ def _cold_read_h5(output, receipt, *, provider):
     return result
 
 
-def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
+def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isaac_python=None):
     output.mkdir(parents=True, exist_ok=False)
     stdout_path, stderr_path = output / 'worker.stdout.log', output / 'worker.stderr.log'
     if provider == 'isaacsim':
-        executable = ISAAC_PYTHON
+        executable = _isaac_python(isaac_python)
         timeout_s = 1200
     else:
         executable = CPU_PYTHON
@@ -416,7 +422,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
 
 
 def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_seed=None,
-                      provider_override=None, source_delivery_manifest=None):
+                      provider_override=None, source_delivery_manifest=None, isaac_python=None):
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     if provider_override is not None:
         route = {
@@ -454,6 +460,7 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
         row = _run_one(
             save_inputs / 'example_spec.json', save_inputs / 'catalog.json',
             save_inputs / 'working_tree_scope.json', seed, run_dir, provider=spec.provider,
+            isaac_python=isaac_python,
         )
         rows.append(row)
         planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(rows)
@@ -503,11 +510,14 @@ def main(argv=None):
     parser.add_argument('--source-delivery-manifest', type=Path,
                         help='required exact F06 PickCube USD manifest for --provider isaacsim')
     parser.add_argument('--only-seed', type=int, choices=(31, 32, 33))
+    parser.add_argument('--isaac-python', type=Path,
+                        help='Isaac interpreter; overrides ISAAC_SIM_PYTHON and checkout default')
     args = parser.parse_args(argv)
     result = validate_provider(args.spec, args.catalog, args.working_tree_scope,
                                args.output_dir, only_seed=args.only_seed,
                                provider_override=args.provider,
-                               source_delivery_manifest=args.source_delivery_manifest)
+                               source_delivery_manifest=args.source_delivery_manifest,
+                               isaac_python=args.isaac_python)
     print(json.dumps({'provider': result['provider'], 'disposition': result['disposition'],
                       'runtime_valid_count': result['runtime_valid_count'],
                       'task_solved_count': result['task_solved_count']}, sort_keys=True))

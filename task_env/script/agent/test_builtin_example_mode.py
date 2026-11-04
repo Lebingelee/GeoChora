@@ -460,3 +460,13 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
     assert row['errors'][0]['phase'] == 'compile'
     assert row['runtime_valid'] is False
     assert not (tmp_path / 'isaac-run' / 'episode.h5').exists()
+
+
+def test_isaac_interpreter_selection_without_launch(monkeypatch, tmp_path):
+    from builtin_example_validation import ISAAC_PYTHON, _isaac_python
+
+    monkeypatch.delenv('ISAAC_SIM_PYTHON', raising=False)
+    assert _isaac_python() == ISAAC_PYTHON
+    monkeypatch.setenv('ISAAC_SIM_PYTHON', str(tmp_path / 'environment-python'))
+    assert _isaac_python() == tmp_path / 'environment-python'
+    assert _isaac_python(tmp_path / 'explicit-python') == tmp_path / 'explicit-python'
