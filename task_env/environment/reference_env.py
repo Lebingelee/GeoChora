@@ -3843,33 +3843,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise ValueError('missing native application receipts')
         if (self.binding.record_native_substeps and self.recorder is not None
                 and self.binding.recorder_mode == 'execution'):
-            pending = getattr(self.recorder, 'pending', None)
-            recorded = pending.get('substeps') if isinstance(pending, dict) else None
-            start_step = self.state.control_step - 1
-            expected_native_indices = [start_step * count + index + 1 for index in range(count)]
-            required_fields = {
-                'index', 'native_step_index', 'native_start_time', 'state',
-                'feedback', 'target', 'applied', 'updated',
-            }
-            if (
-                not isinstance(pending, dict)
-                or type(pending.get('control_step')) is not int
-                or pending.get('control_step') != start_step
-                or pending.get('physics_dt') != self.artifact.timebase.physics_dt
-                or type(pending.get('control_substeps')) is not int
-                or pending.get('control_substeps') != count
-                or type(pending.get('native_step_count')) is not int
-                or pending.get('native_step_count') != count
-                or not isinstance(recorded, list)
-                or len(recorded) != count
-                or any(not isinstance(item, dict) or not required_fields.issubset(item)
-                       for item in recorded)
-                or any(type(item['index']) is not int or type(item['native_step_index']) is not int
-                       for item in recorded)
-                or [item['index'] for item in recorded] != list(range(count))
-                or [item['native_step_index'] for item in recorded] != expected_native_indices
-            ):
-                raise ValueError('incomplete native Recorder application receipts')
+            from ..trajectory.canonical.execution import validate_pending_native_interval
+            validate_pending_native_interval(
+                getattr(self.recorder, 'pending', None),
+                control_step=self.state.control_step - 1,
+                physics_dt=self.artifact.timebase.physics_dt, control_substeps=count,
+            )
         wait = bool(diagnostics.get('readiness_hold', False))
         transition = TransitionRecord(request, canonical, target, applied, float(self.evaluation.reward),
             terminated, truncated, stage, {k: json.dumps(v, sort_keys=True) for k, v in diagnostics.items()}, not wait, wait)

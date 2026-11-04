@@ -9,6 +9,8 @@
 
 classic Gym wrapper 与 selected 环境内的 canonical recorder 是不同入口：前者使用公开 reset/step 和 `get_record_metadata()`；selected 的 `start_recording`、`finish_recording` 与独立 reader 见 [Expert 录制示例](../../../../examples/recording/record_expert.py)。不要将 v2 wrapper 的字段与 selected 的 canonical 记录 schema 混为一谈。
 
+对于记录 native 子步的 execution trajectory，记录器会在追加 transition 前检查实际记录的子步数量、顺序与时间基准；不完整 interval 会被拒绝，不会作为有效 transition 提交。若环境因此进入 execution fault，调用方须按环境的故障语义重置，不能把这段记录视为完整 episode。
+
 - [Wrapper lifecycle](wrapper_lifecycle.md)
 - [Trajectory contract](trajectory_contract.md)
 - [H5 schema](h5_schema.md)

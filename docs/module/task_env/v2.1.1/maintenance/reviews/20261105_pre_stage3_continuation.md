@@ -91,3 +91,9 @@ PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投�
 通用pick-lift candidate binding、oracle和feasibility probe已改为调用方 `Solution.act → env.step → Solution.observe`；Solution factory身份不匹配、缺少caller action route均在step前报错，不再将旧 `step_expert()` 作为回退。`examples/_common.py` 中无调用者的旧helper已删除；Env内旧方法仍作为兼容保留。legacy `--env`也须提供caller route与Solution factory，故不兼容的旧输入明确失败。
 
 无引擎Harness与selected组合 **139 passed、1 skipped、29 subtests passed**；skip为本checkout没有冻结Isaac Python，未运行Isaac。首次试运行candidate的真实编译／H5合成预检被catalog clean-check拒绝：两份原保护untracked仍存在，源码有本轮未提交修改；未隐藏或更改这些文件，也未伪造clean provenance。本轮源码提交后在 `257e5573`、tracked clean且仅余两个保护untracked时再次执行，仍被相同clean-check拒绝，确认不能仅靠提交本轮改动通过。该合成预检仍未通过，以上结果不能替代它或任何物理验证。本轮测试中的fixture缺少 `SimpleNamespace` 导致首次失败，已补齐并重跑；unsupported与错误身份分类明确为invalid。
+
+## Recorder native interval准入（续作，待复审）
+
+将已存在于环境中的pending native interval完整性校验归到canonical execution recorder，并在 `ExecutionRecorder.append` 准备完边界、修改存储前自行执行；环境仍在自己的发布边界调用同一校验，覆盖受限合成recorder及原有故障分类。缺失样本、计数／索引／timebase被篡改均拒绝，新增测试确认拒绝时pending、transitions、boundaries和blobs不变。保留边界序列化异常原有优先顺序：首次扩展测试暴露先读未序列化boundary导致异常类型变化，修正顺序后复验通过。
+
+禁止引擎导入的selected、structured recorder及R05b组 **119 passed、1 deselected**，排除真实provider reset/step；streaming组 **34 passed、2 deselected**。两项被排除的旧诊断测试原始尝试因 `nut_assembly.assets` 迁移后路径不存在而导入失败，尚未修复，不能计为通过；另一次扩展尝试包含需要真实 `scene` 的position／camera测试，被引擎guard拒绝，不计为通过。完整最终argv、stdout、退出码与当时未提交diff摘要保存在ignored `recorder-final-evidence.json`及 `recorder-stream-evidence.json`。以上均为离线／合成验证，未运行native、Isaac或GPU，也不将历史物理结果重标到新源码。

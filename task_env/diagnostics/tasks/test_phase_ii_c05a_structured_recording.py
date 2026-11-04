@@ -409,6 +409,42 @@ def test_execution_v3_does_not_finalize_a_partial_native_interval():
         recorder.freeze("partial", outcome=_outcome("partial", 0, "partial"))
 
 
+@pytest.mark.parametrize("damage", ["missing", "count", "native_index", "timebase"])
+def test_recorder_rejects_damaged_pending_interval_before_mutating(damage):
+    value = _execution_v3()
+    recorder = ExecutionRecorder(
+        EpisodeMetadata.from_mapping(value["metadata"]), value["recipe"], schema=STRUCTURED_SCHEMA,
+    )
+    first = value["boundaries"][0]
+    recorder.boundary(
+        BoundaryRecord.from_mapping(first["record"]),
+        expand_snapshot(first["owners"], value["blobs"]), first["stage"],
+        first["task_metrics_raw"], first["native_time"],
+    )
+    transition = value["transitions"][0]
+    recorder.pending = copy.deepcopy(transition["interval"])
+    if damage == "missing":
+        recorder.pending["substeps"].pop()
+    elif damage == "count":
+        recorder.pending["native_step_count"] -= 1
+    elif damage == "native_index":
+        recorder.pending["substeps"][0]["native_step_index"] += 1
+    else:
+        recorder.pending["physics_dt"] *= 2
+    before_value, before_pending = copy.deepcopy(recorder.value), copy.deepcopy(recorder.pending)
+    following = value["boundaries"][1]
+    with pytest.raises(ValueError, match="incomplete native Recorder application receipts"):
+        recorder.append(
+            TransitionRecord.from_mapping(transition["record"]),
+            BoundaryRecord.from_mapping(following["record"]),
+            expand_snapshot(following["owners"], value["blobs"]), following["stage"],
+            transition["native_audit"], following["task_metrics_raw"], following["native_time"],
+            structured_control=StructuredControlTransitionV1.from_mapping(value["structured_controls"][0]),
+        )
+    assert recorder.value == before_value
+    assert recorder.pending == before_pending
+
+
 def test_canonical_outer_v1_roundtrip_and_v0_file_identity_remains_distinct(tmp_path):
     source_path = Path(__file__).parents[1] / "phase1/integration/fixtures/execution_prefix_fixture.json.gz"
     source = json.loads(gzip.decompress(source_path.read_bytes()))
