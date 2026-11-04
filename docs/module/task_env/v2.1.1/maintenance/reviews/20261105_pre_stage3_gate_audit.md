@@ -2,6 +2,10 @@
 
 本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
 
+## 后续源码检查：`7d15d1e1`
+
+使用冻结F06 delivery和当前Core／GeoPhys Scene importer构造实际F06输入并验证原准入；TaskSource、Scene及reset Artifact三种身份错配均在provider创建前拒绝。导入器报告一个保留的灯光扩展，详见[续作记录](20261105_pre_stage3_continuation.md)。本检查不启动Isaac或执行物理步，不是F06物理验收；该源码的PickCube／Nut代表性物理回归和独立物理reader仍为NOT_RUN。整体维护仍为 **PARTIAL**，以下旧源码证据保留原身份。
+
 ## 后续源码检查：`3ed14c08`
 
 本源码的selected／配置／R05b／F06投影／录制无引擎组合 **181 passed、2 deselected**；三个classic任务在GeoPhys CPU各完成一次真实reset／step／close，结果与 `fa885280` 的同条件单步结构化结果一致。命令、来源、资源、预算和锁收据见[续作记录](20261105_pre_stage3_continuation.md)。这些检查不证明完整任务成功、render、所有provider或物理reader；PickCube与Nut当前源码的代表性物理回归、独立物理reader、剩余职责收敛及Sol复审仍未完成，整体维持 **PARTIAL**。以下 `a55ccac3` 的完整离线组合只对应其原源码。

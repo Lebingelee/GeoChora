@@ -263,3 +263,9 @@ selected scalar／execution的native回执完整性检查、`TransitionRecord`�
 通用 `UsdRuntimeInputV1.validate()` 在materialization前复核TaskSource、Scene、Artifact与reset plan的交叉身份，并验证嵌套RoleBinding和ResetSample；此前部分错配要到RuntimeSession reset才拒绝。F06的固定delivery、任务声明摘要、provider和执行限制仍独立执行，没有放宽。测试使用现有F04本地source fixture构造通用USD输入，再通过F06 `materialize` 准入入口注入错误TaskSource／Scene／reset Artifact身份；三种均在provider创建前拒绝。该fixture不冒充真实F06完整构造或物理运行。
 
 受监督无引擎F04／F05组合 **14 passed、3 deselected**，最大RSS 457318400 bytes；selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165179392 bytes。完整argv、退出码及资源采样见ignored `usd-identity-f04-v2/`和 `usd-identity-selected/`。首次定向尝试误以为 `TaskSourceV1` 有 `validate()`，3项失败后已移除该调用并重测；首次F04组合因缺少测试输出目录环境变量2项失败，补齐独立目录后上述重跑通过。排除真实provider／scene及缺少历史worker；未运行真实引擎、Isaac、GPU或物理reader。
+
+## 真实F06来源输入构造与提前拒绝（续作，待复审）
+
+对 tracked clean `7d15d1e14d1ca48c73cfe4b044df9336debaedba`，以当前Core及GeoPhys Scene importer、seed 31和horizon 1000，从旧位置只读的冻结F06 delivery构造实际 `UsdRuntimeInputV1` 并通过当前完整F06输入校验；manifest SHA为 `6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2`。在该实际输入上分别替换reset的TaskSource、Scene或Artifact身份，均经 `materialize` 在provider创建前拒绝。此为真实来源／声明构造检查，不是Isaac session、native物理、任务成功或Qualification。
+
+worker核验实际导入的Core和GeoPhys路径，并检查未导入 `isaacsim`／`omni`；按序非阻塞持有并释放两把native锁，运行1.379秒、最大进程树RSS 190402560 bytes、进程组退出，未执行物理步。Scene importer日志报告一个保留的 `extension.light`（`/mjcf/worldbody/light[top]`），无拒绝项；本检查不验证渲染或该扩展的执行语义。完整命令、身份、三项拒绝、原始日志与资源／锁收据见ignored `f06-current-input-7d15d1e1/`。本次未启动Isaac、GPU或物理reader，原物理步预留不增加。
