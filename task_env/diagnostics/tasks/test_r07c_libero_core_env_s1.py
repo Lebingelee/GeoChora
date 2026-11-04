@@ -2070,3 +2070,19 @@ def test_recorder_append_and_finalizer_failures_keep_fault_and_close_receipt(tmp
         finalize_env.finish_recording(end.outcome.end_reason)
     finalize_env.close()
     assert finalize_env.close_receipt["session_closed"] is True
+
+
+def test_libero_composition_uses_core_task_contract(monkeypatch):
+    global _FAKE_WORLD
+    from task_env.environment import TaskCompositionSpec
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch, horizon=2)
+    try:
+        composition = env.composition_spec
+        assert type(composition) is TaskCompositionSpec
+        assert composition.task_uid == env.artifact.task_id
+        assert composition.scene_uid == env.value['source'].config.scene.scene_uid
+        assert _FAKE_WORLD.calls['step'] == 0
+    finally:
+        env.close()

@@ -34,7 +34,7 @@ from task_env.environment.task_source import TaskArtifactDeclarationV1
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
 )
-from task_env.environment.types import ReferenceSpec
+from task_env.environment.types import ReferenceSpec, TaskCompositionSpec
 from task_env.environment.reference_binding import ReferenceTaskBinding
 from task_env.environment.reference_env import SelectedReferenceEnv
 
@@ -747,7 +747,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         provider_objects = ()
     reference_declaration = ReferenceTaskDeclarationV1(
         artifact=artifact_declaration,
-        composition=plan['composition_receipt'],
+        composition=TaskCompositionSpec(
+            task_uid=task_uid, scene_uid=config.scene.scene_uid,
+            success_definition=config.task.success_definition,
+        ),
         bodies=bound_bodies,
         frames=frames,
         free_joints=free_joints,
