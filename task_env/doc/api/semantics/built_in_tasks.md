@@ -27,7 +27,9 @@ no policy-checkpoint inference or new P1.6 qualification is implied.
 Public construction uses `make_env("nut-assembly-outcome-reference-v1",
 config=...)`. The registered class is `NutAssemblyReferenceEnv` in
 `nut_assembly/task.py`; the task owns one selected guarded expert and
-Outcome Completion V1. It advances only through `step_expert()`.
+Outcome Completion V1. The ordinary example uses `step_expert()`; the bounded
+external Solution route has separate validation and must not be confused with
+unrestricted external action stepping.
 
 Its canonical artifact remains
 `nut-assembly-square-v1/p1_8_e/nominal-v1` with identity
@@ -44,11 +46,14 @@ not as interchangeable environment constructors.
 
 ## Generic Pendulum and TwoWheel tasks
 
-`PendulumEnv` and `TwoWheelBalanceEnv` remain generic Core environments with
+`EmptyTaskEnv`, `PendulumEnv` and `TwoWheelBalanceEnv` remain generic Core environments with
 their existing task definitions, lifecycle semantics, and optional registered
 batch routes. Pendulum is the only route used by the current bounded
-`merged_scene`, SB3 and rasterizer examples. Those smokes do not qualify general
-learning, rendering, or GeoPhys Rigid Batch capability.
+`merged_scene`, SB3 and rasterizer examples. Empty has no task action dimensions;
+Pendulum and TwoWheel use one and two torque inputs respectively. Existing
+parallel registrations belong to the old route; unified Env batch adaptation
+is deferred to G06. Those smokes do not qualify general learning, rendering,
+or GeoPhys Rigid Batch capability.
 
 ## `PendulumEnv` and `PendulumTaskDefinition`
 
