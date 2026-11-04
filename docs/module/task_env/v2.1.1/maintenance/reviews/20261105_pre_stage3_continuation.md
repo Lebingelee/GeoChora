@@ -19,3 +19,9 @@ F06的固定body/frame/joint映射、controller profile与horizon范围由PickCu
 规范 `SelectedReferenceEnv.from_resolved_config` 负责共同的配置类型／UID、state-only检查及Env组装，Marker和Nut分别通过 `selected_binding(config)` 提供自己的任务接线；PickCube特殊Isaac构造保留其既有实现。示例不再重复 resolved-config 创建Env；task-specific binding仍在示例，尚需复核是否达到本维护所要求的新手最短组合。未增加Panda专用Env模板或任务factory。
 
 无引擎guard下配置、消费者、边界测试 **118 passed**；新增的Marker入口与非法UID／render／额外参数检查 **2 passed**。仍为synthetic，待独立复审；未运行真实引擎。
+
+## 控制器切换记录投影（续作，待复审）
+
+Position终止时待确认切换的记录投影归入既有 `recorders.position_metadata`：区分未尝试、未确认和target/applied ack已见但transition未记录，Env继续拥有生命周期状态及最终提交时序。无引擎synthetic组 **13 passed**，含原leaf/mixed故障与新投影正负例；未将ack提升为已提交transition，也验证未确认分支不读取运行时边界。
+
+尝试运行三个现有Position切换集成测试时，均在 `scene` import被禁止引擎guard拦截（3 failed，未执行到断言）；真实场景集成及物理仍为NOT_RUN，不以synthetic结果替代。完整命令与当前检查输出在ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/receipt-check.json`及相邻日志。

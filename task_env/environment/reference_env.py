@@ -3553,29 +3553,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._position_controller_switch_fault_receipt,
             )
         if self._pending_position_switch is not None:
-            switch_application = {
-                **self._pending_position_switch,
-            }
-            switch_application['status'] = (
-                'not_attempted_before_episode_end'
-                if (self._execution_fault is None
-                    and int(state.control_step) == self._pending_position_switch['effective_control_step'])
-                else 'not_confirmed_in_complete_transition'
+            from ..recorders.position_metadata import pending_controller_switch_receipt
+            details['pending_controller_switch_application'] = pending_controller_switch_receipt(
+                self._pending_position_switch, published_step=state.control_step,
+                execution_fault=self._execution_fault,
+                last_transition=getattr(self, 'last_position_transition', None),
+                runtime_step=lambda: self.state.control_step,
             )
-            last = getattr(self, 'last_position_transition', None)
-            if (isinstance(last, tuple) and len(last) == 3
-                    and getattr(last[1], 'controller_identity', None)
-                    == self._pending_position_switch['controller_identity']
-                    and getattr(last[1].source_boundary, 'boundary_id', None)
-                    == self._pending_position_switch['effective_boundary_id']
-                    and getattr(last[2], 'target_hash', None) == last[1].target.identity_hash):
-                switch_application.update({
-                    'status': 'target_ack_observed_but_transition_not_recorded',
-                    'target_identity_hash': last[1].target.identity_hash,
-                    'applied_target_hash': last[2].target_hash,
-                    'observed_runtime_boundary': int(self.state.control_step),
-                })
-            details['pending_controller_switch_application'] = switch_application
         details.update(dict(payload or {}))
         if task_success is _INFER_POSITION_TASK_SUCCESS:
             success = (None if self._published_position_evaluation is None

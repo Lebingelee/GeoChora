@@ -5,6 +5,31 @@ import hashlib
 import numpy as np
 
 
+def pending_controller_switch_receipt(pending, *, published_step, execution_fault,
+                                      last_transition, runtime_step):
+    """Project a pending switch without treating an unrecorded ack as a transition."""
+    receipt = dict(pending)
+    receipt['status'] = (
+        'not_attempted_before_episode_end'
+        if execution_fault is None and int(published_step) == pending['effective_control_step']
+        else 'not_confirmed_in_complete_transition'
+    )
+    if (isinstance(last_transition, tuple) and len(last_transition) == 3
+            and getattr(last_transition[1], 'controller_identity', None)
+            == pending['controller_identity']
+            and getattr(last_transition[1].source_boundary, 'boundary_id', None)
+            == pending['effective_boundary_id']
+            and getattr(last_transition[2], 'target_hash', None)
+            == last_transition[1].target.identity_hash):
+        receipt.update({
+            'status': 'target_ack_observed_but_transition_not_recorded',
+            'target_identity_hash': last_transition[1].target.identity_hash,
+            'applied_target_hash': last_transition[2].target_hash,
+            'observed_runtime_boundary': int(runtime_step()),
+        })
+    return receipt
+
+
 def _versioned_position_input_kind(input_v1):
     if input_v1 is None:
         return None

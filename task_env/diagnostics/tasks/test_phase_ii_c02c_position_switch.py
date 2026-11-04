@@ -458,3 +458,33 @@ def test_post_switch_target_ack_without_recorded_transition_is_not_promoted(tmp_
     assert pending['target_identity_hash'] == pending['applied_target_hash']
     assert pending['observed_runtime_boundary'] == 1
     env.close()
+
+
+def test_pending_switch_receipt_distinguishes_ack_from_committed_transition():
+    from types import SimpleNamespace as NS
+    from task_env.recorders.position_metadata import pending_controller_switch_receipt
+
+    pending = {'switch_id': 's1', 'effective_control_step': 4,
+               'effective_boundary_id': 'b4', 'controller_identity': 'controller-new'}
+    never = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=None, last_transition=None,
+        runtime_step=lambda: (_ for _ in ()).throw(AssertionError("unexpected runtime read")),
+    )
+    assert never['status'] == 'not_attempted_before_episode_end'
+    assert 'status' not in pending
+    target = NS(identity_hash='target')
+    command = NS(controller_identity='controller-new', source_boundary=NS(boundary_id='b4'),
+                 target=target)
+    acknowledged = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=object(),
+        last_transition=(None, command, NS(target_hash='target')), runtime_step=lambda: 5,
+    )
+    assert acknowledged['status'] == 'target_ack_observed_but_transition_not_recorded'
+    assert acknowledged['target_identity_hash'] == acknowledged['applied_target_hash'] == 'target'
+    assert acknowledged['observed_runtime_boundary'] == 5
+    unconfirmed = pending_controller_switch_receipt(
+        pending, published_step=4, execution_fault=object(),
+        last_transition=(None, command, NS(target_hash='wrong')), runtime_step=lambda: (_ for _ in ()).throw(AssertionError("unexpected runtime read")),
+    )
+    assert unconfirmed['status'] == 'not_confirmed_in_complete_transition'
+    assert 'applied_target_hash' not in unconfirmed
