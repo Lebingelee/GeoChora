@@ -40,6 +40,7 @@ from ...environment.configuration import (
 from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
 from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
+from ...planners import AbsolutePosePlannerConfig
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource
 from ..reference_env import ReferenceTaskBinding, SelectedReferenceEnv
@@ -53,15 +54,22 @@ CONFIG_PATH = Path(__file__).with_name("config.yaml")
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
-PICKCUBE_CONTROLLER_PROFILES = {"r1", "r3_continuous_v1"}
+PICKCUBE_CONTROLLER_PROFILES = {
+    "r1",
+    "r3_continuous_v1",
+    "r3_continuous_v1_pose_path_x20",
+}
+_PICKCUBE_R3_PROFILES = frozenset({
+    "r3_continuous_v1",
+    "r3_continuous_v1_pose_path_x20",
+})
+_PICKCUBE_POSTURE_PATH_ORIGINAL = "original"
+_PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP = "world_x_roundtrip_v1"
+_NUT_ASSEMBLY_MAX_STAGE_PLAN_S = 6.0
 PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
-    "schema_version": "pick-cube-r3-continuous-profile-v1",
-    # The existing R3 default is 2 rad/s. On the identical seed-31 PickCube
-    # action trace, the stable R1 route reached 3.714 rad/s while R3's offline
-    # replay clipped its resolved-rate command repeatedly during approach.
-    # Give this task's existing R3 controller enough rate to track that route;
-    # this changes neither its controller implementation nor task recipe.
-    "joint_velocity_limit_rad_s": 4.0,
+    "schema_version": "pick-cube-r3-nut-aligned-profile-v2",
+    "joint_velocity_limit_rad_s": 2.0,
+    "gripper_force_limit_N": 10.0,
 }
 
 from .task import semantic_definition, evaluate, sample_reset
@@ -96,6 +104,40 @@ def _environment_config(data=None):
     runtime = replace(config.runtime, backend="cpu", prewarm=False,
         physics_dt=float(recipe["physics_dt"]), control_substeps=int(recipe["control_substeps"]))
     return replace(config, runtime=runtime, render=replace(config.render, camera_obs=False))
+
+
+def _nut_aligned_environment_config(config):
+    """Resolve the selected PickCube R3 source with NutAssembly's 10 N gripper cap."""
+    return replace(
+        config,
+        robot=replace(
+            config.robot,
+            gripper=replace(
+                config.robot.gripper,
+                force_limit_N=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_force_limit_N"],
+            ),
+        ),
+    )
+
+
+def _pickcube_r3_planner_config(dynamic_profile, control_dt):
+    """Convert the frozen production R3 planner profile to 100 Hz per-tick limits."""
+    planner = dynamic_profile["planner"]
+    dt = float(control_dt)
+    return AbsolutePosePlannerConfig(
+        max_translation_per_step=float(planner["translation_speed_m_s"]) * dt,
+        max_translation_acceleration_per_step=(
+            float(planner["translation_acceleration_m_s2"]) * dt**2
+        ),
+        max_rotation_per_step=float(planner["rotation_speed_rad_s"]) * dt,
+        max_rotation_acceleration_per_step=(
+            float(planner["rotation_acceleration_rad_s2"]) * dt**2
+        ),
+        settle_steps=math.ceil(
+            float(planner["settle_duration_s"]) / dt - 1e-10
+        ),
+        max_steps=math.ceil(_NUT_ASSEMBLY_MAX_STAGE_PLAN_S / dt - 1e-10),
+    )
 
 
 def _declaration(*, lift_height_m=None, task_config=None):
@@ -165,23 +207,36 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     recipe = task_config["recipe"]
     if backend not in {"cpu", "cuda"}:
         raise ValueError("PickCube reference backend must be cpu or cuda")
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
+    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
+    dynamic_profile, profile_source = _r3_dynamic_profile() if is_r3_profile else (None, None)
+    if is_r3_profile:
+        config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
     artifact, source = compiled.artifact, compiled.source
-    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
-        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    posture_path_profile = (
+        _PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP
+        if controller_profile == "r3_continuous_v1_pose_path_x20"
+        else _PICKCUBE_POSTURE_PATH_ORIGINAL
+    )
+    planner_config = (
+        _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
+        if is_r3_profile else None
+    )
     readiness = PickCubeReadinessConfig.from_source(
         artifact, source,
-        measured_tcp_clearance_gate=(controller_profile == "r3_continuous_v1"),
+        measured_tcp_clearance_gate=is_r3_profile,
+        planner=planner_config,
+        posture_path_profile=posture_path_profile,
     )
-    profile_source = None
     if controller_profile == "r1":
         controller = ProductionCanonicalPandaController.from_source(artifact, source)
     else:
         from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
-        dynamic_profile, profile_source = _r3_dynamic_profile()
         controller = ProductionCanonicalPandaControllerR3.from_source(
             artifact, source, profile=dynamic_profile,
             joint_velocity_limit_rad_s=(
@@ -207,6 +262,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     if controller_profile != "r1":
         resolved["controller_profile"] = controller_profile
         resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
+        resolved["task_controller_profile"]["posture_path_profile"] = posture_path_profile
         resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
@@ -340,7 +396,9 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None, resolved_config=None, lift_height_m=None, task_config=None):
+def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
+                           resolved_config=None, lift_height_m=None, task_config=None,
+                           interval_provider=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def build(provider):
@@ -386,7 +444,13 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
         evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
         object_poses=(("cube-v1", "cube_v1"),),
-        external_actions=True, interval_mode="grouped", recorder_mode="canonical",
+        external_actions=True,
+        interval_mode=(
+            "native"
+            if interval_provider == "mujoco" and controller_profile in _PICKCUBE_R3_PROFILES
+            else "grouped"
+        ),
+        recorder_mode="canonical",
         reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
         observe_expert_kwargs=lambda env, guard_samples: {"execution_info": env.expert_execution_info()},
     )
@@ -443,11 +507,17 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         horizon = config.environment.episode.horizon
         profile = config.controller_profile
         manifest = config.source_delivery_manifest
+        if profile in _PICKCUBE_R3_PROFILES:
+            config = replace(
+                config,
+                environment=_nut_aligned_environment_config(config.environment),
+            )
         task_config = json.loads(config.task_configuration_json)
         binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest,
                                          resolved_config=config.environment,
                                          lift_height_m=dict(config.task_parameters).get("lift_height_m"),
-                                         task_config=task_config)
+                                         task_config=task_config,
+                                         interval_provider=provider)
         if provider == 'isaacsim':
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,
