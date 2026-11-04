@@ -1,11 +1,11 @@
 # Observation and rendering
 
 **Import path**：`task_env.observations`
-**任务域**：Appendix  
-**稳定性**：Public API / Advanced boundary  
+**任务域**：Appendix
+**稳定性**：Public API / Advanced boundary
 **职责**：从一次公开 snapshot 构建 state、RGB、depth observation。
-**调用者/消费者**：`BaseTaskEnv`。  
-**源码**：`observations/state.py`、`observations/camera.py`、`observations/capture.py`
+**调用者/消费者**：classic `BaseTaskEnv` 及 selected 路线。
+**源码**：`observations/state.py`、`observations/camera.py`、`observations/capture.py`、`observations/selected_reference.py`
 
 ## `StateObservationBuilder`
 
@@ -21,7 +21,7 @@
 
 ## UI rendering
 
-**Import path**：`task_env.render`；**状态**：单环境 RGB/offscreen 与基础 headed lifecycle 已接入。
+**Import path**：`task_env.render`；**状态**：以下描述 classic-control 的 render 路线，不适用于当前 selected manipulation。selected 普通配置只接受 state-only，并明确拒绝非空 `render_mode` 和非 none renderer。真实 capability 按具体任务、provider、backend 与 renderer 的验证范围判断。
 
 创建环境时传入 `render_mode="human"` 或 `render_mode="rgb_array"`，之后调用 `env.render()`。UI
 render source 在 runtime 装配时准备，但 visualizer 在第一次 `render()` 时 lazy 创建；`rgb_array` 返回
@@ -43,7 +43,7 @@ UI rendering 绝不会把 `CameraObservationProvider` 的 sensor image 冒充为
 
 当前 `merged_scene` runtime 使用全局扁平 body/geom 字段的 selected device slice，只写入一个 renderer
 proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。内部仍保留对 `(world, local)` 字段形状的历史读取分支，但 public `develop` 集成 S4 后没有 TaskEnv physics route 产生该布局。选中的每个 world 在同一帧内写入
-自己的 renderer record range，然后一次性发布快照，因此网格中不会只显示最后一个 world。
+自己的 renderer record range，然后一次性发布快照。旧 parallel 路线保留，不能以该实现描述推断统一 Env 的 batch 能力。
 
 真实 source 当前支持内部 `rasterizer`/`raytracer`。`rgb_array` 保持 renderer 创建时的固定网格视角，
 `human` 使用同一 visualizer/window，并保留单环境的右键拖拽、滚轮与 W/S/A/D/E/Q 相机控制；窗口关闭
@@ -53,4 +53,4 @@ human presentation 会在窗口关闭后重开，并显示 renderer rebuild、sn
 次数 metrics；这些 metrics 不写入 `rgb_array`。
 
 并行 world 的刚体几何优先使用 surface 表示，以保留 `SubGeomDesc` 的局部位置/姿态；这对 Pendulum 的
-`fromto` link 尤其重要。PickCube 尚未声明同构并行 task contract，仍使用单环境 render API。
+`fromto` link 尤其重要。PickCube 尚未声明同构并行 task contract；其 selected public route 当前也不提供单环境 render API。

@@ -1,10 +1,10 @@
 # Task environment
 
-**Import path**：`task_env.BaseTaskEnv`、`task_env.tasks.BaseTaskEnv`  
-**任务域**：Task Semantics  
-**稳定性**：Public API（使用）/ Extension API（子类 hooks）  
-**职责**：组合组件、维护 Gym reset/step 生命周期。  
-**调用者/消费者**：用户、wrapper、内置 task。  
+**Import path**：`task_env.BaseTaskEnv`、`task_env.tasks.BaseTaskEnv`
+**任务域**：Task Semantics
+**稳定性**：旧 classic 路线及兼容入口；统一迁移尚未完成。
+**职责**：本文先描述旧 classic 生命周期；selected 路线见下文。
+**调用者/消费者**：用户、wrapper、内置 task。
 **源码**：`task_env/environment/env.py`
 
 ## `task_env.tasks.BaseTaskEnv`
@@ -13,7 +13,7 @@
 
 ### Signature
 
-`BaseTaskEnv(config: ResolvedEnvConfig | None = None, *, build_runtime: bool = True)`
+`BaseTaskEnv(config: ResolvedEnvConfig | None = None, *, render_mode=None, build_runtime: bool = True)`
 
 `reset(*, seed: int | None = None, options: dict[str, Any] | None = None)` 返回 `(observation, info)`；会应用初态、归零 elapsed steps、reset action/render/task definition。`step(action)` 返回 Gym 五元组 `(observation, reward, terminated, truncated, info)`：terminal 后再次 step 在 reset 前抛 `RuntimeError`。
 
@@ -39,3 +39,9 @@ finally:
 [`doc/api/examples/index.md`](../examples/index.md)。当前 manipulation UIDs 与
 expert/recording 入口见仓库根目录 `examples/README.md`；历史 `pick-cube-v1`
 不会映射到新的 selected task。
+
+## 当前 selected 路线
+
+`task_env.environment.reference_env.SelectedReferenceEnv` 是 selected 环境的当前实现 owner；`task_env.tasks.reference_env.SelectedReferenceEnv` 为兼容导入。PickCube 和 Nut 由 `make_env` 根据其 task class 与 selected 配置构造，并非上述 `BaseTaskEnv` 类对象。普通 selected `reset()` 不传 seed 时使用 19；显式 `seed=None` 与省略并不等价。Position 候选的 seed 受固定 reset plan 约束，mixed 候选有独立明确的 reset-plan 检查。普通 selected 非空 options 不支持。
+
+selected `step(action)` 与 `step_expert()` 均返回 observation、reward、terminated、truncated、info；Expert 必须由任务提供，不能与外部动作在同一 episode 混用。执行 fault 后必须 reset；`close()` 释放环境持有的 session，重复 close 幂等。selected 普通 public 配置当前 state-only，不接受 `render_mode`。Action/observation、termination 与 success 以实际任务和其 spaces、metadata、评估为准；不将 Panda 的输入维数套到 classic-control。统一生命周期和 `BaseTaskEnv` 同对象 alias 尚未完成，见[维护检查点](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/pre-stage3-refactor-attempt001.md)。
