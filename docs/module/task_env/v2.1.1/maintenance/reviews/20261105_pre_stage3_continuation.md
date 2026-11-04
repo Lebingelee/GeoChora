@@ -321,3 +321,8 @@ PickCube／Nut的源码清单增加共同路径工具以如实记录新的直接
 PickCube与Nut的构造来源清单此前包含RuntimeSource及环境，但遗漏实际参与selected物化准入的 `runtime.sessions.api` 与 `runtime.sessions.control`。现将这两个文件纳入两任务的构造摘要；新增检查分别比较当前磁盘字节，已有PickCube外部Solution录制／重执行检查改为专门篡改或移除control模块摘要并确认在输出前拒绝。清单仍不是完整的Python调用图或运行中代码字节证明，provider实现与间接依赖须按各自证据核对。已包含旧源码清单的历史记录因清单精确匹配而可能拒绝在新源码上重执行；不补写旧记录或把它称为同源。
 
 由于Nut specialization源码变化，R05b 100／500 Hz Controller身份重新计算为 `ff8581c54a2a182f01a460413f742605c1217740a14e7d2e4412d1d6bf668b5e`／`03d7b779743d6d78685bbcca891a4353295768c9092dd9499e6cc601f8b010f9`，仅刷新严格身份值，其他准入不放宽；Nut specialization SHA为 `10c06fbf7f310735d34075774b6b1dfabb70e509bc39528c2277042b382b9707`。受监督、禁止引擎导入的完整selected／配置／R05b／F06投影／录制组合 **187 passed、2 deselected**，最大RSS 165576704 bytes；将已有重执行测试改为针对control模块后，相关定向组 **5 passed**。完整argv、退出码及资源采样见ignored `runtime-source-inventory/`、`runtime-source-replay/`。未运行真实引擎、Isaac、GPU或物理reader。
+
+
+## 完整离线门重跑与边界测试修复（续作，待复审）
+
+在 `e1db3204` 重跑此前完整离线门发现一个测试替身缺少已提取的 `_source_xml_sha256` 方法；其余289项通过，1项跳过、5项排除。以 `7756812f` 修正测试替身绑定，先对边界与Nut五样本缓存定向检查，再对tracked clean源码重跑完整离线门，结果为 **290 passed、1 skipped、5 deselected**。具体排除、命令、资源和原始输出见[门核对](20261105_pre_stage3_gate_audit.md)及ignored `audit-e1db3204-offline/`、`audit-7756812f-offline/`。该修复未改变运行时代码，测试不证明物理结果；整体维护仍为PARTIAL。

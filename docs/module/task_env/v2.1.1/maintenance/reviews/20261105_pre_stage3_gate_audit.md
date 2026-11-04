@@ -2,6 +2,14 @@
 
 本页是维护者交接用的验收门核对草稿，不是Sol复审决定，也不是阶段3启动授权。维护仍在进行；后续源码提交须重新核对受影响证据。详细变更和历史运行身份见[续作检查点](20261105_pre_stage3_continuation.md)，原attempt001／attempt002门结果不倒填。
 
+## 后续源码检查：`7756812f`
+
+对tracked clean `7756812ffece98b1792557653acd846a370b9194` 重跑 `a55ccac3` 的完整离线审计范围，禁用外部pytest插件并禁止引擎导入：**290 passed、1 skipped、5 deselected**，worker耗时15.442秒，进程树最大RSS 171524096 bytes。skip为冻结Isaac解释器未安装；排除真实Pendulum两项、真实F06场景、真实selected provider reset／step及真实Position close。完整argv、退出码、资源采样及原始输出见ignored `audit-7756812f-offline/`。
+
+首次对 `e1db3204` 执行相同范围时为289 passed、1 failed、1 skipped、5 deselected：原轻量测试替身未绑定后来提取的XML摘要方法。修正测试替身后单独验证缓存复用与内容替换，再以新clean提交运行上述完整范围；修复不更改运行时代码。构造来源清单、Marker通用构造、混合控制回执及对应测试变更见[续作记录](20261105_pre_stage3_continuation.md)，后续变更不得沿用本次结果作为其源码证据。
+
+该检查不覆盖真实物理、独立物理reader或全新安装；未启动Isaac、GPU或native窗口。当前源码代表性PickCube／Nut物理回归、独立reader、剩余职责判断与Sol复审仍未完成，整体继续为 **PARTIAL**，阶段3未开始。
+
 ## 后续源码检查：`e8ad4484`
 
 Marker指南的公共factory路线已在本机已有MuJoCo 3.8.1 CPU上完成一次reset、space采样动作、step与close；详细来源、预算和锁收据见[续作记录](20261105_pre_stage3_continuation.md)。这不证明新安装、任务成功或其他provider。Marker构造仍有内部binding接线，当前源码PickCube／Nut代表性物理回归及独立物理reader仍未完成；整体维护继续为 **PARTIAL**。
