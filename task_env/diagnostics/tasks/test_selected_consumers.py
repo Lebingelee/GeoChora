@@ -480,6 +480,18 @@ def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake):
         env.close()
 
 
+def test_nutassembly_rejects_unguarded_finite_external_action_without_step(fake):
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        env.reset(seed=19)
+        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
+            env.step(np.zeros(8, dtype=np.float64))
+        assert env.state.control_step == 0
+        assert env._episode_mode is None and not env.session.calls
+    finally:
+        env.close()
+
+
 def test_c05b_public_solution_lifecycle_and_control_ack_match_internal(fake, tmp_path):
     from task_env.planners.completion import ExpertExecutionInfo
     from task_env.tasks.pick_cube import build_readiness_solution
