@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-04",
-  "status": "G02_2B_PAUSED_INTERIM_REVIEW",
+  "status": "G02_2B_MANUAL_SUCCESS_PENDING_CLOSEOUT",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": "2b",
-  "next_action": "Maintainer manually resumes the same attempt001 with complete r002 replacement package after Sol interim review. No duplicate writer, attempt002, 2c or stage3.",
+  "next_action": "Preserve and close out maintainer-verified lowered-waypoint success: stabilize existing changes, sync targeted tests and impacted regressions, freeze exact route status. Do not redispatch superseded r002 or start2c/stage3.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -410,7 +410,7 @@
           "dependencies": [
             "2a"
           ],
-          "status": "PAUSED_INTERIM_REVIEW",
+          "status": "MANUAL_SUCCESS_PENDING_CLOSEOUT",
           "attempt_count": 1,
           "attempts": [
             {
@@ -418,7 +418,7 @@
               "package_id": "V211_G02_2b_attempt001",
               "package_manifest_sha256": "eb6c26983646262f56cee1d3f788622994b013096b33282131171d048722a480",
               "prompt_sha256": "7f732b250707c398a8d6531dad519a242b12b9f7075a7829a1d2094b1ca7cb08",
-              "status": "PAUSED_INTERIM_REVIEW",
+              "status": "SUPERSEDED_BY_MAINTAINER_MANUAL_TAKEOVER",
               "result": "INCOMPLETE",
               "input_head": "08103c5156020c340b2d1f373a78a63515e67bb3",
               "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
@@ -441,10 +441,12 @@
               "resume_revision": "r002",
               "resume_is_new_attempt": false,
               "resume_package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_attempt001_resume_r002",
-              "full_report_sealed": false
+              "full_report_sealed": false,
+              "superseded_revision": "r002",
+              "manual_success_review_ref": "reviews/20261104_manual_stage2_success_sol_review.md"
             }
           ],
-          "assigned_agent": "Original Terra/Luna main executor, paused by maintainer; no active writer/native owner during Sol review",
+          "assigned_agent": "Maintainer-directed manual execution completed and released; Sol read-only numerical review",
           "package_path": "external handoff V211_G02_2b_attempt001; same-attempt replacement V211_G02_2b_attempt001_resume_r002",
           "package_sha256": "eb6c26983646262f56cee1d3f788622994b013096b33282131171d048722a480",
           "input_head": "08103c5156020c340b2d1f373a78a63515e67bb3",
@@ -459,33 +461,81 @@
             "isaac_reserved_steps_max": 60036,
             "isaac_worker_seconds_max": 2400,
             "isaac_app_starts_max": 2,
-            "native_starts_so_far": 0,
             "pre_pause_active_time": "RECONCILE_NOT_ZERO_ASSUMED",
-            "route_memory_gates": "r002: MuJoCo start2/stop0.75/RSS3 GiB; GeoPhys3/1/6; Isaac6/1/14"
+            "route_memory_gates": "r002: MuJoCo start2/stop0.75/RSS3 GiB; GeoPhys3/1/6; Isaac6/1/14",
+            "ordinary_native_starts_at_pre_manual_pause": 0
           },
-          "last_observation": "Maintainer paused incomplete 2b. Sol independently reproduced8 passing offline tests, detected110-tick A/B confound and partial-lock failure, compared authored plant XML and located existing Isaac/GeoPhys environment metadata. No task/native acceptance.",
+          "last_observation": "Sol verified960/961 H5 boundaries,960 target acknowledgements, original task and0.105m collection predicates,26 current source hashes and controlled cross-replay; archived four runs. Current targeted tests have stale import and two stale assertions.",
           "evidence_refs": [
-            "reviews/20261104_2b_sol_interim_review.md"
+            "reviews/20261104_2b_sol_interim_review.md",
+            "reviews/20261104_manual_stage2_success_sol_review.md"
           ],
           "commits": [
             "987873018c48ff3c677db521b58838b898e7ebe3"
           ],
           "review_decision": {
-            "status": "NEEDS_REWORK_INTERIM",
+            "status": "ACCEPTED_BOUNDED_MANUAL_SEED31_SUCCESS_EVIDENCE",
             "reviewer": "Sol",
             "date": "2026-11-04",
-            "review_ref": "reviews/20261104_2b_sol_interim_review.md",
-            "accepted": false,
-            "complete_report_received": false,
-            "scope": "Paused candidate, offline evidence and preparation helpers only; no 2b native run."
+            "review_ref": "reviews/20261104_manual_stage2_success_sol_review.md",
+            "accepted_2b": false,
+            "scope": "One public full PickCube MuJoCo CPU seed31 success with unchanged task lift predicate; manual dirty source and its controlled diagnostics."
           },
           "blockers": [
-            "A/B has extra110 ticks in B",
-            "Supervisor cleanup/aggregate accounting incomplete",
-            "Compiled plant dynamics/full execution alignment unverified",
-            "All 2b native task/regression runs NOT_RUN"
+            "Manual implementation remains uncommitted in9 existing dirty files",
+            "Safe-approach test imports renamed constant; gate and lift-count assertions use old policy",
+            "Post-extraction Nut regression and different-reset representative check not completed",
+            "GeoPhys/Isaac representative native results still NOT_RUN"
           ],
-          "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3"
+          "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
+          "manual_takeover": {
+            "authorization": "Maintainer direct step-by-step commands in original execution conversation; replaces old execution prompt.",
+            "thread_id": "01a1a18e-cee0-7b03-8f95-2560ffc03356",
+            "ordinary_attempt_count_changed": false,
+            "source_head": "4ebbcfdff1109334974c19b1b81be81d4b970871",
+            "source_state": "HEAD plus uncommitted manual changes; not a committed candidate",
+            "dirty_paths": [
+              "task_env/controllers/canonical/execution.py",
+              "task_env/controllers/canonical/gripper_execution.py",
+              "task_env/diagnostics/phase1/frequency_grasp/cadence.py",
+              "task_env/diagnostics/tasks/test_v211_pickcube_solution_regression.py",
+              "task_env/planners/cartesian.py",
+              "task_env/tasks/nut_assembly/solution.py",
+              "task_env/tasks/nut_assembly/specialization.py",
+              "task_env/tasks/pick_cube/solution.py",
+              "task_env/tasks/pick_cube/specialization.py"
+            ],
+            "success_h5_sha256": "4b9e2e78cb69d08c3b6f023112859e2f9f273eba4ff3905fd21a31a610f3b9e6",
+            "solution_sha256": "0ab4e3480dfa680d337c0c9eae3fd9600e4faed6e8a19a00da1738019ce6cbdf",
+            "transitions": 960,
+            "boundaries": 961,
+            "seed": 31,
+            "horizon": 1000,
+            "provider": "mujoco",
+            "backend": "cpu",
+            "task_success": true,
+            "solution_done": true,
+            "expert_complete": true,
+            "task_lift_metric_m": 0.10518958081676949,
+            "net_initial_to_final_lift_m": 0.10418958081676949,
+            "measured_clearance_gate_m": 0.065,
+            "original_task_lift_threshold_m": 0.1,
+            "source_files_verified": 26,
+            "reviewed_latest_runs": 4,
+            "reviewed_latest_native_steps": 21370,
+            "reviewed_run_count_is_total_manual_resource_ledger": false,
+            "source_snapshot_and_raw_archive": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_manual_success_sol_review_20261104",
+            "review_decision": {
+              "status": "ACCEPTED_BOUNDED_MANUAL_SEED31_SUCCESS_EVIDENCE",
+              "reviewer": "Sol",
+              "date": "2026-11-04",
+              "review_ref": "reviews/20261104_manual_stage2_success_sol_review.md",
+              "accepted_2b": false,
+              "scope": "One public full PickCube MuJoCo CPU seed31 success with unchanged task lift predicate; manual dirty source and its controlled diagnostics."
+            },
+            "writer_and_native_released": true,
+            "sol_native_starts": 0
+          }
         },
         {
           "id": "2c",
@@ -890,7 +940,12 @@
     "input_review_head": "11b1e6c5bf8011acdc39f10449e2eb25764da92d",
     "implementation_complete": false
   },
-  "paused_packages": [
-    "V211_G02_2b_attempt001"
+  "paused_packages": [],
+  "superseded_execution_packages": [
+    {
+      "package_id": "V211_G02_2b_attempt001",
+      "revision": "r002",
+      "reason": "Maintainer manually took over diagnosis, changed waypoints/readiness and obtained seed31 success."
+    }
   ]
 }

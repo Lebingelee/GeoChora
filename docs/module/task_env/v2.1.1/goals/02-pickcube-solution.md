@@ -34,13 +34,19 @@ Sol 独立核验原227个边界的纯模型FK与公开TCP位置最大差小于7e
 - **检查：**任务谓词、合法生命周期成功、Solution completion 分开报告；验证必要运动、抓取／抬升／保持等阶段事实，完整记录有效执行并独立读回。
 - **交付／出口：**MuJoCo 有完整成功参考；另两路线的代表性结果和需后续公共能力解决的问题明确，不要求每改一处跑九格。
 
-### 2b attempt001 暂停中间复审（2026-11-04）
+### 此前2b attempt001 暂停中间复审（2026-11-04时点记录）
 
 候选 `987873018c48ff3c677db521b58838b898e7ebe3` 的窄离线回归通过，但原任务A/B、完整成功及本包原生回归均未运行。维护者暂停goal，Sol中间主审要求返工，详见[记录](../maintenance/reviews/20261104_2b_sol_interim_review.md)；不是完整交付接收。2b状态PAUSED_INTERIM_REVIEW、attempt1，2c仍未启动。
 
 维护者追加要求：全过程对齐PickCube与NutAssembly的Controller/planner参数，并在相同具名q／qdot下验证臂体动力学、native drive与实际执行节拍。当前纯XML显示臂体惯量／joint／臂actuator记录一致，但夹爪forcerange与接触求解选项有差异，编译动力学仍待核验。姿态A/B须逐tick平移／长度／gate计划位置一致，消除B额外110ticks等待；先修监督器异常清理与累计预留，再启动native。区分动态滞后、局部DLS停滞与全局可达性，不由奇异值小直接宣称目标不可达。
 
 同attempt r002恢复包按route区分内存门，复用已定位的既有解释器／冻结USD资产，验证当前源码origin／admission；不自动安装、改pin／物性／oracle或启动旧项目源码。原始失败／候选及已耗预算保留，维护者手动恢复，不另派重复包。
+
+### 维护者人工接管后的成功（2026-11-04当前状态）
+
+维护者逐步对齐完整R3执行链、固定点列与初态跨环境复核，再把高位点0.753→0.603m、接近点0.633→0.593m。新低位路径的空载误差RMS由22.42→2.19mm；随后真实碰撞、public task-owned Solution在MuJoCo CPU seed31、horizon1000中960步成功。原task lift门限0.10m不变，Solution相对task rest-height的lift为0.10519m，完成0.105m收集余量。配套measured gate改为65mm，完整run另含34/50/10 close/settle/postclose hold与hold/ramp；成功对应整组人工变更，不单独归因于一个高度值。
+
+Sol独立接收有界单seed成功证据，见[主审](../maintenance/reviews/20261104_manual_stage2_success_sol_review.md)，状态MANUAL_SUCCESS_PENDING_CLOSEOUT。原r002姿态绕行包由人工指示取代，不再重复派发。当前九份代码改动未提交，tests尚有旧常量导入、215mm gate和lift点数断言未同步；共享抽取的Nut等受影响回归与另两route仍待收尾。以成功版固化与必要回归为下一动作，不再要求泛化根因实验；2c／阶段3保持未开始。
 
 <a id="2c"></a>
 ## 2c：冻结可复现参考
