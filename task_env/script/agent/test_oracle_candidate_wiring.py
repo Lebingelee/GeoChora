@@ -54,6 +54,16 @@ def record_candidate_preflight(spec_path, catalog_path, output):
             self.failed = False
             self.failure_reason = None
 
+        def reset(self, observation, info, metadata):
+            pass
+
+        def act(self, observation, info):
+            from task_env.planners.contracts import ExpertAction
+            return ExpertAction(action=[0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04], stage='lift')
+
+        def observe(self, observation, reward, terminated, truncated, info):
+            self.done = True
+
         def outcome_report(self):
             return {}
 
@@ -70,7 +80,8 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                 self.horizon = compiled.horizon
                 self.value = value
                 self.controller = value['controller']
-                self.solution = SolutionLifecycleSubstitute(value['solution_identity'])
+                self.solution = None
+                self.value = dict(value, solution_factory=lambda: SolutionLifecycleSubstitute(value['solution_identity']))
                 self._external_solution_owner = None
                 self.execution = ExecutionSpec(provider, PROFILE, 'none', 'cpu', 0, 'strict')
                 self.session = ProviderSessionSubstitute()
@@ -123,7 +134,7 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                         *self.sample.poses_world['cube-v1'].quaternion_wxyz]], dtype=np.float32)}}
                 return self.obs, self.info
 
-            def step_expert(self):
+            def step(self, action):
                 pose = self.state.pose_world['panda-v1/ee']
                 request = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz',
                     tuple(float(value) for value in (*pose.position, *pose.quaternion_wxyz, 1.0)))
@@ -161,7 +172,6 @@ def record_candidate_preflight(spec_path, catalog_path, output):
                         *poses['cube-v1'].position, *poses['cube-v1'].quaternion_wxyz]], dtype=np.float32)}}
                 self._record_interval(request, canonical, target, applied, 'lift', {},
                     False, False, [])
-                self.solution.done = True
                 return self.obs, 1.0, False, False, self.info
 
         return ProviderIoPreflightEnv
@@ -197,6 +207,37 @@ def record_candidate_preflight(spec_path, catalog_path, output):
 class OracleCandidateWiringTests(unittest.TestCase):
     def test_helper_is_importable(self):
         self.assertTrue(callable(record_candidate_preflight))
+
+    def test_wrong_caller_identity_fails_before_step_and_closes(self):
+        from test_completion_facts import SPEC
+        class Env:
+            def __init__(self, **kwargs):
+                self.value = {'solution_factory': lambda: SimpleNamespace(identity='wrong'),
+                              'solution_identity': 'expected'}
+                self.closed = False
+                self.stepped = False
+            def reset(self, *, seed):
+                return {}, {}
+            def step(self, action):
+                self.stepped = True
+                raise AssertionError('invalid identity must not step')
+            def close(self):
+                self.closed = True
+        env = Env()
+        compiled = SimpleNamespace(artifact_hash='a' * 64,
+            artifact=SimpleNamespace(to_mapping=lambda: {}), env_class=lambda: lambda **kwargs: env)
+        context = {'core_repo': str(Path(__file__).resolve().parents[3]),
+                   'core_commit': 'c' * 40, 'core_dirty': False}
+        with tempfile.TemporaryDirectory() as parent, \
+                patch.object(oracle_candidate, 'validate_catalog', return_value=context), \
+                patch.object(oracle_candidate, 'compile_candidate', return_value=compiled):
+            report = oracle_candidate.record_candidate(
+                SPEC, {'external_assets': {}}, provider='mujoco', seed=0,
+                directory=Path(parent) / 'oracle', time_limit_s=10)
+        self.assertEqual(report.status, 'error')
+        self.assertFalse(env.stepped)
+        self.assertTrue(env.closed)
+        self.assertIn('identity differs', report.details['errors'][0]['message'])
 
 
 if __name__ == '__main__':

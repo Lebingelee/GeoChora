@@ -66,12 +66,12 @@ def run_seed(env_class, provider, seed, horizon):
         row['reset_attempted'] = True
         obs, info = env.reset(seed=seed)
         row['reset_succeeded'] = True
-        caller_owned = bool(getattr(getattr(env, 'binding', None), 'external_solution_actions', False))
-        if caller_owned:
-            solution = env.value['solution_factory']()
-            solution.reset(obs, info, env.metadata)
-        else:
-            solution = env.prepare_expert()
+        if not getattr(getattr(env, 'binding', None), 'external_solution_actions', False):
+            raise TypeError('feasibility probe requires a caller-driven Solution action route')
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value.get('solution_identity'):
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(obs, info, env.metadata)
         phase = 'execution'
         row['phase'] = phase
         while True:
@@ -102,12 +102,9 @@ def run_seed(env_class, provider, seed, horizon):
                 row.update(reason=reason)
                 break
             row['step_attempts'] += 1
-            if caller_owned:
-                action = solution.act(obs, info)
-                obs, reward, terminated, truncated, info = env.step(action)
-                solution.observe(obs, reward, terminated, truncated, info)
-            else:
-                obs, _, terminated, truncated, info = env.step_expert()
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
             row.update(terminated=terminated, truncated=truncated)
             row['steps'] += 1
     except Exception as error:

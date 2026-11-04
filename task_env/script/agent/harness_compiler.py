@@ -388,7 +388,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
 
     binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
-        object_poses=(('cube-v1','cube_v1'),),external_actions=True,interval_mode='grouped',recorder_mode='canonical',
+        object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
+        interval_mode='grouped',recorder_mode='canonical',
         reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))
     return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,
         hashlib.sha256(source.scene_source.xml.encode()).hexdigest())

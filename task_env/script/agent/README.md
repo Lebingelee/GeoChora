@@ -59,6 +59,12 @@ runtime.
 | `builtin_example_schema.py` / `harness_compiler.compile_builtin_pickcube_example` | Versioned built-in PickCube example input; delegates to the public Core UID and never creates a CandidateSpec |
 | `builtin_example_validation.py` / `builtin_example_worker.py` | Bounded fixed-seed runtime example, existing Core Recorder H5, identity/finite/T+1 readback and separate task/runtime outcome facts |
 
+The candidate feasibility and oracle workflows drive a caller-owned Solution
+through `act → env.step(action) → observe`. Legacy `--env` inputs must expose
+the caller-driven action route and a matching Solution factory; unsupported
+routes fail explicitly rather than falling back to `step_expert()`. Catalog
+provenance still requires a clean checkout, including untracked files.
+
 ## Built-in PickCube runtime example
 
 `--execution harness --provider {mujoco,geophys,isaacsim,genesis,sapien}` selects

@@ -54,8 +54,8 @@ finally:
 
 The NutAssembly and scalar CPU PickCube examples use caller-owned
 `act → step(action) → observe`. PickCube Position/F06 and the built-in Harness use the same caller-driven
-pattern in source; their new route has synthetic evidence only. Other advanced
-Harness routes retain separate compatibility boundaries. NutAssembly does not admit arbitrary ordinary external actions. A successful physical task outcome, a completed
+pattern in source; their new route has synthetic evidence only. The generic candidate Harness also requires a caller-driven Solution action
+route; unsupported legacy routes fail explicitly. NutAssembly does not admit arbitrary ordinary external actions. A successful physical task outcome, a completed
 expert lifecycle, and a finalized recording are reported separately.
 
 ## Batch and learning boundary

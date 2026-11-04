@@ -102,28 +102,6 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int):
         resource.setrlimit(resource.RLIMIT_AS, (as_soft, as_hard))
 
 
-def run_expert(env, *, seed: int, horizon: int, already_reset: bool = False,
-               initial_info: Mapping | None = None) -> dict:
-    """Reset and drive only the selected task-owned expert entry point."""
-
-    if not already_reset:
-        _, info = env.reset(seed=seed)
-    else:
-        info = dict(initial_info or {})
-    terminated = truncated = False
-    transitions = 0
-    env.prepare_expert()
-    while transitions < horizon and not env.solution.done and not env.solution.failed:
-        _, _, terminated, truncated, info = env.step_expert()
-        transitions += 1
-        if terminated or truncated:
-            break
-    if transitions >= horizon and not env.solution.done and not env.solution.failed:
-        truncated = True
-    return episode_result(env, info=info, transitions=transitions,
-                          terminated=terminated, truncated=truncated)
-
-
 def run_caller_solution(env, solution, obs, info, *, horizon: int) -> dict:
     """Drive a caller-owned Solution using the public action/observation boundary."""
     terminated = truncated = False

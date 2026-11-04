@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import tempfile
 import unittest
@@ -53,6 +54,16 @@ class FakeSolution:
         self.failure_reason = None
         self.stage = 'lift'
         self._outcome = outcome
+        self.identity = 'fixture-solution'
+
+    def reset(self, observation, info, metadata):
+        pass
+
+    def act(self, observation, info):
+        return object()
+
+    def observe(self, observation, reward, terminated, truncated, info):
+        pass
 
     def outcome_report(self):
         return {} if self._outcome is None else self._outcome
@@ -62,6 +73,9 @@ class FakeEnv:
     def __init__(self, scenario):
         self.artifact = type('Artifact', (), {'identity_hash': ARTIFACT_HASH})()
         self.solution = FakeSolution(scenario.get('outcome'))
+        self.binding = SimpleNamespace(external_solution_actions=True)
+        self.value = {'solution_factory': lambda: self.solution, 'solution_identity': self.solution.identity}
+        self.metadata = {}
         self.execution_fault = None
         self.sample = None
         self.scenario = scenario
@@ -76,7 +90,7 @@ class FakeEnv:
     def prepare_expert(self):
         return self.solution
 
-    def step_expert(self):
+    def step(self, action):
         scenario = self.scenario
         if scenario.get('step_error'):
             error = LookupError('step broke')
@@ -143,6 +157,21 @@ class RunSeedCompletionTests(unittest.TestCase):
         row = run_seed(lambda **kwargs: env, 'mujoco', 7, horizon)
         self.assertTrue(env.closed)
         return row
+
+    def test_missing_caller_route_and_wrong_solution_identity_fail_before_step(self):
+        for mode in ('missing_route', 'wrong_identity'):
+            with self.subTest(mode=mode):
+                env = FakeEnv({'done': True, 'success': True})
+                if mode == 'missing_route':
+                    env.binding.external_solution_actions = False
+                else:
+                    env.value['solution_identity'] = 'another-solution'
+                row = run_seed(lambda **kwargs: env, 'mujoco', 7, 1)
+                self.assertEqual(row['steps'], 0)
+                self.assertEqual(row['classification'], 'invalid')
+                self.assertTrue(env.closed)
+                self.assertIn('caller-driven' if mode == 'missing_route' else 'identity differs',
+                              row['error_message'])
 
     def test_final_legal_step_can_complete_at_horizon(self):
         row = self.run_scenario({'done': True, 'success': True}, horizon=1)

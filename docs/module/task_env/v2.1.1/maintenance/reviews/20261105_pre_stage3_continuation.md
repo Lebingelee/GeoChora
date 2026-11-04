@@ -85,3 +85,9 @@ PickCube readiness Solution在调用方提供公开info时将当前source bounda
 PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投影为结构化请求，校验任务Solution身份、公开state boundary与当前typed state；实际控制计划继续原有完整预检。Position episode owner负责推进、故障、发布和记录，调用方负责 `Solution.observe()`；不让Env在新路径中调用Solution。内建PickCube Harness的trace改为包装公开 `env.step()`，并由调用方驱动Solution。普通scalar CPU及旧 `step_expert()` 兼容路径保留。
 
 无引擎组合 **131 passed、1 skipped、1 deselected**，包含合成Position请求与错误边界／身份／维度拒绝、调用方Position的record成功／失败发布边界及Harness trace；真实F06场景投影被排除；1项Isaac解释器help测试因本checkout未配置其冻结解释器而跳过，未启动Isaac或GPU。完整argv与输出在ignored `position-harness-final.json`及相邻日志。宽组首次 **130 passed、1 skipped、1 failed、1 deselected**：失败的旧R3测试要求4 rad/s，与维护者已接收的当前Nut对齐2 rad/s配置冲突；在本修改输入 `cb01ff45` 复跑同样失败，现根据实际版本化profile补齐全部固定参数断言后通过。合成结果不授予Isaac能力或物理成功；此源码改动后此前PickCube物理结果保留原commit身份，Sol复审与最终适用回归仍需完成。
+
+## 通用candidate的调用方驱动入口（续作，待复审）
+
+通用pick-lift candidate binding、oracle和feasibility probe已改为调用方 `Solution.act → env.step → Solution.observe`；Solution factory身份不匹配、缺少caller action route均在step前报错，不再将旧 `step_expert()` 作为回退。`examples/_common.py` 中无调用者的旧helper已删除；Env内旧方法仍作为兼容保留。legacy `--env`也须提供caller route与Solution factory，故不兼容的旧输入明确失败。
+
+无引擎Harness与selected组合 **139 passed、1 skipped、29 subtests passed**；skip为本checkout没有冻结Isaac Python，未运行Isaac。首次试运行candidate的真实编译／H5合成预检被catalog clean-check拒绝：两份原保护untracked仍存在，源码有本轮未提交修改；未隐藏或更改这些文件，也未伪造clean provenance。该合成预检仍未通过，以上结果不能替代它或任何物理验证。本轮测试中的fixture缺少 `SimpleNamespace` 导致首次失败，已补齐并重跑；unsupported与错误身份分类明确为invalid。

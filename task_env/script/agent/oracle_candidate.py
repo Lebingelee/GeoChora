@@ -57,15 +57,19 @@ def record_candidate(spec, catalog, *, provider, seed, directory, time_limit_s=1
         artifact_hash = compiled.artifact_hash
         save_json(compiled.artifact.to_mapping(),directory/'candidate.artifact.json')
         env = compiled.env_class()(provider=provider,backend='cpu')
-        _, reset_info = env.reset(seed=seed)
+        observation, reset_info = env.reset(seed=seed)
+        solution = env.value['solution_factory']()
+        if solution.identity != env.value['solution_identity']:
+            raise ValueError('constructed Solution identity differs from compiled task')
+        solution.reset(observation, reset_info, env.metadata)
         env.start_recording(h5)
         recording_started = True
-        from examples._common import run_expert, identity_summary
-        details['episode'] = run_expert(env,seed=seed,horizon=spec.horizon,
-            already_reset=True,initial_info=reset_info)
+        from examples._common import run_caller_solution, identity_summary
+        details['episode'] = run_caller_solution(env, solution, observation, reset_info,
+                                                 horizon=spec.horizon)
         details['identity'] = identity_summary(env,provider=provider)
         details['controller_identity'] = env.controller.identity
-        details['expert_identity'] = env.solution.identity
+        details['expert_identity'] = solution.identity
         fault = getattr(env,'execution_fault',None)
         details['execution_fault'] = fault.to_mapping() if hasattr(fault,'to_mapping') else (str(fault) if fault else None)
         if details['episode']['status'] != 'PASS':
