@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from typing import Callable
-from ..controllers.canonical.contracts import reference_pose_action, reference_pose_action_space
 
 
 def _identity_seed(seed):
@@ -58,8 +57,8 @@ class ReferenceTaskBinding:
     close_task_resources: Callable | None = None
     action_schema: dict | None = None
     scalar_control_binding: object | None = None
-    action_space_factory: Callable = reference_pose_action_space
-    prepare_action: Callable = reference_pose_action
+    action_space_factory: Callable | None = None
+    prepare_action: Callable | None = None
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
     reset_runtime_input: Callable | None = None
@@ -67,8 +66,14 @@ class ReferenceTaskBinding:
     diagnostic_profile: str | None = None
 
     def __post_init__(self):
-        if not callable(self.action_space_factory) or not callable(self.prepare_action):
-            raise TypeError('selected action space and action preparation must be callable')
+        if self.build_mixed_control_profile is None and (
+                not callable(self.action_space_factory) or not callable(self.prepare_action)
+                or not isinstance(self.action_schema, dict) or not self.action_schema):
+            raise TypeError('selected action schema, space and preparation must be explicitly declared')
+        if self.build_mixed_control_profile is not None and (
+                self.action_space_factory is not None or self.prepare_action is not None
+                or self.action_schema is not None):
+            raise ValueError('mixed-control action contract is supplied by its task construction')
         if self.action_schema is not None and not isinstance(self.action_schema, dict):
             raise TypeError('selected task action schema must be a dictionary')
         if self.interval_mode not in {"grouped", "native"}:

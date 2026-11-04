@@ -389,7 +389,12 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
 
     from task_env.robots.panda import panda_reference_control_binding
+    from task_env.controllers.canonical.contracts import (
+        REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
+    )
     binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA,action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
         scalar_control_binding=panda_reference_control_binding(),
         object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
         interval_mode='grouped',recorder_mode='canonical',

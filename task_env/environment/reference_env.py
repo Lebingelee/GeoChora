@@ -1211,8 +1211,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.camera_observation_config = camera_observation_config
         self._camera_consumer = None
         self._camera_session_factory = None
-        action_schema = self.binding.action_schema or METADATA['action_schema']
-        self.metadata = {**METADATA, 'action_schema': dict(action_schema), 'env_id': self.uid,
+        self.metadata = {'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
@@ -1227,6 +1226,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self.action_space is None or self.observation_space is None:
                 raise TypeError('mixed-control task binding must supply task-owned spaces')
         else:
+            self.metadata['action_schema'] = dict(self.binding.action_schema)
             self.action_space = self.binding.action_space_factory()
         keys = [key for _, key in self.binding.object_poses]
         if not _mixed_control_candidate:

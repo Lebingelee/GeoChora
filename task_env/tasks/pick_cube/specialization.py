@@ -23,7 +23,8 @@ from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifa
                                    compile_panda_box_source, compile_panda_box_task)
 from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
-from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
+    reference_pose_action, reference_pose_action_space)
 from ...controllers.canonical.execution import (
     ReferenceExecutionController, StableArmTargetHold,
 )
@@ -537,6 +538,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
 
     return ReferenceTaskBinding(
         build=build,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
         scalar_control_binding=panda_reference_control_binding(),
         build_external=build_external,
         build_seeded=build_seeded,

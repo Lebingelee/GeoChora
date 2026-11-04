@@ -9,7 +9,8 @@ import hashlib
 import yaml
 
 from task_env.artifacts import Timebase
-from task_env.controllers.canonical.contracts import digest
+from task_env.controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
+    reference_pose_action, reference_pose_action_space)
 from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
 from .source import (
     _a05_scene,
@@ -829,6 +830,8 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
 
     binding = ReferenceTaskBinding(
         build=build,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
         reset_sample=lambda _artifact, _seed: input_v1.reset_plan.reset_sample,
         evaluate=evaluate,
         object_poses=tuple(
@@ -935,6 +938,8 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
 
     binding = ReferenceTaskBinding(
         build=build,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
         reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         evaluate=lambda _state, _semantics: SimpleNamespace(
             reward=0.0, success=False, failure=False, metrics={},

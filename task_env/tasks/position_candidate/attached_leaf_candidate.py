@@ -9,7 +9,8 @@ import json
 from ...artifacts import (
     ActuatorReference, FrameReference, JointReference, PoseWorld,
 )
-from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
+    reference_pose_action, reference_pose_action_space)
 from ...controllers.canonical.leaf_profiles import (
     ARM_POSITION_ACTION_SCHEMA, ARM_POSITION_PROFILE_ID,
     HAND_POSITION_ACTION_SCHEMA, HAND_POSITION_PROFILE_ID,
@@ -231,6 +232,8 @@ def build_attached_leaf_candidate(*, environment_type, arm_gain=2.5,
     from ...environment.reference_binding import ReferenceTaskBinding
     binding = ReferenceTaskBinding(
         build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action,
         evaluate=lambda _state, _semantics: SimpleNamespace(
             reward=0.0, success=False, failure=False, metrics={},
         ),

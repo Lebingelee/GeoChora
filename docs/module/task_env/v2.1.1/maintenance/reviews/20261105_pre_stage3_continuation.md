@@ -125,3 +125,11 @@ Nut的GeoPhys CPU/CUDA与100／500 Hz native-feedback选择和profile名称从�
 Nut specialization SHA由 `d569ab5eb807318ca703207e64ee68bf0413828b88e7a277f7242a6c142026d2` 变为 `489f2907990886877e2c00921174ba477ed05c9134dfc622e8943cd0005ac7fe`；实际新源码构造的R05b 100／500 Hz Controller身份分别为 `df93686b259161e81335869bc2514ec3493881cf603547e69af9cf3c835a8686`／`70808c3bc93e825f5c6e1619148098bf651c7b0b451f25b48906777171725769`，Solution身份不变。仅刷新精确source-bound值，其他字段／来源／provider检查不放宽，不将旧运行重标。
 
 禁止引擎导入的selected、R05b和Harness组 **136 passed、1 skipped、1 deselected**，skip为缺少冻结Isaac解释器，排除真实provider reset／step；lifecycle组 **178 passed、3 deselected**；leaf／mixed合成组 **12 passed**。完整argv、输出及未提交diff摘要见ignored `scalar-binding-final-evidence.json`、`scalar-binding-final-lifecycle.json`和 `scalar-binding-final-mixed.json`。未运行真实引擎、Isaac、GPU或物理reader，仍需最终代表性物理验证和Sol复审。
+
+## Selected动作契约显式声明（续作，待复审）
+
+通用selected binding不再默认位姿动作schema、space或转换器。PickCube、Nut、Marker、通用candidate及既有Position／leaf候选显式声明原有参考位姿契约；mixed路线继续由其任务构造提供结构化动作，拒绝混入scalar契约。环境只发布并使用绑定声明的schema／space／转换器。新增合成检查以一维任务动作及其转换器完成一次step，并验证缺失声明拒绝；这仅验证接线，不宣称新控制器或物理路线已实现。
+
+Nut specialization SHA由 `489f2907990886877e2c00921174ba477ed05c9134dfc622e8943cd0005ac7fe` 变为 `fd320df270e66c42600f2f99cf5f44b0cc9f3213255879681d7322f51c3f0f9c`；实际源码构造的R05b 100／500 Hz Controller身份更新为 `fa6a2eb30c9bcefd1be8eda8b63efb89f8c7a237119b4b8121180d3a3cc243f1`／`d45a3cbe52bb45c051b00c1a652b757eac2b0cf668f051ad04c6d1bbd90613b1`，Solution身份不变。仅刷新精确源码身份；控制参数、来源／provider和反馈校验不放宽。
+
+禁止引擎导入的selected／R05b／Harness组 **151 passed、1 skipped、1 deselected**；F04合成adapter **10 passed、3 deselected**；lifecycle组 **179 passed、3 deselected**；leaf／mixed合成组 **12 passed**；PickCube F06投影离线 **13 passed、1 deselected**。skip为缺少冻结Isaac解释器；排除项为真实provider／scene或缺失历史worker。前四组完整argv、输出及未提交diff摘要见ignored `action-contract-evidence.json`、`action-contract-f04.json`、`action-contract-lifecycle.json`、`action-contract-mixed.json`。未运行真实引擎、Isaac、GPU或物理reader，旧物理结果不重标；candidate完整合成预检的工作树限制仍在。

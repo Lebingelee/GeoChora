@@ -101,6 +101,33 @@ def test_scalar_control_binding_is_supplied_by_task_at_materialization(fake, mon
         env.close()
 
 
+def test_scalar_action_contract_is_task_declared_and_drives_step(fake):
+    from gymnasium.spaces import Box
+    from task_env.controllers.canonical.contracts import reference_pose_action
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    base = PickCubeReferenceEnv.binding
+    with pytest.raises(TypeError, match='explicitly declared'):
+        replace(base, action_schema=None)
+    env_ref = []
+    def prepare(action):
+        pose = env_ref[0].state.pose_world['panda-v1/ee']
+        return reference_pose_action((*pose.position, *pose.quaternion_wxyz, float(action[0])))
+    schema = {'schema_version': 'test-one-dimensional-action-v1'}
+    binding = replace(base, action_schema=schema, action_space_factory=lambda: Box(-1, 1, (1,), dtype=np.float32),
+                      prepare_action=prepare)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    env_ref.append(env)
+    try:
+        env.reset(seed=19)
+        assert env.action_space.shape == (1,)
+        assert env.metadata['action_schema'] == schema
+        env.step(np.zeros(1, dtype=np.float32))
+        assert env.state.control_step == 1
+    finally:
+        env.close()
+
+
 def test_missing_scalar_binding_closes_constructed_source_without_materialization(fake):
     from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
 

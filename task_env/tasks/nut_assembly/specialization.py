@@ -23,7 +23,8 @@ from ...assembly.compiler import (
     reference_task_identity_fields,
 )
 from ...assembly.source import TaskSceneSource
-from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
+    reference_pose_action, reference_pose_action_space)
 from ...controllers.canonical.execution import StableArmTargetHold
 from ...controllers.canonical.production_r3 import (
     ProductionCanonicalPandaControllerR3, R3_PROFILE_PATH, load_r3_dynamic_profile,
@@ -538,7 +539,8 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
     return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, include_solution=False,
                                                                       resolved_config=resolved_config,
                                                                       lift_height_m=lift_height_m, task_config=task_config),
-        scalar_control_binding=panda_reference_control_binding(),
+        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        prepare_action=reference_pose_action, scalar_control_binding=panda_reference_control_binding(),
         reset_sample=declaration.sample_reset,
         evaluate=declaration.evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
