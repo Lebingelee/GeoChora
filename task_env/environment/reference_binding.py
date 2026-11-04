@@ -61,6 +61,7 @@ class ReferenceTaskBinding:
     prepare_action: Callable = reference_pose_action
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
+    reset_runtime_input: Callable | None = None
 
     def __post_init__(self):
         if not callable(self.action_space_factory) or not callable(self.prepare_action):
@@ -81,6 +82,8 @@ class ReferenceTaskBinding:
             raise ValueError('external Solution construction and validation must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
+        if self.reset_runtime_input is not None and not callable(self.reset_runtime_input):
+            raise ValueError('reset runtime input selector must be callable when supplied')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:

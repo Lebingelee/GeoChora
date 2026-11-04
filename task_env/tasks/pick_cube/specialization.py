@@ -543,6 +543,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             if env.value.get('f06_pickcube_isaac_input') is not None else None
         ),
         position_execution_info_key='pickcube_position_execution_info_v1',
+        reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
         validate_external_solution=_validate_external_readiness_solution,
         reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
         evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),

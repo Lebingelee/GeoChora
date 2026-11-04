@@ -244,6 +244,24 @@ def test_position_reset_uses_artifact_frame_alias_for_single_segment_semantics()
     }
 
 
+def test_versioned_reset_rejects_distinct_or_changed_artifact():
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from task_env.environment.reference_env import _artifact_for_reset
+
+    @dataclass(frozen=True)
+    class Artifact:
+        identity_hash: str
+
+    current, rebuilt = Artifact('same'), Artifact('same')
+    assert _artifact_for_reset(current, {'artifact': rebuilt}) is current
+    assert _artifact_for_reset(current, {'artifact': rebuilt}, SimpleNamespace(artifact=rebuilt)) is rebuilt
+    with pytest.raises(ValueError, match='not identical'):
+        _artifact_for_reset(current, {'artifact': rebuilt}, SimpleNamespace(artifact=current))
+    with pytest.raises(ValueError, match='changed'):
+        _artifact_for_reset(current, {'artifact': Artifact('different')})
+
+
 def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     from dataclasses import dataclass
     from types import SimpleNamespace
@@ -308,6 +326,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     env.binding = SimpleNamespace(
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
+        reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
     )
     env._diagnostic_profile = None
     env._native_feedback_profile = None

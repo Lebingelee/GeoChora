@@ -29,3 +29,7 @@ Position终止时待确认切换的记录投影归入既有 `recorders.position_
 ## PickCube位置执行反馈归位（续作，待复审）
 
 PickCube特有的夹爪执行信息、输出字段及适用条件由任务specialization通过已有 `ReferenceTaskBinding` 声明；规范Env只调用可选投影并发布其结果，不再直接导入PickCube实现或根据任务名称决定该反馈。非F06 route不产生该字段，既有错误与量值验证保留。无引擎配置／消费者／F06组合 **131 passed、1 deselected**；反馈增加后针对测量值及发布的2项检查通过，leaf/mixed synthetic组 **13 passed**。真实F06 USD和Isaac未运行，本结果待Sol复审。
+
+## 版本化reset输入归属（续作，待复审）
+
+PickCube通过已有task binding选择其版本化runtime输入；通用Env使用该输入校验重建Artifact的对象身份及执行路线／seed，不再在这两处识别F06字段名。无版本化输入的现有行为保持原样。无引擎组合 **124 passed、1 deselected**，含相等但非同一Artifact的拒绝及F06重建Artifact到materialization的合成检查；真实USD/Isaac仍未运行。前一源码HEAD的生命周期合成回归 **172 passed、3 deselected**，本次修改后仍需对最终源码复核。

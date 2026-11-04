@@ -67,17 +67,16 @@ def _position_frame_bindings_from_artifact(artifact, source):
     return bindings
 
 
-def _artifact_for_reset(current_artifact, rebuilt_value):
+def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
     """Keep the reset Artifact identity bound to a versioned runtime input."""
     rebuilt_artifact = rebuilt_value['artifact']
     if rebuilt_artifact != current_artifact:
         raise ValueError('selected Artifact changed between construction and reset')
-    f06_input = rebuilt_value.get('f06_pickcube_isaac_input')
-    if f06_input is None:
+    if runtime_input is None:
         return current_artifact
-    exact_artifact = f06_input.artifact
+    exact_artifact = runtime_input.artifact
     if rebuilt_artifact is not exact_artifact:
-        raise ValueError('F06 reset Artifact is not identical to its exact RuntimeInput artifact')
+        raise ValueError('reset Artifact is not identical to its exact RuntimeInput artifact')
     return exact_artifact
 
 
@@ -1582,7 +1581,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if self.value['artifact'] != self.artifact:
                     raise ValueError('selected Artifact changed between construction and reset')
             else:
-                self.artifact = _artifact_for_reset(self.artifact, self.value)
+                select_runtime_input = getattr(self.binding, 'reset_runtime_input', None)
+                runtime_input = select_runtime_input(self.value) if select_runtime_input else None
+                self.artifact = _artifact_for_reset(self.artifact, self.value, runtime_input)
             if external_solution is not None:
                 self.binding.validate_external_solution(self.value, external_solution)
             failure_phase = 'reset_seed'
@@ -1610,8 +1611,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if (type(versioned_execution) is not ExecutionSpecV1
                         or self._declared_execution_spec_v1 is None):
                     raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
-                f06_input = self.value.get('f06_pickcube_isaac_input')
-                if f06_input is not None:
+                select_runtime_input = getattr(self.binding, 'reset_runtime_input', None)
+                runtime_input = select_runtime_input(self.value) if select_runtime_input else None
+                if runtime_input is not None:
                     declared = self._declared_execution_spec_v1
                     if ((versioned_execution.physics_provider, versioned_execution.physics_backend,
                          versioned_execution.physics_device, versioned_execution.physics_profile,
@@ -1621,8 +1623,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                 declared.physics_device, declared.physics_profile,
                                 declared.determinism_mode, declared.render_default,
                                 declared.camera_overrides, seed)
-                            or f06_input.reset_plan.reset_sample.task_seed != seed):
-                        raise ValueError('F06 seeded rebuild changed its exact route or requested seed')
+                            or runtime_input.reset_plan.reset_sample.task_seed != seed):
+                        raise ValueError('seeded rebuild changed its exact route or requested seed')
                 elif versioned_execution.identity_hash != self._declared_execution_spec_v1.identity_hash:
                     raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
                 self.execution = versioned_execution
