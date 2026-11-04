@@ -1,4 +1,4 @@
-"""Project selected position execution state into its existing recording schema."""
+"""Project selected Position reset and transitions into the existing recorder schema."""
 
 import hashlib
 
@@ -768,3 +768,89 @@ def position_record_reset_info(self):
                 ],
             })
     return info
+
+
+def record_leaf_position_transition(self, action, request, result, *, terminated, truncated):
+    from dataclasses import asdict
+    from ..trajectory.canonical.episode import StructuredControlTransitionV1
+    if getattr(self, 'fixed_attachment_leaf_position_profile', False):
+        from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
+    else:
+        from ..controllers.canonical.leaf_actions import MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID
+
+    groups = {(item.entity_id, item.group_id): item for item in request.groups}
+    commands = {item.writer_id: item for item in result.prepared_commands}
+    applied = {item.writer_id: item for item in result.apply_results}
+    entries = {entry.binding.writer_id: entry for entry in self.leaf_plan.leaves}
+    writer_controls = []
+    request_groups = {(item.entity_id, item.group_id): item for item in request.groups}
+    for writer_id, typed_action in ((ARM_WRITER_ID, action.arm), (HAND_WRITER_ID, action.hand)):
+        entry = entries[writer_id]
+        entity_id, group_id = entry.binding.entity_id, entry.binding.control_group_id
+        if (entity_id, group_id) not in request_groups:
+            raise ValueError('typed leaf request omits its exact Entity/ControlGroup')
+        command = commands[writer_id]
+        applied_result = applied[writer_id]
+        is_arm = entry.binding.profile_kind == 'arm_position'
+        components = (tuple(item.joint_id for item in entry.binding.joint_order)
+                      if is_arm else ('opening_m',))
+        values = tuple(typed_action.position_rad) if is_arm else (float(typed_action.opening_m),)
+        requested_group = request_groups[(entity_id, group_id)]
+        if (requested_group.action_schema_id != entry.binding.action_schema_id
+                or tuple(requested_group.values) != values):
+            raise ValueError('typed leaf request Group schema/values differ from its writer Action')
+        ack = applied_result.ack
+        target = command.target
+        writer_controls.append({
+            'writer_id': writer_id,
+            'action_schema_id': entry.binding.action_schema_id,
+            'components': components,
+            'groups': ({
+                'entity_id': entry.binding.entity_id,
+                'group_id': group_id,
+                'action_components': components,
+            },),
+            'requested_action': {
+                'schema_version': typed_action.schema_version,
+                'values': values,
+                'payload': typed_action.to_mapping(),
+                'unit': 'radian' if is_arm else 'meter_total_opening',
+            },
+            'canonical_action': {
+                'schema_version': 'leaf-canonical-action-v1',
+                'interpreted_values': values,
+                'target_identity_sha256': target.identity_hash,
+                'command_identity_sha256': command.command_identity_sha256,
+                'prepared_command': asdict(command),
+                'application_ack': ack.to_mapping(),
+                'source_boundary': target.source_boundary.to_mapping(),
+                'application_boundary': ack.application_boundary.to_mapping(),
+                'next_boundary': result.next_publication.view.boundary.to_mapping(),
+                'source_closure_sha256': self.value['source'].source_closure_digest,
+                'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+                'effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+            },
+            'controller_target': {
+                'schema_version': target.schema_version,
+                'payload': target.to_mapping(),
+                'identity_hash': target.identity_hash,
+            },
+            'applied_control': {
+                'schema_version': applied_result.schema_version,
+                'payload': asdict(applied_result),
+                'target_hash': target.identity_hash,
+            },
+        })
+    control = StructuredControlTransitionV1(
+        'structured-control-transition-v1', request, tuple(writer_controls),
+    )
+    control.validate()
+    action_values = np.asarray(tuple(
+        value for key in sorted(groups) for value in groups[key].values
+    ), dtype=np.float32)
+    self.recorder.append_transition(
+        action_values, action_values, self.obs, float(self.evaluation.reward),
+        bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+        structured_control=control,
+    )

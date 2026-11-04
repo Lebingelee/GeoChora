@@ -583,6 +583,7 @@ def _session_with_synthetic_native_io(candidate):
     session._leaf_fault=None; session._leaf_consumed_boundaries=set()
     session._leaf_interval_active=False; session._leaf_interval_writers=set()
     session._leaf_active_plan_identity=None
+    session._mixed_actuator_plan=None
     return session
 
 
@@ -590,7 +591,10 @@ def test_public_env_reset_and_step_reach_real_attached_admission_and_publication
     from task_env.runtime.sessions import api
     candidate=_candidate(monkeypatch)
     session=_session_with_synthetic_native_io(candidate)
-    monkeypatch.setattr(api, '_materialize_admitted', lambda *_:session)
+    def synthetic_materialization(*_, mixed_actuator_plan):
+        assert mixed_actuator_plan is None
+        return session
+    monkeypatch.setattr(api, '_materialize_admitted', synthetic_materialization)
     try:
         obs, info=candidate.env.reset(seed=31)
         receipt=session.leaf_materialization_receipt
