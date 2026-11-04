@@ -276,6 +276,21 @@ def test_nutassembly_caller_rejects_tampered_feedback(fake):
         env.close()
 
 
+def test_nutassembly_caller_actions_reject_registered_solution_owner(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset_for_solution(solution, seed=19)
+        action = solution.act(obs, info)
+        with pytest.raises(RuntimeError, match='without an Env-owned Solution'):
+            env.step(action)
+        assert env.state.control_step == 0 and env._episode_mode is None
+    finally:
+        env.close()
+
+
 def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
 

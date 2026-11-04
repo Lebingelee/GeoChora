@@ -1204,6 +1204,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self.binding.external_solution_actions and type(action) is ExpertAction:
             if self._episode_mode in {'expert', 'external_solution'}:
                 raise RuntimeError('cannot mix caller actions with selected Solution execution')
+            if self.solution is not None or self._external_solution_owner is not None:
+                raise RuntimeError('caller actions require reset without an Env-owned Solution')
             if self._stopped or self.session is None:
                 raise RuntimeError('reset required or episode already stopped')
             self._require_published_execution_info()
