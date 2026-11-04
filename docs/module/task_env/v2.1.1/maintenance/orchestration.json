@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-04",
-  "status": "G02_2B_MANUAL_SUCCESS_PENDING_CLOSEOUT",
+  "status": "G02_2C_REPORTED_PENDING_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -19,8 +19,8 @@
     "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
   },
   "active_packages": [],
-  "next_candidate": "2b",
-  "next_action": "Preserve and close out maintainer-verified lowered-waypoint success: stabilize existing changes, sync targeted tests and impacted regressions, freeze exact route status. Do not redispatch superseded r002 or start2c/stage3.",
+  "next_candidate": "2c Sol复审",
+  "next_action": "V211_G02_2c_attempt001文档封存已完成，等待Sol复审；不进入阶段3，不重跑旧仿真。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -410,8 +410,8 @@
           "dependencies": [
             "2a"
           ],
-          "status": "MANUAL_SUCCESS_PENDING_CLOSEOUT",
-          "attempt_count": 1,
+          "status": "INCOMPLETE_USER_PAUSED",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -444,48 +444,77 @@
               "full_report_sealed": false,
               "superseded_revision": "r002",
               "manual_success_review_ref": "reviews/20261104_manual_stage2_success_sol_review.md"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G02_2b_attempt002",
+              "package_manifest_sha256": "435695a7503d35b1373a7284c6577116da2e261a6d1990dd732d3ee1cdd2d771",
+              "prompt_sha256": "e79ccf5ceeffbb5f5ce95c593acfc60860d511d5d3aa60db164192f448224fa0",
+              "manual_patch_sha256": "10489dfe70bcc06c5f4221a2b9d3da831f9fed4d876a80c5c5e210a809f39833",
+              "status": "INCOMPLETE_USER_PAUSED",
+              "result": "FAIL",
+              "input_head": "ff00c9735c0c3e322b57fc371a5d539c98c1c3c2",
+              "candidate_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
+              "output_head": null,
+              "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+              "menagerie_pin": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+              "native_starts": 5,
+              "known_physics_steps": 33570,
+              "unknown_geophys_reserved_steps": 5000,
+              "provider_worker_seconds": 177.458,
+              "gpu_starts": 0,
+              "implementation_test_modules_passed": 6,
+              "manual_analysis_report_ref": "../../../../../execution-output/V211_manual_analysis_stage2_summary_001/report.md",
+              "review_decision": null,
+              "summary": "保留并提交九份人工输入，retry06窄回归通过。PickCube seed31、NutAssembly seed19（两次）成功；PickCube seed32有效runtime/H5但在horizon任务失败。GeoPhys stale-time guard；Isaac无native run。G2 FAIL，G3 PARTIAL，报告及窗口状态待Sol复审。",
+              "run_count_is_not_attempt_count": true,
+              "progress_report_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_stage2_progress_report_20261104.md",
+              "sol_review_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_stopped_sol_review_20261104/review.md",
+              "g2": "FAIL",
+              "g3": "PARTIAL",
+              "g5_at_interrupt": "INCOMPLETE_USER_PAUSED",
+              "full_manifest_at_interrupt": false,
+              "stop_record_ref": "reviews/20261104_2b_closeout.md"
             }
           ],
-          "assigned_agent": "Maintainer-directed manual execution completed and released; Sol read-only numerical review",
-          "package_path": "external handoff V211_G02_2b_attempt001; same-attempt replacement V211_G02_2b_attempt001_resume_r002",
-          "package_sha256": "eb6c26983646262f56cee1d3f788622994b013096b33282131171d048722a480",
-          "input_head": "08103c5156020c340b2d1f373a78a63515e67bb3",
+          "assigned_agent": "Codex primary agent; sole writer/native owner; zero subagents",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_attempt002",
+          "package_sha256": "435695a7503d35b1373a7284c6577116da2e261a6d1990dd732d3ee1cdd2d771",
+          "input_head": "ff00c9735c0c3e322b57fc371a5d539c98c1c3c2",
           "output_head": null,
-          "expected_duration_minutes": "Original active120-180 / hard210 total retained; reconcile pre-pause consumption before resume",
+          "expected_duration_minutes": "90-150 active; hard210",
           "execution_budget": {
             "window_minutes": 210,
-            "mujoco_reserved_steps_max": 150000,
-            "mujoco_worker_seconds_max": 2520,
-            "geophys_reserved_steps_max": 60000,
-            "geophys_worker_seconds_max": 1200,
-            "isaac_reserved_steps_max": 60036,
-            "isaac_worker_seconds_max": 2400,
-            "isaac_app_starts_max": 2,
-            "pre_pause_active_time": "RECONCILE_NOT_ZERO_ASSUMED",
-            "route_memory_gates": "r002: MuJoCo start2/stop0.75/RSS3 GiB; GeoPhys3/1/6; Isaac6/1/14",
-            "ordinary_native_starts_at_pre_manual_pause": 0
+            "native_worker_starts": 5,
+            "mujoco_control_transitions": 6714,
+            "mujoco_verified_native_steps": 33570,
+            "geophys_unknown_steps_reserved": 5000,
+            "provider_worker_seconds": 177.458,
+            "isaac_app_starts": 0,
+            "gpu_starts": 0,
+            "implementation_test_modules_passed_final_retry": 6,
+            "test_retry_count": 6,
+            "tracked_paths": "package allowlist only; source commit plus current execution documentation"
           },
-          "last_observation": "Sol verified960/961 H5 boundaries,960 target acknowledgements, original task and0.105m collection predicates,26 current source hashes and controlled cross-replay; archived four runs. Current targeted tests have stale import and two stale assertions.",
+          "last_observation": "原attempt002在完整报告、validator、manifest/checksum及本地文档提交完成前由维护者暂停。保留G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。后续Sol只接受seed31成功实现与Nut回归的有界证据；不代表完整2b/阶段2已接受。中止记录和2c成功参考页由独立2c attempt001补齐，旧运行未恢复或重跑。",
           "evidence_refs": [
-            "reviews/20261104_2b_sol_interim_review.md",
-            "reviews/20261104_manual_stage2_success_sol_review.md"
+            "reviews/20261104_2b_closeout.md",
+            "reviews/20261104_2c_reference_freeze.md",
+            "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_manual_analysis_stage2_summary_001/report.md",
+            "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_stage2_progress_report_20261104.md",
+            "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_stopped_sol_review_20261104/review.md",
+            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/mujoco_pickcube_seed31/worker_result.json",
+            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/mujoco_pickcube_seed32/worker_result.json",
+            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/geophys_pickcube_seed31/worker/worker_result.json"
           ],
           "commits": [
-            "987873018c48ff3c677db521b58838b898e7ebe3"
+            "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238"
           ],
-          "review_decision": {
-            "status": "ACCEPTED_BOUNDED_MANUAL_SEED31_SUCCESS_EVIDENCE",
-            "reviewer": "Sol",
-            "date": "2026-11-04",
-            "review_ref": "reviews/20261104_manual_stage2_success_sol_review.md",
-            "accepted_2b": false,
-            "scope": "One public full PickCube MuJoCo CPU seed31 success with unchanged task lift predicate; manual dirty source and its controlled diagnostics."
-          },
+          "review_decision": null,
           "blockers": [
-            "Manual implementation remains uncommitted in9 existing dirty files",
-            "Safe-approach test imports renamed constant; gate and lift-count assertions use old policy",
-            "Post-extraction Nut regression and different-reset representative check not completed",
-            "GeoPhys/Isaac representative native results still NOT_RUN"
+            "G2 FAIL: PickCube seed32在1000 control transitions后cube_lift=0.082619m，未达到原0.10m task predicate。",
+            "GeoPhys: ValueError stale execution time，具体sim time mismatch数值未记录。",
+            "Isaac: 当前nvidia-smi driver communication失败，App/native运行未启动。"
           ],
           "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
           "manual_takeover": {
@@ -535,7 +564,8 @@
             },
             "writer_and_native_released": true,
             "sol_native_starts": 0
-          }
+          },
+          "sol_review_ref": null
         },
         {
           "id": "2c",
@@ -543,18 +573,54 @@
           "dependencies": [
             "2b"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "REPORTED_PENDING_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G02_2c_attempt001",
+              "package_manifest_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
+              "prompt_sha256": "cb555eb345ba6720de21a6a0578888d72d4efbebc5aa156c2c62feda291a5f41",
+              "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
+              "output_head": null,
+              "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
+              "status": "REPORTED_PENDING_REVIEW",
+              "result": "DOCUMENTATION_FREEZE_COMPLETE",
+              "report_ref": "reviews/20261104_2c_reference_freeze.md",
+              "closeout_ref": "reviews/20261104_2b_closeout.md",
+              "native_starts": 0,
+              "engine_imports": 0,
+              "gpu_probes": 0,
+              "pytest_runs": 0,
+              "independent_reader_runs": 0,
+              "current_doc_validator_runs": 2,
+              "sol_review_ref": null,
+              "review_decision": null,
+              "next_action": "等待Sol复审；阶段3未授权。"
+            }
+          ],
+          "assigned_agent": "Codex primary agent; sole writer; zero subagents",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2c_attempt001",
+          "package_sha256": "53d1b5ef87a9f91776218367e7148a8a8171c1294d3c61a2b3c98b3f2e73a3c3",
+          "input_head": "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "expected_duration_minutes": "15-30; hard 30",
+          "execution_budget": {
+            "window_minutes": 30,
+            "native_starts": 0,
+            "engine_imports": 0,
+            "gpu_starts": 0,
+            "pytest_runs": 0,
+            "independent_reader_runs": 0,
+            "current_doc_validator_max_invocations": 2,
+            "new_output_max_mib": 10,
+            "tracked_paths": "nine-document allowlist only"
+          },
+          "last_observation": "中止记录、成功参考和检查输出已齐备；current doc validator 2/2、immutable-only、diff --check、allowlist、保护hash及submodule pins均通过。下一步仅本地文档提交并交Sol复审。",
+          "evidence_refs": [
+            "reviews/20261104_2c_reference_freeze.md",
+            "reviews/20261104_2b_closeout.md"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []

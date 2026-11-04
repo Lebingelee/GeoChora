@@ -37,6 +37,18 @@ The v2.1.0 matrix is the single source-baseline TaskEnv table. The separate [v2.
 
 Use [troubleshooting](../../../docs/module/task_env/v2.1.0/guides/troubleshooting.md) to stop at the earliest failure boundary. Do not weaken an oracle, use mock evidence as a native pass, or infer support from registration.
 
+## Stage 2 evidence and troubleshooting (2026-11-04)
+
+The detailed manual investigation is archived at `/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_manual_analysis_stage2_summary_001/report.md`; current handoff state is in the v2.1.1 recovery and 2b stop-record pages. Preserve these distinctions:
+
+- Historical F06/current PickCube seed31 first failed at the measured TCP clearance gate. A valid runtime/HDF5 does not mean task success.
+- The user-directed lower waypoint reduced empty-path TCP error from 22.420/49.531/50.346 mm (RMS/P95/peak) to 2.186/4.879/6.776 mm. The measured clearance gate also changed from 215 mm to 65 mm, so this was a combined intervention.
+- A full PickCube seed31 task passed at 960 transitions with 0.10519 m lift. The same candidate's seed32 run reached horizon at 1000 transitions with 0.08262 m lift; retain and report the task failure.
+- NutAssembly seed19 passed in 2377 transitions. Current GeoPhys PickCube failed at the Solution stale-execution-time guard; current Isaac delivery closure validated, but native was not run because GPU admission was unstable.
+- The stopped 2b attempt remains G2 FAIL, G3 PARTIAL, G5 INCOMPLETE_USER_PAUSED. Sol accepted only the bounded seed31 success and affected Nut regressions. A separate 2c documentation freeze is REPORTED_PENDING_REVIEW; phase 3 has not started.
+
+For cross-task/controller diagnosis, compare resolved R3 arm parameters, planner SI rates, execution wrapper/cadence, scene/source, initial arm q, base transform, action interval binding and recorder mode separately. Controller identity hashes include task Artifact/source bindings; matching arm-law parameters do not make complete TaskEnv identities equal. For a runtime failure at a time guard, capture received and expected boundary values before assigning a provider-level cause.
+
 ## Development and migration
 
 Before proposing behavior, identify the public facade, owner, callers, tests, and limitation; classify work as fix/extend/compose/new. Use CodeGraph when the index is current. Run only the smallest affected offline/API or bounded route checks authorized by the task. The repository has no root packaging metadata; use `task_env/requirements.txt` and explicit `PYTHONPATH`, not `pip install -e .`.

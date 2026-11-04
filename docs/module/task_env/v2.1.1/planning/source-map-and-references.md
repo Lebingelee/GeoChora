@@ -230,6 +230,14 @@ query/build/reset/command/advance/publish/close 的字段、回执、副作用�
 
 主审建议使用版本化 actual capture phase（reset_initial/post_control_step）、沿用现有 RGB 默认并允许构建显式选择、公共 observation/Recorder 独立存储而 device lease显式选择、独立 window close只停展示而 required capture fault。详见 [主审记录](../maintenance/reviews/20261103_1d_sol_review.md)，最终协议冻结由维护者决定。
 
+## G02/2b attempt002：R3 对齐后复测（2026-11-04）
+
+九份人工源输入已整合至提交 8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238。PickCube seed31 成功 960 transitions，seed32 在 1000 tick horizon 失败；NutAssembly seed19 成功 2377 transitions。三条完整 MuJoCo HDF5 均独立读回通过，task 成功与 runtime 有效性分开记账。
+
+PickCube/NutAssembly 使用共享 R3 arm/execution wrapper 与 planner profile；两者仍有 task Artifact/source/scene/reset/Recorder identity 差异。GeoPhys 当前实跑在 PickCube Solution 的边界时间 guard 抛出 stale execution time；原始 run 没记录当前/期望 simulation_time，因此 provider 级根因未定。Isaac delivery 的 77 个文件 hash 匹配，但 GPU admission 不稳定而未启动 native worker。详见[中止记录](../maintenance/reviews/20261104_2b_closeout.md)和[成功参考冻结页](../maintenance/reviews/20261104_2c_reference_freeze.md)；同run原始H5、readback、trace、worker_result与supervisor保存在 `/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/`。
+
+旧2b在维护者中止时G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。Sol有界接收seed31成功实现与Nut回归，不改变完整2b状态。2c attempt001文档封存已提交待审；阶段3未开始。
+
 ## 当前协议基线与后继实施
 
 维护者于2026-11-03确认五协议，详见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。历史1b–1d建议与当前冲突时，以权威正文的7＋2、BodyWrench、嵌套主体、贡献组合、公共可替换模型、同一Env切换、Core随机流和timebase规则为准；原始报告不改。新增[控制命令案例](control-command-cases.json)仍为planning-only。

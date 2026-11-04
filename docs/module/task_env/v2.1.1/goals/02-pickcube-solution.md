@@ -46,15 +46,23 @@ Sol 独立核验原227个边界的纯模型FK与公开TCP位置最大差小于7e
 
 维护者逐步对齐完整R3执行链、固定点列与初态跨环境复核，再把高位点0.753→0.603m、接近点0.633→0.593m。新低位路径的空载误差RMS由22.42→2.19mm；随后真实碰撞、public task-owned Solution在MuJoCo CPU seed31、horizon1000中960步成功。原task lift门限0.10m不变，Solution相对task rest-height的lift为0.10519m，完成0.105m收集余量。配套measured gate改为65mm，完整run另含34/50/10 close/settle/postclose hold与hold/ramp；成功对应整组人工变更，不单独归因于一个高度值。
 
-Sol独立接收有界单seed成功证据，见[主审](../maintenance/reviews/20261104_manual_stage2_success_sol_review.md)，状态MANUAL_SUCCESS_PENDING_CLOSEOUT。原r002姿态绕行包由人工指示取代，不再重复派发。当前九份代码改动未提交，tests尚有旧常量导入、215mm gate和lift点数断言未同步；共享抽取的Nut等受影响回归与另两route仍待收尾。以成功版固化与必要回归为下一动作，不再要求泛化根因实验；2c／阶段3保持未开始。
+Sol已独立接收人工seed31单seed成功证据；该接收不等于2b完成。人工接管输入的九份改动已整合到候选提交`8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238`，六个窄回归模块retry06通过。2b attempt002新增PickCube seed32到horizon失败、NutAssembly seed19两次成功；GeoPhys stale-time guard与Isaac前置门结果见下节和[收尾报告](../maintenance/reviews/20261104_2b_closeout.md)。原2b attempt002 G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED；维护者在原封存完成前暂停。其后Sol仅有界接收seed31成功实现与Nut回归，不等于完整2b接受。2c attempt001已另行完成文档封存，待Sol复审；阶段3未开始。
+
+### 2b attempt002 收尾结果（2026-11-04）
+
+九份人工源改动均保留并提交；共享 R3 Controller/execution/planner owner 对齐，六个窄回归模块 retry06 通过。PickCube seed31 在 960 transitions 成功；NutAssembly seed19 在 2377 transitions 成功；PickCube seed32 到 horizon 1000，cube lift 0.082619 m，低于 0.10 m predicate。seed32 runtime 与独立 HDF5 读回通过，但 Solution/task 失败，故 G2 FAIL，2b 不能自评完成。
+
+GeoPhys PickCube seed31 构建、reset、Recorder start 后在 Solution 执行时间 guard 报 stale execution time，close receipt 返回但没有完整 HDF5。Isaac 77 项 delivery closure 校验通过，当前 GPU admission 不稳定，没有 App/native worker。完整历史见[attempt002中止记录](../maintenance/reviews/20261104_2b_closeout.md)；旧G5仍为INCOMPLETE_USER_PAUSED。后续独立2c文档封存待Sol复审；阶段3未开始。
 
 <a id="2c"></a>
-## 2c：冻结可复现参考
+## 2c：冻结可复现参考（attempt001已交付）
 
 - **输入／依赖：**2b 成功实现、实际运行和独立读回。
 - **工作：**固定 task／source／Controller／资产／seed／timebase／Solution／horizon／容差；保留阶段状态、输入、target、applied ack 和结束原因。
 - **检查：**参考确实属于同一版本和运行，成功不是人工修改状态或宽松判定；剩余后端差异有归因和下一动作。
 - **交付／出口：**供 4c 对照的冻结参考及未决清单，不授予全后端等价或正式 Qualification。
+
+本次 `V211_G02_2c_attempt001` 已冻结 PickCube MuJoCo CPU seed31成功参考，逐项身份、命令入口、HDF5／reader／trace校验值及回归边界见[参考冻结页](../maintenance/reviews/20261104_2c_reference_freeze.md)。未重跑仿真、reader或pytest。当前 `REPORTED_PENDING_REVIEW`，等待Sol；无阶段3授权。
 
 ## 阻塞与后续
 
