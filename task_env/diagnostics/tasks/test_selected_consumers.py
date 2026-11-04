@@ -378,7 +378,8 @@ def test_controller_owned_arm_hold_and_ramp_use_applied_acknowledgement():
 def test_active_imports_do_not_load_diagnostics_or_native(tmp_path):
     import subprocess, os
     code = "from task_env import make_env; make_env('nut-assembly-outcome-reference-v1').close(); import sys; assert not any(k.startswith(('task_env.diagnostics','mujoco','taichi')) for k in sys.modules)"
-    result = subprocess.run([sys.executable, '-c', code], env={**os.environ,'PYTHONPATH':str(__import__('pathlib').Path.cwd())}, cwd=tmp_path, capture_output=True, text=True)
+    core_root = __import__('pathlib').Path(__file__).resolve().parents[3]
+    result = subprocess.run([sys.executable, '-c', code], env={**os.environ,'PYTHONPATH':str(core_root)}, cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
