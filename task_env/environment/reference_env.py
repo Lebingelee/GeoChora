@@ -34,6 +34,10 @@ from .types import ControlCommand, SnapshotRequest, TaskCompositionSpec, TaskEva
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
+from ..runtime.sessions.source import (
+    position_frame_bindings_from_artifact as _position_frame_bindings_from_artifact,
+    position_joint_bindings_from_artifact,
+)
 
 METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
 _RESET_SEED_UNSET = object()
@@ -48,22 +52,6 @@ def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
         math.ulp(float(expected_dt_s)), math.ulp(float(physics_dt_s)),
     )
     return (int(native_steps) + 2) * clock_ulp
-
-
-def _position_frame_bindings_from_artifact(artifact, source):
-    """Resolve source body/Frame names through their exact Artifact references."""
-    from ..artifacts import FrameReference
-
-    semantics = (*source.bodies, *source.frames)
-    if len(semantics) != len(set(semantics)):
-        raise ValueError('Position RuntimeSource body/Frame semantics must be unique')
-    bindings = {}
-    for semantic in semantics:
-        reference = artifact.legacy_frame_bindings.get(semantic)
-        if type(reference) is not FrameReference:
-            raise ValueError('Position RuntimeSource semantic lacks an exact Artifact FrameReference')
-        bindings[semantic] = reference
-    return bindings
 
 
 def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
@@ -1603,32 +1591,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         )
                     if not isinstance(self.position_plan, ControlBindingPlanV1):
                         raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
-                self.position_joint_bindings = {
-                    f'{articulation.entity_id}/{joint.joint_id}': joint
-                    for articulation in self.position_scene.articulations or ()
-                    for joint in articulation.joints
-                    if joint.kind in {'revolute', 'continuous', 'prismatic'}
-                }
-                # Reset poses are keyed by their canonical Frame semantic name.
-                # Resolve each source free joint through the already-bound
-                # Artifact FrameReference to its unique Scene floating Joint;
-                # never infer a Joint ID from a provider/native string.
-                for reset_frame_name in self.value['source'].free_joints:
-                    frame_reference = self.artifact.legacy_frame_bindings.get(reset_frame_name)
-                    if frame_reference is None:
-                        raise ValueError('free-body reset key lacks an Artifact Frame binding')
-                    candidates = tuple(
-                        joint
-                        for articulation in self.position_scene.articulations or ()
-                        if articulation.entity_id == frame_reference.entity_id
-                        for joint in articulation.joints
-                        if joint.kind == 'floating' and joint.child_frame == frame_reference
-                    )
-                    if len(candidates) != 1:
-                        raise ValueError('reset Frame must resolve to exactly one Scene floating Joint')
-                    if reset_frame_name in self.position_joint_bindings:
-                        raise ValueError('free-body reset Joint binding overlaps a scalar binding')
-                    self.position_joint_bindings[reset_frame_name] = candidates[0]
+                self.position_joint_bindings = position_joint_bindings_from_artifact(
+                    self.position_scene, self.artifact, self.value['source'],
+                )
                 self.position_frame_bindings = _position_frame_bindings_from_artifact(
                     self.artifact, self.value['source'],
                 )

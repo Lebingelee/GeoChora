@@ -11,9 +11,51 @@ import re
 import tempfile
 import xml.etree.ElementTree as ET
 
-from ...artifacts import SceneDefinition, TaskArtifactV1
+from ...artifacts import FrameReference, SceneDefinition, TaskArtifactV1
 from ...assembly.source import TaskSceneSource, UsdTaskSceneSourceV1
 from ...assembly.assets import _source_closure_digest
+
+
+def position_frame_bindings_from_artifact(artifact, source):
+    """Resolve runtime body/Frame names through their exact Artifact references."""
+    semantics = (*source.bodies, *source.frames)
+    if len(semantics) != len(set(semantics)):
+        raise ValueError('Position RuntimeSource body/Frame semantics must be unique')
+    bindings = {}
+    for semantic in semantics:
+        reference = artifact.legacy_frame_bindings.get(semantic)
+        if type(reference) is not FrameReference:
+            raise ValueError('Position RuntimeSource semantic lacks an exact Artifact FrameReference')
+        bindings[semantic] = reference
+    return bindings
+
+
+def position_joint_bindings_from_artifact(scene, artifact, source):
+    """Bind scalar joints and resolve each reset Frame to its unique floating Joint."""
+    bindings = {
+        f'{articulation.entity_id}/{joint.joint_id}': joint
+        for articulation in scene.articulations or ()
+        for joint in articulation.joints
+        if joint.kind in {'revolute', 'continuous', 'prismatic'}
+    }
+    for reset_frame_name in source.free_joints:
+        frame_reference = artifact.legacy_frame_bindings.get(reset_frame_name)
+        if frame_reference is None:
+            raise ValueError('free-body reset key lacks an Artifact Frame binding')
+        candidates = tuple(
+            joint
+            for articulation in scene.articulations or ()
+            if articulation.entity_id == frame_reference.entity_id
+            for joint in articulation.joints
+            if joint.kind == 'floating' and joint.child_frame == frame_reference
+        )
+        if len(candidates) != 1:
+            raise ValueError('reset Frame must resolve to exactly one Scene floating Joint')
+        if reset_frame_name in bindings:
+            raise ValueError('free-body reset Joint binding overlaps a scalar binding')
+        bindings[reset_frame_name] = candidates[0]
+    return bindings
+
 
 @dataclass(frozen=True)
 class ExecutionSourceReceiptV1:

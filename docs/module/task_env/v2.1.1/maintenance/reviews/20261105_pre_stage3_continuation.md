@@ -209,3 +209,9 @@ PickCube specialization的源码SHA由 `101b68d9ae6876f90c2ef10a7f21cd025489f76a
 Position materialization成功后保留实际传入的 `ControlBinding` 和selector，v3录制开始时由recorder owner将绑定值及该selector声明文件的SHA-256写入 `resolved_config.position_control_binding_provenance`，经现有H5 `env_cfg` 保存。reset之后替换任务binding不会把新selector误记为当前session实际使用者；源码摘要是录制开始时磁盘字节，不单独证明加载代码或闭包内容与文件一致。摘要无法读取时在发布recorder前失败，可修复后重试。旧H5无该字段仍保留原身份，Position v3重执行仍不支持。
 
 受监督无引擎selected／R05b／F06投影／录制组合 **151 passed、2 deselected**，最大RSS 213962752 bytes；attached-leaf／mixed假provider组 **14 passed**，最大RSS 165650432 bytes，包含64步合成H5写入及独立读取。其后仅将来源投影函数归入recorder owner，相关定向检查 **1 passed**；组合日志对应归位前的源码，不重标为最终diff。日志与资源采样见ignored `position-binding-provenance-selected/`和 `position-binding-provenance-mixed/`。首次单步写回尝试被R03c reader要求64步的契约拒绝，调整为64个合成interval后通过；另一次读取尝试误用v1元数据路径，改用实际v3公开inspect入口后通过。未运行真实引擎、Isaac、GPU或物理reader。
+
+## Position运行时状态绑定归位（续作，待复审）
+
+Position reset对runtime snapshot所需的Scene scalar Joint、free-body reset Frame到唯一floating Joint，以及body／Frame语义到Artifact FrameReference的解析，归入既有 `runtime.sessions.source`；Env调用这些解析器并继续协调materialization和reset。保留旧内部Frame解析入口的同对象导出。定向检查验证使用Artifact与Scene关系而非provider名称选择Joint，并覆盖缺少Frame、无匹配或多个floating Joint、与scalar名称重叠的拒绝边界。此项不宣称runtime与任务候选类型的反向依赖已完全解除。
+
+受监督、禁止引擎导入的selected／R05b／F06投影／录制组合 **152 passed、2 deselected**，最大RSS 213581824 bytes；attached-leaf／mixed假provider组合 **14 passed**，最大RSS 165597184 bytes。完整命令、退出码和资源采样见ignored `source-bindings-selected/`与 `source-bindings-mixed/`。排除真实provider／scene，本次未运行真实引擎、Isaac、GPU或物理reader；旧源码物理结果不重标。

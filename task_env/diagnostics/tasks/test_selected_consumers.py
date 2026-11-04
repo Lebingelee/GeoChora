@@ -19,6 +19,41 @@ from task_env.tasks.reference_env import SelectedReferenceEnv
 IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
 
 
+def test_position_runtime_source_resolves_reset_frames_to_unique_scene_joints():
+    from task_env.artifacts import FrameReference
+    from task_env.runtime.sessions.source import position_joint_bindings_from_artifact
+
+    frame = FrameReference('cube', 'root')
+    scalar = SimpleNamespace(joint_id='hinge', kind='revolute', child_frame=None)
+    floating = SimpleNamespace(joint_id='root_joint', kind='floating', child_frame=frame)
+    other = SimpleNamespace(joint_id='other', kind='floating', child_frame=FrameReference('other', 'root'))
+    scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(scalar, floating)),
+        SimpleNamespace(entity_id='other', joints=(other,)),
+    ))
+    artifact = SimpleNamespace(legacy_frame_bindings={'cube/root': frame})
+    source = SimpleNamespace(free_joints={'cube/root': 'provider-name-must-not-select-joint'})
+    result = position_joint_bindings_from_artifact(scene, artifact, source)
+    assert result == {'cube/hinge': scalar, 'cube/root': floating}
+
+    with pytest.raises(ValueError, match='lacks an Artifact Frame binding'):
+        position_joint_bindings_from_artifact(scene, SimpleNamespace(legacy_frame_bindings={}), source)
+    empty_scene = SimpleNamespace(articulations=(SimpleNamespace(entity_id='cube', joints=(scalar,)),))
+    with pytest.raises(ValueError, match='exactly one Scene floating Joint'):
+        position_joint_bindings_from_artifact(empty_scene, artifact, source)
+    duplicate_scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(scalar, floating, floating)),
+    ))
+    with pytest.raises(ValueError, match='exactly one Scene floating Joint'):
+        position_joint_bindings_from_artifact(duplicate_scene, artifact, source)
+    overlap = SimpleNamespace(joint_id='root', kind='prismatic', child_frame=None)
+    overlap_scene = SimpleNamespace(articulations=(
+        SimpleNamespace(entity_id='cube', joints=(overlap, floating)),
+    ))
+    with pytest.raises(ValueError, match='overlaps a scalar binding'):
+        position_joint_bindings_from_artifact(overlap_scene, artifact, source)
+
+
 class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
     def __init__(self, artifact, execution, *, source, binding, **_diagnostic_options):
