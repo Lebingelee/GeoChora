@@ -82,3 +82,23 @@ def test_selected_compatibility_exports_reference_the_canonical_objects():
 
     assert old_env is SelectedReferenceEnv
     assert old_binding is ReferenceTaskBinding
+
+
+def test_example_bootstrap_accepts_explicit_geophys_source_and_rejects_missing(monkeypatch, tmp_path):
+    import sys
+    from examples._common import bootstrap_imports
+
+    monkeypatch.setattr(sys, 'path', list(sys.path))
+    monkeypatch.setenv('GEOCHORA_GEOPHYS_SRC', str(tmp_path / 'missing'))
+    with pytest.raises(ValueError, match='GeoPhys src directory'):
+        bootstrap_imports()
+    source = tmp_path / 'src'
+    (source / 'scene').mkdir(parents=True)
+    (source / 'scene' / '__init__.py').write_text('')
+    monkeypatch.setenv('GEOCHORA_GEOPHYS_SRC', str(source))
+    monkeypatch.setitem(sys.modules, 'scene', SimpleNamespace(__file__=str(tmp_path / 'old' / 'scene.py')))
+    with pytest.raises(RuntimeError, match='already imported outside'):
+        bootstrap_imports()
+    monkeypatch.delitem(sys.modules, 'scene')
+    bootstrap_imports()
+    assert str(source) in sys.path

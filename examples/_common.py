@@ -18,7 +18,17 @@ def bootstrap_imports() -> None:
     """Make direct ``python examples/...`` execution use the checkout APIs."""
 
     root = Path(__file__).resolve().parents[1]
-    for path in (root / "GeoPhys" / "src", root):
+    configured_geophys = os.environ.get("GEOCHORA_GEOPHYS_SRC")
+    geophys_src = (Path(configured_geophys).expanduser().resolve()
+                   if configured_geophys else root / "GeoPhys" / "src")
+    if configured_geophys and not (geophys_src / "scene" / "__init__.py").is_file():
+        raise ValueError(f"GEOCHORA_GEOPHYS_SRC must point to a GeoPhys src directory: {geophys_src}")
+    loaded_scene = sys.modules.get("scene")
+    if configured_geophys and loaded_scene is not None:
+        origin = getattr(loaded_scene, "__file__", None)
+        if origin is None or not Path(origin).resolve().is_relative_to(geophys_src):
+            raise RuntimeError("scene was already imported outside GEOCHORA_GEOPHYS_SRC; start a fresh interpreter")
+    for path in (geophys_src, root):
         value = str(path)
         if path.is_dir() and value not in sys.path:
             sys.path.insert(0, value)
