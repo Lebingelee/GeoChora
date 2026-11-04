@@ -17,7 +17,7 @@ PickCube seed31 MuJoCo CPU主参考为960 transitions成功、lift 0.10518958081
 
 ## 阶段3前维护检查点
 
-attempt001 已提交有界 replay、记录身份与解释器路径修改，但环境统一和新手文档交付尚未完成；详见[检查点](reviews/pre-stage3-refactor-attempt001.md)。此记录不改变阶段2决定或授权阶段3。
+attempt001 状态为 `REPORTED_PENDING_REVIEW`：已提交有界职责收敛、SHA、启动／文档及 Nut caller-driven Solution 等修改；环境统一、当前源码完整物理回归和新范围下任务目录收敛均未完成。详见[交付与待复审](reviews/pre-stage3-refactor-attempt001.md)。维护者追加的范围决定要求 Sol 在当前 writer 释放后合并实际输出，准备后继包；此记录不改变阶段2决定或授权阶段3。
 
 ## 阶段3前待办
 
@@ -30,4 +30,4 @@ Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交
 - `MUJOCO_LOG.TXT` SHA-256 `dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b`。
 - `docs/maintenance/20261030_runtime_route_diagnostic_handoff.md` SHA-256 `18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61`。
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
-- 阶段2窗口已释放；阶段3前维护 attempt001 正在本工作树继续，具体 writer/native 状态以[维护检查点](reviews/pre-stage3-refactor-attempt001.md)及工作报告为准。本项不授权新的三后端九格、2b attempt3或阶段3。
+- 阶段2窗口已释放；阶段3前维护 attempt001 以 `REPORTED_PENDING_REVIEW` 收束，具体 writer/native 释放和其他用户占锁状态以[交付记录](reviews/pre-stage3-refactor-attempt001.md)及工作报告为准。本项不授权新的三后端九格、2b attempt3或阶段3。
