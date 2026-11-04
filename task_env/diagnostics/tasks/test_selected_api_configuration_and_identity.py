@@ -21,6 +21,65 @@ def test_position_input_classifier_fails_closed_for_missing_or_unknown_inputs():
         position_input_kind(SimpleNamespace(classify_position_input=lambda _value: 'unknown'), object())
 
 
+def test_session_route_requires_exact_candidate_type_even_for_subclasses():
+    from task_env.runtime.sessions.api import _require_session_admission_input_route
+    from task_env.tasks.position_candidate.builder import (
+        F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
+        F05Dg04IsaacNativeCandidateInputV1,
+    )
+
+    routes = (
+        (F05NativePositionCandidateInputV1, 'f05_native'),
+        (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
+        (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
+    )
+    for cls, route in routes:
+        value = object.__new__(cls)
+        _require_session_admission_input_route(value, route, 'wrong candidate')
+        with pytest.raises(TypeError, match='wrong candidate'):
+            _require_session_admission_input_route(value, 'another-route', 'wrong candidate')
+        subclass = type('UnsupportedInputSubclass', (cls,), {})
+        with pytest.raises(TypeError, match='wrong candidate'):
+            _require_session_admission_input_route(object.__new__(subclass), route, 'wrong candidate')
+
+
+def test_native_adapters_reject_wrong_candidate_before_provider_initialization(monkeypatch):
+    from task_env.runtime.sessions.geophys_native_io import F05GeoPhysUsdNativeIO
+    from task_env.runtime.sessions import isaac_native_io
+
+    with pytest.raises(TypeError, match='exact versioned native candidate input'):
+        F05GeoPhysUsdNativeIO(artifact=object(), execution=object(), source=object(), input_v1=object())
+
+    def forbidden_owner():
+        raise AssertionError('invalid candidate reached Isaac App owner')
+    monkeypatch.setattr(isaac_native_io, '_process_app_owner', forbidden_owner)
+    source = SimpleNamespace(assert_fresh=lambda: None, scene_source=SimpleNamespace(
+        source_verified=False, locally_validated=True,
+        representation=SimpleNamespace(provider='isaacsim'),
+    ))
+    execution = SimpleNamespace(physics_profile='isaac-gpu-physx-f05-dg04-native-mimic-v1')
+    with pytest.raises(TypeError, match='exact F05Dg04IsaacNativeCandidateInputV1'):
+        isaac_native_io.create_isaac_native_runtime_io(
+            object(), execution, source, dg04_native_input=object(),
+        )
+
+
+def test_f06_route_classification_does_not_import_position_candidate(monkeypatch):
+    import builtins
+    from task_env.runtime.sessions.api import _session_admission_input_route
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
+
+    value = object.__new__(UsdRuntimeInputV1)
+    object.__setattr__(value, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
+    original_import = builtins.__import__
+    def guarded_import(name, *args, **kwargs):
+        if 'position_candidate.builder' in name:
+            raise AssertionError('F06 classification imported unrelated Position task')
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, '__import__', guarded_import)
+    assert _session_admission_input_route(value) == 'f06_pickcube'
+
+
 @pytest.mark.parametrize("provider,backend,device,profile", [
     ("isaacsim", "cuda", "cuda:0", "isaac-gpu-physx-f04-position-v1"),
     ("geophys", "cpu", "cpu", "geophys-usd-position-f05-s1-v1"),

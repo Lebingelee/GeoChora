@@ -173,3 +173,9 @@ selected scalar录制在开始边界对绑定实际使用的动作转换／space
 通用observations和recorders不再从 `tasks.position_candidate.builder` 导入版本候选识别器；版本候选binding显式提供原精确类型识别，公共组合层检查识别器存在及返回值在原有支持集合内。未知或非精确类型仍拒绝；runtime后续source／provider准入继续独立检查。此项只消除观测及记录两处反向依赖，runtime中的其他versioned候选类型依赖仍待处理，不视为完整职责整理。
 
 无引擎selected／R05b／Harness组 **157 passed、1 skipped、1 deselected**；F04合成adapter **10 passed、3 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。严格禁引擎attached-leaf合成H5及reader／篡改检查另 **1 passed**。四组完整argv、输出与当时diff摘要见ignored `position-classifier-evidence.json`、`position-classifier-f04.json`、`position-classifier-lifecycle.json`及 `position-classifier-mixed.json`。排除真实provider／scene或缺失历史worker，未运行真实引擎、Isaac、GPU或物理reader；物理结果不能重标。
+
+## Session候选类型准入收敛（续作，待复审）
+
+F05三条Session准入、DG04合成IO上下文和GeoPhys／Isaac native adapter复用同一个现有精确类型分类，adapter不再分别导入候选类；保留每条路线的原错误、精确类型（包括拒绝子类）、输入验证和身份绑定。F06的通用USD输入先于F05候选导入完成分类，不再为F06分类加载无关Position构造器。这个分类只决定后续准入路径，不授予provider／source／delivery许可。Session的唯一分类点仍依赖三个任务候选类型；完整解除runtime对任务类型的依赖尚未完成。
+
+无引擎selected／R05b／F06投影／Harness组 **170 passed、1 skipped、2 deselected**；F04合成adapter及DG02无效输入 **11 passed、3 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。新增检查覆盖不同路线／子类拒绝、无效输入在native provider初始化前拒绝，以及F06分类不导入Position任务。首次另外尝试的两项F05测试依赖真实 `scene`，被禁止引擎guard拒绝，未计为通过。完整argv、输出与diff摘要见ignored `session-route-selected.json`、`session-route-f04.json`、`session-route-lifecycle.json`和 `session-route-mixed.json`；本次未运行真实引擎、Isaac、GPU或物理reader。

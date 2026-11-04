@@ -36,13 +36,13 @@ class F05GeoPhysUsdNativeIO:
     execution_provenance_kind = 'native_runtime'
 
     def __init__(self, *, artifact, execution, source, input_v1):
-        from ...tasks.position_candidate.builder import (
-            F05NativePositionCandidateInputV1,
-            F05Dg02GeoPhysUsdCandidateInputV1,
-        )
+        from .api import _session_admission_input_route
 
-        if type(input_v1) not in (
-                F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1):
+        try:
+            route = _session_admission_input_route(input_v1)
+        except TypeError as error:
+            raise TypeError('F05 GeoPhys adapter requires an exact versioned native candidate input') from error
+        if route not in ('f05_native', 'f05_dg02'):
             raise TypeError('F05 GeoPhys adapter requires an exact versioned native candidate input')
         input_v1.validate()
         if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
@@ -59,7 +59,7 @@ class F05GeoPhysUsdNativeIO:
         self._native_step_count = 0
         self._last_control_values = None
         self._metadata = None
-        self._dg02_contact_observation = type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        self._dg02_contact_observation = route == 'f05_dg02'
         self._contact_body_names = {}
         try:
             import os

@@ -1693,10 +1693,12 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
     if source.scene_source.representation.provider != "isaacsim":
         raise ValueError("Isaac Core adapter requires an Isaac Sim representation selection")
     if dg04_native:
-        from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
+        from .api import _require_session_admission_input_route
 
-        if type(dg04_native_input) is not F05Dg04IsaacNativeCandidateInputV1:
-            raise TypeError('DG04 Isaac adapter requires exact F05Dg04IsaacNativeCandidateInputV1')
+        _require_session_admission_input_route(
+            dg04_native_input, 'f05_dg04',
+            'DG04 Isaac adapter requires exact F05Dg04IsaacNativeCandidateInputV1',
+        )
         dg04_native_input.validate()
         if (dg04_native_input.artifact is not artifact
                 or dg04_native_input.execution.identity_hash != execution.identity_hash

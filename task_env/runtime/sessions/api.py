@@ -86,10 +86,9 @@ class _F05Dg04S1NativeIOContext:
     """Private S1 scope replacing only the exact DG04 native I/O port."""
 
     def __init__(self, input_v1, factory):
-        from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
-
-        if type(input_v1) is not F05Dg04IsaacNativeCandidateInputV1:
-            raise TypeError('DG04 S1 requires its exact versioned source-bound candidate input')
+        _require_session_admission_input_route(
+            input_v1, 'f05_dg04', 'DG04 S1 requires its exact versioned source-bound candidate input',
+        )
         input_v1.validate()
         if not callable(factory):
             raise TypeError('DG04 S1 factory must be callable')
@@ -313,10 +312,9 @@ def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
 
 def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, source) -> None:
     """Admit only the frozen local Menagerie/GeoPhys CPU Position cell."""
-    from ...tasks.position_candidate.builder import F05NativePositionCandidateInputV1
-
-    if type(input_v1) is not F05NativePositionCandidateInputV1:
-        raise TypeError('F05 GeoPhys native materialization requires the exact versioned native input')
+    _require_session_admission_input_route(
+        input_v1, 'f05_native', 'F05 GeoPhys native materialization requires the exact versioned native input',
+    )
     _validate_exact_admission_binding(input_v1, artifact, execution, source,
                                       'F05 GeoPhys native materialization differs from its exact candidate identities')
     if (execution.physics_provider, execution.physics_backend, execution.physics_device,
@@ -340,10 +338,9 @@ def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, s
 
 def _validate_f05_dg02_geophys_usd_input(input_v1, artifact, execution, source) -> None:
     """Admit only the exact DG02 source-preserving USD/Core input contract."""
-    from ...tasks.position_candidate.builder import F05Dg02GeoPhysUsdCandidateInputV1
-
-    if type(input_v1) is not F05Dg02GeoPhysUsdCandidateInputV1:
-        raise TypeError('DG02 GeoPhys/USD materialization requires the exact candidate input')
+    _require_session_admission_input_route(
+        input_v1, 'f05_dg02', 'DG02 GeoPhys/USD materialization requires the exact candidate input',
+    )
     _validate_exact_admission_binding(input_v1, artifact, execution, source,
                                       'DG02 materialization differs from its exact Task/Scene/Execution identities')
     if (execution.physics_provider, execution.physics_backend, execution.physics_device,
@@ -363,10 +360,9 @@ def _validate_f05_dg02_geophys_usd_input(input_v1, artifact, execution, source) 
 
 def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source) -> None:
     """Admit only the exact source-bound DG04 native PhysX mimic profile."""
-    from ...tasks.position_candidate.builder import F05Dg04IsaacNativeCandidateInputV1
-
-    if type(input_v1) is not F05Dg04IsaacNativeCandidateInputV1:
-        raise TypeError('DG04 Isaac native materialization requires its exact candidate input')
+    _require_session_admission_input_route(
+        input_v1, 'f05_dg04', 'DG04 Isaac native materialization requires its exact candidate input',
+    )
     _validate_exact_admission_binding(input_v1, artifact, execution, source,
                                       'DG04 materialization differs from its exact Task/Scene/Execution identities')
     if (execution.physics_provider, execution.physics_backend, execution.physics_device,
@@ -550,6 +546,9 @@ def _session_admission_input_route(input_v1) -> str | None:
     """Classify one exact task-owned input for a versioned Session route."""
     if input_v1 is None:
         return None
+    if (type(input_v1) is UsdRuntimeInputV1
+            and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
+        return 'f06_pickcube'
     from ...tasks.position_candidate.builder import (
         F05Dg02GeoPhysUsdCandidateInputV1,
         F05Dg04IsaacNativeCandidateInputV1,
@@ -563,10 +562,17 @@ def _session_admission_input_route(input_v1) -> str | None:
     for input_type, route in routes:
         if type(input_v1) is input_type:
             return route
-    if (type(input_v1) is UsdRuntimeInputV1
-            and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
-        return 'f06_pickcube'
     raise TypeError('Session admission requires one exact supported task runtime input')
+
+
+def _require_session_admission_input_route(input_v1, expected, message):
+    """Require the centralized exact input type, retaining each caller's error."""
+    try:
+        actual = _session_admission_input_route(input_v1)
+    except TypeError as error:
+        raise TypeError(message) from error
+    if actual != expected:
+        raise TypeError(message)
 
 
 def _validate_exact_admission_binding(input_v1, artifact, execution, source, message):
