@@ -2055,6 +2055,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         from ..planners.contracts import ExpertAction
         if self.binding.external_solution_actions and type(action) is ExpertAction:
+            if getattr(self, 'position_profile', False):
+                raise StageUnavailableError('caller-driven Solution actions are unavailable on Position profiles')
             if self._episode_mode in {'expert', 'external_solution'}:
                 raise RuntimeError('cannot mix caller actions with selected Solution execution')
             if self.solution is not None or self._external_solution_owner is not None:
@@ -2062,10 +2064,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self._stopped or self.session is None:
                 raise RuntimeError('reset required or episode already stopped')
             self._require_published_execution_info()
-            if action.request_boundary != self.info['expert_execution_boundary_v1']:
-                raise ValueError('Solution action boundary is stale or mismatched')
-            if action.control_request is None:
-                raise ValueError('Solution action requires its versioned control request')
+            if self.binding.control_request_required:
+                if action.request_boundary != self.info['expert_execution_boundary_v1']:
+                    raise ValueError('Solution action boundary is stale or mismatched')
+                if action.control_request is None:
+                    raise ValueError('Solution action requires its versioned control request')
+            elif action.control_request is not None or action.request_boundary is not None:
+                raise ValueError('this Solution action route does not admit a control request or boundary')
             return self._prepare_reference_step(action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)

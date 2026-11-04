@@ -764,18 +764,37 @@ def test_reference_binding_owns_action_schema_and_conversion(fake, tmp_path):
         env.close()
 
 
-def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake):
+def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_path):
     from task_env.tasks.pick_cube import build_readiness_solution
 
     env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
     try:
         solution = build_readiness_solution()
         obs, info = env.reset(seed=19)
-        solution.reset(obs, info, env.metadata, execution_info=env.expert_execution_info())
+        with pytest.raises(TypeError, match='public execution info'):
+            solution.reset(obs, {}, env.metadata)
+        solution.reset(obs, info, env.metadata)
+        reset_info = dict(info)
+        env.start_recording(tmp_path / 'caller-pick.h5')
+        assert env.recorder.metadata.expert_identity == solution.identity
         proposal = solution.act(obs, info)
-        obs, reward, terminated, truncated, info = env.step(proposal.action)
-        solution.observe(obs, reward, terminated, truncated, info,
-                         execution_info=env.expert_execution_info())
+        from task_env.environment.types import StageUnavailableError
+        env.position_profile = True
+        with pytest.raises(StageUnavailableError, match='unavailable on Position profiles'):
+            env.step(proposal)
+        assert env.state.control_step == 0
+        env.position_profile = False
+        from dataclasses import replace
+        with pytest.raises(ValueError, match='does not admit a control request or boundary'):
+            env.step(replace(proposal, request_boundary={'unexpected': True}))
+        assert env.state.control_step == 0
+        obs, reward, terminated, truncated, info = env.step(proposal)
+        transition = env.recorder.transitions[-1]
+        assert transition.expert_stage == proposal.stage
+        assert transition.readiness_hold == proposal.diagnostics['readiness_hold']
+        with pytest.raises(ValueError, match='stale/skipped'):
+            solution.observe(obs, reward, terminated, truncated, reset_info)
+        solution.observe(obs, reward, terminated, truncated, info)
         assert env._episode_mode == 'external'
         assert env._external_solution_owner is None and env.solution is None
         assert env.state.control_step == 1 and not solution.failed
@@ -1440,7 +1459,13 @@ def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tm
     import task_env
     from examples.recording import record_expert
     monkeypatch.setattr(record_expert, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
-    monkeypatch.setattr(task_env, 'make_env', lambda uid, config=None: make_env(uid, config=config))
+    def make_caller_only(uid, config=None):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('PickCube recording must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
     output=tmp_path/'failed-current-route.h5'
     code=record_expert.main(['--env-id', IDS[0], '--provider', 'mujoco', '--horizon', '3',
         '--output', str(output), '--time-limit-s', '10', '--memory-limit-mb', '1024'])
@@ -1449,6 +1474,27 @@ def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tm
     assert output.exists() and result['roundtrip']=='PASS'
     assert result['recording']['transitions']==3 and result['recording']['boundaries']==4
     assert result['recording']['t_plus_one_valid'] is True
+
+
+def test_pickcube_task_example_uses_caller_solution(fake, tmp_path, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.tasks import pick_cube
+
+    monkeypatch.setattr(pick_cube, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    def make_caller_only(uid, config):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('PickCube example must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
+    output = tmp_path / 'pick-caller.h5'
+    code = pick_cube.main(['--provider', 'mujoco', '--horizon', '3', '--recording', str(output)])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 0 and result['episode']['transitions'] == 3
+    assert result['task_outcome'] == 'TASK_OR_EXPERT_FAILURE_REPORTED'
+    assert output.exists() and result['recording']['t_plus_one_valid']
 
 
 def test_nutassembly_recording_example_drives_caller_solution(fake, tmp_path, monkeypatch, capsys):

@@ -63,16 +63,15 @@ def main(argv=None):
             solution = build_outcome_solution(provider=args.provider)
             solution.reset(observation, info, env.metadata)
         else:
-            solution = env.prepare_expert()
+            from task_env.tasks.pick_cube import build_readiness_solution
+            solution = build_readiness_solution(backend='cpu', controller_profile='r3_continuous_v1')
+            solution.reset(observation, info, env.metadata)
         env.start_recording(args.output)
         terminated = truncated = False
         while not solution.done and not solution.failed:
-            if args.env_id == selected_env_ids[1]:
-                action = solution.act(observation, info)
-                observation, reward, terminated, truncated, info = env.step(action)
-                solution.observe(observation, reward, terminated, truncated, info)
-            else:
-                observation, _, terminated, truncated, info = env.step_expert()
+            action = solution.act(observation, info)
+            observation, reward, terminated, truncated, info = env.step(action)
+            solution.observe(observation, reward, terminated, truncated, info)
             if terminated or truncated:
                 break
         completion = _completion_result(env, info, solution=solution, terminated=terminated, truncated=truncated)

@@ -15,7 +15,7 @@ if str(_REPOSITORY_ROOT) not in sys.path:
 
 from examples._common import (
     RunTimeout, bounded_process, bootstrap_imports, identity_summary,
-    load_recording_summary, run_expert,
+    load_recording_summary, run_caller_solution,
 )
 
 
@@ -177,12 +177,14 @@ def main(argv=None) -> int:
                 "task": {"controller_profile": args.controller_profile},
             })
             construction_succeeded = True
-            _, reset_info = env.reset(seed=args.seed)
+            from task_env.tasks.pick_cube import build_readiness_solution
+            solution = build_readiness_solution(backend='cpu', controller_profile=args.controller_profile)
+            obs, reset_info = env.reset(seed=args.seed)
+            solution.reset(obs, reset_info, env.metadata)
             reset_succeeded = True
             recording.parent.mkdir(parents=True, exist_ok=True)
             env.start_recording(recording)
-            episode = run_expert(env, seed=args.seed, horizon=args.horizon,
-                                 already_reset=True, initial_info=reset_info)
+            episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
             reason = episode.get("failure_reason") or (
                 "task_success" if episode.get("task_success") else "task_or_expert_incomplete"
             )
@@ -192,7 +194,7 @@ def main(argv=None) -> int:
             finalize_succeeded = True
             report.update(episode=episode, identity=identity_summary(env, provider=args.provider),
                           controller_identity=env.controller.identity,
-                          solution_identity=env.solution.identity,
+                          solution_identity=solution.identity,
                           provider_materialization_id=env.session.provider_materialization_id,
                           resource_budget=budget)
     except RunTimeout as exc:

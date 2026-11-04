@@ -826,8 +826,22 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._boundary_step = execution_info.control_step
         self._boundary_time = execution_info.simulation_time
 
-    def reset(self, observation, info, metadata, *, execution_info):
-        self._execution(execution_info, reset=True)
+    @staticmethod
+    def _execution_from_info(info, execution_info):
+        if execution_info is not None:
+            return execution_info
+        if not isinstance(info, Mapping):
+            raise TypeError('public execution info is required')
+        position = info.get('pickcube_position_execution_info_v1')
+        if position is not None:
+            return PickCubePositionExecutionInfoV1.from_mapping(position)
+        value = info.get('expert_execution_info_v1')
+        if value is None:
+            raise TypeError('public execution info is required')
+        return ExpertExecutionInfo.from_mapping(value)
+
+    def reset(self, observation, info, metadata, *, execution_info=None):
+        self._execution(self._execution_from_info(info, execution_info), reset=True)
         self.planned_actions_emitted = 0
         self.readiness_wait_actions_emitted = 0
         self.total_control_actions_emitted = 0
@@ -887,9 +901,10 @@ class PickCubeReadinessSolution(PickCubeSolution):
 
     next_action = act
 
-    def observe(self, observation, reward, terminated, truncated, info, *, execution_info):
+    def observe(self, observation, reward, terminated, truncated, info, *, execution_info=None):
         if not self._awaiting_observation:
             raise RuntimeError("observe requires preceding act")
+        execution_info = self._execution_from_info(info, execution_info)
         self._execution(execution_info)
         self._awaiting_observation = False
         self.total_control_actions_emitted += 1

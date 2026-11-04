@@ -55,3 +55,9 @@ Nut cadence的100／500 Hz检查和专用构建移到既有 `diagnostics/tasks/c
 对 `develop@fa885280`，通过公共 `examples/start.py`／`make_env` 在GeoPhys CPU各运行一次 seed73 reset、1个零动作transition与close：Empty、Pendulum、TwoWheel均退出码0，观察符合各自space，动作shape分别0／1／2、dtype float32；Pendulum／TwoWheel观测shape分别3／7，reward分别0.9779344970878069／0.9996657105631644，均未终止或截断。每个worker在独立输出cwd运行，分别耗时5.780／18.323／19.949秒、进程组退出且有序释放两把共享锁；具体argv、资源采样、日志及锁收据见ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/native/{empty,pendulum,two-wheel-balance}/`。启动参数显式指向本工作树Core及GeoPhys src；本次未另作运行时模块origin打印，因此只记录已传递的路径。两个保护文件SHA与原快照一致，GeoPhys及Menagerie gitlink未变。
 
 这是受限单步CPU检查，不证明任务成功、多环境、render或其他provider；PickCube／Nut物理及独立物理reader仍未运行。原attempt001累计预留约105107／120000步，本轮三个任务各1个control interval，按其配置的substeps计入后续统一总账；不得将旧run或本次结果重标到后续改动的源码。
+
+## PickCube调用方驱动Solution（续作，待复审）
+
+PickCube scalar CPU支持将Solution的 `ExpertAction` 直接交给 `env.step(action)`；保留action stage／readiness及target/applied ack记录。Solution的reset／observe可从公开info解析执行反馈并继续拒绝缺失／过期边界，旧显式参数兼容。Nut仍强制控制请求与source boundary；PickCube拒绝其未支持的请求字段。普通任务、录制和规划入口已迁移到调用方 `act → step → observe`。Position/F06在推进前拒绝该新动作入口，高级Harness仍使用受限兼容路径，不推断其已迁移。
+
+无引擎离线组合 **188 passed、4 deselected**，涵盖原生命周期回归、PickCube动作／readiness和F06静态检查；此后新增不支持Position和多余请求的负例单独 **2 passed**。此前首次测试发现Nut binding约束被意外移除，已恢复并重跑通过；示例测试曾误以为runtime-valid但任务失败应返回非零，按既有报告契约修正测试。均不证明物理任务成功，当前源码真实PickCube/Nut记录与独立物理reader仍待验证。

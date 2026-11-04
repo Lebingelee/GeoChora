@@ -94,8 +94,8 @@ class ReferenceTaskBinding:
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
-        if self.external_solution_actions and not self.control_request_required:
-            raise ValueError('caller-driven Solution actions require the native control request contract')
+        if self.external_solution_actions and not self.external_actions and not self.control_request_required:
+            raise ValueError('caller-driven guarded Solution actions require the native control request contract')
         mixed_hooks = (
             self.build_mixed_control_profile, self.reset_sample_with_options,
             self.prepare_mixed_control, self.observe_mixed_control,

@@ -553,6 +553,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True,
+        external_solution_actions=True,
         interval_mode=(
             "native"
             if interval_provider in {"mujoco", "geophys"}
