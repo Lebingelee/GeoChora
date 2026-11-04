@@ -44,7 +44,6 @@ class ReferenceTaskBinding:
     build_external: Callable | None = None
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
-    build_gripper_cadence_diagnostic: Callable | None = None
     build_seeded: Callable | None = None
     build_native_feedback_profile: Callable | None = None
     build_mixed_control_profile: Callable | None = None
@@ -63,6 +62,7 @@ class ReferenceTaskBinding:
     position_execution_info_key: str | None = None
     reset_runtime_input: Callable | None = None
     position_gripper_binding: Callable | None = None
+    diagnostic_profile: str | None = None
 
     def __post_init__(self):
         if not callable(self.action_space_factory) or not callable(self.prepare_action):
@@ -87,6 +87,9 @@ class ReferenceTaskBinding:
             raise ValueError('reset runtime input selector must be callable when supplied')
         if self.position_gripper_binding is not None and not callable(self.position_gripper_binding):
             raise ValueError('position gripper selector must be callable when supplied')
+        if self.diagnostic_profile is not None and (
+                type(self.diagnostic_profile) is not str or not self.diagnostic_profile):
+            raise ValueError('diagnostic profile must be a nonempty explicit identifier')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:

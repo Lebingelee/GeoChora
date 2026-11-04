@@ -464,8 +464,10 @@ def test_nutassembly_native_receipt_accepts_100hz_update_then_four_holds(fake):
     )
     from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
 
-    env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
-        backend='cpu', gripper_control_hz=100, horizon=3,
+    from task_env.diagnostics.tasks.c05c_geophys_gripper_cadence import cadence_diagnostic_binding
+    env = NutAssemblyReferenceEnv(
+        provider='geophys', backend='cpu', horizon=3,
+        _binding=cadence_diagnostic_binding(backend='cpu', gripper_control_hz=100),
     )
     solution = build_gripper_cadence_diagnostic_solution(
         backend='cpu', gripper_control_hz=100,

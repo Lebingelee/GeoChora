@@ -37,3 +37,9 @@ PickCube通过已有task binding选择其版本化runtime输入；通用Env使�
 ## Position夹爪绑定归属（续作，待复审）
 
 由PickCube task binding选择版本化source对应的gripper semantic；通用Env将该语义交给既有ControlBinding，不再按F06字段名选择任务特定值。无引擎检查 **13 passed、1 deselected**，包括绑定实际到materialize的合成测试，leaf/mixed合成检查 **12 passed**。真实USD场景和Isaac仍未运行。
+
+## Nut cadence诊断接线隔离与R05b准入缺口（续作，待复审）
+
+Nut cadence的100／500 Hz检查和专用构建移到既有 `diagnostics/tasks/c05c_geophys_gripper_cadence.py` 的显式binding构造；诊断调用者使用同一个Nut Env。通用Env不再包含cadence参数、速率列表或Nut诊断分支，只传递显式diagnostic profile到现有runtime准入；普通native feedback保留原独立路径。旧 `for_gripper_cadence_diagnostic` 内部诊断入口已删除，仓库调用者同步迁移；不新增task专用环境factory。无引擎诊断／消费者／边界组 **115 passed**，覆盖不支持速率／provider拒绝、100 Hz五样本和普通selected路径。
+
+较宽R05b检查 **101 passed、8 failed**：其中5项被无引擎guard拦截GeoPhys来源查找；另外3项在原严格Controller/Solution身份准入处被拒绝。恢复源码至本轮输入 `59b082d1` 后单独重跑这3项，仍全部以相同准入错误失败，说明问题先于本轮诊断隔离；日志 `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/r05b-baseline.log`。检查发现当前Controller和Solution身份绑定真实源码SHA，原R05b allowlist仍固定旧身份；试验性更新身份后这3项前进到GeoPhys来源检查并被guard阻止，不能由此认定物理或完整准入成功，试验修改已撤销。现有固定身份及所有其他严格检查保持不变；需在最终源码稳定后核对源码来源、冻结语义和负例，再明确更新或保留此有限准入的决定，不可伪造旧SHA或仅为绿灯放宽。

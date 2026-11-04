@@ -58,8 +58,12 @@ def test_cadence_experiment_is_explicit_and_does_not_widen_selected_manifest(mon
     assert provider_manifest('geophys').backend == 'cpu'
     with pytest.raises(ValueError, match='scalar CPU only'):
         NutAssemblyReferenceEnv(provider='geophys', backend='cuda')
+    from task_env.diagnostics.tasks.c05c_geophys_gripper_cadence import cadence_diagnostic_binding
     with pytest.raises(ValueError, match='100/500 Hz'):
-        NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(backend='cpu', gripper_control_hz=250)
+        cadence_diagnostic_binding(backend='cpu', gripper_control_hz=250)
+    with pytest.raises(ValueError, match='GeoPhys CPU/CUDA'):
+        NutAssemblyReferenceEnv(provider='mujoco', backend='cpu',
+            _binding=cadence_diagnostic_binding(backend='cpu', gripper_control_hz=100))
 
     cpu_100 = build_gripper_cadence_diagnostic_reference(backend='cpu', gripper_control_hz=100)
     cpu_500 = build_gripper_cadence_diagnostic_reference(backend='cpu', gripper_control_hz=500)

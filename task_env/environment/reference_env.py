@@ -1083,7 +1083,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
-                 _binding=None, _diagnostic_gripper_control_hz=None,
+                 _binding=None,
                  _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
@@ -1151,39 +1151,26 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if execution_route not in allowed_versioned_routes:
                 raise ValueError('versioned Position construction has an unsupported provider execution route')
         self._declared_execution_spec_v1 = _execution_spec_v1
-        if sum((bool(_mixed_control_candidate), _diagnostic_gripper_control_hz is not None,
+        diagnostic_profile = self.binding.diagnostic_profile
+        if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):
+            raise ValueError('selected diagnostic profile requires GeoPhys CPU/CUDA')
+        if sum((bool(_mixed_control_candidate), diagnostic_profile is not None,
                 _native_feedback_gripper_control_hz is not None)) > 1:
             raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
-        self._diagnostic_profile = None
-        self._diagnostic_gripper_control_hz = None
+        self._diagnostic_profile = diagnostic_profile
         self._native_feedback_profile = None
         self._native_feedback_gripper_control_hz = None
         self._mixed_control_candidate = bool(_mixed_control_candidate)
         if _mixed_control_candidate:
             build_value = lambda: self.binding.build_mixed_control_profile(provider, backend)
-        elif _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
-            if (_execution_spec_v1 is None
+        elif _native_feedback_gripper_control_hz is None:
+            if (diagnostic_profile is None and _execution_spec_v1 is None
                     and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             if self.binding.build_seeded is not None:
                 build_value = lambda: self.binding.build_seeded(provider, backend, 31, horizon)
             else:
                 build_value = lambda: self.binding.build(provider)
-        elif _diagnostic_gripper_control_hz is not None:
-            if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
-                    or type(_diagnostic_gripper_control_hz) is not int
-                    or _diagnostic_gripper_control_hz not in {100, 500}
-                    or self.binding.build_gripper_cadence_diagnostic is None):
-                raise ValueError(
-                    'gripper cadence diagnostic requires the opted-in GeoPhys NutAssembly binding, '
-                    'CPU/CUDA, and 100/500 Hz'
-                )
-            self._diagnostic_profile = 'nutassembly-gripper-cadence-v1'
-            self._diagnostic_gripper_control_hz = _diagnostic_gripper_control_hz
-            build_value = lambda: self.binding.build_gripper_cadence_diagnostic(
-                provider, backend, _diagnostic_gripper_control_hz, True,
-            )
-            self._native_feedback_profile = None
         else:
             if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
                     or type(_native_feedback_gripper_control_hz) is not int
@@ -1195,7 +1182,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 )
             self._native_feedback_profile = 'nutassembly-native-feedback-v1'
             self._native_feedback_gripper_control_hz = _native_feedback_gripper_control_hz
-            self._diagnostic_profile = None
             build_value = lambda: self.binding.build_native_feedback_profile(
                 provider, backend, _native_feedback_gripper_control_hz, True,
             )
@@ -1553,11 +1539,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._mixed_initial_value_pending = False
             elif self._mixed_control_candidate:
                 self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
-            elif self._diagnostic_profile is not None:
-                self.value = self.binding.build_gripper_cadence_diagnostic(
-                    self.provider, self.backend, self._diagnostic_gripper_control_hz,
-                    external_solution is None,
-                )
             elif self._native_feedback_profile is not None:
                 self.value = self.binding.build_native_feedback_profile(
                     self.provider, self.backend, self._native_feedback_gripper_control_hz,

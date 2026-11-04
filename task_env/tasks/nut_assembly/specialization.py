@@ -538,11 +538,6 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
         build_external=lambda provider: build_reference(provider=provider, include_solution=False,
                                                         resolved_config=resolved_config,
                                                         lift_height_m=lift_height_m, task_config=task_config),
-        build_gripper_cadence_diagnostic=lambda provider, backend, gripper_control_hz, include_solution:
-            build_gripper_cadence_diagnostic_reference(
-                backend=backend, gripper_control_hz=gripper_control_hz,
-                include_solution=include_solution,
-            ),
         build_native_feedback_profile=lambda provider, backend, gripper_control_hz, include_solution:
             build_native_feedback_reference(
                 backend=backend, gripper_control_hz=gripper_control_hz,
@@ -592,12 +587,6 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     def selected_binding(cls, config):
         return _binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
                         json.loads(config.task_configuration_json))
-
-    @classmethod
-    def for_gripper_cadence_diagnostic(cls, *, backend, gripper_control_hz, horizon=6000):
-        """Create the explicit bounded GeoPhys cadence experiment selection."""
-        return cls(provider='geophys', backend=backend, horizon=horizon,
-                   _diagnostic_gripper_control_hz=gripper_control_hz)
 
     @classmethod
     def for_native_feedback_profile(cls, *, backend, gripper_control_hz=500, horizon=6000):
