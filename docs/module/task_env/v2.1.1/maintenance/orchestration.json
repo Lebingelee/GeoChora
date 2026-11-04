@@ -1,11 +1,11 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-04",
-  "status": "G02_2A_ACCEPTED_BOUNDED",
+  "status": "G02_2B_PAUSED_INTERIM_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
-  "implementation_packages_dispatched": false,
+  "implementation_packages_dispatched": true,
   "execution_goals_started": true,
   "source_baseline": {
     "core_commit": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
@@ -20,7 +20,7 @@
   },
   "active_packages": [],
   "next_candidate": "2b",
-  "next_action": "Prepare and freeze one V211_G02_2b_attempt001 after the Sol review commit. Maintainer manually forwards; no automatic execution, 2c or stage3 continuation.",
+  "next_action": "Maintainer manually resumes the same attempt001 with complete r002 replacement package after Sol interim review. No duplicate writer, attempt002, 2c or stage3.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -410,21 +410,82 @@
           "dependencies": [
             "2a"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "PAUSED_INTERIM_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G02_2b_attempt001",
+              "package_manifest_sha256": "eb6c26983646262f56cee1d3f788622994b013096b33282131171d048722a480",
+              "prompt_sha256": "7f732b250707c398a8d6531dad519a242b12b9f7075a7829a1d2094b1ca7cb08",
+              "status": "PAUSED_INTERIM_REVIEW",
+              "result": "INCOMPLETE",
+              "input_head": "08103c5156020c340b2d1f373a78a63515e67bb3",
+              "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3",
+              "output_head": null,
+              "provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+              "native_starts": 0,
+              "physics_steps": 0,
+              "gpu_starts": 0,
+              "reported_offline_tests_passed": 8,
+              "sol_review_ref": "reviews/20261104_2b_sol_interim_review.md",
+              "review_decision": {
+                "status": "NEEDS_REWORK_INTERIM",
+                "reviewer": "Sol",
+                "date": "2026-11-04",
+                "review_ref": "reviews/20261104_2b_sol_interim_review.md",
+                "accepted": false,
+                "complete_report_received": false,
+                "scope": "Paused candidate, offline evidence and preparation helpers only; no 2b native run."
+              },
+              "resume_revision": "r002",
+              "resume_is_new_attempt": false,
+              "resume_package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_attempt001_resume_r002",
+              "full_report_sealed": false
+            }
+          ],
+          "assigned_agent": "Original Terra/Luna main executor, paused by maintainer; no active writer/native owner during Sol review",
+          "package_path": "external handoff V211_G02_2b_attempt001; same-attempt replacement V211_G02_2b_attempt001_resume_r002",
+          "package_sha256": "eb6c26983646262f56cee1d3f788622994b013096b33282131171d048722a480",
+          "input_head": "08103c5156020c340b2d1f373a78a63515e67bb3",
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
-          "blockers": []
+          "expected_duration_minutes": "Original active120-180 / hard210 total retained; reconcile pre-pause consumption before resume",
+          "execution_budget": {
+            "window_minutes": 210,
+            "mujoco_reserved_steps_max": 150000,
+            "mujoco_worker_seconds_max": 2520,
+            "geophys_reserved_steps_max": 60000,
+            "geophys_worker_seconds_max": 1200,
+            "isaac_reserved_steps_max": 60036,
+            "isaac_worker_seconds_max": 2400,
+            "isaac_app_starts_max": 2,
+            "native_starts_so_far": 0,
+            "pre_pause_active_time": "RECONCILE_NOT_ZERO_ASSUMED",
+            "route_memory_gates": "r002: MuJoCo start2/stop0.75/RSS3 GiB; GeoPhys3/1/6; Isaac6/1/14"
+          },
+          "last_observation": "Maintainer paused incomplete 2b. Sol independently reproduced8 passing offline tests, detected110-tick A/B confound and partial-lock failure, compared authored plant XML and located existing Isaac/GeoPhys environment metadata. No task/native acceptance.",
+          "evidence_refs": [
+            "reviews/20261104_2b_sol_interim_review.md"
+          ],
+          "commits": [
+            "987873018c48ff3c677db521b58838b898e7ebe3"
+          ],
+          "review_decision": {
+            "status": "NEEDS_REWORK_INTERIM",
+            "reviewer": "Sol",
+            "date": "2026-11-04",
+            "review_ref": "reviews/20261104_2b_sol_interim_review.md",
+            "accepted": false,
+            "complete_report_received": false,
+            "scope": "Paused candidate, offline evidence and preparation helpers only; no 2b native run."
+          },
+          "blockers": [
+            "A/B has extra110 ticks in B",
+            "Supervisor cleanup/aggregate accounting incomplete",
+            "Compiled plant dynamics/full execution alignment unverified",
+            "All 2b native task/regression runs NOT_RUN"
+          ],
+          "candidate_head": "987873018c48ff3c677db521b58838b898e7ebe3"
         },
         {
           "id": "2c",
@@ -828,5 +889,8 @@
     "receipt": "20261103_protocol_baseline_confirmation.md",
     "input_review_head": "11b1e6c5bf8011acdc39f10449e2eb25764da92d",
     "implementation_complete": false
-  }
+  },
+  "paused_packages": [
+    "V211_G02_2b_attempt001"
+  ]
 }
