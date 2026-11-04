@@ -48,6 +48,10 @@ def reexecute_selected(path, *, output):
     coordinator_source = metadata['source_provenance'].get('coordinator_source')
     if coordinator_source is not None and coordinator_source != reference_provenance.source_snapshot(reference_provenance.__file__):
         raise ValueError('coordinator source identity mismatch; no historical identity substitution')
+    from task_env.observations import selected_reference as selected_observation
+    observation_source = metadata['source_provenance'].get('observation_source')
+    if observation_source is not None and observation_source != reference_provenance.source_snapshot(selected_observation.__file__):
+        raise ValueError('observation source identity mismatch; no historical identity substitution')
     env = make_env(configuration['env_id'], config={k:v for k,v in configuration.items() if k!='env_id'})
     try:
         if digest(env.value['resolved_configuration']) != digest(recipe['resolved_configuration']):
