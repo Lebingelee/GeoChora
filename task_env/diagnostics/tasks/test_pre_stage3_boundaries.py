@@ -347,7 +347,7 @@ def test_artifact_digest_does_not_cache_unknown_mutable_contract_subclasses():
     assert artifact.identity_hash != first
 
 
-def test_selected_source_identity_includes_artifact_contract_bytes():
+def test_selected_source_identity_includes_action_and_artifact_contract_bytes():
     import hashlib
     from pathlib import Path
     from task_env.artifacts import TaskArtifact
@@ -355,12 +355,12 @@ def test_selected_source_identity_includes_artifact_contract_bytes():
     from task_env.tasks.nut_assembly import specialization as nut
 
     root = Path(pick.__file__).resolve().parents[3]
-    relative = 'task_env/artifacts/contracts.py'
-    expected = hashlib.sha256((root / relative).read_bytes()).hexdigest()
     pick_files = pick._source_identity_files(pick.build_artifact(), TaskArtifact)
     nut_files = nut._source_identity_files()
-    assert pick_files[relative] == expected
-    assert nut_files[relative] == expected
+    for relative in ('task_env/artifacts/contracts.py', 'task_env/planners/contracts.py'):
+        expected = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        assert pick_files[relative] == expected
+        assert nut_files[relative] == expected
 
 
 def test_artifact_digest_detects_low_level_frozen_field_tampering():
