@@ -69,3 +69,7 @@ PickCube scalar CPU支持将Solution的 `ExpertAction` 直接交给 `env.step(ac
 独立进程执行既有 `independent_readback.py` 对同一H5校验：PASS，960 transitions／961 boundaries、0.01 s control_dt及target/applied ack一致；无native substep证据，D0及Qualification未评估。详细结果 `native/pickcube-independent/readback.json`，另有用户reader `native/pickcube-reader/` 的T+1／存储校验。这只证明所述源码、seed、provider及路线，不重标其他源码或provider。
 
 按原attempt001登记的105107／120000原生步上限加本续作classic单步和本次PickCube预留5000步，剩余额度不足以保守预留Nut horizon6000所需30000步；Nut完整物理回归与独立物理reader保持NOT_RUN。历史上限的适用／新的原生预算需在后续执行账本中明确，不能静默重置。
+
+## PickCube调用方动作来源与身份（续作，待复审）
+
+PickCube readiness Solution在调用方提供公开info时将当前source boundary和自身identity附在 `ExpertAction`；普通scalar CPU Env在推进前核对动作边界及解析配置中的Solution identity，并继续拒绝未支持的控制请求。旧 `act()` 兼容调用可不带boundary；Nut既有guard不变。此检查是内容一致性，不是防伪或调用者身份认证。无引擎组合 **188 passed、4 deselected**，包含错误identity／过期boundary在物理推进前拒绝以及Nut caller约束。源码已改变，前述 `d61fd168` 物理结果保留其原身份，不自动重标；本次改动后的物理回归仍待执行。

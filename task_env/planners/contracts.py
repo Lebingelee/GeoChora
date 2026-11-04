@@ -21,6 +21,7 @@ class ExpertAction:
     diagnostics: Mapping[str, float | int | bool | str] = field(default_factory=dict)
     control_request: ArmTargetExecutionRequestV1 | None = None
     request_boundary: Mapping[str, object] | None = None
+    solution_identity: str | None = None
 
     def __post_init__(self) -> None:
         action = np.asarray(self.action, dtype=np.float32).reshape(-1).copy()
@@ -29,6 +30,9 @@ class ExpertAction:
         object.__setattr__(self, "stage", str(self.stage))
         if self.request_boundary is not None:
             object.__setattr__(self, "request_boundary", deepcopy(dict(self.request_boundary)))
+        if self.solution_identity is not None and (
+                type(self.solution_identity) is not str or not self.solution_identity):
+            raise ValueError("solution_identity must be a nonempty string when supplied")
         object.__setattr__(self, "done", bool(self.done))
         object.__setattr__(self, "failed", bool(self.failed))
         if self.control_request is not None:

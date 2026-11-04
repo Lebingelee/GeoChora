@@ -897,7 +897,12 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 "measured_tcp_horizontal_error_m": metrics["horizontal_error_m"],
             })
         self._awaiting_observation = True
-        return ExpertAction(action=action, stage=segment.name, diagnostics=diagnostics)
+        return ExpertAction(
+            action=action, stage=segment.name, diagnostics=diagnostics,
+            request_boundary=(info.get('expert_execution_boundary_v1')
+                              if isinstance(info, Mapping) else None),
+            solution_identity=self.identity,
+        )
 
     next_action = act
 

@@ -785,8 +785,10 @@ def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_p
         assert env.state.control_step == 0
         env.position_profile = False
         from dataclasses import replace
-        with pytest.raises(ValueError, match='does not admit a control request or boundary'):
+        with pytest.raises(ValueError, match='boundary is stale or mismatched'):
             env.step(replace(proposal, request_boundary={'unexpected': True}))
+        with pytest.raises(ValueError, match='identity differs'):
+            env.step(replace(proposal, solution_identity='wrong-solution'))
         assert env.state.control_step == 0
         obs, reward, terminated, truncated, info = env.step(proposal)
         transition = env.recorder.transitions[-1]

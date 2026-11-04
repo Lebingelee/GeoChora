@@ -2069,8 +2069,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('Solution action boundary is stale or mismatched')
                 if action.control_request is None:
                     raise ValueError('Solution action requires its versioned control request')
-            elif action.control_request is not None or action.request_boundary is not None:
-                raise ValueError('this Solution action route does not admit a control request or boundary')
+            else:
+                if action.control_request is not None:
+                    raise ValueError('this Solution action route does not admit a control request')
+                if action.request_boundary != self.info['expert_execution_boundary_v1']:
+                    raise ValueError('Solution action boundary is stale or mismatched')
+                if action.solution_identity != self.value.get('solution_identity'):
+                    raise ValueError('Solution action identity differs from the selected task')
             return self._prepare_reference_step(action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
