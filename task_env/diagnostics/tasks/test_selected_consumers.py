@@ -1635,7 +1635,11 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
     # as a normal application. This is a synthetic session, not native proof.
     import examples.tasks.declared_marker  # noqa: F401
 
-    env = make_env('marker-height-example-v1', config={'provider': 'mujoco', 'horizon': 2})
+    # Match the nested public configuration shown in the task authoring guide.
+    env = make_env('marker-height-example-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'episode': {'horizon': 10},
+    })
     try:
         obs, _ = env.reset(seed=31)
         first = env.state.pose_world['marker-v1']
