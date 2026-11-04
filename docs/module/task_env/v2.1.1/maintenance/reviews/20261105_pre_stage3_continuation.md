@@ -61,3 +61,11 @@ Nut cadence的100／500 Hz检查和专用构建移到既有 `diagnostics/tasks/c
 PickCube scalar CPU支持将Solution的 `ExpertAction` 直接交给 `env.step(action)`；保留action stage／readiness及target/applied ack记录。Solution的reset／observe可从公开info解析执行反馈并继续拒绝缺失／过期边界，旧显式参数兼容。Nut仍强制控制请求与source boundary；PickCube拒绝其未支持的请求字段。普通任务、录制和规划入口已迁移到调用方 `act → step → observe`。Position/F06在推进前拒绝该新动作入口，高级Harness仍使用受限兼容路径，不推断其已迁移。
 
 无引擎离线组合 **188 passed、4 deselected**，涵盖原生命周期回归、PickCube动作／readiness和F06静态检查；此后新增不支持Position和多余请求的负例单独 **2 passed**。此前首次测试发现Nut binding约束被意外移除，已恢复并重跑通过；示例测试曾误以为runtime-valid但任务失败应返回非零，按既有报告契约修正测试。均不证明物理任务成功，当前源码真实PickCube/Nut记录与独立物理reader仍待验证。
+
+## PickCube调用方驱动物理回归与独立reader（续作，待复审）
+
+`develop@d61fd168`，经 `examples/tasks/pick_cube.py` 的 `Solution.act → env.step(ExpertAction) → Solution.observe` 普通CPU路线，MuJoCo 3.8.1、seed31、horizon1000、R3：960 transitions，cube lift 0.10518958081676949 m，task success与Solution completion均为true，record finalize及close返回。H5 SHA-256 `0a2b6faff3f580819ee6c9cb105476efc61d3872df8706b5e160dd40c0df6912`，记录的source revision精确为 `d61fd168b23754111062468bc522ae87a233e996`。双锁按顺序获取及释放，worker 11.730秒、进程组退出、最大进程树RSS 338841600 bytes；argv、资源采样、输出位于ignored `native/pickcube-caller/`。
+
+独立进程执行既有 `independent_readback.py` 对同一H5校验：PASS，960 transitions／961 boundaries、0.01 s control_dt及target/applied ack一致；无native substep证据，D0及Qualification未评估。详细结果 `native/pickcube-independent/readback.json`，另有用户reader `native/pickcube-reader/` 的T+1／存储校验。这只证明所述源码、seed、provider及路线，不重标其他源码或provider。
+
+按原attempt001登记的105107／120000原生步上限加本续作classic单步和本次PickCube预留5000步，剩余额度不足以保守预留Nut horizon6000所需30000步；Nut完整物理回归与独立物理reader保持NOT_RUN。历史上限的适用／新的原生预算需在后续执行账本中明确，不能静默重置。
