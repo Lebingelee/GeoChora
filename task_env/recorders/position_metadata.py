@@ -3,6 +3,7 @@
 import hashlib
 
 import numpy as np
+from ..environment.reference_binding import position_input_kind
 
 
 def pending_controller_switch_receipt(pending, *, published_step, execution_fault,
@@ -28,13 +29,6 @@ def pending_controller_switch_receipt(pending, *, published_step, execution_faul
             'observed_runtime_boundary': int(runtime_step()),
         })
     return receipt
-
-
-def _versioned_position_input_kind(input_v1):
-    if input_v1 is None:
-        return None
-    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
-    return _versioned_position_candidate_kind(input_v1)
 
 
 def _attached_leaf_record_metadata(self, asdict):
@@ -142,7 +136,7 @@ def position_record_metadata(self):
 
 
     versioned_position_input = self.value.get('versioned_position_input')
-    versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+    versioned_input_kind = position_input_kind(self.binding, versioned_position_input)
     f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
     f05_native_input = versioned_position_input if versioned_input_kind == 'f05_native' else None
     f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
@@ -612,7 +606,7 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
     target_hash = target.target.identity_hash
     applied_payload = applied.to_mapping()
     versioned_position_input = self.value.get('versioned_position_input')
-    versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
+    versioned_input_kind = position_input_kind(self.binding, versioned_position_input)
     f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
     f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
     if (f04_input is not None or versioned_input_kind == 'f05_native'
@@ -772,8 +766,8 @@ def position_record_reset_info(self):
             # observation. Generic H5 v3 consumes this only for the
             # bounded versioned typed-state witness extension.
             'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-        } if _versioned_position_input_kind(
-            self.value.get('versioned_position_input'),
+        } if position_input_kind(
+            self.binding, self.value.get('versioned_position_input'),
         ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
         **({
             'camera_observation_v1': self.info['camera_observation_v1'],

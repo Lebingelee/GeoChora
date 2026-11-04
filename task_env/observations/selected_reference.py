@@ -88,13 +88,6 @@ def position_camera_observation_declaration(binding, config):
     return OrderedDict((name, Dict(values)) for name, values in groups.items()), schema
 
 
-def _versioned_position_input_kind(input_v1):
-    if input_v1 is None:
-        return None
-    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
-    return _versioned_position_candidate_kind(input_v1)
-
-
 def _position_task_evaluation_state(state, adapted):
     """Merge Position publication fields into the existing v0 task-state contract."""
     return CanonicalStateView(
@@ -250,10 +243,9 @@ def build_selected_observation(self, state):
         'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
         'simulation_time_s': float(state.simulation_time)}
     if getattr(self, 'position_profile', False):
-        position_input_kind = _versioned_position_input_kind(
-            self.value.get('versioned_position_input'),
-        )
-        if position_input_kind == 'dg02_geophys':
+        from ..environment.reference_binding import position_input_kind
+        input_kind = position_input_kind(self.binding, self.value.get('versioned_position_input'))
+        if input_kind == 'dg02_geophys':
             info.update({
                 'task_success_semantics': 'raw_predicate_only',
                 'raw_task_predicate': bool(evaluation.success),
@@ -265,7 +257,7 @@ def build_selected_observation(self, state):
         info['state_boundary_identity'] = boundary.to_mapping()
         info['state_boundary_id'] = boundary.boundary_id
         info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-        if position_input_kind in (
+        if input_kind in (
             'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native',
         ):
             # Versioned USD state-only routes expose the Core-owned typed

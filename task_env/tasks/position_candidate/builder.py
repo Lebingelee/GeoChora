@@ -831,6 +831,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
 
     binding = ReferenceTaskBinding(
         build=build,
+        classify_position_input=_versioned_position_candidate_kind,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,

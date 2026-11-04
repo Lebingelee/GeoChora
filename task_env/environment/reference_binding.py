@@ -16,6 +16,19 @@ def _no_observe_kwargs(env, guard_samples):
     return {}
 
 
+def position_input_kind(binding, value):
+    """Ask the task binding to classify a versioned Position input, if present."""
+    if value is None:
+        return None
+    classify = getattr(binding, 'classify_position_input', None)
+    if not callable(classify):
+        raise TypeError('versioned Position value requires its task-owned input classifier')
+    kind = classify(value)
+    if kind not in {'f04', 'f05_native', 'dg02_geophys', 'dg04_isaac_native'}:
+        raise ValueError('versioned Position input classifier returned an unsupported kind')
+    return kind
+
+
 @dataclass(frozen=True)
 class ReferenceTaskBinding:
     """Internal task-to-reference adapter; not a new public task protocol."""
@@ -65,6 +78,7 @@ class ReferenceTaskBinding:
     position_execution_info_key: str | None = None
     reset_runtime_input: Callable | None = None
     position_gripper_binding: Callable | None = None
+    classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
 
     def __post_init__(self):
@@ -107,6 +121,8 @@ class ReferenceTaskBinding:
             raise ValueError('reset runtime input selector must be callable when supplied')
         if self.position_gripper_binding is not None and not callable(self.position_gripper_binding):
             raise ValueError('position gripper selector must be callable when supplied')
+        if self.classify_position_input is not None and not callable(self.classify_position_input):
+            raise ValueError('position input classifier must be callable when supplied')
         if self.diagnostic_profile is not None and (
                 type(self.diagnostic_profile) is not str or not self.diagnostic_profile):
             raise ValueError('diagnostic profile must be a nonempty explicit identifier')

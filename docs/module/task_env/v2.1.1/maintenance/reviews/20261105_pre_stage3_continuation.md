@@ -167,3 +167,9 @@ Position与mixed共享既有recorder owner的v3终止原因、最终boundary、T
 selected scalar录制在开始边界对绑定实际使用的动作转换／space、观测投影／space函数的源码文件取摘要，不再无条件把默认Panda观测模块当作实际投影来源。每次录制对同一文件只读取一次，新录制重新读取，不持久按路径缓存；文件内容变化后摘要变化。无法追溯到源码文件的callable在recorder发布前明确拒绝，修正后可重试；canonical和execution recorder均在首次boundary准备成功后才发布路径和实例。该摘要是开始时的文件字节，不单独证明运行中加载的代码与磁盘字节一致。
 
 无引擎selected／R05b／recorder／Harness组合 **168 passed、1 skipped、1 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。测试覆盖自定义观测函数的真实文件摘要、重复文件单次读取、文件替换后重新计算、无法追溯函数拒绝及重试；完整argv、输出与当时diff摘要见ignored `binding-source-selected.json`、`binding-source-lifecycle.json`和 `binding-source-mixed.json`。本次不证明物理任务成功，未运行真实引擎、Isaac、GPU或物理reader。
+
+## Position候选识别的调用方向（续作，待复审）
+
+通用observations和recorders不再从 `tasks.position_candidate.builder` 导入版本候选识别器；版本候选binding显式提供原精确类型识别，公共组合层检查识别器存在及返回值在原有支持集合内。未知或非精确类型仍拒绝；runtime后续source／provider准入继续独立检查。此项只消除观测及记录两处反向依赖，runtime中的其他versioned候选类型依赖仍待处理，不视为完整职责整理。
+
+无引擎selected／R05b／Harness组 **157 passed、1 skipped、1 deselected**；F04合成adapter **10 passed、3 deselected**；lifecycle组 **185 passed、3 deselected**；leaf／mixed假provider组 **12 passed**。严格禁引擎attached-leaf合成H5及reader／篡改检查另 **1 passed**。四组完整argv、输出与当时diff摘要见ignored `position-classifier-evidence.json`、`position-classifier-f04.json`、`position-classifier-lifecycle.json`及 `position-classifier-mixed.json`。排除真实provider／scene或缺失历史worker，未运行真实引擎、Isaac、GPU或物理reader；物理结果不能重标。

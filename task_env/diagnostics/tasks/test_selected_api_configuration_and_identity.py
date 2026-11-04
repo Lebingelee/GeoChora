@@ -1,10 +1,24 @@
 """Provider-free regressions for selected construction config and identity facts."""
 
 import pytest
+from types import SimpleNamespace
 
 from task_env.artifacts.contracts import RendererSelectionV1
 from task_env.environment.config import ResolvedEnvConfig
 from task_env.environment.configuration import resolve_task_env_config
+
+
+def test_position_input_classifier_fails_closed_for_missing_or_unknown_inputs():
+    from task_env.environment.reference_binding import position_input_kind
+    from task_env.tasks.position_candidate.builder import _versioned_position_candidate_kind
+
+    assert position_input_kind(None, None) is None
+    with pytest.raises(TypeError, match='task-owned input classifier'):
+        position_input_kind(SimpleNamespace(), object())
+    with pytest.raises(TypeError, match='exact supported candidate input'):
+        position_input_kind(SimpleNamespace(classify_position_input=_versioned_position_candidate_kind), object())
+    with pytest.raises(ValueError, match='unsupported kind'):
+        position_input_kind(SimpleNamespace(classify_position_input=lambda _value: 'unknown'), object())
 
 
 @pytest.mark.parametrize("provider,backend,device,profile", [
