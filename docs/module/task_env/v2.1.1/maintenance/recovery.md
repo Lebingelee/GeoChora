@@ -29,6 +29,8 @@ attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-
 
 2026-11-05后续goal在上述复审之后继续实施，至 `f37dec92` 的源码与文档检查点均待Sol复审：Marker公共组装、F06受信声明、部分task／recorder职责、Nut cadence诊断隔离和R05b源码身份准入均有实现。PickCube普通CPU、Position/F06、内建与通用candidate的调用方动作接线已迁移；Position/F06新路线仅有合成证据，真实Isaac未运行。通用candidate合成oracle预检因两份保护untracked触发clean-check，尚未通过。完整记录及失败边界见[续作检查点](reviews/20261105_pre_stage3_continuation.md)。
 
+当前待处理状态、资源上限违规及待维护者决定事项汇总在[待复审检查点](reviews/20261105_pre_stage3_pending_handoff.md)；该页不是最终返包或验收。
+
 其后续作至 `8416ef49` 的源码与文档仍待Sol复审；当前逐门证据与未完成项见[验收门核对草稿](reviews/20261105_pre_stage3_gate_audit.md)。该草稿不是最终交付或Sol决定，后续源码变化须重新核对适用范围。
 
 已有受限物理证据：`fa885280` 的Empty／Pendulum／TwoWheel GeoPhys CPU各单步与close；`f9cb51fd` 的PickCube MuJoCo CPU seed31调用方驱动回归及同H5独立reader。结果只对应各自源码，后续源码不自动继承这些物理结论。Nut完整物理回归与独立物理reader仍为NOT_RUN；原生步数预算问题已向维护者提出，尚待答复。整体维护仍为PARTIAL，阶段3未开始。
