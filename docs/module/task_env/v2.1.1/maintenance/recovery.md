@@ -25,6 +25,10 @@ attempt001及维护者授权续作已返包，最终执行HEAD为`656ef136`。So
 
 Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交G06后续实施。旧并行注册／脚本及历史证据不改写，不因此要求本次追加并行native或训练检查。阶段3–7状态保持不变。
 
+## 当前返工范围：30分钟
+
+维护者已指定30分钟硬窗口。本轮只优先修复生命周期统一R1；Marker简化、F06职责整理及不受影响的文档诊断优化延期，不因这些事项继续延长窗口。见[规划优先级](../planning/pre-stage3-environment-refactor.md#24-维护者指定的30分钟返工优先级)。本轮无native／GPU／完整物理reader预算，现有物理证据边界不变；新包为`V211_PRE_STAGE3_REFACTOR_attempt002`，准备后由维护者转发，不自动启动或进入阶段3。
+
 ## 保护项和停止点
 
 - `MUJOCO_LOG.TXT` SHA-256 `dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b`。

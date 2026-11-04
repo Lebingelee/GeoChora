@@ -77,6 +77,16 @@ Sol已复审最终执行输出`656ef136`，见[独立复审](../maintenance/revi
 
 待上述实现稳定后做最终必要代表回归与独立读回；不将旧源码成功重标，不新增Isaac native、GPU、九格、训练或全部后端安装门。
 
+### 2.4 维护者指定的30分钟返工优先级
+
+维护者于2026-11-04要求：返工只给30分钟，先抓阻碍后续实施的主要问题，不影响后续阶段的整理先忽略。本轮`V211_PRE_STAGE3_REFACTOR_attempt002`只以R1为主要实现目标：完成三个classic任务的单环境真实生命周期迁移、BaseTaskEnv同对象alias与旧独立生命周期删除，保留现有动作／观测／reset／fault／close和有效render接线。优先复用已有lifecycle owner与组件，不把迁移扩大为统一物理provider底层或阶段3能力建设。
+
+R2 Marker通用构造简化、R3 F06任务规则归位、本轮不受影响的文档／诊断整理记为`DEFERRED_NONBLOCKING_FOR_THIS_WINDOW`，不作为这30分钟的完成门；它们仍是明确欠账，不改写既有源码限制或旧复审。只有发现其直接妨碍R1或造成当前错误时才做最小修复。
+
+硬窗口包含实现、离线验证、本地提交和报告，最后至少留3分钟收尾；不得沿用attempt001的210分钟或原生额度。原生引擎／GPU／完整物理回归及独立物理reader本轮预算为0，合成测试不能标成物理成功。检查聚焦实际公共构造、别名身份、两类任务共享的episode状态owner、reset／step／fault／close与已有selected合成边界。受影响当前文档只做必要修正，不重写整套指南。
+
+若30分钟内R1未完成，保留完整可审查的子改动，报告具体缺口，不能以别名、外壳或两套状态机转发填PASS；时间到完整返包，不自行加时。R1和离线门即使通过，也只报告该有限结果，整体维护／阶段3准入仍由Sol审阅后决定，不能自称原G2–G4全部通过。包输入以Sol准备完成后的manifest／snapshot为准，维护者手动转发。
+
 ## 三、统一环境类的完成标准
 
 当前两条路线的差异不止类名：BaseTaskEnv经bootstrap构建RuntimeBoundary，SelectedReferenceEnv经materialize构建RuntimeSession；两者的action／observation、seed、done、故障和close语义也不能假定相同。
