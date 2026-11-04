@@ -238,6 +238,10 @@ PickCube/NutAssembly 使用共享 R3 arm/execution wrapper 与 planner profile�
 
 旧2b在维护者中止时G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED。Sol在保留旧包结果的前提下，现已按原G02出口有界接收代表实现及2c参考冻结，见[阶段2主审](../maintenance/reviews/20261104_2c_sol_review.md)。阶段2收尾，阶段3未开始。
 
+## 阶段3前环境代码重构建议
+
+维护者提出先整理tasks、隔离诊断、统一BaseTaskEnv／SelectedReferenceEnv并减少冗余SHA开销。基线2fb903aa上的源码审计与目标职责见[重构讨论稿](pre-stage3-environment-refactor.md)。该项尚未实施／派包，不改变阶段2冻结参考，不表示阶段3已启动。
+
 ## 当前协议基线与后继实施
 
 维护者于2026-11-03确认五协议，详见[确认收据](../maintenance/20261103_protocol_baseline_confirmation.md)。历史1b–1d建议与当前冲突时，以权威正文的7＋2、BodyWrench、嵌套主体、贡献组合、公共可替换模型、同一Env切换、Core随机流和timebase规则为准；原始报告不改。新增[控制命令案例](control-command-cases.json)仍为planning-only。
