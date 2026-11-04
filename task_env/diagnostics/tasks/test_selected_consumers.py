@@ -269,7 +269,10 @@ def test_callable_source_snapshot_rechecks_bytes_without_path_cache(tmp_path, mo
         calls.append(source)
         return original(source)
     monkeypatch.setattr(reference_provenance, 'source_snapshot', counted)
-    snapshots = reference_provenance.callable_source_snapshots({'a': module.project, 'b': module.project})
+    from functools import partial
+    snapshots = reference_provenance.callable_source_snapshots({
+        'a': module.project, 'b': partial(partial(module.project)),
+    })
     assert len(calls) == 1 and snapshots['a'] == snapshots['b']
     first = snapshots['a']
     assert first == hashlib.sha256(path.read_bytes()).hexdigest()
@@ -277,6 +280,8 @@ def test_callable_source_snapshot_rechecks_bytes_without_path_cache(tmp_path, mo
     second = reference_provenance.callable_source_snapshot(module.project)
     assert second == hashlib.sha256(path.read_bytes()).hexdigest() and second != first
     assert len(calls) == 2
+    with pytest.raises(ValueError, match='no traceable source file'):
+        reference_provenance.callable_source_snapshot(partial(len))
 
 
 def test_synthetic_candidate_compiles_and_drives_caller_solution_without_judge_claim(fake, monkeypatch):
@@ -2096,13 +2101,18 @@ def test_marker_compiler_snapshots_supplied_binding_callback_source(fake, tmp_pa
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
-    binding = replace(MarkerHeightEnv.selected_binding(config), observation_projection=module.project)
+    from functools import partial
+    binding = replace(MarkerHeightEnv.selected_binding(config), observation_projection=partial(module.project))
     compiled = compile_panda_box_task(
         MarkerHeightEnv.declaration(), config=config.environment,
         controller_factory=ProductionCanonicalPandaController.from_source,
     )
     value = reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
                                          construction_schema='test-construction-v1', binding=binding)
+    with pytest.raises(ValueError, match='construction owner has no source file'):
+        reference_construction_value(compiled, task_id=MarkerHeightEnv.uid,
+                                     construction_schema='test-construction-v1',
+                                     binding=replace(binding, observation_projection=partial(len)))
     from pathlib import Path
     root = Path(__file__).resolve().parents[3]
     name = (path.resolve().relative_to(root).as_posix()

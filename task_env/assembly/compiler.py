@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, fields
 import hashlib
-import inspect
 import json
 from pathlib import Path
 from types import MappingProxyType
@@ -15,6 +14,7 @@ import numpy as np
 
 from ..environment import EpisodePhysicsState, TaskCompositionSpec
 from ..environment.task_source import TaskArtifactDeclarationV1
+from ..utils._paths import callable_source_path
 from .references import TaskReferences, resolve_task_references
 from .logical_source import LogicalAssemblySourceProjectionV1, project_logical_assembly_source
 
@@ -106,8 +106,7 @@ def reference_construction_value(compiled, *, task_id, construction_schema, owne
         if type(binding) is not ReferenceTaskBinding:
             raise TypeError('construction binding must be an exact ReferenceTaskBinding')
         binding_owners = (type(binding), *(
-            value if inspect.isroutine(value) or inspect.isclass(value) else type(value)
-            for descriptor in fields(binding)
+            value for descriptor in fields(binding)
             if callable(value := getattr(binding, descriptor.name))
         ))
         if binding.scalar_control_binding is not None:
@@ -115,13 +114,13 @@ def reference_construction_value(compiled, *, task_id, construction_schema, owne
     all_owners = (*owners, *binding_owners, *compiled.source_owners, type(compiled), ReferenceTaskDeclarationV1,
                   TaskArtifactDeclarationV1, compile_reference_source,
                   reference_task_identity_fields, reference_construction_value,
-                  type(compiled.controller), EpisodeExecutionState)
+                  callable_source_path, type(compiled.controller), EpisodeExecutionState)
     paths = set()
     for owner in all_owners:
-        source = inspect.getsourcefile(owner)
-        if source is None:
-            raise ValueError(f"construction owner has no source file: {owner!r}")
-        paths.add(Path(source).resolve())
+        try:
+            paths.add(callable_source_path(owner))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"construction owner has no source file: {owner!r}") from error
     source_hashes = {
         (path.relative_to(root).as_posix() if path.is_relative_to(root)
          else f'external:{path.name}'): hashlib.sha256(path.read_bytes()).hexdigest()

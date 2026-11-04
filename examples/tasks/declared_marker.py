@@ -1,6 +1,8 @@
 """Register a marker task using the existing Panda/table/box assembly."""
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from task_env.artifacts import PoseWorld, SemanticDefinition, Timebase
@@ -88,7 +90,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
             )
         binding = ReferenceTaskBinding(
             build=build, build_receives_binding=True,
-            reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
+            reset_sample=partial(_sample_box_reset, declaration),
             action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
             prepare_action=reference_pose_action,
             observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,

@@ -9,6 +9,28 @@ compiler is responsible for reporting a missing deployment prerequisite.
 from __future__ import annotations
 
 from pathlib import Path
+from functools import partial
+import inspect
+
+
+def callable_source_path(callback) -> Path:
+    """Find the implementation file of a callable, including partial applications.
+
+    This identifies the callable's code owner only; it does not claim to trace
+    arbitrary captured arguments, closure values, or indirect dependencies.
+    """
+    if not callable(callback):
+        raise TypeError('source owner must be callable')
+    while isinstance(callback, partial):
+        callback = callback.func
+    owner = callback if inspect.isroutine(callback) or inspect.isclass(callback) else type(callback)
+    try:
+        source = inspect.getsourcefile(owner)
+    except (OSError, TypeError) as error:
+        raise ValueError('callable has no traceable source file') from error
+    if source is None or not Path(source).is_file():
+        raise ValueError('callable has no traceable source file')
+    return Path(source).resolve()
 
 
 def repository_root(start: str | Path | None = None) -> Path:
@@ -45,4 +67,5 @@ __all__ = [
     "REPO_ROOT",
     "WORKSPACE_ROOT",
     "repository_root",
+    "callable_source_path",
 ]

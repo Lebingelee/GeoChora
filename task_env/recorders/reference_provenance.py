@@ -1,10 +1,10 @@
 """Recording-time source snapshot and per-boundary coordinator receipt."""
 from hashlib import sha256
-import inspect
 import json
 from pathlib import Path
 
 from ..controllers.canonical.contracts import digest
+from ..utils._paths import callable_source_path
 
 
 def source_snapshot(path):
@@ -13,16 +13,12 @@ def source_snapshot(path):
 
 
 def _callable_source_path(callback):
-    if not callable(callback):
-        raise TypeError('recorded binding source must be callable')
-    owner = callback if inspect.isroutine(callback) else type(callback)
     try:
-        source = inspect.getsourcefile(owner)
-    except (OSError, TypeError) as error:
+        return callable_source_path(callback)
+    except (TypeError, ValueError) as error:
+        if not callable(callback):
+            raise TypeError('recorded binding source must be callable') from error
         raise ValueError('recorded binding callable has no traceable source file') from error
-    if source is None or not Path(source).is_file():
-        raise ValueError('recorded binding callable has no traceable source file')
-    return Path(source).resolve()
 
 
 def callable_source_snapshots(callbacks):

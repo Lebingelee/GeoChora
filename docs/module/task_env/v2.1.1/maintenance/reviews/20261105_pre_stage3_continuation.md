@@ -291,3 +291,12 @@ Nut的原生反馈样本、interval receipt和Solution观察参数接线从任�
 Position结束记录的controller／leaf writer、来源、故障回执和未完成controller切换的payload投影归入既有 `recorders.position_metadata`；Env仍选择最后成功发布的state／boundary、计算最终success及事件序号，并调用既有episode-end构造。未完成切换继续区分尚未尝试、未形成完整transition以及已收到target ack但未记录transition，不能将内部推进误报为已发布边界。无引擎测试新增了上述状态和空双writer列表的检查。
 
 受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制及合成attached H5读回组合 **184 passed、2 deselected**，最大进程树RSS 177483776 bytes；假provider leaf／mixed故障与记录组 **5 passed**，最大RSS 160563200 bytes。完整argv、退出码与资源采样见ignored `position-end-owner-final/`、`position-end-owner-mixed-final/`。首次组合误加入要求真实Scene的切换用例，保护器拒绝 `scene` 导入而出现15项失败；这些用例未运行物理。首次把独立H5读回放进含synthetic MuJoCo占位模块的mixed组，读回的无provider检查正确拒绝该占位，后单独在严格无引擎组通过。合成H5读回不替代最终源码的独立物理reader。未运行真实引擎、Isaac或GPU，旧物理证据不重标。
+
+
+## 通用回调源码识别（续作，待复审）
+
+构造来源收集及录制回调来源检查改用同一既有路径工具，支持识别 `functools.partial` 所包装的实际函数文件；无法定位源文件的内建函数仍被拒绝。Marker的reset接线改用partial直接绑定任务声明，使用无引擎测试核对包装回调的文件摘要及修改后的recipe变化、同源文件每次录制只读取一次和不可追踪回调拒绝。此项只识别实际函数所在文件，不递归追踪partial参数、闭包、对象状态或间接依赖，不能证明内存代码等于磁盘内容；Marker的整体通用构造仍未完成。
+
+PickCube／Nut的源码清单增加共同路径工具以如实记录新的直接依赖。Nut specialization SHA为 `21f32180a191e42e2f2bd8fcfaa52bea4c43754f88e03ee8e96c93deab035403`，重新构造的R05b 100／500 Hz Controller身份为 `a06a48987cbb1e778e194965ac725ae0e213baee3ccabfddc679b9ec52d36f03`／`28544311bf0e8eaf4bcaa9e35eb8a2d7f3faaaa73741bbad4e27c32253b400ac`，仅更新对应精确准入值；其余验证未放宽。
+
+最终受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **183 passed、2 deselected**，最大进程树RSS 216014848 bytes，完整argv与资源采样见ignored `callable-source-partial-final-v2/`。首次组合运行期间错误地修改了Nut源码清单，导致一个R05b worker因源码身份不匹配提前拒绝，结果为182 passed、1 failed、2 deselected；此非稳定源码证据。更新精确身份后在不再修改源码的条件下完整重跑并补充不可追踪回调拒绝检查，得到上述最终结果。未运行真实引擎、Isaac、GPU或物理reader，旧物理结果不重标。
