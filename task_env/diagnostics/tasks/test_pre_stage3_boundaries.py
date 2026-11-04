@@ -227,3 +227,33 @@ def test_articulated_boundary_still_restores_static_world_children():
     assert len(physics.writes) == 2
     assert physics.writes[-1][0].tolist() == [3]
     assert physics.writes[-1][1].tolist() == [[1., 2., 3.]]
+
+
+def test_scalar_example_checks_spaces_and_closes(monkeypatch, capsys):
+    import json
+    import numpy as np
+    import task_env
+    from examples.tasks import scalar_step
+
+    class Space:
+        def contains(self, value):
+            return value['state'].shape == (3,) and value['state'].dtype == np.float32
+    class Env:
+        observation_space = Space()
+        closed = False
+        def reset(self, *, seed):
+            assert seed == 73
+            return {'state': np.zeros(3, dtype=np.float32)}, {}
+        def step(self, action):
+            assert action['torque'].shape == (1,)
+            return {'state': np.ones(3, dtype=np.float32)}, 0.5, False, False, {'is_success': False}
+        def close(self):
+            self.closed = True
+    env = Env()
+    monkeypatch.setattr(scalar_step, 'bootstrap_imports', lambda: None)
+    monkeypatch.setattr(task_env, 'make_env', lambda *args, **kwargs: env)
+    assert scalar_step.main(['--uid', 'pendulum-v1', '--seed', '73']) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert env.closed and result['close_returned']
+    assert result['action']['torque'] == {'shape': [1], 'dtype': 'float32'}
+    assert result['step_observation']['state'] == {'shape': [3], 'dtype': 'float32'}
