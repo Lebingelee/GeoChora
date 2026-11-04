@@ -1693,12 +1693,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         leaf_plan=self.leaf_plan,
                     )
                 else:
+                    select_gripper = getattr(self.binding, 'position_gripper_binding', None)
+                    gripper = select_gripper(self.value) if select_gripper else 'panda-main/gripper'
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
-                        binding=ControlBinding(
-                            ('panda-v1/gripper' if self.value.get('f06_pickcube_isaac_input') is not None
-                             else 'panda-main/gripper'), .08,
-                        ),
+                        binding=ControlBinding(gripper, .08),
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                         session_admission_input=self.value.get('session_admission_input'),

@@ -209,6 +209,8 @@ def test_f06_external_binding_constructs_only_the_solution_free_source_once():
         controller_profile='r3_continuous_v1',
         source_delivery_manifest=manifest,
     )
+    assert binding.position_gripper_binding({}) == 'panda-main/gripper'
+    assert binding.position_gripper_binding({'f06_pickcube_isaac_input': object()}) == 'panda-v1/gripper'
     with patch('task_env.tasks.pick_cube.specialization.build_isaac_reference',
                return_value={'construction': 'external'}) as build:
         result = binding.build_external('isaacsim')
@@ -327,6 +329,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
         reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
+        position_gripper_binding=lambda value: 'panda-v1/gripper',
     )
     env._diagnostic_profile = None
     env._native_feedback_profile = None
@@ -346,6 +349,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
 
     def capture_materialization(artifact, *_args, **_kwargs):
         observed['artifact'] = artifact
+        observed['gripper'] = _kwargs['binding'].gripper_semantic_id
         raise StopAtMaterialization
 
     with patch('task_env.environment.reference_env.materialize_control', capture_materialization):
@@ -358,6 +362,7 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
 
     assert observed['artifact'] is rebuilt_artifact
     assert observed['artifact'] is runtime_input.artifact
+    assert observed['gripper'] == 'panda-v1/gripper'
 
 
 def test_f06_gripper_readback_failure_reports_exact_boundary_values():

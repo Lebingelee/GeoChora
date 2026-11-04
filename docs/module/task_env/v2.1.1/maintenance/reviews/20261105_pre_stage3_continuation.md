@@ -33,3 +33,7 @@ PickCube特有的夹爪执行信息、输出字段及适用条件由任务specia
 ## 版本化reset输入归属（续作，待复审）
 
 PickCube通过已有task binding选择其版本化runtime输入；通用Env使用该输入校验重建Artifact的对象身份及执行路线／seed，不再在这两处识别F06字段名。无版本化输入的现有行为保持原样。无引擎组合 **124 passed、1 deselected**，含相等但非同一Artifact的拒绝及F06重建Artifact到materialization的合成检查；真实USD/Isaac仍未运行。前一源码HEAD的生命周期合成回归 **172 passed、3 deselected**，本次修改后仍需对最终源码复核。
+
+## Position夹爪绑定归属（续作，待复审）
+
+由PickCube task binding选择版本化source对应的gripper semantic；通用Env将该语义交给既有ControlBinding，不再按F06字段名选择任务特定值。无引擎检查 **13 passed、1 deselected**，包括绑定实际到materialize的合成测试，leaf/mixed合成检查 **12 passed**。真实USD场景和Isaac仍未运行。
