@@ -1,6 +1,7 @@
 """Recording-time source snapshot and per-boundary coordinator receipt."""
 from hashlib import sha256
 import inspect
+import json
 from pathlib import Path
 
 from ..controllers.canonical.contracts import digest
@@ -34,6 +35,37 @@ def callable_source_snapshots(callbacks):
 def callable_source_snapshot(callback):
     """Identify the declaring file of one callable used for a recording."""
     return callable_source_snapshots({'source': callback})['source']
+
+
+def append_selected_transition(recorder, *, recorder_mode, record_native_substeps,
+                               timebase, control_step, substeps, request, canonical,
+                               target, applied, reward, terminated, truncated, stage,
+                               diagnostics, boundary, owners, task_metrics):
+    """Validate and append one completed selected interval to its recorder."""
+    from ..trajectory.canonical.contracts import TransitionRecord
+
+    count = timebase.control_substeps
+    if record_native_substeps and (
+            len(substeps) != count or [item[0] for item in substeps] != list(range(count))):
+        raise ValueError('missing native application receipts')
+    if record_native_substeps and recorder is not None and recorder_mode == 'execution':
+        from ..trajectory.canonical.execution import validate_pending_native_interval
+        validate_pending_native_interval(
+            getattr(recorder, 'pending', None), control_step=control_step - 1,
+            physics_dt=timebase.physics_dt, control_substeps=count,
+        )
+    wait = bool(diagnostics.get('readiness_hold', False))
+    transition = TransitionRecord(
+        request, canonical, target, applied, float(reward), terminated, truncated, stage,
+        {key: json.dumps(value, sort_keys=True) for key, value in diagnostics.items()},
+        not wait, wait,
+    )
+    if recorder_mode == 'canonical':
+        recorder.append(transition, boundary())
+        return
+    recorder.append(transition, boundary(), owners(), 'reference',
+                    {'observed_native_substeps': len(substeps), 'control_step': control_step},
+                    task_metrics())
 
 
 def coordinator_receipt(*, step, time, artifact_hash, controller_identity,

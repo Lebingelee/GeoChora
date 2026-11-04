@@ -251,3 +251,9 @@ Nut Solution源码SHA由 `abe5c361554d96455d505fe9b244326e96d72f44faeae054fa52a1
 每个worker在独立ignored cwd运行，依次非阻塞持有两把共享native锁；分别耗时4.380／18.295／19.922秒，最大进程树RSS约367／703／736 MB，三个进程组均退出且双锁释放。轻量运行包装器在同一worker中核验并打印实际导入的Core `task_env`及GeoPhys `scene`模块路径，再执行仓库原scalar示例；没有调用 `examples/start.py`，不把上游启动器本轮未执行的路线称为通过。完整argv、资源采样、进程／锁收据、输出、逐项对照及来源见ignored `native-3ed14c08/`。未启动Isaac、GPU或物理reader。
 
 沿用原120000物理步上限，账本保守按此前105107、两次PickCube各5000、上次三个classic合计至多300、本次三个classic合计至多300计 **115707／120000**；这不是实际推进步数，余量不能覆盖Nut horizon6000需预留的30000步。新增Nut预算仍未得到答复；旧源码结果及阶段2证据保持原身份。后续若改变受影响源码，应重新评估这些单步证据，不能重标。
+
+## Selected transition录制归位（续作，待复审）
+
+selected scalar／execution的native回执完整性检查、`TransitionRecord`投影与两类recorder的append交给既有 `recorders.reference_provenance` owner；Env仍协调生命周期、实际推进、故障及边界获取。保留先核对回执再追加的次序，canonical路线不读取execution专用owner；静默遗漏native回执仍使已推进的interval被拒绝，不生成完整transition。源码来源按本次实际变更重新记录。
+
+受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **181 passed、2 deselected**，最大RSS 165261312 bytes；包含录制故障、native回执遗漏、T/T+1和重执行检查。完整argv、退出码和资源采样见ignored `selected-recorder-owner-selected/`。未运行真实引擎、Isaac、GPU或物理reader；`3ed14c08` 的三个classic单步保留其原源码身份，不重标为本次变更后的物理检查。

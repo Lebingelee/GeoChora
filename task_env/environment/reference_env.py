@@ -3666,27 +3666,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _record_interval(self, request, canonical, target, applied, stage, diagnostics,
                          terminated, truncated, substeps):
-        from ..trajectory.canonical.contracts import TransitionRecord
-        count = self.artifact.timebase.control_substeps
-        if self.binding.record_native_substeps and (len(substeps) != count or [x[0] for x in substeps] != list(range(count))):
-            raise ValueError('missing native application receipts')
-        if (self.binding.record_native_substeps and self.recorder is not None
-                and self.binding.recorder_mode == 'execution'):
-            from ..trajectory.canonical.execution import validate_pending_native_interval
-            validate_pending_native_interval(
-                getattr(self.recorder, 'pending', None),
-                control_step=self.state.control_step - 1,
-                physics_dt=self.artifact.timebase.physics_dt, control_substeps=count,
-            )
-        wait = bool(diagnostics.get('readiness_hold', False))
-        transition = TransitionRecord(request, canonical, target, applied, float(self.evaluation.reward),
-            terminated, truncated, stage, {k: json.dumps(v, sort_keys=True) for k, v in diagnostics.items()}, not wait, wait)
-        if self.binding.recorder_mode == 'canonical':
-            self.recorder.append(transition, self._boundary())
-            return
-        self.recorder.append(transition, self._boundary(), self._owners(), 'reference',
-            {'observed_native_substeps': len(substeps), 'control_step': self.state.control_step},
-            self.info['task_metrics'])
+        from ..recorders.reference_provenance import append_selected_transition
+        return append_selected_transition(
+            self.recorder, recorder_mode=self.binding.recorder_mode,
+            record_native_substeps=self.binding.record_native_substeps,
+            timebase=self.artifact.timebase, control_step=self.state.control_step,
+            substeps=substeps, request=request, canonical=canonical, target=target,
+            applied=applied, reward=self.evaluation.reward, terminated=terminated,
+            truncated=truncated, stage=stage, diagnostics=diagnostics,
+            boundary=self._boundary, owners=self._owners, task_metrics=lambda: self.info['task_metrics'],
+        )
 
     def finish_recording(self, reason):
         if getattr(self, 'mixed_control_profile', False):
