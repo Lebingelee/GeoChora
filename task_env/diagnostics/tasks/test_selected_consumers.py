@@ -1421,6 +1421,25 @@ def test_nutassembly_recording_example_drives_caller_solution(fake, tmp_path, mo
     assert result['recording']['transitions'] == 3 and result['recording']['boundaries'] == 4
 
 
+def test_nutassembly_task_example_uses_caller_solution(fake, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.tasks import nut_assembly
+
+    monkeypatch.setattr(nut_assembly, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    def make_caller_only(uid, config):
+        env = make_env(uid, config=config)
+        def forbidden():
+            raise AssertionError('NutAssembly example must not invoke step_expert')
+        env.step_expert = forbidden
+        return env
+    monkeypatch.setattr(task_env, 'make_env', make_caller_only)
+    code = nut_assembly.main(['--provider', 'mujoco', '--horizon', '3'])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 1 and result['status'] == 'FAIL'
+    assert result['episode']['transitions'] == 3 and result['episode']['truncated']
+
+
 def test_nutassembly_planning_rollout_uses_caller_solution(fake, monkeypatch):
     from task_env.script.trajectory.planning._common import rollout_solution
     from task_env.tasks.nut_assembly.task import build_outcome_solution
