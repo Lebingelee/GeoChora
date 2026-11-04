@@ -1212,6 +1212,7 @@ class NutAssemblyOutcomeSolutionV1:
                 pending = self._pending_action
                 if (not isinstance(application, Mapping) or pending is None
                         or application.get("request_boundary") != self._pending_boundary
+                        or application.get("evaluation_boundary") != native_interval_receipt.evaluation_boundary
                         or application.get("solution_stage") != pending["stage"]
                         or application.get("arm_execution_request_v1") != pending["control_request"]
                         or application.get("requested_action") != {
@@ -1219,6 +1220,8 @@ class NutAssemblyOutcomeSolutionV1:
                             "rotation_representation": "quaternion_wxyz",
                             "values": list(pending["values"]),
                         }
+                        or not isinstance(application.get("target_identity_hash"), str)
+                        or not application.get("target_identity_hash")
                         or application.get("target_identity_hash") != application.get("applied_target_hash")):
                     raise ValueError("control application does not match the pending Solution action")
                 evaluation_boundary = info.get("expert_execution_boundary_v1")
