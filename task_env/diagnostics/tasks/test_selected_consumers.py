@@ -318,6 +318,17 @@ def test_nutassembly_caller_action_cannot_cross_episode(fake):
         second.close()
 
 
+def test_nutassembly_caller_binding_cannot_drop_control_request():
+    from dataclasses import replace
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        with pytest.raises(ValueError, match='require the native control request contract'):
+            replace(env.binding, control_request_required=False)
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('mutation', ['values', 'stage', 'control_mode'])
 def test_nutassembly_solution_rejects_altered_executed_action(fake, mutation):
     from dataclasses import replace
