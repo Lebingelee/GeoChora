@@ -117,7 +117,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._observation_builder = None
         self._task_definition = None
         self._task_lifecycle = None
-        self._last_task_evaluation = None
         self._camera_sensors = ()
         self._sensor_provider = None
         self._last_camera_metadata = {}
@@ -656,7 +655,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         reset_parameters = result.reset_parameters
         self._last_snapshot = snapshot
         self._elapsed_steps = lifecycle.elapsed_steps
-        self._last_task_evaluation = evaluation
         self._last_episode_end = None
         try:
             simulation_time_s = self._require_simulation_time_s(snapshot)
@@ -727,7 +725,6 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         evaluation = result.evaluation
         command = result.command
         applied = result.applied
-        self._last_task_evaluation = evaluation
         self._last_snapshot = snapshot
         self._elapsed_steps = result.elapsed_steps
         action_info = {
