@@ -1,7 +1,7 @@
 """Provider-free declarations for a Panda and one free box on a table."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 
 import numpy as np
@@ -120,7 +120,8 @@ def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config)
     return compile_panda_box_task(declaration, config=config, artifact=artifact).source
 
 
-def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None):
+def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None,
+                           controller_factory=None):
     """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
     composer = PickCubeSceneComposer(
@@ -133,6 +134,8 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
         expected = reference.artifact.compile()
         if artifact.identity_hash != expected.identity_hash:
             raise ValueError("selected Artifact does not match the Panda box declaration")
-    return reference.compile(
+    compiled = reference.compile(
         scene_source=composer.build_source_description(), config=config,
+        controller_factory=controller_factory,
     )
+    return replace(compiled, source_owners=(PickCubeSceneComposer,))

@@ -1546,8 +1546,17 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         obs, _ = env.reset(seed=31)
         first = env.state.pose_world['marker-v1']
         assert env.observation_space.contains(obs)
-        assert 'examples/tasks/declared_marker.py' in env.value['source_sha256']
-        assert 'task_env/tasks/declarative_reference.py' not in env.value['source_sha256']
+        import hashlib
+        from pathlib import Path
+        from task_env.controllers.canonical.contracts import digest
+        hashes = env.value['source_sha256']
+        root = Path(__file__).resolve().parents[3]
+        for name in ('examples/tasks/declared_marker.py', 'task_env/assembly/compiler.py',
+                     'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py'):
+            assert hashes[name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
+        assert 'task_env/tasks/declarative_reference.py' not in hashes
+        assert env.value['resolved_configuration']['object_id'] == 'marker-v1'
+        assert env.value['recipe_identity'] == digest(env.value['resolved_configuration'])
         ee = env.state.pose_world['panda-v1/ee']
         action = np.asarray((*ee.position, *ee.quaternion_wxyz, 0.0), dtype=np.float32)
         obs, reward, terminated, truncated, _ = env.step(action)

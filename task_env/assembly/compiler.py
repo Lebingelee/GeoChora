@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 import hashlib
+import inspect
 import json
+from pathlib import Path
 from types import MappingProxyType
 import xml.etree.ElementTree as ET
 
@@ -49,6 +51,7 @@ class CompiledReferenceTaskV1:
     artifact: object
     source: object
     controller: object | None = None
+    source_owners: tuple = ()
 
     def identity_fields(self, *, include_runtime_config_sha256: bool = True) -> dict[str, object]:
         return reference_task_identity_fields(
@@ -81,6 +84,56 @@ def reference_task_identity_fields(artifact, source, controller, *,
             runtime_config, sort_keys=True, separators=(",", ":"),
         ).encode()).hexdigest()
     return result
+
+
+def reference_construction_value(compiled, *, task_id, construction_schema, owners, metadata=None):
+    """Prepare a selected construction receipt from a compiled task and its owners.
+
+    Source bytes are sampled for this construction, rather than cached by path.
+    The caller supplies task-specific owners; shared construction and lifecycle
+    owners are included here so their changes remain visible in provenance.
+    """
+    from ..controllers.canonical.contracts import digest
+    from ..environment.lifecycle import EpisodeExecutionState
+
+    if compiled.controller is None:
+        raise ValueError("selected reference construction requires a controller")
+    root = Path(__file__).resolve().parents[2]
+    all_owners = (*owners, *compiled.source_owners, type(compiled), ReferenceTaskDeclarationV1,
+                  TaskArtifactDeclarationV1, compile_reference_source,
+                  reference_task_identity_fields, reference_construction_value,
+                  type(compiled.controller), EpisodeExecutionState)
+    paths = set()
+    for owner in all_owners:
+        source = inspect.getsourcefile(owner)
+        if source is None:
+            raise ValueError(f"construction owner has no source file: {owner!r}")
+        paths.add(Path(source).resolve())
+    source_hashes = {
+        (path.relative_to(root).as_posix() if path.is_relative_to(root)
+         else f'external:{path.name}'): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(paths)
+    }
+    if len(source_hashes) != len(paths):
+        raise ValueError("construction owner source paths have ambiguous provenance names")
+    metadata = {} if metadata is None else dict(metadata)
+    identities = reference_task_identity_fields(compiled.artifact, compiled.source, compiled.controller)
+    reserved = {'schema_version', 'task_id', 'source_sha256', 'solution', 'qualification'} | identities.keys()
+    if metadata.keys() & reserved:
+        raise ValueError('construction metadata conflicts with reserved fields')
+    resolved = {
+        **metadata, 'schema_version': construction_schema, 'task_id': task_id,
+        **identities,
+        'source_sha256': source_hashes,
+        'solution': 'not_declared', 'qualification': 'NOT_REQUALIFIED',
+    }
+    return {
+        'construction_id': construction_schema, 'artifact': compiled.artifact,
+        'source': compiled.source, 'controller': compiled.controller, 'solution': None,
+        'solution_identity': digest({'schema': 'no-task-solution-v1', 'task_id': task_id}),
+        'recipe_identity': digest(resolved), 'resolved_configuration': resolved,
+        'source_sha256': source_hashes,
+    }
 
 
 @dataclass(frozen=True)
@@ -444,4 +497,5 @@ __all__ = [
     "ReferenceTaskDeclarationV1",
     "compile_task_scene",
     "reference_task_identity_fields",
+    "reference_construction_value",
 ]

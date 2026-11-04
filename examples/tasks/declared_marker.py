@@ -1,21 +1,15 @@
 """Register a marker task using the existing Panda/table/box assembly."""
 from __future__ import annotations
 
-import hashlib
-import inspect
-from pathlib import Path
-
 import numpy as np
 
 from task_env.artifacts import PoseWorld, SemanticDefinition, Timebase
 from task_env.artifacts.execution import ResetSample
-from task_env.assembly.compiler import reference_task_identity_fields
+from task_env.assembly.compiler import reference_construction_value
 from task_env.assembly.panda_box import (
-    PandaBoxDeclaration, compile_panda_box_artifact, compile_panda_box_source,
-    compile_panda_box_task,
+    PandaBoxDeclaration, compile_panda_box_artifact, compile_panda_box_task,
 )
 from task_env.controllers.canonical import ProductionCanonicalPandaController
-from task_env.controllers.canonical.contracts import digest
 from task_env.environment import TaskEvaluation
 from task_env.environment.configuration import resolve_env_config
 from task_env.environment.config import ResolvedSelectedConfig
@@ -43,38 +37,6 @@ def _sample_box_reset(declaration, artifact, seed):
         velocity_policy='zero_named_joint_and_entity_velocities',
         control_policy='arm_targets_at_initial_joints_gripper_open', settle_steps=0,
     )
-
-
-def _compile_value(declaration, config, evaluator):
-    compiled = compile_panda_box_task(declaration, config=config)
-    artifact, source = compiled.artifact, compiled.source
-    controller = ProductionCanonicalPandaController.from_source(artifact, source)
-    construction_identity = reference_task_identity_fields(artifact, source, controller)
-    from task_env.assembly.compiler import ReferenceTaskDeclarationV1, compile_reference_source
-    from task_env.environment.task_source import TaskArtifactDeclarationV1
-    from task_env.environment.lifecycle import EpisodeExecutionState
-    from task_env.objects.pick_cube import PickCubeSceneComposer
-    owners = (type(declaration), evaluator, compile_panda_box_artifact, compile_panda_box_source,
-              compile_panda_box_task, ReferenceTaskDeclarationV1, compile_reference_source,
-              TaskArtifactDeclarationV1, reference_task_identity_fields, PickCubeSceneComposer,
-              ProductionCanonicalPandaController, EpisodeExecutionState)
-    paths = {Path(__file__).resolve(), *(Path(inspect.getsourcefile(owner)).resolve() for owner in owners)}
-    root = Path(__file__).resolve().parents[2]
-    source_hashes = {(path.relative_to(root).as_posix() if path.is_relative_to(root)
-                      else f'external:{path.name}'): hashlib.sha256(path.read_bytes()).hexdigest()
-                     for path in sorted(paths)}
-    resolved = {
-        'schema_version': 'declared-panda-box-construction-v1',
-        'task_id': declaration.task_id, 'object_id': declaration.object_id,
-        **construction_identity,
-        'source_sha256': source_hashes,
-        'solution': 'not_declared', 'qualification': 'NOT_REQUALIFIED',
-    }
-    return {'construction_id': 'declared-panda-box-construction-v1', 'artifact': artifact,
-            'source': source, 'controller': controller, 'solution': None,
-            'solution_identity': digest({'schema': 'no-task-solution-v1', 'task_id': declaration.task_id}),
-            'recipe_identity': digest(resolved), 'resolved_configuration': resolved,
-            'source_sha256': source_hashes}
 
 
 @register_env()
@@ -114,7 +76,17 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         if declaration.task_id != cls.uid:
             raise ValueError('registered UID and declared task identity differ')
         def build(_provider):
-            return _compile_value(declaration, config.environment, cls.evaluate_task)
+            compiled = compile_panda_box_task(
+                declaration, config=config.environment,
+                controller_factory=ProductionCanonicalPandaController.from_source,
+            )
+            return reference_construction_value(
+                compiled, task_id=declaration.task_id,
+                construction_schema='declared-panda-box-construction-v1',
+                metadata={'object_id': declaration.object_id},
+                owners=(type(declaration), cls.evaluate_task, _sample_box_reset,
+                        compile_panda_box_task, compile_panda_box_artifact),
+            )
         binding = ReferenceTaskBinding(
             build=build, reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
             evaluate=cls.evaluate_task, object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),

@@ -6,6 +6,8 @@
 
 > 2026-11-05 续作检查点：维护者为三个单环境生命周期统一另设较长 goal。`48401525` 经[Sol独立复审](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)，R1以 `ACCEPTED_BOUNDED_LIFECYCLE_UNIFICATION` 有限接收：真实迁移、同对象导出和共同执行协调器已核对，独立无引擎检查171 passed／3 deselected、假provider检查12 passed。下文2026-11-04输入现状、30分钟决定及历史门结果保留为当时记录。整体维护仍为PARTIAL；Marker/F06归位、环境类继续减责及真实物理回归／独立物理reader仍为待办，阶段3未开始。
 
+> 2026-11-05 后续实现检查点（待Sol复审）：Marker的Controller编译、构造身份和来源文件摘要已部分收回既有assembly owner，示例仍自行接线`ReferenceTaskBinding`及resolved config，因此R2尚不能判定完成。公共factory与来源字节的无引擎检查通过；F06职责、环境减责及最终物理／独立reader仍待完成，见[后续记录](../maintenance/reviews/20261105_pre_stage3_continuation.md)。
+
 ## 一、已经查明的现状
 
 | 位置 | 当前事实 | 重构含义 |
