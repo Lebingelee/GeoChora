@@ -94,10 +94,15 @@ Oracle finalization 必须向既有 Recorder 传入 `env.stop(...).outcome.end_r
 而非 Expert 的诊断 failure reason；Recorder 的严格终止语义不变。
 对应检测位于 `test_pickcube_r3_approach_reachability.py`、
 `test_pickcube_position_capture_authorization.py` 与 `test_isaac_candidate_startup.py`；
-命令、输入 HEAD 与尚未关闭的 native/EULA blocker 见
+离线修复命令、输入 HEAD 与当时的 native/EULA blocker 见
 [`20261104 Isaac PickCube Position repair attempt 2`](../maintenance/validation/f_route/20261104_isaac_pickcube_position_repair.md)。
 
 本轮离线相邻检测 59 passed、1 deselected；跳过的检测需要原生环境。
 一次原生重试在启动 Kit/物理之前因 `EULA not accepted` 退出，没有生成新的成功 Episode/H5。
 因此修复尚未获得原生物理验证，20 seed 与成功 Oracle 目标仍未完成。
 历史失败证据保持原样；后续应先验证原 spec/horizon 的代表 seed，再运行完整 campaign。
+
+2026-11-04 后续：maintainer 明确接受 EULA 后，原 spec 的 seeds 0–19 全部 solved，
+seed 2 / seed 0 Oracle 均通过 task + Expert、H5 和清理检查。详见
+[原生验证记录](../maintenance/validation/f_route/20261104_isaac_pickcube_20seed_oracle.md)。
+上面的启动失败及此前 0/20 证据保留为历史；新结论仅限修复提交和精确 candidate 路线。

@@ -38,8 +38,12 @@ Use [troubleshooting](../../../docs/module/task_env/v2.1.0/guides/troubleshootin
 For the 2026-11-04 PickCube Isaac Position repair, follow the dated troubleshooting
 entry: public-boundary-bound stable pad geometry authorizes only a lift attempt;
 it does not change `close_ready` or prove contact/task success. Keep the measured
-TCP gates, reset distribution and budgets intact. Offline checks passed, but
-the new source still requires native validation before a 20-seed/Oracle claim.
+TCP gates, reset distribution and budgets intact. Native validation at commit
+`30cf89e6` subsequently passed seeds 0–19 and seed 0 / seed 2 Oracles under the
+original spec. Use the separate `HARNESS-PICKLIFT-ISAAC-20SEED` matrix row and
+[dated native record](../../../docs/module/task_env/v2.1.0/maintenance/validation/f_route/20261104_isaac_pickcube_20seed_oracle.md).
+Preserve v3 external-stop recording semantics, known shutdown diagnostics and
+the distinction from the earlier F06 matrix; do not claim Qualification.
 
 ## Development and migration
 

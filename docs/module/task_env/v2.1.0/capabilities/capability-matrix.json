@@ -431,6 +431,30 @@
         "bundle": "V210_INTEGRATION_GOAL_20261102_001 local evidence bundle; per-run receipts are ignored workspace artifacts"
       },
       "limitations": "This candidate's local docs/API checks do not substitute for Human Judge or qualification gates."
+    },
+    {
+      "id": "HARNESS-PICKLIFT-ISAAC-20SEED",
+      "task": "Harness pick-lift-v0 candidate suite/task-v0; built-in cube-v1, frozen table and original MuJoCo spec",
+      "provider": "Isaac Sim 6.2 PhysX",
+      "backend": "CUDA cuda:0",
+      "source_identity": {
+        "task_source_commit": "30cf89e67cea2c7193e4d5c6a7356791508118e4",
+        "spec_sha256": "b4cf0013446b70f46698b2944fb61d670109f923934e833dfcd5c3fd016e72e0",
+        "artifact_sha256": "3b93c0631b678fceedd190fbc4f9cd39087dfaf7efa100d05059091a4ad915b1",
+        "delivery_manifest_sha256": "6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2"
+      },
+      "controller_or_control": "r3_continuous_v1 arm + Position gripper; task-owned fresh-state-bound stable opposed-pad lift-attempt authorization; original close_ready, gates, reset distribution and budgets retained",
+      "status": "TESTED_BOUNDED",
+      "evidence": {
+        "core_head": "30cf89e67cea2c7193e4d5c6a7356791508118e4",
+        "provider_commit": null,
+        "core_gitlink_provider_commit": "67da1165149486d3ae3e779c13ce31af49e17d50",
+        "check": "2026-11-04 native seeds0-19; representative seed2 and seed0 Oracles; independent raw receipt/H5/source/cleanup audit",
+        "result": "20/20 solved, 0 invalid/expert_failed/unknown; 375-389 transitions. Both Oracles pass task+Expert, T+1, v3 structured-control readback and 22 storage identity checks; independent last-boundary physical lift/success checks also pass.",
+        "bundle": "workspace/harness/isaac-core-repair-20261104-002/verification.json; raw split reports retained with explicitly derived20-seed report",
+        "record": "../maintenance/validation/f_route/20261104_isaac_pickcube_20seed_oracle.md"
+      },
+      "limitations": "Exact candidate/source/provider/control intersection only; not the historical built-in F06 3x3 matrix. v3 recording outcome remains external_stop, truncated=true, solution_completed=null while task loop completes without truncation. Grasped diagnostic stays false at45mm for50mmcube. Known Kit menu shutdown and protobuf logs retained. No video, D0/D1/D2, replay equivalence, Human Judge approval or Qualification."
     }
   ],
   "non_claims": [
