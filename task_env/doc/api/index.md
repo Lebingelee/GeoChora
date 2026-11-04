@@ -22,7 +22,7 @@ optional SB3/RSL-RL learner or H5 recorder
 
 用户通过 public environment、Gymnasium spaces 和 metadata 访问数据；runtime、solver、Taichi field、contact workspace、actuator ctrl 和 qpos private layout 不属于通用用户契约。
 
-标准交互方向是外部 Solution 从 observation 推理 action，再由调用方交给 `env.step(action)`；`step_expert()` 是旧 selected 任务尚未完成迁移时保留的受限兼容，不是标准 Env API。PickCube 与 NutAssembly 的当前差异见[Solution 接口](planning/task_owned_solutions.md)。
+标准交互方向是外部 Solution 从 observation 推理 action，再由调用方交给 `env.step(action)`；`step_expert()` 仅作为受限兼容保留，不是标准 Env API。当前示例及轨迹脚本使用调用方驱动路线；PickCube 与 NutAssembly 的差异见[Solution 接口](planning/task_owned_solutions.md)。
 
 ## 最短入口
 
@@ -44,7 +44,7 @@ optional SB3/RSL-RL learner or H5 recorder
 - [Planning index](planning/index.md)：public motion primitives 和 task-owned solution。
 - [Recording index](recording/index.md)：wrapper、trajectory lifecycle 和 H5 schema。
 
-单环境通过 `make_env(uid, *, config=None, render_mode=None, **kwargs)` 创建。Empty、Pendulum、TwoWheel、PickCube 和 NutAssembly 的单环境由 `task_env.environment.reference_env.SelectedReferenceEnv` 拥有；`BaseTaskEnv` 和 `task_env.tasks.reference_env` 为兼容导出。组件任务使用 RuntimeBoundary，selected 任务使用 RuntimeSession；两者由共同 episode owner 协调，动作、观测和支持的 render 以任务配置为准。当前变更待 Sol 复审，真实 provider 回归未运行。旧并行入口和 registry 保留；登记、历史运行或单 slot 示例不证明新统一 Env 支持 batch。
+单环境通过 `make_env(uid, *, config=None, render_mode=None, **kwargs)` 创建。Empty、Pendulum、TwoWheel、PickCube 和 NutAssembly 的单环境由 `task_env.environment.reference_env.SelectedReferenceEnv` 拥有；`BaseTaskEnv` 和 `task_env.tasks.reference_env` 为兼容导出。组件任务使用 RuntimeBoundary，selected 任务使用 RuntimeSession；两者由共同 episode owner 协调，动作、观测和支持的 render 以任务配置为准。生命周期源码和无引擎契约已获 [Sol 有限接收](../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_lifecycle_unification_sol_review.md)；后续三个旧任务与 PickCube 有按提交限定的 [CPU 运行记录](../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_pre_stage3_continuation.md)，不能代替当前源码的完整物理验证。旧并行入口和 registry 保留；登记、历史运行或单 slot 示例不证明新统一 Env 支持 batch。
 
 ## 内置任务
 
