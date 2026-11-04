@@ -322,3 +322,16 @@ def test_selected_source_identity_includes_artifact_contract_bytes():
     nut_files = nut._source_identity_files()
     assert pick_files[relative] == expected
     assert nut_files[relative] == expected
+
+
+def test_artifact_digest_detects_low_level_frozen_field_tampering():
+    from dataclasses import replace
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    original = build_artifact()
+    artifact = replace(original, semantics=replace(original.semantics))
+    first = artifact.identity_hash
+    object.__setattr__(artifact.semantics, 'success_definition', 'tampered-success')
+    assert artifact.identity_hash != first
+    object.__setattr__(artifact.semantics, 'success_definition', original.semantics.success_definition)
+    assert artifact.identity_hash == first

@@ -139,37 +139,48 @@ class Contract:
         return {f.name: _encode(getattr(self, f.name)) for f in fields(self)}
 
 
-def _immutable_contract_tree(value):
-    """Recognize only normalized built-in Contract values and frozen leaves.
+_NOT_IMMUTABLE = object()
 
-    Unknown subclasses or containers are deliberately excluded from caching.
-    Contract's decoder makes fresh mapping proxies and tuples at construction.
+
+def _immutable_contract_snapshot(value):
+    """Snapshot recognized frozen values; reject unknown mutable containers.
+
+    The snapshot is checked at every access, including against deliberate
+    mutation through Python's low-level dataclass bypasses. It avoids repeated
+    JSON encoding and hashing, not traversal of the static value tree.
     """
     if value is None or type(value) in (str, bool, int, float):
-        return True
+        return (type(value).__name__, value)
     if type(value) is tuple:
-        return all(_immutable_contract_tree(item) for item in value)
+        values = tuple(_immutable_contract_snapshot(item) for item in value)
+        return _NOT_IMMUTABLE if _NOT_IMMUTABLE in values else ('tuple', values)
     if type(value) is MappingProxyType:
-        return all(_immutable_contract_tree(key) and _immutable_contract_tree(item)
-                   for key, item in value.items())
+        values = tuple((_immutable_contract_snapshot(key), _immutable_contract_snapshot(item))
+                       for key, item in sorted(value.items()))
+        return (_NOT_IMMUTABLE if any(key is _NOT_IMMUTABLE or item is _NOT_IMMUTABLE
+                                     for key, item in values) else ('mapping', values))
     value_type = type(value)
     if (isinstance(value, Contract) and value_type.__module__ == __name__
             and globals().get(value_type.__name__) is value_type
             and getattr(value_type, '__post_init__', None) is Contract.__post_init__
             and getattr(value_type, '__dataclass_params__', None) is not None
             and value_type.__dataclass_params__.frozen):
-        return all(_immutable_contract_tree(getattr(value, item.name)) for item in fields(value))
-    return False
+        values = tuple(_immutable_contract_snapshot(getattr(value, item.name)) for item in fields(value))
+        return _NOT_IMMUTABLE if _NOT_IMMUTABLE in values else (value_type, values)
+    return _NOT_IMMUTABLE
 
 
 def _artifact_identity(artifact):
+    snapshot = _immutable_contract_snapshot(artifact)
     cached = artifact.__dict__.get('_immutable_identity_hash')
-    if cached is not None:
-        return cached
+    if snapshot is not _NOT_IMMUTABLE and cached is not None and cached[0] == snapshot:
+        return cached[1]
     canonical = json.dumps(artifact.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
     result = hashlib.sha256(canonical.encode()).hexdigest()
-    if _immutable_contract_tree(artifact):
-        object.__setattr__(artifact, '_immutable_identity_hash', result)
+    if snapshot is not _NOT_IMMUTABLE:
+        object.__setattr__(artifact, '_immutable_identity_hash', (snapshot, result))
+    else:
+        artifact.__dict__.pop('_immutable_identity_hash', None)
     return result
 
 
