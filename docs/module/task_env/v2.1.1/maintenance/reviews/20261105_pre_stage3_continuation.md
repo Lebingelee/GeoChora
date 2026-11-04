@@ -7,3 +7,9 @@
 Marker仍须在示例中配置并创建 `ReferenceTaskBinding` 和resolved配置；本检查点只收回部分通用接线，并不宣布R2完成。F06任务值与runtime准入职责分离、环境类减责、必要真实物理回归及独立reader尚待实施或验证。
 
 无引擎guard与禁用外部pytest插件条件下，选定的配置／消费者／维护边界三组 **118 passed**；覆盖Marker公共factory、合成reset/step、实际来源文件SHA及recipe摘要。首次测试启动缺少 `PYTHONPATH` 导致收集失败；第二次因pytest basetemp父目录不存在导致38个setup error（80通过）；修复环境与目录后全组重跑通过。合成测试不证明物理成功。未启动Isaac、GPU或其他真实物理引擎，未申请共享native锁。
+
+## F06任务声明与runtime准入（续作，待复审）
+
+F06的固定body/frame/joint映射、controller profile与horizon范围由PickCube specialization给出；通用USD RuntimeInput携带该声明，runtime以固定的 canonical JSON SHA-256 `153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb` 准入声明，再逐项核对RuntimeSource映射及输入限值。固定delivery manifest、representation、provider、seed、renderer和Task/Scene/Execution身份仍由runtime独立检查；未经允许的USD schema不再因仅属于同一类型就被归为F06。改变任务声明时不能只更新输入，须独立审阅受信摘要及其delivery对应关系。
+
+无引擎guard下F06、配置、消费者及维护边界组合 **130 passed、1 deselected**；包括任务生成映射的固定摘要、篡改实际映射、同时篡改映射及policy、改horizon上限和错误schema的拒绝。此前尝试完整投影时 `scene` 导入被guard拒绝（11通过、1失败），保留为未覆盖项；组合命令显式排除该项。该测试不能证明真实USD解析、Isaac运行或物理能力；本轮未启动Isaac或GPU。须经Sol独立复审，不能仅凭移动位置认定R3已接受。

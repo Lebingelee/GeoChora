@@ -845,9 +845,17 @@ def build_pickcube_isaac_runtime_input_v1(
             "renderer-selection-v1", "none", "cpu", "none", None,
         ), "cuda:0", (),
     )
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {
+            'joints': dict(joints), 'joint_targets': dict(joints),
+            'bodies': dict(bodies), 'frames': dict(frames), 'free_joints': dict(free_joints),
+        },
+        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
+    }
     result = UsdRuntimeInputV1(
         "pick-cube-isaac-runtime-input-v1", task_source, artifact, source,
-        execution, reset_plan, "r3_continuous_v1", horizon, manifest_sha,
+        execution, reset_plan, "r3_continuous_v1", horizon, manifest_sha, policy,
     )
     from ...runtime.sessions.api import _validate_f06_pickcube_isaac_input
     _validate_f06_pickcube_isaac_input(result, artifact, execution, source)

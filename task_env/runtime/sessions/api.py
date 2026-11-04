@@ -36,6 +36,8 @@ F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 _F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
 _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
+# Digest of the task-owned USD binding and limits admitted with this delivery.
+_F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -366,6 +368,30 @@ def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source)
         raise ValueError('DG04 Core cell is state-only and does not admit a renderer')
 
 
+def _validate_usd_task_policy(input_v1, expected_sha256):
+    """Verify a pinned task declaration before trusting its binding and limits."""
+    from ...controllers.canonical.contracts import digest
+
+    policy = input_v1.admission_policy
+    if type(policy) is not dict:
+        raise ValueError('USD task admission policy is missing or malformed')
+    try:
+        valid_identity = digest(policy) == expected_sha256
+    except (TypeError, ValueError):
+        valid_identity = False
+    if not valid_identity:
+        raise ValueError('USD task admission policy differs from the trusted policy identity')
+    bindings = policy['bindings']
+    source = input_v1.runtime_source
+    if any(dict(getattr(source, name)) != bindings[name]
+           for name in ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')):
+        raise ValueError('USD RuntimeSource differs from its exact task binding map')
+    if (input_v1.controller_profile != policy['controller_profile']
+            or type(input_v1.horizon) is not int
+            or not policy['horizon_min'] <= input_v1.horizon <= policy['horizon_max']):
+        raise ValueError('USD task requires its frozen controller and horizon limit')
+
+
 def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) -> None:
     """Admit the exact locally validated PickCube desktop USD F06 input."""
     if type(input_v1) is not UsdRuntimeInputV1:
@@ -380,31 +406,7 @@ def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) ->
             or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
             or not delivery.locally_validated or delivery.source_verified):
         raise ValueError("F06 requires its exact locally validated, non-upstream Isaac desktop USD")
-    expected_joints = {
-        **{f"panda-v1/joint{index}": f"joint{index}" for index in range(1, 8)},
-        "panda-v1/finger_joint1": "finger_joint1",
-        "panda-v1/finger_joint2": "finger_joint2",
-    }
-    if (dict(input_v1.runtime_source.joints) != expected_joints
-            or dict(input_v1.runtime_source.joint_targets) != expected_joints
-            or dict(input_v1.runtime_source.bodies) != {
-                "panda-v1/base": "/F06Scene/panda/Geometry/link0",
-                "cube-v1": "/F06Scene/cube_v1",
-            }
-            or dict(input_v1.runtime_source.frames) != {
-                "panda-v1/ee": (
-                    "/F06Scene/panda/Geometry/link0/link1/link2/link3/link4/"
-                    "link5/link6/link7/hand/ee"
-                ),
-                "tabletop-v1/top": "/F06Scene/tabletop_v1/top",
-            }
-            or dict(input_v1.runtime_source.free_joints) != {
-                "cube-v1": "/F06Scene/cube_v1",
-            }):
-        raise ValueError("F06 RuntimeSource differs from its exact Panda/PickCube USD binding map")
-    if (input_v1.controller_profile != "r3_continuous_v1"
-            or type(input_v1.horizon) is not int or not 1 <= input_v1.horizon <= 1000):
-        raise ValueError("F06 PickCube Isaac requires frozen R3 and at most 1000 control ticks")
+    _validate_usd_task_policy(input_v1, _F06_TASK_POLICY_SHA256_V1)
     if (input_v1.execution.physics_provider, input_v1.execution.physics_backend,
             input_v1.execution.physics_profile, input_v1.execution.physics_device,
             input_v1.execution.provider_seed, input_v1.execution.determinism_mode) != (
@@ -539,7 +541,8 @@ def _session_admission_input_route(input_v1) -> str | None:
     for input_type, route in routes:
         if type(input_v1) is input_type:
             return route
-    if type(input_v1) is UsdRuntimeInputV1:
+    if (type(input_v1) is UsdRuntimeInputV1
+            and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
         return 'f06_pickcube'
     raise TypeError('Session admission requires one exact supported task runtime input')
 

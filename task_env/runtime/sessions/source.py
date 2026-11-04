@@ -546,6 +546,7 @@ class UsdRuntimeInputV1:
     controller_profile: str
     horizon: int
     delivery_manifest_sha256: str
+    admission_policy: Mapping | None = None
 
     def validate(self):
         from ...artifacts import ExecutionSpecV1

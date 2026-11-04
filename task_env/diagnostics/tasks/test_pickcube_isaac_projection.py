@@ -13,7 +13,11 @@ def test_session_admission_dispatch_uses_exact_pickcube_runtime_input_type():
     from task_env.runtime.sessions.source import UsdRuntimeInputV1
 
     runtime_input = object.__new__(UsdRuntimeInputV1)
+    object.__setattr__(runtime_input, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
     assert _session_admission_input_route(runtime_input) == 'f06_pickcube'
+    object.__setattr__(runtime_input, 'schema_version', 'unrelated-usd-runtime-input-v1')
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(runtime_input)
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(SimpleNamespace())
 
@@ -72,6 +76,31 @@ def test_pickcube_isaac_projection_preserves_task_semantics_and_binds_runtime_fr
     } <= panda_joints
     assert len(artifact.legacy_joint_bindings) == 9
     artifact.validate_scene(scene)
+
+
+def test_task_owned_f06_bindings_match_trusted_policy_without_native_import():
+    from types import SimpleNamespace as NS
+    from task_env.controllers.canonical.contracts import digest
+    from task_env.runtime.sessions.api import _F06_TASK_POLICY_SHA256_V1
+    from task_env.tasks.pick_cube.specialization import _source_bindings
+
+    names = [*(f'joint{i}' for i in range(1, 8)), 'finger_joint1', 'finger_joint2']
+    scene = NS(articulations=[NS(entity_id='panda-v1', joints=[
+        NS(joint_id=name, kind='prismatic' if name.startswith('finger') else 'revolute')
+        for name in names
+    ])])
+    artifact = NS(legacy_joint_bindings={f'panda-v1/{name}': None for name in names},
+                  legacy_frame_bindings={key: None for key in
+                      ('panda-v1/base', 'cube-v1', 'panda-v1/ee', 'tabletop-v1/top')},
+                  initialization=NS(poses_world={'cube-v1': None}))
+    joints, bodies, frames, free_joints = _source_bindings(scene, artifact)
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {'joints': joints, 'joint_targets': dict(joints), 'bodies': bodies,
+                     'frames': frames, 'free_joints': free_joints},
+        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
+    }
+    assert digest(policy) == _F06_TASK_POLICY_SHA256_V1
 
 
 def test_f06_pickcube_tcp_is_the_task_ee_site_offset():
@@ -472,15 +501,22 @@ def test_f06_runtime_admission_keeps_exact_delivery_and_task_bindings(monkeypatc
     execution = NS(physics_provider='isaacsim', physics_backend='cuda', physics_device='cuda:0',
                    physics_profile=api.F06_PICKCUBE_ISAAC_PROFILE, provider_seed=31,
                    determinism_mode='best_effort', render_default=NS(provider='none'), camera_overrides=())
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {name: dict(getattr(source, name)) for name in
+                     ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')},
+        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
+    }
     value = object.__new__(UsdRuntimeInputV1)
     for name, item in dict(schema_version='pick-cube-isaac-runtime-input-v1', runtime_source=source,
                            execution=execution, reset_plan=NS(reset_sample=NS(task_seed=31)),
                            controller_profile='r3_continuous_v1', horizon=1000,
+                           admission_policy=policy,
                            delivery_manifest_sha256=delivery.manifest_bytes_sha256).items():
         object.__setattr__(value, name, item)
     api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
     object.__setattr__(value, 'horizon', 1001)
-    with pytest.raises(ValueError, match='frozen R3'):
+    with pytest.raises(ValueError, match='frozen controller'):
         api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
     object.__setattr__(value, 'horizon', 1000)
     delivery.manifest_bytes_sha256 = '0' * 64
@@ -490,3 +526,22 @@ def test_f06_runtime_admission_keeps_exact_delivery_and_task_bindings(monkeypatc
     source.bodies['cube-v1'] = '/wrong'
     with pytest.raises(ValueError, match='binding map'):
         api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    # A caller cannot bypass the binding check by changing the declaration too.
+    policy['bindings']['bodies']['cube-v1'] = '/wrong'
+    with pytest.raises(ValueError, match='trusted policy identity'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    policy['bindings']['bodies']['cube-v1'] = '/F06Scene/cube_v1'
+    source.bodies['cube-v1'] = '/F06Scene/cube_v1'
+    policy['horizon_max'] = 1001
+    with pytest.raises(ValueError, match='trusted policy identity'):
+        api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+    policy['horizon_max'] = 1000
+    for name in ('joints', 'joint_targets', 'frames', 'free_joints'):
+        # Copy because the fixture's joint maps initially share a dictionary.
+        original = getattr(source, name)
+        altered = dict(original)
+        altered[next(iter(altered))] = '/wrong'
+        setattr(source, name, altered)
+        with pytest.raises(ValueError, match='binding map'):
+            api._validate_f06_pickcube_isaac_input(value, object(), execution, source)
+        setattr(source, name, original)
