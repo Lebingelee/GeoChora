@@ -59,12 +59,28 @@ def reexecute_selected(path, *, output):
         if (env.controller.identity != metadata['controller_identity'] or
                 env.value['solution_identity'] != metadata['expert_identity']):
             raise ValueError('controller/solution identity mismatch')
-        env.reset(seed=metadata['task_seed'])
+        observation, info = env.reset(seed=metadata['task_seed'])
         if env.sample.to_mapping() != metadata['reset_sample']:
             raise ValueError('reset identity mismatch')
         env.start_recording(output)
+        # Native Nut records distinguish caller-driven actions by their
+        # recorded execution request. Preserve the old expert route for
+        # earlier recordings that do not contain this field.
+        caller_driven = bool(
+            configuration['env_id'] == NA and frozen['transitions']
+            and 'arm_execution_request_v1' in frozen['transitions'][0]['record'].get('expert_diagnostics', {})
+        )
+        solution = None
+        if caller_driven:
+            solution = env.value['solution_factory']()
+            solution.reset(observation, info, env.metadata)
         for index, expected in enumerate(frozen['transitions']):
-            env.step_expert()
+            if caller_driven:
+                action = solution.act(observation, info)
+                observation, reward, terminated, truncated, info = env.step(action)
+                solution.observe(observation, reward, terminated, truncated, info)
+            else:
+                env.step_expert()
             if outer:
                 actual = {'record': env.recorder.transitions[-1].to_mapping()}
                 boundary = {'record': env.recorder.boundaries[-1].to_mapping()}

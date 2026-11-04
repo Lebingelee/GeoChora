@@ -4,9 +4,9 @@ import argparse
 import json
 
 
-def _completion_result(env, info, *, terminated=False, truncated=False):
+def _completion_result(env, info, *, solution=None, terminated=False, truncated=False):
     """Report success only after the selected task policy and outcome complete."""
-    solution = env.solution
+    solution = env.solution if solution is None else solution
     result = {
         'solution_done': bool(solution.done),
         'solution_failed': bool(solution.failed),
@@ -56,15 +56,26 @@ def main(argv=None):
     args = parser.parse_args(argv)
     env = make_env(args.env_id, config={'provider': args.provider, 'backend': 'cpu', 'horizon': args.horizon})
     try:
-        _, info = env.reset(seed=args.seed)
+        observation, info = env.reset(seed=args.seed)
+        solution = None
+        if args.env_id == selected_env_ids[1]:
+            from task_env.tasks.nut_assembly.task import build_outcome_solution
+            solution = build_outcome_solution(provider=args.provider)
+            solution.reset(observation, info, env.metadata)
+        else:
+            solution = env.prepare_expert()
         env.start_recording(args.output)
         terminated = truncated = False
-        env.prepare_expert()
-        while not env.solution.done and not env.solution.failed:
-            _, _, terminated, truncated, info = env.step_expert()
+        while not solution.done and not solution.failed:
+            if args.env_id == selected_env_ids[1]:
+                action = solution.act(observation, info)
+                observation, reward, terminated, truncated, info = env.step(action)
+                solution.observe(observation, reward, terminated, truncated, info)
+            else:
+                observation, _, terminated, truncated, info = env.step_expert()
             if terminated or truncated:
                 break
-        completion = _completion_result(env, info, terminated=terminated, truncated=truncated)
+        completion = _completion_result(env, info, solution=solution, terminated=terminated, truncated=truncated)
         stop_reason = completion['failure_reason'] or 'selected_policy_completed'
         verification = env.finish_recording(stop_reason)
         print(json.dumps({'status': completion['status'], 'completion': completion,

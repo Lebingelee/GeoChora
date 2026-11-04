@@ -923,7 +923,8 @@ class NutAssemblyOutcomeSolutionV1:
                 "control_dt": self.control_dt,
                 "completion_policy_id": OUTCOME_POLICY_ID,
                 "readiness_warning_count": len(self._readiness_warnings)},
-            control_request=control_request)
+            control_request=control_request,
+            request_boundary=self._pending_boundary if self.require_native_feedback_contract else None)
         if planned: self._index += 1
         else: self._hold_ticks += 1
         self._emitted += 1
@@ -1198,6 +1199,27 @@ class NutAssemblyOutcomeSolutionV1:
             raise RuntimeError("cannot observe terminal outcome execution")
         if self.require_native_feedback_contract:
             try:
+                if native_interval_receipt is None and native_samples is None:
+                    native_interval_receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(
+                        info["native_interval_receipt_v1"])
+                    native_samples = native_interval_receipt.samples
+                if not isinstance(native_interval_receipt, NutAssemblyNativeIntervalReceiptV1):
+                    raise ValueError("selected NutAssembly step requires a typed native interval receipt")
+                evaluation_boundary = info.get("expert_execution_boundary_v1")
+                if (not isinstance(evaluation_boundary, Mapping)
+                        or evaluation_boundary != native_interval_receipt.evaluation_boundary
+                        or evaluation_boundary.get("identity_hash") != digest({
+                            key: value for key, value in evaluation_boundary.items()
+                            if key != "identity_hash"
+                        })):
+                    raise ValueError("native receipt evaluation boundary is stale or mismatched")
+                if readiness is None:
+                    from ...planners.completion import ExpertExecutionInfo
+                    execution_info = ExpertExecutionInfo.from_mapping(info["expert_execution_info_v1"])
+                    execution_info.validate()
+                    if info.get("control_readiness_v1") != execution_info.control_readiness.to_mapping():
+                        raise ValueError("inconsistent public control readiness")
+                    readiness = execution_info.control_readiness
                 transition_samples = self._validated_native_guard_samples(
                     native_interval_receipt, native_samples,
                 )

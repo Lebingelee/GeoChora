@@ -38,6 +38,7 @@ class ReferenceTaskBinding:
     native_sample_factory: Callable | None = None
     native_interval_receipt_factory: Callable | None = None
     control_request_required: bool = False
+    external_solution_actions: bool = False
     expert_uses_public_observation: bool = False
     build_external: Callable | None = None
     validate_external_solution: Callable | None = None

@@ -35,12 +35,12 @@ def _capture_bool(value, name: str) -> bool:
     return _bool(value, name)
 
 
-def capture_episode_facts(env, info, *, terminated, truncated, transitions):
+def capture_episode_facts(env, info, *, terminated, truncated, transitions, solution=None):
     """Snapshot Core task/expert facts before cleanup can mutate the environment."""
     _require(isinstance(info, Mapping), 'step/reset info must be a mapping')
     metrics = info.get('task_metrics', {})
     _require(isinstance(metrics, Mapping), 'task_metrics must be a mapping')
-    solution = env.solution
+    solution = env.solution if solution is None else solution
     outcome_method = getattr(solution, 'outcome_report', None)
     outcome = outcome_method() if callable(outcome_method) else {}
     _require(isinstance(outcome, Mapping), 'solution outcome_report must return a mapping')

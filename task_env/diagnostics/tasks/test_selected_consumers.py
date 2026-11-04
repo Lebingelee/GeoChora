@@ -183,6 +183,136 @@ def test_nutassembly_external_solution_publishes_five_bound_native_samples(fake)
     env.close()
 
 
+def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
+    from dataclasses import replace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        assert env.solution is None and env._external_solution_owner is None
+        action = solution.act(obs, info)
+        stale = replace(action, request_boundary={**action.request_boundary, 'episode_id': 'stale'})
+        with pytest.raises(ValueError, match='boundary'):
+            env.step(stale)
+        assert env.state.control_step == 0 and env._episode_mode is None
+        with pytest.raises(ValueError, match='control request'):
+            env.step(replace(action, control_request=None))
+        obs, reward, terminated, truncated, info = env.step(action)
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        assert len(receipt.samples) == 5
+        assert all(s.applied_acknowledgement['target_hash'] == s.target_hash for s in receipt.samples)
+        assert solution._last_observed_step == 0
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert solution._last_observed_step == 1 and not solution.failed
+        with pytest.raises(ValueError, match='boundary'):
+            env.step(action)
+        assert env.state.control_step == 1
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.state.control_step == 2 and not solution.failed
+        assert env.solution is None and env._external_solution_owner is None
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_matches_legacy_interval_and_records(fake, tmp_path):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.trajectory.canonical.streaming import load_streaming
+
+    caller = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    legacy = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 4})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        legacy_solution = build_outcome_solution(provider='geophys')
+        obs, info = caller.reset(seed=19)
+        solution.reset(obs, info, caller.metadata)
+        legacy.reset_for_solution(legacy_solution, seed=19)
+        path = tmp_path / 'caller.h5'
+        caller.start_recording(path)
+        for _ in range(2):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = caller.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+            legacy_obs, legacy_reward, legacy_terminated, legacy_truncated, legacy_info = (
+                legacy.step_with_solution(legacy_solution))
+            assert reward == legacy_reward
+            assert (terminated, truncated) == (legacy_terminated, legacy_truncated)
+            assert info['task_metrics'] == legacy_info['task_metrics']
+            assert solution.stage == legacy_solution.stage
+            assert solution.failed == legacy_solution.failed
+            assert info['control_application_v1']['requested_action'] == (
+                legacy_info['control_application_v1']['requested_action'])
+        result = caller.finish_recording('external_stop')
+        assert result['byte_exact']
+        recorded = load_streaming(path)
+        assert len(recorded['transitions']) == 2 and len(recorded['boundaries']) == 3
+    finally:
+        caller.close()
+        legacy.close()
+
+
+def test_nutassembly_caller_rejects_tampered_feedback(fake):
+    from copy import deepcopy
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        bad = deepcopy(info)
+        bad['native_interval_receipt_v1']['samples'][0]['reset_sample_id'] = 'wrong'
+        with pytest.raises(ValueError):
+            solution.observe(obs, reward, terminated, truncated, bad)
+        assert solution.failed
+    finally:
+        env.close()
+
+
+def test_nutassembly_caller_partial_interval_fault_cannot_be_recorded(fake, tmp_path):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        output = tmp_path / 'partial.h5'
+        env.start_recording(output)
+        original_step = env.session._step_physics_once
+        calls = 0
+
+        def fail_second_native_step():
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError('injected partial interval')
+            original_step()
+
+        env.session._step_physics_once = fail_second_native_step
+        _expose_fake_physics_clock(env)
+        action = solution.act(obs, info)
+        with pytest.raises(RuntimeError, match='partial interval'):
+            env.step(action)
+        assert env.execution_fault.phase == 'physics_step'
+        assert env.execution_fault.physical_progress == 'partially_advanced'
+        assert not env.recorder.value['transitions']
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step(action)
+        with pytest.raises(ValueError, match='incomplete effective interval'):
+            env.finish_recording('incomplete')
+        assert not output.exists() and env.solution is None
+    finally:
+        env.close()
+
+
 def test_nutassembly_native_receipt_rejects_stale_or_incomplete_samples(fake):
     from task_env.tasks.nut_assembly.task import build_outcome_solution
     from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
@@ -424,6 +554,28 @@ def test_current_source_reexecution_uses_selected_factory(uid, fake, tmp_path):
     report=reexecute_selected(tmp_path/'source.h5',output=tmp_path/'reexecution.h5')
     assert report['status']=='PASS' and report['transitions']==3
     assert report['D0']=='NOT_ASSESSED'
+
+
+def test_nutassembly_caller_recording_same_source_reexecution(fake, tmp_path):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.trajectory.reference_replay import reexecute_selected
+
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='mujoco')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        env.start_recording(tmp_path / 'source-caller.h5')
+        for _ in range(3):
+            action = solution.act(obs, info)
+            obs, reward, terminated, truncated, info = env.step(action)
+            solution.observe(obs, reward, terminated, truncated, info)
+        env.finish_recording('bounded_truncation')
+    finally:
+        env.close()
+    report = reexecute_selected(tmp_path / 'source-caller.h5', output=tmp_path / 'reexecution-caller.h5')
+    assert report['status'] == 'PASS' and report['transitions'] == 3
+    assert report['D0'] == 'NOT_ASSESSED'
 
 
 def test_pickcube_reexecution_preserves_explicit_profile_and_task_parameter(fake, tmp_path):
@@ -1063,7 +1215,7 @@ def test_nutassembly_public_example_does_not_admit_external_gripper_actions():
     env=make_env(IDS[1])
     try:
         assert env.binding.external_actions is False
-        with pytest.raises(RuntimeError, match='requires step_expert'):
+        with pytest.raises(RuntimeError, match='unguarded external actions are not admitted'):
             env.step(np.zeros(8))
     finally:
         env.close()
@@ -1144,6 +1296,38 @@ def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tm
     assert output.exists() and result['roundtrip']=='PASS'
     assert result['recording']['transitions']==3 and result['recording']['boundaries']==4
     assert result['recording']['t_plus_one_valid'] is True
+
+
+def test_nutassembly_recording_example_drives_caller_solution(fake, tmp_path, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.recording import record_expert
+    monkeypatch.setattr(record_expert, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    monkeypatch.setattr(task_env, 'make_env', lambda uid, config=None: make_env(uid, config=config))
+    output = tmp_path / 'nut-caller.h5'
+    code = record_expert.main(['--env-id', IDS[1], '--provider', 'mujoco', '--horizon', '3',
+        '--output', str(output), '--time-limit-s', '10', '--memory-limit-mb', '1024'])
+    result = json.loads(capsys.readouterr().out)
+    assert code == 1 and result['status'] == 'FAIL'
+    assert result['roundtrip'] == 'PASS' and result['recording']['t_plus_one_valid']
+    assert result['recording']['transitions'] == 3 and result['recording']['boundaries'] == 4
+
+
+def test_nutassembly_planning_rollout_uses_caller_solution(fake, monkeypatch):
+    from task_env.script.trajectory.planning._common import rollout_solution
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'mujoco', 'horizon': 3})
+    try:
+        def forbidden():
+            raise AssertionError('caller-driven planning must not invoke step_expert')
+        monkeypatch.setattr(env, 'step_expert', forbidden)
+        result = rollout_solution(env, horizon=3, seed=19,
+                                  solution=build_outcome_solution(provider='mujoco'))
+        assert result['transitions'] == 3 and result['truncated']
+        assert env.solution is None and env._external_solution_owner is None
+    finally:
+        env.close()
 
 
 def test_retired_phase_i_and_grouped_trajectory_commands_fail_explicitly(capsys):

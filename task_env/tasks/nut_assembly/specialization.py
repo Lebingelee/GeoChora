@@ -327,7 +327,7 @@ def _source_identity_files():
         "task_env/tasks/canonical_solution_lifecycle.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
-        "task_env/planners/cartesian.py",
+        "task_env/planners/cartesian.py", "task_env/planners/contracts.py",
     )
     controller = root / "task_env/controllers/canonical"
     relative = (*relative, R3_PROFILE_PATH.relative_to(root).as_posix(),
@@ -529,7 +529,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
         evaluate=declaration.evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
         external_actions=False, interval_mode="native", recorder_mode="execution",
-        external_action_error="selected NutAssembly requires step_expert; unguarded external actions are not admitted",
+        external_action_error="selected NutAssembly requires a source-bound ExpertAction; unguarded external actions are not admitted",
         reset_seed=_reset_seed, observe_expert_kwargs=_observe_kwargs,
         native_sample_factory=_native_feedback_sample,
         native_interval_receipt_factory=_native_interval_receipt,
@@ -548,6 +548,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
             ),
         validate_external_solution=_validate_external_solution,
         control_request_required=True,
+        external_solution_actions=True,
         expert_uses_public_observation=True,
         runtime_episode_identity=True,
         record_native_substeps=True, abort_solution_on_runtime_error=True)

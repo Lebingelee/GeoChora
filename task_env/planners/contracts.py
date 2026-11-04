@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from copy import deepcopy
 from typing import Mapping, Protocol
 
 import numpy as np
@@ -19,12 +20,15 @@ class ExpertAction:
     failed: bool = False
     diagnostics: Mapping[str, float | int | bool | str] = field(default_factory=dict)
     control_request: ArmTargetExecutionRequestV1 | None = None
+    request_boundary: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         action = np.asarray(self.action, dtype=np.float32).reshape(-1).copy()
         action.setflags(write=False)
         object.__setattr__(self, "action", action)
         object.__setattr__(self, "stage", str(self.stage))
+        if self.request_boundary is not None:
+            object.__setattr__(self, "request_boundary", deepcopy(dict(self.request_boundary)))
         object.__setattr__(self, "done", bool(self.done))
         object.__setattr__(self, "failed", bool(self.failed))
         if self.control_request is not None:

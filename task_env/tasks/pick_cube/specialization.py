@@ -184,6 +184,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
+             root / "task_env/planners/contracts.py",
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
              Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),

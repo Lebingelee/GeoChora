@@ -53,6 +53,7 @@ def rollout_solution(
     *,
     horizon: int,
     seed: int,
+    solution: Any = None,
 ) -> dict[str, Any]:
     """Run a selected task-owned solution through its public expert boundary.
 
@@ -60,17 +61,26 @@ def rollout_solution(
     helper admits only the selected public reference environment interface.
     """
 
-    if not callable(getattr(env, "step_expert", None)):
+    caller_owned = solution is not None
+    if not caller_owned and not callable(getattr(env, "step_expert", None)):
         raise TypeError("planning workflow requires a selected task-owned step_expert() route")
     observation, info = env.reset(seed=seed)
-    solution = env.prepare_expert()
+    if caller_owned:
+        solution.reset(observation, info, env.metadata)
+    else:
+        solution = env.prepare_expert()
     transitions = 0
     stages: list[str] = []
     reward_sum = 0.0
     terminated = truncated = False
     while transitions < horizon and not solution.done and not solution.failed:
         stages.append(solution.stage)
-        observation, reward, terminated, truncated, info = env.step_expert()
+        if caller_owned:
+            action = solution.act(observation, info)
+            observation, reward, terminated, truncated, info = env.step(action)
+            solution.observe(observation, reward, terminated, truncated, info)
+        else:
+            observation, reward, terminated, truncated, info = env.step_expert()
         reward_sum += float(reward)
         transitions += 1
         if terminated or truncated:
@@ -104,7 +114,11 @@ def run_solution(
         raise ValueError('planning commands admit only the selected public reference UIDs')
     env = make_env(env_id, config={'provider': provider, 'backend': 'cpu', 'horizon': horizon})
     try:
-        result = rollout_solution(env, horizon=horizon, seed=seed)
+        solution = None
+        if env_id == 'nut-assembly-outcome-reference-v1':
+            from task_env.tasks.nut_assembly.task import build_outcome_solution
+            solution = build_outcome_solution(provider=provider)
+        result = rollout_solution(env, horizon=horizon, seed=seed, solution=solution)
         if not result['success']:
             reason = result['failure_reason'] or 'task_outcome_or_expert_incomplete'
             raise RuntimeError('selected reference expert did not complete: ' + str(reason))

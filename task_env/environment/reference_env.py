@@ -1200,6 +1200,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'selected execution is faulted; reset() is required '
                 f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
             )
+        from ..planners.contracts import ExpertAction
+        if self.binding.external_solution_actions and type(action) is ExpertAction:
+            if self._episode_mode in {'expert', 'external_solution'}:
+                raise RuntimeError('cannot mix caller actions with selected Solution execution')
+            if self._stopped or self.session is None:
+                raise RuntimeError('reset required or episode already stopped')
+            self._require_published_execution_info()
+            if action.request_boundary != self.info['expert_execution_boundary_v1']:
+                raise ValueError('Solution action boundary is stale or mismatched')
+            if action.control_request is None:
+                raise ValueError('Solution action requires its versioned control request')
+            return self._step(action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
@@ -2119,7 +2131,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
         return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
 
-    def _step(self, action, *, proposal=None, observer_solution=None):
+    def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         if self._execution_fault is not None:
             fault = self._execution_fault
             raise RuntimeError(
@@ -2137,9 +2149,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
             raise
         request = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
-        if proposal is not None and observer_solution is None:
+        if proposal is not None and observer_solution is None and not caller_driven:
             observer_solution = self.solution
         requested_mode = (
+            'external' if caller_driven else
             'external_solution' if proposal is not None and observer_solution is self._external_solution_owner
             else 'expert' if proposal is not None else 'external'
         )
@@ -2148,7 +2161,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = requested_mode
         stage = proposal.stage if proposal is not None else 'external'
         diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
-        if (requested_mode == 'external_solution' and proposal is not None
+        if (requested_mode in {'external_solution', 'external'} and proposal is not None
                 and proposal.control_request is not None):
             control_request = proposal.control_request
             diagnostics['arm_execution_request_v1'] = {
@@ -2251,7 +2264,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.info['native_interval_receipt_v1'] = interval_receipt.to_mapping()
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
-            if proposal is not None:
+            if proposal is not None and not caller_driven:
                 phase = 'solution_observation'
                 extra = (self.binding.observe_expert_kwargs(self, native_samples, interval_receipt)
                          if interval_receipt is not None

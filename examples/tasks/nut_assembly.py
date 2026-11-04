@@ -1,4 +1,4 @@
-"""Run the guarded NutAssembly Outcome V1 expert through step_expert()."""
+"""Run the guarded NutAssembly Outcome V1 Solution through public actions."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPOSITORY_ROOT))
 
-from examples._common import RunTimeout, bounded_process, bootstrap_imports, identity_summary, run_expert
+from examples._common import RunTimeout, bounded_process, bootstrap_imports, identity_summary, run_caller_solution
 
 
 ENV_ID = "nut-assembly-outcome-reference-v1"
@@ -35,13 +35,17 @@ def main(argv=None) -> int:
     bootstrap_imports()
     env = None
     report = {"status": "ERROR", "env_id": ENV_ID, "provider": args.provider,
-              "capability_intersection": "selected NutAssembly Outcome V1, guarded step_expert, scalar CPU; no external gripper actions"}
+              "capability_intersection": "selected NutAssembly Outcome V1, caller-owned Solution, scalar CPU"}
     try:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
+            from task_env.tasks.nut_assembly.task import build_outcome_solution
 
             env = make_env(ENV_ID, config={"execution": {"physics_provider": args.provider, "physics_backend": "cpu"}, "episode": {"horizon": args.horizon}})
-            episode = run_expert(env, seed=args.seed, horizon=args.horizon)
+            solution = build_outcome_solution(provider=args.provider)
+            obs, info = env.reset(seed=args.seed)
+            solution.reset(obs, info, env.metadata)
+            episode = run_caller_solution(env, solution, obs, info, horizon=args.horizon)
             report.update(episode=episode, identity=identity_summary(env, provider=args.provider), resource_budget=budget)
             report["status"] = episode["status"]
     except RunTimeout as exc:

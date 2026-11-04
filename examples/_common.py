@@ -124,14 +124,31 @@ def run_expert(env, *, seed: int, horizon: int, already_reset: bool = False,
                           terminated=terminated, truncated=truncated)
 
 
-def episode_result(env, *, info: Mapping | None = None, transitions: int,
+def run_caller_solution(env, solution, obs, info, *, horizon: int) -> dict:
+    """Drive a caller-owned Solution using the public action/observation boundary."""
+    terminated = truncated = False
+    transitions = 0
+    while transitions < horizon and not solution.done and not solution.failed:
+        action = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(action)
+        solution.observe(obs, reward, terminated, truncated, info)
+        transitions += 1
+        if terminated or truncated:
+            break
+    if transitions >= horizon and not solution.done and not solution.failed:
+        truncated = True
+    return episode_result(env, solution=solution, info=info, transitions=transitions,
+                          terminated=terminated, truncated=truncated)
+
+
+def episode_result(env, *, solution=None, info: Mapping | None = None, transitions: int,
                    terminated: bool = False,
                    truncated: bool = False) -> dict:
     """Keep physical task outcome and expert lifecycle as separate fields."""
 
     info = dict(info or {})
     metrics = dict(info.get("task_metrics", {}))
-    solution = env.solution
+    solution = env.solution if solution is None else solution
     outcome = solution.outcome_report() if callable(getattr(solution, "outcome_report", None)) else {}
     task_success = bool(metrics.get("task_success", info.get("is_success", False)))
     solution_done = bool(solution.done)

@@ -18,6 +18,7 @@ from examples._common import (
     identity_summary,
     load_recording_summary,
     run_expert,
+    run_caller_solution,
 )
 
 
@@ -63,12 +64,19 @@ def main(argv=None) -> int:
             from task_env import make_env
 
             env = make_env(args.env_id, config={"provider": args.provider, "backend": "cpu", "horizon": args.horizon})
-            _, reset_info = env.reset(seed=seed)
+            obs, reset_info = env.reset(seed=seed)
+            if args.env_id == ENV_IDS[1]:
+                from task_env.tasks.nut_assembly.task import build_outcome_solution
+                solution = build_outcome_solution(provider=args.provider)
+                solution.reset(obs, reset_info, env.metadata)
             # Recording begins with the measured reset boundary, before the first expert action.
             env.start_recording(output)
             recording_started = True
-            episode = run_expert(env, seed=seed, horizon=args.horizon, already_reset=True,
-                                 initial_info=reset_info)
+            if args.env_id == ENV_IDS[1]:
+                episode = run_caller_solution(env, solution, obs, reset_info, horizon=args.horizon)
+            else:
+                episode = run_expert(env, seed=seed, horizon=args.horizon, already_reset=True,
+                                     initial_info=reset_info)
             identity = identity_summary(env, provider=args.provider)
             status = episode["status"]
     except RunTimeout as exc:
