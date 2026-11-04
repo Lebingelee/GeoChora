@@ -139,6 +139,40 @@ class Contract:
         return {f.name: _encode(getattr(self, f.name)) for f in fields(self)}
 
 
+def _immutable_contract_tree(value):
+    """Recognize only normalized built-in Contract values and frozen leaves.
+
+    Unknown subclasses or containers are deliberately excluded from caching.
+    Contract's decoder makes fresh mapping proxies and tuples at construction.
+    """
+    if value is None or type(value) in (str, bool, int, float):
+        return True
+    if type(value) is tuple:
+        return all(_immutable_contract_tree(item) for item in value)
+    if type(value) is MappingProxyType:
+        return all(_immutable_contract_tree(key) and _immutable_contract_tree(item)
+                   for key, item in value.items())
+    value_type = type(value)
+    if (isinstance(value, Contract) and value_type.__module__ == __name__
+            and globals().get(value_type.__name__) is value_type
+            and getattr(value_type, '__post_init__', None) is Contract.__post_init__
+            and getattr(value_type, '__dataclass_params__', None) is not None
+            and value_type.__dataclass_params__.frozen):
+        return all(_immutable_contract_tree(getattr(value, item.name)) for item in fields(value))
+    return False
+
+
+def _artifact_identity(artifact):
+    cached = artifact.__dict__.get('_immutable_identity_hash')
+    if cached is not None:
+        return cached
+    canonical = json.dumps(artifact.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+    result = hashlib.sha256(canonical.encode()).hexdigest()
+    if _immutable_contract_tree(artifact):
+        object.__setattr__(artifact, '_immutable_identity_hash', result)
+    return result
+
+
 @dataclass(frozen=True)
 class PoseWorld(Contract):
     position: tuple[float, float, float]
@@ -1337,8 +1371,7 @@ class TaskArtifact(Contract):
 
     @property
     def identity_hash(self):
-        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
-        return hashlib.sha256(canonical.encode()).hexdigest()
+        return _artifact_identity(self)
 
 
 @dataclass(frozen=True)
@@ -1523,8 +1556,7 @@ class TaskArtifactV1(Contract):
 
     @property
     def identity_hash(self):
-        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
-        return hashlib.sha256(canonical.encode()).hexdigest()
+        return _artifact_identity(self)
 
     @property
     def task_source_mapping(self) -> Mapping:

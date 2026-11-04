@@ -257,3 +257,52 @@ def test_scalar_example_checks_spaces_and_closes(monkeypatch, capsys):
     assert env.closed and result['close_returned']
     assert result['action']['torque'] == {'shape': [1], 'dtype': 'float32'}
     assert result['step_observation']['state'] == {'shape': [3], 'dtype': 'float32'}
+
+
+def test_artifact_digest_reuses_immutable_snapshot_and_recomputes_replacements(monkeypatch):
+    import hashlib
+    import json
+    from dataclasses import FrozenInstanceError, replace
+    from task_env.artifacts import TaskArtifact
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    original = build_artifact()
+    artifact = replace(original)
+    canonical = json.dumps(artifact.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+    expected = hashlib.sha256(canonical.encode()).hexdigest()
+    real_to_mapping = TaskArtifact.to_mapping
+    calls = []
+    def counted(value):
+        calls.append(value)
+        return real_to_mapping(value)
+    monkeypatch.setattr(TaskArtifact, 'to_mapping', counted)
+    assert artifact.identity_hash == expected
+    assert artifact.identity_hash == expected
+    assert len(calls) == 1
+    with pytest.raises((FrozenInstanceError, AttributeError)):
+        artifact.artifact_id = 'changed'
+    with pytest.raises(TypeError):
+        artifact.semantics.parameters_si['new'] = 1.0
+    changed = replace(artifact, artifact_version='v999')
+    assert changed.identity_hash != expected
+    assert len(calls) == 2
+
+
+def test_artifact_digest_does_not_cache_unknown_mutable_contract_subclasses():
+    from dataclasses import replace
+    from task_env.artifacts import SemanticDefinition
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    class MutableSemantic(SemanticDefinition):
+        def to_mapping(self):
+            result = super().to_mapping()
+            result['success_definition'] = self.extra[0]
+            return result
+    base = build_artifact()
+    data = base.semantics.to_mapping()
+    semantic = MutableSemantic.from_mapping(data)
+    object.__setattr__(semantic, 'extra', ['first'])
+    artifact = replace(base, semantics=semantic)
+    first = artifact.identity_hash
+    semantic.extra[0] = 'second'
+    assert artifact.identity_hash != first
