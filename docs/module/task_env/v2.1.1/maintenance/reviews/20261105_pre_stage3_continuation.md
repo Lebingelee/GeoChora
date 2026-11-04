@@ -340,3 +340,10 @@ worker在独立ignored cwd运行，按序非阻塞持有并释放两把共享nat
 对tracked clean `33c51a4ff42397c67a41b7c0d3369b20ec359131`，以当前Core canonical H5读取实现和独立 `independent_readback.py`，在禁止仿真引擎导入的单独进程只读检查 `f9cb51fd` 的MuJoCo PickCube物理H5。输入SHA前后均为 `264b35a9f08e754287957d8d7271be072bc5c06157d3755e80b155b9a2896763`；reader报告 **PASS**、960 transitions／961 boundaries、0.01 s间隔和target／applied身份一致，生成trace SHA `486d9c3cd0c67c04f9df842fbffd5ff4859e49a9859126738b078ab011f518d2`，与原reader trace一致。该H5没有native substep记录，未评估D0或Qualification。
 
 reader脚本SHA为 `6adb10b8659aaab43941e34dbd0c726fa57bc7cff7c9d32db122ae88cd9c1422`；受监督进程耗时1.924秒、最大RSS 128774144 bytes，进程内核对未加载native模块，原H5未修改。原始argv、guard、输出和资源采样见ignored `historical-reader-33c51a4f/`。此项只验证当前reader能读取旧源码产生的记录，不能用旧轨迹替代当前源码PickCube／Nut代表物理回归及其同次独立读回；未消耗物理步、未启动Isaac或GPU。
+
+
+## 资源上限复核与后续物理预检（需维护者决定）
+
+对既有输出进行目录占用复核时发现，attempt001与本续作目录合计 `du -sb` 10031264898 bytes（约9.34 GiB），超过交接包2 GiB总新输出上限；其中续作目录9758553641 bytes，主要为12组约740 MiB的pytest F04临时资产副本。此前没有及时执行总量核查，是本次执行的资源管理失误；目录占用不是累计写入字节的完整审计。冻结输入、历史raw、日志和临时副本均未删除，G0此项记 **FAIL**，不能通过清理将历史超限改写为合规。现已暂停大体量输出及native运行，维护者尚未决定是否调整输出预算。
+
+在发现该问题前，以tracked clean `dc95e1d9ecd994354944a9fa26de9ef408e82b53` 对PickCube seed31／horizon1000和Nut seed19／horizon6000进行不导入引擎的纯构造预检：两者控制substeps均为5，外部Solution身份与环境声明一致；预检不执行reset、物理或reader。按已登记的115807／120000步预留，两个完整回归还需35000步预留，需追加至少30807步；维护者尚未答复。预检、备选argv及来源检查脚本保存在ignored `physical-gate-preflight-dc95e1d9/`，不构成运行授权。其计划将worker的输出目录与cwd合并以覆盖H5，再对每个reader单独限额；实际执行前仍须以维护者确认的总额度和实际HEAD重新核算、锁定来源。
