@@ -43,6 +43,7 @@ from ...objects.nut_assembly import (
     SQUARE_PEG_HALF_WIDTH,
 )
 from ...registry import make_agent, make_object, make_scene, register_env
+from ...robots.panda import panda_reference_control_binding
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource, ExecutionSourceReceiptV1
 from ...utils.rotation import quat_wxyz_to_matrix
@@ -319,7 +320,7 @@ def _source_identity_files():
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
         "task_env/assembly/r05b_trusted_execution_source_manifest.json",
         "task_env/assembly/compiler.py", "task_env/environment/task_source.py",
-        "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
+        "task_env/objects/nut_assembly.py", "task_env/assembly/source.py", "task_env/robots/panda.py",
         "task_env/environment/reference_env.py", "task_env/environment/reference_binding.py",
         "task_env/environment/lifecycle.py",
         "task_env/artifacts/contracts.py",
@@ -537,6 +538,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
     return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider, include_solution=False,
                                                                       resolved_config=resolved_config,
                                                                       lift_height_m=lift_height_m, task_config=task_config),
+        scalar_control_binding=panda_reference_control_binding(),
         reset_sample=declaration.sample_reset,
         evaluate=declaration.evaluate,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),

@@ -117,3 +117,11 @@ Nut的GeoPhys CPU/CUDA与100／500 Hz native-feedback选择和profile名称从�
 既有单Panda Position相机路线的space与schema声明归入observations owner，基于同一次相机字段声明构建空间与schema；环境继续组合并发布原有metadata。字段次序、shape、dtype、语义和限定的Panda路线未扩大；新增离线检查各相机space和schema的shape／dtype一致。该调整不表示已支持任意资产或新的camera／provider组合。
 
 禁止引擎导入的selected／camera发布与故障组合 **112 passed**；F04合成adapter **10 passed、3 deselected**，排除项仍依赖本checkout缺失的历史worker。完整argv、输出与源码diff摘要见ignored `camera-declaration-evidence.json`及 `camera-f04-evidence.json`。本次未运行真实scene、Isaac、GPU或物理reader；旧物理结果不能重标。
+
+## Scalar控制主体声明归位（续作，待复审）
+
+原Env内固定的 `ControlBinding('panda-v1/gripper', 0.08)` 改为由任务binding显式提供；已有Panda机器人owner提供相同绑定，PickCube、Nut、Marker和通用candidate声明并在来源摘要中包含该owner。Position／mixed仍使用原有各自绑定计划；已有 `ControlBinding` 只实现经审计的0.08 m映射，不因本次改动支持新机器人或新夹爪。合成测试核对声明值确实传给materialization；缺失绑定时拒绝并释放已构造的source snapshot，reset重建也在materialization前复核。通用candidate完整合成oracle预检仍受保护untracked文件的clean-check阻挡。
+
+Nut specialization SHA由 `d569ab5eb807318ca703207e64ee68bf0413828b88e7a277f7242a6c142026d2` 变为 `489f2907990886877e2c00921174ba477ed05c9134dfc622e8943cd0005ac7fe`；实际新源码构造的R05b 100／500 Hz Controller身份分别为 `df93686b259161e81335869bc2514ec3493881cf603547e69af9cf3c835a8686`／`70808c3bc93e825f5c6e1619148098bf651c7b0b451f25b48906777171725769`，Solution身份不变。仅刷新精确source-bound值，其他字段／来源／provider检查不放宽，不将旧运行重标。
+
+禁止引擎导入的selected、R05b和Harness组 **136 passed、1 skipped、1 deselected**，skip为缺少冻结Isaac解释器，排除真实provider reset／step；lifecycle组 **178 passed、3 deselected**；leaf／mixed合成组 **12 passed**。完整argv、输出及未提交diff摘要见ignored `scalar-binding-final-evidence.json`、`scalar-binding-final-lifecycle.json`和 `scalar-binding-final-mixed.json`。未运行真实引擎、Isaac、GPU或物理reader，仍需最终代表性物理验证和Sol复审。

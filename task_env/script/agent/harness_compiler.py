@@ -352,7 +352,8 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
             for name in ('harness_compiler.py','harness_spec_schema.py')}
         for name in ('task_env/tasks/pick_cube/task.py','task_env/tasks/pick_cube/solution.py',
                      'task_env/assembly/panda_box.py','task_env/assembly/compiler.py',
-                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py'):
+                     'task_env/environment/task_source.py','task_env/controllers/canonical/production.py',
+                     'task_env/robots/panda.py'):
             path=Path(catalog['core_repo'])/name
             if path.is_file():source_ids[name]=hashlib.sha256(path.read_bytes()).hexdigest()
         return dict(construction_id='harness-pick-lift-v0',artifact=artifact,source=source,
@@ -387,7 +388,9 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         return {'execution_info':ExpertExecutionInfo('expert-execution-info-v1',env.state.control_step,
             env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
 
+    from task_env.robots.panda import panda_reference_control_binding
     binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
+        scalar_control_binding=panda_reference_control_binding(),
         object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
         interval_mode='grouped',recorder_mode='canonical',
         reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))

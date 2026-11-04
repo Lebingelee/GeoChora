@@ -44,7 +44,7 @@ from ...environment.task_definition import TaskDefinitionBase, as_task_state_vie
 from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...planners import AbsolutePosePlannerConfig
-from ...robots.panda import PandaAgent
+from ...robots.panda import PandaAgent, panda_reference_control_binding
 from ...runtime.sessions.source import RuntimeSource
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
@@ -184,6 +184,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
+             Path(inspect.getsourcefile(panda_reference_control_binding)).resolve(),
              root / "task_env/planners/contracts.py",
              root / "task_env/planners/completion.py",
              Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
@@ -536,6 +537,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
 
     return ReferenceTaskBinding(
         build=build,
+        scalar_control_binding=panda_reference_control_binding(),
         build_external=build_external,
         build_seeded=build_seeded,
         position_execution_info=lambda env: (

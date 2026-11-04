@@ -1193,6 +1193,19 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._bind_selected_controller(self.value)
         self._mixed_initial_value_pending = bool(_mixed_control_candidate)
         self.dual_entity_position = len(self.position_profiles) == 2
+        if not self.position_profile and not _mixed_control_candidate:
+            if type(self.binding.scalar_control_binding) is not ControlBinding:
+                error = TypeError('selected scalar control requires its declared ControlBinding')
+                receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
+                if receipt is not None:
+                    try:
+                        receipt.close()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'source cleanup after binding rejection failed: {cleanup_error!r}')
+                fault = ExecutionFaultV1.from_exception('selected_construction', error)
+                self._execution_fault = fault
+                attach_execution_fault(error, fault)
+                raise error
         if camera_observation_config is not None and not self.position_profile:
             raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
         self.camera_observation_config = camera_observation_config
@@ -1652,8 +1665,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 )
             else:
                 self.position_profile = False
+                if type(self.binding.scalar_control_binding) is not ControlBinding:
+                    raise TypeError('selected scalar control requires its declared ControlBinding')
                 self.session = materialize_control(self.artifact, self.execution,
-                    source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08),
+                    source=self.value['source'], binding=self.binding.scalar_control_binding,
                     diagnostic_profile=(self._diagnostic_profile
                                         if self.backend == 'cuda' else None),
                     native_feedback_profile=self._native_feedback_profile,

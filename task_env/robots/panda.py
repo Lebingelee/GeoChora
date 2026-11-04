@@ -32,6 +32,13 @@ from ..utils.rotation import matrix_to_quat_wxyz
 PANDA_ASSET_ROOT = MUJOCO_MENAGERIE_ROOT / "franka_emika_panda"
 
 
+def panda_reference_control_binding():
+    """Return the legacy scalar Panda gripper binding owned by this robot."""
+    from ..runtime.sessions.control import ControlBinding
+
+    return ControlBinding('panda-v1/gripper', 0.08)
+
+
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
@@ -220,7 +227,7 @@ class PandaAgent(BaseAgent):
         )
 
 
-__all__ = ["PANDA_ASSET_ROOT", "PandaAgent"]
+__all__ = ["PANDA_ASSET_ROOT", "PandaAgent", "panda_reference_control_binding"]
 
 
 def _panda_scene_from_import(

@@ -82,6 +82,41 @@ def fake(monkeypatch):
     monkeypatch.setattr('task_env.runtime.sessions.provenance.provider_build_identity', lambda provider: {'synthetic_provider':provider})
 
 
+def test_scalar_control_binding_is_supplied_by_task_at_materialization(fake, monkeypatch):
+    from task_env.runtime.sessions.control import ControlBinding
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    declared = ControlBinding('custom-v1/gripper', 0.08)
+    binding = replace(PickCubeReferenceEnv.binding, scalar_control_binding=declared)
+    seen = []
+    def materialize(*args, **kwargs):
+        seen.append(kwargs['binding'])
+        return FakeSession(*args, **kwargs)
+    monkeypatch.setattr('task_env.environment.reference_env.materialize_control', materialize)
+    env = PickCubeReferenceEnv(provider='mujoco', _binding=binding)
+    try:
+        env.reset(seed=19)
+        assert seen == [declared]
+    finally:
+        env.close()
+
+
+def test_missing_scalar_binding_closes_constructed_source_without_materialization(fake):
+    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
+
+    base = NutAssemblyReferenceEnv.binding
+    receipts = []
+    def build(*args):
+        value = base.build_native_feedback_profile(*args)
+        receipts.append(value['source'].execution_source_receipt)
+        return value
+    binding = replace(base, scalar_control_binding=None, build_native_feedback_profile=build)
+    with pytest.raises(TypeError, match='declared ControlBinding'):
+        NutAssemblyReferenceEnv(provider='geophys', backend='cpu', _binding=binding,
+                                _native_feedback_request=500)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
 @pytest.mark.parametrize('uid', IDS)
 @pytest.mark.parametrize('provider', ['geophys', 'mujoco'])
 def test_actual_factory_reset_expert_recording_and_teardown(uid, provider, fake, tmp_path):
@@ -1650,7 +1685,8 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         hashes = env.value['source_sha256']
         root = Path(__file__).resolve().parents[3]
         for name in ('examples/tasks/declared_marker.py', 'task_env/assembly/compiler.py',
-                     'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py'):
+                     'task_env/assembly/panda_box.py', 'task_env/objects/pick_cube.py',
+                     'task_env/robots/panda.py'):
             assert hashes[name] == hashlib.sha256((root / name).read_bytes()).hexdigest()
         assert 'task_env/tasks/declarative_reference.py' not in hashes
         assert env.value['resolved_configuration']['object_id'] == 'marker-v1'

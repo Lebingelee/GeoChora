@@ -57,6 +57,7 @@ class ReferenceTaskBinding:
     post_reset_session_validator: Callable | None = None
     close_task_resources: Callable | None = None
     action_schema: dict | None = None
+    scalar_control_binding: object | None = None
     action_space_factory: Callable = reference_pose_action_space
     prepare_action: Callable = reference_pose_action
     position_execution_info: Callable | None = None

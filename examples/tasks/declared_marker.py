@@ -15,6 +15,7 @@ from task_env.environment.configuration import resolve_env_config
 from task_env.environment.reference_binding import ReferenceTaskBinding
 from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.registry import register_env
+from task_env.robots.panda import panda_reference_control_binding
 
 
 def _sample_box_reset(declaration, artifact, seed):
@@ -79,11 +80,12 @@ class MarkerHeightEnv(SelectedReferenceEnv):
                 compiled, task_id=declaration.task_id,
                 construction_schema='declared-panda-box-construction-v1',
                 metadata={'object_id': declaration.object_id},
-                owners=(type(declaration), cls.evaluate_task, _sample_box_reset,
+                owners=(type(declaration), cls.evaluate_task, _sample_box_reset, panda_reference_control_binding,
                         compile_panda_box_task, compile_panda_box_artifact),
             )
         return ReferenceTaskBinding(
             build=build, reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
+            scalar_control_binding=panda_reference_control_binding(),
             evaluate=cls.evaluate_task, object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
             external_actions=True, interval_mode='grouped', recorder_mode='canonical',
         )
