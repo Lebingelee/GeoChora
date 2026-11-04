@@ -1,6 +1,6 @@
 # v2.1.1 恢复与当前状态
 
-更新时间：2026-11-04。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
+更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
 ## 状态
 
@@ -23,7 +23,9 @@ attempt002 的 30 分钟 R1 返工已记录在[返工交付](reviews/pre-stage3-
 
 ### 2026-11-05 生命周期续作
 
-维护者授权更长的三个单环境修复。当前工作将 `BaseTaskEnv` 兼容出口指向 `SelectedReferenceEnv`，三个组件任务通过共同 episode owner 执行 reset、step、stop 和 close；组件 RuntimeBoundary 和 selected RuntimeSession 保持各自物理接口。证据限于禁止引擎导入的合成回归；真实 provider、物理和独立 reader 未运行。本次结果等待 Sol 复审，不代表 R2/R3 或阶段3已经接受；详见[Terra 交付记录](reviews/20261105_lifecycle_unification_terra.md)。
+维护者授权更长的三个单环境修复，提交为 `4840152530e55fb8a3e77517c3b187e99647b5b7`。Sol 已作[独立复审](reviews/20261105_lifecycle_unification_sol_review.md)，决定 `ACCEPTED_BOUNDED_LIFECYCLE_UNIFICATION`：R1 的真实源码迁移与无引擎契约有限接收。四个 `BaseTaskEnv` 出口与 `SelectedReferenceEnv` 为同一类对象，三个组件任务及 selected 路线通过共同 episode owner 执行 reset、step、stop 和 close；组件 RuntimeBoundary 和 selected RuntimeSession 保持各自物理接口。Sol 独立复跑171 passed／3 deselected和12 passed；真实 provider、物理和独立物理 reader 未运行。整体维护仍为 PARTIAL，R2/R3等后续项和阶段3均未获本次整体验收。原[Terra 交付记录](reviews/20261105_lifecycle_unification_terra.md)及历史30分钟结果保留。
+
+维护者计划后续从 develop 建立阶段3分支；本次仅完成复审，尚未创建新分支或 worktree，也未启动3a。正式执行前固定起点提交、独立工作目录及与后续维护的接口边界；旧编排中的零新增分支方案届时按维护者新安排更新。
 
 ## 阶段3前待办
 

@@ -4,7 +4,7 @@
 
 维护者提出：整理tasks、隔离诊断、统一BaseTaskEnv与SelectedReferenceEnv，减少冗余诊断和SHA开销，并补齐新手安装、路径复用、启动脚本及基于example的二次开发指引。本次先完成单环境规范路线，Pendulum并行适配延期至G06。本项作为阶段3前的独立维护工作，不修改七阶段／22子阶段编号，不重开已接收的阶段2，也不表示阶段3已经启动。实施要求和验收以本仓库开发文档为准，GPT工作文档只作交接入口。
 
-> 2026-11-05 续作检查点：维护者为三个单环境生命周期统一另设较长 goal。当前实现与离线证据待 Sol 复审；`BaseTaskEnv` 已是规范 `SelectedReferenceEnv` 的同对象兼容导出。下文 2026-11-04 的输入现状、30 分钟返工决定及历史门结果保留为当时记录，不代表本次续作的当前源码。Marker/F06 归位及真实物理回归仍为独立待办；本续作不授权阶段3。
+> 2026-11-05 续作检查点：维护者为三个单环境生命周期统一另设较长 goal。`48401525` 经[Sol独立复审](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)，R1以 `ACCEPTED_BOUNDED_LIFECYCLE_UNIFICATION` 有限接收：真实迁移、同对象导出和共同执行协调器已核对，独立无引擎检查171 passed／3 deselected、假provider检查12 passed。下文2026-11-04输入现状、30分钟决定及历史门结果保留为当时记录。整体维护仍为PARTIAL；Marker/F06归位、环境类继续减责及真实物理回归／独立物理reader仍为待办，阶段3未开始。
 
 ## 一、已经查明的现状
 
