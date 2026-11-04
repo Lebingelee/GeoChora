@@ -12,4 +12,4 @@
 - [Episode reset](episode_reset.md)
 - [Built-in tasks](built_in_tasks.md)
 
-`reward`、`success`、`failure` 属于 task definition。success/failure 决定 `terminated`；episode horizon 决定 `truncated`。任务实现或 solution 不得绕过 `env.step()` 推进 runtime。
+`reward`、`success`、`failure` 由任务语义决定；终止、截断还取决于任务路线、episode 策略和 horizon，不能把 success 一律等同于 `terminated`。普通动作通过 `env.step()`，受支持的 task-owned Solution 通过 `step_expert()` 或 `step_with_solution()`；任务和调用者不直接推进 runtime。

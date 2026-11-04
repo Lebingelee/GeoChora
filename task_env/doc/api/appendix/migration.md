@@ -18,15 +18,14 @@
 | `task_env.action` | `task_env.controllers` |
 | `task_env.agents` | `task_env.robots` |
 | `task_env.core` | `task_env.environment` / `task_env.assembly` |
-| `task_env.scene`、`task_env.scenes` | `task_env.worlds`、`task_env.assembly` |
+| `task_env.scene`、`task_env.scenes` | `task_env.tasks.worlds`、`task_env.assembly` |
 | `task_env.observation` | `task_env.observations` |
 | `task_env.planning` | `task_env.planners` |
 | `task_env.recording` | `task_env.recorders` |
 | `task_env.rendering` | `task_env.render`（具体 renderer 以实际后端支持为准） |
 | `task_env.experts` | 任务拥有各自的 Solution；通用 `ExpertAction` 等契约在 `task_env.planners` |
-| `task_env.utils` | 按实际公开子包替换 |
 
-以上旧路径不保留 compatibility shim。迁移时使用顶层 `task_env.__all__` 或目标子包 `__all__` 核验导入名。
+以上旧路径不保留 compatibility shim。`task_env.utils` 仍存在，按其 `__all__` 使用公开工具；私有 helper 不因此成为稳定接口。迁移时使用顶层 `task_env.__all__` 或目标子包 `__all__` 核验导入名。
 
 ## P2.0-B S3：Go2 retirement
 

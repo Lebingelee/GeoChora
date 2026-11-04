@@ -1,6 +1,6 @@
 # Task Composition
 
-**Import path**：`task_env.worlds`、`task_env.objects`、`task_env.robots`、`task_env.controllers`、`task_env.assembly`  
+**Import path**：`task_env.tasks.worlds`、`task_env.objects`、`task_env.robots`、`task_env.controllers`、`task_env.assembly`
 **任务域**：Task Composition  
 **稳定性**：组件扩展接口；具体接口的适用范围见各页
 **职责**：将纯描述组件编译为场景及稳定 `TaskReferences`。  

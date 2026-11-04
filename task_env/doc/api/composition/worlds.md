@@ -1,19 +1,19 @@
 # Worlds
 
-**Import path**：`task_env.worlds`  
+**Import path**：`task_env.tasks.worlds`
 **任务域**：Task Composition  
 **稳定性**：Extension API（`BaseSceneBuilder`）/ Public API（`TabletopSceneBuilder`）  
 **职责**：提供可复用背景的资产与名称需求。  
 **调用者/消费者**：registry、场景编译。  
-**源码**：`task_env/worlds/base.py`、`tabletop.py`
+**源码**：`task_env/tasks/worlds/base.py`、`tabletop.py`
 
-## `task_env.worlds.BaseSceneBuilder`
+## `task_env.tasks.worlds.BaseSceneBuilder`
 
 **Kind**：class；**Defined in**：`worlds/base.py`
 
-继承 `SceneBuilderComponent`。实现者必须提供 `asset_manifest() -> AssetManifest` 与 `reference_spec() -> ReferenceSpec`，不拥有 runtime 状态、不推进 episode。
+`BaseSceneBuilder` 是 `SceneBuilderComponent` 的别名。实现者必须提供 `asset_manifest() -> AssetManifest` 与 `reference_spec() -> ReferenceSpec`，不拥有 runtime 状态、不推进 episode。
 
-## `task_env.worlds.TabletopSceneBuilder`
+## `task_env.tasks.worlds.TabletopSceneBuilder`
 
 **Kind**：class；**Defined in**：`worlds/tabletop.py`
 

@@ -6,7 +6,10 @@ inspection, batch smoke, learning smoke, and the bounded rendering route.
 Examples call existing public APIs; they do not define another TaskEnv,
 TaskArtifact, recorder, or renderer contract.
 
-Run from the repository root in the GeoChora dependency environment:
+The following commands are examples, not validation of the latest source in
+this maintenance attempt. Run from the repository root in a prepared GeoChora
+dependency environment; the [installation and startup guide](../../../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)
+states checked paths and remaining installation gaps:
 
 ```bash
 PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline --env-id pendulum-v1 --backend cpu --num-env 2 --steps 1
@@ -14,8 +17,8 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --
 PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19
 ```
 
-The v1.1.0 `single_inline` Pendulum route currently fails during stepping because its helper reads
-`env.binding`, which generic Pendulum does not expose. Use the public construction example below;
+The historical v1.1.0 `single_inline` Pendulum route was reported to fail during stepping because its helper reads
+`env.binding`, which generic Pendulum does not expose. This maintenance attempt has not rerun that historical command. Use the public construction example below;
 [canonical troubleshooting](../../../../docs/module/task_env/v2.0.0/guides/troubleshooting.md#已复现的-cli-缺陷) records the reproducer.
 
 ## Current commands
@@ -25,7 +28,7 @@ The v1.1.0 `single_inline` Pendulum route currently fails during stepping becaus
 | Scalar task construction | `examples/tasks/pick_cube.py` or `examples/tasks/nut_assembly.py` | Public `task_env.make_env`; explicit provider; selected task-owned expert. |
 | Canonical recording | `examples/recording/record_expert.py --env-id <selected-uid> --provider <geophys\|mujoco> --output <fresh.h5>` | Existing task-owned recorder and canonical H5. |
 | Offline H5 inspection | `examples/recording/inspect_h5.py --input <recording.h5>` | Canonical schema/hash/projection and T+1 validation; not D0 replay. |
-| Batch environment | `task_env.script.env.parallel_inline` | Generic Pendulum `make_parallel_env` route; current bounded CPU smoke only. |
+| Batch environment | `task_env.script.env.parallel_inline` | Old Pendulum `make_parallel_env` route; unified Env batch adaptation is deferred. |
 | SB3 example | `examples/learning/pendulum_sb3.py --output-dir <fresh-dir>` | One update through the existing Pendulum PPO runner; no convergence claim. |
 | Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Bounded Pendulum × GeoPhys CPU × rasterizer RGB smokes through scalar `make_env` and merged-scene batch routes. |
 | Offline trajectory conversion | `task_env.script.trajectory.convert` | Existing Panda/controller action conversion contract. |
@@ -77,9 +80,9 @@ smoke do not qualify training.
 ## Rendering and Camera limits
 
 `CameraSpec`, camera observation, UI rendering, the Renderer Registry, Flora,
-and rasterizer contracts remain distinct APIs. The bounded native rendering
-examples cover Pendulum × GeoPhys CPU × scalar TaskEnv × rasterizer RGB and
-Pendulum × GeoPhys CPU × merged-scene batch × rasterizer RGB. They do not test
+and rasterizer contracts remain distinct APIs. Historical bounded native rendering
+examples covered Pendulum × GeoPhys CPU × scalar TaskEnv × rasterizer RGB and
+Pendulum × GeoPhys CPU × merged-scene batch × rasterizer RGB; they were not rerun in this attempt. They do not test
 Flora or any Physics × Renderer interoperation. The old single-task CLI and
 PickCube camera scripts are retired; the current scalar example uses public
 `make_env`, while selected reference tasks have no camera acceptance claim.

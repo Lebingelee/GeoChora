@@ -7,6 +7,8 @@
 **调用者/消费者**：`TransitionRecorder.save_h5()`、离线读取器。  
 **源码**：`recorders/contracts.py`、`h5.py`、`flatten.py`
 
+本页的 v2 和 collection 描述适用于以下 generic wrapper/recorder；selected 的 canonical H5 入口及独立读回见 [录制示例](../../../../examples/recording/record_expert.py) 和 [检查示例](../../../../examples/recording/inspect_h5.py)，不要把这两种记录路径当成同一 schema。
+
 ## `RecorderConfig`
 
 **Kind**：frozen dataclass；**Defined in**：`contracts.py`

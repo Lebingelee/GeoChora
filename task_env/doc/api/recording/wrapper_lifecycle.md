@@ -19,7 +19,7 @@
 
 **Kind**：class；**Defined in**：`recorders/vector.py`
 
-构造签名为 `VectorTransitionRecorder(venv, path=None, name_prefix="trajectory", config=None)`。它使用
+构造签名为 `VectorTransitionRecorder(venv, *, path=None, name_prefix="trajectory", config=None, record=True)`。它使用
 `make_parallel_env` 已有的 `reset`/`step_async`/`step_wait` 协议，不导入 Stable-Baselines3；兼容旧调用名
 `VectorTransitionRecordWrapper` 仍作为别名保留。它通常包在
 raw `HomogeneousVectorTaskEnv`/`RemoteBatchVecEnv` 之上、SB3 flatten wrapper 之下。每个 vector slot 独立维护
