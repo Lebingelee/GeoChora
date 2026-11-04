@@ -1208,7 +1208,9 @@ class NutAssemblyOutcomeSolutionV1:
                     native_samples = native_interval_receipt.samples
                 if not isinstance(native_interval_receipt, NutAssemblyNativeIntervalReceiptV1):
                     raise ValueError("selected NutAssembly step requires a typed native interval receipt")
-                native_interval_receipt.validate()
+                transition_samples = self._validated_native_guard_samples(
+                    native_interval_receipt, native_samples,
+                )
                 application = info.get("control_application_v1")
                 pending = self._pending_action
                 if (not isinstance(application, Mapping) or pending is None
@@ -1241,9 +1243,6 @@ class NutAssemblyOutcomeSolutionV1:
                     if info.get("control_readiness_v1") != execution_info.control_readiness.to_mapping():
                         raise ValueError("inconsistent public control readiness")
                     readiness = execution_info.control_readiness
-                transition_samples = self._validated_native_guard_samples(
-                    native_interval_receipt, native_samples,
-                )
             except (ValueError, KeyError, TypeError):
                 self._task_success = False
                 self._fail("native_feedback_invalid")
