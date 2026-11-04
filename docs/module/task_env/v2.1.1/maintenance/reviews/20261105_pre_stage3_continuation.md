@@ -103,3 +103,11 @@ PickCube Position/F06的调用方 `ExpertAction` 经现有runtime控制owner投�
 六条既有versioned Position构造路线的provider／backend／device／determinism／profile组合从环境构造收回现有runtime sessions admission owner，复用该owner已有profile常量；原准入集合和错误语义不变。该预检不授予source、delivery、provider build或native session准入，后续各自的精确检查仍然保留。新增测试逐路线检查五项身份偏移均拒绝；禁止引擎导入的selected／R05b／PickCube组 **133 passed、2 deselected**，排除真实provider reset／step及真实场景投影。
 
 F04合成adapter在显式独立输出目录下 **10 passed、3 deselected**；被排除的三项依赖本checkout不存在的历史attempt003 worker。首次尝试未设置 `F04_S1_OUTPUT`，另两项因输出目录环境变量缺失而失败；后续已设置并重跑。完整argv、输出及源码diff摘要见ignored `route-owner-evidence.json`和 `route-f04-evidence.json`。未启动真实引擎、Isaac或GPU，历史物理结果仍绑定原提交。
+
+## Native反馈任务准入归位（续作，待复审）
+
+Nut的GeoPhys CPU/CUDA与100／500 Hz native-feedback选择和profile名称从通用Env构造移到任务binding；环境传递经该binding检查的请求，在reset时保留同一选择。binding要求准入与构造成对提供；错误provider、backend、非整数／布尔值及不支持频率在源构造前拒绝。原profile互斥、runtime的真实来源／controller／Solution／provider校验及五样本语义不变；旧私有 `_native_feedback_gripper_control_hz` 构造参数已由内部通用请求替代，公开任务工厂签名不变。
+
+任务specialization源码SHA-256由此前 `f5f1ff2abc7d49a71df1327e02dc22122a313da3e292b3c379105a977efb727e` 变为 `d569ab5eb807318ca703207e64ee68bf0413828b88e7a277f7242a6c142026d2`。基于实际新源码构造的R05b Controller身份分别由100 Hz `cb0587780036a783be872beb44f9757586d35a6c5e753863f3f96f1e023d4d5b`、500 Hz `2f4292e6e2b15d4ae2947164e9766f5c185d0e4fe64bd1355afcc91ac5b9a4b5` 更新为 `4f6d28f5494912d2cae90769e63fe605c9dec4b0d0f8fbeb04fd45a556678a24`、`b832d4d959a1b818c02275dcb46803b458ba7c810fa6ae2dde858f288a5828d0`；Solution身份保持 `2db224bced2156e691276c6eaedf7468a87e6e07b90c205f5a2df208c0da8f07`。仅刷新精确身份，不接受旧值作为新源码别名，也不放宽原其他逐项约束。
+
+禁止引擎导入的R05b／selected／recorder组 **138 passed、1 deselected**；lifecycle组 **176 passed、3 deselected**；leaf／mixed合成组 **12 passed**。其中R05b包括两种频率、来源及反馈篡改拒绝和合成H5读回；被排除的真实provider／Pendulum／scene测试不能算通过。完整argv、输出与源码diff摘要见ignored `native-binding-evidence.json`、`native-binding-lifecycle.json`和 `native-binding-mixed.json`。无真实引擎、Isaac、GPU或物理reader运行；旧物理结果不重标。

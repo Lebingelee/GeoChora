@@ -46,6 +46,7 @@ class ReferenceTaskBinding:
     runtime_episode_identity: bool = False
     build_seeded: Callable | None = None
     build_native_feedback_profile: Callable | None = None
+    admit_native_feedback_profile: Callable | None = None
     build_mixed_control_profile: Callable | None = None
     reset_sample_with_options: Callable | None = None
     prepare_mixed_control: Callable | None = None
@@ -81,6 +82,11 @@ class ReferenceTaskBinding:
             raise ValueError('position execution info requires a callable and nonempty result key')
         if (self.build_external is None) != (self.validate_external_solution is None):
             raise ValueError('external Solution construction and validation must be supplied together')
+        if ((self.build_native_feedback_profile is None) != (self.admit_native_feedback_profile is None)
+                or (self.build_native_feedback_profile is not None
+                    and (not callable(self.build_native_feedback_profile)
+                         or not callable(self.admit_native_feedback_profile)))):
+            raise ValueError('native feedback construction and admission must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.reset_runtime_input is not None and not callable(self.reset_runtime_input):

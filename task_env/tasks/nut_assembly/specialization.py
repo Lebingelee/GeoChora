@@ -518,6 +518,16 @@ def _validate_external_solution(value, solution):
         raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
 
 
+def _admit_native_feedback_profile(provider, backend, gripper_control_hz):
+    if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
+            or type(gripper_control_hz) is not int or gripper_control_hz not in {100, 500}):
+        raise ValueError(
+            'normal native-feedback profile requires the opted-in GeoPhys NutAssembly binding, '
+            'CPU/CUDA, and 100/500 Hz'
+        )
+    return R05B_NATIVE_FEEDBACK_PROFILE
+
+
 def _binding(resolved_config=None, lift_height_m=None, task_config=None):
     task_config = _configuration() if task_config is None else task_config
     declaration = NutAssemblyTaskDefinition.from_artifact(
@@ -543,6 +553,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
                 backend=backend, gripper_control_hz=gripper_control_hz,
                 include_solution=include_solution,
             ),
+        admit_native_feedback_profile=_admit_native_feedback_profile,
         validate_external_solution=_validate_external_solution,
         control_request_required=True,
         external_solution_actions=True,
@@ -592,4 +603,4 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     def for_native_feedback_profile(cls, *, backend, gripper_control_hz=500, horizon=6000):
         """Create the explicit normal R05b GeoPhys native-feedback route."""
         return cls(provider='geophys', backend=backend, horizon=horizon,
-                   _native_feedback_gripper_control_hz=gripper_control_hz)
+                   _native_feedback_request=gripper_control_hz)

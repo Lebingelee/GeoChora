@@ -1084,7 +1084,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
-                 _native_feedback_gripper_control_hz=None,
+                 _native_feedback_request=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
                  _execution_spec_v1=None, _mixed_control_candidate=False,
@@ -1142,15 +1142,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):
             raise ValueError('selected diagnostic profile requires GeoPhys CPU/CUDA')
         if sum((bool(_mixed_control_candidate), diagnostic_profile is not None,
-                _native_feedback_gripper_control_hz is not None)) > 1:
+                _native_feedback_request is not None)) > 1:
             raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
         self._diagnostic_profile = diagnostic_profile
         self._native_feedback_profile = None
-        self._native_feedback_gripper_control_hz = None
+        self._native_feedback_request = None
         self._mixed_control_candidate = bool(_mixed_control_candidate)
         if _mixed_control_candidate:
             build_value = lambda: self.binding.build_mixed_control_profile(provider, backend)
-        elif _native_feedback_gripper_control_hz is None:
+        elif _native_feedback_request is None:
             if (diagnostic_profile is None and _execution_spec_v1 is None
                     and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
@@ -1159,18 +1159,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             else:
                 build_value = lambda: self.binding.build(provider)
         else:
-            if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
-                    or type(_native_feedback_gripper_control_hz) is not int
-                    or _native_feedback_gripper_control_hz not in {100, 500}
-                    or self.binding.build_native_feedback_profile is None):
+            if self.binding.admit_native_feedback_profile is None:
                 raise ValueError(
-                    'normal native-feedback profile requires the opted-in GeoPhys NutAssembly binding, '
-                    'CPU/CUDA, and 100/500 Hz'
+                    'normal native-feedback profile requires an opted-in task binding'
                 )
-            self._native_feedback_profile = 'nutassembly-native-feedback-v1'
-            self._native_feedback_gripper_control_hz = _native_feedback_gripper_control_hz
+            self._native_feedback_profile = self.binding.admit_native_feedback_profile(
+                provider, backend, _native_feedback_request,
+            )
+            if type(self._native_feedback_profile) is not str or not self._native_feedback_profile:
+                raise ValueError('native-feedback admission must return a nonempty profile identifier')
+            self._native_feedback_request = _native_feedback_request
             build_value = lambda: self.binding.build_native_feedback_profile(
-                provider, backend, _native_feedback_gripper_control_hz, True,
+                provider, backend, _native_feedback_request, True,
             )
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
@@ -1528,7 +1528,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
             elif self._native_feedback_profile is not None:
                 self.value = self.binding.build_native_feedback_profile(
-                    self.provider, self.backend, self._native_feedback_gripper_control_hz,
+                    self.provider, self.backend, self._native_feedback_request,
                     external_solution is None,
                 )
             else:

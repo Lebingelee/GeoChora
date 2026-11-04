@@ -37,6 +37,25 @@ def _execution(backend='cpu'):
     return ExecutionSpec('geophys', 'p1_2_scalar_cpu_v0', 'none', backend, 0, 'strict')
 
 
+@pytest.mark.parametrize('provider,backend,rate', [
+    ('mujoco', 'cpu', 500), ('geophys', 'other', 500),
+    ('geophys', 'cpu', True), ('geophys', 'cpu', 100.0),
+    ('geophys', 'cpu', 200),
+])
+def test_native_feedback_binding_rejects_unsupported_request_before_source_build(
+        monkeypatch, provider, backend, rate):
+    from task_env.tasks.nut_assembly import specialization
+
+    def unexpected_build(**_kwargs):
+        raise AssertionError('invalid native feedback request built a source')
+
+    monkeypatch.setattr(specialization, 'build_native_feedback_reference', unexpected_build)
+    with pytest.raises(ValueError, match='100/500 Hz'):
+        NutAssemblyReferenceEnv(
+            provider=provider, backend=backend, _native_feedback_request=rate,
+        )
+
+
 @pytest.mark.parametrize('backend', ['cpu', 'cuda'])
 def test_public_r05b_profile_builds_and_passes_real_source_admission(backend):
     env = NutAssemblyReferenceEnv.for_native_feedback_profile(
