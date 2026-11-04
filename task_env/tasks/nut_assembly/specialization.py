@@ -72,8 +72,78 @@ R05B_CANONICAL_MENAGERIE_ASSET_ROOT = Path(
 R05B_CANONICAL_XML_SHA256 = '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
 
 
-from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sample_reset, _reset_seed,
-                   _native_feedback_sample, _native_interval_receipt, _observe_kwargs)
+from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sample_reset, _reset_seed)
+
+def _native_feedback_sample(env, stage, index, state, feedback, target, applied, diagnostics,
+                            provider_feedback_sample, request_boundary):
+    metrics = None
+    if stage == "close_gripper":
+        _, observation_info, _ = env.observation(state)
+        metrics = observation_info["task_metrics"]
+    ee = state.pose_world["panda-v1/ee"]
+    sample = NutAssemblyNativeFeedbackSampleV1(
+        "nutassembly-native-feedback-sample-v1",
+        env.provider,
+        provider_feedback_sample.provider_materialization_id,
+        env.artifact.identity_hash,
+        env.value["source"].scene_source.source_id,
+        env._source_xml_sha256(),
+        request_boundary["controller_identity"],
+        request_boundary["solution_identity"],
+        request_boundary["episode_id"],
+        request_boundary["reset_sample_id"],
+        request_boundary["identity_hash"],
+        float(state.simulation_time),
+        int(state.control_step),
+        int(index),
+        int(provider_feedback_sample.actuator_force_measurement.sample_sequence),
+        float(provider_feedback_sample.actuator_force_measurement.native_sample_time_s),
+        float(env.artifact.timebase.physics_dt),
+        str(provider_feedback_sample.actuator_force_measurement.phase),
+        "valid" if provider_feedback_sample.actuator_force_measurement.valid else "invalid",
+        tuple((*ee.position, *ee.quaternion_wxyz)),
+        feedback,
+        dict(diagnostics),
+        provider_feedback_sample,
+        target.identity_hash,
+        applied.to_mapping(),
+        None if metrics is None else bool(metrics.get("grasped_nut", False)),
+    )
+    return sample
+
+
+def _native_interval_receipt(env, request_boundary, evaluation_boundary, native_samples, substeps):
+    expected = env.artifact.timebase.control_substeps
+    if expected != 5 or len(native_samples) != expected or len(substeps) != expected:
+        raise ValueError("NutAssembly native interval requires five completed 2 ms applications")
+    if tuple(index for index, _, _ in substeps) != tuple(range(expected)):
+        raise ValueError("NutAssembly native interval substeps are missing or out of order")
+    return NutAssemblyNativeIntervalReceiptV1(
+        "nutassembly-native-interval-receipt-v1",
+        env.provider,
+        request_boundary["provider_materialization_id"],
+        env.artifact.identity_hash,
+        env.value["source"].scene_source.source_id,
+        env._source_xml_sha256(),
+        request_boundary["controller_identity"],
+        request_boundary["solution_identity"],
+        request_boundary["episode_id"],
+        request_boundary["reset_sample_id"],
+        request_boundary,
+        evaluation_boundary,
+        float(env.artifact.timebase.physics_dt),
+        expected,
+        len(native_samples),
+        tuple(native_samples),
+    )
+
+
+def _observe_kwargs(env, native_samples, receipt):
+    if not isinstance(receipt, NutAssemblyNativeIntervalReceiptV1):
+        raise ValueError("NutAssembly Solution observation requires a completed native interval receipt")
+    return {"readiness": env.controller.readiness(env.state, env.feedback),
+        "native_samples": tuple(native_samples),
+        "native_interval_receipt": receipt}
 
 def _configuration():
     value = load_yaml_mapping(CONFIG_PATH)

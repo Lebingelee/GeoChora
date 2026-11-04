@@ -15,7 +15,7 @@
 | 控制反馈／记录／重执行 | `controllers/canonical/feedback.py` 校验并投影selected applied ack；`recorders/reference_provenance.py` 处理selected来源与transition；`recorders/position_metadata.py` 投影Position记录 | PickCube／Nut示例及selected重执行使用调用方 `act → env.step(action) → observe`；正式native反馈与故障数据由任务／runtime契约提供，展示与对照在diagnostics | `step_expert()`仍为受限兼容。旧Nut专家录制与新调用方记录契约不同，当前重执行明确拒绝；Position v3重执行不支持。合成H5读回不是物理成功证明 |
 | 历史replay构造 | `environment/_historical.py::make_replay_env` 提供受限历史入口；`trajectory/replay.py` 使用它 | `diagnostics/historical_tasks.py` 是兼容调用者；`diagnostics/tasks/test_pre_stage3_boundaries.py` 检查历史拒绝 | 不恢复已退役任务，也不把旧H5或冻结源码结果重标为当前实现 |
 
-PickCube和Nut任务目录当前各保留四个业务文件 `task.py`、`specialization.py`、`solution.py`、`config.yaml` 及必要 `__init__.py`。`task.py` 承担任务评价、reset及必要反馈投影；`specialization.py` 连接声明、source、Controller和执行配置；`solution.py` 负责各自规划、阶段和完成策略；`config.yaml` 保存配置。实际职责还须结合源码逐项复审，不能以数量代替检查。
+PickCube和Nut任务目录当前各保留四个业务文件 `task.py`、`specialization.py`、`solution.py`、`config.yaml` 及必要 `__init__.py`。`task.py` 承担任务评价和reset；`specialization.py` 连接声明、source、Controller、执行配置及Nut原生反馈接线；`solution.py` 负责各自规划、阶段和完成策略；`config.yaml` 保存配置。实际职责还须结合源码逐项复审，不能以数量代替检查。
 
 静态扫描中活跃非测试Python未调用 `step_expert()`，只保留方法定义；兼容／故障测试仍有调用。旧三个模块、旧Marker包装／模板及 `tasks.pick_cube.isaac` 没有活跃源码导入；扫描中旧 `declarative_reference.py` 名称只用于测试断言其不在新来源清单。该扫描不等同真实provider验证。
 

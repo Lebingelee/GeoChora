@@ -450,6 +450,47 @@ def test_nutassembly_external_solution_publishes_five_bound_native_samples(fake)
     env.close()
 
 
+def test_nutassembly_feedback_xml_cache_tracks_source_changes(fake, monkeypatch):
+    import hashlib
+    from types import SimpleNamespace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    try:
+        solution = build_outcome_solution(provider='geophys')
+        obs, info = env.reset(seed=19)
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        source = env.value['source']
+        xml = source.scene_source.xml
+        real_sha256 = hashlib.sha256
+        xml_hashes = []
+
+        def counted_sha256(data=b'', *args, **kwargs):
+            if data == xml.encode():
+                xml_hashes.append(data)
+            return real_sha256(data, *args, **kwargs)
+
+        monkeypatch.setattr(hashlib, 'sha256', counted_sha256)
+        env._boundary_xml_snapshot = None
+        obs, reward, terminated, truncated, info = env.step(action)
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(info['native_interval_receipt_v1'])
+        expected = real_sha256(xml.encode()).hexdigest()
+        assert receipt.source_xml_sha256 == expected
+        assert all(sample.source_xml_sha256 == expected for sample in receipt.samples)
+        assert len(xml_hashes) == 1
+        changed_xml = xml + '\n<!-- source changed -->'
+        env.value['source'] = SimpleNamespace(scene_source=SimpleNamespace(xml=changed_xml))
+        assert env._source_xml_sha256() == real_sha256(changed_xml.encode()).hexdigest()
+        env.value['source'] = source
+        assert env._source_xml_sha256() == expected
+        assert len(xml_hashes) == 2
+        solution.observe(obs, reward, terminated, truncated, info)
+    finally:
+        env.close()
+
+
 def test_nutassembly_caller_drives_solution_without_env_ownership(fake):
     from dataclasses import replace
     from task_env.tasks.nut_assembly.task import build_outcome_solution

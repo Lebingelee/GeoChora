@@ -275,3 +275,12 @@ worker核验实际导入的Core和GeoPhys路径，并检查未导入 `isaacsim`�
 对 tracked clean `e8ad4484`，按 `task_env/doc/自定义任务构建指南.md` 的嵌套配置，通过示例注册和公共 `make_env` 在已有 MuJoCo 3.8.1 CPU上执行 `reset(seed=31) → action_space.sample() → step → close`，额外设置 action-space seed为31。reset／step观测及采样动作通过space检查，动作shape为8、dtype为float64，单transition后control step为1、simulation time为0.01 s、reward为0、未终止或截断，close返回。该检查证明此源码和本机已有依赖上的一次单步入口，不证明任务成功、全新安装、其他provider、训练或渲染。
 
 worker在独立ignored cwd中核验Core与MuJoCo模块来源，按序非阻塞持有并释放两把共享锁；耗时0.832秒、最大进程树RSS 167399424 bytes，进程组退出。完整脚本、源提交、预算、argv、结果、资源采样及锁收据在ignored `marker-guide-e8ad4484/`。按声明horizon 10及5个substeps保守预留50步，累计保守预留 **115757／120000**；实际只执行一个control interval。未运行Isaac、GPU或物理reader，后续源码变化不重标本证据。
+
+
+## Nut正式反馈接线归位与XML摘要复用（续作，待复审）
+
+Nut的原生反馈样本、interval receipt和Solution观察参数接线从任务评价／reset文件迁至任务 `specialization.py`；五样本、target／applied及边界检查保持为正式执行契约。Env将既有XML快照摘要提取为可复用方法，边界和每次反馈采样均比较当前XML，内容不变时复用摘要，变化时重新计算。新增合成检查覆盖一次interval的五样本与receipt一致、同一XML只计算一次摘要，以及内容变化后重新计算；这不证明源文件或闭包依赖在运行中未变化。
+
+按实际新源码重新构造，R05b的100／500 Hz Controller身份分别为 `43c75b446d10e41dbbb55cacd0cdd397ab7345b09bce1da5a9d25d1350f5001e`／`c35796e4068ffb4f3fd95245f5173eb07a6a471a05fca2330ae24c953275400f`；Solution身份不变。严格身份值随源码更新，其他来源、参数、provider和反馈准入未放宽。当前Nut specialization SHA为 `1b82836f0d5aad2ab2d0053309e7c46e31b5c03fdc06c4eb045fa5d00052773b`。
+
+受监督、禁止引擎导入的selected／配置／R05b／F06投影／录制组合 **182 passed、2 deselected**，最大进程树RSS 164868096 bytes；完整argv、退出码、资源采样见ignored `nut-feedback-owner-regression/`。没有运行真实引擎、Isaac、GPU或物理reader；先前物理证据不重标。
