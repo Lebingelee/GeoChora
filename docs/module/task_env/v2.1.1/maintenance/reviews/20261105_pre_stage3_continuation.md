@@ -13,3 +13,9 @@ Marker仍须在示例中配置并创建 `ReferenceTaskBinding` 和resolved配置
 F06的固定body/frame/joint映射、controller profile与horizon范围由PickCube specialization给出；通用USD RuntimeInput携带该声明，runtime以固定的 canonical JSON SHA-256 `153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb` 准入声明，再逐项核对RuntimeSource映射及输入限值。固定delivery manifest、representation、provider、seed、renderer和Task/Scene/Execution身份仍由runtime独立检查；未经允许的USD schema不再因仅属于同一类型就被归为F06。改变任务声明时不能只更新输入，须独立审阅受信摘要及其delivery对应关系。
 
 无引擎guard下F06、配置、消费者及维护边界组合 **130 passed、1 deselected**；包括任务生成映射的固定摘要、篡改实际映射、同时篡改映射及policy、改horizon上限和错误schema的拒绝。此前尝试完整投影时 `scene` 导入被guard拒绝（11通过、1失败），保留为未覆盖项；组合命令显式排除该项。该测试不能证明真实USD解析、Isaac运行或物理能力；本轮未启动Isaac或GPU。须经Sol独立复审，不能仅凭移动位置认定R3已接受。
+
+## Marker与Nut的规范组装入口（续作，待复审）
+
+规范 `SelectedReferenceEnv.from_resolved_config` 负责共同的配置类型／UID、state-only检查及Env组装，Marker和Nut分别通过 `selected_binding(config)` 提供自己的任务接线；PickCube特殊Isaac构造保留其既有实现。示例不再重复 resolved-config 创建Env；task-specific binding仍在示例，尚需复核是否达到本维护所要求的新手最短组合。未增加Panda专用Env模板或任务factory。
+
+无引擎guard下配置、消费者、边界测试 **118 passed**；新增的Marker入口与非法UID／render／额外参数检查 **2 passed**。仍为synthetic，待独立复审；未运行真实引擎。

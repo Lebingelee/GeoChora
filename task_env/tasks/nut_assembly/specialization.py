@@ -589,18 +589,9 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
                                         render_mode=render_mode, **kwargs)
 
     @classmethod
-    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
-        from ...environment.config import ResolvedSelectedConfig
-        if type(config) is not ResolvedSelectedConfig:
-            raise TypeError("selected construction requires resolved configuration")
-        if kwargs or render_mode is not None:
-            raise ValueError('selected reference admits state-only execution without extra kwargs')
-        env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
-                  horizon=config.environment.episode.horizon,
-                  _binding=_binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
-                                    json.loads(config.task_configuration_json)))
-        env.resolved_public_config = config
-        return env
+    def selected_binding(cls, config):
+        return _binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
+                        json.loads(config.task_configuration_json))
 
     @classmethod
     def for_gripper_cadence_diagnostic(cls, *, backend, gripper_control_hz, horizon=6000):

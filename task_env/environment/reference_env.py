@@ -666,6 +666,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return cls(**values)
 
     @classmethod
+    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
+        """Assemble a selected task that supplies its own binding for a config."""
+        from .config import ResolvedSelectedConfig
+
+        if type(config) is not ResolvedSelectedConfig or config.task_uid != cls.uid:
+            raise TypeError('selected construction requires its own resolved configuration')
+        if kwargs or render_mode is not None:
+            raise ValueError('selected reference admits state-only execution without extra kwargs')
+        binding = cls.selected_binding(config)
+        env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
+                  horizon=config.environment.episode.horizon, _binding=binding)
+        env.resolved_public_config = config
+        return env
+
+    @classmethod
     def from_position_candidate(
         cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
         camera_observation_config=None, execution_spec=None,

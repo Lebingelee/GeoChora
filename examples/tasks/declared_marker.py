@@ -12,7 +12,6 @@ from task_env.assembly.panda_box import (
 from task_env.controllers.canonical import ProductionCanonicalPandaController
 from task_env.environment import TaskEvaluation
 from task_env.environment.configuration import resolve_env_config
-from task_env.environment.config import ResolvedSelectedConfig
 from task_env.environment.reference_binding import ReferenceTaskBinding
 from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.registry import register_env
@@ -67,11 +66,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         return None
 
     @classmethod
-    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
-        if type(config) is not ResolvedSelectedConfig or config.task_uid != cls.uid:
-            raise TypeError('declared task requires its resolved selected configuration')
-        if render_mode is not None or kwargs:
-            raise ValueError('declared Panda box route is state-only')
+    def selected_binding(cls, config):
         declaration = cls.declaration()
         if declaration.task_id != cls.uid:
             raise ValueError('registered UID and declared task identity differ')
@@ -87,15 +82,11 @@ class MarkerHeightEnv(SelectedReferenceEnv):
                 owners=(type(declaration), cls.evaluate_task, _sample_box_reset,
                         compile_panda_box_task, compile_panda_box_artifact),
             )
-        binding = ReferenceTaskBinding(
+        return ReferenceTaskBinding(
             build=build, reset_sample=lambda artifact, seed: _sample_box_reset(declaration, artifact, seed),
             evaluate=cls.evaluate_task, object_poses=((declaration.object_id, declaration.object_id.replace('-', '_')),),
             external_actions=True, interval_mode='grouped', recorder_mode='canonical',
         )
-        env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
-                  horizon=config.environment.episode.horizon, _binding=binding)
-        env.resolved_public_config = config
-        return env
 
     uid = 'marker-height-example-v1'
 

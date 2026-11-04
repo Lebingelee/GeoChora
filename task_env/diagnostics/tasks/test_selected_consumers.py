@@ -1569,6 +1569,23 @@ def test_marker_public_factory_reset_step_and_source_provenance(fake):
         env.close()
 
 
+def test_common_selected_construction_rejects_wrong_uid_and_render_before_binding(monkeypatch):
+    from dataclasses import replace
+    from examples.tasks.declared_marker import MarkerHeightEnv
+    from task_env.environment.configuration import resolve_task_env_config
+
+    config = resolve_task_env_config(MarkerHeightEnv, {'provider': 'mujoco'})
+    def unexpected_binding(*_args):
+        raise AssertionError('binding must not be built for invalid construction input')
+    monkeypatch.setattr(MarkerHeightEnv, 'selected_binding', unexpected_binding)
+    with pytest.raises(TypeError, match='own resolved configuration'):
+        MarkerHeightEnv.from_resolved_config(replace(config, task_uid='unrelated'))
+    with pytest.raises(ValueError, match='state-only'):
+        MarkerHeightEnv.from_resolved_config(config, render_mode='rgb_array')
+    with pytest.raises(ValueError, match='state-only'):
+        MarkerHeightEnv.from_resolved_config(config, extra=True)
+
+
 def test_nut_solution_lifecycle_restores_then_requires_final_task_success():
     from task_env.tasks.nut_assembly.solution import (
         NutAssemblySolutionLifecycle, SolutionCompletionPolicy,
