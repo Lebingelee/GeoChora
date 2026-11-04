@@ -3,7 +3,11 @@
 import hashlib
 
 
-from ..environment.reference_binding import versioned_position_input_kind
+def _versioned_position_input_kind(input_v1):
+    if input_v1 is None:
+        return None
+    from ..tasks.position_candidate.builder import _versioned_position_candidate_kind
+    return _versioned_position_candidate_kind(input_v1)
 
 
 def _attached_leaf_record_metadata(self, asdict):
@@ -111,7 +115,7 @@ def position_record_metadata(self):
 
 
     versioned_position_input = self.value.get('versioned_position_input')
-    versioned_input_kind = versioned_position_input_kind(self.binding, versioned_position_input)
+    versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
     f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
     f05_native_input = versioned_position_input if versioned_input_kind == 'f05_native' else None
     f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None

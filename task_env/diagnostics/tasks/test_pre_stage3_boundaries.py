@@ -368,17 +368,3 @@ def test_artifact_digest_distinguishes_signed_zero_after_frozen_field_tampering(
     values[key] = 0.0
     object.__setattr__(artifact.semantics, 'parameters_si', MappingProxyType(dict(values)))
     assert artifact.identity_hash != negative
-
-
-def test_position_input_classification_requires_task_owner_and_exact_contract():
-    from task_env.environment.reference_binding import versioned_position_input_kind
-    from task_env.tasks.position_candidate.builder import _versioned_position_candidate_kind
-
-    assert versioned_position_input_kind(None, None) is None
-    with pytest.raises(TypeError, match='task input classifier'):
-        versioned_position_input_kind(None, object())
-    binding = SimpleNamespace(position_input_kind=_versioned_position_candidate_kind)
-    with pytest.raises(TypeError, match='exact supported candidate input'):
-        versioned_position_input_kind(binding, SimpleNamespace(schema_version='f04-position-candidate-input-v1'))
-    with pytest.raises(ValueError, match='unsupported kind'):
-        versioned_position_input_kind(SimpleNamespace(position_input_kind=lambda _input: 'unknown'), object())

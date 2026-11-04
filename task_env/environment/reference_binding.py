@@ -16,19 +16,6 @@ def _no_observe_kwargs(env, guard_samples):
     return {}
 
 
-def versioned_position_input_kind(binding, input_v1):
-    """Classify a task-owned Position input through its exact-type validator."""
-    if input_v1 is None:
-        return None
-    resolver = getattr(binding, 'position_input_kind', None)
-    if not callable(resolver):
-        raise TypeError('versioned Position value requires its task input classifier')
-    kind = resolver(input_v1)
-    if kind not in {'f04', 'f05_native', 'dg02_geophys', 'dg04_isaac_native'}:
-        raise ValueError('task Position input classifier returned an unsupported kind')
-    return kind
-
-
 @dataclass(frozen=True)
 class ReferenceTaskBinding:
     """Internal task-to-reference adapter; not a new public task protocol."""
@@ -71,7 +58,6 @@ class ReferenceTaskBinding:
     position_execution_info_key: str | None = None
     reconcile_reset_artifact: Callable | None = None
     validate_seeded_execution: Callable | None = None
-    position_input_kind: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -92,7 +78,7 @@ class ReferenceTaskBinding:
                          or not isinstance(self.position_execution_info_key, str)
                          or not self.position_execution_info_key))):
             raise ValueError('position execution info requires a callable and a non-empty key')
-        for name in ('reconcile_reset_artifact', 'validate_seeded_execution', 'position_input_kind'):
+        for name in ('reconcile_reset_artifact', 'validate_seeded_execution'):
             value = getattr(self, name)
             if value is not None and not callable(value):
                 raise ValueError(f'{name} must be callable when supplied')
