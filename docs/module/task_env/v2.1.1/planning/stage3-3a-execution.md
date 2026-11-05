@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前 attempt001 已执行并待 Sol 独立复审，见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。没有实施开始或接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前 attempt001 已执行并待 Sol 独立复审，见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -51,3 +51,11 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 遵循[诊断规范](../../../../global/diagnostics-and-code-boundaries.md)：诊断从外部消费核心，核心不感知实验／测试case；正式feedback、source、fault、stale/tamper、target/applied与close继续保留。既存耦合按[维护规划2.6](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记，7a开始时集中合理解耦，随后稳定源码验证，不现在重开全面整理。
 
 本次Sol接手仅做文档和包一致性检查：未运行implementation tests、provider import、native、reader、GPU/resource probe。3a未派发，3b/3c未准备；完整报告与writer释放后Sol独立核对diff和证据，接收后才准备下一包。阶段3最终汇总三项独立接收与真实覆盖，等待维护者安排，不自动进入阶段4。
+
+## attempt001独立复审与attempt002安排
+
+当前以[Sol复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)及[编排索引](../maintenance/orchestration.json)为准：3a为REWORK_REQUIRED_3A／attempt1；上文未派发／attempt0文字保留为首包准备历史。输出32397283继续作为实现基线，先提交此次复审／规划文档，再冻结attempt002准确输入HEAD。
+
+attempt002只修R1普通source闭包／reset回归、R2逐能力准确build oracle、R3嵌套具名／typed评估、R4worker错误回复清理，并补齐原20项门。定向枚举真实source引用、读取摘要及必要的小型快照属于闭包实施，不属于禁止的全库扫描；沿现有source receipt和importer消费者接线，不移植另一个资产平台。保留严格拒绝且恢复合法ordinary caller；成功路径不得绕过闭包。metadata unavailable必须如实报告，缺GeoPhys环境或Isaac SDK不要求本包安装或运行native。
+
+同一分支，预计主动120–150分钟／墙时180分钟，其他资源限额同首包；一个writer、一个测试组，原始失败不可覆盖。新包含全部输入、方法、正负例、预算、报告和释放要求，由维护者指定后人工转发；准备不增加attempt计数。3a接收后才准备3b；新增Isaac兼容范围按[独立规划](isaac-deployment-compatibility.md)接入3b完整包，不倒加本次原门，不在返工窗口提前实施。

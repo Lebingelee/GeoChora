@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；阶段3未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
+状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a attempt001已复审需返工，3b及后续未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 
 ### 2026-11-04 G02/2b 中止与 2c 文档封存
 
@@ -45,7 +45,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 7b | 7a | 冻结输入下 PickCube 三后端×三 seed 任务成功与独立记录检查；切换／render／batch 组合分别收口 |
 | 7c | 7b | API／指南／矩阵／Skills／恢复页与实际证据一致；版本未决项明确 |
 
-初建时全部22项为 `PLANNED`、attempt为0；现1a–1d及2a–2c均有相应有界接收，维护者已确认五协议实施基线，阶段3–7的15项仍未执行；原2b扩展包失败及中止记录保留。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
+初建时全部22项为 `PLANNED`、attempt为0；现1a–1d及2a–2c均有相应有界接收，维护者已确认五协议实施基线，3a attempt001已实施但未接收，其余阶段3–7子项未执行；原2b扩展包失败及中止记录保留。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
 
 阶段 2 若证明必需修复属于后续公共协议 owner，先记录根因、最小提前实施范围和依赖影响，经维护者确认后更新执行表；可复用修复不重复实施。不得以无变化重试、私有状态或更改任务判定跨过阻塞。
 
@@ -88,3 +88,5 @@ Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一
 按[Goal 编排流程](../../../../../.agents/skills/geochora/references/goal-orchestration.md)，一次 attempt 可包含多次修复与运行；普通子阶段至多三次窗口，第三次前重审根因与官方项目实现。常规修复不因单次测试失败而结束 attempt。执行包有完整预算，不能把“一次启动、失败即停”设成默认。反复同根因且无新假设时归因并向维护者报告。
 
 原始日志、失败、图像和 H5 保持 ignored；跟踪文档仅保存摘要和证据引用。每个有界输出配本地提交，只暂存本包路径。推送、合并、tag、Release、正式 Qualification 不在当前文档授权中。
+
+2026-11-05当前推进：3a attempt001经[独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；attempt002准备不消耗新attempt。Isaac6.1／6.2兼容实现和5.1延期按[兼容规划](isaac-deployment-compatibility.md)在3a接收后的3b完整包安排，七阶段依赖不变。

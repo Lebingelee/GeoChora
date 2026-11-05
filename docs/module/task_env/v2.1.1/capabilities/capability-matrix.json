@@ -53,7 +53,24 @@
       "isaacsim_physx_cuda": {
         "candidate": "Isaac Sim 6.2.0.0 / PhysX / CUDA",
         "cuda_device": "cuda:0",
-        "source_requirement": "F06 admission requires explicit source delivery manifest"
+        "source_requirement": "F06 admission requires explicit source delivery manifest",
+        "maintainer_compatibility_scope": {
+          "decision_date": "2026-11-05",
+          "planning_ref": "../planning/isaac-deployment-compatibility.md",
+          "v211_versions": [
+            "6.1.0",
+            "6.2.0"
+          ],
+          "common_adapter_implementation_status": "NOT_STARTED",
+          "native_validation_by_version": {
+            "6.1.0": "NOT_RUN",
+            "6.2.0": "NOT_RUN"
+          },
+          "future_versions": {
+            "5.1.0": "DEFERRED"
+          },
+          "scope": "Planned shared state-only PhysX adapter and portable deployment; does not promote existing targets, historical evidence or all legacy candidates."
+        }
       }
     },
     "renderer_names": {
@@ -233,7 +250,8 @@
       "evidence_refs": [],
       "result": null,
       "limitations": [
-        "Isaac Sim 6.2.0.0, PhysX, CUDA cuda:0 and explicit source delivery remain the bounded source candidate; no native run was performed in 1a."
+        "Isaac Sim 6.2.0.0, PhysX, CUDA cuda:0 and explicit source delivery remain the bounded source candidate; no native run was performed in 1a.",
+        "Maintainer requires v2.1.1 shared 6.1/6.2 implementation; 6.1 SDK absent and native NOT_RUN. See planning/isaac-deployment-compatibility.md; no full version-by-task matrix is added."
       ]
     },
     {

@@ -9,7 +9,7 @@
 <a id="3a"></a>
 ## 3a：执行路由、配置与能力交集
 
-2026-11-05 attempt001 已返包待 Sol 独立复审，尚未通过：普通 MJCF 资产闭包缺证导致 reset 兼容性受阻，能力交集与真实后端证据仍有缺口。见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。
+2026-11-05 attempt001 已经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)，决定 `REWORK_REQUIRED_3A`。普通reset闭包、逐能力build oracle、嵌套／typed及worker错误清理待attempt002修复，未接收、不可部署；3b未开始。
 
 - **输入／依赖：**1c、1d、2c。首批 route 和协议已冻结。
 - **工作：**将宿主、引擎、solver／coupler、设备、renderer 和 batch 选择接入单一配置解析；能力求交任务／资产／嵌套Robot通道／Controller／typed物理命令／render 要求，替换必要的阶段特判但保留真实限制。
@@ -19,7 +19,7 @@
 <a id="3b"></a>
 ## 3b：首批三后端的场景翻译和公开反馈
 
-- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。
+- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1未安装时运行层保留NOT_RUN，不追溯改动3a attempt001门。
 - **工作：**在各 adapter 内消费统一模型，公开 native mapping、realized reset、单位／坐标转换、状态和时间；使用各自公开 API，报告无法表达或未测量项。按源约束编译具名通道和嵌套语义映射，不提前宣称阶段4命令已实现。
 - **检查：**三路线从 make_env 真实构建→reset→施控／step→state→记录／读回→close；检查实体／关节、质量／惯性及声明的约束／传动与初始化。源码／设备身份和错误关闭可核实。资产检查分别覆盖输入物理合法性、native映射/readback、reset/短程数值行为；每项有quantity-specific oracle/容差，required未测量不能通过，optional保留原因；cube约5%惯量差不自动修正。
 - **交付／出口：**三后端协议的真实最小连续执行；不声称同源模型严格等价、全任务支持或 task-success 已完成。

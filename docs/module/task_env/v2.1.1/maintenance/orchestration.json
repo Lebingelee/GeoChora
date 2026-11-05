@@ -31,16 +31,14 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3a",
-    "package_id": "V211_G03_3a_attempt001",
-    "status": "REPORTED_PENDING_SOL_REVIEW",
-    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+    "package_id": "V211_G03_3a_attempt002",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "assigned_agent": null,
     "target_thread": null,
-    "assignment": "Maintainer designated and forwarded to Terra; independent Sol review is pending.",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
-    "prompt_sha256": "3ed706e1842b2f243a7f68e143e8541b741f17608f23471248ab9247f15da00b",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001/manifest.json",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001/input-snapshot.json#/input_head",
-    "source_preparation_parent": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+    "assignment": "Maintainer designates one Terra/Luna and forwards manually; preparation does not consume attempt2.",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
     "planning_ref": "../planning/stage3-3a-execution.md",
     "expected_active_minutes": "120-150",
     "execution_budget": {
@@ -57,9 +55,10 @@
       "engine_imports": 0,
       "additional_worktrees": 0
     },
-    "preparation_consumes_attempt": false
+    "preparation_consumes_attempt": false,
+    "prompt_sha256": "11c5e407eb4b1490fc2470358e5dbc8203a47e926f65ce0cd3b75bfd5b934e71"
   },
-  "next_action": "维护者手动转交 attempt001 完整报告，Sol 独立审阅；普通 MJCF 资产闭包和 selected reset 兼容性未过门，不自动进入 3b。",
+  "next_action": "维护者手动指定并转发3a attempt002，修复R1–R4并按原门返包。3a接收后才准备含Isaac6.1/6.2兼容实现的3b包；5.1延期。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -725,38 +724,53 @@
             "1d",
             "2c"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "REWORK_REQUIRED_3A",
           "attempt_count": 1,
           "attempts": [
             {
               "attempt": 1,
               "package_id": "V211_G03_3a_attempt001",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_REWORK_REQUIRED",
               "started_at": "2026-11-05T14:36:23+08:00",
               "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98",
               "prompt_sha256": "3ed706e1842b2f243a7f68e143e8541b741f17608f23471248ab9247f15da00b",
               "writer_ownership": "released upon report and commit",
               "result": "PARTIAL_NOT_ACCEPTED",
-              "summary_ref": "reviews/20261105_3a_attempt001_execution.md"
+              "summary_ref": "reviews/20261105_3a_attempt001_execution.md",
+              "output_head": "32397283e635148788848c0c009e5223d40333df",
+              "finished_at": "2026-11-05T15:57:19+08:00",
+              "sol_review_ref": "reviews/20261105_3a_attempt001_sol_review.md",
+              "review_decision": "REWORK_REQUIRED_3A"
             }
           ],
           "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
           "package_sha256": "fcb88f6ff05201b602b7da15f436b030df3560cd9ad6b78b75d89032eaeb4550",
           "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98",
-          "output_head": null,
+          "output_head": "32397283e635148788848c0c009e5223d40333df",
           "expected_duration_minutes": "120–150; hard 180",
           "execution_budget": null,
-          "last_observation": "Offline implementation reported; missing ordinary MJCF source closure blocks selected reset compatibility; no native evidence.",
+          "last_observation": "Sol independently verified hashes, reproduced both ordinary reset regressions, named-mapping assessment omission and malformed worker response cleanup defect; 3a not accepted.",
           "evidence_refs": [
-            "reviews/20261105_3a_attempt001_execution.md"
+            "reviews/20261105_3a_attempt001_execution.md",
+            "reviews/20261105_3a_attempt001_sol_review.md"
           ],
-          "commits": [],
-          "review_decision": null,
+          "commits": [
+            "32397283e635148788848c0c009e5223d40333df"
+          ],
+          "review_decision": {
+            "status": "REWORK_REQUIRED_3A",
+            "reviewer": "Sol",
+            "date": "2026-11-05",
+            "review_ref": "reviews/20261105_3a_attempt001_sol_review.md",
+            "deployment_or_native_approval": false
+          },
           "blockers": [
-            "Ordinary selected MJCF sources lack a verified asset closure; reset compatibility is not preserved.",
-            "Request-specific nested/typed capability coverage and real backend execution remain unverified."
+            "R1 ordinary MJCF closure / public reset regression",
+            "R2 exact per-capability build oracles",
+            "R3 nested named channels / typed requirements",
+            "R4 malformed worker replies escape cleanup"
           ]
         },
         {
@@ -779,7 +793,9 @@
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [
+            "3a is not independently accepted"
+          ]
         },
         {
           "id": "3c",
@@ -801,7 +817,9 @@
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [
+            "3b is not started or accepted"
+          ]
         }
       ]
     },
@@ -1119,20 +1137,20 @@
     }
   ],
   "stage3_handoff": {
-    "status": "SOL_TAKEOVER_CONFIRMED_3A_PREPARED_NOT_DISPATCHED",
+    "status": "SOL_REVIEWED_3A_REWORK_REQUIRED",
     "reviewed_input_head": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
     "handoff_ref": "20261105_stage3_sol_handoff.md",
     "external_package": "V211_G03_sol_handoff",
     "pre_stage3_core_closeout": "ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT",
     "core_review_ref": "reviews/20261105_pre_stage3_closeout_120min_sol_review.md",
     "diagnostic_policy_commit": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
-    "execution_started": false,
+    "execution_started": true,
     "next_substage": "3a",
     "implementation_package_prepared": true,
     "takeover_input_head": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
     "takeover_planning_ref": "../planning/stage3-3a-execution.md",
-    "prepared_package_id": "V211_G03_3a_attempt001",
-    "writer_check": "Original closeout Terra final report released writer/native; G03 Terra conversation contains only waiting instruction. Recheck before execution.",
+    "prepared_package_id": "V211_G03_3a_attempt002",
+    "writer_check": "Terra reported writer/processes released; Sol reviewed exact output HEAD; no automatic assignment or messaging.",
     "native_checks_performed": false
   }
 }
