@@ -354,6 +354,47 @@ def test_missing_scalar_binding_closes_constructed_source_without_materializatio
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
+@pytest.mark.parametrize('failure_stage', ['controller', 'action_space'])
+@pytest.mark.parametrize('source_fails', [False, True])
+def test_selected_construction_failure_cleans_source_and_task_resources(fake, monkeypatch, failure_stage, source_fails):
+    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+
+    base = NutAssemblyReferenceEnv.binding
+    receipts = []
+    cleanup_calls = []
+    def build(*args):
+        value = base.build_native_feedback_profile(*args)
+        receipts.append(value['source'].execution_source_receipt)
+        return value
+    def fail(*_args):
+        raise ValueError('selected initialization failed')
+    def cleanup():
+        cleanup_calls.append('task')
+        raise RuntimeError('task cleanup failed')
+    if source_fails:
+        original_close = ExecutionSourceReceiptV1.close
+        def fail_after_source_close(receipt):
+            original_close(receipt)
+            raise RuntimeError('source cleanup failed')
+        monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_after_source_close)
+    if failure_stage == 'controller':
+        monkeypatch.setattr(NutAssemblyReferenceEnv, '_bind_selected_controller', fail)
+    binding = replace(
+        base, build_native_feedback_profile=build, close_task_resources=cleanup,
+        action_space_factory=fail if failure_stage == 'action_space' else base.action_space_factory,
+    )
+    with pytest.raises(ValueError, match='selected initialization failed') as raised:
+        NutAssemblyReferenceEnv(provider='geophys', backend='cpu', _binding=binding,
+                                _native_feedback_request=500)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+    assert cleanup_calls == ['task']
+    assert any('task cleanup failed' in note for note in raised.value.__notes__)
+    if source_fails:
+        assert any('source cleanup failed' in note for note in raised.value.__notes__)
+    assert raised.value.execution_fault.phase == 'selected_construction'
+
+
 @pytest.mark.parametrize('uid', IDS)
 @pytest.mark.parametrize('provider', ['geophys', 'mujoco'])
 def test_actual_factory_reset_expert_recording_and_teardown(uid, provider, fake, tmp_path):

@@ -1058,6 +1058,70 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._build_runtime_with_rollback()
 
 
+    def _initialize_selected_value(self, *, mixed_control_candidate, camera_observation_config):
+        """Initialize task-declared metadata before the selected Env is published."""
+        self.artifact = self.value['artifact']
+        self.solution = self.value['solution']
+        self._bind_selected_controller(self.value)
+        self._mixed_initial_value_pending = bool(mixed_control_candidate)
+        self.dual_entity_position = len(self.position_profiles) == 2
+        if not self.position_profile and not mixed_control_candidate:
+            if type(self.binding.scalar_control_binding) is not ControlBinding:
+                raise TypeError('selected scalar control requires its declared ControlBinding')
+        if camera_observation_config is not None and not self.position_profile:
+            raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
+        self.camera_observation_config = camera_observation_config
+        self._camera_consumer = None
+        self._camera_session_factory = None
+        self.metadata = {'env_id': self.uid,
+            'task_artifact_hash': self.artifact.identity_hash,
+            'construction_id': self.value['construction_id'],
+            'control_dt': self.artifact.timebase.control_dt}
+        self.supports_structured_control_recording = bool(mixed_control_candidate)
+        if mixed_control_candidate:
+            action_schema = self.value.get('action_schema')
+            if not isinstance(action_schema, Mapping):
+                raise TypeError('mixed-control task binding must supply its typed action schema')
+            self.metadata['action_schema'] = dict(action_schema)
+            self.action_space = self.value.get('action_space')
+            self.observation_space = self.value.get('observation_space')
+            if self.action_space is None or self.observation_space is None:
+                raise TypeError('mixed-control task binding must supply task-owned spaces')
+        else:
+            self.metadata['action_schema'] = dict(self.binding.action_schema)
+            self.action_space = self.binding.action_space_factory()
+        if not mixed_control_candidate:
+            observation_spaces = self.binding.observation_space_factory(self)
+        if camera_observation_config is not None:
+            from ..observations.selected_reference import position_camera_observation_declaration
+
+            camera_spaces, self.camera_observation_schema = position_camera_observation_declaration(
+                self.binding, camera_observation_config,
+            )
+            observation_spaces.update(camera_spaces)
+            self.metadata['observation_schema'] = {
+                'schema_version': 'position-camera-observation-v1',
+                'leaf_specs': tuple({
+                    'path': field.name,
+                    'shape': field.shape,
+                    'dtype': field.dtype,
+                    'semantic': field.semantic,
+                    'unit': field.unit,
+                    'frame': field.frame,
+                    'time_reference': field.time_reference,
+                } for field in self.camera_observation_schema.fields),
+            }
+            self.metadata['camera_observation_schema'] = 'camera-observation-boundary-v1'
+            self.metadata['info_schema'] = {
+                'camera_observation_v1': {
+                    'schema_version': 'camera-observation-boundary-v1',
+                    'required': True,
+                    'same_boundary_as_observation': True,
+                },
+            }
+        if not mixed_control_candidate:
+            self.observation_space = Dict(observation_spaces)
+
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
@@ -1166,78 +1230,31 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._execution_fault = fault
             attach_execution_fault(error, fault)
             raise
-        self.artifact = self.value['artifact']
-        self.solution = self.value['solution']
-        self._bind_selected_controller(self.value)
-        self._mixed_initial_value_pending = bool(_mixed_control_candidate)
-        self.dual_entity_position = len(self.position_profiles) == 2
-        if not self.position_profile and not _mixed_control_candidate:
-            if type(self.binding.scalar_control_binding) is not ControlBinding:
-                error = TypeError('selected scalar control requires its declared ControlBinding')
-                receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
-                if receipt is not None:
-                    try:
-                        receipt.close()
-                    except BaseException as cleanup_error:
-                        error.add_note(f'source cleanup after binding rejection failed: {cleanup_error!r}')
-                fault = ExecutionFaultV1.from_exception('selected_construction', error)
-                self._execution_fault = fault
-                attach_execution_fault(error, fault)
-                raise error
-        if camera_observation_config is not None and not self.position_profile:
-            raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
-        self.camera_observation_config = camera_observation_config
-        self._camera_consumer = None
-        self._camera_session_factory = None
-        self.metadata = {'env_id': self.uid,
-            'task_artifact_hash': self.artifact.identity_hash,
-            'construction_id': self.value['construction_id'],
-            'control_dt': self.artifact.timebase.control_dt}
-        self.supports_structured_control_recording = bool(_mixed_control_candidate)
-        if _mixed_control_candidate:
-            action_schema = self.value.get('action_schema')
-            if not isinstance(action_schema, Mapping):
-                raise TypeError('mixed-control task binding must supply its typed action schema')
-            self.metadata['action_schema'] = dict(action_schema)
-            self.action_space = self.value.get('action_space')
-            self.observation_space = self.value.get('observation_space')
-            if self.action_space is None or self.observation_space is None:
-                raise TypeError('mixed-control task binding must supply task-owned spaces')
-        else:
-            self.metadata['action_schema'] = dict(self.binding.action_schema)
-            self.action_space = self.binding.action_space_factory()
-        keys = [key for _, key in self.binding.object_poses]
-        if not _mixed_control_candidate:
-            observation_spaces = self.binding.observation_space_factory(self)
-        if camera_observation_config is not None:
-            from ..observations.selected_reference import position_camera_observation_declaration
-
-            camera_spaces, self.camera_observation_schema = position_camera_observation_declaration(
-                self.binding, camera_observation_config,
+        try:
+            self._initialize_selected_value(
+                mixed_control_candidate=_mixed_control_candidate,
+                camera_observation_config=camera_observation_config,
             )
-            observation_spaces.update(camera_spaces)
-            self.metadata['observation_schema'] = {
-                'schema_version': 'position-camera-observation-v1',
-                'leaf_specs': tuple({
-                    'path': field.name,
-                    'shape': field.shape,
-                    'dtype': field.dtype,
-                    'semantic': field.semantic,
-                    'unit': field.unit,
-                    'frame': field.frame,
-                    'time_reference': field.time_reference,
-                } for field in self.camera_observation_schema.fields),
-            }
-            self.metadata['camera_observation_schema'] = 'camera-observation-boundary-v1'
-            self.metadata['info_schema'] = {
-                'camera_observation_v1': {
-                    'schema_version': 'camera-observation-boundary-v1',
-                    'required': True,
-                    'same_boundary_as_observation': True,
-                },
-            }
-        if not _mixed_control_candidate:
-            self.observation_space = Dict(observation_spaces)
+        except BaseException as error:
+            def close_source():
+                source = self.value.get('source') if isinstance(self.value, Mapping) else None
+                receipt = getattr(source, 'execution_source_receipt', None)
+                if receipt is not None:
+                    receipt.close()
+
+            for label, cleanup in (
+                ('source', close_source),
+                ('task resource', self.binding.close_task_resources),
+            ):
+                if callable(cleanup):
+                    try:
+                        cleanup()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'{label} cleanup after selected construction failed: {cleanup_error!r}')
+            fault = ExecutionFaultV1.from_exception('selected_construction', error)
+            self._execution_fault = fault
+            attach_execution_fault(error, fault)
+            raise
         self.session = None
         self._external_solution_owner = None
         self._active_native_interval_receipt = None
