@@ -41,6 +41,14 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
                  'physics_backend': resolved.environment.runtime.backend,
                  'physics_device': resolved.physics_device,
                  'render_default': resolved.render_default.to_mapping()}
+    selection = resolved.execution_spec_v2
+    requested = ({} if resolved.requested_execution_json is None
+                 else json.loads(resolved.requested_execution_json))
+    route_names = ('host', 'engine', 'solver_family', 'solver_algorithm', 'coupler',
+                   'batch_layout', 'deployment', 'interpreter', 'native_dt')
+    if selection is not None and (selection.deployment != 'in_process'
+                                  or any(name in requested for name in route_names)):
+        execution.update({name: getattr(selection, name) for name in route_names})
     if resolved.source_delivery_manifest is not None:
         execution['source_delivery_manifest'] = resolved.source_delivery_manifest
     task = dict(resolved.task_parameters)
@@ -52,7 +60,7 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
 
 def selected_source_provenance(*, adapter_path, binding, value, artifact,
                                controller_identity, solution_identity,
-                               execution_configuration):
+                               execution_configuration, execution_receipt=None):
     """Snapshot recorder provenance once, before the first recorded boundary."""
     from ..runtime.sessions import common as session_common
 
@@ -71,6 +79,8 @@ def selected_source_provenance(*, adapter_path, binding, value, artifact,
         'resolved_configuration_json': json.dumps(config, sort_keys=True),
         'execution_configuration_json': json.dumps(execution_configuration, sort_keys=True),
     }
+    if execution_receipt is not None:
+        provenance['execution_receipt_json'] = json.dumps(execution_receipt, sort_keys=True, allow_nan=False)
     if 'source_revision' in value:
         source = value['source']
         provenance.update({

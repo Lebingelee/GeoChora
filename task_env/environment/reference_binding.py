@@ -102,6 +102,9 @@ def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, positio
             raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlan')
         if binding.build_seeded is None and seed != reset_plan.reset_sample.task_seed:
             raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
+    if not mixed and not position:
+        # Task seed validation is pure preflight and must not close a live session.
+        seed = binding.reset_seed(seed)
     mixed_sample = None
     if mixed:
         seed = binding.reset_seed(seed)

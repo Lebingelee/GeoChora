@@ -336,3 +336,112 @@ def test_mixed_stepwise_receipt_checks_count_and_first_target():
     with pytest.raises(TypeError, match='unknown or missing fields'):
         callback(None, 0, 2, 0)
     assert collected == []
+
+
+@pytest.mark.parametrize('task_class', [
+    'task_env.tasks.pick_cube.specialization.PickCubeReferenceEnv',
+    'task_env.tasks.nut_assembly.specialization.NutAssemblyReferenceEnv',
+])
+def test_direct_selected_constructor_revalidates_fabricated_resolved_config(task_class, monkeypatch):
+    from dataclasses import replace
+    from importlib import import_module
+    module_name, class_name = task_class.rsplit('.', 1)
+    module = import_module(module_name)
+    cls = getattr(module, class_name)
+    resolved = resolve_task_env_config(cls, None)
+    bad = replace(resolved, physics_provider='not-a-provider')
+    # The binding must not be built and no existing session can be touched.
+    if hasattr(cls, 'selected_binding'):
+        monkeypatch.setattr(cls, 'selected_binding', lambda *args: pytest.fail('binding reached'))
+    else:
+        monkeypatch.setattr(module, 'make_reference_binding', lambda **kwargs: pytest.fail('binding reached'))
+    with pytest.raises(ValueError, match='unsupported selected physics'):
+        cls.from_resolved_config(bad)
+
+
+@pytest.mark.parametrize('provider,backend,device,host,engine', [
+    ('mujoco', 'cpu', 'cpu', 'standalone', 'mujoco'),
+    ('geophys', 'cpu', 'cpu', 'standalone', 'geophys'),
+    ('isaacsim', 'cuda', 'cuda:0', 'isaacsim', 'physx'),
+])
+def test_layered_selected_route_resolves_without_native_build(provider, backend, device, host, engine):
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    execution = {'physics_provider': provider, 'physics_backend': backend, 'physics_device': device}
+    if provider == 'isaacsim':
+        execution['source_delivery_manifest'] = '/not-read-by-resolver/manifest.json'
+    config = {'execution': execution}
+    if provider == 'isaacsim':
+        config['task'] = {'controller_profile': 'r3_continuous_v1'}
+    selected = resolve_task_env_config(PickCubeReferenceEnv, config)
+    route = selected.execution_spec_v2
+    assert (route.host, route.engine, route.batch_layout) == (host, engine, 'scalar')
+    assert route.native_dt is None
+    assert route.physics_profile == 'unknown'
+    assert resolve_task_env_config(PickCubeReferenceEnv, selected) == selected
+
+
+def test_layered_route_rejects_unimplemented_selection_and_different_native_dt():
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    for override, message in [
+        ({'engine': 'newton'}, 'no implemented adapter'),
+        ({'host': 'isaacsim', 'engine': 'newton'}, 'no implemented adapter'),
+        ({'batch_layout': 'native_batch'}, 'batch is not implemented'),
+        ({'native_dt': 0.004}, 'no versioned mapping'),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            resolve_task_env_config(PickCubeReferenceEnv, {'execution': override})
+    route = resolve_task_env_config(PickCubeReferenceEnv, {'execution': {'native_dt': 0.002}})
+    assert route.execution_spec_v2.native_dt == 0.002
+    remote = resolve_task_env_config(PickCubeReferenceEnv, {'execution': {'deployment': 'isolated_worker'}})
+    assert remote.execution_spec_v2.deployment == 'isolated_worker'
+
+
+def test_public_factory_consumes_same_layered_selected_resolution(monkeypatch):
+    from task_env import registry
+    target = _resolver_target()
+    target.from_resolved_config = classmethod(lambda cls, resolved, **kwargs: resolved)
+    monkeypatch.setattr(registry.ENV_REGISTRY, 'get', lambda uid: target)
+    result = registry.make_env('resolver-target-v1', config={'provider': 'mujoco'})
+    assert result.execution_spec_v2.physics_provider == 'mujoco'
+    assert result.execution_spec_v2.engine == 'mujoco'
+    assert result.execution_spec_v2.native_dt is None
+
+
+def test_invalid_task_seed_rejects_before_existing_session_or_camera_close(monkeypatch):
+    from types import SimpleNamespace
+    from task_env import make_env
+    env = make_env('nut-assembly-outcome-reference-v1', config={'provider': 'mujoco'})
+    effects = []
+    sentinel = SimpleNamespace(close=lambda: effects.append('session.close'))
+    env.session = sentinel
+    monkeypatch.setattr(env, '_close_camera_consumer', lambda: effects.append('camera.close'))
+    try:
+        with pytest.raises(ValueError, match='seed19'):
+            env._prepare_reference_reset(seed=31)
+        assert env.session is sentinel
+        assert effects == []
+    finally:
+        env.session = None
+        env.close()
+
+
+def test_public_static_rejection_has_stable_json_receipt_and_no_binding(monkeypatch, tmp_path):
+    import json
+    from task_env import make_env
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    monkeypatch.setattr(PickCubeReferenceEnv, 'selected_binding', lambda *args: pytest.fail('binding reached'))
+    def rejected(config):
+        with pytest.raises(Exception) as failure:
+            make_env('pick-cube-p16-reference-v1', config=config)
+        error = failure.value
+        assert error.phase == 'static_config'
+        assert error.receipt['request_identity'] == error.request_identity
+        assert error.receipt['native_effective']['status'] == 'unknown'
+        assert json.loads(json.dumps(error.receipt)) == error.receipt
+        return error.request_identity
+    first = {'execution': {'engine': 'newton'}}
+    assert rejected(first) == rejected(first)
+    assert rejected(first) != rejected({'execution': {'host': 'isaacsim', 'engine': 'newton'}})
+    bad_yaml = tmp_path / 'duplicate.yaml'
+    bad_yaml.write_text('execution: {}\nexecution: {}\n')
+    assert len(rejected(bad_yaml)) == 64

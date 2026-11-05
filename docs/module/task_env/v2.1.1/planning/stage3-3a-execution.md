@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。状态：`PREPARED_NOT_DISPATCHED`。本页记录3a实施落点与首包准备；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。没有实施开始或接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前 attempt001 已执行并待 Sol 独立复审，见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。没有实施开始或接收结论。
 
 ## 接手与分支
 

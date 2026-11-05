@@ -9,7 +9,7 @@ import json
 from math import isfinite, pi
 from typing import Any, Literal
 
-from ..artifacts.contracts import RendererSelectionV1
+from ..artifacts.contracts import ExecutionSpecV2, RendererSelectionV1
 
 
 @dataclass(frozen=True)
@@ -577,8 +577,15 @@ class ResolvedSelectedConfig:
     render_default: RendererSelectionV1 = field(default_factory=lambda: RendererSelectionV1(
         "renderer-selection-v1", "none", "cpu", "none", None,
     ))
+    execution_spec_v2: ExecutionSpecV2 | None = None
+    requested_execution_json: str | None = None
 
     def __post_init__(self) -> None:
+        if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:
+            raise TypeError("selected execution_spec_v2 must be ExecutionSpecV2 or None")
+        if self.requested_execution_json is not None:
+            if type(self.requested_execution_json) is not str or not isinstance(json.loads(self.requested_execution_json), dict):
+                raise ValueError("requested execution must be a JSON mapping")
         if type(self.render_default) is not RendererSelectionV1:
             raise TypeError("selected render_default must be a RendererSelectionV1")
         self.render_default.validate()
@@ -615,8 +622,11 @@ class ExecutionPlan:
     resource_owner_identities: tuple[tuple[str, str], ...]
     configuration_identity: str
     state_requirements: Any | None = None
+    execution_spec_v2: ExecutionSpecV2 | None = None
 
     def __post_init__(self) -> None:
+        if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:
+            raise TypeError("execution_spec_v2 must be ExecutionSpecV2 or None")
         if self.schema_version != "execution-plan-v0":
             raise ValueError("unsupported execution plan schema")
         for name, value in (

@@ -516,10 +516,8 @@ def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
 def _f06_pickcube_isaac_capability_manifest(artifact):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
 
-    names = sorted(set(artifact.required_capabilities.names) | {
-        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
-        'body_pose_query', 'frame_pose_query', 'free_body',
-    })
+    # The Artifact request cannot expand this fixed source-bound adapter.
+    names = sorted(CAPABILITIES)
     return ProviderCapabilityManifest(
         'provider-capability-v0', 'isaacsim', '6.2.0.0',
         'f06-pickcube-desktop-native-mimic-v1', 'cuda', F06_PICKCUBE_ISAAC_PROFILE,
@@ -1332,3 +1330,148 @@ def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=No
         from .genesis import _GenesisSession
         return _GenesisSession(artifact, source)
     raise ValueError(f'unknown physics provider: {execution.physics_provider}')
+
+
+def assess_selected_request(*, selection, artifact, source, value, binding,
+                            dependency_status, request_identity, caller_manifest=None):
+    """Assess actual selected declarations before any native materialization.
+
+    Provider API and historical evidence are intentionally not inferred from
+    a generic Core manifest. Exact build checks are identified separately.
+    """
+    from ...artifacts import CapabilityAssessmentV1, CapabilityAssessmentRowV1
+    from .control import (CONTROL_REQUIRED, ControlBinding, bind_selected_controller,
+                          prepare_position_control_materialization)
+    from ...artifacts.contracts import SUPPORTED_STATUSES
+
+    if dependency_status not in {'available', 'unavailable', 'unknown'}:
+        raise ValueError('invalid dependency assessment status')
+    if caller_manifest is not None and not isinstance(caller_manifest, ProviderCapabilityManifest):
+        raise TypeError('caller restriction must be a ProviderCapabilityManifest')
+    actual_capabilities = set(CAPABILITIES)
+    restricted = None if caller_manifest is None else {
+        item.name for item in caller_manifest.capabilities if item.status in SUPPORTED_STATUSES
+    }
+    if caller_manifest is not None and (caller_manifest.provider_name != selection.physics_provider
+                                        or caller_manifest.backend != selection.physics_backend):
+        restricted = set()
+    phase = 'static_preflight'
+    rows = []
+
+    def row(capability, subject, required='required', *, implemented=True,
+            valid='satisfied', reason='adapter build must verify this request',
+            oracle=None, restrict=False):
+        if oracle is None:
+            oracle = ('task_env.runtime.sessions.isaac_native_io:create_isaac_native_runtime_io'
+                      if selection.physics_provider == 'isaacsim'
+                      else 'task_env.runtime.sessions.api:_materialize_admitted')
+        rows.append(CapabilityAssessmentRowV1(
+            'capability-assessment-row-v1', capability, subject, required,
+            'unknown', 'implemented' if implemented else 'not_implemented',
+            dependency_status, 'none', phase, reason, None,
+            oracle if implemented else None, 'denied' if restrict else 'none', valid,
+        ))
+
+    source_problem = None
+    try:
+        artifact.validate()
+        if (value.get('source') is not source or value.get('artifact') is None
+                or value['artifact'].identity_hash != artifact.identity_hash):
+            raise ValueError('selected value/source/Artifact identity mismatch')
+        if source.task_artifact_hash != artifact.identity_hash:
+            raise ValueError('source/Artifact identity mismatch')
+        if selection.physics_provider in {'geophys', 'mujoco'}:
+            if not isinstance(source, RuntimeSource):
+                raise TypeError('MJCF route requires RuntimeSource')
+            if (source.config.runtime.backend != selection.physics_backend
+                    or source.config.runtime.physics_dt != artifact.timebase.physics_dt
+                    or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+                    or source.config.render.camera_obs):
+                raise ValueError('source execution/timebase mismatch')
+            if set(source.joints) != set(artifact.initialization.joint_position):
+                raise ValueError('source joint bindings do not cover initialization')
+            if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
+                raise ValueError('source pose bindings do not cover semantics')
+            if isinstance(artifact, TaskArtifactV1):
+                execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
+                                          selection.physics_backend, 0, 'strict')
+                _validate_v1_materialization_source(artifact, execution, source)
+            elif source.scene_definition is not None and selection.physics_provider != 'geophys':
+                raise ValueError('Scene-v3 legacy projection is currently GeoPhys-only')
+            receipt = source.execution_source_receipt
+            if receipt is None or source.source_closure_digest is None:
+                raise ValueError('asset closure has no source-bound receipt; native import cannot prove the requested closure')
+            receipt.validate_snapshot()
+        elif selection.physics_provider == 'isaacsim':
+            runtime_input = value.get('session_admission_input')
+            if type(runtime_input) is not UsdRuntimeInputV1:
+                raise TypeError('Isaac worker requires the exact F06 runtime input')
+            _validate_f06_pickcube_isaac_input(runtime_input, artifact, runtime_input.execution, source)
+        else:
+            raise ValueError('no selected adapter for provider')
+    except (TypeError, ValueError, OSError, AttributeError) as error:
+        source_problem = f'{type(error).__name__}: {error}'
+    row('source_closure', 'task:' + artifact.task_id,
+        valid='unsatisfied' if source_problem else 'satisfied',
+        reason=source_problem or 'source declarations passed; native importer must verify the closure')
+
+    selected = None
+    control_problem = None
+    try:
+        selected = bind_selected_controller(value, binding=binding,
+                                            provider=selection.physics_provider,
+                                            backend=selection.physics_backend)
+        if selected.mixed or selected.leaf_plan is not None or len(selected.position_profiles) > 1:
+            raise ValueError('selected worker profile is outside the scalar adapter envelope')
+        if selected.position:
+            prepare_position_control_materialization(
+                source=source, artifact=artifact, profiles=selected.position_profiles,
+                leaf_position=False, plan=value.get('controller_binding_plan'),
+                select_binding=binding.position_control_binding, value=value,
+            )
+        else:
+            if type(binding.scalar_control_binding) is not ControlBinding:
+                raise TypeError('selected scalar Controller binding is missing')
+            if len(source.joint_targets) != 7 or len(source.open_actuators) != 1:
+                raise ValueError('source lacks the scalar position control bindings')
+            import hashlib
+            controller_artifact = getattr(selected.controller, 'source_artifact_hash', None)
+            controller_source = getattr(selected.controller, 'source_xml_sha256', None)
+            if (controller_artifact != artifact.identity_hash
+                    or controller_source != hashlib.sha256(source.scene_source.xml.encode()).hexdigest()):
+                raise ValueError('Controller model does not match the selected Artifact and source')
+    except (TypeError, ValueError, OSError, AttributeError) as error:
+        control_problem = f'{type(error).__name__}: {error}'
+    row('controller_binding', 'controller:' + artifact.task_id,
+        valid='unsatisfied' if control_problem else 'satisfied',
+        reason=control_problem or 'Controller/source declarations passed; build must verify native mapping',
+        oracle='task_env.runtime.sessions.control:materialize_control')
+
+    for owner, requirements in (('task', artifact.required_capabilities), ('controller', CONTROL_REQUIRED)):
+        for name in requirements.names:
+            available = name in actual_capabilities
+            row(name, owner + ':' + artifact.task_id, implemented=available,
+                reason=('adapter has a source-bound build check' if available
+                        else 'required capability has no selected Core adapter'),
+                restrict=restricted is not None and name not in restricted)
+    if selected is not None and selected.position:
+        for profile in selected.position_profiles:
+            for requirement in profile.requirements.requirements:
+                name = requirement.required_capability
+                subject = ('state:' + requirement.entity_id + '/' + requirement.subject_id + '/'
+                           + requirement.field_name + '/' + requirement.sample_domain)
+                row(name, subject, required=requirement.requiredness,
+                    implemented=name in actual_capabilities,
+                    reason=('declared StateRequirements field requires native mapping'
+                            if name in actual_capabilities else 'state field has no selected Core adapter'),
+                    oracle='task_env.runtime.sessions.control:materialize_control',
+                    restrict=restricted is not None and name not in restricted)
+    row('scalar_layout', 'batch:scalar',
+        valid='satisfied' if selection.batch_layout == 'scalar' else 'unsatisfied',
+        reason='selected adapter is scalar; native batch and partial reset are not admitted')
+    render = selection.render_default
+    state_only = (render.provider, render.backend, render.profile, render.device) == ('none', 'cpu', 'none', None)
+    row('state_only_renderer', 'renderer:default',
+        valid='satisfied' if state_only else 'unsatisfied',
+        reason='selected adapter admits state-only rendering' if state_only else 'required renderer is not implemented')
+    return CapabilityAssessmentV1('capability-assessment-v1', request_identity, phase, tuple(rows))

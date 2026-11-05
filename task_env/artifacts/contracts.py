@@ -1718,10 +1718,55 @@ class ExecutionSpecV1(Contract):
         return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1) -> ExecutionSpec | ExecutionSpecV1:
-    """Dispatch only exact legacy-v0 (missing discriminator) or declared v1 mappings."""
 
-    if isinstance(values, (ExecutionSpec, ExecutionSpecV1)):
+@dataclass(frozen=True)
+class ExecutionSpecV2(Contract):
+    """Layered selection; unknown future build facts remain explicit."""
+
+    schema_version: str
+    physics_provider: str
+    physics_backend: str
+    physics_device: str
+    physics_profile: str
+    provider_seed: int | None
+    determinism_mode: str
+    render_default: RendererSelectionV1
+    host: str
+    engine: str
+    solver_family: str
+    solver_algorithm: str
+    coupler: str
+    batch_layout: str
+    deployment: str
+    interpreter: str | None
+    native_dt: float | None
+
+    def validate(self):
+        _choice(self.schema_version, {'execution-spec-v2'}, 'execution schema')
+        for value in (self.physics_provider, self.physics_backend, self.physics_device,
+                      self.physics_profile, self.host, self.engine, self.solver_family,
+                      self.solver_algorithm, self.coupler):
+            _name(value)
+        if self.provider_seed is not None and self.provider_seed < 0:
+            raise ValueError('provider seed must be nonnegative or unknown')
+        _choice(self.determinism_mode, {'strict', 'best_effort', 'none', 'unknown'}, 'determinism')
+        _choice(self.batch_layout, {'scalar', 'native_batch'}, 'batch layout')
+        _choice(self.deployment, {'in_process', 'isolated_worker'}, 'deployment')
+        if self.interpreter is not None and not self.interpreter.strip():
+            raise ValueError('deployment interpreter must be nonempty or unknown')
+        if self.native_dt is not None and self.native_dt <= 0:
+            raise ValueError('native dt must be positive or unknown')
+
+    @property
+    def identity_hash(self) -> str:
+        payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1 | ExecutionSpecV2) -> ExecutionSpec | ExecutionSpecV1 | ExecutionSpecV2:
+    """Dispatch exact legacy-v0 or explicitly versioned execution mappings."""
+
+    if isinstance(values, (ExecutionSpec, ExecutionSpecV1, ExecutionSpecV2)):
         return values
     if not isinstance(values, Mapping):
         raise TypeError('execution spec decoder requires a validated spec or mapping')
@@ -1730,6 +1775,8 @@ def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1) -> 
         return ExecutionSpec.from_mapping(values)
     if version == 'execution-spec-v1':
         return ExecutionSpecV1.from_mapping(values)
+    if version == 'execution-spec-v2':
+        return ExecutionSpecV2.from_mapping(values)
     raise ValueError(f'unsupported execution spec schema: {version!r}')
 
 
@@ -1779,6 +1826,87 @@ class ProviderCapabilityManifest(Contract):
 
         payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
         return hashlib.sha256(payload.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class CapabilityAssessmentRowV1(Contract):
+    """One request-specific fact; provider, adapter and evidence are separate."""
+    schema_version: str
+    capability_id: str
+    object_ref: str
+    requiredness: str
+    provider_api: str
+    core_adapter: str
+    dependency: str
+    evidence: str
+    phase: str
+    reason: str
+    evidence_ref: str | None
+    build_oracle: str | None
+    caller_restriction: str = 'none'
+    requirement_status: str = 'satisfied'
+
+    def validate(self):
+        _choice(self.schema_version, {'capability-assessment-row-v1'}, 'assessment row schema')
+        for item in (self.capability_id, self.object_ref):
+            _name(item)
+        _choice(self.requiredness, {'required', 'optional'}, 'requiredness')
+        _choice(self.provider_api, {'supported', 'unsupported', 'unknown'}, 'provider API status')
+        _choice(self.core_adapter, {'implemented', 'not_implemented', 'unknown'}, 'adapter status')
+        _choice(self.dependency, {'available', 'unavailable', 'unknown'}, 'dependency status')
+        _choice(self.evidence, {'none', 'bounded_execution', 'qualified'}, 'evidence status')
+        _choice(self.phase, {'declaration', 'static_preflight', 'native_build', 'runtime'}, 'assessment phase')
+        _choice(self.caller_restriction, {'none', 'denied'}, 'caller restriction')
+        _choice(self.requirement_status, {'satisfied', 'unsatisfied', 'unknown'}, 'requirement status')
+        if not self.reason.strip():
+            raise ValueError('assessment reason is required')
+        if self.build_oracle is not None:
+            _name(self.build_oracle)
+        if self.evidence != 'none' and not self.evidence_ref:
+            raise ValueError('bounded or qualified evidence requires a reference')
+
+
+# Only Core-owned checks may make a required unknown provisional.
+_ASSESSMENT_BUILD_ORACLES = frozenset({
+    'task_env.runtime.sessions.api:_materialize_admitted',
+    'task_env.runtime.sessions.control:materialize_control',
+    'task_env.runtime.sessions.isaac_native_io:create_isaac_native_runtime_io',
+})
+
+
+@dataclass(frozen=True)
+class CapabilityAssessmentV1(Contract):
+    schema_version: str
+    request_identity: str
+    phase: str
+    rows: tuple[CapabilityAssessmentRowV1, ...]
+
+    def validate(self):
+        _choice(self.schema_version, {'capability-assessment-v1'}, 'assessment schema')
+        if not _SHA256.fullmatch(self.request_identity):
+            raise ValueError('assessment requires a request SHA-256')
+        _choice(self.phase, {'declaration', 'static_preflight', 'native_build', 'runtime'}, 'assessment phase')
+        keys = [(row.capability_id, row.object_ref) for row in self.rows]
+        if len(keys) != len(set(keys)):
+            raise ValueError('duplicate capability assessment object')
+        if any(row.phase != self.phase for row in self.rows):
+            raise ValueError('assessment row phase mismatch')
+
+    @property
+    def decision(self):
+        pending = False
+        for row in self.rows:
+            if row.requiredness == 'optional':
+                continue
+            if (row.provider_api == 'unsupported' or row.core_adapter != 'implemented'
+                    or row.dependency != 'available' or row.caller_restriction == 'denied'
+                    or row.requirement_status == 'unsatisfied'):
+                return 'rejected'
+            if row.provider_api == 'unknown' or row.requirement_status == 'unknown':
+                if self.phase in {'native_build', 'runtime'} or row.build_oracle not in _ASSESSMENT_BUILD_ORACLES:
+                    return 'rejected'
+                pending = True
+        return 'pending_native_build' if pending else 'static_admitted'
 
 
 class CapabilityAdmissionError(ValueError):

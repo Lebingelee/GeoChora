@@ -258,3 +258,11 @@ def test_close_has_one_runtime_owner_and_attempts_all_auxiliary_owners():
     assert (ui.close_calls, sensor.close_calls, runtime.close_calls) == (1, 1, 1)
     env.close()
     assert (ui.close_calls, sensor.close_calls, runtime.close_calls) == (1, 1, 1)
+
+
+@pytest.mark.parametrize('value', [False, 0, '', [], 1])
+def test_component_overlay_rejects_non_mapping_even_when_empty(value):
+    from task_env.environment.configuration import overlay_public_env_config
+    from task_env.environment.config import ResolvedEnvConfig
+    with pytest.raises(TypeError, match='overlay must be a mapping'):
+        overlay_public_env_config(ResolvedEnvConfig(), {'runtime': value})

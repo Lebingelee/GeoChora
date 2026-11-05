@@ -617,10 +617,25 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                                         render_mode=render_mode, **kwargs)
 
     @classmethod
+    def selected_binding(cls, config):
+        profile = config.controller_profile
+        environment = (_nut_aligned_environment_config(config.environment)
+                       if profile in _PICKCUBE_R3_PROFILES else config.environment)
+        return make_reference_binding(
+            controller_profile=profile, source_delivery_manifest=config.source_delivery_manifest,
+            resolved_config=environment,
+            lift_height_m=dict(config.task_parameters).get("lift_height_m"),
+            task_config=json.loads(config.task_configuration_json),
+            interval_provider=config.physics_provider,
+        )
+
+    @classmethod
     def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
         from ...environment.config import ResolvedSelectedConfig
         if type(config) is not ResolvedSelectedConfig:
             raise TypeError("selected construction requires resolved configuration")
+        from ...environment.configuration import resolve_task_env_config
+        config = resolve_task_env_config(cls, config)
         if kwargs or render_mode is not None:
             raise ValueError('selected reference admits state-only execution without extra kwargs')
         provider = config.physics_provider
@@ -628,28 +643,21 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         horizon = config.environment.episode.horizon
         profile = config.controller_profile
         manifest = config.source_delivery_manifest
-        if profile in _PICKCUBE_R3_PROFILES:
-            config = replace(
-                config,
-                environment=_nut_aligned_environment_config(config.environment),
-            )
-        task_config = json.loads(config.task_configuration_json)
-        binding = make_reference_binding(controller_profile=profile, source_delivery_manifest=manifest,
-                                         resolved_config=config.environment,
-                                         lift_height_m=dict(config.task_parameters).get("lift_height_m"),
-                                         task_config=task_config,
-                                         interval_provider=provider)
+        binding = cls.selected_binding(config)
         if provider == 'isaacsim':
+            environment = (_nut_aligned_environment_config(config.environment)
+                           if profile in _PICKCUBE_R3_PROFILES else config.environment)
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
                                             horizon=horizon, include_solution=False,
-                                            controller_profile=profile, resolved_config=config.environment,
-                                            task_config=task_config)
+                                            controller_profile=profile, resolved_config=environment,
+                                            task_config=json.loads(config.task_configuration_json))
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
                       _execution_spec_v1=initial['execution_spec_v1'], _initial_value=initial)
         else:
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding)
         env.resolved_public_config = config
         return env
+
 
 
 from ...artifacts import (ExecutionSpecV1, RendererSelectionV1, ArticulationDefinition,

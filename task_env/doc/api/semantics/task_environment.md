@@ -40,6 +40,14 @@ finally:
 expert/recording 入口见仓库根目录 `examples/README.md`；历史 `pick-cube-v1`
 不会映射到新的 selected task。
 
+## 3a 执行选择与预检（待独立复审）
+
+selected 的 `execution` 可指定 provider/backend/device、host/engine、solver family/algorithm、coupler、`batch_layout`、`deployment`、`interpreter` 与 `native_dt`。`get_execution_receipt()` 返回请求、解析结果、预检及尚未读取的 native effective 状态；预检失败的异常提供 `reason`、`phase`、`request_identity` 和 JSON-compatible `receipt`。这些字段不证明原生执行或资格。
+
+当前实现只接受 scalar、state-only 和与 task cadence 相同的 native dt。GeoPhys 默认从 `GEOCHORA_GEOPHYS_PYTHON`、Isaac 从 `ISAAC_SIM_PYTHON` 选择隔离解释器；MuJoCo 默认当前解释器，可用 `GEOCHORA_CORE_PYTHON` 显式选择。必须满足对应依赖与当前源码 origin，缺失或冲突会在关闭已有 session 前拒绝。
+
+**已知兼容性缺口：**普通 PickCube／Nut 的既有 MJCF 来源没有完整资产闭包回执，因此当前 3a 预检会拒绝其 reset；这不是 provider 不支持或原生测试结果。必须由后续有界工作提供可核验的来源闭包并恢复原有兼容路线；不要将本次变更视为已接收。F06 的精确 USD 来源约束仍适用，尚未进行真实 SDK 构建。
+
 ## 当前 selected 路线
 
 `task_env.environment.reference_env.SelectedReferenceEnv` 是 selected 环境的当前实现 owner；`task_env.tasks.reference_env.SelectedReferenceEnv` 为兼容导入。PickCube、Nut、Empty、Pendulum 和 TwoWheel 通过各自任务配置和同一环境 owner 构造；动作、观测及运行时接线仍由具体任务决定。普通 selected `reset()` 不传 seed 时使用 19；显式 `seed=None` 与省略并不等价。Position 候选的 seed 受固定 reset plan 约束，mixed 候选有独立明确的 reset-plan 检查。普通 selected 非空 options 不支持。

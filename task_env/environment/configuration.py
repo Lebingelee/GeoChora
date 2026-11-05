@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Mapping, TypeVar
 
-from ..artifacts.contracts import RendererSelectionV1
+from ..artifacts.contracts import ExecutionSpecV2, RendererSelectionV1
 
 from .config import (
     ActionConfig,
@@ -61,6 +61,10 @@ _LEGACY_GRIPPER_FIELDS = {
 def update_config(config: T, values: Mapping[str, object] | None) -> T:
     """拒绝未知参数后更新 frozen dataclass。"""
 
+    if values is None:
+        return config
+    if not isinstance(values, Mapping):
+        raise TypeError(f"{type(config).__name__} overlay must be a mapping")
     if not values:
         return config
     allowed = {item.name for item in fields(config)}
@@ -219,6 +223,9 @@ def overlay_public_env_config(
             "TaskEnv public config cannot override task topology/semantics: "
             + ", ".join(unknown)
         )
+    for section, section_value in values.items():
+        if not isinstance(section_value, Mapping):
+            raise TypeError(f"{section} overlay must be a mapping")
     runtime_values = values.get("runtime")
     if isinstance(runtime_values, Mapping):
         layout = str(runtime_values.get("batch_physics_layout", "")).strip().lower()
@@ -249,6 +256,44 @@ def overlay_public_env_config(
     )
 
 
+
+def _layered_execution_selection(*, provider, backend, device, renderer, runtime, values=None, selected=False):
+    """Resolve shared layered facts without constructing a provider."""
+    import sys
+    host, engine, family = {
+        "mujoco": ("standalone", "mujoco", "unknown"),
+        "geophys": ("standalone", "geophys", "rigid"),
+        "isaacsim": ("isaacsim", "physx", "physx"),
+    }[provider]
+    defaults = {
+        "host": host, "engine": engine, "solver_family": family,
+        "solver_algorithm": (runtime.rigid_solver_backend or "unknown") if provider == "geophys" else "unknown",
+        "coupler": "not_applicable" if provider == "mujoco" else "unknown",
+        "batch_layout": "scalar", "deployment": "in_process",
+        "interpreter": sys.executable, "native_dt": None,
+    }
+    if selected:
+        import os
+        if provider == 'geophys':
+            defaults.update(deployment='isolated_worker', interpreter=os.environ.get('GEOCHORA_GEOPHYS_PYTHON'))
+        elif provider == 'isaacsim':
+            defaults.update(deployment='isolated_worker', interpreter=os.environ.get('ISAAC_SIM_PYTHON'))
+        elif os.environ.get('GEOCHORA_CORE_PYTHON'):
+            configured_python = os.environ['GEOCHORA_CORE_PYTHON']
+            defaults.update(interpreter=configured_python,
+                            deployment=('in_process' if Path(configured_python).resolve() == Path(sys.executable).resolve()
+                                        else 'isolated_worker'))
+    values = {} if values is None else values
+    route = {name: values.get(name, default) for name, default in defaults.items()}
+    selection = ExecutionSpecV2(
+        schema_version="execution-spec-v2", physics_provider=provider,
+        physics_backend=backend, physics_device=device, physics_profile="unknown",
+        provider_seed=None, determinism_mode="unknown", render_default=renderer,
+        **route,
+    )
+    return selection, defaults
+
+
 def _resolve_selected_config(environment_type, config):
     """Normalize selected legacy fields at the common configuration boundary."""
     supplied = config if isinstance(config, ResolvedSelectedConfig) else None
@@ -261,6 +306,14 @@ def _resolve_selected_config(environment_type, config):
                                 "source_delivery_manifest": supplied.source_delivery_manifest,
                                 "render_default": supplied.render_default.to_mapping()},
                   "episode": {"horizon": supplied.environment.episode.horizon}}
+        if supplied.execution_spec_v2 is not None:
+            selection = supplied.execution_spec_v2
+            config["execution"].update({
+                name: getattr(selection, name) for name in (
+                    "host", "engine", "solver_family", "solver_algorithm", "coupler",
+                    "batch_layout", "deployment", "interpreter", "native_dt",
+                )
+            })
         config["task"] = dict(supplied.task_parameters)
         if supplied.controller_profile is not None:
             config["task"]["controller_profile"] = supplied.controller_profile
@@ -284,7 +337,9 @@ def _resolve_selected_config(environment_type, config):
         sections[name] = dict(section)
     allowed_sections = {
         "execution": {"physics_provider", "physics_backend", "physics_device",
-                      "source_delivery_manifest", "render_default"},
+                      "source_delivery_manifest", "render_default", "host", "engine",
+                      "solver_family", "solver_algorithm", "coupler", "batch_layout",
+                      "deployment", "interpreter", "native_dt"},
         "episode": {"horizon"},
         "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
                 | set(environment_type.selected_parameter_limits),
@@ -306,6 +361,9 @@ def _resolve_selected_config(environment_type, config):
         if key in sections[section]:
             raise ValueError(f"{old} conflicts with {section}.{key}")
         sections[section][key] = values[old]
+    requested_json = (supplied.requested_execution_json if supplied is not None else
+                      json.dumps(_identity_value(sections["execution"]), sort_keys=True,
+                                 separators=(",", ":"), allow_nan=False))
     configuration_loader = getattr(environment_type, "selected_task_configuration", None)
     task_configuration = configuration_loader() if configuration_loader is not None else None
     base = (environment_type.selected_default_config(task_configuration)
@@ -384,6 +442,21 @@ def _resolve_selected_config(environment_type, config):
         task_configuration_json = json.dumps(
             task_values, sort_keys=True, separators=(",", ":"), allow_nan=False,
         )
+    selection, route_defaults = _layered_execution_selection(
+        provider=provider, backend=backend, device=device, renderer=renderer,
+        runtime=env.runtime, values=execution_defaults, selected=True,
+    )
+    for name in ("host", "engine", "solver_family", "solver_algorithm", "coupler"):
+        if getattr(selection, name) != route_defaults[name]:
+            raise ValueError(f"static_config: requested {name} has no implemented adapter for {provider}")
+    if selection.batch_layout != "scalar":
+        raise ValueError("static_config: selected native batch is not implemented")
+    if selection.deployment == "in_process":
+        import sys
+        if selection.interpreter is None or Path(selection.interpreter).resolve() != Path(sys.executable).resolve():
+            raise ValueError("static_config: in-process deployment must use the current interpreter")
+    if selection.native_dt is not None and selection.native_dt != env.runtime.physics_dt:
+        raise ValueError("static_config: native dt differs from task timebase; no versioned mapping is implemented")
     result = ResolvedSelectedConfig(
         environment=env,
         task_uid=environment_type.uid,
@@ -394,13 +467,28 @@ def _resolve_selected_config(environment_type, config):
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
         render_default=renderer,
+        execution_spec_v2=selection,
+        requested_execution_json=requested_json,
     )
+    if supplied is not None and supplied.execution_spec_v2 is None:
+        supplied = replace(supplied, execution_spec_v2=selection)
     if supplied is not None and supplied != result:
         raise ValueError("resolved selected configuration contains unsupported overrides")
+    if supplied is not None and requested_json is not None:
+        original = {"execution": json.loads(requested_json),
+                    "episode": {"horizon": result.environment.episode.horizon},
+                    "task": dict(result.task_parameters)}
+        if result.controller_profile is not None:
+            original["task"]["controller_profile"] = result.controller_profile
+        reconstructed = _resolve_selected_config(environment_type, original)
+        if (reconstructed.environment != result.environment
+                or reconstructed.execution_spec_v2 != result.execution_spec_v2
+                or reconstructed.source_delivery_manifest != result.source_delivery_manifest):
+            raise ValueError("resolved selected requested execution does not match its selection")
     return result
 
 
-def resolve_task_env_config(
+def _resolve_task_env_config_impl(
     environment_type,
     config: ResolvedEnvConfig | Mapping[str, object] | str | Path | None,
 ) -> ResolvedEnvConfig:
@@ -428,6 +516,41 @@ def resolve_task_env_config(
             raise TypeError("TaskEnv config must be ResolvedEnvConfig, mapping, or YAML path")
         merged = _deep_merge(merged, override)
     return overlay_public_env_config(base, merged)
+
+
+
+def resolve_task_env_config(environment_type, config):
+    """Resolve the common config and attach a stable receipt to static rejections."""
+    try:
+        return _resolve_task_env_config_impl(environment_type, config)
+    except Exception as error:
+        try:
+            snapshot = _identity_value(config)
+            json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except (TypeError, ValueError, OverflowError):
+            snapshot = {"unserializable_type": f"{type(config).__module__}.{type(config).__qualname__}"}
+        payload = {"task_uid": str(getattr(environment_type, "uid", "unknown")), "requested": snapshot}
+        if isinstance(config, (str, Path)):
+            try:
+                payload["config_file_sha256"] = hashlib.sha256(Path(config).read_bytes()).hexdigest()
+            except OSError:
+                payload["config_file_sha256"] = None
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        identity = hashlib.sha256(encoded.encode()).hexdigest()
+        message = str(error)
+        reason = ('input_unavailable' if isinstance(error, OSError) else
+                  'unknown_field' if isinstance(error, KeyError) else
+                  'invalid_type' if isinstance(error, TypeError) else
+                  'configuration_conflict' if 'conflict' in message else
+                  'unsupported_configuration')
+        error.phase = 'static_config'
+        error.reason = reason
+        error.request_identity = identity
+        error.receipt = {'schema_version': 'configuration-rejection-v1', 'phase': error.phase,
+                         'reason': reason, 'message': message, 'request_identity': identity,
+                         'requested': snapshot, 'resolved': None,
+                         'native_effective': {'status': 'unknown', 'reason': 'not built'}}
+        raise
 
 
 def _identity_value(value):
@@ -543,6 +666,18 @@ def resolve_execution_plan(
         if normalized_render_mode is not None
         else "none"
     )
+    if config.render.camera_obs or normalized_render_mode is not None:
+        renderer = RendererSelectionV1(
+            "renderer-selection-v1", config.render.backend, config.runtime.backend,
+            "unknown", None,
+        )
+    else:
+        renderer = RendererSelectionV1("renderer-selection-v1", "none", "cpu", "none", None)
+    selection, _ = _layered_execution_selection(
+        provider="geophys", backend=config.runtime.backend,
+        device="cpu" if config.runtime.backend == "cpu" else "unknown",
+        renderer=renderer, runtime=config.runtime,
+    )
     return ExecutionPlan(
         schema_version="execution-plan-v0",
         environment_uid=environment_uid,
@@ -566,6 +701,7 @@ def resolve_execution_plan(
         ),
         configuration_identity=_resolved_config_identity(config),
         state_requirements=state_requirements,
+        execution_spec_v2=selection,
     )
 
 

@@ -32,10 +32,10 @@
   "next_candidate": {
     "substage": "3a",
     "package_id": "V211_G03_3a_attempt001",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "assigned_agent": null,
+    "status": "REPORTED_PENDING_SOL_REVIEW",
+    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
     "target_thread": null,
-    "assignment": "Maintainer designates and manually forwards to one Terra or Luna; Sol does not dispatch.",
+    "assignment": "Maintainer designated and forwarded to Terra; independent Sol review is pending.",
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
     "prompt_sha256": "3ed706e1842b2f243a7f68e143e8541b741f17608f23471248ab9247f15da00b",
     "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001/manifest.json",
@@ -59,7 +59,7 @@
     },
     "preparation_consumes_attempt": false
   },
-  "next_action": "维护者指定一个Terra或Luna并手动转发已准备的V211_G03_3a_attempt001；开工重验snapshot与writer。3a-3c仍PLANNED／attempt0，无G03包派发；完整报告及窗口释放后由Sol独立主审。",
+  "next_action": "维护者手动转交 attempt001 完整报告，Sol 独立审阅；普通 MJCF 资产闭包和 selected reset 兼容性未过门，不自动进入 3b。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -725,21 +725,39 @@
             "1d",
             "2c"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G03_3a_attempt001",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T14:36:23+08:00",
+              "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98",
+              "prompt_sha256": "3ed706e1842b2f243a7f68e143e8541b741f17608f23471248ab9247f15da00b",
+              "writer_ownership": "released upon report and commit",
+              "result": "PARTIAL_NOT_ACCEPTED",
+              "summary_ref": "reviews/20261105_3a_attempt001_execution.md"
+            }
+          ],
+          "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
+          "package_sha256": "fcb88f6ff05201b602b7da15f436b030df3560cd9ad6b78b75d89032eaeb4550",
+          "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98",
           "output_head": null,
-          "expected_duration_minutes": null,
+          "expected_duration_minutes": "120–150; hard 180",
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "last_observation": "Offline implementation reported; missing ordinary MJCF source closure blocks selected reset compatibility; no native evidence.",
+          "evidence_refs": [
+            "reviews/20261105_3a_attempt001_execution.md"
+          ],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [
+            "Ordinary selected MJCF sources lack a verified asset closure; reset compatibility is not preserved.",
+            "Request-specific nested/typed capability coverage and real backend execution remain unverified."
+          ]
         },
         {
           "id": "3b",

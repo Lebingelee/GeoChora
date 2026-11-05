@@ -1600,6 +1600,24 @@ def execute_position_control_interval(
 ):
     """Preflight both groups, compute/apply once, then advance one outer interval."""
     prepared = prepare_structured_action(plan, request)
+    from .transport import RemoteSession
+    if isinstance(session, RemoteSession):
+        if isinstance(controller_profile, (tuple, list)):
+            raise ValueError('isolated Position route currently requires one writer')
+        if len(prepared) != 1 or prepared[0][0] != controller_profile.writer_id:
+            raise ValueError('PositionServoV1 requires exactly one matching structured-action writer')
+        controller_profile._validate_source(controller_profile.source)
+        plan_identity = controller_profile._validate_plan(plan)
+        if session.position_preflight(publication) != plan_identity:
+            raise ValueError('worker Position plan identity mismatch')
+        canonical, target = controller_profile.compute(publication, prepared[0][1], plan)
+        applied = session.position_apply(target, publication)
+        state = session.step()
+        next_publication = session.snapshot_v1(
+            scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+            requirements=requirements or controller_profile.requirements,
+        )
+        return canonical, target, applied, state, next_publication
     if isinstance(controller_profile, (tuple, list)):
         profiles = tuple(controller_profile)
         if len(profiles) != 2 or any(not hasattr(item, 'controller_binding') for item in profiles):

@@ -2,7 +2,11 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 新Sol已接手：3a完整包已准备，尚未派发
+## 3a attempt001 已返包，待 Sol 独立复审
+
+维护者已指定 Terra 执行 `V211_G03_3a_attempt001`，当前状态为 `REPORTED_PENDING_SOL_REVIEW`，不自动进入 3b。预检发现普通 PickCube／Nut 缺可验证的 MJCF 资产闭包回执，当前 reset 会拒绝，兼容性门未通过；不得将离线替身结果当成真实后端运行。详见[执行摘要](reviews/20261105_3a_attempt001_execution.md)及 ignored 输出目录的完整报告。
+
+## 历史：新Sol接手时3a完整包已准备，尚未派发
 
 Sol已完整核对交接及必读资料，实际Core输入与`develop@9d942d43`快照一致，两份保护untracked及子模块pin不变。只读核对未发现新的3a在途包／writer；旧Terra前置窗口已有完整返包和释放声明。已fetch核对public/develop，本地develop领先236、落后0；从完整本地develop建立`codex/v211-stage3`，3a–3c共用当前checkout，新增worktree为0。develop保留原交接HEAD，无reset/rebase或推送。
 

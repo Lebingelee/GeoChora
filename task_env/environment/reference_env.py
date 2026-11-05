@@ -648,6 +648,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         if type(config) is not ResolvedSelectedConfig or config.task_uid != cls.uid:
             raise TypeError('selected construction requires its own resolved configuration')
+        # Direct advanced callers must pass through the same validation as the
+        # public factory; a fabricated resolved value is not an admission token.
+        from .configuration import resolve_task_env_config
+        config = resolve_task_env_config(cls, config)
         if kwargs or render_mode is not None:
             raise ValueError('selected reference admits state-only execution without extra kwargs')
         binding = cls.selected_binding(config)
@@ -1365,6 +1369,27 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
+        resolved = getattr(self, 'resolved_public_config', None)
+        selection = None if resolved is None else resolved.execution_spec_v2
+        deployment_receipt = None
+        if selection is not None:
+            import json
+            from ..runtime.sessions.provenance import (
+                DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
+            )
+            requested = (None if resolved.requested_execution_json is None
+                         else json.loads(resolved.requested_execution_json))
+            facts = dict(requested=requested, task_uid=self.uid, artifact=self.artifact,
+                         source=self.value['source'], controller=self.value['controller'], seed=seed)
+            if selection.deployment == 'isolated_worker':
+                if (self._mixed_control_candidate or self.leaf_position_profile
+                        or self.dual_entity_position or self._diagnostic_profile is not None
+                        or self._native_feedback_profile is not None):
+                    receipt = describe_execution_selection(selection, **facts)
+                    receipt['phase'] = 'static_preflight'
+                    raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
+            deployment_receipt = preflight_selected_deployment(
+                selection, **facts, binding=self.binding, value=self.value)
         previous_episode_end = self._position_episode_end
         if (getattr(self, 'position_profile', False) and self.session is not None
                 and self._published_position_typed_state is not None
@@ -1390,6 +1415,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def prepare():
             nonlocal seed, previous_session_close_attempted, failure_phase
+            self._deployment_receipt = deployment_receipt
             self._close_camera_consumer()
             failure_phase = 'reset_close'
             if previous_session is not None:
@@ -1432,7 +1458,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if external_solution is not None:
                 self.binding.validate_external_solution(self.value, external_solution)
             failure_phase = 'reset_seed'
-            if not getattr(self, 'position_profile', False):
+            if self._mixed_control_candidate:
                 seed = self.binding.reset_seed(seed)
             self.solution = self.value.get('solution')
             if self._native_feedback_profile is not None and self.solution is not None:
@@ -1461,6 +1487,32 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def materialize_runtime():
             nonlocal failure_phase
             failure_phase = 'session_materialization'
+
+            def start_worker():
+                from ..runtime.sessions.transport import (
+                    request_identity, source_execution_facts, start_selected_worker,
+                )
+                from ..utils._paths import GEOCHORA_ROOT, GEOPHYS_PROVIDER_ROOT
+                replay = self._recorded_execution_configuration()
+                config = {key: value for key, value in replay.items() if key != 'env_id'}
+                # The worker uses the original adapter in its own process; its
+                # deployment itself is already represented by this request.
+                for name in ('host', 'engine', 'solver_family', 'solver_algorithm', 'coupler',
+                             'batch_layout', 'deployment', 'interpreter', 'native_dt'):
+                    config['execution'].pop(name, None)
+                payload = {
+                    'uid': self.uid, 'config': config, 'seed': seed,
+                    'selection': selection.to_mapping(), 'execution': self.execution.to_mapping(),
+                    'facts': source_execution_facts(self.artifact, self.execution,
+                                                    self.value['source'], self.value['controller']),
+                    'preflight_request_identity': deployment_receipt['request_identity'],
+                    'preflight_identity_facts': deployment_receipt['identity_facts'],
+                    'core_root': str(GEOCHORA_ROOT), 'geophys_src': str(GEOPHYS_PROVIDER_ROOT / 'src'),
+                    'environment': deployment_receipt['environment'],
+                }
+                session = start_selected_worker(selection.interpreter, payload)
+                deployment_receipt['worker_request_identity'] = request_identity(payload)
+                return session
             if self.position_profile:
                 from ..runtime.sessions.control import prepare_position_control_materialization
                 self.position_scene = self.value['source'].scene_definition
@@ -1472,7 +1524,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     plan=self.value.get('controller_binding_plan'),
                     select_binding=select_binding, value=self.value,
                 )
-                if self.leaf_position_profile:
+                if selection is not None and selection.deployment == 'isolated_worker':
+                    self.session = start_worker()
+                elif self.leaf_position_profile:
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
                         binding=position_binding,
@@ -1505,6 +1559,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.position_profile = False
                 if type(self.binding.scalar_control_binding) is not ControlBinding:
                     raise TypeError('selected scalar control requires its declared ControlBinding')
+                if selection is not None and selection.deployment == 'isolated_worker':
+                    self.session = start_worker()
+                    return
                 self.session = materialize_control(self.artifact, self.execution,
                     source=self.value['source'], binding=self.binding.scalar_control_binding,
                     diagnostic_profile=(self._diagnostic_profile
@@ -1807,8 +1864,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def observation(self, state):
         if self.mixed_control_profile:
             from ..observations.selected_reference import build_selected_observation
-            return build_selected_observation(self, state)
-        return self.binding.observation_projection(self, state)
+            observation, info, evaluation = build_selected_observation(self, state)
+        else:
+            observation, info, evaluation = self.binding.observation_projection(self, state)
+        if getattr(self, 'resolved_public_config', None) is not None:
+            info = dict(info)
+            info['execution_configuration_v1'] = self.get_execution_receipt()
+        return observation, info, evaluation
 
     def _close_camera_consumer(self):
         consumer, self._camera_consumer = self._camera_consumer, None
@@ -3282,6 +3344,36 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             source_sha256=self._recording_adapter_source_sha256,
         )
 
+    def get_execution_receipt(self):
+        """Return JSON-safe requested/resolved facts, without native-readback claims."""
+        import json
+        from ..runtime.sessions.transport import request_identity
+        if self._has_component_assembly():
+            plan = self.execution_plan
+            selection = plan.execution_spec_v2
+            facts = {'plan': plan.to_mapping(), 'selection': selection.to_mapping()}
+            receipt = {'schema_version': 'deployment-preflight-v1', 'phase': 'static_config',
+                       'request_identity': request_identity(facts), 'requested': None,
+                       'resolved': selection.to_mapping(), 'identity_facts': facts,
+                       'dependency': {'status': 'unknown', 'reason': 'not checked'},
+                       'native_effective': {'status': 'unknown', 'reason': 'native readback not available'},
+                       'evidence': 'none', 'status': 'selection_only'}
+        else:
+            receipt = getattr(self, '_deployment_receipt', None)
+            if receipt is None:
+                resolved = getattr(self, 'resolved_public_config', None)
+                if resolved is None or resolved.execution_spec_v2 is None:
+                    raise StageUnavailableError('execution receipt is unavailable on this compatibility route')
+                from ..runtime.sessions.provenance import describe_execution_selection
+                requested = (None if resolved.requested_execution_json is None
+                             else json.loads(resolved.requested_execution_json))
+                receipt = describe_execution_selection(
+                    resolved.execution_spec_v2, requested=requested, task_uid=self.uid,
+                    artifact=self.artifact, source=self.value['source'],
+                    controller=self.value['controller'], seed=None,
+                )
+        return json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
+
     def _recorded_execution_configuration(self):
         from ..recorders.reference_provenance import recorded_execution_configuration
         return recorded_execution_configuration(
@@ -3335,6 +3427,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             adapter_path=__file__, binding=self.binding, value=self.value, artifact=self.artifact,
             controller_identity=self.controller.identity, solution_identity=solution_identity,
             execution_configuration=execution_configuration,
+            execution_receipt=(self.get_execution_receipt()
+                               if getattr(self, 'resolved_public_config', None) is not None else None),
         )
         owners = self._owners()
         metadata, recipe = selected_recording_metadata(
@@ -3405,7 +3499,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def get_record_metadata(self):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
         if self._has_component_assembly():
-            return self._component_record_metadata()
+            return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
         if not getattr(self, 'mixed_control_profile', False):
             raise StageUnavailableError('selected reference recording metadata is unavailable on this route')
         value = self._mixed_record_metadata
@@ -3413,8 +3507,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             value = self.binding.mixed_record_metadata(self)
         if not isinstance(value, Mapping):
             raise TypeError('task recording metadata hook must return a mapping')
-        return dict(value)
+        result = dict(value)
+        if getattr(self, 'resolved_public_config', None) is not None:
+            result['execution_configuration_v1'] = self.get_execution_receipt()
+        return result
 
     def _position_record_metadata(self):
         from ..recorders.position_metadata import position_record_metadata
-        return position_record_metadata(self)
+        result = position_record_metadata(self)
+        if getattr(self, 'resolved_public_config', None) is not None:
+            result['execution_configuration_v1'] = self.get_execution_receipt()
+        return result
