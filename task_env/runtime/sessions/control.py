@@ -868,18 +868,15 @@ def materialize_control(
     if native_feedback_profile is not None:
         import hashlib
         from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
-        from ...controllers.canonical.execution import StableArmTargetHold
-        from ...controllers.canonical.gripper_execution import EqualRateGripperServo
-        from ...tasks.nut_assembly.solution import (
-            NativeRateGripperServo, NutAssemblyOutcomeSolutionV1,
-            ReferenceExecutionController,
-        )
+        from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
+        from ...controllers.canonical.gripper_execution import EqualRateGripperServo, NativeRateGripperServo
+        from ...tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
         from ...controllers.canonical.contracts import digest
         expected_controller_identity = {
             # Pin the post-refactor source-bound identities. The independent
             # field, source, provider and resource checks remain mandatory.
-            100: 'ff8581c54a2a182f01a460413f742605c1217740a14e7d2e4412d1d6bf668b5e',
-            500: '03d7b779743d6d78685bbcca891a4353295768c9092dd9499e6cc601f8b010f9',
+            100: '081685dc897132168173cf176bdaeecc81aa1bf72c4180677d34571616424801',
+            500: 'e0540a9e0ceaff8865704114a88983f113333ed3a736b9e81749617c92147a85',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,

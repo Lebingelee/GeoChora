@@ -25,7 +25,7 @@ from ...assembly.compiler import (
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
-from ...controllers.canonical.execution import StableArmTargetHold
+from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
 from ...controllers.canonical.production_r3 import (
     ProductionCanonicalPandaControllerR3, R3_PROFILE_PATH, load_r3_dynamic_profile,
 )
@@ -54,7 +54,7 @@ from ...environment.reference_env import SelectedReferenceEnv
 from .solution import (
     NutAssemblyNativeFeedbackSampleV1, NutAssemblyNativeIntervalReceiptV1,
     NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig,
-    OUTCOME_POLICY_ID, ReferenceExecutionController,
+    OUTCOME_POLICY_ID,
 )
 
 CONFIG_PATH = Path(__file__).with_name("config.yaml")
