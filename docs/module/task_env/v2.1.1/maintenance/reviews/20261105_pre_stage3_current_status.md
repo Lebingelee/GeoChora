@@ -4,7 +4,7 @@
 
 | 门 | 当前状态 | 证据与剩余边界 |
 | --- | --- | --- |
-| G0 输入与资源 | **PARTIAL** | 两份保护 untracked 的 SHA 和 GeoPhys／Menagerie pin 与原记录一致。维护者将物理步总限额调整为 300000，并以两目录现存占用检查 2 GiB；当前约 1.03 GiB。可见 pytest supervisor 累计约 1464 秒，超过原 1200 秒离线墙时上限；已请求调整并暂停新增离线测试。当前数字不是完整历史命令账本。 |
+| G0 输入与资源 | **PARTIAL** | 两份保护 untracked 的 SHA 和 GeoPhys／Menagerie pin 与原记录一致。维护者将物理步总限额调整为 300000，并以两目录现存占用检查 2 GiB；当前约 1.03 GiB。两目录中可见的 121 条 pytest supervisor 记录累计约 1464 秒，超过原 1200 秒离线墙时上限；已请求调整并暂停新增离线测试。逐项路径、PID、时间和分类保存在 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/visible-supervisor-budget-ledger-20261105.json`；该数字不是完整历史命令账本。 |
 | G1 代码职责 | **PARTIAL，待复审** | 三个旧任务使用统一 scalar Env，四个 BaseTaskEnv 出口为同对象别名；PickCube／Nut 各保留四个业务文件与薄 `__init__.py`。公共 factory 为 `make_env(uid, *, config=None, render_mode=None, **kwargs)`；调用方 Solution 路线为 `act → step(action) → observe`，`step_expert()` 仅为受限兼容。F05 source-bound 准入类型归 runtime，任务 builder 保留兼容导出；reset 输入校验归现有 binding，录制来源／持久化归 recorder。`SelectedReferenceEnv` 仍有 3574 行及多种接线分支，不能宣布整体减责完成。 |
 | G2 功能与身份 | **PARTIAL** | `f06ee2f5` 上 PickCube／Nut MuJoCo CPU 代表回归及独立 reader 均通过；`8b3c8d93` 上 Empty／Pendulum／TwoWheel GeoPhys CPU 各一个 reset／step／close 通过。`f06ee2f5` 干净无引擎组合 335 passed、1 skipped、5 deselected，mixed 假 provider 9 passed；`0c224302` 上 Nut Solution 35 项无引擎语义测试分批全通过。每项只属于所记源码／路线；DG04 为冻结来源加最低 I/O 合成测试，不是 Isaac 物理。 |
 | G3 文档与启动 | **PARTIAL** | [安装与启动指南](../../guides/installation-and-start.md)、[任务开发指南](../../../../../../task_env/doc/自定义任务构建指南.md)及[Solution 接口](../../../../../../task_env/doc/api/planning/task_owned_solutions.md)提供当前入口；显式路径启动器 Pendulum CPU 已执行。完整新克隆安装和全部适用入口未验证，不能据此宣称完整新手流程验收。 |
