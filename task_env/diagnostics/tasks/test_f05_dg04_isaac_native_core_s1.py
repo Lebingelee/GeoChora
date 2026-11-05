@@ -14,9 +14,10 @@ import pytest
 from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
 
 
-DELIVERY_MANIFEST = (
+DELIVERY_MANIFEST = os.environ.get(
+    "F05_DG04_DELIVERY_MANIFEST",
     "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
-    "f05_diagnostic04/window_002/isaac_usd_v4/delivery_manifest.json"
+    "f05_diagnostic04/window_002/isaac_usd_v4/delivery_manifest.json",
 )
 
 

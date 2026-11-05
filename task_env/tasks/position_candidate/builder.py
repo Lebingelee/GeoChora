@@ -6,7 +6,6 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
-import yaml
 
 from task_env.artifacts import Timebase
 from task_env.controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
@@ -63,16 +62,13 @@ POSITION_CANDIDATE_SEED = 31
 
 
 def _dg02_r3_arm_profile():
-    """Read the existing NutAssembly R3 profile as configuration, not task logic."""
-    path = Path(__file__).resolve().parents[1] / 'nut_assembly' / 'config.yaml'
-    data = yaml.safe_load(path.read_text(encoding='utf-8'))
-    controller = data.get('recipe', {}).get('controller', {})
-    if controller.get('implementation') != 'ProductionCanonicalPandaControllerR3':
-        raise ValueError('DG02 R3 profile source no longer selects the production R3 owner')
-    profile = controller.get('dynamic_profile')
-    if not isinstance(profile, dict):
-        raise ValueError('DG02 requires the existing NutAssembly R3 dynamic profile')
-    return {**profile, 'profile_source_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    """Resolve the shared R3 profile from its controller owner."""
+    from task_env.controllers.canonical.production_r3 import (
+        R3_PROFILE_PATH, load_r3_dynamic_profile,
+    )
+
+    profile = load_r3_dynamic_profile()
+    return {**profile, 'profile_source_sha256': hashlib.sha256(R3_PROFILE_PATH.read_bytes()).hexdigest()}
 
 
 def _validate_f05_native_position_action_config(controller_config):
