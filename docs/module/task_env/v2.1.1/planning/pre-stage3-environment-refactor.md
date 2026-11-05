@@ -1,6 +1,6 @@
 # 阶段3前环境代码重构方案
 
-初稿：2026-11-04；当前补充：2026-11-05。状态：**整体维护待复审，维护者指定最后一个至多120分钟的核心收尾窗口，见第2.5节**。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。这些基线及第2.3／2.4节解释原审计和历史窗口，不代表当前实现。当前源码检查点为 `dba855e1ad9575d21604304dc04e9f7fc036ad7e`；原[维护检查点](../maintenance/reviews/pre-stage3-refactor-attempt001.md)保留历史身份，两个保护untracked保留。
+初稿：2026-11-04；当前决定：2026-11-05。**第2.5节的限定核心收尾已获Sol接收：ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT**，返包`99de88ab`，见[独立复审](../maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)。本次窗口结束，延期整理及未验证能力仍保留限制，阶段3未开始。初次源码审计基线为 `develop@2fb903aa35a80a42aef34a10cfe4dbca63dd2d83`；新手入口和并行边界补充核对基线为 `develop@3dd27bd1ece06294efcd3f85f0d6c9673b6b4def`。这些基线及第2.3／2.4节解释原审计和历史窗口；`dba855e1`为两小时窗口准备前的实现检查点，原[维护检查点](../maintenance/reviews/pre-stage3-refactor-attempt001.md)和两个保护untracked保留。
 
 维护者提出：整理tasks、隔离诊断、统一BaseTaskEnv与SelectedReferenceEnv，减少冗余诊断和SHA开销，并补齐新手安装、路径复用、启动脚本及基于example的二次开发指引。本次先完成单环境规范路线，Pendulum并行适配延期至G06。本项作为阶段3前的独立维护工作，不修改七阶段／22子阶段编号，不重开已接收的阶段2，也不表示阶段3已经启动。实施要求和验收以本仓库开发文档为准，GPT工作文档只作交接入口。
 
@@ -98,6 +98,8 @@ R2 Marker通用构造简化、R3 F06任务规则归位、本轮不受影响的�
 <a id="pre-stage3-closeout-120min"></a>
 
 ### 2.5 维护者指定的两小时核心收尾窗口（当前执行范围）
+
+执行后决定：本节C1、C2、V已在限定范围获[Sol接收](../maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，不再开本次维护续作。下文保留本窗口原要求；未验证的R05b真实provider和更广整理不冒充通过，也不改写旧宽范围门结果。G03/3a须另行派包。
 
 > 2026-11-05 本轮执行返包：源码检查点 `b6ce23727f1b2cd21da15758785b59448eb9ceb0`；C1、C2、针对性验证、复用依据及明确余项见[120分钟收尾报告](../maintenance/reviews/20261105_pre_stage3_closeout_120min_001.md)。状态 `REPORTED_PENDING_REVIEW`，等待 Sol 复审，不构成阶段3启动或整项维护接收。
 

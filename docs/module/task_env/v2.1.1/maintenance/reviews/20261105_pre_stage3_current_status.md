@@ -1,5 +1,7 @@
 # 阶段3前维护：当前证据与待复审项
 
+当前决定：`99de88ab`经[Sol主审](20261105_pre_stage3_closeout_120min_sol_review.md)，第2.5节限定的C1、C2、V以 **ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT** 接收，前置核心窗口结束，阶段3未开始。R05b真实provider、新安装及更广整理仍有边界，不因此续开本窗口。下文宽范围G0–G5草稿及其检查点保留为历史，不能把其中PARTIAL解释为本次C1／C2／V仍未返包或未审阅。
+
 2026-11-05；核心源码检查点 `b6ce23727f1b2cd21da15758785b59448eb9ceb0`。本轮具体结论及限制见[120分钟收尾报告](20261105_pre_stage3_closeout_120min_001.md)。整体维护仍为 **PARTIAL、待 Sol 复审**，阶段 3 未开始。本页汇总现状；逐次结果、失败和资源记录保留在[续作证据历史](20261105_pre_stage3_renewed_evidence_history.md)及[物理验证记录](20261105_pre_stage3_resumed_physical_checks.md)，不能将其重标到其他源码。
 
 | 门 | 当前状态 | 证据与剩余边界 |

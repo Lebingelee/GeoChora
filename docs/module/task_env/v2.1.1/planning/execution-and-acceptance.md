@@ -10,7 +10,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 
 维护者要求先完成[环境重构与新手交付](pre-stage3-environment-refactor.md)：归整tasks、隔离诊断、统一Env与旧别名、优化静态摘要，并同步README、`task_env/doc`、本版指南及轻量启动入口。新手流程区分新克隆安装与复用既有安装，包含基于example的二次开发；详见[指南清单](../guides/README.md)。
 
-单环境生命周期R1已有限接收，后续实现停在`dba855e1`待复审。维护者于2026-11-05指定至多120分钟完成前置核心收尾：具体任务／Solution与通用Env/runtime职责归位、诊断隔离、当前`task_env/doc`和真实开发示例，详见[维护方案第2.5节](pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)。已有成果不重做，验证按实际影响复用，不把历史资源审计或全路线整理设为出口。Pendulum并行留G06。本项不增加第23个子阶段，不重开G02，也不启动或收尾G03的3a–3c；七阶段出口保持不变。
+单环境生命周期R1和[维护方案第2.5节](pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)的前置核心收尾均已有限接收；`99de88ab`经[Sol主审](../maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)完成C1任务／Solution与通用Env/runtime职责、C2当前开发文档及V受影响行为出口。本次维护窗口结束，不因剩余历史诊断、环境类更广整理或安装矩阵延长。R05b真实provider等能力仍有明确未验证边界，后续按对应实现检查；Pendulum并行留G06。本项不增加第23个子阶段，不重开G02，不启动G03的3a–3c；七阶段出口保持不变。
 
 ## 顺序与最小出口
 

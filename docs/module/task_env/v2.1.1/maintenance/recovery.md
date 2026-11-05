@@ -2,11 +2,13 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 当前返包：120分钟核心收尾待复审
+## 当前决定：前置核心收尾已有限接收
 
-`V211_PRE_STAGE3_CLOSEOUT_120MIN_001` 已完成本轮代码、文档、针对性验证和本地返包，状态 **REPORTED_PENDING_REVIEW**；实现源码检查点 `b6ce23727f1b2cd21da15758785b59448eb9ceb0`，最终报告提交为包含[本轮报告](reviews/20261105_pre_stage3_closeout_120min_001.md)的后续 HEAD。R05b runtime 物化与 Nut Solution 类型依赖分开，任务侧仍检查 Solution，受影响 Nut MuJoCo CPU 代表运行及同次独立 reader 通过。R05b 普通 reset 不持有 Solution，旧 Env-driven Expert 可按需创建；真实 R05b provider 运行及新安装未在本轮验证。已释放 writer 和锁，等待维护者转交 Sol；阶段3未开始。以下计划与旧记录保留其当时身份。
+`V211_PRE_STAGE3_CLOSEOUT_120MIN_001`返包`99de88abd6d3f464de0d5c9c98362813f52252c9`经[Sol复审](reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，决定 **ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT**：C1核心职责、C2当前文档、V受影响行为在限定范围通过，本次前置核心收尾结束，不再追加持续拆分窗口。runtime不依赖具体Nut Solution，任务侧保留检查；R05b普通reset不持有Solution，兼容Expert按需创建。Sol独立R05b检查25 passed／1 deselected，核对执行者182 passed／1 deselected及Nut物理／同次reader结果，并接受有调用链差异依据的PickCube和Nut证据复用。详见[原返包](reviews/20261105_pre_stage3_closeout_120min_001.md)。
 
-## 当前恢复入口：120分钟核心收尾
+真实R05b provider、新安装及其他未验证能力继续保留限制，环境类更广整理不等于已完成；它们不重开本次限定收尾。可另行准备阶段3分支和3a包，但目前未创建或执行，G03仍未开始。以下派包计划与旧记录保留当时身份，不覆盖本段决定。
+
+## 本次收尾的派包记录（历史）
 
 维护者要求回到原环境重构与开发指引目标，最多再用两小时。最新源码检查点为`develop@dba855e1ad9575d21604304dc04e9f7fc036ad7e`，tracked clean，两个保护untracked保留；整体维护待Sol复审，G03未开始。最后窗口以[规划第2.5节](../planning/pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)为当前执行范围：C1任务／Solution与Env/runtime职责、诊断隔离；C2当前`task_env/doc`和真实example；V只验证实际受影响行为。已接受生命周期不重做，不再逐helper拆分或逐提交重建全套证据。
 
