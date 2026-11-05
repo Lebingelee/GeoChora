@@ -319,6 +319,34 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
         receipt.close()
 
 
+def test_normal_profile_rejects_missing_or_subclassed_solution_before_materialization(monkeypatch):
+    from task_env.runtime.sessions import api
+    from task_env.runtime.sessions.control import ControlBinding, materialize_control
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+
+    value = build_native_feedback_reference(backend='cpu', gripper_control_hz=500)
+    receipt = value['source'].execution_source_receipt
+    class SubstitutedSolution(NutAssemblyOutcomeSolutionV1):
+        pass
+    substitute = object.__new__(SubstitutedSolution)
+    substitute.__dict__.update(value['solution'].__dict__)
+    calls = []
+    monkeypatch.setattr(api, '_materialize_admitted', lambda *_args, **_kwargs: calls.append('native'))
+    try:
+        for solution in (None, substitute):
+            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
+                materialize_control(
+                    value['artifact'], _execution(), source=value['source'],
+                    binding=ControlBinding('panda-v1/gripper', .08),
+                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
+                    selected_controller=value['controller'], selected_solution=solution,
+                    native_feedback_gripper_control_hz=500,
+                )
+        assert calls == []
+    finally:
+        receipt.close()
+
+
 def test_source_composer_points_to_receipt_snapshot_and_checks_importer_dependencies(monkeypatch):
     value = build_native_feedback_reference(backend='cpu', gripper_control_hz=500)
     source = value['source']
