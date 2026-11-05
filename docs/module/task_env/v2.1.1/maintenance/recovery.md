@@ -2,6 +2,10 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
+## 新Sol交接入口：G03未开始
+
+维护者将另开Sol对话接手阶段3。[新Sol检查点](20261105_stage3_sol_handoff.md)及外部`V211_G03_sol_handoff`包汇总前置、诊断规范、证据边界与首轮动作。3a–3c保持PLANNED／attempt0，无实现包派发；当前仅准备交接。阶段3规划为从develop新建一个主题分支供3a–3c复用，默认沿用现有checkout、新worktree为0；分支尚未创建。编排中的分支计划与下一动作已同步维护者新安排，既有阶段接收／attempt历史不变。
+
 ## 当前决定：前置核心收尾已有限接收
 
 维护者最新安排：先落实[诊断与代码边界规范](../../../../global/diagnostics-and-code-boundaries.md)，本轮不再全面解耦。后续环境、Controller、provider和renderer开发从外部诊断，不向核心新增实验／测试分支；现存已确认耦合登记在[规划第2.6节](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)，在版本准备进入7a集成时集中处理，并在稳定源码上验证。有限接收不表示诊断完全隔离，规则更新也不表示代码已整改。当前仅完成规范／规划更新，G03未启动。

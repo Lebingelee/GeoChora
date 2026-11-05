@@ -1,6 +1,6 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-04",
+  "updated_date": "2026-11-05",
   "status": "G02_ACCEPTED_BOUNDED_STAGE2_REFERENCE",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
@@ -14,13 +14,16 @@
   },
   "branch_plan": {
     "reuse_existing_checkout": true,
-    "additional_branches": 0,
+    "additional_branches": 1,
     "additional_worktrees": 0,
-    "reason": "Maintainer explicitly requested continued development on existing develop; no F/R branch revival."
+    "reason": "Maintainer requested one new branch from develop for G03; reuse it for 3a-3c. No branch or worktree has been created by handoff preparation.",
+    "stage": "3",
+    "proposed_stage_branch": "codex/v211-stage3",
+    "creation_status": "PLANNED_NOT_CREATED"
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "阶段2按MuJoCo代表成功实现与冻结参考范围有界接收；保留seed32/GeoPhys/Isaac未决。停在阶段2，等待维护者另行安排，不派发或启动阶段3。",
+  "next_action": "由新Sol读取阶段3交接、规范和实际状态，安排一个阶段3分支并准备首份3a完整包；维护者手动转发后实施。当前未派发3a，3a-3c保持PLANNED／attempt0。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1060,5 +1063,17 @@
       "revision": "r002",
       "reason": "Maintainer manually took over diagnosis, changed waypoints/readiness and obtained seed31 success."
     }
-  ]
+  ],
+  "stage3_handoff": {
+    "status": "READY_FOR_MANUAL_HANDOFF",
+    "reviewed_input_head": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
+    "handoff_ref": "20261105_stage3_sol_handoff.md",
+    "external_package": "V211_G03_sol_handoff",
+    "pre_stage3_core_closeout": "ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT",
+    "core_review_ref": "reviews/20261105_pre_stage3_closeout_120min_sol_review.md",
+    "diagnostic_policy_commit": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
+    "execution_started": false,
+    "next_substage": "3a",
+    "implementation_package_prepared": false
+  }
 }

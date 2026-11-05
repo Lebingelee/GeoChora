@@ -81,6 +81,8 @@ NutAssembly 用于已有后端的代表性复用；不自动扩为所有任务�
 
 当前前置收尾继续既有`develop`工作树，本窗口不新增分支／worktree。维护者后续已计划从develop独立建立阶段3分支；具体起点和独立工作目录在G03包中安排，本窗口不执行，不恢复F/R线或逐Goal建分支。每个包开工核对实际HEAD／dirty paths即可。若需修改GeoPhys公共API或pin，先冻结明确范围；本次收尾不修改它们。
 
+2026-11-05阶段3交接补充：前置核心窗口已结束，后续由[新Sol](../maintenance/20261105_stage3_sol_handoff.md)接手G03。计划新增一个阶段3分支，3a–3c共用；建议`codex/v211-stage3`，尚未创建。默认复用当前checkout，不另建worktree；若需要并行写入则先安排隔离目录／scope。分支起点必须包含已接受的本地实现与本次规范，不因fetch抹掉本地develop进展。本次准备不派发3a、不开始执行。
+
 Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一个完整包。默认一个 writer 和一个 native 执行窗口；尚未指定谁执行哪个阶段，不自动创建线程或发送消息。完整报告与窗口释放后再审核 diff 和证据，PASS 不是自动接收。
 
 按[Goal 编排流程](../../../../../.agents/skills/geochora/references/goal-orchestration.md)，一次 attempt 可包含多次修复与运行；普通子阶段至多三次窗口，第三次前重审根因与官方项目实现。常规修复不因单次测试失败而结束 attempt。执行包有完整预算，不能把“一次启动、失败即停”设成默认。反复同根因且无新假设时归因并向维护者报告。
