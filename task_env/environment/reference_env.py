@@ -16,7 +16,6 @@ from uuid import uuid4
 import numpy as np
 from gymnasium.spaces import Box, Dict
 
-from ..artifacts import ExecutionSpec
 from ..observations.selected_reference import _position_task_evaluation_state
 from ..controllers.canonical.contracts import RequestedAction, REFERENCE_POSE_ACTION_SCHEMA, digest
 from ..controllers.canonical.feedback import (
@@ -34,7 +33,7 @@ from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fau
 from .lifecycle import EpisodeExecutionState, SingleTaskLifecycleAdapter, TaskLifecycleAdapter
 from .types import ControlCommand, SnapshotRequest, TaskCompositionSpec, TaskEvaluation
 from ..planners.completion import ExpertExecutionInfo
-from ..runtime.sessions.api import PROFILE, close_session_and_runtime_owner, materialize
+from ..runtime.sessions.api import close_session_and_runtime_owner, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 from ..runtime.sessions.source import (
     position_frame_bindings_from_artifact as _position_frame_bindings_from_artifact,
@@ -1484,33 +1483,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
                 self._selected_episode_id = uuid4().hex
-            versioned_execution = self.value.get('execution_spec_v1')
-            if versioned_execution is not None:
-                from ..artifacts import ExecutionSpecV1
-                if (type(versioned_execution) is not ExecutionSpecV1
-                        or self._declared_execution_spec_v1 is None):
-                    raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
-                select_runtime_input = getattr(self.binding, 'reset_runtime_input', None)
-                runtime_input = select_runtime_input(self.value) if select_runtime_input else None
-                if runtime_input is not None:
-                    declared = self._declared_execution_spec_v1
-                    if ((versioned_execution.physics_provider, versioned_execution.physics_backend,
-                         versioned_execution.physics_device, versioned_execution.physics_profile,
-                         versioned_execution.determinism_mode, versioned_execution.render_default,
-                         versioned_execution.camera_overrides, versioned_execution.provider_seed)
-                            != (declared.physics_provider, declared.physics_backend,
-                                declared.physics_device, declared.physics_profile,
-                                declared.determinism_mode, declared.render_default,
-                                declared.camera_overrides, seed)
-                            or runtime_input.reset_plan.reset_sample.task_seed != seed):
-                        raise ValueError('seeded rebuild changed its exact route or requested seed')
-                elif versioned_execution.identity_hash != self._declared_execution_spec_v1.identity_hash:
-                    raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
-                self.execution = versioned_execution
-            else:
-                if self._declared_execution_spec_v1 is not None:
-                    raise ValueError('SelectedReferenceEnv rebuild dropped its declared ExecutionSpecV1')
-                self.execution = ExecutionSpec(self.provider, PROFILE, 'none', self.backend, 0, 'strict')
+            from .reference_binding import resolve_reset_execution
+            self.execution = resolve_reset_execution(
+                self.binding, self.value, self._declared_execution_spec_v1,
+                seed=seed, provider=self.provider, backend=self.backend,
+            )
 
         def materialize_runtime():
             nonlocal failure_phase

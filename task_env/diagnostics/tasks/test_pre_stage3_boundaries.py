@@ -4,6 +4,39 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_reset_execution_binding_preserves_exact_route_and_requested_seed():
+    from dataclasses import replace
+    from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
+    from task_env.environment.reference_binding import resolve_reset_execution
+
+    declared = ExecutionSpecV1(
+        schema_version='execution-spec-v1', physics_provider='mujoco',
+        physics_backend='cpu', physics_profile='example-profile', provider_seed=19,
+        determinism_mode='strict',
+        render_default=RendererSelectionV1('renderer-selection-v1', 'none', 'none', 'none'),
+        physics_device='cpu',
+    )
+    runtime_input = SimpleNamespace(reset_plan=SimpleNamespace(
+        reset_sample=SimpleNamespace(task_seed=31)))
+    binding = SimpleNamespace(reset_runtime_input=lambda value: value['runtime_input'])
+    current = replace(declared, provider_seed=31)
+    value = {'execution_spec_v1': current, 'runtime_input': runtime_input}
+    assert resolve_reset_execution(binding, value, declared, seed=31,
+                                   provider='mujoco', backend='cpu') is current
+    for changed in (replace(current, physics_profile='other'),
+                    replace(current, provider_seed=32)):
+        with pytest.raises(ValueError, match='exact route or requested seed'):
+            resolve_reset_execution(binding, {**value, 'execution_spec_v1': changed},
+                                    declared, seed=31, provider='mujoco', backend='cpu')
+    runtime_input.reset_plan.reset_sample.task_seed = 32
+    with pytest.raises(ValueError, match='exact route or requested seed'):
+        resolve_reset_execution(binding, value, declared, seed=31,
+                                provider='mujoco', backend='cpu')
+    with pytest.raises(ValueError, match='dropped its declared'):
+        resolve_reset_execution(binding, {}, declared, seed=31,
+                                provider='mujoco', backend='cpu')
+
+
 @pytest.mark.parametrize('session_fails', [False, True])
 def test_mixed_close_receipt_failure_does_not_skip_remaining_cleanup(session_fails):
     from task_env.environment.reference_env import SelectedReferenceEnv

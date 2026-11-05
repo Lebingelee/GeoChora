@@ -30,6 +30,36 @@ def position_input_kind(binding, value):
     return kind
 
 
+def resolve_reset_execution(binding, value, declared, *, seed, provider, backend):
+    """Keep rebuilt task execution bound to its declared route and reset seed."""
+    from ..artifacts import ExecutionSpec, ExecutionSpecV1
+    from ..runtime.sessions.api import PROFILE
+
+    versioned = value.get('execution_spec_v1')
+    if versioned is None:
+        if declared is not None:
+            raise ValueError('SelectedReferenceEnv rebuild dropped its declared ExecutionSpecV1')
+        return ExecutionSpec(provider, PROFILE, 'none', backend, 0, 'strict')
+    if type(versioned) is not ExecutionSpecV1 or declared is None:
+        raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
+    select_runtime_input = getattr(binding, 'reset_runtime_input', None)
+    runtime_input = select_runtime_input(value) if select_runtime_input else None
+    if runtime_input is not None:
+        if ((versioned.physics_provider, versioned.physics_backend,
+             versioned.physics_device, versioned.physics_profile,
+             versioned.determinism_mode, versioned.render_default,
+             versioned.camera_overrides, versioned.provider_seed)
+                != (declared.physics_provider, declared.physics_backend,
+                    declared.physics_device, declared.physics_profile,
+                    declared.determinism_mode, declared.render_default,
+                    declared.camera_overrides, seed)
+                or runtime_input.reset_plan.reset_sample.task_seed != seed):
+            raise ValueError('seeded rebuild changed its exact route or requested seed')
+    elif versioned.identity_hash != declared.identity_hash:
+        raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
+    return versioned
+
+
 def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, position,
                            has_session, previous_sample, artifact, value):
     """Validate reset inputs and resolve a task-bound sample before runtime changes."""
