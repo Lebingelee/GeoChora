@@ -46,17 +46,16 @@ from task_env.runtime.sessions.geophys_source import (
     source_closure_digest_for_import,
 )
 from task_env.runtime.sessions.source import RuntimeSource
+from task_env.runtime.sessions.position_admission import (
+    F05_DG01_SCENE_ID, F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_RECIPE_SHA256,
+)
 
 FIXTURE_ROOT = Path(__file__).with_name("assets")
 MENAGERIE_REVISION = "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
 EXPECTED_SCENE_IDENTITY = "047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e"
 EXPECTED_PANDA_CLOSURE = "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a"
 EXPECTED_PEG_CLOSURE = "6fadf3986265a56bbedc99e1546a566641928e612d8839ea94cafaa6f15b19ff"
-F05_DG01_SCENE_ID = "f05-dg01-menagerie-panda-cube-support"
-F05_DG01_TASK_ID = "phase-ii-f05-dg01-panda-cube"
-F05_DG01_TASK_VERSION = "candidate-v1"
 F05_DG01_RECIPE = FIXTURE_ROOT / "f05_dg01_task_scene_recipe.json"
-F05_DG01_RECIPE_SHA256 = "6a705816e619681e948a1b243e0588dd1db2f667ecfb085bd2e55b1c3fd8b89d"
 F05_DG01_R009_RECIPE_SHA256 = "3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede"
 
 

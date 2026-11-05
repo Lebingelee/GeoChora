@@ -549,7 +549,7 @@ def _session_admission_input_route(input_v1) -> str | None:
     if (type(input_v1) is UsdRuntimeInputV1
             and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
         return 'f06_pickcube'
-    from ...tasks.position_candidate.builder import (
+    from .position_admission import (
         F05Dg02GeoPhysUsdCandidateInputV1,
         F05Dg04IsaacNativeCandidateInputV1,
         F05NativePositionCandidateInputV1,

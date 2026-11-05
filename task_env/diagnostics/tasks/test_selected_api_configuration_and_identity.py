@@ -80,6 +80,28 @@ def test_f06_route_classification_does_not_import_position_candidate(monkeypatch
     assert _session_admission_input_route(value) == 'f06_pickcube'
 
 
+def test_f05_session_classification_uses_runtime_input_types_without_task_import(monkeypatch):
+    import builtins
+    from task_env.runtime.sessions.api import _session_admission_input_route
+    from task_env.runtime.sessions.position_admission import (
+        F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
+        F05Dg04IsaacNativeCandidateInputV1,
+    )
+
+    original_import = builtins.__import__
+    def guarded_import(name, *args, **kwargs):
+        if 'position_candidate' in name:
+            raise AssertionError('runtime classification imported Position task')
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, '__import__', guarded_import)
+    for cls, route in (
+        (F05NativePositionCandidateInputV1, 'f05_native'),
+        (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
+        (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
+    ):
+        assert _session_admission_input_route(object.__new__(cls)) == route
+
+
 @pytest.mark.parametrize("provider,backend,device,profile", [
     ("isaacsim", "cuda", "cuda:0", "isaac-gpu-physx-f04-position-v1"),
     ("geophys", "cpu", "cpu", "geophys-usd-position-f05-s1-v1"),
