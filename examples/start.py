@@ -5,6 +5,7 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 CLASSIC = {'empty-v1', 'pendulum-v1', 'two-wheel-balance-v1'}
@@ -12,7 +13,7 @@ SELECTED = {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}
 
 
 def _file(parser, value, label, *, executable=False):
-    path = Path(value).expanduser().resolve()
+    path = Path(value).expanduser().absolute()
     if not path.is_file() or (executable and not os.access(path, os.X_OK)):
         parser.error(f'{label} must be an existing' + (' executable' if executable else ' file') + f': {path}')
     return path
@@ -20,7 +21,7 @@ def _file(parser, value, label, *, executable=False):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--python', required=True, help='Core Python interpreter')
+    parser.add_argument('--python', default=sys.executable, help='Core Python interpreter (default: current Python)')
     parser.add_argument('--core', type=Path, default=ROOT, help='this Core checkout')
     parser.add_argument('--geophys-src', type=Path, required=True, help='GeoPhys src directory')
     parser.add_argument('--uid', choices=sorted(CLASSIC | SELECTED), required=True)
@@ -48,9 +49,10 @@ def main(argv=None):
     if args.renderer != 'none' and (args.uid, args.provider, args.backend) != ('pendulum-v1', 'geophys', 'cpu'):
         parser.error('rasterizer example is restricted to scalar Pendulum / GeoPhys / CPU')
     if args.provider == 'isaacsim':
-        if args.isaac_python is None or args.source_delivery_manifest is None:
-            parser.error('Isaac requires --isaac-python and --source-delivery-manifest')
-        isaac_python = _file(parser, args.isaac_python, '--isaac-python', executable=True)
+        selected_isaac = args.isaac_python or os.environ.get('ISAAC_SIM_PYTHON')
+        if selected_isaac is None or args.source_delivery_manifest is None:
+            parser.error('Isaac requires --isaac-python or ISAAC_SIM_PYTHON, and --source-delivery-manifest')
+        isaac_python = _file(parser, selected_isaac, '--isaac-python/ISAAC_SIM_PYTHON', executable=True)
         manifest = _file(parser, args.source_delivery_manifest, '--source-delivery-manifest')
     elif args.isaac_python is not None or args.source_delivery_manifest is not None:
         parser.error('Isaac interpreter and delivery manifest require --provider isaacsim')

@@ -39,7 +39,8 @@ def _materialize_selected(payload):
             or selection.render_default != config.render_default):
         raise ValueError('worker selection or preflight request identity mismatch')
     from .provenance import assess_declared_dependencies
-    dependency = assess_declared_dependencies(selection.physics_provider, payload['environment'])
+    dependency = assess_declared_dependencies(selection.physics_provider, payload['environment'],
+                                             solver_family=selection.solver_family)
     if dependency != identity_facts['dependency'] or dependency['status'] != 'available':
         raise ValueError('worker dependency facts differ from admissible preflight')
     if not callable(getattr(cls, 'selected_binding', None)):
@@ -131,6 +132,8 @@ def _validate_environment(payload):
     if GEOCHORA_ROOT.resolve() != expected_core or (GEOPHYS_PROVIDER_ROOT / 'src').resolve() != expected_geo:
         raise ValueError('worker loaded a different Core or GeoPhys checkout')
     facts = payload['environment']
+    if str(Path(sys.executable).absolute()) != facts.get('worker_executable', str(Path(sys.executable).absolute())):
+        raise ValueError('worker executable differs from preflight')
     if str(Path(sys.executable).resolve()) != facts['python']:
         raise ValueError('worker interpreter identity differs from preflight')
     for name, expected in facts['origins'].items():
@@ -140,7 +143,8 @@ def _validate_environment(payload):
             raise ValueError(f'worker source origin changed for {name}')
     modules = {'numpy':'numpy', 'scipy':'scipy', 'psutil':'psutil', 'pydantic':'pydantic',
                'taichi-forge':'taichi_forge', 'trimesh':'trimesh', 'pyvista':'pyvista',
-               'Pillow':'PIL', 'mujoco':'mujoco', 'gymnasium':'gymnasium', 'h5py':'h5py', 'PyYAML':'yaml', 'isaacsim':'isaacsim'}
+               'Pillow':'PIL', 'mujoco':'mujoco', 'gymnasium':'gymnasium', 'h5py':'h5py', 'PyYAML':'yaml', 'isaacsim':'isaacsim', 'packaging':'packaging'}
+    isaacsim_namespace_owner = None
     for name, expected in facts['module_origins'].items():
         spec = PathFinder.find_spec(modules[name], sys.path)
         origin = None if spec is None else spec.origin
@@ -156,14 +160,26 @@ def _validate_environment(payload):
                 if dist.files is not None:
                     relative = Path(actual).relative_to(Path(dist.locate_file('')).resolve()).as_posix()
                     names = {str(item).replace('\\', '/') for item in dist.files}
-                    ownership = ('owned' if relative in names or any(item.startswith(relative + '/') for item in names)
-                                 else 'mismatch')
+                    owned = relative in names or any(item.startswith(relative + '/') for item in names)
+                    if name == 'isaacsim' and not owned:
+                        try:
+                            kernel = metadata.distribution('isaacsim-kernel')
+                            kernel_relative = Path(actual).relative_to(Path(kernel.locate_file('')).resolve()).as_posix()
+                            kernel_files = {str(item).replace('\\', '/') for item in (kernel.files or ())}
+                            if kernel.version == dist.version and kernel_relative in kernel_files:
+                                owned = True
+                                isaacsim_namespace_owner = 'isaacsim-kernel'
+                        except (metadata.PackageNotFoundError, ValueError):
+                            pass
+                    ownership = 'owned' if owned else 'mismatch'
             except metadata.PackageNotFoundError:
                 pass
             except ValueError:
                 ownership = 'mismatch'
         if ownership != facts['origin_ownership'].get(name):
             raise ValueError(f'worker distribution origin ownership changed for {name}')
+    if isaacsim_namespace_owner != facts.get('isaacsim_namespace_owner'):
+        raise ValueError('worker Isaac namespace owner differs from preflight')
     for name, expected in facts['versions'].items():
         try:
             actual = metadata.version(name)
@@ -171,6 +187,21 @@ def _validate_environment(payload):
             actual = None
         if actual != expected:
             raise ValueError(f'worker package metadata changed for {name}')
+    sdk_identity = facts.get('isaac_sdk_identity')
+    if sdk_identity is not None:
+        from .provenance import resolve_isaac_sdk_identity
+        try:
+            pip_version = metadata.version('isaacsim')
+        except metadata.PackageNotFoundError:
+            pip_version = None
+        if resolve_isaac_sdk_identity(pip_version=pip_version,
+                                      sdk_root=sdk_identity['sdk_root']) != sdk_identity:
+            raise ValueError('worker Isaac SDK version differs from preflight')
+        os.environ['GEOCHORA_SELECTED_ISAAC_VERSION'] = sdk_identity['normalized_version']
+        if facts['module_origins'].get('isaacsim') is not None:
+            os.environ['GEOCHORA_SELECTED_ISAAC_ORIGIN'] = facts['module_origins']['isaacsim']
+        if sdk_identity['sdk_root'] is not None:
+            os.environ['GEOCHORA_SELECTED_ISAAC_ROOT'] = sdk_identity['sdk_root']
 
 
 def main():
@@ -180,10 +211,19 @@ def main():
     payload = request.get('payload')
     handed_off = False
     source = None
+    early_app_owner = None
     try:
         if request.get('kind') != 'build' or not isinstance(payload, dict) or request_identity(payload) != identity:
             raise ValueError('worker build request identity mismatch')
         _validate_environment(payload)
+        # Kit must establish its USD libraries before F06 reconstructs the
+        # USD source. Importing the standalone USD wheel first can load an
+        # incompatible set of libraries into the same process.
+        if (payload.get('uid') == 'pick-cube-p16-reference-v1'
+                and payload.get('selection', {}).get('physics_provider') == 'isaacsim'):
+            from .isaac_native_io import _process_app_owner, F06_ISAAC_APP_LAUNCH_PROFILE_V1
+            early_app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+            early_app_owner.open(f06_compatibility=True)
         session, handlers, source = _materialize_selected(payload)
         handed_off = True
         serve_session(sock, session, identity, handlers=handlers)
@@ -199,6 +239,8 @@ def main():
         receipt = getattr(source, 'execution_source_receipt', None)
         if receipt is not None:
             receipt.close()
+        if early_app_owner is not None:
+            early_app_owner.close()
         sock.close()
 
 

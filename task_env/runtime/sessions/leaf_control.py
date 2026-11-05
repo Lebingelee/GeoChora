@@ -412,12 +412,13 @@ class IsaacNativeMimicPositionDriveReceiptV1:
             'isaac-gpu-physx-pickcube-f06-v1' if f06_profile
             else 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
         )
-        if (self.provider_build_identity, self.physics_profile, self.backend,
-                self.device, self.determinism_mode, self.physics_dt_s,
-                self.control_substeps) != (
-                'isaacsim-6.2.0.0', expected_profile,
-                'cuda', 'cuda:0', 'best_effort', 0.002, 5):
-            raise ValueError('native mimic receipt differs from its fixed Isaac 6.2 CUDA PhysX profile')
+        allowed_builds = ({'isaacsim-6.1.0.0', 'isaacsim-6.2.0.0'} if f06_profile
+                          else {'isaacsim-6.2.0.0'})
+        if (self.provider_build_identity not in allowed_builds
+                or (self.physics_profile, self.backend, self.device, self.determinism_mode,
+                    self.physics_dt_s, self.control_substeps) !=
+                   (expected_profile, 'cuda', 'cuda:0', 'best_effort', 0.002, 5)):
+            raise ValueError('native mimic receipt differs from its admitted Isaac CUDA PhysX profile')
         _stable_identity(self.writer_id, 'writer ID')
         names = tuple(self.native_dof_names)
         expected_names = {f'joint{index}' for index in range(1, 8)} | {
@@ -1228,9 +1229,12 @@ def compile_isaac_native_mimic_position_receipt_v1(
             execution.determinism_mode, execution.physics_profile) != (
             'isaacsim', 'cuda', 'cuda:0', 'best_effort', expected_profile):
         raise ValueError('native mimic receipt compiler refuses a different Isaac execution profile')
-    if (native_metadata.provider_build_identity, native_metadata.physics_provider,
-            native_metadata.backend, native_metadata.device, native_metadata.determinism_mode) != (
-            'isaacsim-6.2.0.0', 'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
+    allowed_builds = ({'isaacsim-6.1.0.0', 'isaacsim-6.2.0.0'} if f06_profile
+                      else {'isaacsim-6.2.0.0'})
+    if (native_metadata.provider_build_identity not in allowed_builds
+            or (native_metadata.physics_provider, native_metadata.backend,
+                native_metadata.device, native_metadata.determinism_mode) !=
+               ('isaacsim', 'cuda', 'cuda:0', 'best_effort')):
         raise ValueError('DG04 receipt compiler refuses a different public Isaac build/device')
     expected_entity = 'panda-v1' if f06_profile else 'panda-main'
     expected_targets = {

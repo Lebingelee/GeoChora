@@ -74,6 +74,47 @@ def _lower_receipt_mjcf_assets(receipt):
     return ET.tostring(root, encoding='unicode'), alias_payloads, rows
 
 
+def _mujoco_model_facts(model, mj):
+    """Read compiled public MjModel values, with inertia about COM in body axes."""
+    bodies = []
+    for i in range(model.nbody):
+        rotation = np.empty(9, dtype=np.float64)
+        mj.mju_quat2Mat(rotation, model.body_iquat[i])
+        rotation = rotation.reshape(3, 3)
+        tensor = rotation @ np.diag(model.body_inertia[i]) @ rotation.T
+        bodies.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_BODY, i),
+                       'mass_kg': float(model.body_mass[i]),
+                       'com_body_m': model.body_ipos[i].tolist(),
+                       'inertia_body_at_com_kg_m2': tensor.tolist(),
+                       'inertial_quaternion_body_wxyz': model.body_iquat[i].tolist()})
+    joints = []
+    for i in range(model.njnt):
+        joints.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, i), 'id': i,
+                       'type': int(model.jnt_type[i]), 'axis_body': model.jnt_axis[i].tolist(),
+                       'limited': bool(model.jnt_limited[i]), 'range': model.jnt_range[i].tolist()})
+    actuators = []
+    for i in range(model.nu):
+        actuators.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_ACTUATOR, i), 'id': i,
+                          'transmission_type': int(model.actuator_trntype[i]),
+                          'transmission_ids': model.actuator_trnid[i].tolist(),
+                          'gear': model.actuator_gear[i].tolist()})
+    equality = [{'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_EQUALITY, i),
+                 'type': int(model.eq_type[i]), 'object1_id': int(model.eq_obj1id[i]),
+                 'object2_id': int(model.eq_obj2id[i]), 'active': bool(model.eq_active0[i]),
+                 'data': model.eq_data[i].tolist()} for i in range(model.neq)]
+    tendons = []
+    for i in range(model.ntendon):
+        start, count = int(model.tendon_adr[i]), int(model.tendon_num[i])
+        tendons.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, i), 'id': i,
+                        'wraps': [{'type': int(model.wrap_type[j]), 'object_id': int(model.wrap_objid[j]),
+                                   'parameter': float(model.wrap_prm[j])}
+                                  for j in range(start, start + count)]})
+    return {'schema_version': 'mujoco-public-model-facts-v1', 'bodies': bodies,
+            'joints': joints, 'actuators': actuators, 'native_timestep_s': float(model.opt.timestep),
+            'inertia_reference': 'center_of_mass', 'inertia_frame': 'body',
+            'equalities': equality, 'tendons': tendons}
+
+
 def check_mujoco_named_layout(model, mj, source):
     """Resolve this source's names and address shapes in a compiled model."""
     result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
@@ -245,7 +286,8 @@ class _MuJoCoSession(_SessionValues):
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
                 'provider': 'mujoco', 'source_id': source.scene_source.source_id,
                 'source_closure': source.source_closure_digest, 'objects': checked,
-                'materialization_id': self.provider_materialization_id}
+                'materialization_id': self.provider_materialization_id,
+                'physical_model': _mujoco_model_facts(self._model, self._mj)}
         except BaseException:
             self.close()
             raise

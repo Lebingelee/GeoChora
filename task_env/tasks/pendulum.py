@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..environment.gym_compat import Box, Dict
 
 from ..environment import (
     EpisodePhysicsState,

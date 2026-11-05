@@ -31,7 +31,7 @@ _METHODS = frozenset({
 _PROPERTIES = frozenset({
     'provider_materialization_id', 'episode_id', 'state_revision',
     'runtime_progress_receipt', 'reset_readback_v1', 'compiled_layout_receipt',
-    'reset_plan_evidence', 'close_receipt', 'build_layout_facts',
+    'reset_plan_evidence', 'close_receipt', 'build_layout_facts', 'native_interval_evidence',
 })
 
 
@@ -338,7 +338,7 @@ class RemoteSession:
             if (response.get('kind'), response.get('materialization_id')) != ('result', self._materialization_id):
                 raise TransportProtocolError('worker response materialization mismatch')
             response_episode = response.get('episode_id')
-            if method not in {'reset', 'close'} and response_episode != self._episode_id:
+            if method not in {'reset', 'reset_plan', 'close'} and response_episode != self._episode_id:
                 raise TransportProtocolError('worker response episode mismatch')
             self._episode_id = response_episode
             if response.get('error') is not None:
@@ -461,9 +461,13 @@ def start_selected_worker(interpreter, payload, *, timeout=30.0):
     executable = Path(interpreter).expanduser().absolute()
     if not executable.is_file():
         raise ValueError(f'worker interpreter unavailable: {executable}')
+    environment = payload['environment']
+    expected_launcher = environment.get('launcher')
+    launcher_matches = (str(executable) == expected_launcher if expected_launcher is not None
+                        else str(executable.resolve()) == environment['python'])
     if (Path(payload['core_root']).resolve() != core
             or Path(payload['geophys_src']).resolve() != geophys
-            or str(executable.resolve()) != payload['environment']['python']):
+            or not launcher_matches):
         raise ValueError('worker deployment differs from preflight origins or interpreter')
     identity = request_identity(payload)
     parent, child = socket.socketpair()
@@ -475,8 +479,10 @@ def start_selected_worker(interpreter, payload, *, timeout=30.0):
         process = subprocess.Popen(
             [str(executable), '-I', '-S', '-B', '-c', _WORKER_BOOTSTRAP,
              str(core), str(geophys), str(child.fileno())],
-            cwd=str(core), env=env, pass_fds=(child.fileno(),), start_new_session=True,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            cwd=os.getcwd(), env=env, pass_fds=(child.fileno(),), start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=None if payload['selection']['physics_provider'] == 'isaacsim' else subprocess.DEVNULL,
+            stderr=None if payload['selection']['physics_provider'] == 'isaacsim' else subprocess.DEVNULL,
         )
         child.close()
         _send(parent, {'kind': 'build', 'request_identity': identity, 'payload': payload})

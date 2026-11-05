@@ -646,20 +646,23 @@ def position_record_metadata(self):
     }
     f06_input = self.value.get('f06_pickcube_isaac_input')
     if f06_input is not None:
-        native_io = getattr(self.session, '_native_io', None)
-        native_metadata = getattr(native_io, '_metadata', None)
-        bootstrap = dict(native_io.bootstrap_receipt())
+        native_facts = self.session.build_layout_facts
+        native_metadata = native_facts['native_runtime_metadata']
+        bootstrap = dict(native_facts['native_public_bootstrap_receipt'])
+        deployment = self.get_execution_receipt()
         env_metadata['reference_profile'].update({
-            'provider': 'isaacsim', 'provider_version': 'isaacsim-6.2.0.0',
-            'provider_build_identity': getattr(
-                native_metadata, 'provider_build_identity', 'isaacsim-6.2.0.0',
-            ),
+            'provider': 'isaacsim', 'provider_version': native_metadata['provider_build_identity'],
+            'provider_build_identity': native_metadata['provider_build_identity'],
             'backend': 'cuda', 'device': 'cuda:0',
             'determinism_mode': 'best_effort',
             'execution_identity_sha256': f06_input.execution.identity_hash,
             'source_id': self.value['source'].source_id,
             'delivery_manifest_sha256': f06_input.delivery_manifest_sha256,
             'native_public_bootstrap_receipt': bootstrap,
+            'request_identity_sha256': deployment['request_identity'],
+            'worker_request_identity_sha256': deployment.get('worker_request_identity'),
+            'materialization_identity': self.session.provider_materialization_id,
+            'native_build_layout_facts': native_facts,
             'solution_identity': self._active_solution_identity(),
             'tcp_semantic_frame': 'panda-v1/ee',
         })
@@ -723,20 +726,20 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
             or f05_dg02_input is not None
             or versioned_input_kind == 'dg04_isaac_native'
             or self.value.get('f06_pickcube_isaac_input') is not None):
-        native_ack = getattr(self.session, '_last_native_position_ack', None)
-        native_advances = getattr(self.session, '_last_interval_advances', ())
-        advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
+        evidence = self.session.native_interval_evidence
+        native_ack = evidence['position_ack']
+        native_advances = evidence['advances']
+        advance_attempts = evidence['advance_attempts']
         if native_ack is None or len(native_advances) != self.artifact.timebase.control_substeps:
             raise ValueError('versioned USD recording requires a complete native Position Ack and interval receipts')
-        applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
+        applied_payload['native_position_write_ack_v1'] = native_ack
         applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
         applied_payload['native_interval_advance_attempts'] = advance_attempts
         if (f04_input is not None or versioned_input_kind == 'f05_native'
                 or f05_dg02_input is not None
                 or versioned_input_kind == 'dg04_isaac_native'
                 or self.value.get('f06_pickcube_isaac_input') is not None):
-            native_io = getattr(self.session, '_native_io', None)
-            provenance = getattr(native_io, 'execution_provenance_kind', None)
+            provenance = evidence['provenance_kind']
             if provenance == 'native_runtime':
                 execution_class = 'native_runtime_accepted_physics'
             elif provenance == 'synthetic_fixture':

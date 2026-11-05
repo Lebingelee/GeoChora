@@ -4,7 +4,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..environment.gym_compat import Box, Dict
 
 from ..artifacts import CanonicalStateView
 

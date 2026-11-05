@@ -20,14 +20,8 @@ if _GEOPHYS_SRC:
     _geophys_path = Path(_GEOPHYS_SRC).expanduser().resolve()
     if not (_geophys_path / 'scene' / '__init__.py').is_file():
         raise ValueError(f'GEOCHORA_GEOPHYS_SRC must point to a GeoPhys src directory: {_geophys_path}')
-    # Prefer the requested source over unrelated installed modules; the
-    # filtered Core overlay below still stays behind Isaac's native packages.
+    # Prefer the requested source over unrelated installed modules.
     sys.path.insert(1, str(_geophys_path))
-_CORE_SITE = os.environ.get('GEOCHORA_CORE_SITE')
-if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
-    # Keep Isaac's native packages first; use the frozen Core environment only
-    # for Python dependencies that the Isaac distribution does not ship.
-    sys.path.append(_CORE_SITE)
 
 if __package__:
     from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
@@ -395,7 +389,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                    core_commit=context['core_commit'])
         execution_phase = 'reset'
         if app_owner is not None:
-            app_owner.open()
+            app_owner.open(f06_compatibility=True)
             row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
         observation, reset_info = env.reset(seed=seed)
         solution = env.value['solution_factory']()

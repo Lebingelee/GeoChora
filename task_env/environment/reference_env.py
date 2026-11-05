@@ -14,7 +14,7 @@ import hashlib
 from types import SimpleNamespace
 from uuid import uuid4
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from .gym_compat import Box, Dict
 
 from ..observations.selected_reference import _position_task_evaluation_state
 from ..controllers.canonical.contracts import RequestedAction, REFERENCE_POSE_ACTION_SCHEMA, digest
@@ -1557,7 +1557,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'core_root': str(GEOCHORA_ROOT), 'geophys_src': str(GEOPHYS_PROVIDER_ROOT / 'src'),
                     'environment': deployment_receipt['environment'],
                 }
-                session = start_selected_worker(selection.interpreter, payload)
+                # SDK App startup includes loading Kit and PhysX.  Keep the
+                # worker deadline finite while allowing that selected route's
+                # cold start to finish inside the enclosing run budget.
+                session = start_selected_worker(selection.interpreter, payload,
+                    timeout=300.0 if selection.physics_provider == 'isaacsim' else 30.0)
                 deployment_receipt['worker_request_identity'] = request_identity(payload)
                 return session
             if self.position_profile:
@@ -2003,6 +2007,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
                 action.structured_request(self.position_scene, self.leaf_plan)
                 return self._prepare_leaf_position(action)
+            if (not isinstance(action, StructuredActionRequestV1)
+                    and self.value.get('f06_pickcube_isaac_input') is not None
+                    and len(self.position_profiles) == 1):
+                from ..runtime.sessions.control import single_position_action_request
+                action = single_position_action_request(
+                    action, scene=self.position_scene, plan=self.position_plan,
+                    profile=self.position_profiles[0],
+                )
             if not isinstance(action, StructuredActionRequestV1):
                 raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
             from ..runtime.sessions.control import prepare_structured_action

@@ -294,7 +294,8 @@ class NativeAdvanceReceiptV1:
             # against the receipt emitted by its own native adapter.
             is_f06_pickcube = (
                 isinstance(application, Mapping)
-                and application.get('profile_id') == 'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
+                and application.get('profile_id') in {'isaacsim-6.1-pickcube-physx-mimic-5n-v1',
+                                                       'isaacsim-6.2-pickcube-physx-mimic-5n-v1'}
             )
             numeric_fields = (
                 'reference_position_m', 'follower_position_m',
@@ -305,11 +306,8 @@ class NativeAdvanceReceiptV1:
             if (not isinstance(application, Mapping)
                     or application.get('schema_version') != 'native-physx-mimic-substep-application-v1'
                     or application.get('native_step_index') != expected_index
-                    or application.get('profile_id') != (
-                        'isaacsim-6.2-pickcube-physx-mimic-5n-v1'
-                        if is_f06_pickcube
-                        else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
-                    )
+                    or (not is_f06_pickcube and application.get('profile_id') !=
+                        'isaacsim-6.2-physx-native-mimic-leader-drive-v1')
                     or application.get('provenance_kind') not in {'synthetic_fixture', 'native_runtime'}
                     or application.get('reference_joint') != 'finger_joint1'
                     or application.get('follower_joint') != 'finger_joint2'
@@ -546,6 +544,18 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._last_readback: NativeRuntimeReadbackV1 | None = None
         self._position_applied_boundary_ids = set()
 
+    @property
+    def native_interval_evidence(self):
+        """Return owned, serializable evidence for the last native interval."""
+        import copy
+        return {
+            'position_ack': (None if self._last_native_position_ack is None
+                             else self._last_native_position_ack.to_mapping()),
+            'advances': copy.deepcopy(list(self._last_interval_advances)),
+            'advance_attempts': self._last_interval_advance_attempts,
+            'provenance_kind': self._drive_receipt.provenance_kind,
+        }
+
     def _assert_native_identity(self):
         self._source.assert_fresh()
         current = self._native_io.metadata()
@@ -679,6 +689,12 @@ class UsdCoreRuntimeSession(_SessionValues):
             if type(self._drive_receipt) is IsaacNativeMimicPositionDriveReceiptV1:
                 application = receipt.native_adaptation_application
                 ack = self._last_native_position_ack
+                if (application is not None and self._execution_spec_v1.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'):
+                    expected_profile = ('isaacsim-' + self._native_io_metadata.provider_build_identity
+                                        .removeprefix('isaacsim-').rsplit('.', 2)[0]
+                                        + '-pickcube-physx-mimic-5n-v1')
+                    if application.get('profile_id') != expected_profile:
+                        raise ValueError('native mimic application version differs from runtime metadata')
                 if (application is None or ack is None
                         or application.get('drive_receipt_identity_sha256') != self._drive_receipt.identity_sha256
                         or application.get('provenance_kind') != self._drive_receipt.provenance_kind

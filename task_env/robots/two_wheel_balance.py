@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
-from gymnasium.spaces import Box, Dict
+from ..environment.gym_compat import Box, Dict
 
 from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
 

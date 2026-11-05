@@ -515,11 +515,15 @@ def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
 
 def _f06_pickcube_isaac_capability_manifest(artifact):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
+    import os
 
     # The Artifact request cannot expand this fixed source-bound adapter.
     names = sorted(CAPABILITIES)
+    version = os.environ.get('GEOCHORA_SELECTED_ISAAC_VERSION', '6.2.0.0')
+    if version not in {'6.1.0.0', '6.2.0.0'}:
+        raise ValueError('F06 capability manifest requires an admitted Isaac release')
     return ProviderCapabilityManifest(
-        'provider-capability-v0', 'isaacsim', '6.2.0.0',
+        'provider-capability-v0', 'isaacsim', version,
         'f06-pickcube-desktop-native-mimic-v1', 'cuda', F06_PICKCUBE_ISAAC_PROFILE,
         'none', 'best_effort',
         tuple(CapabilityClaim(name, 'implemented', 'F06-exact-PickCube-desktop-source-bound-cell')

@@ -5,7 +5,7 @@ import math,re
 from ...artifacts.contracts import Contract,CanonicalStateView,ExecutionSpec,Timebase
 from ...artifacts.execution import ResetSample,RealizedInitialState
 from ...controllers.canonical.contracts import RequestedAction,CanonicalAction,CanonicalControlTarget,AppliedCanonicalControl,digest
-from ...controllers.canonical.feedback import CanonicalControlFeedback
+from ...controllers.canonical.feedback import CanonicalControlFeedback, boundary_interval_clock_tolerance
 from ...controllers.canonical.readiness import CanonicalControlReadiness
 from ...controllers.canonical.kinematics import ARM,FINGERS
 from .episode import BoundaryEventV1,EpisodeOutcomeV1,StructuredControlTransitionV1,validate_episode_records
@@ -95,7 +95,10 @@ class CanonicalTrajectory(Contract):
             a,b=self.boundaries[i:i+2];target=transition.controller_target
             if b.control_step!=a.control_step+1:raise ValueError('skipped/duplicate control boundary')
             dt=b.simulation_time-a.simulation_time
-            if abs(dt-self.metadata.timebase.control_dt)>max(math.ulp(a.simulation_time),math.ulp(b.simulation_time),math.ulp(self.metadata.timebase.control_dt)):raise ValueError('timebase mismatch')
+            timebase=self.metadata.timebase
+            tolerance=boundary_interval_clock_tolerance(a.simulation_time,b.simulation_time,
+                timebase.control_dt,timebase.physics_dt,timebase.control_substeps)
+            if abs(dt-timebase.control_dt)>tolerance:raise ValueError('timebase mismatch')
             if set(b.state.joint_position)!=names or set(b.state.pose_world)!=poses:raise ValueError('semantic state fields changed')
             if target.arm_joint_order!=ARM or target.task_artifact_hash!=self.metadata.task_artifact_hash or target.controller_identity!=self.metadata.controller_identity:raise ValueError('target identity/order mismatch')
             if transition.applied_control.provider_name!=self.metadata.execution.physics_provider:raise ValueError('applied provider mismatch')

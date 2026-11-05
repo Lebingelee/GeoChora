@@ -26,7 +26,12 @@ class FakeSession:
         return self._episode
     @property
     def state_revision(self): return self._revision
+    @property
+    def native_interval_evidence(self):
+        return {'position_ack': {'partial': False}, 'advances': [{'step': 1}],
+                'advance_attempts': 1, 'provenance_kind': 'synthetic_fixture'}
     def reset(self, value): self._episode = value; return {'episode': value, 'items': [1, 2]}
+    def reset_plan(self, value): self._episode = value; return {'episode': value}
     def snapshot(self): return {'episode': self._episode, 'revision': self._revision}
     def step(self): self._revision += 1; return self.snapshot()
     def control_feedback(self, value): raise ValueError('fixture failure')
@@ -74,6 +79,10 @@ def test_worker_dispatch_callbacks_owned_values_and_idempotent_close(tmp_path):
     try:
         assert session.reset('episode-a') == {'episode': 'episode-a', 'items': [1, 2]}
         assert session.episode_id == 'episode-a'
+        assert session.reset_plan('episode-b') == {'episode': 'episode-b'}
+        assert session.episode_id == 'episode-b'
+        assert session.native_interval_evidence['provenance_kind'] == 'synthetic_fixture'
+        assert session.native_interval_evidence['advances'] == [{'step': 1}]
         assert session.step()['revision'] == 1
         from task_env.artifacts import CanonicalStateView
         state = CanonicalStateView('canonical-state-v0', 'SI_right_handed_z_up_wxyz', 1, .01, {}, {}, {})
@@ -157,7 +166,8 @@ worker.main()
 '''
 
 
-def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkeypatch):
+@pytest.mark.parametrize('use_launcher', [False, True])
+def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkeypatch, tmp_path, use_launcher):
     from task_env import make_env
     from task_env.artifacts import ExecutionSpec
     from task_env.runtime.sessions import transport
@@ -171,10 +181,19 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
         source = env.value['source']
         from dataclasses import replace
         from task_env.runtime.sessions import provenance
-        observed = probe_interpreter_environment(sys.executable)
+        interpreter = sys.executable
+        if use_launcher:
+            import shlex
+            launcher = tmp_path / 'SDK with spaces' / 'python.sh'
+            launcher.parent.mkdir()
+            launcher.write_text('#!/bin/sh\nprintf "SDK launcher log\\n"\nexec '
+                                + shlex.quote(sys.executable) + ' "$@"\n')
+            launcher.chmod(0o755)
+            interpreter = str(launcher)
+        observed = probe_interpreter_environment(interpreter)
         monkeypatch.setattr(provenance, 'probe_interpreter_environment', lambda _: observed)
         selection = replace(env.resolved_public_config.execution_spec_v2,
-                            deployment='isolated_worker', interpreter=sys.executable)
+                            deployment='isolated_worker', interpreter=interpreter)
         preflight = provenance.preflight_selected_deployment(
             selection, requested={'deployment': 'isolated_worker'}, task_uid=env.uid,
             artifact=env.artifact, source=source, controller=env.value['controller'], seed=31,
@@ -190,7 +209,8 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
             'environment': observed,
         }
         monkeypatch.setattr(transport, '_WORKER_BOOTSTRAP', PRODUCTION_BOOTSTRAP_FAKE_SESSION)
-        session = transport.start_selected_worker(sys.executable, payload)
+        monkeypatch.chdir(tmp_path)
+        session = transport.start_selected_worker(interpreter, payload)
         try:
             sample = env.binding.reset_sample(env.artifact, 31)
             assert session.reset(sample) == sample
@@ -200,7 +220,7 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
         assert session._process.poll() == 0
         wrong = {**payload, 'facts': {**payload['facts'], 'source_xml_sha256': '0' * 64}}
         with pytest.raises(ValueError, match='identity mismatch'):
-            transport.start_selected_worker(sys.executable, wrong)
+            transport.start_selected_worker(interpreter, wrong)
     finally:
         env.close()
 

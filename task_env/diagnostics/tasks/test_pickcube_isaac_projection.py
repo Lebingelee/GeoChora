@@ -115,7 +115,8 @@ def test_f06_pickcube_tcp_is_the_task_ee_site_offset():
     }
 
 
-def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
+@pytest.mark.parametrize('sdk_version', ['6.1.0.0', '6.2.0.0'])
+def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity(sdk_version):
     from task_env.artifacts import JointReference
     from task_env.runtime.sessions.leaf_control import (
         IsaacNamedPositionDriveV1,
@@ -143,7 +144,7 @@ def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
     )
     receipt = IsaacNativeMimicPositionDriveReceiptV1(
         'isaac-native-mimic-position-drive-receipt-v1', 'synthetic_fixture',
-        'a' * 64, 'b' * 64, 'c' * 64, 'isaacsim-6.2.0.0',
+        'a' * 64, 'b' * 64, 'c' * 64, 'isaacsim-' + sdk_version,
         'isaac-gpu-physx-pickcube-f06-v1', 'cuda', 'cuda:0', 'best_effort',
         0.002, 5, f'{entity_id}/position-servo-v1', native_names, limits, drives,
         gripper_drive_stiffness_N_m=5000.0,
@@ -436,12 +437,13 @@ def test_f06_gripper_readback_normalizes_only_submicrometer_lower_limit_residue(
         env_for_opening(-1.000001e-6).expert_execution_info()
 
 
-def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
+@pytest.mark.parametrize('sdk_minor', ['6.1', '6.2'])
+def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract(sdk_minor):
     from task_env.runtime.sessions.native_io import NativeAdvanceReceiptV1
 
     application = {
         'schema_version': 'native-physx-mimic-substep-application-v1',
-        'profile_id': 'isaacsim-6.2-pickcube-physx-mimic-5n-v1',
+        'profile_id': f'isaacsim-{sdk_minor}-pickcube-physx-mimic-5n-v1',
         'provenance_kind': 'native_runtime',
         'drive_receipt_identity_sha256': 'a' * 64,
         'target_identity_sha256': 'b' * 64,

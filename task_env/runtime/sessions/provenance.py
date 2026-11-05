@@ -2,8 +2,57 @@
 from importlib import metadata, util
 from pathlib import Path
 import hashlib
+import os
+import signal
 import subprocess
 import sys
+
+
+def resolve_isaac_sdk_identity(*, pip_version=None, sdk_root=None):
+    """Identify supported SDK releases from explicit metadata, preserving raw text.
+
+    The source representation's build is a separate identity from the runtime.
+    An SDK directory name is never treated as a version declaration.
+    """
+    import re
+    from packaging.version import InvalidVersion, Version
+
+    version_file = None
+    if sdk_root is not None:
+        path = Path(sdk_root).expanduser().absolute() / 'VERSION'
+        if path.is_file():
+            version_file = path.read_text(encoding='utf-8').strip()
+    def parse(raw, *, label):
+        if raw is None:
+            return None
+        if not isinstance(raw, str) or not raw.strip():
+            raise ValueError(f'empty Isaac {label} version')
+        if label == 'distribution' and re.search(r'(?i)(?:rc|alpha|beta|preview)', raw):
+            raise ValueError(f'Isaac {label} pre-release is not admitted')
+        match = (re.fullmatch(r'\d+(?:\.\d+){2,}', raw.strip())
+                 if label == 'distribution' else
+                 re.search(r'(?<!\d)(\d+(?:\.\d+){2,})(?![\d.])', raw))
+        if match is None:
+            raise ValueError(f'cannot parse Isaac {label} version')
+        try:
+            version = Version(match.group(0) if label == 'distribution' else match.group(1))
+        except InvalidVersion as exc:
+            raise ValueError(f'invalid Isaac {label} version') from exc
+        release = version.release
+        if any(release[3:]):
+            raise ValueError(f'unsupported Isaac {label} release: {raw}')
+        return tuple((release + (0, 0, 0))[:3])
+    pip = parse(pip_version, label='distribution')
+    installed = parse(version_file, label='SDK VERSION')
+    if pip is not None and installed is not None and pip != installed:
+        raise ValueError('Isaac distribution and SDK VERSION conflict')
+    resolved = pip or installed
+    if resolved not in {(6, 1, 0), (6, 2, 0)}:
+        raise ValueError('Isaac SDK release is missing or not admitted')
+    return {'schema_version': 'isaac-sdk-identity-v1',
+            'normalized_version': '.'.join(map(str, resolved)) + '.0',
+            'pip_version_raw': pip_version, 'sdk_version_raw': version_file,
+            'sdk_root': None if sdk_root is None else str(Path(sdk_root).expanduser().absolute())}
 
 
 def provider_build_identity(provider):
@@ -99,7 +148,7 @@ for name in ('task_env', 'geophys', 'scene', 'control', 'simulation', 'solvers')
     spec = PathFinder.find_spec(name, sys.path)
     origins[name] = None if spec is None or spec.origin is None else str(pathlib.Path(spec.origin).resolve())
 versions = {}
-for name in ('numpy', 'scipy', 'psutil', 'pydantic', 'taichi-forge', 'trimesh', 'pyvista', 'Pillow', 'mujoco', 'geophys', 'isaacsim', 'gymnasium', 'h5py', 'PyYAML'):
+for name in ('numpy', 'scipy', 'psutil', 'pydantic', 'taichi-forge', 'trimesh', 'pyvista', 'Pillow', 'mujoco', 'geophys', 'isaacsim', 'gymnasium', 'h5py', 'PyYAML', 'packaging'):
     try:
         versions[name] = metadata.version(name)
     except metadata.PackageNotFoundError:
@@ -107,8 +156,9 @@ for name in ('numpy', 'scipy', 'psutil', 'pydantic', 'taichi-forge', 'trimesh', 
 modules = {'numpy':'numpy', 'scipy':'scipy', 'psutil':'psutil', 'pydantic':'pydantic',
            'taichi-forge':'taichi_forge', 'trimesh':'trimesh', 'pyvista':'pyvista',
            'Pillow':'PIL', 'mujoco':'mujoco', 'gymnasium':'gymnasium',
-           'h5py':'h5py', 'PyYAML':'yaml', 'isaacsim':'isaacsim'}
+           'h5py':'h5py', 'PyYAML':'yaml', 'isaacsim':'isaacsim', 'packaging':'packaging'}
 module_origins, origin_ownership = {}, {}
+isaacsim_namespace_owner = None
 for distribution, name in modules.items():
     spec = PathFinder.find_spec(name, sys.path)
     origin = None if spec is None else spec.origin
@@ -128,15 +178,28 @@ for distribution, name in modules.items():
         relative = origin.relative_to(pathlib.Path(dist.locate_file('')).resolve()).as_posix()
         names = {str(item).replace('\\', '/') for item in files}
         owned = relative in names or any(item.startswith(relative + '/') for item in names)
+        if distribution == 'isaacsim' and not owned:
+            try:
+                kernel = metadata.distribution('isaacsim-kernel')
+                kernel_base = pathlib.Path(kernel.locate_file('')).resolve()
+                kernel_relative = origin.relative_to(kernel_base).as_posix()
+                kernel_files = {str(item).replace('\\', '/') for item in (kernel.files or ())}
+                if kernel.version == dist.version and kernel_relative in kernel_files:
+                    owned = True
+                    isaacsim_namespace_owner = 'isaacsim-kernel'
+            except (metadata.PackageNotFoundError, ValueError):
+                pass
         origin_ownership[distribution] = 'owned' if owned else 'mismatch'
     except metadata.PackageNotFoundError:
         origin_ownership[distribution] = 'unknown'
     except ValueError:
         origin_ownership[distribution] = 'mismatch'
-print(json.dumps({'python': str(pathlib.Path(sys.executable).resolve()),
+print('GEOCHORA_METADATA_V1:' + json.dumps({'python': str(pathlib.Path(sys.executable).resolve()),
+                  'worker_executable': str(pathlib.Path(sys.executable).absolute()),
                   'python_version': list(sys.version_info[:3]), 'origins': origins,
                   'versions': versions, 'module_origins': module_origins,
-                  'origin_ownership': origin_ownership}, sort_keys=True))
+                  'origin_ownership': origin_ownership,
+                  'isaacsim_namespace_owner': isaacsim_namespace_owner}, sort_keys=True))
 '''
 
 
@@ -161,19 +224,35 @@ def probe_interpreter_environment(python, *, core_root=None, geophys_src=None):
     if not (geophys / 'geophys' / '__init__.py').is_file() or not (geophys / 'scene' / '__init__.py').is_file():
         raise ValueError(f'current GeoPhys source unavailable: {geophys}')
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             [str(interpreter), '-I', '-S', '-B', '-c', _ENVIRONMENT_METADATA_PROBE, str(core), str(geophys)],
-            check=True, capture_output=True, text=True, timeout=30,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
         )
+        try:
+            stdout, stderr = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+            raise
+        if process.returncode:
+            raise subprocess.CalledProcessError(process.returncode, process.args, stdout, stderr)
     except subprocess.TimeoutExpired as exc:
         raise ValueError('deployment interpreter metadata probe timed out') from exc
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ValueError(f'deployment interpreter metadata probe failed: {exc}') from exc
     import json
     try:
-        receipt = json.loads(result.stdout)
+        frames = [line.removeprefix('GEOCHORA_METADATA_V1:') for line in stdout.splitlines()
+                  if line.startswith('GEOCHORA_METADATA_V1:')]
+        if len(frames) != 1:
+            raise ValueError('expected exactly one metadata frame')
+        receipt = json.loads(frames[0])
     except (TypeError, ValueError) as exc:
         raise ValueError('deployment interpreter metadata probe returned invalid JSON') from exc
+    receipt['launcher'] = str(interpreter)
     expected = {'task_env': core / 'task_env' / '__init__.py',
                 'geophys': geophys / 'geophys' / '__init__.py',
                 'scene': geophys / 'scene' / '__init__.py',
@@ -186,7 +265,7 @@ def probe_interpreter_environment(python, *, core_root=None, geophys_src=None):
     return receipt
 
 
-def assess_mujoco_distribution(provider, metadata_receipt):
+def assess_mujoco_distribution(provider, metadata_receipt, *, solver_family=None):
     """Assess the declared MuJoCo distribution constraint, not all dependencies."""
     import re
     constraints = {
@@ -199,6 +278,9 @@ def assess_mujoco_distribution(provider, metadata_receipt):
     version = metadata_receipt['versions'].get('mujoco')
     result = {'dependency': 'mujoco', 'constraint': constraints[provider],
               'observed_version': version, 'status': 'unknown', 'reason': ''}
+    if provider == 'geophys' and solver_family == 'rigid':
+        result.update(status='not_selected', reason='GeoPhys native rigid solver does not consume MuJoCo solver')
+        return result
     if provider == 'isaacsim':
         result['reason'] = 'Isaac SDK dependency compatibility requires its own build oracle'
         return result
@@ -222,7 +304,7 @@ def assess_mujoco_distribution(provider, metadata_receipt):
     return result
 
 
-def assess_declared_dependencies(provider, metadata_receipt):
+def assess_declared_dependencies(provider, metadata_receipt, *, solver_family=None):
     """Check recorded distributions against the current route's declarations.
 
     GeoPhys worker and Core/MuJoCo worker have separate MuJoCo constraints;
@@ -250,9 +332,18 @@ def assess_declared_dependencies(provider, metadata_receipt):
     if provider in {'geophys', 'isaacsim'}:
         declared = [line for line in declared if Requirement(line).name.lower() != 'mujoco']
     if provider == 'geophys':
-        declared += geo['dependencies']
+        declared += [line for line in geo['dependencies']
+                     if solver_family != 'rigid' or Requirement(line).name.lower() != 'mujoco']
     elif provider == 'isaacsim':
-        declared.append('isaacsim==6.2.0.0')
+        # These are selected worker imports, not a claim that the SDK Python
+        # satisfies Core's complete installation requirements.  Renderer and
+        # GeoPhys-only dependencies belong to their own consumers.
+        worker_names = {'numpy', 'scipy', 'psutil', 'pydantic', 'pyyaml', 'trimesh'}
+        declared = [line for line in declared if Requirement(line).name.lower() in worker_names]
+        declared = ['numpy>=1.26,<3' if Requirement(line).name.lower() == 'numpy' else line
+                    for line in declared]
+        declared.append('isaacsim>=6.1.0,<6.3.0')
+        declared.append('packaging')
     versions = {re.sub(r'[-_.]+', '-', name).lower(): value
                 for name, value in metadata_receipt['versions'].items()}
     module_origins = {re.sub(r'[-_.]+', '-', name).lower(): value
@@ -269,6 +360,18 @@ def assess_declared_dependencies(provider, metadata_receipt):
             row.update(status='unknown', reason='target-environment marker or extra is not evaluated')
         elif name not in versions:
             row.update(status='unknown', reason='distribution was not queried')
+        elif (name == 'isaacsim' and observed is None
+              and metadata_receipt.get('isaac_sdk_identity', {}).get('sdk_version_raw')):
+            sdk_root = metadata_receipt['isaac_sdk_identity'].get('sdk_root')
+            origin = module_origins.get(name)
+            try:
+                if not sdk_root or not origin:
+                    raise ValueError('no SDK module origin')
+                Path(origin).resolve().relative_to(Path(sdk_root).resolve())
+            except ValueError:
+                row.update(status='unknown', reason='SDK VERSION exists; App module origin still requires verification')
+            else:
+                row.update(status='available', reason='explicit SDK VERSION and module origin inside SDK root; no pip metadata')
         elif observed is None:
             row.update(status='unavailable', reason='distribution metadata missing')
         elif name not in module_origins:
@@ -282,6 +385,11 @@ def assess_declared_dependencies(provider, metadata_receipt):
         else:
             try:
                 compatible = Version(observed) in requirement.specifier
+                if name == 'isaacsim':
+                    try:
+                        resolve_isaac_sdk_identity(pip_version=observed)
+                    except ValueError:
+                        compatible = False
             except InvalidVersion:
                 row.update(status='unknown', reason='invalid distribution version metadata')
             else:
@@ -300,6 +408,10 @@ def assess_declared_dependencies(provider, metadata_receipt):
               else 'unknown' if any(row['status'] == 'unknown' for row in rows)
               else 'available')
     return {'status': status, 'requirements': rows, 'source_hashes': source_hashes,
+            'dependency_scope': ('geophys-native-rigid' if provider == 'geophys' and solver_family == 'rigid'
+                                 else 'geophys-declared' if provider == 'geophys' else provider),
+            'installation_scope': ('selected SDK worker imports; Core full installation not assessed'
+                                   if provider == 'isaacsim' else 'declared route dependencies'),
             'reason': 'distribution metadata only; native build remains unverified'}
 
 
@@ -318,7 +430,13 @@ class DeploymentPreflightError(ValueError):
 def inspect_selected_interpreter(selection):
     """Read and assess one selected interpreter without importing provider SDKs."""
     environment = probe_interpreter_environment(selection.interpreter)
-    return environment, assess_declared_dependencies(selection.physics_provider, environment)
+    if selection.physics_provider == 'isaacsim':
+        launcher = Path(selection.interpreter).expanduser().absolute()
+        sdk_root = launcher.parent if launcher.name == 'python.sh' else None
+        environment['isaac_sdk_identity'] = resolve_isaac_sdk_identity(
+            pip_version=environment['versions'].get('isaacsim'), sdk_root=sdk_root)
+    return environment, assess_declared_dependencies(selection.physics_provider, environment,
+                                                      solver_family=selection.solver_family)
 
 
 def preflight_interpreter_before_source(selection, *, requested, task_uid):

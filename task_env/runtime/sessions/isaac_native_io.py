@@ -1,4 +1,4 @@
-"""Narrow Isaac Sim 6.2 public-API implementation of NativeRuntimeIOV1.
+"""Narrow Isaac Sim public-API implementation of NativeRuntimeIOV1.
 
 This module is imported only by the admitted runtime materialization route.
 It owns Isaac's process App and one stage/view lease; Core's shared USD
@@ -7,9 +7,13 @@ RuntimeSession continues to own reset, control, clock projection and faults.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import copy
 from importlib import metadata as importlib_metadata
 import hashlib
 import math
+import os
+from pathlib import Path
+import sys
 from threading import RLock
 from typing import Any
 
@@ -124,6 +128,8 @@ class IsaacSimAppOwnerV1:
         self._atexit_close_unregister_attempted = False
         self._atexit_close_unregister_completed = False
         self._atexit_close_unregister_failure: dict[str, str] | None = None
+        self.sdk_identity = None
+        self.sdk_runtime_version_raw = None
 
     @property
     def app(self):
@@ -139,15 +145,25 @@ class IsaacSimAppOwnerV1:
         }
         return {"profile_id": self.launch_profile_id, "simulation_app_config": config}
 
-    def open(self):
+    def open(self, *, f06_compatibility=False):
         if self._closed or self._close_attempted:
             raise RuntimeError("Isaac App owner cannot reopen after close")
+        if self._app is not None and f06_compatibility and self.sdk_identity is None:
+            raise RuntimeError('already-open Isaac App lacks F06 version verification')
         if self._app is None:
-            installed = importlib_metadata.version("isaacsim")
-            if installed != "6.2.0.0":
-                raise RuntimeError(
-                    f"F04 requires the installed isaacsim 6.2.0.0 distribution, found {installed}"
-                )
+            try:
+                installed = importlib_metadata.version("isaacsim")
+            except importlib_metadata.PackageNotFoundError:
+                installed = None
+            if f06_compatibility:
+                from .provenance import resolve_isaac_sdk_identity
+                root = os.environ.get('GEOCHORA_SELECTED_ISAAC_ROOT') or os.environ.get('ISAAC_PATH')
+                self.sdk_identity = resolve_isaac_sdk_identity(pip_version=installed, sdk_root=root)
+                expected = os.environ.get('GEOCHORA_SELECTED_ISAAC_VERSION')
+                if expected is not None and expected != self.sdk_identity['normalized_version']:
+                    raise RuntimeError('Isaac App version differs from selected preflight version')
+            elif installed != "6.2.0.0":
+                raise RuntimeError(f"F04 requires the installed isaacsim 6.2.0.0 distribution, found {installed}")
             self.start_attempts += 1
             from isaacsim.simulation_app import SimulationApp
 
@@ -156,12 +172,37 @@ class IsaacSimAppOwnerV1:
             self._app = SimulationApp(self.launch_profile_receipt()["simulation_app_config"])
             import carb
 
-            actual = int(carb.settings.get_settings().get_as_int(
-                "/plugins/carb.tasking.plugin/threadCount"
-            ))
             try:
+                if f06_compatibility:
+                    from isaacsim.core.version import get_version
+                    expected_origin = os.environ.get('GEOCHORA_SELECTED_ISAAC_ORIGIN')
+                    actual_origin = getattr(sys.modules.get('isaacsim'), '__file__', None)
+                    if expected_origin and (actual_origin is None or
+                            Path(actual_origin).resolve() != Path(expected_origin).resolve()):
+                        raise RuntimeError('Isaac runtime module source conflicts with selected preflight')
+                    expected_root = os.environ.get('GEOCHORA_SELECTED_ISAAC_ROOT')
+                    actual_root = os.environ.get('ISAAC_PATH')
+                    if (expected_root and actual_root
+                            and Path(expected_root).resolve() != Path(actual_root).resolve()):
+                        raise RuntimeError('Isaac runtime SDK root conflicts with selected preflight')
+                    runtime_version = tuple(str(value) for value in get_version())
+                    if len(runtime_version) != 8 or not runtime_version[0]:
+                        raise RuntimeError('Isaac runtime did not publish its SDK version')
+                    runtime_identity = resolve_isaac_sdk_identity(pip_version=runtime_version[0])
+                    if runtime_identity['normalized_version'] != self.sdk_identity['normalized_version']:
+                        raise RuntimeError('Isaac runtime version conflicts with static SDK version')
+                    runtime_full = (runtime_version[0]
+                                    + ('-' + runtime_version[1] if runtime_version[1] else '')
+                                    + ('+' + runtime_version[7] if runtime_version[7] else ''))
+                    if (self.sdk_identity['sdk_version_raw'] is not None
+                            and runtime_full != self.sdk_identity['sdk_version_raw']):
+                        raise RuntimeError('Isaac runtime build conflicts with static SDK VERSION')
+                    self.sdk_runtime_version_raw = runtime_version
+                actual = int(carb.settings.get_settings().get_as_int(
+                    "/plugins/carb.tasking.plugin/threadCount"
+                ))
                 _validate_isaac_task_thread_count(actual)
-            except RuntimeError as primary:
+            except BaseException as primary:
                 try:
                     self._close_now()
                 except BaseException as cleanup_error:
@@ -264,6 +305,84 @@ def _tensor_rows(value, *, width: int, label: str) -> tuple[tuple[float, ...], .
 
     if any(not math.isfinite(item) for row in result for item in row):
         raise ValueError(f"public Isaac {label} view contains non-finite values")
+    return result
+
+
+def _read_f06_public_physical_model(articulation, free_views):
+    """Read F06 link/free-body mass properties through public tensor views."""
+    import numpy as np
+
+    def array(value, shape, label):
+        actual = np.asarray(value.numpy(), dtype=np.float64)
+        if actual.shape != shape or not np.isfinite(actual).all():
+            raise ValueError(f'public Isaac {label} has invalid shape or nonfinite values: {actual.shape}')
+        return actual
+    names = tuple(articulation.link_names)
+    if not names or any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(names):
+        raise ValueError('public Isaac articulation link names must be unique and nonempty')
+    for name in ('get_link_masses', 'get_link_coms', 'get_link_inertias'):
+        if not callable(getattr(articulation, name, None)):
+            raise ValueError(f'public Isaac articulation lacks required {name}')
+    if not callable(getattr(articulation, 'is_physics_tensor_entity_valid', None)) or not articulation.is_physics_tensor_entity_valid():
+        raise ValueError('public Isaac articulation tensor view is unavailable')
+    count = len(names)
+    masses = array(articulation.get_link_masses(), (1, count), 'link masses')
+    positions, orientations = articulation.get_link_coms()
+    positions = array(positions, (1, count, 3), 'link COM positions')
+    orientations = array(orientations, (1, count, 4), 'link COM orientations')
+    inertias = array(articulation.get_link_inertias(), (1, count, 9), 'link inertias')
+    links = [{'name': name, 'mass_kg': float(masses[0, i]),
+              'com_body_m': positions[0, i].tolist(),
+              'inertial_quaternion_body_wxyz': orientations[0, i].tolist(),
+              'inertia_body_at_com_kg_m2': inertias[0, i].reshape((3, 3), order='F').tolist()}
+             for i, name in enumerate(names)]
+    free = {}
+    for semantic, view in free_views.items():
+        for name in ('get_masses', 'get_coms', 'get_inertias'):
+            if not callable(getattr(view, name, None)):
+                raise ValueError(f'public Isaac rigid-body view lacks required {name}: {semantic}')
+        if not callable(getattr(view, 'is_physics_tensor_entity_valid', None)) or not view.is_physics_tensor_entity_valid():
+            raise ValueError(f'public Isaac rigid-body tensor view is unavailable: {semantic}')
+        mass = array(view.get_masses(), (1, 1), f'{semantic} mass')
+        position, orientation = view.get_coms()
+        position = array(position, (1, 3), f'{semantic} COM position')
+        orientation = array(orientation, (1, 4), f'{semantic} COM orientation')
+        inertia = array(view.get_inertias(), (1, 9), f'{semantic} inertia')
+        free[semantic] = {'mass_kg': float(mass[0, 0]), 'com_body_m': position[0].tolist(),
+                          'inertial_quaternion_body_wxyz': orientation[0].tolist(),
+                          'inertia_body_at_com_kg_m2': inertia[0].reshape((3, 3), order='F').tolist()}
+    return {'schema_version': 'isaac-public-tensor-model-facts-v1', 'links': links, 'free_bodies': free,
+            'inertia_reference': 'center_of_mass', 'inertia_frame': 'body',
+            'inertia_tensor_storage': 'provider column-major, projected as rows',
+            'scope': 'public Isaac articulation and rigid-body tensor views'}
+
+
+def _read_f06_authored_mass_properties(stage, paths, usd_physics):
+    """Retain authored USD values separately from computed native tensor values."""
+    result = {}
+    for label, path in paths.items():
+        prim = stage.GetPrimAtPath(path)
+        if not prim or not prim.IsValid():
+            raise ValueError(f'F06 physical source prim is unavailable: {path}')
+        row = {'path': str(path), 'has_mass_api': bool(prim.HasAPI(usd_physics.MassAPI))}
+        if not row['has_mass_api']:
+            result[label] = row
+            continue
+        api = usd_physics.MassAPI(prim)
+        for key, getter in (('mass_kg', 'GetMassAttr'), ('center_of_mass_m', 'GetCenterOfMassAttr'),
+                            ('diagonal_inertia_kg_m2', 'GetDiagonalInertiaAttr'),
+                            ('principal_axes_wxyz', 'GetPrincipalAxesAttr')):
+            attr = getattr(api, getter)()
+            authored = bool(attr and attr.HasAuthoredValueOpinion())
+            value = attr.Get() if authored else None
+            if value is not None and key == 'principal_axes_wxyz':
+                value = [float(value.GetReal()), *(float(v) for v in value.GetImaginary())]
+            elif value is not None and key != 'mass_kg':
+                value = [float(v) for v in value]
+            elif value is not None:
+                value = float(value)
+            row[key] = {'authored': authored, 'value': value}
+        result[label] = row
     return result
 
 
@@ -487,7 +606,7 @@ class IsaacSimNativeRuntimeIOV1:
 
     def _open_public_runtime(self) -> None:
         try:
-            self._app_owner.open()
+            self._app_owner.open(f06_compatibility=True) if self._f06_pickcube else self._app_owner.open()
             import omni.usd
             import torch
             from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
@@ -731,11 +850,28 @@ class IsaacSimNativeRuntimeIOV1:
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
                 'provider': 'isaacsim', 'source_id': self._source.source_id,
                 'source_closure': self._source.source_closure_digest, 'objects': checked}
+            if self._f06_pickcube:
+                self._build_layout_facts['sdk_identity'] = dict(self._app_owner.sdk_identity)
+                self._build_layout_facts['sdk_runtime_version_raw'] = list(self._app_owner.sdk_runtime_version_raw)
+                from isaacsim.core.experimental.utils import backend as backend_utils
+                with backend_utils.use_backend('tensor', raise_on_fallback=True):
+                    self._build_layout_facts['physical_model'] = _read_f06_public_physical_model(
+                        self._articulation, self._free_views)
+                link_names = tuple(self._articulation.link_names)
+                link_paths = self._articulation.link_paths
+                if len(link_paths) != 1 or len(link_paths[0]) != len(link_names):
+                    raise ValueError('public Isaac articulation link paths do not match link names')
+                mass_paths = {f'link:{name}': str(path) for name, path in zip(link_names, link_paths[0], strict=True)}
+                mass_paths.update({semantic: _native_prim_path(self._source.bodies[semantic], entry_prim)
+                                   for semantic in self._free_views})
+                self._build_layout_facts['authored_usd_mass_properties'] = _read_f06_authored_mass_properties(
+                    self._stage, mass_paths, UsdPhysics)
             self._metadata = NativeRuntimeIOMetadataV1(
                 "native-runtime-io-metadata-v1", self._source.source_id,
                 self._source.source_closure_digest, self._source.scene_definition.identity_hash,
                 self._artifact.identity_hash, self._execution.identity_hash,
-                "isaacsim", "isaacsim-6.2.0.0", "cuda", "cuda:0", "best_effort",
+                "isaacsim", ("isaacsim-" + self._app_owner.sdk_identity['normalized_version']
+                             if self._f06_pickcube else "isaacsim-6.2.0.0"), "cuda", "cuda:0", "best_effort",
                 float(self._artifact.timebase.physics_dt),
                 int(self._artifact.timebase.control_substeps), self._dof_names,
                 self._position_limits,
@@ -769,6 +905,8 @@ class IsaacSimNativeRuntimeIOV1:
                 )
                 self._bootstrap_receipt['native_mimic_drive_witness'] = witness
                 self._bootstrap_receipt['native_adaptation_receipt'] = self.drive_receipt.to_mapping()
+                self._build_layout_facts['native_public_bootstrap_receipt'] = copy.deepcopy(self._bootstrap_receipt)
+                self._build_layout_facts['native_runtime_metadata'] = self._metadata.to_mapping()
             self._manager = SimulationManager
         except BaseException as primary:
             import gc
@@ -1603,7 +1741,8 @@ class IsaacSimNativeRuntimeIOV1:
                 native_adaptation_application = {
                     'schema_version': 'native-physx-mimic-substep-application-v1',
                     'profile_id': (
-                        'isaacsim-6.2-pickcube-physx-mimic-5n-v1' if self._f06_pickcube
+                        ('isaacsim-' + self._app_owner.sdk_identity['normalized_version'].rsplit('.', 2)[0]
+                         + '-pickcube-physx-mimic-5n-v1') if self._f06_pickcube
                         else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
                     ),
                     'provenance_kind': 'native_runtime',
@@ -1753,7 +1892,8 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                 or f06_pickcube_input.execution.identity_hash != execution.identity_hash
                 or f06_pickcube_input.runtime_source is not source):
             raise ValueError('F06 Isaac adapter input differs from the exact artifact/execution/source')
-    owner = _process_app_owner()
+    owner = _process_app_owner(launch_profile_id=(F06_ISAAC_APP_LAUNCH_PROFILE_V1
+                                                   if f06_pickcube else None))
     lease = source.scene_source.acquire_snapshot()
     try:
         return IsaacSimNativeRuntimeIOV1(

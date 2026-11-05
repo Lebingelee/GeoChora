@@ -8,6 +8,62 @@ from .common import _SessionValues, pose
 from .geophys_source import GeoPhysSourceComposer
 
 
+def _geophys_model_facts(compiled):
+    """Read the public rigid scene passed to GeoPhys materialization.
+
+    These are compiled-model values, not an independent solver-field readback.
+    """
+    scene = compiled.scene_model
+    data = scene.joint_data
+    names = compiled.references.names
+    bodies = []
+    for i, obj in enumerate(scene.objects):
+        w, x, y, z = (float(v) for v in data['body_iquat'][i])
+        norm = np.linalg.norm([w, x, y, z])
+        if not np.isfinite(norm) or norm < 1e-12:
+            raise ValueError(f'GeoPhys body has invalid inertial quaternion: {obj.object_key}')
+        w, x, y, z = (v / norm for v in (w, x, y, z))
+        rotation = np.asarray(((1-2*(y*y+z*z), 2*(x*y-z*w), 2*(x*z+y*w)),
+                               (2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w)),
+                               (2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y))))
+        tensor = rotation @ np.diag(np.asarray(obj.body_inertia, dtype=np.float64)) @ rotation.T
+        bodies.append({'name': obj.object_key, 'mass_kg': float(obj.body_config.mass),
+                       'com_body_m': np.asarray(data['body_ipos'][i]).tolist(),
+                       'inertia_body_at_com_kg_m2': tensor.tolist(),
+                       'inertial_quaternion_body_wxyz': [w, x, y, z]})
+    joints = []
+    for name, i in sorted(names.joints.items(), key=lambda item: item[1]):
+        i = int(i)
+        joints.append({'name': name, 'id': i, 'type': int(data['jnt_type'][i]),
+                       'axis_child_body': np.asarray(data['jnt_axis_child'][i]).tolist(),
+                       'axis_parent_body': np.asarray(data['jnt_axis_parent'][i]).tolist(),
+                       'limited': bool(data['jnt_limited'][i]),
+                       'range': np.asarray(data['jnt_range'][i]).tolist()})
+    actuators = []
+    for name, i in sorted(names.actuators.items(), key=lambda item: item[1]):
+        i = int(i)
+        actuators.append({'name': name, 'id': i, 'transmission_type': int(data['actuator_trntype'][i]),
+                          'transmission_id': int(data['actuator_trnid'][i]),
+                          'gear': np.asarray(data['actuator_gear'][i]).tolist()})
+    eq = data.get('eq_data')
+    equality = None if eq is None else {
+        'n_eq': int(eq.n_eq), 'n_rows': int(eq.n_rows),
+        'joint_id_a': np.asarray(eq.joint_id_a).tolist(),
+        'joint_id_b': np.asarray(eq.joint_id_b).tolist(),
+        'polycoef': np.asarray(eq.polycoef).tolist(),
+        'active': np.asarray(eq.active).tolist(),
+    }
+    tendon_keys = ('n_tendons', 'tendon_wrap_adr', 'tendon_wrap_num',
+                   'tendon_wrap_jntid', 'tendon_wrap_coef')
+    tendons = {key: (int(data[key]) if key == 'n_tendons' else np.asarray(data[key]).tolist())
+               for key in tendon_keys if key in data}
+    tendons['name_to_id'] = {str(k): int(v) for k, v in data.get('name_to_tendon', {}).items()}
+    return {'schema_version': 'geophys-public-compiled-model-facts-v1', 'bodies': bodies,
+            'joints': joints, 'actuators': actuators, 'inertia_reference': 'center_of_mass',
+            'inertia_frame': 'body', 'scope': 'public compiled rigid scene, not solver-field readback',
+            'equalities': equality, 'tendons': tendons}
+
+
 def check_geophys_named_layout(names, data, source, boundary):
     """Resolve selected MJCF names and scalar/free addresses in public model data."""
     result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
@@ -110,7 +166,8 @@ class _GeoPhysSession(_SessionValues):
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.geophys:check_geophys_named_layout',
                 'provider': 'geophys', 'source_id': source.scene_source.source_id,
                 'source_closure': source.source_closure_digest, 'objects': checked,
-                'materialization_id': self.provider_materialization_id}
+                'materialization_id': self.provider_materialization_id,
+                'physical_model': _geophys_model_facts(compiled)}
         except BaseException:
             self._boundary.close()
             raise
