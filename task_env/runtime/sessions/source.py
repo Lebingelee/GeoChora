@@ -576,6 +576,23 @@ class UsdRuntimeSourceV1:
         self.scene_source.assert_fresh()
 
 
+def validate_usd_task_reset_identities(task_source, artifact, source, reset_plan, *, error_message):
+    """Check the shared source/scene/artifact/reset identity closure.
+
+    Callers validate the contract types and each object's own fields first;
+    provider and task-specific admission remain with their respective owners.
+    """
+    scene = source.scene_definition
+    if (source.task_artifact.identity_hash != artifact.identity_hash
+            or artifact.scene_identity_hash != scene.identity_hash
+            or source.scene_source.task_source_identity_sha256 != task_source.identity_hash
+            or source.scene_source.scene_identity_sha256 != scene.identity_hash
+            or reset_plan.role_binding.task_source_identity_hash != task_source.identity_hash
+            or reset_plan.role_binding.scene_identity_hash != scene.identity_hash
+            or reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+        raise ValueError(error_message)
+
+
 @dataclass(frozen=True)
 class UsdRuntimeInputV1:
     """Source-bound USD session inputs; admission policy remains in runtime."""

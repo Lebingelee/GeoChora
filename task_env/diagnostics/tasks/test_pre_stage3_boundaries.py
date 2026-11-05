@@ -416,3 +416,59 @@ def test_artifact_digest_distinguishes_signed_zero_after_frozen_field_tampering(
     values[key] = 0.0
     object.__setattr__(artifact.semantics, 'parameters_si', MappingProxyType(dict(values)))
     assert artifact.identity_hash != negative
+
+
+def test_usd_task_reset_identity_closure_rejects_each_wrong_source():
+    from types import SimpleNamespace as Namespace
+    import pytest
+    from task_env.runtime.sessions.source import validate_usd_task_reset_identities
+
+    task = Namespace(identity_hash='task')
+    artifact = Namespace(identity_hash='artifact', scene_identity_hash='scene')
+    source = Namespace(
+        task_artifact=Namespace(identity_hash='artifact'),
+        scene_definition=Namespace(identity_hash='scene'),
+        scene_source=Namespace(task_source_identity_sha256='task', scene_identity_sha256='scene'),
+    )
+    plan = Namespace(role_binding=Namespace(task_source_identity_hash='task', scene_identity_hash='scene'),
+                     reset_sample=Namespace(task_artifact_hash='artifact'))
+
+    def check():
+        validate_usd_task_reset_identities(task, artifact, source, plan, error_message='identity mismatch')
+
+    check()
+    for owner, name in (
+        (source.task_artifact, 'identity_hash'),
+        (artifact, 'scene_identity_hash'),
+        (source.scene_source, 'task_source_identity_sha256'),
+        (source.scene_source, 'scene_identity_sha256'),
+        (plan.role_binding, 'task_source_identity_hash'),
+        (plan.role_binding, 'scene_identity_hash'),
+        (plan.reset_sample, 'task_artifact_hash'),
+    ):
+        value = getattr(owner, name)
+        setattr(owner, name, 'wrong')
+        with pytest.raises(ValueError, match='identity mismatch'):
+            check()
+        setattr(owner, name, value)
+    check()
+
+
+def test_usd_task_reset_identity_closure_accepts_real_f04_input_and_rejects_wrong_plan():
+    from dataclasses import replace
+    from task_env.diagnostics.tasks.f04_candidate_s1_support import build_candidate
+    from task_env.runtime.sessions.source import validate_usd_task_reset_identities
+
+    candidate = build_candidate('menagerie-panda')
+    validate_usd_task_reset_identities(
+        candidate.task_source, candidate.artifact, candidate.runtime_source, candidate.reset_plan,
+        error_message='identity mismatch',
+    )
+    wrong_plan = replace(candidate.reset_plan, role_binding=replace(
+        candidate.reset_plan.role_binding, scene_identity_hash='0' * 64,
+    ))
+    with pytest.raises(ValueError, match='identity mismatch'):
+        validate_usd_task_reset_identities(
+            candidate.task_source, candidate.artifact, candidate.runtime_source, wrong_plan,
+            error_message='identity mismatch',
+        )

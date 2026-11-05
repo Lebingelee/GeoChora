@@ -33,7 +33,9 @@ from task_env.environment import compile_task_artifact_v1, sample_episode_reset_
 from task_env.environment.task_source import TaskSourceV1
 from task_env.artifacts import ExecutionSpecV1, TaskArtifactV1, RendererSelectionV1
 from task_env.artifacts.execution import EpisodeResetPlanV1
-from task_env.runtime.sessions.source import RuntimeSource, UsdRuntimeSourceV1
+from task_env.runtime.sessions.source import (
+    RuntimeSource, UsdRuntimeSourceV1, validate_usd_task_reset_identities,
+)
 from task_env.runtime.sessions.leaf_control import (
     GeoPhysHostModelProducerIdentityV1,
     GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
@@ -208,17 +210,14 @@ class F05NativePositionCandidateInputV1:
         artifact.validate()
         execution.validate()
         self.reset_plan.validate()
-        if (source.task_artifact.identity_hash != artifact.identity_hash
-                or source.scene_definition.identity_hash != artifact.scene_identity_hash
-                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
-                or source.scene_source.scene_identity_sha256 != source.scene_definition.identity_hash
-                or self.task_source.scene_ref != source.scene_definition.scene_id
+        if (self.task_source.scene_ref != source.scene_definition.scene_id
                 or self.task_source.task_id != artifact.task_id
-                or self.task_source.version != artifact.artifact_version
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != source.scene_definition.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+                or self.task_source.version != artifact.artifact_version):
             raise ValueError('F05 native source/TaskSource/Artifact/reset identities disagree')
+        validate_usd_task_reset_identities(
+            self.task_source, artifact, source, self.reset_plan,
+            error_message='F05 native source/TaskSource/Artifact/reset identities disagree',
+        )
         if (execution.physics_provider, execution.physics_backend, execution.physics_device,
                 execution.physics_profile, execution.determinism_mode) != (
                 'geophys', 'cpu', 'cpu', 'geophys-usd-position-f05-native-v1', 'best_effort'):
@@ -312,14 +311,10 @@ class F05Dg02GeoPhysUsdCandidateInputV1:
                 F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID,
                 F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID):
             raise ValueError('DG02 TaskSource/Artifact identity differs from accepted DG01 task semantics')
-        if (source.task_artifact.identity_hash != artifact.identity_hash
-                or artifact.scene_identity_hash != scene.identity_hash
-                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
-                or source.scene_source.scene_identity_sha256 != scene.identity_hash
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != scene.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
-            raise ValueError('DG02 Task/Scene/Artifact/reset identities disagree')
+        validate_usd_task_reset_identities(
+            self.task_source, artifact, source, self.reset_plan,
+            error_message='DG02 Task/Scene/Artifact/reset identities disagree',
+        )
         if (execution.physics_provider, execution.physics_backend, execution.physics_device,
                 execution.physics_profile, execution.determinism_mode) != (
                 'geophys', 'cpu', 'cpu', F05_DG02_GEOPHYS_PROFILE, 'best_effort'):
@@ -438,14 +433,10 @@ class _F05IsaacUsdSourcePreparationV1:
                 F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID,
                 F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID):
             raise ValueError('F05 Isaac source preparation differs from the frozen DG01 task')
-        if (source.task_artifact.identity_hash != artifact.identity_hash
-                or artifact.scene_identity_hash != scene.identity_hash
-                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
-                or source.scene_source.scene_identity_sha256 != scene.identity_hash
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != scene.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
-            raise ValueError('F05 Isaac source-preparation Task/Scene/Artifact/reset identities disagree')
+        validate_usd_task_reset_identities(
+            self.task_source, artifact, source, self.reset_plan,
+            error_message='F05 Isaac source-preparation Task/Scene/Artifact/reset identities disagree',
+        )
         delivery = source.scene_source.loaded_delivery
         representation = source.scene_source.representation
         d = delivery.delivery
