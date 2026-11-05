@@ -2,6 +2,8 @@
 
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
+后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
+
 | 门 | 当前状态 | 证据与剩余边界 |
 | --- | --- | --- |
 | G0 输入与资源 | **PARTIAL** | 两份保护 untracked 的 SHA 和 GeoPhys／Menagerie pin 与原记录一致。维护者将物理步总限额调整为 300000，并以两目录现存占用检查 2 GiB；当前约 1.03 GiB。两目录中可见的 121 条 pytest supervisor 记录累计约 1464 秒，超过原 1200 秒离线墙时上限；已请求调整并暂停新增离线测试。逐项路径、PID、时间和分类保存在 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/visible-supervisor-budget-ledger-20261105.json`；该数字不是完整历史命令账本。 |
