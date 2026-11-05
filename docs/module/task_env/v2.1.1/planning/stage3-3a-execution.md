@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。普通attempt003整体未获Sol接收、已到三次上限；维护者现已指定诊断001，完整包准备待手动转发，002核心恢复保留。首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。普通attempt003的PARTIAL与三次上限记录保留；维护者指定的诊断001现已获Sol接收，3a完成，002核心恢复保留。首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -102,3 +102,8 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 ## 维护者指定诊断001：普通历史保留，另计诊断
 
 维护者在本会话讨论主要缺口、阶段归属、测试/SHA及60–90分钟估计后，明确要求构建诊断包交Terra。当前[诊断001完整安排](stage3-3a-diagnostic-001.md)已准备，等待手动转发；普通三次和003未接收结果不改写，diagnostic_attempt_count=0，未开工／无native。该包包括既定范围内诊断、最小修复、聚焦验证、本地提交及120分钟内返包，不是只读审计或普通004。来源解析与严格预检guard分开，实际Isaac DOF/view／三后端物性留3b；不重跑历史矩阵。完整报告释放后Sol独立复审。
+
+
+## 诊断001独立复审后：3a接收
+
+诊断001／6b11123e经[Sol主审](../maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md)接收为ACCEPTED_3A_ROUTING_ADMISSION，当前3a whole_3a_accepted=true。F06前置拒绝、已有Position/leaf完整生产consumer及同请求记录闭合，原三次与诊断单独计数，未改写历史。3b仅进入完整包准备候选，未派发／执行；具体真实SDK／物性与6.1/6.2兼容仍按原3b出口。

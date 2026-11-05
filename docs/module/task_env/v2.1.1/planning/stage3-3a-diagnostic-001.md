@@ -56,3 +56,8 @@ SHA只做一次开工HEAD／保护字节／pins核对、loader正常来源校验
 验证累计30分钟、单组10分钟；MuJoCo CPU及原生编译累计10分钟、1000物理substeps（含reset/settle/失败重试），无一次启动限制。进程树／并发RSS预算8GiB、输出128MiB／单日志8MiB；未测不声称已测。GeoPhys物理、Isaac App、GPU、render、安装/下载、新worktree0。原双锁仅在MuJoCo原生编译/运行期间按Core→历史checkout获取、逆序释放，等锁计入窗口，不删锁／盘点全机。
 
 外部完整包为主工作区handoffs/V211_G03_3a_diagnostic_attempt001，Terra维护者手动转发。输出新ignored目录workspace/maintenance/v211_g03_3a_diagnostic_attempt001，report/results/commands/logs/output-manifest及跟踪短执行摘要；只本地明确路径提交，不push/merge。返回DIAGNOSIS_RESOLVED/PARTIAL/BLOCKED和整个3a技术结果、真实计量与未决、input/output HEAD和writer/进程/锁释放，状态REPORTED_PENDING_SOL_REVIEW。Sol独立复审预计另10–15分钟，不自动接收或进入3b。
+
+
+## 最终复审：诊断与3a已接收
+
+本包已返6b11123e，由[Sol独立复审](../maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md)接收ACCEPTED_3A_ROUTING_ADMISSION，D1/D2关闭；上文PREPARED与预算均为冻结准备历史，不继续派发原包。普通计数3、诊断计数1保持，3b未启动。

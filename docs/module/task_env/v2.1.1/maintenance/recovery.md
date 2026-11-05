@@ -2,7 +2,13 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 当前：诊断001已由维护者指定并准备，等待手动转交Terra
+## 当前：3a已由Sol接收，诊断001关闭
+
+诊断001输出6b11123e经[Sol独立复审](reviews/20261105_3a_diagnostic_attempt001_sol_review.md)决定 **ACCEPTED_3A_ROUTING_ADMISSION**，3a整体在配置／环境准入／已有声明与具体构建检查接线／同请求回执范围通过。真实Position和leaf生产来源consumer、required缺Frame拒绝、H5 metadata及最终PickCube31／Nut19 MuJoCo CPU短程均有证据；F06真实目标依赖不满足时已在加载USD前准确拒绝，source未评估明确保留。Sol核对215输出／10提交文件hash，独立5项guard离线通过，未解析来源或运行native。
+
+普通attempt_count=3、diagnostic_attempt_count=1，原三次失败／局部接收记录不改写，诊断D1/D2关闭、active_packages为空。3b仅具备完整包准备条件，仍PLANNED／attempt0、无派发执行；真实三后端／物性及Isaac6.1/6.2兼容留3b。进程树RSS未测及首次source命令cwd偏差已保留说明，不为补账本重跑。
+
+## 历史：诊断001由维护者指定并准备
 
 维护者在本会话完成阶段范围／矩阵与SHA／时间讨论，明确要求诊断attempt工作包并指定Terra手动转交。[诊断001完整安排](../planning/stage3-3a-diagnostic-001.md)现为PREPARED_NOT_DISPATCHED，普通attempt_count=3、diagnostic_attempt_count=0，active_packages为空；当前准确输入在准备文档提交后的外部snapshot冻结。已定位真实F06和现有代表输入，无Sol native／自动派发。手动转发后按120分钟窗口诊断、最小修复和聚焦验证，原三次结果不改写，报告后Sol独立复审，不自动普通004或3b。
 

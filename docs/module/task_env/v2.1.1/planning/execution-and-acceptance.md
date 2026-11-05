@@ -98,3 +98,6 @@ Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一
 
 
 2026-11-05维护者人工讨论后已指定Terra诊断attempt。[诊断001](stage3-3a-diagnostic-001.md)完整包准备待手动转发，普通三次结果保留、诊断另计0；包含已明确范围内的最小修复和聚焦验证，墙时120分钟，无Sol native／自动派发，不自动进入3b。
+
+
+2026-11-05最新：诊断001／6b11123e经[Sol独立复审](../maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md)接收，3a为ACCEPTED_3A_ROUTING_ADMISSION。普通3次与诊断1次历史保留；3b可准备完整包，仍PLANNED／attempt0，真实三后端／物性及Isaac6.1/6.2兼容未因本次接收完成，无自动派发。
