@@ -13,7 +13,7 @@
 
 ## 后续最小工作
 
-1. 对照[职责／文档处置清单](20261105_pre_stage3_owner_and_document_map.md)和[规划](../../planning/pre-stage3-environment-refactor.md)，继续处理环境类内剩余路线接线、旧诊断与新手入口的实际缺口；不以行数、改名或单纯移动代码代替职责判断。
+1. 对照[职责／文档处置清单](20261105_pre_stage3_owner_and_document_map.md)、[环境类剩余职责](20261105_reference_env_remaining_owners.md)和[规划](../../planning/pre-stage3-environment-refactor.md)，继续处理环境类内剩余路线接线、旧诊断与新手入口的实际缺口；不以行数、改名或单纯移动代码代替职责判断。
 2. 按维护者对离线墙时预算的决定安排必要验证；若继续修改生产源码，对受影响路线重新固定源码身份及运行预算，不将既有 H5 重标。
 3. 最终执行文档 validator、保护项和 gitlink 核对，完成报告及本地提交；确认本次 worker／进程组退出并释放两把锁，再交 Sol 独立复审。
 
