@@ -1389,63 +1389,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
-        mixed_reset_plan = None
-        if self._mixed_control_candidate:
-            if options is None:
-                options = {}
-            if not isinstance(options, Mapping) or any(type(key) is not str for key in options):
-                raise TypeError('mixed-control reset options must be a string-keyed mapping')
-            if 'reset_plan_v1' in options:
-                from ..artifacts import ResetPlanV1
-                mixed_reset_plan = options['reset_plan_v1']
-                if type(mixed_reset_plan) is not ResetPlanV1:
-                    raise TypeError('mixed-control reset_plan_v1 must be the public ResetPlanV1 contract')
-                mixed_reset_plan.validate()
-                sample = mixed_reset_plan.reset_sample
-                if (sample.task_artifact_hash != self.artifact.identity_hash
-                        or sample.source_id != self.value['source'].scene_source.source_id
-                        or sample.source_closure_digest != self.value['source'].source_closure_digest):
-                    raise ValueError('ResetPlanV1 Artifact/source identity differs from this selected candidate')
-                if seed is _RESET_SEED_UNSET:
-                    seed = sample.task_seed
-                elif type(seed) is not int or seed != sample.task_seed:
-                    raise ValueError('ResetPlanV1 seed differs from reset seed')
-        elif options:
-            raise ValueError('selected reference reset options are not supported')
-        if seed is _RESET_SEED_UNSET:
-            if self._mixed_control_candidate and mixed_reset_plan is not None:
-                seed = mixed_reset_plan.reset_sample.task_seed
-            elif self._mixed_control_candidate and self.session is not None:
-                seed = self.sample.task_seed
-            elif getattr(self, 'position_profile', False):
-                seed = self.value['reset_plan'].reset_sample.task_seed
-            else:
-                seed = 19
-        if getattr(self, 'position_profile', False):
-            # Validate the fixed ResetPlan seed before closing/reconstructing a
-            # live RuntimeSession. Legacy selected bindings keep their existing
-            # reconstruction-before-seed-validation lifecycle below.
-            seed = self.binding.reset_seed(seed)
-            reset_plan = self.value.get('reset_plan')
-            if reset_plan is None:
-                raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlan')
-            if (self.binding.build_seeded is None
-                    and seed != reset_plan.reset_sample.task_seed):
-                raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
-        mixed_reset_sample = None
-        if self._mixed_control_candidate:
-            seed = self.binding.reset_seed(seed)
-            mixed_reset_sample = self.binding.reset_sample_with_options(
-                self.artifact, seed, options, self.value['source'],
-            )
-            from ..artifacts import ResetSampleV1
-            if type(mixed_reset_sample) is not ResetSampleV1:
-                raise TypeError('mixed-control reset binding must return ResetSampleV1')
-            if (mixed_reset_sample.task_artifact_hash != self.artifact.identity_hash
-                    or mixed_reset_sample.source_id != self.value['source'].scene_source.source_id
-                    or mixed_reset_sample.source_closure_digest != self.value['source'].source_closure_digest
-                    or mixed_reset_sample.task_seed != seed):
-                raise ValueError('mixed-control reset sample differs from its selected source or seed')
+        from .reference_binding import prepare_selected_reset
+        seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
+            self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
+            mixed=self._mixed_control_candidate, position=getattr(self, 'position_profile', False),
+            has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
+            artifact=self.artifact, value=self.value,
+        )
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         previous_episode_end = self._position_episode_end

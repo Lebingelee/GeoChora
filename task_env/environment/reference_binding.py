@@ -1,6 +1,7 @@
 """Internal binding between selected task semantics and the environment."""
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Callable
 
 
@@ -27,6 +28,63 @@ def position_input_kind(binding, value):
     if kind not in {'f04', 'f05_native', 'dg02_geophys', 'dg04_isaac_native'}:
         raise ValueError('versioned Position input classifier returned an unsupported kind')
     return kind
+
+
+def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, position,
+                           has_session, previous_sample, artifact, value):
+    """Validate reset inputs and resolve a task-bound sample before runtime changes."""
+    mixed_plan = None
+    if mixed:
+        if options is None:
+            options = {}
+        if not isinstance(options, Mapping) or any(type(key) is not str for key in options):
+            raise TypeError('mixed-control reset options must be a string-keyed mapping')
+        if 'reset_plan_v1' in options:
+            from ..artifacts import ResetPlanV1
+            mixed_plan = options['reset_plan_v1']
+            if type(mixed_plan) is not ResetPlanV1:
+                raise TypeError('mixed-control reset_plan_v1 must be the public ResetPlanV1 contract')
+            mixed_plan.validate()
+            sample = mixed_plan.reset_sample
+            if (sample.task_artifact_hash != artifact.identity_hash
+                    or sample.source_id != value['source'].scene_source.source_id
+                    or sample.source_closure_digest != value['source'].source_closure_digest):
+                raise ValueError('ResetPlanV1 Artifact/source identity differs from this selected candidate')
+            if seed is seed_unset:
+                seed = sample.task_seed
+            elif type(seed) is not int or seed != sample.task_seed:
+                raise ValueError('ResetPlanV1 seed differs from reset seed')
+    elif options:
+        raise ValueError('selected reference reset options are not supported')
+    if seed is seed_unset:
+        if mixed and mixed_plan is not None:
+            seed = mixed_plan.reset_sample.task_seed
+        elif mixed and has_session:
+            seed = previous_sample.task_seed
+        elif position:
+            seed = value['reset_plan'].reset_sample.task_seed
+        else:
+            seed = 19
+    if position:
+        seed = binding.reset_seed(seed)
+        reset_plan = value.get('reset_plan')
+        if reset_plan is None:
+            raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlan')
+        if binding.build_seeded is None and seed != reset_plan.reset_sample.task_seed:
+            raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
+    mixed_sample = None
+    if mixed:
+        seed = binding.reset_seed(seed)
+        mixed_sample = binding.reset_sample_with_options(artifact, seed, options, value['source'])
+        from ..artifacts import ResetSampleV1
+        if type(mixed_sample) is not ResetSampleV1:
+            raise TypeError('mixed-control reset binding must return ResetSampleV1')
+        if (mixed_sample.task_artifact_hash != artifact.identity_hash
+                or mixed_sample.source_id != value['source'].scene_source.source_id
+                or mixed_sample.source_closure_digest != value['source'].source_closure_digest
+                or mixed_sample.task_seed != seed):
+            raise ValueError('mixed-control reset sample differs from its selected source or seed')
+    return seed, options, mixed_plan, mixed_sample
 
 
 @dataclass(frozen=True)
