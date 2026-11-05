@@ -10,7 +10,7 @@
 
 续作将 Position session 的控制计划、joint／frame 绑定及 task ControlBinding 选择准备归入 `runtime.sessions.control`；Env 仍发起现有 materialization 并保留实际采用的绑定。该整理不代表 Position／leaf 的全部 interval 路线已经统一。
 | `__init__`、`_build_runtime_with_rollback`、`_close_reference_resources`（第 1063、98、3050 行） | 负责多种构造／资源路线、失败回收和 close；`_close_reference_resources` 仍含 mixed、Position 和 selected 分支。续作已将共同的 session／runtime owner 关闭和故障保留归 runtime；路线特定的录制、camera、source 和 task 资源收尾仍由 Env 编排。 | 构造只协调已有组件；资源创建／关闭由各自 session、camera 和 recorder owner 承接。迁移必须保留先前异常、附加清理错误、资源所有权及重复 close 语义；禁止把未完成 interval 保存成成功轨迹。 |
-| `start_recording`、`finish_recording`（第 3431、原方法所在区段） | 起始边界和 recording 生命周期在 Env；selected 来源与 metadata、H5 保存／校验已交 `recorders.reference_provenance`，mixed／Position 仍做 recorder 创建与路由。 | `recorders` 和 canonical trajectory 负责格式、元数据和持久化；Env 只判断可否开始／结束、Stop 与故障顺序。保留 `test_selected_consumers.py`、`test_pre_stage3_boundaries.py` 与真实同次 reader 检查。 |
+| `start_recording`、`finish_recording`（第 3431、原方法所在区段） | 起始边界和 recording 生命周期在 Env；selected 来源与 metadata、H5 保存／校验已交 `recorders.reference_provenance`，mixed／Position 的 v3 recorder 创建、目标文件检查和开始提交也已归 recorder，Env 仍选择路线与准备任务 metadata。 | `recorders` 和 canonical trajectory 负责格式、元数据和持久化；Env 只判断可否开始／结束、Stop 与故障顺序。保留 `test_selected_consumers.py`、`test_pre_stage3_boundaries.py` 与真实同次 reader 检查。 |
 | `_format_step_result` 和 observation 发布 | scalar 组件／selected 路线仍在 Env 投影信息；selected observation 组合已由 `observations.selected_reference` 和 task binding 承担。 | 继续区分正式反馈、task evaluation 和一次性诊断；保留 shape／dtype／space、reward、terminated／truncated 和实时边界，不把观察结果简化为静态布局。 |
 
 后续重构应按以上可测试的职责边界逐项推进，不以机械拆文件、改变任务数学或另造 Runtime／Env 模板完成。最新物理和离线证据见[验证记录](20261105_pre_stage3_resumed_physical_checks.md)；维护者已授权续作的离线墙时重新计数，上限为 3000 秒，详见[当前状态](20261105_pre_stage3_current_status.md)。

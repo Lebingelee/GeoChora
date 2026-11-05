@@ -3346,47 +3346,32 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 or self._mixed_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
         if getattr(self, 'mixed_control_profile', False):
-            from ..recorders import RecorderConfig, TransitionRecorder
-
-            path = Path(path)
-            if path.suffix != '.h5':
-                path = path.with_name(path.name + '.h5')
-            if path.exists():
-                raise FileExistsError(path)
-            recorder = TransitionRecorder(RecorderConfig(
-                schema_version='v3', max_transitions=max(self.horizon, 1),
-            ))
-            recorder.begin_episode(self.obs, dict(self.info), self.get_record_metadata())
-            self.recording_path = path
-            self.recorder = recorder
+            from ..recorders.recorder import begin_structured_recording
+            self.recording_path, self.recorder = begin_structured_recording(
+                path, horizon=self.horizon, observation=self.obs, reset_info=self.info,
+                metadata_factory=self.get_record_metadata,
+            )
             return
         if getattr(self, 'position_profile', False):
-            from ..recorders import RecorderConfig, TransitionRecorder
-
-            path = Path(path)
-            if path.suffix != '.h5':
-                path = path.with_name(path.name + '.h5')
-            if path.exists():
-                raise FileExistsError(path)
-            recorder = TransitionRecorder(RecorderConfig(
-                schema_version='v3', max_transitions=max(self.horizon, 1),
+            from ..recorders.recorder import begin_structured_recording
+            from ..recorders.position_metadata import position_control_binding_provenance
+            def metadata_factory():
+                record_metadata = self._position_record_metadata()
+                record_metadata['resolved_config']['position_control_binding_provenance'] = (
+                    position_control_binding_provenance(
+                        self._materialized_position_control_binding,
+                        self._materialized_position_control_selector,
+                    )
+                )
+                return record_metadata
+            self.recording_path, self.recorder = begin_structured_recording(
+                path, horizon=self.horizon, observation=self.obs,
+                reset_info=self._position_reset_info, metadata_factory=metadata_factory,
                 max_buffer_bytes=(
                     self.camera_observation_config.max_recording_buffer_bytes
-                    if self.camera_observation_config is not None
-                    else RecorderConfig().max_buffer_bytes
+                    if self.camera_observation_config is not None else None
                 ),
-            ))
-            from ..recorders.position_metadata import position_control_binding_provenance
-            record_metadata = self._position_record_metadata()
-            record_metadata['resolved_config']['position_control_binding_provenance'] = (
-                position_control_binding_provenance(
-                    self._materialized_position_control_binding,
-                    self._materialized_position_control_selector,
-                )
             )
-            recorder.begin_episode(self.obs, dict(self._position_reset_info), record_metadata)
-            self.recording_path = path
-            self.recorder = recorder
             return
         path = Path(path)
         if path.exists():

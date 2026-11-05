@@ -274,6 +274,22 @@ class TransitionRecorder:
         return output
 
 
+def begin_structured_recording(path, *, horizon, observation, reset_info, metadata_factory,
+                               max_buffer_bytes=None):
+    """Create a v3 recording and publish it only after begin_episode succeeds."""
+    path = Path(path)
+    if path.suffix != '.h5':
+        path = path.with_name(path.name + '.h5')
+    if path.exists():
+        raise FileExistsError(path)
+    config = {'schema_version': 'v3', 'max_transitions': max(horizon, 1)}
+    if max_buffer_bytes is not None:
+        config['max_buffer_bytes'] = max_buffer_bytes
+    recorder = TransitionRecorder(RecorderConfig(**config))
+    recorder.begin_episode(observation, dict(reset_info), metadata_factory())
+    return path, recorder
+
+
 def finalize_structured_recording(recorder, path, episode_end, reason, *, position, leaf=False, camera=False):
     """Finalize and verify the existing v3 stream against its episode boundary."""
     from .h5 import (load_camera_observations_h5, load_leaf_control_records_h5,

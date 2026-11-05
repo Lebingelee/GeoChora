@@ -4,6 +4,32 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_position_recording_does_not_publish_on_existing_path_or_metadata_failure(tmp_path):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    calls = []
+    def bad_metadata():
+        calls.append('metadata')
+        raise ValueError('injected metadata failure')
+    env = SimpleNamespace(
+        session=object(), state=SimpleNamespace(control_step=0), recorder=None,
+        recording_path=None, _stopped=False, _position_episode_end=None,
+        _mixed_episode_end=None, mixed_control_profile=False, position_profile=True,
+        horizon=3, obs={'state': 1}, _position_reset_info={},
+        camera_observation_config=None, _position_record_metadata=bad_metadata,
+    )
+    existing = tmp_path / 'existing.h5'
+    existing.write_bytes(b'unchanged')
+    with pytest.raises(FileExistsError):
+        SelectedReferenceEnv.start_recording(env, tmp_path / 'existing')
+    assert calls == [] and existing.read_bytes() == b'unchanged'
+    with pytest.raises(ValueError, match='injected metadata failure'):
+        SelectedReferenceEnv.start_recording(env, tmp_path / 'new')
+    assert calls == ['metadata']
+    assert env.recorder is None and env.recording_path is None
+    assert not (tmp_path / 'new.h5').exists()
+
+
 def test_position_materialization_preparation_binds_exact_source_and_rejects_invalid(monkeypatch):
     from task_env.runtime.sessions import source as source_owner
     from task_env.runtime.sessions.control import (
