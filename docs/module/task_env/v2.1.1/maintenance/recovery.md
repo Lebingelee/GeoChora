@@ -2,7 +2,11 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 当前：3a第三次未接收，必须人工诊断
+## 当前：诊断001已由维护者指定并准备，等待手动转交Terra
+
+维护者在本会话完成阶段范围／矩阵与SHA／时间讨论，明确要求诊断attempt工作包并指定Terra手动转交。[诊断001完整安排](../planning/stage3-3a-diagnostic-001.md)现为PREPARED_NOT_DISPATCHED，普通attempt_count=3、diagnostic_attempt_count=0，active_packages为空；当前准确输入在准备文档提交后的外部snapshot冻结。已定位真实F06和现有代表输入，无Sol native／自动派发。手动转发后按120分钟窗口诊断、最小修复和聚焦验证，原三次结果不改写，报告后Sol独立复审，不自动普通004或3b。
+
+## 历史：3a第三次未接收与人工诊断停止点
 
 Sol对attempt003／3d10b357作出 **NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED**，详见[独立复审](reviews/20261105_3a_attempt003_sol_review.md)。最终PickCube31／Nut19真实MuJoCo CPU、隔离worker PickCube和同请求H5 metadata事实保留；Sol核对110输出／20提交文件hash、最终日志并独立5项离线通过，native为0。
 

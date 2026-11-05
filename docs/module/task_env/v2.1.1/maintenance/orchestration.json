@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G03_3A_HUMAN_DIAGNOSIS_REQUIRED",
+  "status": "G03_3A_DIAGNOSTIC_PACKAGE_PREPARED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,8 +29,50 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Sol独立复审不接收整体3a，第三次普通窗口已关闭。保留MuJoCo/worker/metadata有界结果；等待维护者主导人工诊断D1 F06来源预检边界与D2 versioned/nested完整consumer。无普通候选包，不自动attempt004、重置计数或进入3b。",
+  "next_candidate": {
+    "substage": "3a",
+    "attempt_series": "diagnostic",
+    "package_id": "V211_G03_3a_diagnostic_attempt001",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "assigned_agent": "Terra; maintainer manual forwarding",
+    "target_thread": null,
+    "planned_diagnostic_attempt": 1,
+    "diagnostic_attempt_count_now": 0,
+    "ordinary_attempt_count_preserved": 3,
+    "preparation_consumes_attempt": false,
+    "planning_ref": "../planning/stage3-3a-diagnostic-001.md",
+    "review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001",
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/prompt.md",
+    "prompt_sha256": "5788cb4f8ca16412b3cff1e34651cd3a03628c2613b103678e04f4e12beb21f8",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/manifest.json",
+    "input_snapshot_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/input-snapshot.json",
+    "input_head_ref": "Frozen externally after Sol diagnostic preparation documentation commit.",
+    "expected_duration_minutes": "60-90 active; hard wall120; Sol review separately10-15",
+    "execution_budget": {
+      "expected_active_minutes": "60-90",
+      "total_wall_minutes": 120,
+      "cumulative_validation_minutes": 30,
+      "single_test_group_minutes": 10,
+      "cumulative_mujoco_native_minutes": 10,
+      "physics_substeps": 1000,
+      "native_launch_count_limit": null,
+      "source_only_parsing": "OpenUSD and existing GeoPhys Scene parsing allowed to executor in separate group; no physical Runtime/solver/App/GPU init. MuJoCo compilation counted under CPU budget/locks.",
+      "rss_process_tree_gib": 8,
+      "new_output_mib": 128,
+      "single_log_mib": 8,
+      "geophys_physical_native_starts": 0,
+      "isaac_app_starts": 0,
+      "gpu_starts": 0,
+      "render_starts": 0,
+      "install_or_download": 0,
+      "additional_worktrees": 0,
+      "additional_branches": 0,
+      "sol_native_imports_or_runs": 0
+    },
+    "assignment": "Explicit maintainer-designated diagnostic001; manual forwarding to Terra, no dispatch by Sol. Implementation/scoped validation authorized within frozen package; ordinary3 remains unchanged."
+  },
+  "next_action": "维护者已明确指定诊断attempt，完整V211_G03_3a_diagnostic_attempt001准备完成待手动转交Terra。普通3次历史与未接收结果保留，诊断计数0，尚未实施。按已确认3a范围最小修复和聚焦验证，120分钟硬窗口；报告后Sol独立复审，不自动3b或后续窗口。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -696,7 +738,7 @@
             "1d",
             "2c"
           ],
-          "status": "HUMAN_DIAGNOSIS_REQUIRED",
+          "status": "DIAGNOSTIC_PREPARED_NOT_DISPATCHED",
           "attempt_count": 3,
           "attempts": [
             {
@@ -764,7 +806,7 @@
           "output_head": "3d10b3570f69d2c09400a2e8d06029e2a5bb844b",
           "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "Sol independently verified manifests, final CPU/worker logs and five guarded offline checks; bounded results retained, whole3a not accepted. Final ordinary window exhausted; maintainer-led human diagnosis required for F06 production-source preflight and versioned/nested complete selected consumer.",
+          "last_observation": "Maintainer discussed stage boundaries, tests/SHA and time, then explicitly requested a Terra diagnostic package. Diagnostic001 prepared; ordinary3 results preserved, no dispatch/native.",
           "evidence_refs": [
             "reviews/20261105_3a_attempt002_execution.md",
             "reviews/20261105_3a_attempt001_sol_review.md",
@@ -793,7 +835,9 @@
           "blockers": [
             "D1: F06 real source stops at pxr guard before selected preflight; missing SDK/assets not established, Isaac helper only synthetic source.",
             "D2: existing versioned Controller/StateRequirements/nested declarations lack a complete selected production-source consumer proof."
-          ]
+          ],
+          "diagnostic_attempt_count": 0,
+          "diagnostic_attempts": []
         },
         {
           "id": "3b",
@@ -1239,7 +1283,7 @@
   },
   "human_diagnosis": {
     "substage": "3a",
-    "status": "REQUIRED_NOT_STARTED",
+    "status": "MAINTAINER_AUTHORIZED_PREPARED_NOT_DISPATCHED",
     "required_after_attempt": 3,
     "review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
     "ordinary_execution_allowed": false,
@@ -1249,6 +1293,11 @@
       "D1_F06_SOURCE_PREFLIGHT_BOUNDARY",
       "D2_VERSIONED_SELECTED_CONSUMER"
     ],
-    "authority": "Explicit maintainer three-attempt rule and goal-orchestration Skill; further work requires maintainer-led human diagnosis and authorization."
+    "authority": "Explicit maintainer three-attempt rule and goal-orchestration Skill; further work requires maintainer-led human diagnosis and authorization.",
+    "authorization_source": "Maintainer post003 scope discussion, then explicit request: 请构建诊断attempt的工作包，我来转交给terra",
+    "authorized_executor": "Terra",
+    "scope_ref": "../planning/stage3-3a-diagnostic-001.md",
+    "diagnostic_implementation_authorized_after_manual_forward": true,
+    "diagnostic_attempts_counted_separately": true
   }
 }

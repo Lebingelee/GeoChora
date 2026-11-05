@@ -95,3 +95,6 @@ Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一
 
 
 2026-11-05最新复审：attempt003整体THREE_A_PARTIAL，经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)不接收，3a转HUMAN_DIAGNOSIS_REQUIRED／attempt_count=3。真实MuJoCo/worker及metadata有界结果保留，F06来源预检与versioned/nested完整生产consumer待维护者人工诊断。第三次窗口关闭，无下个普通包，不自动004／续003或进入3b；前文准备状态保留历史时点。
+
+
+2026-11-05维护者人工讨论后已指定Terra诊断attempt。[诊断001](stage3-3a-diagnostic-001.md)完整包准备待手动转发，普通三次结果保留、诊断另计0；包含已明确范围内的最小修复和聚焦验证，墙时120分钟，无Sol native／自动派发，不自动进入3b。

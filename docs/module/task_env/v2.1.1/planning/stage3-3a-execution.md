@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt003整体未获Sol接收、已到三次上限，须维护者人工诊断；002核心恢复保留。首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。普通attempt003整体未获Sol接收、已到三次上限；维护者现已指定诊断001，完整包准备待手动转发，002核心恢复保留。首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -97,3 +97,8 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 ## attempt003复审后：停止普通执行，等待人工诊断
 
 执行输出3d10b357经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)决定NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED。两任务及worker的真实MuJoCo短程与metadata事实保留，Sol独立5项离线通过；主要未决仅F06真实来源预检边界、versioned/nested完整selected生产consumer证据。当前3a状态HUMAN_DIAGNOSIS_REQUIRED／attempt_count=3，active_packages为空，无普通候选；上节完整包准备和预算是已结束的冻结历史，不继续派发。维护者主导人工诊断并决定后续授权前，不再实施、补验证或自动第四次；3b/3c仍PLANNED。
+
+
+## 维护者指定诊断001：普通历史保留，另计诊断
+
+维护者在本会话讨论主要缺口、阶段归属、测试/SHA及60–90分钟估计后，明确要求构建诊断包交Terra。当前[诊断001完整安排](stage3-3a-diagnostic-001.md)已准备，等待手动转发；普通三次和003未接收结果不改写，diagnostic_attempt_count=0，未开工／无native。该包包括既定范围内诊断、最小修复、聚焦验证、本地提交及120分钟内返包，不是只读审计或普通004。来源解析与严格预检guard分开，实际Isaac DOF/view／三后端物性留3b；不重跑历史矩阵。完整报告释放后Sol独立复审。

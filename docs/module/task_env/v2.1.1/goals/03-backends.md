@@ -9,7 +9,7 @@
 <a id="3a"></a>
 ## 3a：执行路由、配置与能力交集
 
-2026-11-05 attempt003／3d10b357经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)整体未接收，当前HUMAN_DIAGNOSIS_REQUIRED、attempt_count=3。普通MuJoCo CPU PickCube31／Nut19、隔离worker PickCube及同请求记录事实保留；F06来源到selected preflight、versioned／nested完整生产consumer证据未闭合。最后普通窗口已关闭，须维护者人工诊断后再授权，不自动第四次、续003或进入3b；不重做002已接收核心或历史验收。
+2026-11-05 attempt003／3d10b357经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)整体未接收，复审时状态HUMAN_DIAGNOSIS_REQUIRED、attempt_count=3。普通MuJoCo CPU PickCube31／Nut19、隔离worker PickCube及同请求记录事实保留；F06来源到selected preflight、versioned／nested完整生产consumer证据未闭合。最后普通窗口已关闭，须维护者人工诊断后再授权，不自动第四次、续003或进入3b；不重做002已接收核心或历史验收。维护者随后已确认范围并指定Terra诊断001，[完整安排](../planning/stage3-3a-diagnostic-001.md)准备待手动转发；普通计数仍3、诊断计数0，尚未实施或接收。
 
 - **输入／依赖：**1c、1d、2c。首批 route 和协议已冻结。
 - **工作：**将宿主、引擎、solver／coupler、设备、renderer 和 batch 选择接入单一配置解析；能力求交任务／资产／嵌套Robot通道／Controller／typed物理命令／render 要求，替换必要的阶段特判但保留真实限制。
