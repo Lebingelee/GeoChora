@@ -16,14 +16,50 @@
     "reuse_existing_checkout": true,
     "additional_branches": 1,
     "additional_worktrees": 0,
-    "reason": "Maintainer requested one new branch from develop for G03; reuse it for 3a-3c. No branch or worktree has been created by handoff preparation.",
+    "reason": "One maintainer-authorized G03 topic branch created from local develop after fetch; preserve 236 local commits, reuse checkout for 3a-3c.",
     "stage": "3",
     "proposed_stage_branch": "codex/v211-stage3",
-    "creation_status": "PLANNED_NOT_CREATED"
+    "creation_status": "CREATED",
+    "actual_stage_branch": "codex/v211-stage3",
+    "created_from_head": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+    "develop_preserved_at": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+    "remote_checked": "public/develop",
+    "remote_head": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
+    "ahead_at_creation": 236,
+    "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "由新Sol读取阶段3交接、规范和实际状态，安排一个阶段3分支并准备首份3a完整包；维护者手动转发后实施。当前未派发3a，3a-3c保持PLANNED／attempt0。",
+  "next_candidate": {
+    "substage": "3a",
+    "package_id": "V211_G03_3a_attempt001",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "assigned_agent": null,
+    "target_thread": null,
+    "assignment": "Maintainer designates and manually forwards to one Terra or Luna; Sol does not dispatch.",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
+    "prompt_sha256": "3ed706e1842b2f243a7f68e143e8541b741f17608f23471248ab9247f15da00b",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001/manifest.json",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001/input-snapshot.json#/input_head",
+    "source_preparation_parent": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+    "planning_ref": "../planning/stage3-3a-execution.md",
+    "expected_active_minutes": "120-150",
+    "execution_budget": {
+      "total_wall_minutes": 180,
+      "single_test_group_minutes": 15,
+      "cumulative_test_metadata_minutes": 60,
+      "rss_process_tree_gib": 8,
+      "new_output_mib": 256,
+      "single_log_mib": 16,
+      "metadata_process_seconds": 30,
+      "native_starts": 0,
+      "physics_steps": 0,
+      "gpu_starts": 0,
+      "engine_imports": 0,
+      "additional_worktrees": 0
+    },
+    "preparation_consumes_attempt": false
+  },
+  "next_action": "维护者指定一个Terra或Luna并手动转发已准备的V211_G03_3a_attempt001；开工重验snapshot与writer。3a-3c仍PLANNED／attempt0，无G03包派发；完整报告及窗口释放后由Sol独立主审。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1065,7 +1101,7 @@
     }
   ],
   "stage3_handoff": {
-    "status": "READY_FOR_MANUAL_HANDOFF",
+    "status": "SOL_TAKEOVER_CONFIRMED_3A_PREPARED_NOT_DISPATCHED",
     "reviewed_input_head": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
     "handoff_ref": "20261105_stage3_sol_handoff.md",
     "external_package": "V211_G03_sol_handoff",
@@ -1074,6 +1110,11 @@
     "diagnostic_policy_commit": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
     "execution_started": false,
     "next_substage": "3a",
-    "implementation_package_prepared": false
+    "implementation_package_prepared": true,
+    "takeover_input_head": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+    "takeover_planning_ref": "../planning/stage3-3a-execution.md",
+    "prepared_package_id": "V211_G03_3a_attempt001",
+    "writer_check": "Original closeout Terra final report released writer/native; G03 Terra conversation contains only waiting instruction. Recheck before execution.",
+    "native_checks_performed": false
   }
 }

@@ -2,17 +2,21 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 新Sol交接入口：G03未开始
+## 新Sol已接手：3a完整包已准备，尚未派发
 
-维护者将另开Sol对话接手阶段3。[新Sol检查点](20261105_stage3_sol_handoff.md)及外部`V211_G03_sol_handoff`包汇总前置、诊断规范、证据边界与首轮动作。3a–3c保持PLANNED／attempt0，无实现包派发；当前仅准备交接。阶段3规划为从develop新建一个主题分支供3a–3c复用，默认沿用现有checkout、新worktree为0；分支尚未创建。编排中的分支计划与下一动作已同步维护者新安排，既有阶段接收／attempt历史不变。
+Sol已完整核对交接及必读资料，实际Core输入与`develop@9d942d43`快照一致，两份保护untracked及子模块pin不变。只读核对未发现新的3a在途包／writer；旧Terra前置窗口已有完整返包和释放声明。已fetch核对public/develop，本地develop领先236、落后0；从完整本地develop建立`codex/v211-stage3`，3a–3c共用当前checkout，新增worktree为0。develop保留原交接HEAD，无reset/rebase或推送。
+
+首份`V211_G03_3a_attempt001`已准备，由维护者指定一个Terra／Luna并手动转发。准确输入HEAD、保护字节和成员摘要在外部包snapshot／manifest冻结；[3a实施安排](../planning/stage3-3a-execution.md)记录当前源码落点、缺口、预算与出口。3a–3c仍PLANNED／attempt0，active_packages为空；未启动实施、native、subagent或后续子阶段。准备不计attempt，不因已有G03等待对话而重复派包。
+
+原[交接检查点](20261105_stage3_sol_handoff.md)保留交接准备时事实。当前动作是等待维护者指定并转发完整3a包，完整报告与writer释放后Sol独立审阅，不自动进入3b或阶段4。下文旧“分支尚未创建”等描述按其历史时点理解。
 
 ## 当前决定：前置核心收尾已有限接收
 
-维护者最新安排：先落实[诊断与代码边界规范](../../../../global/diagnostics-and-code-boundaries.md)，本轮不再全面解耦。后续环境、Controller、provider和renderer开发从外部诊断，不向核心新增实验／测试分支；现存已确认耦合登记在[规划第2.6节](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)，在版本准备进入7a集成时集中处理，并在稳定源码上验证。有限接收不表示诊断完全隔离，规则更新也不表示代码已整改。当前仅完成规范／规划更新，G03未启动。
+维护者最新安排：先落实[诊断与代码边界规范](../../../../global/diagnostics-and-code-boundaries.md)，本轮不再全面解耦。后续环境、Controller、provider和renderer开发从外部诊断，不向核心新增实验／测试分支；现存已确认耦合登记在[规划第2.6节](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)，在版本准备进入7a集成时集中处理，并在稳定源码上验证。有限接收不表示诊断完全隔离，规则更新也不表示代码已整改。规范已落地；目前G03只完成分支与首包准备，尚未启动实施。
 
 `V211_PRE_STAGE3_CLOSEOUT_120MIN_001`返包`99de88abd6d3f464de0d5c9c98362813f52252c9`经[Sol复审](reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，决定 **ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT**：C1核心职责、C2当前文档、V受影响行为在限定范围通过，本次前置核心收尾结束，不再追加持续拆分窗口。runtime不依赖具体Nut Solution，任务侧保留检查；R05b普通reset不持有Solution，兼容Expert按需创建。Sol独立R05b检查25 passed／1 deselected，核对执行者182 passed／1 deselected及Nut物理／同次reader结果，并接受有调用链差异依据的PickCube和Nut证据复用。详见[原返包](reviews/20261105_pre_stage3_closeout_120min_001.md)。
 
-真实R05b provider、新安装及其他未验证能力继续保留限制，环境类更广整理不等于已完成；它们不重开本次限定收尾。可另行准备阶段3分支和3a包，但目前未创建或执行，G03仍未开始。以下派包计划与旧记录保留当时身份，不覆盖本段决定。
+真实R05b provider、新安装及其他未验证能力继续保留限制，环境类更广整理不等于已完成；它们不重开本次限定收尾。阶段3分支和首份3a包现已另行准备，见本页顶部；尚未派发实施。以下派包计划与旧记录保留当时身份，不覆盖本段接收决定及顶部的新接手状态。
 
 ## 本次收尾的派包记录（历史）
 
