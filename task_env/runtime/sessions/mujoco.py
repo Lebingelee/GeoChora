@@ -2292,21 +2292,195 @@ class _MuJoCoSession(_SessionValues):
         sample.validate()
         return sample
 
+    def configure_gravity_compensation(self):
+        """Admit source-bound arm gravity on the exact affine MuJoCo drive.
+
+        This profile composes the torque through a position-reference offset;
+        it is not a general effort interface. The existing actuator's native
+        force limit remains in effect and the actual adjusted target is acked.
+        """
+        if self._mixed_actuator_plan is not None or self._source.fixed_attachment_plan is not None:
+            raise ValueError('gravity compensation does not admit mixed or attached sources')
+        if self._reset_done or hasattr(self, '_gravity_model'):
+            raise ValueError('gravity compensation must be configured once before reset')
+        if int(self._model.opt.disableflags) & int(self._mj.mjtDisableBit.mjDSBL_GRAVITY):
+            raise ValueError('gravity compensation requires native gravity to be enabled')
+        from ...controllers.canonical.kinematics import PandaKinematics, PANDA_HAND_ORIGIN_TCP_V1
+        source_xml = self._source.scene_source.xml
+        model = PandaKinematics(source_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        bodies = model._compile_gravity_bodies()
+        model._gravity_bodies = bodies
+        base = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, model._gravity_root_body_id))
+        if base <= 0:
+            raise ValueError('gravity compensation requires the exact named fixed Panda base')
+        ancestor = base
+        while ancestor:
+            if int(self._model.body_jntnum[ancestor]) != 0:
+                raise ValueError('gravity compensation requires a fixed base and fixed ancestors')
+            ancestor = int(self._model.body_parentid[ancestor])
+        indices = []
+        for name, parent, fixed, joint, kind, axis, pivot, mass, com in bodies:
+            body = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, name))
+            parent_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, parent))
+            native_rotation = np.empty(9, dtype=np.float64)
+            if body >= 0:
+                self._mj.mju_quat2Mat(native_rotation, self._model.body_quat[body])
+            if (body < 0 or int(self._model.body_parentid[body]) != parent_id
+                    or abs(float(self._model.body_mass[body]) - mass) > 1e-10
+                    or not np.allclose(self._model.body_ipos[body], com, rtol=0, atol=1e-10)
+                    or not np.allclose(self._model.body_pos[body], fixed[:3, 3], rtol=0, atol=1e-10)
+                    or not np.allclose(native_rotation.reshape(3, 3), fixed[:3, :3], rtol=0, atol=1e-10)
+                    or abs(float(self._model.body_gravcomp[body])) > 0):
+                raise ValueError(f'gravity source/compiled mass, COM, parent or compensation differs: {name}')
+            if joint:
+                jid = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint))
+                expected_type = self._mj.mjtJoint.mjJNT_HINGE if kind == 'hinge' else self._mj.mjtJoint.mjJNT_SLIDE
+                if (jid < 0 or int(self._model.jnt_bodyid[jid]) != body
+                        or int(self._model.jnt_type[jid]) != int(expected_type)
+                        or not np.allclose(self._model.jnt_axis[jid], axis, rtol=0, atol=1e-10)
+                        or not np.allclose(self._model.jnt_pos[jid], pivot, rtol=0, atol=1e-10)):
+                    raise ValueError(f'gravity source/compiled joint differs: {joint}')
+        for i in range(1, 8):
+            semantic = f'panda-v1/joint{i}'
+            if semantic not in self._target_actuators or semantic not in self._joint_addresses:
+                raise ValueError('gravity compensation requires seven exact panda-v1 arm joints')
+            actuator = self._target_actuators[semantic]
+            gain = float(self._model.actuator_gainprm[actuator, 0])
+            bias = self._model.actuator_biasprm[actuator]
+            gear = self._model.actuator_gear[actuator]
+            jid = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, self._source.joints[semantic]))
+            if (int(self._model.actuator_trntype[actuator]) != int(self._mj.mjtTrn.mjTRN_JOINT)
+                    or int(self._model.actuator_trnid[actuator, 0]) != jid
+                    or int(self._model.actuator_dyntype[actuator]) != int(self._mj.mjtDyn.mjDYN_NONE)
+                    or int(self._model.actuator_gaintype[actuator]) != int(self._mj.mjtGain.mjGAIN_FIXED)
+                    or int(self._model.actuator_biastype[actuator]) != int(self._mj.mjtBias.mjBIAS_AFFINE)
+                    or not np.isfinite(gain) or gain <= 0 or not np.isfinite(gear).all()
+                    or abs(float(gear[0])) < 1e-12 or not np.allclose(gear[1:], 0, rtol=0, atol=0)
+                    or abs(float(bias[0])) > 1e-12 or abs(float(bias[1]) + gain) > 1e-9
+                    or not bool(self._model.actuator_ctrllimited[actuator])
+                    or not bool(self._model.actuator_forcelimited[actuator])):
+                raise ValueError(f'gravity compensation cannot represent this position actuator: {semantic}')
+            indices.append((semantic, actuator, gain, float(gear[0])))
+        for name in ('panda-v1/finger_joint1', 'panda-v1/finger_joint2'):
+            if name not in self._joint_addresses:
+                raise ValueError('gravity compensation requires both named finger positions')
+        finger_ids = [int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT,
+                      self._source.joints[f'panda-v1/finger_joint{i}'])) for i in (1, 2)]
+        equalities = [i for i in range(self._model.neq)
+                      if int(self._model.eq_type[i]) == int(self._mj.mjtEq.mjEQ_JOINT)
+                      and bool(self._model.eq_active0[i])
+                      and [int(self._model.eq_obj1id[i]), int(self._model.eq_obj2id[i])] == finger_ids
+                      and np.allclose(self._model.eq_data[i, :5], [0, 1, 0, 0, 0], rtol=0, atol=1e-12)]
+        if len(equalities) != 1 or len(self._open_actuators) != 1:
+            raise ValueError('gravity compensation requires the exact coupled Panda finger equality and one tendon')
+        opening = self._open_actuators[0]
+        if {item[1] for item in indices} | {opening} != set(range(self._model.nu)):
+            raise ValueError('gravity compensation refuses additional or shared source actuators')
+        if int(self._model.actuator_trntype[opening]) != int(self._mj.mjtTrn.mjTRN_TENDON):
+            raise ValueError('gravity compensation requires the Panda opening tendon')
+        tendon = int(self._model.actuator_trnid[opening, 0])
+        if not 0 <= tendon < self._model.ntendon:
+            raise ValueError('gravity compensation opening tendon is unavailable')
+        start, count = int(self._model.tendon_adr[tendon]), int(self._model.tendon_num[tendon])
+        wraps = [(int(self._model.wrap_type[i]), int(self._model.wrap_objid[i]), float(self._model.wrap_prm[i]))
+                 for i in range(start, start + count)]
+        if wraps != [(int(self._mj.mjtWrap.mjWRAP_JOINT), finger_ids[0], 0.5),
+                     (int(self._mj.mjtWrap.mjWRAP_JOINT), finger_ids[1], 0.5)]:
+            raise ValueError('gravity compensation requires the exact symmetric opening tendon')
+        if not np.isfinite(self._model.opt.gravity).all():
+            raise ValueError('gravity compensation requires finite scene gravity')
+        self._gravity_model = model
+        self._gravity_base_body = base
+        self._gravity_actuators = tuple(indices)
+        self._gravity_interval_receipts = []
+
+    @property
+    def gravity_compensation_receipt(self):
+        import copy
+        if not hasattr(self, '_gravity_model'):
+            return None
+        return copy.deepcopy(self._gravity_interval_receipts)
+
+    def _gravity_adjusted_targets(self, target):
+        if np.any(self._data.qfrc_applied) or np.any(self._data.xfrc_applied):
+            raise ValueError('gravity contribution refuses unaccounted applied force contributions')
+        model = self._gravity_model
+        q = [float(self._data.qpos[self._joint_addresses[f'panda-v1/joint{i}'][0]]) for i in range(1, 8)]
+        fingers = [float(self._data.qpos[self._joint_addresses[f'panda-v1/finger_joint{i}'][0]]) for i in (1, 2)]
+        rotation = np.asarray(self._data.xmat[self._gravity_base_body]).reshape(3, 3).copy()
+        gravity = np.asarray(self._model.opt.gravity).copy()
+        torque, finger_force = model.gravity_support(q, fingers, gravity, rotation, include_fingers=True)
+        # The current Panda hand has one equality-coupled tendon, not two
+        # independent effort actuators. Equal travel is gravity-neutral only
+        # when the sum of the two finger loads vanishes. Fail closed rather
+        # than silently pretending to compensate an unrepresentable load.
+        if abs(float(np.sum(finger_force))) > 1e-9:
+            raise ValueError('gravity compensation cannot represent net coupled finger gravity')
+        rows, adjusted = [], {}
+        for (semantic, actuator, gain, gear), support in zip(self._gravity_actuators, torque, strict=True):
+            original = float(target.arm_servo_position[semantic])
+            requested = original + float(support) / (gain * gear)
+            low, high = self._model.actuator_ctrlrange[actuator]
+            actual = float(np.clip(requested, low, high))
+            adjusted[semantic] = actual
+            rows.append({'joint': semantic, 'unit': 'N*m', 'computed_support_torque': float(support),
+                         'original_position_target_rad': original, 'requested_position_target_rad': requested,
+                         'applied_position_target_rad': actual, 'gain': gain, 'gear': gear,
+                         'position_target_clamped': actual != requested})
+        if not self._gravity_interval_receipts or self._gravity_interval_receipts[-1]['control_step'] != self._control_step:
+            self._gravity_interval_receipts = []
+        self._gravity_interval_receipts.append({
+            'schema_version': 'panda-gravity-position-contribution-v1',
+            'calculation_kind': 'source_body_mass_com_gravity_only',
+            'source_closure_digest': self._source.source_closure_digest,
+            'kinematics_source_sha256': model.source_sha256,
+            'body_names': [item[0] for item in model._gravity_bodies],
+            'provider_materialization_id': self.provider_materialization_id,
+            'episode_id': self._episode_id, 'reset_sample_id': self._reset_sample_id,
+            'control_step': self._control_step, 'native_step_before': self._native_steps,
+            'target_identity_sha256': target.identity_hash,
+            'joint_position_rad': q, 'finger_position_m': fingers,
+            'finger_gravity_support_force_N': finger_force.tolist(),
+            'coupled_finger_gravity_support_force_N': float(np.sum(finger_force)),
+            'gravity_world_m_s2': gravity.tolist(), 'world_from_base_rotation': rotation.tolist(),
+            'mapping': 'affine_position_target_offset_with_native_force_limits', 'joints': rows,
+            'actual_actuator_force_samples': [],
+        })
+        return adjusted
+
+    def _record_gravity_force_sample(self):
+        if not getattr(self, '_gravity_interval_receipts', None):
+            return
+        values = []
+        for semantic, actuator, _gain, gear in self._gravity_actuators:
+            force = float(self._data.actuator_force[actuator])
+            low, high = self._model.actuator_forcerange[actuator]
+            values.append({'joint': semantic, 'native_actuator_force': force,
+                           'generalized_actuator_torque_Nm': gear * force,
+                           'force_limit_reached': bool(force <= low + 1e-9 or force >= high - 1e-9)})
+        self._gravity_interval_receipts[-1]['actual_actuator_force_samples'].append({
+            'native_step': self._native_steps, 'values': values,
+            'provenance': 'provider_actuator_force_not_external_sensor',
+        })
+
     def apply_control(self, target):
         if self._mixed_actuator_plan is not None:
             return self.apply_mixed_actuator_command(target)
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         validate_target(self, target)
+        gravity_targets = self._gravity_adjusted_targets(target) if hasattr(self, '_gravity_model') else None
         clipped = False
         realized = {}
         for name, requested in target.arm_servo_position.items():
             index = self._target_actuators[name]
             low, high = self._model.actuator_ctrlrange[index]
-            value = float(np.clip(requested, low, high)) if self._model.actuator_ctrllimited[index] else requested
+            candidate = requested if gravity_targets is None else gravity_targets[name]
+            value = float(np.clip(candidate, low, high)) if self._model.actuator_ctrllimited[index] else candidate
             self._data.ctrl[index] = value
             realized[name] = value
-            clipped = clipped or value != requested
+            clipped = clipped or value != candidate or (gravity_targets is not None and any(
+                row['position_target_clamped'] for row in self._gravity_interval_receipts[-1]['joints']))
         index = getattr(self, '_open_actuators_by_semantic', {}).get(
             target.gripper.semantic_id, self._open_actuators[0],
         )
@@ -2324,7 +2498,9 @@ class _MuJoCoSession(_SessionValues):
         self._current_ctrl = self._data.ctrl.copy()
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'mujoco',
             realized, opening, target.gripper.force_limit_N, clipped,
-            'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
+            ('named_position_servo_plus_source_gravity_offset_and_affine_tendon_force_limit_ZOH'
+             if gravity_targets is not None else
+             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH'))
 
     def bind_mixed_controller(self, controller_identity):
         if self._mixed_actuator_plan is None:
@@ -2568,6 +2744,7 @@ class _MuJoCoSession(_SessionValues):
         for _ in range(self._artifact.timebase.control_substeps):
             self._mj.mj_step(self._model, self._data)
             self._native_steps += 1
+            self._record_gravity_force_sample()
             self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
         if self._source.fixed_attachment_plan is not None:
@@ -2580,6 +2757,7 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         self._mj.mj_step(self._model, self._data)
         self._native_steps += 1
+        self._record_gravity_force_sample()
         self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
 

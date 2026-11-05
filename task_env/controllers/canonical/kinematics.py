@@ -184,6 +184,11 @@ class PandaKinematics:
         if root.find('compiler').get('angle','degree')!='radian':raise ValueError('kinematic source must use radians')
         native_prefix=str(native_prefix)
         root_body_id = f'{native_prefix}link0' if base_body_id is None else str(base_body_id)
+        # Retain the exact source for an optional, lazy gravity calculation.
+        # Existing position-only construction and its identity are unchanged.
+        self._gravity_source_xml = raw_xml
+        self._gravity_native_prefix = native_prefix
+        self._gravity_root_body_id = root_body_id
         body=next((item for item in root.iter('body') if item.get('name')==root_body_id),None)
         if body is None:raise ValueError(f'unsupported Panda chain; source root body is absent: {root_body_id}')
         self.base_transform=_body_world_transform(root, root_body_id);self.chain=[];self.limits=[]
@@ -244,3 +249,136 @@ class PandaKinematics:
 
     def pose(self,q):
         t,_=self.fk_jacobian(q);return PoseWorld(tuple(float(v) for v in t[:3,3]),tuple(float(v) for v in matrix_to_quat_wxyz(t[:3,:3])))
+
+    def gravity_support(self, q, fingers, gravity_world, world_from_base_rotation, *, include_fingers=False):
+        """Return Panda arm support torques in N m, from source body mass/COM.
+
+        This is a pure calculation, not an applied-control receipt. The input
+        rotation maps base-local vectors to world; gravity is in world m/s².
+        Only the exact Panda link/hand/finger subtree is admitted. No scene
+        object, contact, payload, velocity or solver state enters this result.
+        """
+        q = np.asarray(q, dtype=np.float64)
+        fingers = np.asarray(fingers, dtype=np.float64)
+        gravity = np.asarray(gravity_world, dtype=np.float64)
+        rotation = np.asarray(world_from_base_rotation, dtype=np.float64)
+        if (q.shape != (7,) or fingers.shape != (2,) or gravity.shape != (3,)
+                or rotation.shape != (3, 3) or not all(np.isfinite(x).all()
+                    for x in (q, fingers, gravity, rotation))):
+            raise ValueError('gravity support requires finite q[7], fingers[2], gravity[3] and rotation[3,3]')
+        if type(include_fingers) is not bool:
+            raise TypeError('include_fingers must be a boolean')
+        if (not np.allclose(rotation.T @ rotation, np.eye(3), rtol=0, atol=1e-8)
+                or not np.isclose(np.linalg.det(rotation), 1.0, rtol=0, atol=1e-8)):
+            raise ValueError('gravity support base rotation must be a proper orthonormal rotation')
+        if not hasattr(self, '_gravity_bodies'):
+            self._gravity_bodies = self._compile_gravity_bodies()
+        gravity_base = rotation.T @ gravity
+        coordinates = dict(zip(
+            [*(f'{self._gravity_native_prefix}joint{i}' for i in range(1, 8)),
+             *(f'{self._gravity_native_prefix}finger_joint{i}' for i in (1, 2))],
+            (*q, *fingers), strict=True,
+        ))
+        torque = np.zeros(7, dtype=np.float64)
+        finger_force = np.zeros(2, dtype=np.float64)
+        origins, axes = {}, {}
+        world = {self._gravity_root_body_id: np.eye(4)}
+        for name, parent, fixed, joint, kind, axis, pivot, mass, com in self._gravity_bodies:
+            body = world[parent] @ fixed
+            if joint:
+                if kind == 'hinge':
+                    index = int(joint.removeprefix(self._gravity_native_prefix + 'joint')) - 1
+                    origins[index] = body[:3, 3] + body[:3, :3] @ pivot
+                    axes[index] = body[:3, :3] @ axis
+                    motion = np.eye(4)
+                    motion[:3, :3] = rotvec_to_matrix(axis * coordinates[joint])
+                    motion[:3, 3] = pivot - motion[:3, :3] @ pivot
+                else:
+                    finger_index = int(joint.removeprefix(self._gravity_native_prefix + 'finger_joint')) - 1
+                    finger_axis = body[:3, :3] @ axis
+                    motion = np.eye(4)
+                    motion[:3, 3] = axis * coordinates[joint]
+                body = body @ motion
+            world[name] = body
+            position = body[:3, 3] + body[:3, :3] @ com
+            force = mass * gravity_base
+            if joint and kind == 'slide':
+                finger_force[finger_index] -= np.dot(finger_axis, force)
+            for index in range(7):
+                if index in axes and self._gravity_is_descendant(name, index):
+                    torque[index] -= np.dot(axes[index], np.cross(position - origins[index], force))
+        return (torque, finger_force) if include_fingers else torque
+
+    def _gravity_is_descendant(self, body, arm_index):
+        parents = self._gravity_parent
+        anchor = f'{self._gravity_native_prefix}link{arm_index + 1}'
+        while body != self._gravity_root_body_id:
+            if body == anchor:
+                return True
+            body = parents[body]
+        return False
+
+    def _compile_gravity_bodies(self):
+        """Fail closed on anything other than the source-bound Panda subtree."""
+        root = ET.fromstring(self._gravity_source_xml)
+        prefix = self._gravity_native_prefix
+        bases = [b for b in root.iter('body') if b.get('name') == self._gravity_root_body_id]
+        if len(bases) != 1:
+            raise ValueError('gravity source must contain exactly one selected Panda base')
+        base = bases[0]
+        allowed = {*(f'{prefix}link{i}' for i in range(1, 8)),
+                   f'{prefix}hand', f'{prefix}left_finger', f'{prefix}right_finger'}
+        expected_parent = {f'{prefix}link{i}': (self._gravity_root_body_id if i == 1
+                            else f'{prefix}link{i-1}') for i in range(1, 8)}
+        expected_parent.update({f'{prefix}hand': f'{prefix}link7',
+                                f'{prefix}left_finger': f'{prefix}hand',
+                                f'{prefix}right_finger': f'{prefix}hand'})
+        expected_joint = {f'{prefix}link{i}': (f'{prefix}joint{i}', 'hinge') for i in range(1, 8)}
+        expected_joint.update({f'{prefix}left_finger': (f'{prefix}finger_joint1', 'slide'),
+                               f'{prefix}right_finger': (f'{prefix}finger_joint2', 'slide')})
+        panda_default = root.find(".//default[@class='panda']/joint")
+        finger_default = root.find(".//default[@class='finger']/joint")
+        defaults = {} if panda_default is None else dict(panda_default.attrib)
+        finger_defaults = dict(defaults)
+        if finger_default is not None:
+            finger_defaults.update(finger_default.attrib)
+        rows, parents, seen = [], {}, set()
+        def visit(parent):
+            for child in parent.findall('body'):
+                name = child.get('name')
+                if name not in allowed or name in seen:
+                    raise ValueError(f'gravity source contains unsupported or repeated robot body {name!r}')
+                if parent.get('name') != expected_parent[name]:
+                    raise ValueError(f'gravity source body {name!r} has an unsupported parent')
+                seen.add(name); parents[name] = parent.get('name')
+                inertial = child.find('inertial')
+                if inertial is None or inertial.get('mass') is None or inertial.get('pos') is None:
+                    raise ValueError(f'gravity source body {name!r} requires explicit mass and COM')
+                mass = float(inertial.get('mass')); com = np.fromstring(inertial.get('pos'), sep=' ')
+                if not np.isfinite(mass) or mass <= 0 or com.shape != (3,) or not np.isfinite(com).all():
+                    raise ValueError(f'gravity source body {name!r} has invalid mass or COM')
+                joints = child.findall('joint'); expected = expected_joint.get(name)
+                if len(joints) != (1 if expected else 0):
+                    raise ValueError(f'gravity source body {name!r} has unsupported joint topology')
+                joint = kind = None; axis = pivot = np.zeros(3)
+                if expected:
+                    raw = dict(finger_defaults if expected[1] == 'slide' else defaults)
+                    raw.update(joints[0].attrib); joint = raw.get('name'); kind = raw.get('type', 'hinge')
+                    if (joint, kind) != expected or float(raw.get('ref', 0)) != 0:
+                        raise ValueError(f'gravity source body {name!r} has unsupported joint')
+                    axis = np.fromstring(raw.get('axis', '0 0 1'), sep=' ')
+                    pivot = np.fromstring(raw.get('pos', '0 0 0'), sep=' ')
+                    if (axis.shape != (3,) or pivot.shape != (3,) or not np.isfinite(axis).all()
+                            or not np.isfinite(pivot).all() or np.linalg.norm(axis) < 1e-12):
+                        raise ValueError(f'gravity source body {name!r} has invalid joint axis or pivot')
+                    axis = axis / np.linalg.norm(axis)
+                fixed = transform(child)
+                if not np.isfinite(fixed).all():
+                    raise ValueError(f'gravity source body {name!r} has invalid transform')
+                rows.append((name, parent.get('name'), fixed, joint, kind, axis, pivot, mass, com))
+                visit(child)
+        visit(base)
+        if seen != allowed:
+            raise ValueError(f'gravity source does not contain the exact Panda body set: {sorted(allowed - seen)}')
+        self._gravity_parent = parents
+        return tuple(rows)

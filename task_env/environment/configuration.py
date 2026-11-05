@@ -343,6 +343,8 @@ def _resolve_selected_config(environment_type, config):
                 )
             })
         config["task"] = dict(supplied.task_parameters)
+        if supplied.gravity_compensation:
+            config["controller"] = {"gravity_compensation": True}
         if supplied.controller_profile is not None:
             config["task"]["controller_profile"] = supplied.controller_profile
     if isinstance(config, (str, Path)):
@@ -352,11 +354,17 @@ def _resolve_selected_config(environment_type, config):
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "provider", "backend", "horizon",
+    allowed = {"execution", "episode", "task", "controller", "provider", "backend", "horizon",
                "controller_profile", "source_delivery_manifest"}
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
+    controller = values.get('controller', {})
+    if not isinstance(controller, Mapping) or set(controller) - {'gravity_compensation'}:
+        raise ValueError('selected controller supports only gravity_compensation')
+    gravity_compensation = controller.get('gravity_compensation', False)
+    if type(gravity_compensation) is not bool:
+        raise TypeError('controller.gravity_compensation must be a boolean')
     sections = {}
     for name in ("execution", "episode", "task"):
         section = values.get(name, {})
@@ -474,6 +482,8 @@ def _resolve_selected_config(environment_type, config):
         provider=provider, backend=backend, device=device, renderer=renderer,
         runtime=env.runtime, values=execution_defaults, selected=True,
     )
+    if gravity_compensation and (provider, backend, selection.deployment) != ('mujoco', 'cpu', 'in_process'):
+        raise ValueError('gravity compensation currently requires in-process MuJoCo CPU')
     for name in ("host", "engine", "solver_family", "solver_algorithm", "coupler"):
         if getattr(selection, name) != route_defaults[name]:
             raise ValueError(f"static_config: requested {name} has no implemented adapter for {provider}")
@@ -491,6 +501,7 @@ def _resolve_selected_config(environment_type, config):
         physics_provider=provider,
         physics_device=device,
         controller_profile=profile,
+        gravity_compensation=gravity_compensation,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
@@ -506,6 +517,8 @@ def _resolve_selected_config(environment_type, config):
         original = {"execution": json.loads(requested_json),
                     "episode": {"horizon": result.environment.episode.horizon},
                     "task": dict(result.task_parameters)}
+        if result.gravity_compensation:
+            original['controller'] = {'gravity_compensation': True}
         if result.controller_profile is not None:
             original["task"]["controller_profile"] = result.controller_profile
         reconstructed = _resolve_selected_config(environment_type, original)

@@ -579,8 +579,11 @@ class ResolvedSelectedConfig:
     ))
     execution_spec_v2: ExecutionSpecV2 | None = None
     requested_execution_json: str | None = None
+    gravity_compensation: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.gravity_compensation) is not bool:
+            raise TypeError('selected gravity_compensation must be a boolean')
         if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:
             raise TypeError("selected execution_spec_v2 must be ExecutionSpecV2 or None")
         if self.requested_execution_json is not None:

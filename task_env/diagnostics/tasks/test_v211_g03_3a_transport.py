@@ -133,7 +133,7 @@ def test_episode_tamper_stops_worker_and_timeout_exits_process(tmp_path):
 
 PRODUCTION_BOOTSTRAP_FAKE_SESSION = r'''
 import importlib.abc, importlib.machinery, importlib.util, pathlib, sys, sysconfig
-core, geophys, fd = sys.argv[1:]
+core, geophys, fd, launcher_mode = sys.argv[1:]
 prefix = str(pathlib.Path(sys.executable).parent.parent)
 paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
 sys.path[:0] = [core, geophys, paths['purelib'], paths['platlib']]

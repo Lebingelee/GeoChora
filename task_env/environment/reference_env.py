@@ -1398,6 +1398,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
             )
             requested = None if requested_json is None else json.loads(requested_json)
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                requested = dict(requested or {})
+                requested['controller'] = {'gravity_compensation': True}
             facts = dict(requested=requested, task_uid=self.uid, artifact=self.artifact,
                          source=self.value['source'],
                          controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
@@ -1624,6 +1627,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         self.value['resolved_configuration'].get('gripper_control_hz')
                         if self._native_feedback_profile is not None else None
                     ))
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                if self.uid not in ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'):
+                    raise ValueError('gravity compensation is limited to the selected Panda tasks')
+                self.session.configure_gravity_compensation()
 
         def reset_runtime():
             nonlocal failure_phase
@@ -2578,6 +2585,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def evaluate(state):
             self.obs, self.info, self.evaluation = self.observation(state)
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                self.info['gravity_compensation_v1'] = self.session.gravity_compensation_receipt
             return self.evaluation
 
         def publish(result, state, evaluation, observation):
@@ -2893,6 +2902,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
+            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                self.info['gravity_compensation_v1'] = self.session.gravity_compensation_receipt
             if not self.position_profile:
                 self._publish_execution_info(self.info)
                 if canonical is not None and target is not None and applied is not None:
@@ -2922,7 +2933,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self.evaluation
 
         def publish(_control, _state, _evaluation, _observation):
-            nonlocal failure_phase, record_append_attempted
+            nonlocal failure_phase, record_append_attempted, diagnostics
             terminated, truncated = self._episode_execution_state().step_outcome(
                 task_terminated=self.evaluation.failure, task_truncated=False,
                 control_step=self.state.control_step, horizon=self.horizon,
@@ -2949,6 +2960,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self.recorder is not None:
                 failure_phase = 'record_interval'
                 record_append_attempted = True
+                if 'gravity_compensation_v1' in self.info:
+                    diagnostics = {**diagnostics, 'gravity_compensation_v1': self.info['gravity_compensation_v1']}
                 self._record_interval(request, canonical, target, applied, stage, diagnostics,
                                       terminated, truncated, substeps)
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -3580,6 +3593,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _position_record_metadata(self):
         from ..recorders.position_metadata import position_record_metadata
         result = position_record_metadata(self)
+        if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+            result['resolved_config']['gravity_compensation'] = True
+            result['env_metadata']['reference_profile']['gravity_compensation'] = {
+                'enabled': True, 'schema_version': 'panda-gravity-position-contribution-v1',
+                'source_closure_digest': self.value['source'].source_closure_digest,
+            }
         if self._selected_execution_context()[0] is not None:
             result['execution_configuration_v1'] = self.get_execution_receipt()
         return result

@@ -323,7 +323,9 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding
     env.position_profile = True
     env.leaf_position_profile = False
     env.fixed_attachment_leaf_position_profile = False
-    env.position_profiles = (object(),)
+    # The Position preparation seam validates the profile/plan before it
+    # reaches the materializer; the old plain object lacked that protocol.
+    env.position_profiles = (SimpleNamespace(_validate_plan=lambda _plan: None),)
     env.position_plan = plan
     env.provider, env.backend, env.horizon = 'isaacsim', 'cuda', 1000
     env.artifact = initial_artifact

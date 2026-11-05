@@ -54,8 +54,11 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
     task = dict(resolved.task_parameters)
     if resolved.controller_profile is not None:
         task['controller_profile'] = resolved.controller_profile
-    return {'env_id': uid, 'execution': execution,
-            'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+    result = {'env_id': uid, 'execution': execution,
+              'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+    if resolved.gravity_compensation:
+        result['controller'] = {'gravity_compensation': True}
+    return result
 
 
 def selected_source_provenance(*, adapter_path, binding, value, artifact,

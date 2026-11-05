@@ -132,6 +132,11 @@ def _validate_environment(payload):
     if GEOCHORA_ROOT.resolve() != expected_core or (GEOPHYS_PROVIDER_ROOT / 'src').resolve() != expected_geo:
         raise ValueError('worker loaded a different Core or GeoPhys checkout')
     facts = payload['environment']
+    launcher_paths = facts.get('launcher_pythonpath', [])
+    if Path(facts.get('launcher', '')).name == 'python.sh':
+        actual_paths = [str(Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
+        if actual_paths != launcher_paths:
+            raise ValueError('worker launcher Python path differs from preflight')
     if str(Path(sys.executable).absolute()) != facts.get('worker_executable', str(Path(sys.executable).absolute())):
         raise ValueError('worker executable differs from preflight')
     if str(Path(sys.executable).resolve()) != facts['python']:

@@ -128,7 +128,7 @@ def provider_module_origins(provider, module_names=('control', 'geophys', 'scene
 _ENVIRONMENT_METADATA_PROBE = r'''
 import importlib.metadata as metadata
 import importlib.util as util
-import json, pathlib, sys, sysconfig
+import json, os, pathlib, sys, sysconfig
 from importlib.abc import MetaPathFinder
 from importlib.machinery import PathFinder
 
@@ -137,12 +137,14 @@ class BlockNative(MetaPathFinder):
         if fullname.split('.')[0] in {'mujoco', 'taichi', 'taichi_forge', 'scene', 'solvers', 'geophys', 'isaacsim', 'omni', 'carb', 'pxr', 'isaaclab', 'sapien', 'genesis', 'warp'}:
             raise RuntimeError('native import forbidden: ' + fullname)
 sys.meta_path.insert(0, BlockNative())
-core, geophys = sys.argv[1:3]
+core, geophys, launcher_mode = sys.argv[1:4]
 # -S suppresses site hooks/.pth code. Query this interpreter's environment
 # directories directly, without executing installed package code.
 prefix = str(pathlib.Path(sys.executable).parent.parent)
 paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
-sys.path[:0] = [core, geophys, paths['purelib'], paths['platlib']]
+launcher_paths = ([str(pathlib.Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
+                  if launcher_mode == 'launcher' else [])
+sys.path[:0] = [core, geophys, *launcher_paths, paths['purelib'], paths['platlib']]
 origins = {}
 for name in ('task_env', 'geophys', 'scene', 'control', 'simulation', 'solvers'):
     spec = PathFinder.find_spec(name, sys.path)
@@ -195,6 +197,7 @@ for distribution, name in modules.items():
     except ValueError:
         origin_ownership[distribution] = 'mismatch'
 print('GEOCHORA_METADATA_V1:' + json.dumps({'python': str(pathlib.Path(sys.executable).resolve()),
+                  'launcher_pythonpath': launcher_paths,
                   'worker_executable': str(pathlib.Path(sys.executable).absolute()),
                   'python_version': list(sys.version_info[:3]), 'origins': origins,
                   'versions': versions, 'module_origins': module_origins,
@@ -225,7 +228,8 @@ def probe_interpreter_environment(python, *, core_root=None, geophys_src=None):
         raise ValueError(f'current GeoPhys source unavailable: {geophys}')
     try:
         process = subprocess.Popen(
-            [str(interpreter), '-I', '-S', '-B', '-c', _ENVIRONMENT_METADATA_PROBE, str(core), str(geophys)],
+            [str(interpreter), '-I', '-S', '-B', '-c', _ENVIRONMENT_METADATA_PROBE, str(core), str(geophys),
+             'launcher' if interpreter.name == 'python.sh' else 'python'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
         )
         try:

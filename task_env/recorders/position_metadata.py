@@ -595,6 +595,12 @@ def position_record_metadata(self):
         {'path': 'state.hand_pose', 'semantic': 'provider_measured_panda_hand_pose'},
         {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
     ]
+    if self.value.get('f06_pickcube_isaac_input') is not None:
+        # F06's position profile binds its historical hand_pose field to the
+        # source ee frame; it is not the physical hand-origin frame.
+        for field in observation_leaf_specs:
+            if field['path'] in ('state.ee_pose', 'state.hand_pose'):
+                field.update(semantic='provider_measured_pickcube_ee_pose', frame='panda-v1/ee')
     if self.dual_entity_position:
         for writer_profile in position_profiles:
             observation_leaf_specs.extend((
@@ -663,8 +669,13 @@ def position_record_metadata(self):
             'worker_request_identity_sha256': deployment.get('worker_request_identity'),
             'materialization_identity': self.session.provider_materialization_id,
             'native_build_layout_facts': native_facts,
+            'reset_plan_evidence': self.session.reset_plan_evidence,
+            'requested_reset_sample': self.value['reset_plan'].to_provider_sample().to_mapping(),
+            'measured_reset_state': self.realized.measured_state.to_mapping(),
+            'typed_state_h5_witness_schema_version': 'f06-public-typed-state-witness-v1',
             'solution_identity': self._active_solution_identity(),
             'tcp_semantic_frame': 'panda-v1/ee',
+            'hand_pose_semantic_frame': 'panda-v1/ee',
         })
     universal_components = tuple(action_schema.components)
     if self.dual_entity_position:
@@ -718,6 +729,8 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
     target_payload = target.target.to_mapping()
     target_hash = target.target.identity_hash
     applied_payload = applied.to_mapping()
+    if 'gravity_compensation_v1' in self.info:
+        applied_payload['gravity_compensation_v1'] = self.info['gravity_compensation_v1']
     versioned_position_input = self.value.get('versioned_position_input')
     versioned_input_kind = position_input_kind(self.binding, versioned_position_input)
     f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
@@ -881,7 +894,8 @@ def position_record_reset_info(self):
             'canonical_state_view_v1': self.info['canonical_state_view_v1'],
         } if position_input_kind(
             self.binding, self.value.get('versioned_position_input'),
-        ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native') else {}),
+        ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native')
+          or self.value.get('f06_pickcube_isaac_input') is not None else {}),
         **({
             'camera_observation_v1': self.info['camera_observation_v1'],
         } if self.camera_observation_config is not None else {}),

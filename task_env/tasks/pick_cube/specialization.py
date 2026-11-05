@@ -411,6 +411,10 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                                        text=True).strip()
     effective_config = (legacy["resolved_configuration"]["runtime_config"]
                         if resolved_config is None else asdict(resolved_config))
+    # Keep historical F06 source/configuration identity when the additive
+    # gravity option is disabled; F06 does not yet admit the enabled route.
+    if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
+        effective_config.pop('gravity_compensation', None)
     effective_config_sha = hashlib.sha256(json.dumps(
         effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     resolved = {

@@ -442,11 +442,13 @@ def source_execution_facts(artifact, execution, source, controller):
 
 
 _WORKER_BOOTSTRAP = r'''
-import pathlib, runpy, sys, sysconfig
-core, geophys, fd = sys.argv[1:]
+import os, pathlib, runpy, sys, sysconfig
+core, geophys, fd, launcher_mode = sys.argv[1:]
 prefix = str(pathlib.Path(sys.executable).parent.parent)
 paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
-sys.path[:0] = [core, geophys, paths['purelib'], paths['platlib']]
+launcher_paths = ([str(pathlib.Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
+                  if launcher_mode == 'launcher' else [])
+sys.path[:0] = [core, geophys, *launcher_paths, paths['purelib'], paths['platlib']]
 sys.argv = ['task_env.runtime.sessions.worker', fd]
 runpy.run_module('task_env.runtime.sessions.worker', run_name='__main__')
 '''
@@ -478,7 +480,8 @@ def start_selected_worker(interpreter, payload, *, timeout=30.0):
                    GEOCHORA_CORE_PYTHON=str(executable), PYTHONDONTWRITEBYTECODE='1')
         process = subprocess.Popen(
             [str(executable), '-I', '-S', '-B', '-c', _WORKER_BOOTSTRAP,
-             str(core), str(geophys), str(child.fileno())],
+             str(core), str(geophys), str(child.fileno()),
+             'launcher' if executable.name == 'python.sh' else 'python'],
             cwd=os.getcwd(), env=env, pass_fds=(child.fileno(),), start_new_session=True,
             stdin=subprocess.DEVNULL,
             stdout=None if payload['selection']['physics_provider'] == 'isaacsim' else subprocess.DEVNULL,

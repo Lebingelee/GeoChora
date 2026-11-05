@@ -419,6 +419,82 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
     f05_typed_state_extension = _f05_typed_state_extension(trajectory)
     if f05_typed_state_extension is not None:
         _json_dataset(meta, "f05_public_typed_state_witness_v1_json", f05_typed_state_extension)
+    f06_typed_state_extension = _f06_typed_state_extension(trajectory)
+    if f06_typed_state_extension is not None:
+        _json_dataset(meta, "f06_public_typed_state_witness_v1_json", f06_typed_state_extension)
+
+
+def _validate_f06_typed_state_witness(witness, profile, observation_count, observations=None):
+    """Validate actual public state values and request-bound T+1 identities."""
+    from task_env.artifacts.state import CanonicalStateViewV1
+    schema = 'f06-public-typed-state-witness-v1'
+    if not isinstance(witness, Mapping) or witness.get('schema_version') != schema:
+        raise ValueError('F06 typed state witness schema missing or invalid')
+    rows = witness.get('rows')
+    if not isinstance(rows, list) or len(rows) != observation_count or witness.get('observation_count') != observation_count:
+        raise ValueError('F06 typed state witness must contain every T+1 boundary')
+    expected = tuple([f'joint{i}' for i in range(1, 8)] + ['finger_joint1', 'finger_joint2'])
+    if witness.get('joint_order') != list(expected):
+        raise ValueError('F06 witness joint order is incomplete')
+    if (witness.get('source_closure_digest') != profile.get('source_closure_digest')
+            or witness.get('request_identity_sha256') != profile.get('request_identity_sha256')
+            or witness.get('materialization_identity') != profile.get('materialization_identity')):
+        raise ValueError('F06 witness source/request/materialization differs from profile')
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping) or row.get('boundary_index') != index:
+            raise ValueError('F06 typed state witness boundary order mismatch')
+        view = CanonicalStateViewV1.from_mapping(row['canonical_state_view_v1'])
+        if (view.boundary.control_step != index or view.sample_clock.sample_index != index
+                or view.boundary.provider_materialization_id != profile['materialization_identity']
+                or view.boundary.reset_sample_id != profile['reset_sample_id']
+                or view.boundary.scene_identity_hash != profile['scene_identity_hash']):
+            raise ValueError('F06 typed state witness identity or clock mismatch')
+        values = {v.joint_id: v for v in view.joints if v.entity_id == 'panda-v1'}
+        if set(values) != set(expected):
+            raise ValueError('F06 typed state witness requires all nine named joint velocities')
+        for name in expected:
+            value = values[name]
+            unit = 'radian_per_second' if name.startswith('joint') else 'meter_per_second'
+            if value.velocity_representation != unit or len(value.velocity) != 1:
+                raise ValueError(f'F06 typed state witness has invalid velocity or unit for {name}')
+        if not any(v.frame.entity_id == 'panda-v1' and v.frame.frame_id == 'ee' for v in view.frames):
+            raise ValueError('F06 typed state witness requires the declared ee frame')
+        if observations is not None:
+            ee = next(v.pose_world for v in view.frames
+                      if v.frame.entity_id == 'panda-v1' and v.frame.frame_id == 'ee')
+            expected_pose = np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)
+            expected_q = np.asarray([values[name].position[0] for name in expected], dtype=np.float32)
+            if (not np.array_equal(observations['joint_position'][index], expected_q)
+                    or not np.array_equal(observations['ee_pose'][index], expected_pose)
+                    or not np.array_equal(observations['hand_pose'][index], expected_pose)
+                    or bytes(observations['boundary_identity_sha256'][index]).hex()
+                    != view.boundary.boundary_id.removeprefix('state-boundary-')):
+                raise ValueError('F06 typed state witness differs from recorded observation or frame')
+    return witness
+
+
+def _f06_typed_state_extension(trajectory):
+    metadata = trajectory.record_metadata.get('env_metadata', {})
+    profile = metadata.get('reference_profile', {}) if isinstance(metadata, Mapping) else {}
+    if not isinstance(profile, Mapping) or profile.get('typed_state_h5_witness_schema_version') != 'f06-public-typed-state-witness-v1':
+        return None
+    infos = [trajectory.reset_info, *trajectory.infos]
+    rows = []
+    for index, info in enumerate(infos):
+        if not isinstance(info, Mapping) or not isinstance(info.get('canonical_state_view_v1'), Mapping):
+            raise ValueError(f'F06 public typed state missing at boundary {index}')
+        state = info['canonical_state_view_v1']
+        if state.get('boundary') != info.get('state_boundary_identity') or state.get('sample_clock') != info.get('state_sample_clock'):
+            raise ValueError(f'F06 typed state boundary or clock disagrees at boundary {index}')
+        rows.append({'boundary_index': index, 'canonical_state_view_v1': dict(info['canonical_state_view_v1'])})
+    witness = {'schema_version': 'f06-public-typed-state-witness-v1',
+               'source': 'public canonical state at evaluation boundary',
+               'observation_count': len(trajectory.observations),
+               'joint_order': [f'joint{i}' for i in range(1, 8)] + ['finger_joint1', 'finger_joint2'],
+               'source_closure_digest': profile['source_closure_digest'],
+               'request_identity_sha256': profile['request_identity_sha256'],
+               'materialization_identity': profile['materialization_identity'], 'rows': rows}
+    return _validate_f06_typed_state_witness(witness, profile, len(trajectory.observations))
 
 
 def _f05_typed_state_extension(trajectory: FrozenTrajectory):
@@ -1024,6 +1100,21 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         transition_count = int(root.attrs["transition_count"])
         observation_count = int(root.attrs["observation_count"])
         stop_reason = str(root.attrs.get("stop_reason", ""))
+        profile = env_meta.get('reference_profile', {})
+        f06_witness = None
+        if isinstance(profile, Mapping) and profile.get('typed_state_h5_witness_schema_version') == 'f06-public-typed-state-witness-v1':
+            name = 'meta/f06_public_typed_state_witness_v1_json'
+            if name not in root:
+                raise ValueError('F06 recording lacks required typed state witness')
+            paths = {key: 'obs/state/' + key for key in
+                     ('joint_position', 'ee_pose', 'hand_pose', 'boundary_identity_sha256')}
+            if any(path not in root for path in paths.values()):
+                raise ValueError('F06 recording lacks required typed-state observations')
+            observations = {key: np.asarray(root[path]) for key, path in paths.items()}
+            if any(len(value) != observation_count for value in observations.values()):
+                raise ValueError('F06 observation count differs from typed state witness')
+            f06_witness = _validate_f06_typed_state_witness(
+                json.loads(_read_text(root, name)), profile, observation_count, observations)
     if observation_count != transition_count + 1 or len(controls_raw) != transition_count:
         raise ValueError("task-env-h5/v3 T/T+1 or structured control count mismatch")
     if boundary_contexts is not None:
@@ -1052,6 +1143,7 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         "boundary_contexts": boundary_contexts,
         "boundary_events": events, "outcome": outcome,
         "training_projection": training_projection,
+        **({'f06_typed_state_witness': f06_witness} if f06_witness is not None else {}),
     }
 
 

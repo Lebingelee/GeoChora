@@ -263,7 +263,7 @@ def build_selected_observation(self, state):
         info['state_boundary_identity'] = boundary.to_mapping()
         info['state_boundary_id'] = boundary.boundary_id
         info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-        if input_kind in (
+        if self.value.get('f06_pickcube_isaac_input') is not None or input_kind in (
             'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native',
         ):
             # Versioned USD state-only routes expose the Core-owned typed
