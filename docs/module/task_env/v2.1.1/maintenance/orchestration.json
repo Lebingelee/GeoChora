@@ -40,25 +40,39 @@
     "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
     "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
     "planning_ref": "../planning/stage3-3a-execution.md",
-    "expected_active_minutes": "120-150",
+    "expected_active_minutes": "90-120",
     "execution_budget": {
       "total_wall_minutes": 180,
       "single_test_group_minutes": 15,
-      "cumulative_test_metadata_minutes": 60,
+      "cumulative_validation_minutes": 60,
+      "cumulative_native_minutes": 30,
       "rss_process_tree_gib": 8,
       "new_output_mib": 256,
       "single_log_mib": 16,
-      "metadata_process_seconds": 30,
-      "native_starts": 0,
-      "physics_steps": 0,
+      "native_routes": [
+        "mujoco/cpu"
+      ],
+      "physics_steps": 2000,
+      "native_launch_count_limit": null,
+      "native_launch_limit_reason": "Reruns bounded by time and cumulative physical steps, not a one-launch cap.",
       "gpu_starts": 0,
-      "engine_imports": 0,
-      "additional_worktrees": 0
+      "isaac_app_starts": 0,
+      "geophys_native_starts": 0,
+      "render_starts": 0,
+      "additional_worktrees": 0,
+      "native_authorization": "Maintainer runtime-first request; executor only after manual forwarding; Sol preparation native remains zero."
     },
     "preparation_consumes_attempt": false,
-    "prompt_sha256": "11c5e407eb4b1490fc2470358e5dbc8203a47e926f65ce0cd3b75bfd5b934e71"
+    "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
+    "package_revision": 2,
+    "supersedes_unexecuted_revision": {
+      "revision": 1,
+      "manifest_sha256": "5e3c459d035c2286ea21edf7ba9fae237bb0f3076159d4aac088909a42a0d225",
+      "archive_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/archive/V211_G03_3a_attempt002_r1_20261105"
+    },
+    "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence."
   },
-  "next_action": "维护者手动指定并转发3a attempt002，修复R1–R4并按原门返包。3a接收后才准备含Isaac6.1/6.2兼容实现的3b包；5.1延期。",
+  "next_action": "维护者手动指定并转发3a attempt002 revision2：先修真实source/reset主线，完成PickCube31/Nut19真实MuJoCo CPU创建/reset/10步/close；只做受影响检查、旧证据直接引用。3b及Isaac兼容后续安排不变。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,

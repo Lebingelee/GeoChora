@@ -4,7 +4,7 @@
 
 ## 3a attempt001：Sol已复审，需返工
 
-Sol对 `32397283` 作出 `REWORK_REQUIRED_3A`：普通PickCube／Nut reset闭包回归、逐能力build oracle、嵌套／typed需求及错误worker回复清理未闭合；不可部署，不进入3b。完整证据与安排见[独立复审](reviews/20261105_3a_attempt001_sol_review.md)。attempt_count=1；下一候选为 `V211_G03_3a_attempt002`，准备不计attempt，仍由维护者指定Terra／Luna手动转发。使用同一分支，native预算0。
+Sol对 `32397283` 作出 `REWORK_REQUIRED_3A`：普通PickCube／Nut reset闭包回归、逐能力build oracle、嵌套／typed需求及错误worker回复清理未闭合；不可部署，不进入3b。完整证据与安排见[独立复审](reviews/20261105_3a_attempt001_sol_review.md)。attempt_count=1；下一候选为 `V211_G03_3a_attempt002`，准备不计attempt，仍由维护者指定Terra／Luna手动转发。使用同一分支。维护者最新要求已将未派发的attempt002修订为revision 2：先修核心source/reset接线，读取真实资产，让PickCube31和Nut19各在真实MuJoCo CPU上创建、reset、10步及close；只做必要受影响检查、旧证据直接引用。执行者转发后原生累计30分钟／2000物理步，Sol准备不启动引擎。详见[当前runtime-first安排](../planning/stage3-3a-execution.md#attempt002-runtime-first)。
 
 新增Isaac反馈范围已进入[仓库兼容规划](../planning/isaac-deployment-compatibility.md)：v2.1.1实现6.1／6.2共同PhysX路线与部署可移植性，5.1留后续版本。它不追溯增加attempt001门，3a返工后在3b完整包中实施；6.1未安装，native仍NOT_RUN。下文旧状态均属各自历史检查点。
 

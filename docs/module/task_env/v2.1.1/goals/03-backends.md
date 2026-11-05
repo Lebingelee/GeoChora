@@ -9,7 +9,7 @@
 <a id="3a"></a>
 ## 3a：执行路由、配置与能力交集
 
-2026-11-05 attempt001 已经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)，决定 `REWORK_REQUIRED_3A`。普通reset闭包、逐能力build oracle、嵌套／typed及worker错误清理待attempt002修复，未接收、不可部署；3b未开始。
+2026-11-05 attempt001 已经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)，决定 `REWORK_REQUIRED_3A`。未接收、不可部署；3b未开始。维护者现要求[attempt002 revision 2先恢复真实运行](../planning/stage3-3a-execution.md#attempt002-runtime-first)：读取真实资产、改核心接线，让普通PickCube31／Nut19在MuJoCo CPU上创建/reset/10步/close；不重复历史验收或铺开边界矩阵。本有界回归验证不授予3b或整阶段接收。
 
 - **输入／依赖：**1c、1d、2c。首批 route 和协议已冻结。
 - **工作：**将宿主、引擎、solver／coupler、设备、renderer 和 batch 选择接入单一配置解析；能力求交任务／资产／嵌套Robot通道／Controller／typed物理命令／render 要求，替换必要的阶段特判但保留真实限制。

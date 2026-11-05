@@ -41,3 +41,9 @@ Terra最终108 passed、1 deselected按原报告保留；被排除的真实provi
 维护者另行批准的Isaac 6.1／6.2兼容及5.1延期范围，见[兼容规划](../../planning/isaac-deployment-compatibility.md)。它不追溯增加attempt001验收条件，也不塞入此次回归返工；3a接收后，3b完整包必须先含该有界实现，再执行获授权的实际三后端验证。6.1未安装则native结果保留NOT_RUN；不能借此继续把6.1实现永久拒绝。现存诊断耦合仍按原安排在7a集中处理。
 
 原始执行证据在Core ignored `workspace/maintenance/v211_g03_3a_attempt001/`，执行摘要见[Terra返包](20261105_3a_attempt001_execution.md)。Sol独立检测、命令及身份核验在主工作区 `reviews/V211_G03_3a_attempt001_sol_review/`；新包snapshot将冻结这些外部资料字节。本次Sol未运行任何原生引擎、物理、GPU或Isaac App，未发送其他对话消息。
+
+## 维护者后续调整：runtime-first
+
+上文首次准备的attempt002 native=0及全20项安排已被维护者最新指令替换，原attempt001判断与证据保持。见[当前revision 2](../../planning/stage3-3a-execution.md#attempt002-runtime-first)：先修R1核心source/reset接线并做两任务真实MuJoCo CPU创建／reset／10步／close，旧结果未受影响直接引用，不追加广泛边界矩阵。Sol本次不运行原生引擎，执行者在维护者手动转发后使用新预算。
+
+对旧排除node的说明更正：当前test_ordinary_public_pickcube_and_nutassembly_reset_step_routes_survive明确替换_materialize_admitted，不能依据名字称其为真实provider验证。此前排除原因不作为本轮核心修复前置；新真实验证明确禁止替换materializer／Session。此更正不改变两条公开reset回归的独立复现结果。

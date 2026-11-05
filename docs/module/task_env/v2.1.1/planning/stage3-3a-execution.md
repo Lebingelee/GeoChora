@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前 attempt001 已执行并待 Sol 独立复审，见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt001已复审需返工；首包与首次返工准备均属历史。当前维护者安排见末节runtime-first。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -52,10 +52,15 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 
 本次Sol接手仅做文档和包一致性检查：未运行implementation tests、provider import、native、reader、GPU/resource probe。3a未派发，3b/3c未准备；完整报告与writer释放后Sol独立核对diff和证据，接收后才准备下一包。阶段3最终汇总三项独立接收与真实覆盖，等待维护者安排，不自动进入阶段4。
 
-## attempt001独立复审与attempt002安排
+<a id="attempt002-runtime-first"></a>
+## attempt002 revision 2：真实运行优先
 
-当前以[Sol复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)及[编排索引](../maintenance/orchestration.json)为准：3a为REWORK_REQUIRED_3A／attempt1；上文未派发／attempt0文字保留为首包准备历史。输出32397283继续作为实现基线，先提交此次复审／规划文档，再冻结attempt002准确输入HEAD。
+维护者于2026-11-05明确要求先解决核心矛盾、舍弃大量无用安全／边界核查及旧路线重复验收。未派发revision 1已封存；本revision替换其native=0及全20case重验要求，仍为attempt002，当前attempt_count=1，不自动派发。
 
-attempt002只修R1普通source闭包／reset回归、R2逐能力准确build oracle、R3嵌套具名／typed评估、R4worker错误回复清理，并补齐原20项门。定向枚举真实source引用、读取摘要及必要的小型快照属于闭包实施，不属于禁止的全库扫描；沿现有source receipt和importer消费者接线，不移植另一个资产平台。保留严格拒绝且恢复合法ordinary caller；成功路径不得绕过闭包。metadata unavailable必须如实报告，缺GeoPhys环境或Isaac SDK不要求本包安装或运行native。
+首要硬门：明确允许读取PickCube／Nut实际MJCF引用的mesh、texture及其他依赖，修现有source→reset/preflight→materialize/importer接线。执行者经make_env分别以PickCube31、Nut19在真实MuJoCo CPU上创建、reset、连续10个公开control step、读取有限state/obs/reward并close，记录时间与control_step推进。不能用fake、绕过闭包或拒绝负例数量抵消失败。必要时删除／合并重复预检，沿原消费owner处理真实映射／文件错误，不强制新快照／能力注册表或通用oracle框架。
 
-同一分支，预计主动120–150分钟／墙时180分钟，其他资源限额同首包；一个writer、一个测试组，原始失败不可覆盖。新包含全部输入、方法、正负例、预算、报告和释放要求，由维护者指定后人工转发；准备不增加attempt计数。3a接收后才准备3b；新增Isaac兼容范围按[独立规划](isaac-deployment-compatibility.md)接入3b完整包，不倒加本次原门，不在返工窗口提前实施。
+优先R1及合法路线实际涉及的R2/R3映射；R4只修已复现的错误回复与回收。20case只是阶段需求追踪，旧证据未受影响直接REUSED，不重跑108项、旧维护组、codec oracle或全能力／消息边界矩阵；历史合同／报告不重读。原3a尚未覆盖项如实报告给Sol，不把本次核心恢复冒充整阶段接收，也不让其挤掉核心修改与真实运行。G02及前置有限接收不重开。
+
+预计主动90–120分钟、总墙时180分钟；先核对直接输入，最迟第60分钟开始第一次真实构建尝试并在窗口内修复。仅执行者在维护者手动转发后可运行MuJoCo CPU，原生累计30分钟／2000物理步（含失败／reset／settle），全部验证累计60分钟、单组15分钟；RSS8GiB、输出256MiB。仅原生期间沿既有双锁串行，GPU/render/App/GeoPhys原生0，禁止下载／安装。Sol准备中native仍0。三后端完整验证与Isaac6.1/6.2兼容仍在3b，未启动3b。
+
+原revision 1完整包保留于主工作区handoffs/archive/V211_G03_3a_attempt002_r1_20261105；当前根目录prompt、snapshot和manifest冻结本revision的输入及预算。一个writer、本地明确路径提交、报告真实运行结果与剩余项后释放，维护者手动交Sol复审。准备不增加attempt计数。
