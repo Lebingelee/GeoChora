@@ -4,6 +4,8 @@
 
 2026-11-05 更新：后续源码的 PickCube／Nut MuJoCo CPU 回归和独立 reader 已通过，显式路径启动器的 Pendulum GeoPhys CPU 单步已通过，详见[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)。下表是 `80904684` 的历史检查点，其中关于这些验证尚未执行的描述不代表当前状态；职责整理和独立复审仍未完成。
 
+同日 `2fd30a47` 又将 selected 录制配置、来源快照及 metadata／recipe 组装归到既有 recorder owner，并完成无引擎回归；由于生产录制代码更新，之前的物理运行仅属于 `1d8cabdc`，不能当作该新提交的物理结果。
+
 ## 原功能到当前 owner
 
 | 原功能／输入 | 当前通用 owner | 任务、诊断和真实调用者 | 尚需复核的边界 |
