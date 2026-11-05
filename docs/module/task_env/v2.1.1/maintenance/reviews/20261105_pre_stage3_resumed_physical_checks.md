@@ -48,3 +48,14 @@ F04 篡改测试后续改为每个 pytest worker、每种来源按需复用一�
 在 tracked clean `8b3c8d93` 经显式路径启动器串行运行 Empty、Pendulum、TwoWheel 的 GeoPhys CPU seed 73 各一次 reset、step、close；动作／观测空间检查通过，三条均正常返回。Pendulum 和 TwoWheel 各配置 25 个控制子步；每任务保守预留 100 步。三次 worker 各按序获取并释放两把共享锁、进程组均退出；Core 与 GeoPhys `scene` 的绝对来源由入口核对，未启动 Isaac／GPU。账本、argv、来源、stdout/stderr 和 supervisor 位于 ignored `classic-final-8b3c8d93/`。累计保守物理步预留 **222107／300000**，剩余 77893。此为单环境最短路线，不证明并行、render 或完整任务成功。
 
 资源复核另发现原 attempt001 与续作目录可见的 pytest supervisor 记录累计约 **1464 秒**，超过原交接包 **1200 秒**离线墙时上限；该数字不含无法从这些记录归类的其他命令，不能作为完整账本。此前没有及时累计检查是实施遗漏；原 180 秒单命令超时记录仍保留。已停止新增离线测试并向维护者请求调整该总限额；物理步及当前存储分别依维护者已明确的新口径记账。当前文档 validator 对 `8b3c8d93` 为 **0 errors、0 stale paths、96 条历史链接问题**，输出位于 ignored `docs-current-8b3c8d93.json`；两项保护文件 SHA 和 GeoPhys／Menagerie pin 与原记录一致。
+
+## 追加预算后的当前源码代表回归
+
+维护者随后将离线预算更新为新计数 3000 秒，原约 1464 秒保留历史记录且不计入新预算。对 `5a04140a5699c17534dfb3c0a95eb46751c8eea5`，使用 MuJoCo 3.8.1 CPU、外部 `Solution.act → env.step(action) → Solution.observe` 执行下列受限代表检查；各输出记录的源码身份均为该提交，不能重标至其他源码：
+
+| 任务及输入 | 实际结果 | 同次独立 reader 与 H5 SHA-256 |
+| --- | --- | --- |
+| PickCube，seed 31，horizon 1000，R3 | 960 transitions，任务成功、Solution 完成；worker 11.698 秒 | PASS，961 boundaries、T+1 与 target/applied 一致；`cddd13423a81b3127ee629a724fdc02c6f151d6bc6029c26b2f1fa7b41f3b330`，该 canonical 记录没有 native substep 证据 |
+| NutAssembly，seed 19，horizon 6000 | 2377 transitions，任务成功、Solution 完成；worker 59.945 秒 | PASS，2378 boundaries、11885 native substeps、T+1 与 target/applied 一致；`7a94fa1feda17c3f82beaf4b465cdb3a9ccacc190174ec9c74270ecdd86a647c` |
+
+两个 worker 都核对 Core／MuJoCo 来源，按序取得并释放两把共享锁，进程组退出；reader 是禁止 native 导入的独立进程。Nut 的首次尝试因第二把锁被占用而未启动 worker，已释放第一把锁并保留失败 supervisor；锁可用后另建 `nut-retry01` 完成。完整 argv、资源、原始输出、reader、锁记录及预留账本位于 ignored `physical-gate-renewed-5a04140a/`。两次保守预留 35000 步后累计 **257107／300000**；旧账本可见 native worker 935.985 秒，加上本续作双锁源构造 14.959 秒和本次物理 71.643 秒，可见合计 1022.587 秒，该统计不是完整历史账本。两个 reader 分别 1.632／11.435 秒。两目录当前约 1.46 GiB；两项保护 SHA、GeoPhys／Menagerie pin 均与原快照一致。未启动 Isaac／GPU；这些种子和任务的结果不证明其他后端、D0 或 Qualification。
