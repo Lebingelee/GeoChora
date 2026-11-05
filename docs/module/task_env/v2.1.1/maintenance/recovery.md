@@ -2,6 +2,14 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
+## 当前恢复入口：120分钟核心收尾
+
+维护者要求回到原环境重构与开发指引目标，最多再用两小时。最新源码检查点为`develop@dba855e1ad9575d21604304dc04e9f7fc036ad7e`，tracked clean，两个保护untracked保留；整体维护待Sol复审，G03未开始。最后窗口以[规划第2.5节](../planning/pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)为当前执行范围：C1任务／Solution与Env/runtime职责、诊断隔离；C2当前`task_env/doc`和真实example；V只验证实际受影响行为。已接受生命周期不重做，不再逐helper拆分或逐提交重建全套证据。
+
+`5a04140a`的PickCube31／Nut19 MuJoCo成功和独立reader已有记录；至`dba855e1`仅五个文档文件变化，允许按原运行身份引用并注明运行代码未变。旧任务短检查按其各自来源和调用链另判，不将新文档HEAD视为全部证据自动失效，也不冒充新run。证据入口见[当前状态](reviews/20261105_pre_stage3_current_status.md)。下文各次NOT_RUN／PARTIAL与预算待答复描述均保留所属历史检查点，不能覆盖本段当前入口。
+
+两小时包含实现、必要验证、文档、提交与返包，到时无条件停止新工作并释放窗口；核心未过门就列具体阻塞，不自行延期，不自动接收或进入阶段3。包由维护者手动转发，Sol本次仅准备规划与prompt，未启动执行。
+
 ## 状态
 
 - G01/1a–1d 和 G02/2a 的既有 Sol 决定保留。

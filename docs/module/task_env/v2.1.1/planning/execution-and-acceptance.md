@@ -10,7 +10,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 
 维护者要求先完成[环境重构与新手交付](pre-stage3-environment-refactor.md)：归整tasks、隔离诊断、统一Env与旧别名、优化静态摘要，并同步README、`task_env/doc`、本版指南及轻量启动入口。新手流程区分新克隆安装与复用既有安装，包含基于example的二次开发；详见[指南清单](../guides/README.md)。
 
-本次先迁移Pendulum等任务的单环境规范路线，并行适配留G06；不将其作为本项验收门。维护项仍待实施／派包，不增加第23个子阶段，不重开G02或提前启动G03/G06，不改变下表的七阶段出口。
+单环境生命周期R1已有限接收，后续实现停在`dba855e1`待复审。维护者于2026-11-05指定至多120分钟完成前置核心收尾：具体任务／Solution与通用Env/runtime职责归位、诊断隔离、当前`task_env/doc`和真实开发示例，详见[维护方案第2.5节](pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)。已有成果不重做，验证按实际影响复用，不把历史资源审计或全路线整理设为出口。Pendulum并行留G06。本项不增加第23个子阶段，不重开G02，也不启动或收尾G03的3a–3c；七阶段出口保持不变。
 
 ## 顺序与最小出口
 
@@ -75,7 +75,7 @@ NutAssembly 用于已有后端的代表性复用；不自动扩为所有任务�
 
 ## 工作流、分支与资源
 
-维护者已指定继续当前 `develop` 工作树，本版本计划新增分支数和工作树数均为 0，不恢复 F/R 线，不逐 Goal 新建分支。每个冻结包仍需重新检查真实 HEAD／dirty paths。若需修改 GeoPhys 公共 API 或 pin，先冻结子模块修改范围、分支／提交归属和受影响检查；不把 pin 修改当成默认动作。
+当前前置收尾继续既有`develop`工作树，本窗口不新增分支／worktree。维护者后续已计划从develop独立建立阶段3分支；具体起点和独立工作目录在G03包中安排，本窗口不执行，不恢复F/R线或逐Goal建分支。每个包开工核对实际HEAD／dirty paths即可。若需修改GeoPhys公共API或pin，先冻结明确范围；本次收尾不修改它们。
 
 Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一个完整包。默认一个 writer 和一个 native 执行窗口；尚未指定谁执行哪个阶段，不自动创建线程或发送消息。完整报告与窗口释放后再审核 diff 和证据，PASS 不是自动接收。
 
