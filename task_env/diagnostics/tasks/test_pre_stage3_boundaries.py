@@ -4,6 +4,38 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_legacy_position_expert_route_uses_task_admission_not_task_key(monkeypatch):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions import control
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
+
+    pickcube_binding = make_reference_binding()
+    assert pickcube_binding.legacy_position_expert_admission({'f06_pickcube_isaac_input': object()})
+    assert not pickcube_binding.legacy_position_expert_admission({})
+
+    env = object.__new__(SelectedReferenceEnv)
+    env.position_profile = True
+    env._episode_mode = None
+    env.value = {'task_owned_admission': True}
+    env.binding = SimpleNamespace(
+        legacy_position_expert_admission=lambda value: value.get('task_owned_admission') is True,
+        expert_uses_public_observation=False,
+    )
+    proposal = SimpleNamespace(action=object())
+    env.solution = SimpleNamespace(done=False, failed=False, act=lambda: proposal)
+    env.prepare_expert = lambda: env.solution
+    env.position_scene, env.position_plan, env.position_profiles = object(), object(), (object(),)
+    request = object()
+    monkeypatch.setattr(control, 'single_position_action_request', lambda *_args, **_kwargs: request)
+    env._step_position_profile = lambda actual, **kwargs: (actual, kwargs['proposal'])
+    assert env.step_expert() == (request, proposal)
+
+    env._episode_mode = None
+    env.value = {'task_owned_admission': False}
+    with pytest.raises(RuntimeError, match='does not provide expert execution'):
+        env.step_expert()
+
+
 def test_selected_controller_binding_checks_route_and_writer_identity():
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
     from task_env.runtime.sessions.control import bind_selected_controller, is_admitted_position_profile_set

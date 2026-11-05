@@ -2597,7 +2597,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
         if getattr(self, 'position_profile', False):
-            if self.value.get('f06_pickcube_isaac_input') is None:
+            admit_legacy = self.binding.legacy_position_expert_admission
+            if admit_legacy is None or not admit_legacy(self.value):
                 raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
         elif hasattr(self.solution, 'readiness_config'):
             try:

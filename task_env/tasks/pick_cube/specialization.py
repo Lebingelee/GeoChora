@@ -551,6 +551,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             if env.value.get('f06_pickcube_isaac_input') is not None else None
         ),
         position_execution_info_key='pickcube_position_execution_info_v1',
+        legacy_position_expert_admission=lambda value: (
+            value.get('f06_pickcube_isaac_input') is not None
+        ),
         reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
         position_control_binding=lambda value: ControlBinding(
             'panda-v1/gripper' if value.get('f06_pickcube_isaac_input') is not None
