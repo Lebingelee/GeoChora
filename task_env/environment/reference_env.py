@@ -1943,7 +1943,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..runtime.sessions.control import (
             mixed_stepwise_receipt, mixed_substep_controller, validate_mixed_control_preparation,
         )
-        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+        from ..recorders.recorder import mixed_control_transition
 
         if self._stopped or self.session is None:
             raise RuntimeError('reset required or mixed-control episode already stopped')
@@ -2051,30 +2051,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 )
                 if bool(observer_solution.done) and bool(observer_solution.failed):
                     raise ValueError('mixed Solution cannot be complete and failed at one boundary')
-            transition = StructuredControlTransitionV1(
-                'structured-control-transition-v1', request, ({
-                    **dict(writer_control),
-                    'controller_target': {
-                        'schema_version': target.schema_version,
-                        'payload': target.to_mapping(),
-                        'identity_hash': target.identity_hash,
-                    },
-                    'applied_control': {
-                        'schema_version': applied_payload['schema_version'],
-                        'payload': dict(applied_payload),
-                        'target_hash': applied_payload['target_hash'],
-                    },
-                },),
+            transition = mixed_control_transition(
+                request, writer_control, target, applied_payload, stepwise_receipt,
             )
-            if stepwise_receipt is not None:
-                writer_row = dict(transition.writer_controls[0])
-                canonical_action = dict(writer_row['canonical_action'])
-                canonical_action['physics_rate_control_v1'] = stepwise_receipt
-                writer_row['canonical_action'] = canonical_action
-                transition = StructuredControlTransitionV1(
-                    'structured-control-transition-v1', request, (writer_row,),
-                )
-            transition.validate()
             terminated, truncated = self._episode_execution_state().step_outcome(
                 task_terminated=bool(self.evaluation.failure) if proposal is not None else False,
                 task_truncated=False, control_step=self.state.control_step, horizon=self.horizon,

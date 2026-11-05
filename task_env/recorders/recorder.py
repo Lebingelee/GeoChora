@@ -274,6 +274,32 @@ class TransitionRecorder:
         return output
 
 
+def mixed_control_transition(request, writer_control, target, applied_payload, stepwise_receipt):
+    """Build and validate the structured recording projection for one interval."""
+    writer_row = {
+        **dict(writer_control),
+        'controller_target': {
+            'schema_version': target.schema_version,
+            'payload': target.to_mapping(),
+            'identity_hash': target.identity_hash,
+        },
+        'applied_control': {
+            'schema_version': applied_payload['schema_version'],
+            'payload': dict(applied_payload),
+            'target_hash': applied_payload['target_hash'],
+        },
+    }
+    if stepwise_receipt is not None:
+        canonical_action = dict(writer_row['canonical_action'])
+        canonical_action['physics_rate_control_v1'] = stepwise_receipt
+        writer_row['canonical_action'] = canonical_action
+    transition = StructuredControlTransitionV1(
+        'structured-control-transition-v1', request, (writer_row,),
+    )
+    transition.validate()
+    return transition
+
+
 def begin_structured_recording(path, *, horizon, observation, reset_info, metadata_factory,
                                max_buffer_bytes=None):
     """Create a v3 recording and publish it only after begin_episode succeeds."""

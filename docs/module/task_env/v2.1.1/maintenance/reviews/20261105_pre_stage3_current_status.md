@@ -30,6 +30,8 @@ mixed／Position 的 v3 录制文件路径、覆盖拒绝、recorder 创建和�
 
 源码提交 `a406ad82` 后干净 tracked HEAD 重跑无引擎组合：264 passed、4 deselected，监督墙时 14.002 秒、峰值采样约 286 MiB，进程组已退出；原始记录在 ignored `renewed-record-begin-clean-a406ad82`。新离线预算累计 297.943／3000 秒。
 
+mixed interval 的结构化 transition、target／applied 投影及 stepwise 记录格式归 recorder；环境保留推进、校验时机和最终发布。工作树假 provider／无引擎检查 5 passed（3.044 秒），包括官方冻结输入上的 LIBERO V8 外部 Solution、25 substeps、H5 记录、部分故障和 recorder 故障；不是物理 rollout。首次用旧场景运行时官方来源校验正确拒绝，4 passed、1 failed（1.912 秒），替换为已冻结官方输入后通过。原始日志与输入路径在 ignored `renewed-mixed-projection-001`、`002`；进程组均退出，有资源采样。新离线预算累计 302.899／3000 秒；提交后需固定源码身份。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
