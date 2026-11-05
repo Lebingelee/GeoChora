@@ -632,7 +632,8 @@ def test_normal_public_profile_laws_drive_real_five_sample_interval(
     env = NutAssemblyReferenceEnv.for_native_feedback_profile(
         backend='cpu', gripper_control_hz=law_hz,
     )
-    solution = env.solution
+    from task_env.tasks.nut_assembly.specialization import build_native_feedback_solution
+    solution = build_native_feedback_solution(backend='cpu', gripper_control_hz=law_hz)
     try:
         env.reset_for_solution(solution, seed=19)
         assert env.controller.gripper_rate_hz == law_hz
@@ -647,6 +648,43 @@ def test_normal_public_profile_laws_drive_real_five_sample_interval(
     finally:
         env.close()
 
+
+
+@pytest.mark.parametrize('law_hz', [100, 500])
+def test_normal_profile_caller_owns_solution_and_executes_public_action(monkeypatch, law_hz):
+    from task_env.tasks.nut_assembly.specialization import build_native_feedback_solution
+
+    _install_provider_free_materialize(monkeypatch)
+    env = NutAssemblyReferenceEnv.for_native_feedback_profile(backend='cpu', gripper_control_hz=law_hz)
+    solution = build_native_feedback_solution(backend='cpu', gripper_control_hz=law_hz)
+    try:
+        assert env.solution is None
+        obs, info = env.reset(seed=19)
+        assert env.solution is None
+        solution.reset(obs, info, env.metadata)
+        proposal = solution.act(obs, info)
+        obs, reward, terminated, truncated, info = env.step(proposal)
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert env.solution is None
+        assert info['native_interval_receipt_v1']['completed_substeps'] == 5
+        assert len(info['native_interval_receipt_v1']['samples']) == 5
+        assert env.state.control_step == 1
+    finally:
+        env.close()
+
+
+def test_normal_profile_legacy_solution_is_created_only_on_request(monkeypatch):
+    _install_provider_free_materialize(monkeypatch)
+    env = NutAssemblyReferenceEnv.for_native_feedback_profile(backend='cpu')
+    try:
+        env.reset(seed=19)
+        assert env.solution is None
+        solution = env.prepare_expert()
+        assert env.solution is solution
+        env.step_expert()
+        assert env.state.control_step == 1
+    finally:
+        env.close()
 
 def _run_raw_reader(h5_path, expected_path, output_path):
     return subprocess.run(

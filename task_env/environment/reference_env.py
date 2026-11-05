@@ -1163,7 +1163,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise ValueError('native-feedback admission must return a nonempty profile identifier')
             self._native_feedback_request = _native_feedback_request
             build_value = lambda: self.binding.build_native_feedback_profile(
-                provider, backend, _native_feedback_request, True,
+                provider, backend, _native_feedback_request, False,
             )
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
@@ -1406,8 +1406,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
             elif self._native_feedback_profile is not None:
                 self.value = self.binding.build_native_feedback_profile(
-                    self.provider, self.backend, self._native_feedback_request,
-                    external_solution is None,
+                    self.provider, self.backend, self._native_feedback_request, False,
                 )
             else:
                 if external_solution is not None:
@@ -2575,6 +2574,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 solution = factory()
                 if getattr(solution, 'identity', None) != self.value.get('solution_identity'):
                     raise ValueError('constructed Solution identity differs from compiled task')
+                if self._native_feedback_profile is not None:
+                    self.binding.validate_external_solution(self.value, solution)
                 solution.reset(self.obs, self.info, self.metadata,
                                **self.binding.reset_expert_kwargs(self))
             except BaseException as error:
