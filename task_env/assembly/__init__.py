@@ -36,6 +36,8 @@ from .usd_delivery import (
     load_usd_asset_delivery,
     resolve_provider_representation,
 )
+from .asset_scene import LoadedAssetScenePreparationV1, load_asset_scene_preparation
+from .asset_scene_structure import validate_asset_scene_structure
 
 __all__ = [
     "AgentReferences",
@@ -59,4 +61,6 @@ __all__ = [
     "LoadedUsdDeliveryV1",
     "load_usd_asset_delivery",
     "resolve_provider_representation",
+    "LoadedAssetScenePreparationV1", "load_asset_scene_preparation",
+    "validate_asset_scene_structure",
 ]

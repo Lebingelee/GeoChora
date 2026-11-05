@@ -27,6 +27,14 @@ from .logical_assembly_resolution import (
     resolve_logical_assembly,
 )
 from .fixed_attachment import FixedAttachmentPlanV1
+from .asset_scene import (
+    PANDA_RIGID_SCENE_PROFILE_V1,
+    REQUIRED_PREPARATION_CHECKS_V1,
+    AssetPreparationEvidenceV1,
+    AssetScenePreparationV1,
+    PandaRigidSceneBindingsV1,
+    RigidMeshGeometryV1,
+)
 from .execution import ResetPlanV1, ResetReadbackV1, ResetSampleV1
 from .state import (
     CanonicalStatePublicationV2,
@@ -78,5 +86,8 @@ __all__ = [
     'ResolvedLogicalAssemblyLeafV1', 'ResolvedLogicalAssemblyV1',
     'resolve_logical_assembly',
     'FixedAttachmentPlanV1',
+    'PANDA_RIGID_SCENE_PROFILE_V1', 'REQUIRED_PREPARATION_CHECKS_V1',
+    'AssetPreparationEvidenceV1', 'AssetScenePreparationV1',
+    'PandaRigidSceneBindingsV1', 'RigidMeshGeometryV1',
     'ResetReadbackV1', 'ResetSampleV1',
 ]

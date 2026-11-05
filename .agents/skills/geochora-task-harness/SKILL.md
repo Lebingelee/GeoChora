@@ -9,6 +9,13 @@ Deliver a checked Candidate Spec + Artifact, hash-bound construction history, Or
 
 Read [the CLI workflow](references/workflow.md). Resolve the supplied Core checkout, Python environment, runtime directory and task workspace. The runtime directory is `<Core>/task_env/script/agent/`; see its README for setup and input contracts. Core must be a clean known snapshot; regenerate the catalog when moving machines. Keep generated work in ignored `workspace/` or outside the checkout. Ordinary candidate construction does not authorize Core edits, task registration, engine installation, or artifact approval/freeze. A separate explicit maintainer maintenance package may authorize a bounded repair in an existing owner.
 
+When a task requires a real USD asset or authored scene before candidate
+construction, follow the [asset-scene preparation handoff](references/asset-scene-integration.md)
+and use the sibling `scene-orchestration`, `asset-creation`, and
+`asset-material-creation` skills as applicable. Their output is preparation
+evidence, not a runnable TaskEnv task or runtime admission; keep reset,
+semantics, execution, recording, and Judge evidence in their existing owners.
+
 The versioned built-in PickCube Harness example is an execution route, not
 candidate construction. For user requests to run or extend that example, follow
 the [TaskEnv module Skill](../geochora-task-env/SKILL.md)

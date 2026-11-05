@@ -501,7 +501,11 @@ class UsdAssetDeliveryLocalV1(Contract):
             raise ValueError("entry_prim must be an absolute USD prim path")
         _name(self.representation_format)
         _name(self.representation_id)
-        _choice(self.closure_policy, {"f04-selected-derived-scene-v1"}, "local USD closure policy")
+        _choice(
+            self.closure_policy,
+            {"f04-selected-derived-scene-v1", "asset-scene-selected-derived-v1"},
+            "local USD closure policy",
+        )
         for label, values in (("source_files", self.source_files), ("files", self.files)):
             if type(values) is not tuple or not values or any(type(item) is not UsdDeliveryFileV1 for item in values):
                 raise TypeError(f"{label} must be a nonempty tuple of exact USD file bindings")

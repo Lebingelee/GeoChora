@@ -1,0 +1,4 @@
+interface:
+  display_name: "可仿真资产创建"
+  short_description: "按需求确定资产分件与生成方法，完成几何、材质和物理配置，验证并交付 USD"
+  default_prompt: "使用 $asset-creation 按需求确定主体与连接部分的划分及生成方法，完成几何、材质、物理配置、装配与技术检查，再按场景技能进行整体验收，交付可复现的 USD。"
