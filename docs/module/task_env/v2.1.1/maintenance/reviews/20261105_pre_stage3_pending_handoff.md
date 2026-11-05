@@ -1,5 +1,7 @@
 # 阶段3前维护：待处理的复审检查点
 
+> 2026-11-05 恢复更新：下文为原检查点，预算、存储及物理回归状态以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。维护仍未整体完成，等待职责整理及 Sol 独立复审。
+
 状态：**PREPARED_PARTIAL_AWAITING_BUDGET_AND_SOL**。本页供维护者人工转交Sol或恢复工作，不是最终验收、资源超限豁免或阶段3启动授权。检查时 `develop@dce469ab470f37fb7ab475c6a30c218513fd1220`，tracked clean；本页所在提交只增加交接文档。实际执行前重新固定HEAD并核对保护项。
 
 ## 结论与门
