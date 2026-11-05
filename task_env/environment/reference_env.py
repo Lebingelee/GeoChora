@@ -662,11 +662,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         camera_observation_config=None, execution_spec=None,
     ):
         """Explicitly construct a bounded Position profile through the selected binding."""
-        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
-
         if not isinstance(binding, ReferenceTaskBinding):
             raise TypeError('PositionServoV1 candidate requires the existing ReferenceTaskBinding')
-        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+        from ..runtime.sessions.control import is_admitted_position_profile_set
 
         candidate_type = cls
         if getattr(cls, 'uid', None) == 'base-task-env':
@@ -688,10 +686,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             _execution_spec_v1=execution_spec,
         )
         profiles = env.position_profiles
-        if (not profiles or len(profiles) > 2
-                or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
-                or len({profile.writer_id for profile in profiles}) != len(profiles)
-                or len({profile.entity_id for profile in profiles}) != len(profiles)):
+        if not is_admitted_position_profile_set(profiles):
             env.close()
             raise TypeError('candidate binding did not construct one or two Entity-bound PositionServoV1 profiles')
         if camera_observation_config is not None and len(profiles) != 1:
@@ -755,60 +750,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return env
 
     def _bind_selected_controller(self, value):
-        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+        from ..runtime.sessions.control import bind_selected_controller
 
-        self.mixed_control_profile = False
-        leaf_plan = value.get('leaf_plan')
-        if leaf_plan is not None:
-            from ..controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-            if type(leaf_plan) is not EffectiveLeafPlanV1 or not leaf_plan._compiled:
-                raise TypeError('leaf Position route requires a compiled EffectiveLeafPlanV1')
-            if (leaf_plan.provider_name, leaf_plan.backend) != (self.provider, self.backend):
-                raise ValueError('leaf plan provider/backend differs from the selected environment')
-            self.leaf_position_profile = True
-            self.leaf_plan = leaf_plan
-            self.position_profiles = ()
-            self.position_profile = True
-            self.controller = None
-            return
-        self.leaf_position_profile = False
-        self.leaf_plan = None
-
-        raw = value['controller']
-        if value.get('selected_controller_kind') == 'mixed_actuator_v1':
-            source = value.get('source')
-            plan = getattr(source, 'mixed_actuator_plan', None)
-            if (self.binding is None
-                    or self.binding.build_mixed_control_profile is None
-                    or plan is None
-                    or not callable(getattr(raw, 'compute_target', None))
-                    or not callable(getattr(raw, 'identity_mapping', None))
-                    or type(getattr(raw, 'identity', None)) is not str
-                    or getattr(plan, 'controller_identity', None) != raw.identity):
-                raise TypeError('mixed-control route requires a controller bound to its typed source plan')
-            self.mixed_control_profile = True
-            self.position_profiles = ()
-            self.position_profile = False
-            self.controller = raw
-            return
-        profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
-        if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
-            if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
-                raise ValueError('selected Position route admits one writer or the bounded two-Entity profile set')
-            if len({item.entity_id for item in profiles}) != len(profiles):
-                raise ValueError('selected Position writers must bind distinct Entities')
-            profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
-            self.position_profiles = profiles
-            self.position_profile = True
-            # Existing callers of selected-reference metadata continue to see
-            # the original Panda profile; dual dispatch uses position_profiles.
-            self.controller = profiles[0]
-        else:
-            if isinstance(raw, (tuple, list)):
-                raise TypeError('legacy selected routes do not accept a Controller profile collection')
-            self.position_profiles = ()
-            self.position_profile = False
-            self.controller = raw
+        selected = bind_selected_controller(
+            value, binding=self.binding, provider=self.provider, backend=self.backend,
+        )
+        self.mixed_control_profile = selected.mixed
+        self.leaf_plan = selected.leaf_plan
+        self.leaf_position_profile = selected.leaf_plan is not None
+        self.position_profiles = selected.position_profiles
+        self.position_profile = selected.position
+        self.controller = selected.controller
 
     def _episode_execution_state(self):
         state = self.__dict__.get('_episode_state')

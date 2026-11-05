@@ -4,6 +4,39 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_selected_controller_binding_checks_route_and_writer_identity():
+    from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
+    from task_env.runtime.sessions.control import bind_selected_controller, is_admitted_position_profile_set
+
+    def profile(entity, writer):
+        item = object.__new__(PandaPositionServoProfileV1)
+        item.entity_id, item.writer_id = entity, writer
+        return item
+    first, second = profile('entity-b', 'writer-b'), profile('entity-a', 'writer-a')
+    binding = SimpleNamespace(build_mixed_control_profile=lambda *_args: None)
+    selected = bind_selected_controller({'controller': (first, second)}, binding=binding,
+                                        provider='mujoco', backend='cpu')
+    assert selected.position and not selected.mixed
+    assert selected.position_profiles == (second, first) and selected.controller is second
+    assert is_admitted_position_profile_set(selected.position_profiles)
+    with pytest.raises(ValueError, match='one writer'):
+        bind_selected_controller({'controller': (first, profile('entity-c', 'writer-b'))},
+                                 binding=binding, provider='mujoco', backend='cpu')
+    with pytest.raises(ValueError, match='distinct Entities'):
+        bind_selected_controller({'controller': (first, profile('entity-b', 'writer-c'))},
+                                 binding=binding, provider='mujoco', backend='cpu')
+    raw = SimpleNamespace(identity='controller-a', compute_target=lambda: None,
+                          identity_mapping=lambda: {})
+    source = SimpleNamespace(mixed_actuator_plan=SimpleNamespace(controller_identity='controller-b'))
+    with pytest.raises(TypeError, match='typed source plan'):
+        bind_selected_controller({'controller': raw, 'source': source,
+                                  'selected_controller_kind': 'mixed_actuator_v1'},
+                                 binding=binding, provider='mujoco', backend='cpu')
+    with pytest.raises(TypeError, match='compiled EffectiveLeafPlanV1'):
+        bind_selected_controller({'leaf_plan': object()}, binding=binding,
+                                 provider='mujoco', backend='cpu')
+
+
 def test_position_recording_does_not_publish_on_existing_path_or_metadata_failure(tmp_path):
     from task_env.environment.reference_env import SelectedReferenceEnv
 

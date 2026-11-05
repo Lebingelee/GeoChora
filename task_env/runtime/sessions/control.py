@@ -39,6 +39,62 @@ class ControlledRuntimeSession(RuntimeSession, Protocol):
 CONTROL_REQUIRED=RequiredCapabilitySet(('articulated_robot','joint_position_actuation','joint_state_query','body_pose_query','frame_pose_query'))
 
 
+@dataclass(frozen=True)
+class SelectedControllerBinding:
+    """Admitted controller and profile facts for selected environment assembly."""
+    controller: object
+    position_profiles: tuple
+    leaf_plan: object | None
+    mixed: bool
+    position: bool
+
+
+def is_admitted_position_profile_set(profiles):
+    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+    return (bool(profiles) and len(profiles) <= 2
+            and all(isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
+            and len({profile.writer_id for profile in profiles}) == len(profiles)
+            and len({profile.entity_id for profile in profiles}) == len(profiles))
+
+
+def bind_selected_controller(value, *, binding, provider, backend):
+    """Admit a declared controller against its source and execution route."""
+    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+    leaf_plan = value.get('leaf_plan')
+    if leaf_plan is not None:
+        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+        if type(leaf_plan) is not EffectiveLeafPlanV1 or not leaf_plan._compiled:
+            raise TypeError('leaf Position route requires a compiled EffectiveLeafPlanV1')
+        if (leaf_plan.provider_name, leaf_plan.backend) != (provider, backend):
+            raise ValueError('leaf plan provider/backend differs from the selected environment')
+        return SelectedControllerBinding(None, (), leaf_plan, False, True)
+
+    raw = value['controller']
+    if value.get('selected_controller_kind') == 'mixed_actuator_v1':
+        plan = getattr(value.get('source'), 'mixed_actuator_plan', None)
+        if (binding is None or binding.build_mixed_control_profile is None or plan is None
+                or not callable(getattr(raw, 'compute_target', None))
+                or not callable(getattr(raw, 'identity_mapping', None))
+                or type(getattr(raw, 'identity', None)) is not str
+                or getattr(plan, 'controller_identity', None) != raw.identity):
+            raise TypeError('mixed-control route requires a controller bound to its typed source plan')
+        return SelectedControllerBinding(raw, (), None, True, False)
+
+    profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
+    if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
+        if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
+            raise ValueError('selected Position route admits one writer or the bounded two-Entity profile set')
+        if len({item.entity_id for item in profiles}) != len(profiles):
+            raise ValueError('selected Position writers must bind distinct Entities')
+        profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
+        return SelectedControllerBinding(profiles[0], profiles, None, False, True)
+    if isinstance(raw, (tuple, list)):
+        raise TypeError('legacy selected routes do not accept a Controller profile collection')
+    return SelectedControllerBinding(raw, (), None, False, False)
+
+
 def mixed_substep_controller(hook, env, prepared):
     """Validate each task-produced native-rate command and retain its receipt."""
     controller_receipts = []
