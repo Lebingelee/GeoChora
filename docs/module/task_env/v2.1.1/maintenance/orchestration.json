@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B_ATTEMPT002_REVIEWED_REWORK_REQUIRED",
+  "status": "G03_3B003_3C001_PREPARED_CONDITIONAL_SERIES",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,22 +31,25 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "REASSESSMENT_REQUIRED_BEFORE_FINAL_ATTEMPT",
-    "package_id": null,
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_id": "V211_G03_3b_attempt003",
     "attempt_count_now": 2,
     "attempt_planned": 3,
-    "assigned_agent": null,
+    "assigned_agent": "Terra, maintainer-designated same execution conversation",
     "target_thread": null,
-    "planning_ref": "../planning/stage3-3b-rework-analysis.md",
+    "planning_ref": "../planning/stage3-3b-attempt003-reassessment.md",
     "sol_review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
-    "mandatory_decisions": [
-      "GeoPhys public effective-model readback contract and implementation/pin ownership",
-      "Versioned direction-response cases separated from hold/accuracy; preserve original N08 failures",
-      "Final bounded Panda same-run recording and steady-state scope plus remaining required model/reset/constraint and rejection checks"
-    ],
-    "assignment": "No execution package yet. Maintainer manually forwards only after final-attempt reassessment and complete package; no automatic messages/native/3c."
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3b_attempt003",
+    "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle",
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/prompt.md",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/input-snapshot.json",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/manifest.json",
+    "manifest_digest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/manifest.sha256",
+    "expected_active_minutes": "120-180",
+    "total_wall_minutes": 240,
+    "assignment": "Maintainer manually forwards complete dual bundle. Last ordinary3b attempt; all required technical gates pass before conditional3c. Sol reviews both independently after serial implementation."
   },
-  "next_action": "Sol reviewed attempt002: bounded TCP gravity fix and launcher/F06 recording accepted; whole 3b remains rework required. Resolve final-attempt prerequisites before preparing 003; no automatic dispatch or 3c.",
+  "next_action": "Maintainer manually forwards dual bundle to Terra. Preparation spends no attempt. 3b ordinary003 must technically pass all revised prospective gates and release before binding/start of conditional3c001; both await independent Sol review afterward. No automatic dispatch or stage4.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -923,7 +926,13 @@
             "Some required model/reset/constraint and missing API/schema/DOF rejection evidence remains incomplete",
             "Final bounded Panda gravity same-run H5 and final steady-state verification incomplete",
             "Freeze independently justified direction-response cases separately from hold/accuracy; retain original N08 FAIL history"
-          ]
+          ],
+          "prepared_package": {
+            "package_id": "V211_G03_3b_attempt003",
+            "status": "PREPARED_NOT_DISPATCHED",
+            "planning_ref": "../planning/stage3-3b-attempt003-reassessment.md",
+            "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle"
+          }
         },
         {
           "id": "3c",
@@ -946,8 +955,15 @@
           "commits": [],
           "review_decision": null,
           "blockers": [
-            "3b is not accepted; attempt002 reviewed, no automatic 003 or 3c"
-          ]
+            "Do not start until final3b full technical PASS, frozen report/commit/release and actual input binding; maintainer-authorized serial execution, Sol review remains pending"
+          ],
+          "prepared_package": {
+            "package_id": "V211_G03_3c_attempt001",
+            "status": "PREPARED_CONDITIONAL_NOT_STARTED",
+            "planning_ref": "../planning/stage3-3c-attempt001.md",
+            "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle",
+            "input_head": null
+          }
         }
       ]
     },
@@ -1363,5 +1379,34 @@
     "authority": "Maintainer: GeoPhys only consumes MuJoCo when its MuJoCo solver route is selected; native solver does not conflict with Core MuJoCo.",
     "implementation_status": "IMPLEMENTED_IN_3B_ATTEMPT001_PENDING_SOL_REVIEW",
     "policy": "Use resolved host/engine/solver and actual source/worker consumer dependencies; preserve checks for genuinely required dependencies. No submodule/pin/requirements change."
+  },
+  "conditional_candidates": [
+    {
+      "substage": "3c",
+      "package_id": "V211_G03_3c_attempt001",
+      "status": "PREPARED_CONDITIONAL_NOT_STARTED",
+      "attempt_count_now": 0,
+      "attempt_planned": 1,
+      "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3c_attempt001",
+      "planning_ref": "../planning/stage3-3c-attempt001.md",
+      "input_head": null,
+      "actual_input_binding": "Executor-only bind-3c-input.py after final3b report/commit/release",
+      "prerequisite": "Full THREE_B_TECHNICAL_PASS_REVISED_N08_V2; no unresolved required case; pending Sol review preserved",
+      "expected_active_minutes": "120-180",
+      "total_wall_minutes": 240
+    }
+  ],
+  "serial_execution_exception": {
+    "date": "2026-11-06",
+    "authority": "Maintainer explicitly requests both complete packages forwarded once to Terra for serial implementation",
+    "scope": [
+      "V211_G03_3b_attempt003",
+      "V211_G03_3c_attempt001"
+    ],
+    "intermediate_sol_acceptance_required_before_technical_3c": false,
+    "sol_independent_acceptance_delegated": false,
+    "predecessor_technical_all_pass_required": true,
+    "predecessor_failure": "3c NOT_STARTED; final ordinary3b goes human diagnosis",
+    "reference": "../planning/stage3-3b003-3c001-sequential-execution.md"
   }
 }

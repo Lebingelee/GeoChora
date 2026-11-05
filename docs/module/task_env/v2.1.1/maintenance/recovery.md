@@ -1,6 +1,12 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3b attempt002已复审，TCP有界修复接收，整体待收口
+## 当前：3b003与条件3c001完整包已准备，待维护者一次转交
+
+维护者要求一次将两个Goal包交Terra顺序实施；[连续安排](../planning/stage3-3b003-3c001-sequential-execution.md)明确仅在3b全部required技术通过、提交／报告冻结及资源释放后，绑定其实际HEAD开始3c；Sol最后分别独立复审，中间不伪记3b已接收。3b count仍2／REWORK_REQUIRED_3B，3c count0／PLANNED，active_packages=[]，准备不计次数。最后普通[3b003重评](../planning/stage3-3b-attempt003-reassessment.md)已完成；[3c首包](../planning/stage3-3c-attempt001.md)固定公开reset入口、opt-in observation、随机流、四条实际切换边及fault恢复。外部包入口在维护者工作区handoffs/V211_G03_3b003_3c001_bundle，精确3b输入见其snapshot，3c未来SHA不预造。
+
+3b未过则不启动3c，第三次后人工诊断，不普通004或改名续作。两包分别120–180分钟主动、240分钟硬墙时，不能互借；不自动消息／对话／subagent或阶段4。原3a及002有界接收、原N08 FAIL保留；新N08-v2方向／保持案例在本包执行前显式冻结。准备时Sol无native或SDK launcher。
+
+## 历史：3b attempt002独立复审时
 
 Sol已作[002独立复审](reviews/20261106_3b_attempt002_sol_review.md)：整体REWORK_REQUIRED_3B，普通count=2，active_packages=[]。已确认所测MuJoCo下沉在3b前就存在；维护者授权的默认关闭Panda补偿在最终PickCube31／Nut19短程中已消除初始下沉并产生正向上移。launcher及F06同次九关节速度记录修复有界接收。长时实验早于最终细化，最终补偿H5／稳态、required物性公共读回、部分reset／约束及缺项拒绝仍须闭合；原默认关闭三路线N08 FAIL不改。通用装配树选择是维护者确认的设计方向，未实现，不追加为原3b阻塞。第三次前先重评上游公共接口依赖和新案例，不自动003或3c；不再重复旧HEAD因果对照。
 
