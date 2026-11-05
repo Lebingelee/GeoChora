@@ -11,4 +11,4 @@
 | `start_recording`、`finish_recording`（第 3431、原方法所在区段） | 起始边界和 recording 生命周期在 Env；selected 来源与 metadata、H5 保存／校验已交 `recorders.reference_provenance`，mixed／Position 仍做 recorder 创建与路由。 | `recorders` 和 canonical trajectory 负责格式、元数据和持久化；Env 只判断可否开始／结束、Stop 与故障顺序。保留 `test_selected_consumers.py`、`test_pre_stage3_boundaries.py` 与真实同次 reader 检查。 |
 | `_format_step_result` 和 observation 发布 | scalar 组件／selected 路线仍在 Env 投影信息；selected observation 组合已由 `observations.selected_reference` 和 task binding 承担。 | 继续区分正式反馈、task evaluation 和一次性诊断；保留 shape／dtype／space、reward、terminated／truncated 和实时边界，不把观察结果简化为静态布局。 |
 
-后续重构应按以上可测试的职责边界逐项推进，不以机械拆文件、改变任务数学或另造 Runtime／Env 模板完成。最新物理和离线证据见[验证记录](20261105_pre_stage3_resumed_physical_checks.md)；总离线墙时预算决定仍待维护者答复。
+后续重构应按以上可测试的职责边界逐项推进，不以机械拆文件、改变任务数学或另造 Runtime／Env 模板完成。最新物理和离线证据见[验证记录](20261105_pre_stage3_resumed_physical_checks.md)；维护者已授权续作的离线墙时重新计数，上限为 3000 秒，详见[当前状态](20261105_pre_stage3_current_status.md)。
