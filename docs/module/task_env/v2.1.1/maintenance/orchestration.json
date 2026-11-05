@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G03_3B_REPORTED_PENDING_SOL_REVIEW",
+  "status": "G03_3B_REWORK_REQUIRED_AFTER_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,13 +31,17 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "REPORTED_PENDING_SOL_REVIEW",
-    "package_id": "V211_G03_3b_attempt001",
+    "status": "AWAITING_COMPLETE_REWORK_PACKAGE",
+    "package_id": null,
     "attempt_count_now": 1,
-    "technical_result": "THREE_B_TECHNICAL_PARTIAL",
-    "review_ref": "reviews/20261105_3b_attempt001_execution.md"
+    "attempt_planned": 2,
+    "assigned_agent": null,
+    "target_thread": null,
+    "planning_ref": "../planning/stage3-3b-rework-analysis.md",
+    "sol_review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
+    "assignment": "Analysis only. Maintainer manually forwards a separately frozen complete package. No automatic execution/native/3c."
   },
-  "next_action": "3b attempt001 reported PARTIAL; Sol independently reviews exact output and process deviations. Do not auto-start 3c or a new attempt.",
+  "next_action": "Sol复审3b attempt001为REWORK_REQUIRED_3B，原PARTIAL和三路线真实闭环保留。先区分初始下沉、驱动响应与短窗oracle前提，再补launcher上下文、物性/记录缺项；准备完整普通attempt002后维护者手动转发，当前未准备/未派发，不进入3c。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -829,13 +833,13 @@
           "dependencies": [
             "3a"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "REWORK_REQUIRED_3B",
           "attempt_count": 1,
           "attempts": [
             {
               "attempt": 1,
               "package_id": "V211_G03_3b_attempt001",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_REWORK_REQUIRED",
               "started_at": "2026-11-05T20:52:28+08:00",
               "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "0192f2ec538582c3945acc2b9fcfca22589500ec",
@@ -844,29 +848,44 @@
               "writer_ownership": "released after final documentation commit",
               "native_ownership": "released after final runs; no automatic 3c",
               "report_ref": "reviews/20261105_3b_attempt001_execution.md",
-              "output_head": "see returned output manifest for final documentation commit"
+              "output_head": "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
+              "sol_review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
+              "review_decision": "REWORK_REQUIRED_3B",
+              "package_manifest_sha256": "f1cdcb0467f4613e9c3f61003aa18a22b89f212c83466aede3383f981ba46ff4",
+              "elapsed_to_final_state_seconds": 4320.329173
             }
           ],
-          "assigned_agent": "Terra-designated executor",
+          "assigned_agent": null,
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
-          "package_sha256": null,
+          "package_sha256": "f1cdcb0467f4613e9c3f61003aa18a22b89f212c83466aede3383f981ba46ff4",
           "input_head": "0192f2ec538582c3945acc2b9fcfca22589500ec",
-          "output_head": null,
+          "output_head": "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Three routes completed 10 transitions and readers, but frozen N08 failed on all three; model and recording required scope remains partial.",
+          "last_observation": "Sol verified239 output hashes; independent12 guarded tests, readback/FK/R3 reconstruction and launcher fixture. Hold drift precedes upward action; CPU target reconstruction error0, no canonical Controller/source math diff. Three-way native run not repeated by Sol.",
           "evidence_refs": [
             "reviews/20261105_3b_attempt001_execution.md",
-            "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md"
+            "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md",
+            "reviews/20261105_3b_attempt001_sol_review.md",
+            "../planning/stage3-3b-rework-analysis.md"
           ],
           "commits": [
-            "d5731655"
+            "d5731655",
+            "2c565f5336d3cb1ff700f98db2b238f01ad86ab9"
           ],
-          "review_decision": null,
+          "review_decision": {
+            "status": "REWORK_REQUIRED_3B",
+            "reviewer": "Sol",
+            "date": "2026-11-05",
+            "review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
+            "whole_3b_accepted": false,
+            "scope": "Keep actual three-route short execution and reader evidence; frozenN08 remains FAIL. Cause not proven new regression; App launcher context bug and required model/record gaps remain.",
+            "qualification": false
+          },
           "blockers": [
-            "N08 positive-z motion failed in all three routes",
-            "Required model and recorded qdot coverage incomplete",
-            "Source-only early command lock/cwd deviations require review"
+            "Frozen N08 failed; causal distinction between initial sag/new regression/oracle prerequisites remains open",
+            "App launcher metadata/worker -I/-S discard SDK Python path context",
+            "Required physical/reset/mapping and same-run qdot/semantic recording evidence incomplete"
           ]
         },
         {

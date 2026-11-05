@@ -19,7 +19,7 @@
 <a id="3b"></a>
 ## 3b：首批三后端的场景翻译和公开反馈
 
-2026-11-05：[attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)已返包，技术结果 `THREE_B_TECHNICAL_PARTIAL`，等待Sol独立复审。三路线10步与同次读回已执行，但冻结N08短窗方向门均FAIL；其他required物性与读回项目部分未完成。GeoPhys原生solver的准入不再因未选MuJoCo solver而拒绝，6.2 pip路线已实测、6.1仍NOT_RUN。
+2026-11-05：[attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)已返包，技术结果THREE_B_TECHNICAL_PARTIAL，经[Sol独立复审](../maintenance/reviews/20261105_3b_attempt001_sol_review.md)决定REWORK_REQUIRED_3B。三路线10步与同次读回已执行，但冻结N08短窗方向门均FAIL；其他required物性与读回项目部分未完成。GeoPhys原生solver的准入不再因未选MuJoCo solver而拒绝，6.2 pip路线已实测、6.1仍NOT_RUN。先按[返工分析](../planning/stage3-3b-rework-analysis.md)区分TCP初始下沉、实际驱动响应与短窗判据，修launcher上下文及剩余物性／记录；不自动002或3c。
 
 - **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1尚未执行运行层验证，保留NOT_RUN，不追溯改动3a attempt001门。
 - **工作：**在各 adapter 内消费统一模型，公开 native mapping、realized reset、单位／坐标转换、状态和时间；使用各自公开 API，报告无法表达或未测量项。按源约束编译具名通道和嵌套语义映射，不提前宣称阶段4命令已实现。
