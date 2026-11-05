@@ -1,6 +1,6 @@
 # v2.1.1 能力与验收矩阵
 
-3b attempt001 的指定三路线短程执行与读回已有结果，整体 PARTIAL、待 Sol 复审；冻结 N08 位移门三路线均 FAIL。6.2 native 状态按有限范围记 PARTIAL，6.1 保持 NOT_RUN；不提升最终能力格或 Qualification。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。
+3b attempt002 已由[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)，整体 REWORK_REQUIRED_3B。三路线默认关闭下的短程执行与读回、F06九关节速度记录及Panda MuJoCo CPU开启补偿的最终短程行为有界接收；原 N08 三路线 FAIL保留，最终补偿记录及required物性等未闭合。6.2 native 状态仍按有限范围记 PARTIAL，6.1 保持 NOT_RUN；不提升最终能力格或 Qualification。
 
 [capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。当前为规划矩阵：所有新目标 `NOT_RUN`，实现状态为 `NOT_STARTED`，证据引用为空。五协议已获维护者确认为实施基线，设计批准与实现／运行状态分列；本次不提升targets或最终cells状态。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
 

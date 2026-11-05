@@ -1,4 +1,6 @@
-# Panda 本体重力补偿（有界实现，待独立复审）
+# Panda 本体重力补偿（有界实现，最终验收未闭合）
+
+2026-11-06 [Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)已有界接收计算机制与最终PickCube31／Nut19 MuJoCo CPU短程行为；最终版本同次H5与长时稳态仍待补齐，整个3b尚未通过。较早的3.5 s保持实验不充作最终版本完整验收。
 
 此选项为 selected PickCube 与 NutAssembly 的 MuJoCo CPU、进程内位置伺服路径增加 Panda 本体重力贡献。默认关闭；关闭时沿用原控制语义及动作空间。当前 GeoPhys、Isaac、隔离 worker、混合执行器和固定附件路线不支持开启，显式请求不支持的组合会拒绝，不会静默降级。本实现不表示阶段 4 控制协议已接收。
 

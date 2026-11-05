@@ -1,4 +1,10 @@
-# 3b attempt001后：TCP与剩余出口的返工分析
+# 3b返工分析：TCP定位已闭合，003前收敛剩余出口
+
+2026-11-06当前决定见[002独立复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)。普通count=2，尚无003包。配对旧／新MuJoCo轨迹无差异；维护者诊断并授权的有界重力补偿在最终PickCube31／Nut19短程消除初始下沉，后5步分别上移约0.407／0.417 mm。此机制及已测修复有界接收，不再将“TCP根因不明”或“3b新回归”作为返工任务。
+
+003前先明确：GeoPhys公共solver-effective物性快照的provider／Core边界及可能pin依赖；补最终补偿版本的同次H5与稳态；按原逐量清单补真实reset／约束等required缺项；最小required API/schema/DOF反例；独立冻结将方向响应与保持／精度分开的新案例。原N08 FAIL和全部历史保留；相对hold正响应不能单独替代保持性能。通用装配树选择是已确认设计方向，尚未实现，交4a合同与贡献组合范围评估，不新增为3b出口，不自动移出本版。
+
+先形成可实施的最后普通窗口，再由维护者手动派发；不重复旧HEAD因果控制、历史全矩阵或完整任务，不自动003／3c。下文保留001后、002前的分析时点。
 
 2026-11-05，Sol分析，非执行包。[独立复审](../maintenance/reviews/20261105_3b_attempt001_sol_review.md)决定REWORK_REQUIRED_3B；attempt_count=1、无活动writer，不自动attempt002或3c。原FAIL、全部native成果和过程偏差保留。
 

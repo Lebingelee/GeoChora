@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B_ATTEMPT002_REPORTED_PENDING_SOL_REVIEW",
+  "status": "G03_3B_ATTEMPT002_REVIEWED_REWORK_REQUIRED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,24 +31,22 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "package_id": "V211_G03_3b_attempt002",
-    "attempt_count_now": 1,
-    "attempt_planned": 2,
+    "status": "REASSESSMENT_REQUIRED_BEFORE_FINAL_ATTEMPT",
+    "package_id": null,
+    "attempt_count_now": 2,
+    "attempt_planned": 3,
     "assigned_agent": null,
     "target_thread": null,
-    "planning_ref": "../planning/stage3-3b-attempt002.md",
-    "sol_review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002",
-    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/prompt.md",
-    "prompt_sha256": "6996ed22990d41ba807b59f4e214099ec49167c63d410e690d129a9fdcd210c9",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/input-snapshot.json",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/manifest.json",
-    "expected_active_minutes": "120-180",
-    "total_wall_minutes": 240,
-    "assignment": "Maintainer manually forwards to one Terra/Luna. Causal controls before tracked edits; restore stage branch then register attempt2. Preparation consumes no attempt."
+    "planning_ref": "../planning/stage3-3b-rework-analysis.md",
+    "sol_review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
+    "mandatory_decisions": [
+      "GeoPhys public effective-model readback contract and implementation/pin ownership",
+      "Versioned direction-response cases separated from hold/accuracy; preserve original N08 failures",
+      "Final bounded Panda same-run recording and steady-state scope plus remaining required model/reset/constraint and rejection checks"
+    ],
+    "assignment": "No execution package yet. Maintainer manually forwards only after final-attempt reassessment and complete package; no automatic messages/native/3c."
   },
-  "next_action": "Maintainer manually forwards attempt002 to Sol for independent review; no automatic attempt003 or 3c.",
+  "next_action": "Sol reviewed attempt002: bounded TCP gravity fix and launcher/F06 recording accepted; whole 3b remains rework required. Resolve final-attempt prerequisites before preparing 003; no automatic dispatch or 3c.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -840,7 +838,7 @@
           "dependencies": [
             "3a"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "REWORK_REQUIRED_3B",
           "attempt_count": 2,
           "attempts": [
             {
@@ -864,51 +862,67 @@
             {
               "attempt": 2,
               "package_id": "V211_G03_3b_attempt002",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_REWORK_REQUIRED",
               "started_at": "2026-11-05T23:04:47.929214+08:00",
               "executor": "Terra thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "470c3ef90bf2179916733f0049444bedefe07e3d",
               "result": "THREE_B_TECHNICAL_PARTIAL",
-              "oracle_disposition": "ORACLE_REVIEW_REQUIRED",
+              "oracle_disposition": "ORIGINAL_N08_FAIL_PRESERVED_NEW_CASES_NOT_FROZEN",
               "implementation_commit": "be88c5cd4ac823c997040d3166f7ea14e069b610",
               "report_ref": "reviews/20261105_3b_attempt002_execution.md",
-              "writer_ownership": "released upon delivery documentation commit",
-              "native_ownership": "released; no further physics",
-              "review_decision": null
+              "writer_ownership": "released; independent review complete",
+              "native_ownership": "released; no Sol native or further execution",
+              "review_decision": "REWORK_REQUIRED_3B",
+              "finished_at": "2026-11-06T01:25:10.298724+08:00",
+              "output_head": "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e",
+              "sol_review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
+              "reported_elapsed_wall_seconds": 8422.36951,
+              "bounded_acceptance": [
+                "matched MuJoCo old/current causal controls",
+                "production launcher context and F06 T+1 measured-state recording repair",
+                "source-bound Panda MuJoCo CPU gravity calculation and final short public-loop behavior"
+              ]
             }
           ],
           "assigned_agent": null,
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
-          "package_sha256": "f1cdcb0467f4613e9c3f61003aa18a22b89f212c83466aede3383f981ba46ff4",
-          "input_head": "0192f2ec538582c3945acc2b9fcfca22589500ec",
-          "output_head": "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002",
+          "package_sha256": "47f71cc70f7fdcd66ef5fa12a03a2677c1824dee37b8f5db8ab77873ffcd4187",
+          "input_head": "470c3ef90bf2179916733f0049444bedefe07e3d",
+          "output_head": "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Attempt002: matched old/current MuJoCo trajectories; original three-route N08 remains FAIL; launcher and F06 T+1 witness repaired; explicitly authorized default-off bounded Panda gravity support tested separately.",
+          "last_observation": "Sol independently confirmed no matched MuJoCo TCP regression; final gravity-on PickCube/Nut short loops rise without clipping. Bounded fixes accepted; final gravity recording/steady run and required physical/reset/constraint/rejection evidence remain incomplete. Generic assembly-tree selection is a future extension, not a new 3b blocker.",
           "evidence_refs": [
             "reviews/20261105_3b_attempt001_execution.md",
             "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md",
             "reviews/20261105_3b_attempt001_sol_review.md",
             "../planning/stage3-3b-rework-analysis.md",
-            "reviews/20261105_3b_attempt002_execution.md"
+            "reviews/20261105_3b_attempt002_execution.md",
+            "reviews/20261106_3b_attempt002_sol_review.md",
+            "../planning/gravity-compensation-assembly-tree.md"
           ],
           "commits": [
             "d5731655",
-            "2c565f5336d3cb1ff700f98db2b238f01ad86ab9"
+            "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
+            "be88c5cd4ac823c997040d3166f7ea14e069b610",
+            "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e"
           ],
           "review_decision": {
             "status": "REWORK_REQUIRED_3B",
             "reviewer": "Sol",
-            "date": "2026-11-05",
-            "review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
+            "date": "2026-11-06",
+            "review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
             "whole_3b_accepted": false,
-            "scope": "Keep actual three-route short execution and reader evidence; frozenN08 remains FAIL. Cause not proven new regression; App launcher context bug and required model/record gaps remain.",
+            "bounded_gravity_short_behavior_accepted": true,
+            "final_gravity_recording_or_general_assembly_support_accepted": false,
+            "scope": "Matched MuJoCo old/current no-regression finding, launcher/F06 recording fix, and bounded final Panda gravity-on short behavior accepted; required remainder unresolved. Original N08 failures immutable.",
             "qualification": false
           },
           "blockers": [
-            "Original N08 FAIL; oracle revision requires independent review",
-            "Required native physical and constraint readback remains incomplete",
-            "General assembly-tree gravity selection is design only"
+            "Required solver-effective model readback lacks an established GeoPhys public contract on the inspected route; finalize upstream/Core ownership before final attempt",
+            "Some required model/reset/constraint and missing API/schema/DOF rejection evidence remains incomplete",
+            "Final bounded Panda gravity same-run H5 and final steady-state verification incomplete",
+            "Freeze independently justified direction-response cases separately from hold/accuracy; retain original N08 FAIL history"
           ]
         },
         {
@@ -932,7 +946,7 @@
           "commits": [],
           "review_decision": null,
           "blockers": [
-            "3b is not started or accepted"
+            "3b is not accepted; attempt002 reviewed, no automatic 003 or 3c"
           ]
         }
       ]

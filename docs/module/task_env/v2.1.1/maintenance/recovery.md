@@ -1,6 +1,12 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3b attempt002完整包已准备，尚未派发
+## 当前：3b attempt002已复审，TCP有界修复接收，整体待收口
+
+Sol已作[002独立复审](reviews/20261106_3b_attempt002_sol_review.md)：整体REWORK_REQUIRED_3B，普通count=2，active_packages=[]。已确认所测MuJoCo下沉在3b前就存在；维护者授权的默认关闭Panda补偿在最终PickCube31／Nut19短程中已消除初始下沉并产生正向上移。launcher及F06同次九关节速度记录修复有界接收。长时实验早于最终细化，最终补偿H5／稳态、required物性公共读回、部分reset／约束及缺项拒绝仍须闭合；原默认关闭三路线N08 FAIL不改。通用装配树选择是维护者确认的设计方向，未实现，不追加为原3b阻塞。第三次前先重评上游公共接口依赖和新案例，不自动003或3c；不再重复旧HEAD因果对照。
+
+更新时间：2026-11-06。3a接收、原attempt历史和原始包均不变。当前精确状态见[编排索引](orchestration.json)。
+
+## 历史：3b attempt002准备时
 
 3a接收决定不变。Sol对3b attempt001决定[REWORK_REQUIRED_3B](reviews/20261105_3b_attempt001_sol_review.md)，原技术结果THREE_B_TECHNICAL_PARTIAL保留；普通attempt_count=1，不进入3c。三条指定路线各完成公开10步及独立读回，但短窗正向位移门三者均失败；部分模型／记录要求尚未充分验证。6.2 pip路线真实启动并关闭，维护者另装6.1但本轮未运行。独立FK与R3重构表明两CPU目标方向／TCP映射一致，下沉在hold段已开始，尚不能归为新代码回归；launcher路径上下文丢失已离线复现。按[聚焦返工分析](../planning/stage3-3b-rework-analysis.md)完成[002完整包](../planning/stage3-3b-attempt002.md)准备，count仍1、active_packages为空，等待维护者手动转发。首组三组CPU因果控制采用双锁内临时detached旧基线并恢复当前主题分支，不新建branch/worktree；先在ignored登记start，恢复后才改tracked编排。原N08不改，6.1辅助仅主线完成且明确有余时；Sol无native/SDK launcher/自动消息。详见[执行摘要](reviews/20261105_3b_attempt001_execution.md)及ignored原始返包。
 
