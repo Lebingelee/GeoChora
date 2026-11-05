@@ -1909,7 +1909,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             closed_message='environment is closed',
             fault_prefix='selected execution is faulted; reset() is required',
         )
-        from ..planners.contracts import ExpertAction
+        from ..planners.contracts import ExpertAction, validate_caller_solution_action
         if self.binding.external_solution_actions and type(action) is ExpertAction:
             if self._episode_mode in {'expert', 'external_solution'}:
                 raise RuntimeError('cannot mix caller actions with selected Solution execution')
@@ -1920,14 +1920,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if getattr(self, 'position_profile', False):
                 if self.binding.position_execution_info is None or len(self.position_profiles) != 1:
                     raise StageUnavailableError('caller-driven Solution actions are unavailable on this Position profile')
-                if action.control_request is not None:
-                    raise ValueError('Position Solution action does not admit a native control request')
-                published_boundary = self.info.get('state_boundary_identity')
-                if (action.request_boundary is None or action.request_boundary != published_boundary
-                        or published_boundary != self.typed_state.view.boundary.to_mapping()):
-                    raise ValueError('Solution action boundary is stale or mismatched')
-                if action.solution_identity != self.value.get('solution_identity'):
-                    raise ValueError('Solution action identity differs from the selected task')
+                validate_caller_solution_action(
+                    action, boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'),
+                    control_request_mode='position',
+                )
                 from ..runtime.sessions.control import single_position_action_request
                 request = single_position_action_request(
                     action.action, scene=self.position_scene, plan=self.position_plan,
@@ -1935,20 +1933,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 )
                 return self._prepare_position_profile(request, proposal=action, caller_driven=True)
             self._require_published_execution_info()
-            if self.binding.control_request_required:
-                if action.request_boundary != self.info['expert_execution_boundary_v1']:
-                    raise ValueError('Solution action boundary is stale or mismatched')
-                if action.control_request is None:
-                    raise ValueError('Solution action requires its versioned control request')
-                if action.solution_identity != self.value.get('solution_identity'):
-                    raise ValueError('Solution action identity differs from the selected task')
-            else:
-                if action.control_request is not None:
-                    raise ValueError('this Solution action route does not admit a control request')
-                if action.request_boundary != self.info['expert_execution_boundary_v1']:
-                    raise ValueError('Solution action boundary is stale or mismatched')
-                if action.solution_identity != self.value.get('solution_identity'):
-                    raise ValueError('Solution action identity differs from the selected task')
+            validate_caller_solution_action(
+                action, boundary=self.info['expert_execution_boundary_v1'],
+                solution_identity=self.value.get('solution_identity'),
+                control_request_mode=('required' if self.binding.control_request_required
+                                      else 'forbidden'),
+            )
             return self._prepare_reference_step(action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)

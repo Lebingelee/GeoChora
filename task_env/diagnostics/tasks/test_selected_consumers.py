@@ -1257,6 +1257,11 @@ def test_pickcube_position_caller_prepares_bound_request_without_solution_callba
         assert env.state.control_step == 0 and solution._awaiting_observation
         with pytest.raises(ValueError, match='boundary is stale'):
             env._prepare_selected_step(replace(proposal, request_boundary={'boundary_id': 'old'}))
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: {'boundary_id': 'other'})))
+        with pytest.raises(ValueError, match='boundary is stale'):
+            env._prepare_selected_step(proposal)
+        assert env.state.control_step == 0 and env._episode_mode is None
+        env.typed_state = NS(view=NS(boundary=NS(to_mapping=lambda: boundary)))
         with pytest.raises(ValueError, match='identity differs'):
             env._prepare_selected_step(replace(proposal, solution_identity='other'))
         with pytest.raises(ValueError, match='eight-dimensional'):

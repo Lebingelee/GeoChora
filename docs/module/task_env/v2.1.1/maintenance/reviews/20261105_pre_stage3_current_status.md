@@ -10,6 +10,8 @@
 
 随后补充 mixed 关闭回执读取失败的故障处理：无论 session 关闭是否已失败，均继续关闭 runtime owner 并清理 source／task 资源，保留第一异常及其后的回执错误。工作树无引擎回归 148 passed，监督墙时 7.985 秒、进程树峰值采样约 283 MiB、进程组已退出；详见 ignored `renewed-close-receipt-001`。新离线预算累计 107.123／3000 秒；该证据标识提交前工作树。
 
+外部 Solution 动作的发布边界、Solution 身份及控制请求准入收敛到 `planners.contracts`；环境仍决定实际执行路线。保留 Position 的 typed state 边界校验及既有拒绝顺序；补充不匹配时零推进检查。工作树上的 PickCube／Nut、Position 投影及 native feedback 无引擎组合为 182 passed、2 deselected；最终一次监督墙时 13.297 秒、峰值采样约 288 MiB、进程组已退出。两次运行共 26.584 秒，原始记录见 ignored `renewed-action-admission-001`、`002`；新离线预算累计 133.707／3000 秒，提交后仍需固定源码身份。此检查未运行 Isaac 或物理 rollout。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。

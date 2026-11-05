@@ -46,6 +46,39 @@ class ExpertAction:
         )
 
 
+def validate_caller_solution_action(
+    action: ExpertAction, *, boundary, solution_identity, control_request_mode: str,
+    state_boundary=None,
+) -> None:
+    """Admit an external Solution proposal against the last published boundary.
+
+    Position proposals also bind the typed state boundary; other routes either
+    require or forbid the versioned control request specified by their binding.
+    This check does not mutate the Solution, environment, or controller.
+    """
+    if control_request_mode not in {'position', 'required', 'forbidden'}:
+        raise ValueError('invalid Solution control request mode')
+    if control_request_mode == 'position':
+        if action.control_request is not None:
+            raise ValueError('Position Solution action does not admit a native control request')
+        boundary = boundary()
+        if (action.request_boundary is None or action.request_boundary != boundary
+                or boundary != state_boundary()):
+            raise ValueError('Solution action boundary is stale or mismatched')
+    elif control_request_mode == 'required':
+        if action.request_boundary != boundary:
+            raise ValueError('Solution action boundary is stale or mismatched')
+        if action.control_request is None:
+            raise ValueError('Solution action requires its versioned control request')
+    else:
+        if action.control_request is not None:
+            raise ValueError('this Solution action route does not admit a control request')
+        if action.request_boundary != boundary:
+            raise ValueError('Solution action boundary is stale or mismatched')
+    if action.solution_identity != solution_identity:
+        raise ValueError('Solution action identity differs from the selected task')
+
+
 class TaskExpertSolver(Protocol):
     """External task policy that only consumes public env observations and info."""
 
