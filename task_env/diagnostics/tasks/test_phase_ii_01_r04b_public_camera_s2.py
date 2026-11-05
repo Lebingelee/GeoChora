@@ -523,7 +523,7 @@ def test_provider_free_complete_worker_success_and_independent_reader_negative_m
     factory_calls = {"camera": 0, "fail_on_camera_call": None}
 
     from task_env import make_env as actual_make_env
-    reference_env_module = importlib.import_module("task_env.tasks.reference_env")
+    reference_env_module = importlib.import_module("task_env.environment.reference_env")
     camera_module = importlib.import_module("task_env.render.camera")
     from task_env.runtime.boundary import GeoPhysRuntimeBoundary
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1

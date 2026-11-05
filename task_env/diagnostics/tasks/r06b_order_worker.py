@@ -272,7 +272,7 @@ def _run_case(case, output_dir: Path, counters: dict, active: dict,
     )
     from task_env.tasks.reference_env import SelectedReferenceEnv
     from task_env.runtime.sessions import control as control_module
-    from task_env.tasks import reference_env as reference_env_module
+    from task_env.environment import reference_env as reference_env_module
     from task_env.runtime.sessions.leaf_control import prepare_leaf_command
     from task_env.recorders.h5 import load_leaf_control_records_h5
     from task_env.assembly.fixed_attachment import lower_fixed_attachment_sources

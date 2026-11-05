@@ -43,7 +43,7 @@ def _patch_provider_free_route(monkeypatch, worker_output: Path):
     created_envs = []
     sessions = []
     from task_env import make_env as actual_make_env
-    reference_env_module = importlib.import_module("task_env.tasks.reference_env")
+    reference_env_module = importlib.import_module("task_env.environment.reference_env")
     camera_module = importlib.import_module("task_env.render.camera")
 
     def materialize(artifact, execution, *, source, binding,
