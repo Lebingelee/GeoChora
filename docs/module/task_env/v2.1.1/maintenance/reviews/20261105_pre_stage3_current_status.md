@@ -48,6 +48,8 @@ Position 回归的 7 次相同 Panda 源快照构建收敛为模块级 1 份共�
 
 通用 Env 不再直接读取 PickCube F06 字段判断旧 Position expert 兼容路线：准入由 PickCube 任务 binding 显式声明，其他 binding 默认不开放。`step_expert()` 仍只是受限兼容，调用方的 `act → step(action) → observe` 路线不变。工作树无引擎组合 270 passed、4 deselected（15.094 秒）；定向检查 16 passed、1 deselected（0.819 秒）。首次定向测试遗漏一个既有 scene 原生排除项，被防护阻断为 16 passed、1 failed（0.820 秒），日志保留。三次均采样资源并确认进程组退出；记录在 ignored `renewed-f06-binding-001` 至 `003`。新离线预算累计 390.419／3000 秒；此为提交前工作树证据，不证明 Isaac 物理。
 
+源码提交 `59fba768` 后干净 tracked HEAD 重跑无引擎组合：270 passed、4 deselected，监督墙时 14.243 秒、进程树峰值采样约 294 MiB，进程组已退出；记录在 ignored `renewed-f06-binding-clean-59fba768`。新离线预算累计 404.662／3000 秒。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
