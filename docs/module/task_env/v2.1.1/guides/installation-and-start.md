@@ -1,5 +1,7 @@
 # 安装、复用已有路径和启动单环境
 
+3b attempt001 对既有环境执行了三路线短程检查，结果和限制见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。GeoPhys 原生 rigid solver 不消费未选的 MuJoCo solver 声明；显式选择后者时仍检查其版本。Core 与 SDK 的安装清单和所选运行链依赖分开判定；这不证明两份 requirements 可以整体混装。
+
 本页记录阶段3前维护中的入口；环境统一与下列组合的最终验收尚未完成。命令中的路径是占位符。仓库无根 packaging metadata，不使用 `pip install -e .`。训练和 renderer 都不是 state-only 首次启动的前提。
 
 ## 新克隆与已有安装
@@ -10,7 +12,7 @@
 | --- | --- |
 | GeoPhys CPU | Core checkout、与其匹配的 GeoPhys `src`、该路线所需 Python 包和任务资产；classic-control 单环境当前走此路线。GeoPhys 的 rasterizer 是可选 render 路线，不是 state-only 的前提。 |
 | MuJoCo CPU | 已有 Core Python 环境中的 MuJoCo Python 绑定及任务资产；[MuJoCo 官方 Python 安装说明](https://mujoco.readthedocs.io/en/stable/python.html)说明其发行方式。当前 Core 声明 `mujoco>=3.8.1,<3.9.0`，GeoPhys 声明 `mujoco>=3.15.0`，区间无交集；不要将两份 requirements 的直接混装当成已验证方案。现有解释器中检测到 MuJoCo 3.8.1 不证明新安装组合可解析或全部路线可用。 |
-| Isaac Sim | 仅现有 PickCube Isaac harness 接受 CUDA、明确的 Isaac Python 和精确 delivery manifest；需要兼容的 Core Python、SDK 和资产。参考 [NVIDIA Isaac Sim 安装文档](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_workstation.html)及 [NVIDIA Isaac Lab 6.2 安装说明](https://docs.nvidia.com/isaaclab/3.0/isaac-lab/installation)核对版本和平台。此维护窗口没有启动 Isaac 或验证全新安装。 |
+| Isaac Sim | 仅现有 PickCube Isaac harness 接受 CUDA、明确的 Isaac Python 和精确 delivery manifest；需要兼容的 Core Python、SDK 和资产。参考 [NVIDIA Isaac Sim 安装文档](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_workstation.html)及 [NVIDIA Isaac Lab 6.2 安装说明](https://docs.nvidia.com/isaaclab/3.0/isaac-lab/installation)核对版本和平台。历史阶段3前维护窗口没有启动 Isaac 或验证全新安装；后续3b的既有6.2 pip环境运行见本页开头摘要。 |
 | Flora | 可选外部 renderer，复用 `FLORA_ROOT` 或 `runtime_root`；布局与要求见 [Flora adapter](../../../../../task_env/render/flora/README.md)。本页启动器没有提供 Flora 路线，selected tasks 仍只接收 state-only。 |
 
 在选定解释器中可用 `python --version` 和 `python -m pip show mujoco taichi-forge` 检查已安装发行包元数据；找不到 `geophys` 发行包不代表源码路径不可用。GeoPhys 的实际来源由下面的 `--geophys-src` 显式指定。不要凭上述元数据推断 native 任务成功。本轮未验证新克隆后的完整安装，也没有执行下载或安装。

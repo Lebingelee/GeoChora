@@ -9,7 +9,7 @@
 <a id="3a"></a>
 ## 3a：执行路由、配置与能力交集
 
-2026-11-05诊断001／6b11123e经[Sol独立复审](../maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md)接收为 **ACCEPTED_3A_ROUTING_ADMISSION**。普通attempt3次及诊断1次分别保留，原003 PARTIAL不改写。F06前置依赖准确拒绝、真实Position/leaf声明与构建检查及同请求H5回执已贯通；普通PickCube31／Nut19 MuJoCo CPU回归通过。3a接收不表示真实Isaac/GeoPhys物理或3b通过；3b仍PLANNED／attempt0，未派发。
+2026-11-05诊断001／6b11123e经[Sol独立复审](../maintenance/reviews/20261105_3a_diagnostic_attempt001_sol_review.md)接收为 **ACCEPTED_3A_ROUTING_ADMISSION**。普通attempt3次及诊断1次分别保留，原003 PARTIAL不改写。F06前置依赖准确拒绝、真实Position/leaf声明与构建检查及同请求H5回执已贯通；普通PickCube31／Nut19 MuJoCo CPU回归通过。3a接收不表示真实Isaac/GeoPhys物理或3b通过；3b其后已执行，当前结果见下节。
 
 - **输入／依赖：**1c、1d、2c。首批 route 和协议已冻结。
 - **工作：**将宿主、引擎、solver／coupler、设备、renderer 和 batch 选择接入单一配置解析；能力求交任务／资产／嵌套Robot通道／Controller／typed物理命令／render 要求，替换必要的阶段特判但保留真实限制。
@@ -19,9 +19,9 @@
 <a id="3b"></a>
 ## 3b：首批三后端的场景翻译和公开反馈
 
-2026-11-05：[attempt001完整包](../planning/stage3-3b-execution.md)已准备，尚未派发，仍PLANNED／attempt0。消费级依赖按维护者澄清修正：GeoPhys原生solver不因未选择的MuJoCo solver依赖而拒绝。与Isaac6.1/6.2共用适配及三条真实数值闭环同包实施；本段不表示代码已完成或native通过。
+2026-11-05：[attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)已返包，技术结果 `THREE_B_TECHNICAL_PARTIAL`，等待Sol独立复审。三路线10步与同次读回已执行，但冻结N08短窗方向门均FAIL；其他required物性与读回项目部分未完成。GeoPhys原生solver的准入不再因未选MuJoCo solver而拒绝，6.2 pip路线已实测、6.1仍NOT_RUN。
 
-- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1未安装时运行层保留NOT_RUN，不追溯改动3a attempt001门。
+- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1尚未执行运行层验证，保留NOT_RUN，不追溯改动3a attempt001门。
 - **工作：**在各 adapter 内消费统一模型，公开 native mapping、realized reset、单位／坐标转换、状态和时间；使用各自公开 API，报告无法表达或未测量项。按源约束编译具名通道和嵌套语义映射，不提前宣称阶段4命令已实现。
 - **检查：**三路线从 make_env 真实构建→reset→施控／step→state→记录／读回→close；检查实体／关节、质量／惯性及声明的约束／传动与初始化。源码／设备身份和错误关闭可核实。资产检查分别覆盖输入物理合法性、native映射/readback、reset/短程数值行为；每项有quantity-specific oracle/容差，required未测量不能通过，optional保留原因；cube约5%惯量差不自动修正。
 - **交付／出口：**三后端协议的真实最小连续执行；不声称同源模型严格等价、全任务支持或 task-success 已完成。

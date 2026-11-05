@@ -1,6 +1,6 @@
 # TaskEnv v2.1.1 — 协议与实施规划
 
-日期：2026-11-04。状态：G01/1a–1d和G02阶段2已按各自限定范围接受；2c成功参考冻结经Sol主审通过，停在阶段2。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，阶段3未开始。详见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
+日期：2026-11-04。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt001已执行，技术结果PARTIAL，待Sol复审。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留。详见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
 ## 版本目标
 
@@ -12,7 +12,7 @@
 
 - [范围与七阶段路线](planning/roadmap.md)：7 个阶段、22 个 a/b/c/d 子阶段及延期事项。
 - [执行顺序与验收](planning/execution-and-acceptance.md)：依赖、阶段出口、工作包、证据及分支约束。
-- [阶段3前维护方案](planning/pre-stage3-environment-refactor.md)：生命周期R1与限定的核心代码／开发文档收尾已获[Sol有限接收](maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，本次前置核心窗口结束；更广整理和未验证能力保留边界，阶段3未开始。Pendulum并行适配留阶段6。
+- [阶段3前维护方案](planning/pre-stage3-environment-refactor.md)：生命周期R1与限定的核心代码／开发文档收尾已获[Sol有限接收](maintenance/reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，该前置核心窗口结束；更广整理和未验证能力保留边界。Pendulum并行适配留阶段6。
 - [源码 owner 与外部参考](planning/source-map-and-references.md)：当前基础、缺口、待讨论事项和官方项目链接。
 - 协议实施基线：[统一任务表示](contracts/unified-task-representation.md)、[physics provider](contracts/physics-provider.md)、[render provider](contracts/render-provider.md)、[控制与反馈](contracts/control-and-feedback.md)、[生命周期与数据](contracts/lifecycle-and-data.md)。
 - 阶段 Goal：[01 协议](goals/01-protocols.md)、[02 Solution](goals/02-pickcube-solution.md)、[03 后端](goals/03-backends.md)、[04 控制](goals/04-control.md)、[05 渲染](goals/05-rendering.md)、[06 并行](goals/06-parallel.md)、[07 集成](goals/07-integration.md)。
@@ -29,7 +29,7 @@ F06 历史 9/9 runtime-valid、0/9 task-success，R07 A123 的有界接收与例
 
 ## 当前 G02 证据
 
-MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与独立 HDF5 读回均通过；PickCube seed32 的 runtime/记录有效，但在 horizon 1000 时任务与 Solution 失败。GeoPhys PickCube 在执行边界时间 guard 抛出 stale execution time；Isaac delivery 文件校验通过，但 GPU admission 不稳定，本包未启动 Isaac App。详见 [2b 收尾报告](maintenance/reviews/20261104_2b_closeout.md) 与 [恢复页](maintenance/recovery.md)。2c文档封存已由Sol有界接收，阶段2收尾；阶段3仍未开始。
+MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与独立 HDF5 读回均通过；PickCube seed32 的 runtime/记录有效，但在 horizon 1000 时任务与 Solution 失败。GeoPhys PickCube 在执行边界时间 guard 抛出 stale execution time；Isaac delivery 文件校验通过，但 GPU admission 不稳定，本包未启动 Isaac App。详见 [2b 收尾报告](maintenance/reviews/20261104_2b_closeout.md) 与 [恢复页](maintenance/recovery.md)。2c文档封存已由Sol有界接收，该阶段2收尾记录的时点早于阶段3执行。
 
 ## 文档边界
 

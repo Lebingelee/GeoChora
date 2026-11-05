@@ -1,5 +1,7 @@
 # v2.1.1 指南交付要求
 
+3b 的运行范围与未通过项见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)；不把10步执行等同于方向或整体验收通过。Isaac 解释器可用显式 `--isaac-python` 或 `ISAAC_SIM_PYTHON` 选择，前者优先，Core 解释器默认当前 Python。
+
 [安装与启动指南](installation-and-start.md)提供已有安装路径、轻量入口与新克隆的依赖边界；已有受限CPU启动与任务回归记录见[当前状态](../maintenance/reviews/20261105_pre_stage3_current_status.md)，不证明完整新安装组合或selected RGB。仓库当前无root packaging metadata，不使用`pip install -e .`。
 
 2026-11-05两小时收尾按[规划第2.5节](../planning/pre-stage3-environment-refactor.md#pre-stage3-closeout-120min)执行。本指南和`task_env/doc`是核心交付：依据最终接口补齐“安装或复用路径→启动单环境→修改已有example”的真实操作链，开发者不手写来源SHA或增加专用factory；已正确的段落保留。全新安装全部provider、所有历史文档逐页审计及阶段3–6未实现操作不设为本窗口出口，不用旧的未运行描述覆盖已有受限证据。

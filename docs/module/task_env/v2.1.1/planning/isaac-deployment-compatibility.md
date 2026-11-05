@@ -1,5 +1,7 @@
 # Isaac部署兼容：v2.1.1与后续版本范围
 
+3b attempt001 已完成一条6.2 pip环境的真实F06短程运行与同次读回，但 N08 失败，整体待 Sol 复审。6.1 仅有离线兼容检查；维护者后续告知已有6.1独立安装，本次依其先完成当前目标的顺序未启动该安装。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。
+
 2026-11-05，Sol按维护者反馈及版本化官方资料核对后的仓库实施规划。此页规定G03后续包的版本范围；当前实现／原生证据仍查[能力矩阵](../capabilities/README.md)。当前源码尚有6.2精确门和回执字面量，不能把本页写成已支持。外部反馈调整单保留完整维护者需求和逐项验收，此页是仓库内执行入口。
 
 | 版本 | 本次安排 | 真实运行证据 |
@@ -27,7 +29,7 @@
 
 ## 实施顺序与验收边界
 
-当前3a已独立接收，[3b attempt001完整包](stage3-3b-execution.md)已准备未派发。消费级依赖按实际host／engine／solver与worker角色判断；Core host安装清单不直接等于Isaac worker必需清单。真正required缺项继续拒绝，不能用未选GeoPhys/Taichi路线依赖误报SDK缺失。维护者已澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖；本包在原preflight owner修正，不改pin或混装环境。以下早期协调顺序保留历史。
+当前3a已独立接收，[3b attempt001完整包](stage3-3b-execution.md)已执行，结果待Sol复审。消费级依赖按实际host／engine／solver与worker角色判断；Core host安装清单不直接等于Isaac worker必需清单。真正required缺项继续拒绝，不能用未选GeoPhys/Taichi路线依赖误报SDK缺失。维护者已澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖；本包在原preflight owner修正，不改pin或混装环境。以下早期协调顺序保留历史。
 
 3a attempt001按原包复审，新增反馈不倒加门。attempt002先修普通reset闭包与原能力／worker缺口。3a独立接收后，3b完整包先纳入上述路径、SDK识别、6.1／6.2共同接口与准确身份接线，再在单独授权的native预算内验证三路线。不得以本规划开启3b、安装或native。
 

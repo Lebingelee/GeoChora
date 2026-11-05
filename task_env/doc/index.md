@@ -1,5 +1,7 @@
 # TaskEnv 文档入口
 
+3b attempt001 已形成三路线短程证据，整体仍PARTIAL、待复审；具体失败和未测范围见[执行摘要](../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_3b_attempt001_execution.md)。
+
 ## v2.1.1 新手入口与当前范围
 
 从[安装与启动指南](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)选择新克隆或已有安装路径，并查看解释器、simulator／renderer、资产与启动脚本的要求。该指南标明尚未验证的新安装和native路线；[实施记录](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)中的单环境生命周期与限定核心收尾已有限接收，更广整理仍有边界。

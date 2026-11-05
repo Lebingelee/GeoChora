@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G03_3B_PACKAGE_PREPARED_NOT_DISPATCHED",
+  "status": "G03_3B_REPORTED_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,25 +31,13 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "PREPARED_NOT_DISPATCHED",
+    "status": "REPORTED_PENDING_SOL_REVIEW",
     "package_id": "V211_G03_3b_attempt001",
-    "assigned_agent": null,
-    "target_thread": null,
-    "planning_ref": "../planning/stage3-3b-execution.md",
-    "compatibility_ref": "../planning/isaac-deployment-compatibility.md",
-    "dependency_3a_accepted": true,
-    "attempt_count_now": 0,
-    "attempt_planned": 1,
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
-    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/prompt.md",
-    "prompt_sha256": "36587fd7a161045e80a043a153d139efee488445564e4b42e2f30511f5b2e593",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/input-snapshot.json",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/manifest.json",
-    "expected_active_minutes": "150-210",
-    "total_wall_minutes": 240,
-    "assignment": "Maintainer designates one Terra/Luna and manually forwards; Sol preparation does not dispatch, run native or consume attempt."
+    "attempt_count_now": 1,
+    "technical_result": "THREE_B_TECHNICAL_PARTIAL",
+    "review_ref": "reviews/20261105_3b_attempt001_execution.md"
   },
-  "next_action": "3a已接收；3b完整attempt001包已准备，等待维护者指定单一执行者并手动转发。3b仍PLANNED/attempt0，无writer或native启动；先修消费级依赖与Isaac6.1/6.2共同接线，再三路线物性/真实闭环，报告后Sol复审，不自动3c。",
+  "next_action": "3b attempt001 reported PARTIAL; Sol independently reviews exact output and process deviations. Do not auto-start 3c or a new attempt.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -841,21 +829,45 @@
           "dependencies": [
             "3a"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G03_3b_attempt001",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T20:52:28+08:00",
+              "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "0192f2ec538582c3945acc2b9fcfca22589500ec",
+              "result": "THREE_B_TECHNICAL_PARTIAL",
+              "implementation_commit": "d5731655",
+              "writer_ownership": "released after final documentation commit",
+              "native_ownership": "released after final runs; no automatic 3c",
+              "report_ref": "reviews/20261105_3b_attempt001_execution.md",
+              "output_head": "see returned output manifest for final documentation commit"
+            }
+          ],
+          "assigned_agent": "Terra-designated executor",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
           "package_sha256": null,
-          "input_head": null,
+          "input_head": "0192f2ec538582c3945acc2b9fcfca22589500ec",
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
-          "commits": [],
+          "last_observation": "Three routes completed 10 transitions and readers, but frozen N08 failed on all three; model and recording required scope remains partial.",
+          "evidence_refs": [
+            "reviews/20261105_3b_attempt001_execution.md",
+            "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md"
+          ],
+          "commits": [
+            "d5731655"
+          ],
           "review_decision": null,
-          "blockers": []
+          "blockers": [
+            "N08 positive-z motion failed in all three routes",
+            "Required model and recorded qdot coverage incomplete",
+            "Source-only early command lock/cwd deviations require review"
+          ]
         },
         {
           "id": "3c",
@@ -1293,7 +1305,7 @@
   "stage3_dependency_clarification": {
     "date": "2026-11-05",
     "authority": "Maintainer: GeoPhys only consumes MuJoCo when its MuJoCo solver route is selected; native solver does not conflict with Core MuJoCo.",
-    "implementation_status": "PLANNED_IN_3B_ATTEMPT001",
+    "implementation_status": "IMPLEMENTED_IN_3B_ATTEMPT001_PENDING_SOL_REVIEW",
     "policy": "Use resolved host/engine/solver and actual source/worker consumer dependencies; preserve checks for genuinely required dependencies. No submodule/pin/requirements change."
   }
 }
