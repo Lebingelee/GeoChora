@@ -814,12 +814,12 @@ def _mixed_actuator_manifest(artifact, execution, source):
     base = provider_manifest(provider)
     claims = tuple(base.capabilities)
     unsupported = base.known_unsupported
-    if provider == 'geophys':
+    if provider in {'mujoco', 'geophys'}:
         if not any(channel.drive_mode == 'joint_torque' for channel in plan.channels):
-            raise ValueError('GeoPhys mixed actuator admission requires a named torque channel')
+            raise ValueError('mixed actuator admission requires a named torque channel')
         claims += (CapabilityClaim(
             'joint_torque_actuation', 'tested',
-            f'{evidence}/provider_adapter=task_env.runtime.sessions.geophys',
+            f'{evidence}/provider_adapter=task_env.runtime.sessions.{provider}',
         ),)
         unsupported = tuple(item for item in unsupported if item != 'joint_torque_actuation')
     if source.contact_geom_groups:
@@ -1332,6 +1332,37 @@ def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=No
     raise ValueError(f'unknown physics provider: {execution.physics_provider}')
 
 
+def project_feedback_assessment(projected_feedback, artifact, source, actual_capabilities, helper):
+    """Classify each existing typed feedback requirement against source bindings."""
+    result = []
+    for writer_id, requirement in projected_feedback:
+        name, kind = requirement.required_capability, requirement.subject_kind
+        semantic = requirement.entity_id + '/' + requirement.subject_id
+        if kind == 'frame':
+            bindings = getattr(artifact, 'legacy_frame_bindings', {})
+            matches = [key for key, reference in bindings.items()
+                       if reference.entity_id == requirement.entity_id
+                       and reference.frame_id == requirement.subject_id
+                       and key in (set(getattr(source, 'frames', {})) |
+                                   set(getattr(source, 'bodies', {})))]
+            if len(matches) == 1:
+                semantic = matches[0]
+        source_values = (getattr(source, 'joints', {}) if kind == 'joint'
+                         else {**getattr(source, 'bodies', {}), **getattr(source, 'frames', {})}
+                         if kind == 'frame' else {})
+        supported = name in actual_capabilities and kind in {'joint', 'frame'}
+        bound = semantic in source_values
+        subject = ('state:' + kind + ':' + semantic + ':' + requirement.field_name + ':'
+                   + requirement.sample_domain + ':' + writer_id)
+        result.append((name, subject, requirement.requiredness, supported,
+                       'unknown' if bound else 'unsatisfied',
+                       (f'{helper} must resolve the declared Controller feedback object' if supported and bound
+                        else 'selected Core adapter does not implement this declared feedback field' if not supported
+                        else 'declared feedback object has no source binding'),
+                       helper if supported and bound else None))
+    return tuple(result)
+
+
 def assess_selected_request(*, selection, artifact, source, value, binding,
                             dependency_status, request_identity, caller_manifest=None):
     """Assess actual selected declarations before any native materialization.
@@ -1340,8 +1371,9 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
     a generic Core manifest. Exact build checks are identified separately.
     """
     from ...artifacts import CapabilityAssessmentV1, CapabilityAssessmentRowV1
-    from .control import (CONTROL_REQUIRED, ControlBinding, bind_selected_controller,
-                          prepare_position_control_materialization)
+    from .control import (ControlBinding, ControlBindingPlanV1, bind_selected_controller,
+                          prepare_position_control_materialization, project_controller_feedback,
+                          project_leaf_feedback, declared_source_capabilities)
     from ...artifacts.contracts import SUPPORTED_STATUSES
 
     if dependency_status not in {'available', 'unavailable', 'unknown'}:
@@ -1358,16 +1390,19 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
     phase = 'static_preflight'
     rows = []
 
+    helper = {
+        'mujoco': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+        'geophys': 'task_env.runtime.sessions.geophys:check_geophys_named_layout',
+        'isaacsim': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
+    }.get(selection.physics_provider)
+
     def row(capability, subject, required='required', *, implemented=True,
-            valid='satisfied', reason='adapter build must verify this request',
+            valid='satisfied', reason='Core declaration was checked',
             oracle=None, restrict=False):
-        if oracle is None:
-            oracle = ('task_env.runtime.sessions.isaac_native_io:create_isaac_native_runtime_io'
-                      if selection.physics_provider == 'isaacsim'
-                      else 'task_env.runtime.sessions.api:_materialize_admitted')
         rows.append(CapabilityAssessmentRowV1(
             'capability-assessment-row-v1', capability, subject, required,
-            'unknown', 'implemented' if implemented else 'not_implemented',
+            'supported' if implemented and valid != 'unknown' else 'unknown',
+            'implemented' if implemented else 'not_implemented',
             dependency_status, 'none', phase, reason, None,
             oracle if implemented else None, 'denied' if restrict else 'none', valid,
         ))
@@ -1388,14 +1423,22 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                     or source.config.runtime.control_substeps != artifact.timebase.control_substeps
                     or source.config.render.camera_obs):
                 raise ValueError('source execution/timebase mismatch')
-            if set(source.joints) != set(artifact.initialization.joint_position):
+            if not set(artifact.initialization.joint_position) <= set(source.joints):
                 raise ValueError('source joint bindings do not cover initialization')
             if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
                 raise ValueError('source pose bindings do not cover semantics')
             if isinstance(artifact, TaskArtifactV1):
                 execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
                                           selection.physics_backend, 0, 'strict')
-                _validate_v1_materialization_source(artifact, execution, source)
+                if source.fixed_attachment_plan is not None:
+                    _validate_fixed_attachment_materialization_source(artifact, execution, source)
+                else:
+                    _validate_v1_materialization_source(
+                        artifact, execution, source,
+                        _allow_independent_robot_instances=(
+                            isinstance(value.get('controller'), (tuple, list))
+                            and len(value['controller']) > 1),
+                    )
             elif source.scene_definition is not None and selection.physics_provider != 'geophys':
                 raise ValueError('Scene-v3 legacy projection is currently GeoPhys-only')
             # Check names against this request's actual MJCF, not only the
@@ -1407,19 +1450,23 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             sites = {node.get('name') for node in root.iter('site')}
             actuators = root.find('actuator')
             actuators = set() if actuators is None else {node.get('name') for node in actuators}
-            for label, requested, available in (
+            for label, requested, available in (() if source.fixed_attachment_plan is not None else (
                 ('joint', (*source.joints.values(), *source.free_joints.values()), joints),
                 ('body', source.bodies.values(), bodies),
                 ('frame', source.frames.values(), sites),
-                ('actuator', (*source.joint_targets.values(), *source.open_actuators), actuators),
-            ):
+                ('actuator', (*source.joint_targets.values(), *source.open_actuators,
+                              *source.torque_actuators.values(), *source.position_actuators.values()), actuators),
+            )):
                 missing = set(requested) - available
                 if missing:
                     raise ValueError(f'selected source missing named {label}: {sorted(missing)}')
             receipt = source.execution_source_receipt
-            if receipt is None or source.source_closure_digest is None:
-                raise ValueError('asset closure has no source-bound receipt; native import cannot prove the requested closure')
-            receipt.validate_snapshot()
+            if source.scene_definition is None:
+                if receipt is None or source.source_closure_digest is None:
+                    raise ValueError('asset closure has no source-bound receipt; native import cannot prove the requested closure')
+                receipt.validate_snapshot()
+            elif source.source_closure_digest is None:
+                raise ValueError('versioned Scene source has no declared closure digest')
         elif selection.physics_provider == 'isaacsim':
             runtime_input = value.get('session_admission_input')
             if type(runtime_input) is not UsdRuntimeInputV1:
@@ -1435,18 +1482,46 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
 
     selected = None
     control_problem = None
+    plan = value.get('controller_binding_plan')
+    declared_bindings = ()
+    projected_feedback = ()
+    leaf_plan = None
     try:
+        if plan is not None:
+            if (type(plan) is not ControlBindingPlanV1 or not plan._compiled
+                    or source.scene_definition is None
+                    or plan.scene_identity_hash != source.scene_definition.identity_hash):
+                raise ValueError('Controller binding plan is not compiled for the selected Scene')
+            declared_bindings = plan.controller_bindings
         selected = bind_selected_controller(value, binding=binding,
                                             provider=selection.physics_provider,
                                             backend=selection.physics_backend)
-        if selected.mixed or selected.leaf_plan is not None or len(selected.position_profiles) > 1:
+        if selection.deployment == 'isolated_worker' and (
+                selected.mixed or selected.leaf_plan is not None or len(selected.position_profiles) > 1):
             raise ValueError('selected worker profile is outside the scalar adapter envelope')
-        if selected.position:
-            prepare_position_control_materialization(
+        if selected.mixed:
+            execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
+                                      selection.physics_backend, 0, 'strict')
+            manifest = _mixed_actuator_manifest(artifact, execution, source)
+            actual_capabilities = {item.name for item in manifest.capabilities
+                                   if item.status in SUPPORTED_STATUSES}
+        elif selected.leaf_plan is not None:
+            leaf_plan = selected.leaf_plan
+            if (source.scene_definition is None
+                    or leaf_plan.source_closure_sha256 != source.source_closure_digest):
+                raise ValueError('leaf plan differs from the selected Scene or source closure')
+            projected_feedback = project_leaf_feedback(
+                source.scene_definition, value.get('logical_assembly'),
+                value.get('child_assemblies', {}), leaf_plan)
+        elif selected.position:
+            if not declared_bindings:
+                declared_bindings = tuple(profile.controller_binding() for profile in selected.position_profiles)
+            plan, _, _, _ = prepare_position_control_materialization(
                 source=source, artifact=artifact, profiles=selected.position_profiles,
                 leaf_position=False, plan=value.get('controller_binding_plan'),
                 select_binding=binding.position_control_binding, value=value,
             )
+            projected_feedback = project_controller_feedback(plan)
         else:
             if type(binding.scalar_control_binding) is not ControlBinding:
                 raise TypeError('selected scalar Controller binding is missing')
@@ -1463,27 +1538,71 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
     row('controller_binding', 'controller:' + artifact.task_id,
         valid='unsatisfied' if control_problem else 'satisfied',
         reason=control_problem or 'Controller/source declarations passed; build must verify native mapping',
-        oracle='task_env.runtime.sessions.control:materialize_control')
+        oracle=None)
 
-    for owner, requirements in (('task', artifact.required_capabilities), ('controller', CONTROL_REQUIRED)):
-        for name in requirements.names:
-            available = name in actual_capabilities
-            row(name, owner + ':' + artifact.task_id, implemented=available,
-                reason=('declared names are checked; native provider behavior remains unverified' if available
-                        else 'required capability has no selected Core adapter'),
-                restrict=restricted is not None and name not in restricted)
-    if selected is not None and selected.position:
-        for profile in selected.position_profiles:
-            for requirement in profile.requirements.requirements:
-                name = requirement.required_capability
-                subject = ('state:' + requirement.entity_id + '/' + requirement.subject_id + '/'
-                           + requirement.field_name + '/' + requirement.sample_domain)
-                row(name, subject, required=requirement.requiredness,
-                    implemented=name in actual_capabilities,
-                    reason=('declared StateRequirements field requires native mapping'
-                            if name in actual_capabilities else 'state field has no selected Core adapter'),
-                    oracle='task_env.runtime.sessions.control:materialize_control',
-                    restrict=restricted is not None and name not in restricted)
+    # Legacy scalar Controller requirements are inferred from its actual source
+    # bindings; versioned controllers contribute their declared feedback below.
+    declared = set(artifact.required_capabilities.names)
+    for name in sorted(declared):
+        available = name in actual_capabilities
+        row(name, 'task:' + artifact.task_id, implemented=available,
+            reason=('selected adapter exposes this declared capability; native evidence remains separate'
+                    if available else 'required capability has no selected Core adapter'),
+            restrict=restricted is not None and name not in restricted)
+
+    for name in declared_source_capabilities(source).names:
+        row(name, 'source:' + artifact.task_id,
+            implemented=name in actual_capabilities,
+            reason='required by the selected source bindings',
+            restrict=restricted is not None and name not in restricted)
+
+    source_objects = (
+        ('joints', 'joint', 'joint_state_query'),
+        ('free_joints', 'free', 'free_body'),
+        ('bodies', 'body', 'body_pose_query'),
+        ('frames', 'frame', 'frame_pose_query'),
+        ('joint_targets', 'actuator', 'joint_position_actuation'),
+        ('torque_actuators', 'actuator', 'joint_torque_actuation'),
+        ('position_actuators', 'actuator', 'joint_position_actuation'),
+    )
+    check_conditions = {
+        'joint': 'resolve the named scalar joint and its valid position/velocity state',
+        'free': 'resolve the named floating body and its valid pose/velocity state',
+        'body': 'resolve the named body and its public pose mapping',
+        'frame': 'resolve the named site or public frame view',
+        'actuator': 'resolve the named position target and its declared joint mapping',
+    }
+    for field, kind, capability in source_objects:
+        for semantic, native in getattr(source, field, {}).items():
+            row(capability, kind + ':' + semantic, valid='unknown', oracle=helper,
+                reason=(f'{helper} must {check_conditions[kind]} for '
+                        f'{semantic!r} -> {native!r}; missing or incompatible mapping fails build'),
+                restrict=restricted is not None and capability not in restricted)
+    for native in getattr(source, 'open_actuators', ()):
+        row('joint_position_actuation', 'actuator:open:' + native, valid='unknown', oracle=helper,
+            reason=f'{helper} must resolve the declared opening actuator in the actual model',
+            restrict=restricted is not None and 'joint_position_actuation' not in restricted)
+
+    if plan is not None and declared_bindings:
+        for controller_binding in plan.controller_bindings:
+            for group in controller_binding.groups:
+                row('control_group_binding', 'group:' + group.entity_id + '/' + group.group_id,
+                    reason='compiled Scene ControlGroup is assigned to writer ' + controller_binding.writer_id)
+        for entity_id, actuator_id, writer_id in plan.resource_writers:
+            row('control_resource_binding', 'resource:' + entity_id + '/' + actuator_id,
+                reason='compiled Scene actuator resource is assigned to writer ' + writer_id)
+    elif leaf_plan is not None:
+        for entry in leaf_plan.leaves:
+            leaf = entry.binding
+            row('control_group_binding', 'group:' + leaf.entity_id + '/' + leaf.control_group_id,
+                reason='resolved logical Assembly assigns the ControlGroup to writer ' + leaf.writer_id)
+        for entity_id, actuator_id, writer_id in leaf_plan.resource_writers:
+            row('control_resource_binding', 'resource:' + entity_id + '/' + actuator_id,
+                reason='compiled leaf plan assigns the actuator resource to writer ' + writer_id)
+    for name, subject, required, supported, valid, reason, oracle in project_feedback_assessment(
+            projected_feedback, artifact, source, actual_capabilities, helper):
+        row(name, subject, required=required, implemented=supported, valid=valid,
+            reason=reason, oracle=oracle, restrict=restricted is not None and name not in restricted)
     row('scalar_layout', 'batch:scalar',
         valid='satisfied' if selection.batch_layout == 'scalar' else 'unsatisfied',
         reason='selected adapter is scalar; native batch and partial reset are not admitted')

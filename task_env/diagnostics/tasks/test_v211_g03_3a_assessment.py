@@ -37,7 +37,8 @@ def test_real_task_closure_is_bound_and_does_not_infer_provider_evidence(selecte
     assert closure.requirement_status == 'satisfied'
     assert env.value['source'].execution_source_receipt is not None
     assert assessment.request_identity == env.get_execution_receipt()['request_identity']
-    assert all(row.provider_api == 'unknown' and row.evidence == 'none' for row in assessment.rows)
+    assert all(row.evidence == 'none' for row in assessment.rows)
+    assert any(row.provider_api == 'supported' for row in assessment.rows)
     assert {'source_closure', 'controller_binding', 'scalar_layout', 'state_only_renderer'} <= {
         row.capability_id for row in assessment.rows}
     assert assessment.to_mapping()['rows']
@@ -86,7 +87,7 @@ def test_batch_renderer_and_unknown_required_do_not_gain_admission(selected):
     assert assessment.decision == 'rejected'
     assert {r.capability_id for r in assessment.rows if r.requirement_status == 'unsatisfied'} >= {
         'scalar_layout', 'state_only_renderer'}
-    sample = next(r for r in _assess(env, dependency).rows if r.capability_id == 'rigid_body')
+    sample = next(r for r in _assess(env, dependency).rows if r.requirement_status == 'unknown')
     no_oracle = replace(sample, build_oracle=None)
     unknown = CapabilityAssessmentV1('capability-assessment-v1', 'a' * 64, 'static_preflight', (no_oracle,))
     assert unknown.decision == 'rejected'

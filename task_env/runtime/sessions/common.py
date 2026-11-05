@@ -188,6 +188,15 @@ class _SessionValues:
             raise ValueError('source/native physics timestep mismatch')
 
     @property
+    def build_layout_facts(self):
+        """Owned values from the adapter's completed request-specific mapping check."""
+        import copy
+        facts = getattr(self, '_build_layout_facts', None)
+        if facts is None:
+            raise RuntimeError('request-specific build layout was not checked')
+        return copy.deepcopy(facts)
+
+    @property
     def provider_materialization_id(self):
         """Public identity of this concrete RuntimeSession materialization."""
         return self._provider_materialization_id

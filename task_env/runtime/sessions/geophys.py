@@ -8,6 +8,74 @@ from .common import _SessionValues, pose
 from .geophys_source import GeoPhysSourceComposer
 
 
+def check_geophys_named_layout(names, data, source, boundary):
+    """Resolve selected MJCF names and scalar/free addresses in public model data."""
+    result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
+    types, qadr, vadr = (data['jnt_type'], data['jnt_qposadr'], data['jnt_dofadr'])
+    for field, free in (('joints', False), ('free_joints', True)):
+        for semantic, native in getattr(source, field).items():
+            index = int(names.joints[native])
+            if index < 0 or index >= min(len(types), len(qadr), len(vadr)):
+                raise ValueError(f'public GeoPhys joint index invalid: {semantic}')
+            kind = int(types[index])
+            # Public GeoPhys JointType IDs: FREE=0, HINGE=2, SLIDE=3.
+            if kind not in ((0,) if free else (2, 3)):
+                raise ValueError(f'public GeoPhys joint type mismatch: {semantic}')
+            q, v = int(qadr[index]), int(vadr[index]); nq, nv = ((7, 6) if free else (1, 1))
+            if q < 0 or v < 0 or q+nq > int(data['n_qpos']) or v+nv > int(data['n_dof']):
+                raise ValueError(f'public GeoPhys joint addresses exceed dimensions: {semantic}')
+            result[field][semantic] = {'native': native, 'id': index, 'type': kind,
+                                       'qpos': q, 'dof': v, 'qpos_width': nq, 'dof_width': nv}
+    for field, table in (('bodies', names.bodies), ('frames', names.sites)):
+        for semantic, native in getattr(source, field).items():
+            index = int(table[native])
+            if index < 0: raise ValueError(f'public GeoPhys {field} index invalid: {semantic}')
+            result[field][semantic] = {'native': native, 'id': index}
+    for semantic, native in source.joint_targets.items():
+        if semantic not in source.joints: raise ValueError(f'actuator has no bound joint: {semantic}')
+        index = int(names.actuators[native])
+        if index < 0: raise ValueError(f'public GeoPhys actuator index invalid: {semantic}')
+        transmission_types, transmission_joints = data['actuator_trntype'], data['actuator_trnid']
+        if index >= min(len(transmission_types), len(transmission_joints)):
+            raise ValueError(f'public GeoPhys actuator metadata missing: {semantic}')
+        joint_index = result['joints'][semantic]['id']
+        if int(transmission_types[index]) != 0 or int(transmission_joints[index]) != joint_index:
+            raise ValueError(f'public GeoPhys actuator transmission mismatch: {semantic}')
+        result['actuators'][semantic] = {'native': native, 'id': index, 'joint_id': joint_index}
+    for native in source.open_actuators:
+        index = int(names.actuators[native])
+        if index < 0: raise ValueError(f'public GeoPhys actuator index invalid: {native}')
+        result['actuators']['open:'+native] = {'native': native, 'id': index}
+    for field in ('torque_actuators', 'position_actuators'):
+        for semantic, native in getattr(source, field, {}).items():
+            index = int(names.actuators[native])
+            types, targets = data['actuator_trntype'], data['actuator_trnid']
+            joint = result['joints'].get(semantic)
+            if (joint is None or index < 0 or index >= min(len(types), len(targets))
+                    or int(types[index]) != 0 or int(targets[index]) != joint['id']):
+                raise ValueError(f'public GeoPhys mixed actuator transmission mismatch: {semantic}')
+            result['actuators'][semantic] = {'native': native, 'id': index, 'joint_id': joint['id']}
+    snapshot = boundary.read_snapshot(SnapshotRequest(
+        qacc=False, ctrl=True, body_pose=bool(source.bodies), site_pose=bool(source.frames)))
+    qpos, qvel, ctrl = (np.asarray(snapshot.qpos), np.asarray(snapshot.qvel), np.asarray(snapshot.ctrl))
+    if (qpos.ndim != 1 or qpos.size < int(data['n_qpos'])
+            or qvel.ndim != 1 or qvel.size < int(data['n_dof']) or ctrl.ndim != 1):
+        raise ValueError('public GeoPhys state or control channel dimensions do not match model')
+    if any(item['id'] >= ctrl.size for item in result['actuators'].values()):
+        raise ValueError('public GeoPhys control channel lacks a declared actuator')
+    for field, position, orientation in (
+        ('bodies', snapshot.body_xpos, snapshot.body_xquat),
+        ('frames', snapshot.site_xpos, snapshot.site_xquat),
+    ):
+        if not result[field]:
+            continue
+        p, q = np.asarray(position), np.asarray(orientation)
+        if (p.ndim != 2 or p.shape[1] != 3 or q.ndim != 2 or q.shape[1] != 4
+                or any(item['id'] >= min(len(p), len(q)) for item in result[field].values())):
+            raise ValueError(f'public GeoPhys {field} pose channel does not cover source mappings')
+    return result
+
+
 class _GeoPhysSession(_SessionValues):
     def __init__(self, artifact, source):
         self._initialize_values(artifact, source, 'geophys')
@@ -28,23 +96,24 @@ class _GeoPhysSession(_SessionValues):
         self._boundary = runtime.boundary
         compiled = runtime.compiled_scene
         names, data = compiled.references.names, compiled.scene_model.joint_data
-        self._body_parentid = np.asarray(data['body_parentid'], dtype=np.int32).reshape(-1)
-        self._body_jntnum = np.asarray(data['body_jntnum'], dtype=np.int32).reshape(-1)
-        self._joint_addresses = {
-            semantic: (int(data['jnt_qposadr'][names.joints[native]]),
-                       int(data['jnt_dofadr'][names.joints[native]]))
-            for semantic, native in source.joints.items()
-        }
-        self._free_addresses = {semantic: (int(data['jnt_qposadr'][names.joints[native]]),
-                                           int(data['jnt_dofadr'][names.joints[native]]))
-                                for semantic, native in source.free_joints.items()}
-        self._bodies = {semantic: names.bodies[native] for semantic, native in source.bodies.items()}
-        self._frames = {semantic: names.sites[native] for semantic, native in source.frames.items()}
-        self._fixture_bodies = {
-            name: int(names.bodies[source.bodies[name]]) for name in source.fixture_bodies
-        }
-        self._target_actuators = {semantic: names.actuators[native] for semantic, native in source.joint_targets.items()}
-        self._open_actuators = tuple(names.actuators[name] for name in source.open_actuators)
+        try:
+            self._body_parentid = np.asarray(data['body_parentid'], dtype=np.int32).reshape(-1)
+            self._body_jntnum = np.asarray(data['body_jntnum'], dtype=np.int32).reshape(-1)
+            checked = check_geophys_named_layout(names, data, source, self._boundary)
+            self._joint_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['joints'].items()}
+            self._free_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['free_joints'].items()}
+            self._bodies = {k: v['id'] for k, v in checked['bodies'].items()}
+            self._frames = {k: v['id'] for k, v in checked['frames'].items()}
+            self._fixture_bodies = {name: self._bodies[name] for name in source.fixture_bodies}
+            self._target_actuators = {k: checked['actuators'][k]['id'] for k in source.joint_targets}
+            self._open_actuators = tuple(checked['actuators']['open:'+n]['id'] for n in source.open_actuators)
+            self._build_layout_facts = {'helper': 'task_env.runtime.sessions.geophys:check_geophys_named_layout',
+                'provider': 'geophys', 'source_id': source.scene_source.source_id,
+                'source_closure': source.source_closure_digest, 'objects': checked,
+                'materialization_id': self.provider_materialization_id}
+        except BaseException:
+            self._boundary.close()
+            raise
         self._ctrl_range = data['actuator_ctrlrange']
         self._mixed_actuator_plan = source.mixed_actuator_plan
         self._mixed_controller_identity = None
@@ -61,7 +130,11 @@ class _GeoPhysSession(_SessionValues):
         self._mixed_channel_records = {}
         self._last_reset_readback_v1 = None
         if self._mixed_actuator_plan is not None:
-            self._initialize_mixed_actuator(source, names, data)
+            try:
+                self._initialize_mixed_actuator(source, names, data)
+            except BaseException:
+                self._boundary.close()
+                raise
         self._initial = runtime.boundary.initial_state
         self._reset_force_measurement = None
         self._last_reset_force_sequence = 0

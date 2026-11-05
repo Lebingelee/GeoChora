@@ -39,6 +39,26 @@ class ControlledRuntimeSession(RuntimeSession, Protocol):
 CONTROL_REQUIRED=RequiredCapabilitySet(('articulated_robot','joint_position_actuation','joint_state_query','body_pose_query','frame_pose_query'))
 
 
+def declared_source_capabilities(source):
+    """Project only requirements present in the selected source bindings."""
+    required = set()
+    if getattr(source, 'joints', {}):
+        required.update(('articulated_robot', 'joint_state_query'))
+    if getattr(source, 'free_joints', {}):
+        required.add('free_body')
+    if (getattr(source, 'joint_targets', {}) or getattr(source, 'open_actuators', ())
+            or getattr(source, 'position_actuators', {})):
+        required.add('joint_position_actuation')
+    if getattr(source, 'torque_actuators', {}):
+        required.add('joint_torque_actuation')
+    if getattr(source, 'bodies', {}):
+        required.add('body_pose_query')
+    if getattr(source, 'frames', {}):
+        required.add('frame_pose_query')
+    return RequiredCapabilitySet(tuple(sorted(required)))
+
+
+
 @dataclass(frozen=True)
 class SelectedControllerBinding:
     """Admitted controller and profile facts for selected environment assembly."""
@@ -413,6 +433,33 @@ def compile_control_binding_plan(
     return plan
 
 
+def project_controller_feedback(plan):
+    """Return the feedback actually declared by a Scene-compiled writer plan."""
+    if type(plan) is not ControlBindingPlanV1 or not plan._compiled:
+        raise ValueError('feedback projection requires a compiled ControllerBindingPlanV1')
+    return tuple((binding.writer_id, requirement)
+                 for binding in plan.controller_bindings
+                 for requirement in binding.feedback_requirements.requirements)
+
+
+def project_leaf_feedback(scene, root, children, plan):
+    """Project a compiled leaf plan through the existing logical resolver."""
+    from ...artifacts.logical_assembly_resolution import resolve_logical_assembly
+    from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+    if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
+        raise ValueError('leaf feedback projection requires a compiled EffectiveLeafPlanV1')
+    resolved = resolve_logical_assembly(root, scene, children)
+    if (resolved.root_logical_content_sha256 != plan.root_logical_content_sha256
+            or resolved.scene_identity_sha256 != plan.scene_identity_sha256):
+        raise ValueError('leaf plan does not match the resolved logical Assembly and Scene')
+    paths = {leaf.full_path for leaf in resolved.leaves}
+    if any(entry.binding.member_path not in paths for entry in plan.leaves):
+        raise ValueError('leaf plan refers to an unresolved logical Assembly member')
+    return tuple((entry.binding.writer_id, requirement)
+                 for entry in plan.leaves
+                 for requirement in entry.binding.required_state.state_requirements.requirements)
+
+
 def _validate_feedback_requirements(scene, binding, entity_ids):
     joints = {
         (articulation.entity_id, joint.joint_id)
@@ -430,16 +477,15 @@ def _validate_feedback_requirements(scene, binding, entity_ids):
         key = (requirement.entity_id, requirement.subject_id)
         if requirement.entity_id not in entity_ids:
             raise ValueError('Controller feedback requirement crosses its bound Entity')
-        if requirement.subject_kind == 'joint' and key not in joints:
-            raise ValueError(f'Controller feedback references unknown Joint: {key}')
-        if requirement.subject_kind == 'frame' and key not in frames:
-            raise ValueError(f'Controller feedback references unknown Frame: {key}')
-        if requirement.subject_kind == 'actuator' and key not in actuators:
-            raise ValueError(f'Controller feedback references unknown actuator resource: {key}')
-        if requirement.subject_kind == 'entity' and (
-            requirement.entity_id not in entities or requirement.subject_id not in entities
-        ):
-            raise ValueError(f'Controller feedback references unknown Entity: {key}')
+        missing = ((requirement.subject_kind == 'joint' and key not in joints)
+                   or (requirement.subject_kind == 'frame' and key not in frames)
+                   or (requirement.subject_kind == 'actuator' and key not in actuators)
+                   or (requirement.subject_kind == 'entity' and
+                       (requirement.entity_id not in entities or requirement.subject_id not in entities)))
+        if missing and requirement.requiredness == 'required':
+            label = {'joint': 'Joint', 'frame': 'Frame', 'actuator': 'actuator resource', 'entity': 'Entity'}[requirement.subject_kind]
+            raise ValueError(f'Controller feedback references unknown {label}: {key}')
+
 
 
 def single_position_action_request(action, *, scene, plan, profile):
@@ -554,6 +600,8 @@ def prepare_position_control_materialization(
             )
         if not isinstance(plan, ControlBindingPlanV1):
             raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
+        for profile in profiles:
+            profile._validate_plan(plan)
     joint_bindings = position_joint_bindings_from_artifact(scene, artifact, source)
     frame_bindings = position_frame_bindings_from_artifact(artifact, source)
     if not callable(select_binding):
@@ -1007,9 +1055,10 @@ def materialize_control(
     elif not (f04_native or f05_native or f05_dg02_native
               or f05_dg04_native or f06_pickcube_isaac):
         actual_manifest = provider_manifest(execution.physics_provider)
+    source_requirements = declared_source_capabilities(source)
     if manifest is not None:
-        admit_capabilities(CONTROL_REQUIRED, manifest, execution)
-    admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
+        admit_capabilities(source_requirements, manifest, execution)
+    admit_capabilities(source_requirements, actual_manifest, execution)
     # DG02 materialize() admits the Core-generated, source-bound manifest
     # alongside its exact candidate input. Keep it on the same public path
     # after the controller-level capability check.

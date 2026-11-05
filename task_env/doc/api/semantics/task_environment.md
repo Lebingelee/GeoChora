@@ -44,6 +44,8 @@ expert/recording 入口见仓库根目录 `examples/README.md`；历史 `pick-cu
 
 selected 的 `execution` 可指定 provider/backend/device、host/engine、solver family/algorithm、coupler、`batch_layout`、`deployment`、`interpreter` 与 `native_dt`。`get_execution_receipt()` 返回请求、解析结果、预检及尚未读取的 native effective 状态；预检失败的异常提供 `reason`、`phase`、`request_identity` 和 JSON-compatible `receipt`。这些字段不证明原生执行或资格。
 
+预检中的 `assessment` 按实际来源及控制声明记录对象、必需性和检查阶段；需要构建确认的项目在静态阶段保持 `pending_native_build`。已连接该检查的 adapter 完成构建后，`build_checks` 将实际具名映射与同一请求绑定，查询、reset info 及记录元数据共享该回执；这不把 `native_effective` 升为已读取，也不证明物性或任务成功。预检拒绝的回执标记 `rejected` 并记录 `failure_reason`。这些接线仍待 Sol 按 3a 完整范围复审，特别是 Isaac F06 的离线入口与 versioned Controller 的完整生产入口。
+
 当前实现只接受 scalar、state-only 和与 task cadence 相同的 native dt。GeoPhys 默认从 `GEOCHORA_GEOPHYS_PYTHON`、Isaac 从 `ISAAC_SIM_PYTHON` 选择隔离解释器；MuJoCo 默认当前解释器，可用 `GEOCHORA_CORE_PYTHON` 显式选择。必须满足对应依赖与当前源码 origin，缺失或冲突会在关闭已有 session 前拒绝。
 
 普通 PickCube／Nut 的 MJCF 会捕获其实际引用的 Panda 资源，并把原始 XML 和导入快照绑定到同一来源回执；MuJoCo 使用回执中的相同资源字节。attempt002 的 PickCube seed31、Nut seed19 已分别完成真实 MuJoCo CPU reset 和 10 步有界检查，已由Sol有界接收核心恢复，3a整体仍待收口；不推及其他后端、任务成功或资格。F06 的精确 USD 来源约束仍适用。

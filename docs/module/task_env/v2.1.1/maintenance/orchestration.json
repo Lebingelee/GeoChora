@@ -32,7 +32,7 @@
   "next_candidate": {
     "substage": "3a",
     "package_id": "V211_G03_3a_attempt003",
-    "status": "PREPARED_NOT_DISPATCHED",
+    "status": "REPORTED_PENDING_SOL_REVIEW",
     "assigned_agent": null,
     "target_thread": null,
     "planning_ref": "../planning/stage3-3a-execution.md#attempt003-complete-package",
@@ -77,7 +77,7 @@
     "completion_priority": "Close actual declarations -> concrete production adapter build checks -> same receipt for whole3a; reuse bounded002 core recovery and unaffected evidence.",
     "acceptance_cases_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/acceptance-cases.json"
   },
-  "next_action": "最后完整包V211_G03_3a_attempt003已准备，等待维护者指定一个Terra／Luna并手动转发；准确HEAD和保护字节在外部snapshot冻结。准备不消耗attempt，当前2；一个writer、复用阶段分支，完整3a出口与180分钟硬窗口已固定。003整体仍未接收则停止普通执行并人工诊断，不自动第四次或进入3b。",
+  "next_action": "003整体技术结果THREE_A_PARTIAL，执行者已返包；维护者手动转交Sol独立复审。若未接收，由维护者组织人工诊断；不自动attempt004或进入3b。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -743,8 +743,8 @@
             "1d",
             "2c"
           ],
-          "status": "PARTIAL_CORE_RUNTIME_RECOVERED",
-          "attempt_count": 2,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 3,
           "attempts": [
             {
               "attempt": 1,
@@ -781,35 +781,48 @@
               "reported_native_substeps_derived": 400,
               "package_revision": 2,
               "package_manifest_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64"
+            },
+            {
+              "attempt": 3,
+              "package_id": "V211_G03_3a_attempt003",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T17:55:47+08:00",
+              "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "2825c5749326fcca60845dde5cae21f9cfcd04ad",
+              "result": "THREE_A_PARTIAL",
+              "summary_ref": "reviews/20261105_3a_attempt003_execution.md",
+              "writer_ownership": "released upon final commit and report",
+              "implementation_finished_at": "2026-11-05T18:49:02+08:00",
+              "finished_at": null,
+              "final_timing_ref": "workspace/maintenance/v211_g03_3a_attempt003/output-manifest.json"
             }
           ],
-          "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
+          "assigned_agent": null,
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003",
           "package_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64",
-          "input_head": "81e257cbef6c3469ba23fadcfe481d93b114f4d1",
-          "output_head": "42dfcda57757d6d14bd963f692f6bd9154a974f3",
+          "input_head": "2825c5749326fcca60845dde5cae21f9cfcd04ad",
+          "output_head": null,
           "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "Sol accepted bounded ordinary MuJoCo CPU recovery after source/log audit and five focused guarded offline checks; no Sol native rerun; remaining 3a declaration/build-check closure only.",
+          "last_observation": "Attempt003 connected request-specific layout checks and verified bounded MuJoCo paths; whole 3a remains partial pending independent review, notably F06 source-bound preflight and versioned production-consumer evidence.",
           "evidence_refs": [
             "reviews/20261105_3a_attempt002_execution.md",
             "reviews/20261105_3a_attempt001_sol_review.md",
-            "reviews/20261105_3a_attempt002_sol_review.md"
+            "reviews/20261105_3a_attempt002_sol_review.md",
+            "reviews/20261105_3a_attempt003_execution.md"
           ],
           "commits": [
             "32397283e635148788848c0c009e5223d40333df",
             "42dfcda57757d6d14bd963f692f6bd9154a974f3"
           ],
           "review_decision": {
-            "status": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY",
+            "status": "REPORTED_PENDING_SOL_REVIEW",
             "reviewer": "Sol",
-            "date": "2026-11-05",
-            "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
             "whole_3a_accepted": false
           },
           "blockers": [
-            "Actual task/source/Controller required declaration intersection is not fully closed for the selected three-route scope.",
-            "Required unknown needs a concrete existing adapter mapping/build check; generic function-name whitelist remains insufficient."
+            "F06 real source cannot reach selected preflight under the frozen offline guard; configuration/dependency evidence is not full source admission.",
+            "Existing versioned Controller/StateRequirements projection lacks an end-to-end selected production-source consumer proof."
           ]
         },
         {

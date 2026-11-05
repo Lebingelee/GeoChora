@@ -466,6 +466,10 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._initialize_values(artifact, source, execution.physics_provider)
         self._execution_spec_v1 = execution
         self._native_io = native_io
+        self._build_layout_facts = getattr(native_io, 'build_layout_facts', None)
+        if self._build_layout_facts is not None:
+            self._build_layout_facts = {**self._build_layout_facts,
+                'materialization_id': self.provider_materialization_id}
         self._native_io_metadata = native_io.metadata()
         if type(self._native_io_metadata) is not NativeRuntimeIOMetadataV1:
             raise TypeError('native Runtime I/O metadata() must return NativeRuntimeIOMetadataV1')

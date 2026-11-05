@@ -98,6 +98,8 @@ def test_real_conflicting_metadata_rejects_before_existing_session_is_closed(mon
                          'observed_version': '3.8.1', 'status': 'unavailable',
                          'reason': 'version conflicts with declaration'}]
         assert receipt['native_effective']['status'] == 'unknown'
+        assert receipt['status'] == 'rejected'
+        assert receipt['failure_reason'] == 'dependency_unavailable'
         assert failure.value.phase == 'static_preflight'
         assert len(failure.value.request_identity) == 64
         assert env.session is sentinel and effects == []

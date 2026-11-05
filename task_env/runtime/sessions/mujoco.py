@@ -74,6 +74,84 @@ def _lower_receipt_mjcf_assets(receipt):
     return ET.tostring(root, encoding='unicode'), alias_payloads, rows
 
 
+def check_mujoco_named_layout(model, mj, source):
+    """Resolve this source's names and address shapes in a compiled model."""
+    result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
+    joint_ids = {}
+    for field, free in (('joints', False), ('free_joints', True)):
+        for semantic, native in getattr(source, field).items():
+            joint = int(model.joint(native).id)
+            if joint < 0 or joint >= min(len(model.jnt_type), len(model.jnt_qposadr), len(model.jnt_dofadr)):
+                raise ValueError(f'named joint is missing or has an invalid index: {semantic}')
+            kind = int(model.jnt_type[joint])
+            allowed = ((int(mj.mjtJoint.mjJNT_FREE),) if free else
+                       (int(mj.mjtJoint.mjJNT_HINGE), int(mj.mjtJoint.mjJNT_SLIDE)))
+            if kind not in allowed:
+                raise ValueError(f'unsupported named joint type for {semantic}: {kind}')
+            q, v = int(model.jnt_qposadr[joint]), int(model.jnt_dofadr[joint])
+            nq, nv = (7, 6) if free else (1, 1)
+            if q < 0 or v < 0 or q+nq > int(model.nq) or v+nv > int(model.nv):
+                raise ValueError(f'named joint addresses exceed compiled dimensions: {semantic}')
+            result[field][semantic] = {'native': native, 'id': joint, 'type': kind,
+                                       'qpos': q, 'dof': v, 'qpos_width': nq, 'dof_width': nv}
+            joint_ids[semantic] = joint
+    for field, accessor in (('bodies', model.body), ('frames', model.site)):
+        for semantic, native in getattr(source, field).items():
+            index = int(accessor(native).id)
+            if index < 0:
+                raise ValueError(f'named {field} object is missing: {semantic}')
+            result[field][semantic] = {'native': native, 'id': index}
+    for semantic, native in source.joint_targets.items():
+        actuator = int(model.actuator(native).id)
+        if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+            raise ValueError(f'named actuator is missing or has an invalid index: {semantic}')
+        if semantic not in joint_ids:
+            raise ValueError(f'actuator binding lacks its declared joint: {semantic}')
+        if (int(model.actuator_trntype[actuator]) != int(mj.mjtTrn.mjTRN_JOINT)
+                or int(model.actuator_trnid[actuator][0]) != joint_ids[semantic]):
+            raise ValueError(f'actuator transmission does not target the declared joint: {semantic}')
+        result['actuators'][semantic] = {'native': native, 'id': actuator,
+                                         'joint_id': joint_ids[semantic]}
+    for native in source.open_actuators:
+        actuator = int(model.actuator(native).id)
+        if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+            raise ValueError(f'named opening actuator is missing or invalid: {native}')
+        fact = {'native': native, 'id': actuator}
+        if source.scene_definition is None:
+            actuator_section = ET.fromstring(source.scene_source.xml).find('actuator')
+            candidates = [] if actuator_section is None else [
+                node for node in actuator_section if node.get('name') == native]
+            if len(candidates) != 1:
+                raise ValueError(f'opening actuator has no unique source declaration: {native}')
+            declaration = candidates[0]
+            tendon_name, joint_name = declaration.get('tendon'), declaration.get('joint')
+            if tendon_name and not joint_name:
+                expected_type, target = int(mj.mjtTrn.mjTRN_TENDON), int(model.tendon(tendon_name).id)
+                fact.update(target_kind='tendon', target_native=tendon_name, target_id=target)
+            elif joint_name and not tendon_name:
+                expected_type, target = int(mj.mjtTrn.mjTRN_JOINT), int(model.joint(joint_name).id)
+                fact.update(target_kind='joint', target_native=joint_name, target_id=target)
+            else:
+                raise ValueError(f'opening actuator has an unsupported transmission declaration: {native}')
+            if (int(model.actuator_trntype[actuator]) != expected_type
+                    or int(model.actuator_trnid[actuator][0]) != target):
+                raise ValueError(f'opening actuator transmission differs from source: {native}')
+        result['actuators']['open:'+native] = fact
+    for field in ('torque_actuators', 'position_actuators'):
+        for semantic, native in getattr(source, field, {}).items():
+            actuator = int(model.actuator(native).id)
+            if actuator < 0 or actuator >= min(len(model.actuator_trntype), len(model.actuator_trnid)):
+                raise ValueError(f'named mixed actuator is missing or invalid: {semantic}')
+            if semantic not in joint_ids:
+                raise ValueError(f'mixed actuator lacks its declared joint: {semantic}')
+            if (int(model.actuator_trntype[actuator]) != int(mj.mjtTrn.mjTRN_JOINT)
+                    or int(model.actuator_trnid[actuator][0]) != joint_ids[semantic]):
+                raise ValueError(f'mixed actuator transmission mismatch: {semantic}')
+            result['actuators'][semantic] = {'native': native, 'id': actuator,
+                                             'joint_id': joint_ids[semantic]}
+    return result
+
+
 class _MuJoCoSession(_SessionValues):
     def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
@@ -81,6 +159,13 @@ class _MuJoCoSession(_SessionValues):
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
+                checked = check_mujoco_named_layout(self._model, self._mj, source)
+                self._build_layout_facts = {
+                    'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                    'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                    'source_closure': source.source_closure_digest, 'objects': checked,
+                    'materialization_id': self.provider_materialization_id,
+                }
             except Exception:
                 # The existing adapter owns every partially-created native value.
                 self.close()
@@ -92,6 +177,13 @@ class _MuJoCoSession(_SessionValues):
                 raise TypeError('unsupported typed mixed actuator plan')
             try:
                 self._initialize_mixed_actuator(artifact, source)
+                checked = check_mujoco_named_layout(self._model, self._mj, source)
+                self._build_layout_facts = {
+                    'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                    'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                    'source_closure': source.source_closure_digest, 'objects': checked,
+                    'materialization_id': self.provider_materialization_id,
+                }
             except BaseException as error:
                 try:
                     self.close()
@@ -142,15 +234,21 @@ class _MuJoCoSession(_SessionValues):
         self._completed_force_measurement = None
         if self._model.opt.timestep != artifact.timebase.physics_dt:
             raise ValueError('MuJoCo native timestep mismatch')
-        self._joint_addresses = {
-            semantic: self._addresses(native, free=False) for semantic, native in source.joints.items()
-        }
-        self._free_addresses = {semantic: self._addresses(native, free=True)
-                                for semantic, native in source.free_joints.items()}
-        self._bodies = {semantic: self._model.body(native).id for semantic, native in source.bodies.items()}
-        self._frames = {semantic: self._model.site(native).id for semantic, native in source.frames.items()}
-        self._target_actuators = {semantic: self._model.actuator(native).id for semantic, native in source.joint_targets.items()}
-        self._open_actuators = tuple(self._model.actuator(native).id for native in source.open_actuators)
+        try:
+            checked = check_mujoco_named_layout(self._model, self._mj, source)
+            self._joint_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['joints'].items()}
+            self._free_addresses = {k: (v['qpos'], v['dof']) for k, v in checked['free_joints'].items()}
+            self._bodies = {k: v['id'] for k, v in checked['bodies'].items()}
+            self._frames = {k: v['id'] for k, v in checked['frames'].items()}
+            self._target_actuators = {k: checked['actuators'][k]['id'] for k in source.joint_targets}
+            self._open_actuators = tuple(checked['actuators']['open:'+n]['id'] for n in source.open_actuators)
+            self._build_layout_facts = {'helper': 'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+                'provider': 'mujoco', 'source_id': source.scene_source.source_id,
+                'source_closure': source.source_closure_digest, 'objects': checked,
+                'materialization_id': self.provider_materialization_id}
+        except BaseException:
+            self.close()
+            raise
         self._leaf_plan = None
         self._leaf_materialization_receipt = None
         self._leaf_configuration_revision = None

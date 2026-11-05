@@ -31,7 +31,7 @@ _METHODS = frozenset({
 _PROPERTIES = frozenset({
     'provider_materialization_id', 'episode_id', 'state_revision',
     'runtime_progress_receipt', 'reset_readback_v1', 'compiled_layout_receipt',
-    'reset_plan_evidence', 'close_receipt',
+    'reset_plan_evidence', 'close_receipt', 'build_layout_facts',
 })
 
 
@@ -405,6 +405,17 @@ def request_identity(payload):
     return hashlib.sha256(data).hexdigest()
 
 
+def source_binding_facts(source):
+    """Canonical declared semantic/native mappings for one selected source."""
+    result = {name: dict(getattr(source, name, {})) for name in
+              ('joints', 'free_joints', 'bodies', 'frames', 'joint_targets',
+               'torque_actuators', 'position_actuators')}
+    result['open_actuators'] = list(getattr(source, 'open_actuators', ()))
+    plan = getattr(source, 'mixed_actuator_plan', None)
+    result['mixed_actuator_plan'] = None if plan is None else plan.identity_hash
+    return result
+
+
 def source_execution_facts(artifact, execution, source, controller):
     """Project request-bound Core facts without exporting live provider objects."""
     import hashlib
@@ -422,6 +433,7 @@ def source_execution_facts(artifact, execution, source, controller):
         'artifact_identity': artifact.identity_hash,
         'execution_identity': request_identity(execution.to_mapping()),
         'source_id': source_value.source_id,
+        'source_bindings': source_binding_facts(source),
         'source_closure': getattr(source, 'source_closure_digest', None),
         'source_xml_sha256': None if xml is None else hashlib.sha256(xml.encode()).hexdigest(),
         'scene_identity': None if scene is None else scene.identity_hash,

@@ -407,6 +407,34 @@ def _native_prim_path(native_name: str, entry_prim: str) -> str:
     return entry_prim.rstrip("/") + "/" + native_name
 
 
+def check_isaac_named_layout(source, dof_names, frame_views, free_views, read_views):
+    """Validate selected USD/DOF mappings against live public tensor views."""
+    dofs = tuple(dof_names)
+    if len(dofs) != len(set(dofs)):
+        raise ValueError('Isaac public DOF names are ambiguous')
+    index = {name: i for i, name in enumerate(dofs)}
+    joints, velocities, frames, free = read_views()
+    result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
+    for semantic, native in source.joints.items():
+        if native not in index or semantic not in joints or semantic not in velocities:
+            raise ValueError(f'Isaac public joint state missing: {semantic}')
+        result['joints'][semantic] = {'native': native, 'id': index[native], 'qpos_width': 1, 'dof_width': 1}
+    for semantic, native in source.joint_targets.items():
+        if semantic not in source.joints or native not in index or native != source.joints[semantic]:
+            raise ValueError(f'Isaac public position target mismatch: {semantic}')
+        result['actuators'][semantic] = {'native': native, 'id': index[native]}
+    for field in ('bodies', 'frames'):
+        for semantic, native in getattr(source, field).items():
+            if semantic not in frame_views or semantic not in frames:
+                raise ValueError(f'Isaac public {field} pose view missing: {semantic}')
+            result[field][semantic] = {'native': native, 'view': 'public_world_pose'}
+    for semantic, native in source.free_joints.items():
+        if semantic not in free_views or semantic not in free:
+            raise ValueError(f'Isaac public free-body state missing: {semantic}')
+        result['free_joints'][semantic] = {'native': native, 'view': 'public_rigid_body'}
+    return result
+
+
 class IsaacSimNativeRuntimeIOV1:
     """Implement the six Core native-I/O operations over public Isaac APIs."""
 
@@ -698,6 +726,11 @@ class IsaacSimNativeRuntimeIOV1:
                 "static_collision_paths": list(static_collision_paths),
             }
             self._torch = torch
+            checked = check_isaac_named_layout(self._source, self._dof_names,
+                self._frame_views, self._free_views, self._read_views)
+            self._build_layout_facts = {'helper': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
+                'provider': 'isaacsim', 'source_id': self._source.source_id,
+                'source_closure': self._source.source_closure_digest, 'objects': checked}
             self._metadata = NativeRuntimeIOMetadataV1(
                 "native-runtime-io-metadata-v1", self._source.source_id,
                 self._source.source_closure_digest, self._source.scene_definition.identity_hash,
@@ -1255,6 +1288,11 @@ class IsaacSimNativeRuntimeIOV1:
                 for path, name, schema in sorted(authored)
             ],
         }
+
+    @property
+    def build_layout_facts(self):
+        import copy
+        return copy.deepcopy(self._build_layout_facts)
 
     def metadata(self) -> NativeRuntimeIOMetadataV1:
         if self._closed or self._metadata is None:

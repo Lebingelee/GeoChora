@@ -1866,12 +1866,37 @@ class CapabilityAssessmentRowV1(Contract):
             raise ValueError('bounded or qualified evidence requires a reference')
 
 
-# Only Core-owned checks may make a required unknown provisional.
-_ASSESSMENT_BUILD_ORACLES = frozenset({
-    'task_env.runtime.sessions.api:_materialize_admitted',
-    'task_env.runtime.sessions.control:materialize_control',
-    'task_env.runtime.sessions.isaac_native_io:create_isaac_native_runtime_io',
+# These are concrete source-to-native layout checks called by the adapters.
+# A caller-provided string is never executed; only matching object/capability
+# pairs produced by the Core assessment can be provisional.
+_LAYOUT_CHECKS = frozenset({
+    'task_env.runtime.sessions.mujoco:check_mujoco_named_layout',
+    'task_env.runtime.sessions.geophys:check_geophys_named_layout',
+    'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
 })
+_LAYOUT_CAPABILITY_PREFIXES = {
+    'joint_state_query': ('joint:', 'state:joint:'),
+    'free_body': ('free:',),
+    'body_pose_query': ('body:',),
+    'frame_pose_query': ('frame:', 'state:frame:'),
+    'joint_position_actuation': ('actuator:',),
+    'joint_torque_actuation': ('actuator:',),
+}
+
+
+def _layout_check_covers_row(row):
+    prefixes = _LAYOUT_CAPABILITY_PREFIXES.get(row.capability_id, ())
+    if not row.object_ref.startswith(prefixes):
+        return False
+    if row.object_ref.startswith('state:'):
+        parts = row.object_ref.rsplit(':', 3)
+        if len(parts) != 4 or not all(parts):
+            return False
+        field = parts[1]
+        return ((row.capability_id == 'joint_state_query' and field in {'joint_position', 'joint_velocity'})
+                or (row.capability_id == 'frame_pose_query' and field == 'frame_pose_world'))
+    return any(row.object_ref.startswith(prefix) and len(row.object_ref) > len(prefix)
+               for prefix in prefixes)
 
 
 @dataclass(frozen=True)
@@ -1903,7 +1928,8 @@ class CapabilityAssessmentV1(Contract):
                     or row.requirement_status == 'unsatisfied'):
                 return 'rejected'
             if row.provider_api == 'unknown' or row.requirement_status == 'unknown':
-                if self.phase in {'native_build', 'runtime'} or row.build_oracle not in _ASSESSMENT_BUILD_ORACLES:
+                if (self.phase in {'native_build', 'runtime'} or row.build_oracle not in _LAYOUT_CHECKS
+                        or not _layout_check_covers_row(row)):
                     return 'rejected'
                 pending = True
         return 'pending_native_build' if pending else 'static_admitted'

@@ -205,13 +205,10 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
         env.close()
 
 
-def test_public_factory_remote_reset_step_and_recorder_receipt(monkeypatch, tmp_path):
-    """Real public path plus fake session; this is not a physics result."""
-    import json
+def test_public_factory_remote_rejects_unchecked_fixture(monkeypatch):
+    """A synthetic session without the production layout check cannot reset."""
     from task_env import make_env
     from task_env.runtime.sessions import transport
-    from task_env.trajectory.canonical.h5 import load
-
     fake_bootstrap = PRODUCTION_BOOTSTRAP_FAKE_SESSION.replace(
         "api._materialize_admitted = lambda *args, **kwargs: FakeSession()",
         "from task_env.diagnostics.tasks.test_selected_consumers import FakeSession as FixtureSession\n"
@@ -224,29 +221,11 @@ def test_public_factory_remote_reset_step_and_recorder_receipt(monkeypatch, tmp_
                       'interpreter': sys.executable},
         'episode': {'horizon': 3}, 'task': {'controller_profile': 'r3_continuous_v1'},
     })
-    process = None
     try:
-        before = env.get_execution_receipt()
-        assert before['native_effective']['status'] == 'unknown'
-        obs, info = env.reset(seed=31)
-        process = env.session._process
-        receipt = info['execution_configuration_v1']
-        assert receipt['request_identity'] == env.get_execution_receipt()['request_identity']
-        assert receipt['dependency']['status'] == 'available'
-        assert receipt['native_effective']['status'] == 'unknown'
-        assert json.loads(json.dumps(receipt)) == receipt
-        env.start_recording(tmp_path / 'offline.h5')
-        env.prepare_expert()
-        env.step_expert()
-        env.finish_recording('bounded_fixture')
-        metadata = load(tmp_path / 'offline.h5').to_mapping()['metadata']
-        recorded = json.loads(metadata['source_provenance']['execution_receipt_json'])
-        assert recorded == receipt
-        replay_config = json.loads(metadata['source_provenance']['execution_configuration_json'])
-        assert replay_config['execution']['deployment'] == 'isolated_worker'
+        with pytest.raises(RuntimeError, match='layout was not checked'):
+            env.reset(seed=31)
     finally:
         env.close()
-    assert process is not None and process.poll() == 0
 
 
 def test_malformed_json_reply_terminates_owned_worker(tmp_path):

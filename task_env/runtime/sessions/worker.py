@@ -69,7 +69,7 @@ def _materialize_selected(payload):
         actual = source_execution_facts(artifact, execution, source, value['controller'])
         if actual != payload['facts']:
             raise ValueError('worker rebuilt source/Artifact/execution/Controller identity mismatch')
-        for name in ('artifact_identity', 'source_id', 'source_xml_sha256', 'source_closure', 'scene_identity', 'controller_identities'):
+        for name in ('artifact_identity', 'source_id', 'source_bindings', 'source_xml_sha256', 'source_closure', 'scene_identity', 'controller_identities'):
             if actual[name] != identity_facts[name]:
                 raise ValueError(f'worker rebuilt source differs from preflight {name}')
         if artifact.timebase.to_mapping() != identity_facts['timebase']:
@@ -82,6 +82,10 @@ def _materialize_selected(payload):
             binding=binding, dependency_status=dependency['status'],
             request_identity=payload['preflight_request_identity'],
         )
+        plan = value.get('controller_binding_plan')
+        if (assessment.to_mapping()['rows'] != identity_facts.get('assessment_rows')
+                or (None if plan is None else plan.identity_hash) != identity_facts.get('control_binding_plan')):
+            raise ValueError('worker rebuilt assessment or Controller plan differs from preflight')
         if assessment.decision == 'rejected':
             raise ValueError('worker rebuilt request failed capability preflight')
         selected = bind_selected_controller(value, binding=binding, provider=provider, backend=backend)

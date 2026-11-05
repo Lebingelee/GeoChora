@@ -309,15 +309,18 @@ class DeploymentPreflightError(ValueError):
         self.reason = reason
         self.phase = 'static_preflight'
         self.request_identity = receipt['request_identity']
+        receipt['status'] = 'rejected'
+        receipt['failure_reason'] = reason
         self.receipt = receipt
         super().__init__(f'{self.phase}: {reason}; request={self.request_identity}')
 
 
 def describe_execution_selection(selection, *, requested, task_uid, artifact, source, controller, seed):
     """Return a request-bound selection; native effective values remain unknown."""
-    from .transport import request_identity
+    from .transport import request_identity, source_binding_facts
     profiles = tuple(controller) if isinstance(controller, (tuple, list)) else (controller,)
-    controller_ids = [getattr(item, 'identity', None) for item in profiles]
+    controller_ids = [getattr(item, 'identity', None) or getattr(item, 'identity_sha256', None)
+                      for item in profiles]
     if any(not isinstance(item, str) or not item for item in controller_ids):
         raise ValueError('worker preflight requires Controller identities')
     scene = getattr(source, 'scene_definition', None)
@@ -325,6 +328,7 @@ def describe_execution_selection(selection, *, requested, task_uid, artifact, so
         'selection': selection.to_mapping(), 'requested': requested, 'task_uid': task_uid,
         'artifact_identity': artifact.identity_hash,
         'source_id': source.scene_source.source_id,
+        'source_bindings': source_binding_facts(source),
         'source_xml_sha256': (None if getattr(source.scene_source, 'xml', None) is None
                               else hashlib.sha256(source.scene_source.xml.encode()).hexdigest()),
         'source_closure': getattr(source, 'source_closure_digest', None),
@@ -351,6 +355,18 @@ def preflight_selected_deployment(selection, *, requested, task_uid, artifact, s
 
     def assess(status):
         from .api import assess_selected_request
+        assessment = assess_selected_request(
+            selection=selection, artifact=artifact, source=source, value=value, binding=binding,
+            dependency_status=status, request_identity=receipt['request_identity'],
+        )
+        # Bind the actual declaration projection (without its outer request ID)
+        # into the canonical request before publishing the final assessment.
+        from .transport import request_identity
+        receipt['identity_facts']['assessment_rows'] = assessment.to_mapping()['rows']
+        plan = value.get('controller_binding_plan') or value.get('leaf_plan')
+        receipt['identity_facts']['control_binding_plan'] = (None if plan is None else
+            getattr(plan, 'identity_hash', None) or plan.identity_sha256)
+        receipt['request_identity'] = request_identity(receipt['identity_facts'])
         assessment = assess_selected_request(
             selection=selection, artifact=artifact, source=source, value=value, binding=binding,
             dependency_status=status, request_identity=receipt['request_identity'],
@@ -383,4 +399,66 @@ def preflight_selected_deployment(selection, *, requested, task_uid, artifact, s
     if assessment.decision == 'rejected':
         raise DeploymentPreflightError('capability_rejected', receipt)
     receipt['status'] = assessment.decision
+    return receipt
+
+
+def bind_selected_build_checks(receipt, facts, *, materialization_id):
+    """Bind concrete adapter layout facts to the same static request.
+
+    This records only named layout/read-view checks, not physical qualification
+    or a native-effective parameter readback.
+    """
+    if not isinstance(facts, dict) or not isinstance(facts.get('objects'), dict):
+        raise ValueError('adapter did not return request-specific named layout facts')
+    identity = receipt['identity_facts']
+    if (facts.get('provider') != receipt['resolved']['physics_provider']
+            or facts.get('source_id') != identity['source_id']
+            or facts.get('source_closure') != identity['source_closure']
+            or facts.get('materialization_id') != materialization_id):
+        raise ValueError('adapter layout facts differ from preflight source or materialization')
+    groups = {'joint': 'joints', 'free': 'free_joints', 'body': 'bodies',
+              'frame': 'frames', 'actuator': 'actuators'}
+    fields = {'joints': 'joints', 'free_joints': 'free_joints', 'bodies': 'bodies',
+              'frames': 'frames', 'joint_targets': 'actuators',
+              'torque_actuators': 'actuators', 'position_actuators': 'actuators'}
+    declared = identity['source_bindings']
+    for source_field, checked_field in fields.items():
+        for semantic, native in declared[source_field].items():
+            checked_object = facts['objects'].get(checked_field, {}).get(semantic)
+            if not isinstance(checked_object, dict) or checked_object.get('native') != native:
+                raise ValueError(f'adapter layout differs from declared binding: {source_field}/{semantic}')
+    for native in declared['open_actuators']:
+        checked_object = facts['objects'].get('actuators', {}).get('open:' + native)
+        if not isinstance(checked_object, dict) or checked_object.get('native') != native:
+            raise ValueError(f'adapter layout lacks declared opening actuator: {native}')
+    checked = []
+    for row in receipt['assessment']['rows']:
+        if row['requiredness'] != 'required' or row['requirement_status'] != 'unknown':
+            continue
+        if row['build_oracle'] != facts.get('helper'):
+            raise ValueError('adapter layout helper differs from pending requirement')
+        ref = row['object_ref']
+        if ref.startswith('state:'):
+            matched = False
+            for kind, field in (('joint', 'joints'), ('frame', 'frames'), ('frame', 'bodies')):
+                for semantic in facts['objects'].get(field, {}):
+                    if ref.startswith('state:' + kind + ':' + semantic + ':'):
+                        matched = True
+                        break
+                if matched:
+                    break
+        else:
+            kind, _, semantic = ref.partition(':')
+            matched = semantic in facts['objects'].get(groups.get(kind, ''), {})
+        if not matched:
+            raise ValueError(f'adapter build did not check required object: {ref}')
+        checked.append(ref)
+    receipt['build_checks'] = {
+        'schema_version': 'selected-build-layout-checks-v1',
+        'request_identity': receipt['request_identity'],
+        'materialization_id': materialization_id,
+        'phase': 'native_build', 'status': 'checked',
+        'checked_requirements': checked, 'adapter_facts': facts,
+        'scope': 'named layout and bound public state views; no physical qualification or parameter readback',
+    }
     return receipt

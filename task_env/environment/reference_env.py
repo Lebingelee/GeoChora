@@ -1380,7 +1380,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             requested = (None if resolved.requested_execution_json is None
                          else json.loads(resolved.requested_execution_json))
             facts = dict(requested=requested, task_uid=self.uid, artifact=self.artifact,
-                         source=self.value['source'], controller=self.value['controller'], seed=seed)
+                         source=self.value['source'],
+                         controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
             if selection.deployment == 'isolated_worker':
                 if (self._mixed_control_candidate or self.leaf_position_profile
                         or self.dual_entity_position or self._diagnostic_profile is not None
@@ -1446,10 +1447,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             replacement_receipt = getattr(
                 self.value.get('source'), 'execution_source_receipt', None,
             )
-            if (deployment_receipt is not None and
-                    getattr(self.value.get('source'), 'source_closure_digest', None)
-                    != deployment_receipt['identity_facts']['source_closure']):
-                raise ValueError('selected source closure changed after preflight')
+            if deployment_receipt is not None:
+                from ..runtime.sessions.transport import source_binding_facts
+                if (getattr(self.value.get('source'), 'source_closure_digest', None)
+                        != deployment_receipt['identity_facts']['source_closure']
+                        or source_binding_facts(self.value['source'])
+                        != deployment_receipt['identity_facts']['source_bindings']):
+                    raise ValueError('selected source closure or bindings changed after preflight')
             if previous_receipt is not None and previous_receipt is not replacement_receipt:
                 previous_receipt.close()
             if self._mixed_control_candidate or self._native_feedback_profile is not None:
@@ -1469,6 +1473,26 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.binding.validate_external_solution(self.value, self.solution)
             self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
+            if deployment_receipt is not None:
+                from ..runtime.sessions.api import assess_selected_request
+                from ..runtime.sessions.provenance import describe_execution_selection
+                rebuilt = describe_execution_selection(
+                    selection, requested=requested, task_uid=self.uid, artifact=self.artifact,
+                    source=self.value['source'],
+                    controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
+                if (rebuilt['identity_facts']['artifact_identity'] != deployment_receipt['identity_facts']['artifact_identity']
+                        or rebuilt['identity_facts']['controller_identities'] != deployment_receipt['identity_facts']['controller_identities']):
+                    raise ValueError('selected Artifact or Controller changed after preflight')
+                reassessed = assess_selected_request(
+                    selection=selection, artifact=self.artifact, source=self.value['source'],
+                    value=self.value, binding=self.binding,
+                    dependency_status=deployment_receipt['dependency']['status'],
+                    request_identity=deployment_receipt['request_identity'])
+                plan = self.value.get('controller_binding_plan') or self.value.get('leaf_plan')
+                if (reassessed.to_mapping()['rows'] != deployment_receipt['identity_facts']['assessment_rows']
+                        or (None if plan is None else getattr(plan, 'identity_hash', None) or plan.identity_sha256)
+                        != deployment_receipt['identity_facts']['control_binding_plan']):
+                    raise ValueError('selected declarations or Controller plan changed after preflight')
             self.dual_entity_position = len(self.position_profiles) == 2
             failure_phase = 'reset_sample'
             if self.position_profile:
@@ -1580,6 +1604,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def reset_runtime():
             nonlocal failure_phase
+            if deployment_receipt is not None:
+                from ..runtime.sessions.provenance import bind_selected_build_checks
+                failure_phase = 'build_layout_receipt'
+                bind_selected_build_checks(deployment_receipt, self.session.build_layout_facts,
+                    materialization_id=self.session.provider_materialization_id)
             failure_phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
@@ -3374,7 +3403,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 receipt = describe_execution_selection(
                     resolved.execution_spec_v2, requested=requested, task_uid=self.uid,
                     artifact=self.artifact, source=self.value['source'],
-                    controller=self.value['controller'], seed=None,
+                    controller=self.value.get('controller', self.value.get('leaf_plan')), seed=None,
                 )
         return json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
 
@@ -3505,7 +3534,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self._has_component_assembly():
             return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
         if not getattr(self, 'mixed_control_profile', False):
-            raise StageUnavailableError('selected reference recording metadata is unavailable on this route')
+            if getattr(self, 'position_profile', False):
+                return self._position_record_metadata()
+            return {'execution_configuration_v1': self.get_execution_receipt()}
         value = self._mixed_record_metadata
         if value is None:
             value = self.binding.mixed_record_metadata(self)

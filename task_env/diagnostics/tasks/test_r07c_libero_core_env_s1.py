@@ -666,7 +666,7 @@ def _pose_hold_action(observation, gripper=0.0):
 
 
 def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfast",
-                               object_poses=(("payload", "payload"),)):
+                               object_poses=(("payload", "payload"),), install_fake_sdk=True):
     """Build a different-name, different-dimension candidate through production owners."""
     import hashlib
     from gymnasium.spaces import Box, Dict
@@ -687,7 +687,8 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfa
     from task_env.runtime.sessions.source import ExecutionSourceReceiptV1, RuntimeSource
     from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
-    _fake_api(monkeypatch)
+    if install_fake_sdk:
+        _fake_api(monkeypatch)
     _FAKE_WORLD.contact_pair = lambda model, data: (
         model._geom_ids["anchor_collision"], model._geom_ids["payload_collision"],
     )
