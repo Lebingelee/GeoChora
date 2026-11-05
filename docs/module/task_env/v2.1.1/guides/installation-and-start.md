@@ -19,6 +19,8 @@
 
 `examples/start.py` 只转调现有示例或 scalar public factory，不安装依赖、不自动切 provider。脚本、解释器和 `--geophys-src` 均需指向本次希望使用的安装；`--core` 默认是脚本所在 checkout，若显式提供其他 checkout 会报错。
 
+2026-11-05 已在已有 Python 环境、`08a728ea` 源码上，通过本启动器的显式路径运行 Pendulum／GeoPhys／CPU／state-only 一次 reset、step、close；观测符合空间，锁和资源收据见[恢复后的验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。这只验证该环境中的一条启动路径，不代表新安装或其他组合已验证。
+
 ```sh
 CORE=/absolute/path/to/GeoChora
 PY=/absolute/path/to/core-python

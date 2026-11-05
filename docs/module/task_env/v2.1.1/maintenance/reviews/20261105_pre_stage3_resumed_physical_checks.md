@@ -14,3 +14,5 @@
 reader 在独立进程运行，输出报告未加载 native 模块。此结果只覆盖上述两条 MuJoCo CPU 路线及其记录读取，不构成 D0、Qualification、其他 provider 或全新安装验收。此前源码的证据不重标；此前续作的新职责调整仍待 Sol 独立复审。Marker 构造、F06 任务与 runtime 职责、诊断归位和完整新手入口等保留项仍按规划判断，阶段3未开始。
 
 F04 篡改测试后续改为每个 pytest worker、每种来源按需复用一份临时副本；每个用例在 `finally` 恢复被篡改文件，module fixture 结束时删除副本。六种实际篡改用例在禁止引擎导入的进程中 **6 passed**；受监控输出峰值 248783523 bytes，结束后输出目录约 2657 bytes。输出及 supervisor 记录位于 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/f04-reuse-verification-20261105/`。该修改仅针对测试，不重标上述物理运行的源码身份。
+
+在 tracked clean `08a728ea` 通过 `examples/start.py` 指定已有 Python 和 GeoPhys 源码路径，执行 Pendulum／GeoPhys CPU／state-only seed 73 的 reset、一个 transition 和 close，观测空间检查通过，进程返回 0。两把锁按序获取及释放，worker 进程组退出，峰值 RSS 720629760 bytes；完整 argv、stdout/stderr 和 supervisor 位于 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/starter-geophys-pendulum-08a728ea/`。此运行额外保守预留 1000 物理步，累计预留 151807／160000，剩余 8193；仅验证已有安装中的最小启动路径，不代表全新安装或所有入口完成。
