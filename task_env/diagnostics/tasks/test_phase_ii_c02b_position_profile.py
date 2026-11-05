@@ -80,6 +80,30 @@ def _candidate(scene, tmp_path):
     return declared_source, artifact, reset_plan, source, file_count
 
 
+@pytest.fixture(scope='module')
+def position_candidate(tmp_path_factory):
+    """Share one verified, read-only Panda source closure across this test module."""
+    import shutil
+    from task_env.assembly.assets import _source_closure_digest
+    from task_env.tasks.position_candidate.source import EXPECTED_PANDA_CLOSURE
+
+    root = tmp_path_factory.mktemp('c02b-position-shared')
+    try:
+        scene = _a05_scene()
+        candidate = _candidate(scene, root)
+        snapshot = root / 'panda-snapshot'
+        def snapshot_digest():
+            files = {p.relative_to(snapshot).as_posix(): p.read_bytes()
+                     for p in snapshot.rglob('*') if p.is_file()}
+            assert len(files) == 68
+            return _source_closure_digest(files)
+        assert snapshot_digest() == EXPECTED_PANDA_CLOSURE
+        yield scene, candidate
+        assert snapshot_digest() == EXPECTED_PANDA_CLOSURE
+    finally:
+        shutil.rmtree(root)
+
+
 def _typed_publication(scene, reset_plan, *, step=0, state_revision=None):
     sample = reset_plan.reset_sample
     revision = step if state_revision is None else state_revision
@@ -186,9 +210,9 @@ class _PositionSessionProbe:
         return SimpleNamespace(control_step=self.publication.view.boundary.control_step)
 
 
-def test_position_profile_binds_hand_origin_tcp_a05_mapping_and_100hz_candidate(tmp_path):
-    scene = _a05_scene()
-    _declared_source, artifact, reset_plan, source, _file_count = _candidate(scene, tmp_path)
+def test_position_profile_binds_hand_origin_tcp_a05_mapping_and_100hz_candidate(position_candidate):
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _file_count = candidate
     profile = PandaPositionServoProfileV1.from_source(artifact, source)
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
 
@@ -223,9 +247,9 @@ def test_position_profile_binds_hand_origin_tcp_a05_mapping_and_100hz_candidate(
     assert not any(item.field_name == 'actuator_force' for item in requirements)
 
 
-def test_typed_hand_and_joint_state_adapt_to_canonical_controller_inputs(tmp_path):
-    scene = _a05_scene()
-    _declared_source, artifact, reset_plan, source, _ = _candidate(scene, tmp_path)
+def test_typed_hand_and_joint_state_adapt_to_canonical_controller_inputs(position_candidate):
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
     profile = PandaPositionServoProfileV1.from_source(artifact, source)
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     publication = _typed_publication(scene, reset_plan)
@@ -244,9 +268,9 @@ def test_typed_hand_and_joint_state_adapt_to_canonical_controller_inputs(tmp_pat
     assert requested.schema_id == plan.controller_bindings[0].action_schema.schema_id
 
 
-def test_structured_position_preflight_then_single_writer_apply_and_five_step_interval(tmp_path):
-    scene = _a05_scene()
-    _declared_source, artifact, reset_plan, source, _ = _candidate(scene, tmp_path)
+def test_structured_position_preflight_then_single_writer_apply_and_five_step_interval(position_candidate):
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
     profile = PandaPositionServoProfileV1.from_source(artifact, source)
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     publication = _typed_publication(scene, reset_plan)
@@ -270,14 +294,14 @@ def test_structured_position_preflight_then_single_writer_apply_and_five_step_in
 
 @pytest.mark.parametrize("provider", ("geophys", "mujoco"))
 def test_position_candidate_admission_binds_profile_and_disables_force_cache(
-    provider, monkeypatch, tmp_path,
+    provider, monkeypatch, position_candidate,
 ):
     from task_env.artifacts import ExecutionSpec
     from task_env.runtime.sessions import control as control_sessions
     from task_env.runtime.sessions.control import ControlBinding, materialize_control
 
-    scene = _a05_scene()
-    _declared_source, artifact, _reset_plan, source, _ = _candidate(scene, tmp_path)
+    scene, candidate = position_candidate
+    _declared_source, artifact, _reset_plan, source, _ = candidate
     profile = PandaPositionServoProfileV1.from_source(artifact, source)
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     session = SimpleNamespace()
@@ -333,9 +357,9 @@ def test_position_candidate_admission_binds_profile_and_disables_force_cache(
     assert len(calls) == 1
 
 
-def test_invalid_groups_wrong_identity_and_duplicate_or_stale_targets_reject_before_extra_write(tmp_path):
-    scene = _a05_scene()
-    _declared_source, artifact, reset_plan, source, _ = _candidate(scene, tmp_path)
+def test_invalid_groups_wrong_identity_and_duplicate_or_stale_targets_reject_before_extra_write(position_candidate):
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
     profile = PandaPositionServoProfileV1.from_source(artifact, source)
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     publication = _typed_publication(scene, reset_plan)
@@ -491,12 +515,12 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
         geo.control_feedback('state')
 
 
-def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypatch, tmp_path):
+def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypatch, position_candidate):
     from task_env.tasks.reference_env import SelectedReferenceEnv
     from task_env.runtime.sessions import control as control_sessions
 
-    scene = _a05_scene()
-    _declared_source, artifact, _reset_plan, _source, _ = _candidate(scene, tmp_path)
+    scene, candidate = position_candidate
+    _declared_source, artifact, _reset_plan, _source, _ = candidate
     before = SimpleNamespace(control_step=0, simulation_time=0.0)
     selected = object.__new__(SelectedReferenceEnv)
     selected.horizon = 10
