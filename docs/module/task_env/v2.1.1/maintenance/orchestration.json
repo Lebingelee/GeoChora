@@ -42,7 +42,7 @@
     "attempt_planned": 1,
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
     "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/prompt.md",
-    "prompt_sha256": "a4e99dc1af905af46033784d472bef16a65a220e26af6d2893371bce3839f4db",
+    "prompt_sha256": "36587fd7a161045e80a043a153d139efee488445564e4b42e2f30511f5b2e593",
     "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/input-snapshot.json",
     "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/manifest.json",
     "expected_active_minutes": "150-210",
