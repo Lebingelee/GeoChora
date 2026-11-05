@@ -29,12 +29,13 @@ def _assess(env, dependency, *, artifact=None, source=None, value=None, selectio
     )
 
 
-def test_real_task_without_asset_closure_fails_closed_and_does_not_infer_provider_evidence(selected):
+def test_real_task_closure_is_bound_and_does_not_infer_provider_evidence(selected):
     env, dependency = selected
     assessment = _assess(env, dependency)
-    assert assessment.decision == 'rejected'
+    assert assessment.decision == 'pending_native_build'
     closure = next(row for row in assessment.rows if row.capability_id == 'source_closure')
-    assert closure.requirement_status == 'unsatisfied' and 'no source-bound receipt' in closure.reason
+    assert closure.requirement_status == 'satisfied'
+    assert env.value['source'].execution_source_receipt is not None
     assert assessment.request_identity == env.get_execution_receipt()['request_identity']
     assert all(row.provider_api == 'unknown' and row.evidence == 'none' for row in assessment.rows)
     assert {'source_closure', 'controller_binding', 'scalar_layout', 'state_only_renderer'} <= {

@@ -46,7 +46,7 @@ selected 的 `execution` 可指定 provider/backend/device、host/engine、solve
 
 当前实现只接受 scalar、state-only 和与 task cadence 相同的 native dt。GeoPhys 默认从 `GEOCHORA_GEOPHYS_PYTHON`、Isaac 从 `ISAAC_SIM_PYTHON` 选择隔离解释器；MuJoCo 默认当前解释器，可用 `GEOCHORA_CORE_PYTHON` 显式选择。必须满足对应依赖与当前源码 origin，缺失或冲突会在关闭已有 session 前拒绝。
 
-**已知兼容性缺口：**普通 PickCube／Nut 的既有 MJCF 来源没有完整资产闭包回执，因此当前 3a 预检会拒绝其 reset；这不是 provider 不支持或原生测试结果。必须由后续有界工作提供可核验的来源闭包并恢复原有兼容路线；不要将本次变更视为已接收。F06 的精确 USD 来源约束仍适用，尚未进行真实 SDK 构建。
+普通 PickCube／Nut 的 MJCF 会捕获其实际引用的 Panda 资源，并把原始 XML 和导入快照绑定到同一来源回执；MuJoCo 使用回执中的相同资源字节。attempt002 的 PickCube seed31、Nut seed19 已分别完成真实 MuJoCo CPU reset 和 10 步有界检查，结果待 Sol 复审；不推及其他后端、任务成功或资格。F06 的精确 USD 来源约束仍适用。
 
 ## 当前 selected 路线
 

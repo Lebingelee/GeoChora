@@ -111,7 +111,10 @@ def test_missing_asset_closure_rejects_before_existing_session_is_closed(monkeyp
     from types import SimpleNamespace
     from task_env import make_env
     from task_env.runtime.sessions.provenance import DeploymentPreflightError
+    from dataclasses import replace
     env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
+    original_source = env.value['source']
+    env.value['source'] = replace(original_source, execution_source_receipt=None, source_closure_digest=None)
     effects = []
     sentinel = SimpleNamespace(close=lambda: effects.append('session.close'))
     env.session = sentinel
@@ -127,4 +130,5 @@ def test_missing_asset_closure_rejects_before_existing_session_is_closed(monkeyp
         assert env.session is sentinel and effects == []
     finally:
         env.session = None
+        env.value['source'] = original_source
         env.close()

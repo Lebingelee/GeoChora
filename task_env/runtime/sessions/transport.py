@@ -126,9 +126,12 @@ def _receive(sock):
             result[key] = item
         return result
     try:
-        return json.loads(exact(size), parse_constant=bad_constant, object_pairs_hook=unique_pairs)
+        value = json.loads(exact(size), parse_constant=bad_constant, object_pairs_hook=unique_pairs)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise TransportProtocolError('invalid transport JSON') from exc
+    if not isinstance(value, dict):
+        raise TransportProtocolError('transport message must be a JSON object')
+    return value
 
 
 def _episode(session):

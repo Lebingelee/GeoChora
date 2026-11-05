@@ -178,6 +178,66 @@ class ExecutionSourceReceiptV1:
             owner.cleanup()
 
 
+def snapshot_legacy_mjcf_source(source):
+    """Capture the files actually referenced by an existing Panda MJCF source.
+
+    Canonical XML remains unchanged. The importer XML points at the existing
+    receipt snapshot and its bytes are consumed directly by the adapter.
+    """
+    from dataclasses import replace
+    from ...utils._paths import MUJOCO_MENAGERIE_ROOT
+    if source.scene_definition is not None or source.execution_source_receipt is not None:
+        return source
+    xml = source.scene_source.xml
+    root = ET.fromstring(xml)
+    compiler = root.find('compiler')
+    if compiler is None:
+        raise ValueError('selected MJCF source has no compiler')
+    allowed = (MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets').resolve()
+    files = {'canonical-source.xml': xml.encode('utf-8')}
+    total = 0
+    for node in root.iter():
+        raw = node.get('file')
+        if raw is None:
+            continue
+        if node.tag not in {'mesh', 'skin', 'texture'}:
+            raise ValueError(f'unsupported MJCF external reference: {node.tag}')
+        rel = Path(raw)
+        if rel.is_absolute() or '\\' in raw or any(part in {'', '.', '..'} for part in rel.parts):
+            raise ValueError(f'unsafe MJCF asset reference: {raw!r}')
+        attr = 'texturedir' if node.tag == 'texture' else 'meshdir'
+        directory = Path(compiler.get(attr, compiler.get('meshdir', ''))).resolve()
+        if directory != allowed:
+            raise ValueError(f'selected MJCF {attr} differs from pinned Panda assets')
+        path = (directory / rel).resolve()
+        try:
+            path.relative_to(allowed)
+        except ValueError as exc:
+            raise ValueError('MJCF asset escaped pinned Panda assets') from exc
+        if not path.is_file():
+            raise ValueError(f'MJCF asset is missing: {raw!r}')
+        data = path.read_bytes()
+        total += len(data)
+        if total > 128 * 1024 * 1024:
+            raise ValueError('selected MJCF referenced assets exceed 128 MiB')
+        key = 'assets/' + rel.as_posix()
+        if key in files and files[key] != data:
+            raise ValueError(f'MJCF asset alias differs: {key}')
+        files[key] = data
+    compiler.set('meshdir', 'assets')
+    if compiler.get('texturedir') is not None:
+        compiler.set('texturedir', 'assets')
+    importer = ET.tostring(root, encoding='utf-8')
+    receipt = ExecutionSourceReceiptV1.create(source_id=source.scene_source.source_id,
+        canonical_xml=xml.encode('utf-8'), importer_xml=importer, closure_files=files)
+    try:
+        return replace(source, execution_source_receipt=receipt,
+                       source_closure_digest=receipt.source_closure_digest)
+    except BaseException:
+        receipt.close()
+        raise
+
+
 def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: SceneDefinition) -> str:
     """Apply the bounded v3 scalar-joint projection to an MJCF source.
 

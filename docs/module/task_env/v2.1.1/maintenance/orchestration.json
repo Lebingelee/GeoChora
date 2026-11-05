@@ -32,10 +32,10 @@
   "next_candidate": {
     "substage": "3a",
     "package_id": "V211_G03_3a_attempt002",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "assigned_agent": null,
+    "status": "REPORTED_PENDING_SOL_REVIEW",
+    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
     "target_thread": null,
-    "assignment": "Maintainer designates one Terra/Luna and forwards manually; preparation does not consume attempt2.",
+    "assignment": "Maintainer forwarded revision 2; execution reported and Sol review pending.",
     "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
     "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
     "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
@@ -72,7 +72,7 @@
     },
     "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence."
   },
-  "next_action": "维护者手动指定并转发3a attempt002 revision2：先修真实source/reset主线，完成PickCube31/Nut19真实MuJoCo CPU创建/reset/10步/close；只做受影响检查、旧证据直接引用。3b及Isaac兼容后续安排不变。",
+  "next_action": "维护者转交 attempt002 报告，由 Sol 独立审阅两例真实 MuJoCo CPU 恢复及尚未完成的3a范围；不自动进入3b。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -738,8 +738,8 @@
             "1d",
             "2c"
           ],
-          "status": "REWORK_REQUIRED_3A",
-          "attempt_count": 1,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -756,35 +756,38 @@
               "finished_at": "2026-11-05T15:57:19+08:00",
               "sol_review_ref": "reviews/20261105_3a_attempt001_sol_review.md",
               "review_decision": "REWORK_REQUIRED_3A"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G03_3a_attempt002",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T16:45:38+08:00",
+              "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "81e257cbef6c3469ba23fadcfe481d93b114f4d1",
+              "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
+              "result": "CORE_RUNTIME_RECOVERY_PASS",
+              "summary_ref": "reviews/20261105_3a_attempt002_execution.md",
+              "writer_ownership": "released after commit and report"
             }
           ],
           "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt001",
-          "package_sha256": "fcb88f6ff05201b602b7da15f436b030df3560cd9ad6b78b75d89032eaeb4550",
-          "input_head": "40ca5d56153b9e13848b20c2af550c1efe076b98",
-          "output_head": "32397283e635148788848c0c009e5223d40333df",
-          "expected_duration_minutes": "120–150; hard 180",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
+          "package_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64",
+          "input_head": "81e257cbef6c3469ba23fadcfe481d93b114f4d1",
+          "output_head": null,
+          "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "Sol independently verified hashes, reproduced both ordinary reset regressions, named-mapping assessment omission and malformed worker response cleanup defect; 3a not accepted.",
+          "last_observation": "attempt002: real MuJoCo CPU PickCube31 and Nut19 each completed reset, 10 steps and close; broader 3a pending Sol review.",
           "evidence_refs": [
-            "reviews/20261105_3a_attempt001_execution.md",
-            "reviews/20261105_3a_attempt001_sol_review.md"
+            "reviews/20261105_3a_attempt002_execution.md"
           ],
           "commits": [
             "32397283e635148788848c0c009e5223d40333df"
           ],
-          "review_decision": {
-            "status": "REWORK_REQUIRED_3A",
-            "reviewer": "Sol",
-            "date": "2026-11-05",
-            "review_ref": "reviews/20261105_3a_attempt001_sol_review.md",
-            "deployment_or_native_approval": false
-          },
+          "review_decision": null,
           "blockers": [
-            "R1 ordinary MJCF closure / public reset regression",
-            "R2 exact per-capability build oracles",
-            "R3 nested named channels / typed requirements",
-            "R4 malformed worker replies escape cleanup"
+            "Per-capability build oracle and broader nested/typed assessment remain incomplete.",
+            "GeoPhys and Isaac native routes have not been exercised."
           ]
         },
         {

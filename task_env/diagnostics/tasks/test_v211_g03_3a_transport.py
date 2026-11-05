@@ -140,17 +140,6 @@ def find_spec(name, package=None):
     return real_find_spec(name, package)
 importlib.util.find_spec = find_spec
 from task_env.runtime.sessions import api, worker
-# Synthetic worker fixture only: preserve all real assessment rows except the
-# intentionally unavailable large-asset closure receipt.
-from dataclasses import replace
-actual_assess = api.assess_selected_request
-def fixture_assess(**kwargs):
-    result = actual_assess(**kwargs)
-    return replace(result, rows=tuple(
-        replace(row, requirement_status='satisfied')
-        if row.capability_id == 'source_closure' and 'no source-bound receipt' in row.reason
-        else row for row in result.rows))
-api.assess_selected_request = fixture_assess
 class FakeSession:
     provider_materialization_id = 'fixture-materialization'
     def __init__(self): self._episode = None
@@ -168,21 +157,6 @@ worker.main()
 '''
 
 
-def _allow_fixture_only_missing_closure(monkeypatch):
-    # These transport tests replace the native materializer and deliberately
-    # bypass only the absent asset receipt. They establish no route admission.
-    from dataclasses import replace
-    from task_env.runtime.sessions import api
-    original = api.assess_selected_request
-    def assess(**kwargs):
-        result = original(**kwargs)
-        rows = tuple(replace(row, requirement_status='satisfied')
-                     if row.capability_id == 'source_closure' and 'no source-bound receipt' in row.reason
-                     else row for row in result.rows)
-        return replace(result, rows=rows)
-    monkeypatch.setattr(api, 'assess_selected_request', assess)
-
-
 def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkeypatch):
     from task_env import make_env
     from task_env.artifacts import ExecutionSpec
@@ -191,7 +165,6 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
     from task_env.runtime.sessions.provenance import probe_interpreter_environment
     from task_env.utils._paths import GEOCHORA_ROOT, GEOPHYS_PROVIDER_ROOT
 
-    _allow_fixture_only_missing_closure(monkeypatch)
     env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
     try:
         execution = ExecutionSpec('mujoco', PROFILE, 'none', 'cpu', 0, 'strict')
@@ -228,12 +201,6 @@ def test_production_worker_rebuilds_real_source_and_dispatches_to_fixture(monkey
         wrong = {**payload, 'facts': {**payload['facts'], 'source_xml_sha256': '0' * 64}}
         with pytest.raises(ValueError, match='identity mismatch'):
             transport.start_selected_worker(sys.executable, wrong)
-        # The production worker must reject the fabricated parent receipt
-        # when its own rebuilt source has no closure proof.
-        monkeypatch.setattr(transport, '_WORKER_BOOTSTRAP',
-            PRODUCTION_BOOTSTRAP_FAKE_SESSION.replace('api.assess_selected_request = fixture_assess', 'pass'))
-        with pytest.raises(ValueError, match='failed capability preflight'):
-            transport.start_selected_worker(sys.executable, payload)
     finally:
         env.close()
 
@@ -252,7 +219,6 @@ def test_public_factory_remote_reset_step_and_recorder_receipt(monkeypatch, tmp_
         "control.materialize_control = FixtureSession",
     )
     monkeypatch.setattr(transport, '_WORKER_BOOTSTRAP', fake_bootstrap)
-    _allow_fixture_only_missing_closure(monkeypatch)
     env = make_env('pick-cube-p16-reference-v1', config={
         'execution': {'physics_provider': 'mujoco', 'deployment': 'isolated_worker',
                       'interpreter': sys.executable},
@@ -281,3 +247,19 @@ def test_public_factory_remote_reset_step_and_recorder_receipt(monkeypatch, tmp_
     finally:
         env.close()
     assert process is not None and process.poll() == 0
+
+
+def test_malformed_json_reply_terminates_owned_worker(tmp_path):
+    from task_env.runtime.sessions.transport import TransportProtocolError
+    server = WORKER.replace(
+        "serve_session(sock, FakeSession(), 'a' * 64)",
+        "from task_env.runtime.sessions.transport import _send, _receive\n"
+        "_send(sock, {'kind':'ready', 'request_identity':'a'*64, "
+        "'materialization_id':'fake-materialization', 'methods':['snapshot'], 'properties':[]})\n"
+        "_receive(sock)\n_send(sock, [])\ntime.sleep(30)",
+    )
+    session, process, _ = _spawn(tmp_path, code=server)
+    with pytest.raises(TransportProtocolError, match='JSON object'):
+        session.snapshot()
+    assert process.poll() is not None
+    session.close()

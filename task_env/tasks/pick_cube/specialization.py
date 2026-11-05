@@ -173,7 +173,8 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_conf
         raise ValueError("PickCube reference backend must be cpu or cuda")
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
-    return compile_panda_box_source(declaration, artifact, config)
+    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
+    return snapshot_legacy_mjcf_source(compile_panda_box_source(declaration, artifact, config))
 
 
 def _source_identity_files(controller, solution_type, *, profile_source=None):
@@ -233,7 +234,8 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     if is_r3_profile:
         config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
-    artifact, source = compiled.artifact, compiled.source
+    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
+    artifact, source = compiled.artifact, snapshot_legacy_mjcf_source(compiled.source)
     posture_path_profile = (
         _PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP
         if controller_profile == "r3_continuous_v1_pose_path_x20"

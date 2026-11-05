@@ -112,7 +112,14 @@ class _MuJoCoSession(_SessionValues):
                 source.source_closure_digest,
             )
         else:
-            source_xml = source.scene_source.xml
+            receipt = source.execution_source_receipt
+            if receipt is None:
+                source_xml = source.scene_source.xml
+            else:
+                receipt.validate_snapshot()
+                source_xml = receipt.importer_xml.decode('utf-8')
+                assets = {name: payload for name, payload in receipt.closure_files.items()
+                          if name not in {'scene.xml', 'canonical-source.xml'}}
             legacy_root = ET.fromstring(source_xml)
             for element in legacy_root.iter('freejoint'):
                 element.tag = 'joint'

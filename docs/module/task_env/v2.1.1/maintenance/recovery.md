@@ -2,7 +2,11 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 3a attempt001：Sol已复审，需返工
+## 3a attempt002：真实 MuJoCo CPU 恢复待复审
+
+`V211_G03_3a_attempt002` 已返包，PickCube seed31 与 Nut seed19 各经公开 factory、reset、10步及 close 在真实 MuJoCo CPU 完成，均推进0.10秒。来源快照绑定实际引用文件与导入字节；具名映射和异常worker回复已作有界修复。全3a未自行接收，逐能力oracle、嵌套／typed、其他后端及资格仍未覆盖。详见[执行摘要](reviews/20261105_3a_attempt002_execution.md)，维护者手动交Sol审阅；不自动进入3b。
+
+## 历史：3a attempt001：Sol已复审，需返工
 
 Sol对 `32397283` 作出 `REWORK_REQUIRED_3A`：普通PickCube／Nut reset闭包回归、逐能力build oracle、嵌套／typed需求及错误worker回复清理未闭合；不可部署，不进入3b。完整证据与安排见[独立复审](reviews/20261105_3a_attempt001_sol_review.md)。attempt_count=1；下一候选为 `V211_G03_3a_attempt002`，准备不计attempt，仍由维护者指定Terra／Luna手动转发。使用同一分支。维护者最新要求已将未派发的attempt002修订为revision 2：先修核心source/reset接线，读取真实资产，让PickCube31和Nut19各在真实MuJoCo CPU上创建、reset、10步及close；只做必要受影响检查、旧证据直接引用。执行者转发后原生累计30分钟／2000物理步，Sol准备不启动引擎。详见[当前runtime-first安排](../planning/stage3-3a-execution.md#attempt002-runtime-first)。
 

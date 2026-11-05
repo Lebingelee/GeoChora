@@ -376,6 +376,9 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         if provider != 'geophys':
             raise ValueError('R05b native feedback profile is GeoPhys-only')
         runtime_source = _r05b_execution_source(runtime_source)
+    else:
+        from ...runtime.sessions.source import snapshot_legacy_mjcf_source
+        runtime_source = snapshot_legacy_mjcf_source(runtime_source)
     return runtime_source, contact_profile
 
 

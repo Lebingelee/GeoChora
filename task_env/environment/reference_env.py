@@ -1446,6 +1446,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             replacement_receipt = getattr(
                 self.value.get('source'), 'execution_source_receipt', None,
             )
+            if (deployment_receipt is not None and
+                    getattr(self.value.get('source'), 'source_closure_digest', None)
+                    != deployment_receipt['identity_facts']['source_closure']):
+                raise ValueError('selected source closure changed after preflight')
             if previous_receipt is not None and previous_receipt is not replacement_receipt:
                 previous_receipt.close()
             if self._mixed_control_candidate or self._native_feedback_profile is not None:

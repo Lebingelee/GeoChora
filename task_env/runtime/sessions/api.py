@@ -1398,6 +1398,24 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 _validate_v1_materialization_source(artifact, execution, source)
             elif source.scene_definition is not None and selection.physics_provider != 'geophys':
                 raise ValueError('Scene-v3 legacy projection is currently GeoPhys-only')
+            # Check names against this request's actual MJCF, not only the
+            # number of joints or actuators in its declared binding.
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(source.scene_source.xml)
+            joints = {node.get('name') for tag in ('joint', 'freejoint') for node in root.iter(tag)}
+            bodies = {node.get('name') for node in root.iter('body')}
+            sites = {node.get('name') for node in root.iter('site')}
+            actuators = root.find('actuator')
+            actuators = set() if actuators is None else {node.get('name') for node in actuators}
+            for label, requested, available in (
+                ('joint', (*source.joints.values(), *source.free_joints.values()), joints),
+                ('body', source.bodies.values(), bodies),
+                ('frame', source.frames.values(), sites),
+                ('actuator', (*source.joint_targets.values(), *source.open_actuators), actuators),
+            ):
+                missing = set(requested) - available
+                if missing:
+                    raise ValueError(f'selected source missing named {label}: {sorted(missing)}')
             receipt = source.execution_source_receipt
             if receipt is None or source.source_closure_digest is None:
                 raise ValueError('asset closure has no source-bound receipt; native import cannot prove the requested closure')
@@ -1451,7 +1469,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         for name in requirements.names:
             available = name in actual_capabilities
             row(name, owner + ':' + artifact.task_id, implemented=available,
-                reason=('adapter has a source-bound build check' if available
+                reason=('declared names are checked; native provider behavior remains unverified' if available
                         else 'required capability has no selected Core adapter'),
                 restrict=restricted is not None and name not in restricted)
     if selected is not None and selected.position:
