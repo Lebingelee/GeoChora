@@ -24,8 +24,9 @@ The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
 Construct them through `from task_env import make_env`. The NutAssembly and
 PickCube examples use a caller-owned Solution and `act → step(action) → observe`.
-The separate advanced R05b profile below uses a bounded caller-owned Solution
-route, which still invokes that Solution through the Env and is transitional.
+The advanced R05b profile below also supports caller-owned Solution actions; its
+legacy Env-driven Solution route remains transitional. Its new caller route has
+provider-free tests only.
 Task success and Expert lifecycle completion remain separate.
 
 An advanced bounded GeoPhys native-feedback profile is available through
