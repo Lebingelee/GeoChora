@@ -36,6 +36,40 @@ F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 
 
+def close_session_and_runtime_owner(
+    session, *, first_error=None, session_error_label, owner_error_label,
+    capture_close_receipt=False,
+):
+    """Close a materialized session and its owner, retaining the first fault.
+
+    The receipt is observed after session close and before owner close, as the
+    mixed-control session owns that evidence. The caller retains route-specific
+    finalization, source/task cleanup and publication of the receipt.
+    """
+    if session is None:
+        return first_error, None
+
+    def retain(error, label):
+        nonlocal first_error
+        if first_error is None:
+            first_error = error
+        else:
+            first_error.add_note(f'{label} also failed: {type(error).__name__}: {error}')
+
+    try:
+        session.close()
+    except BaseException as error:
+        retain(error, session_error_label)
+    receipt = getattr(session, 'close_receipt', None) if capture_close_receipt else None
+    try:
+        close_owner = getattr(session, 'close_runtime_owner', None)
+        if callable(close_owner):
+            close_owner()
+    except BaseException as error:
+        retain(error, owner_error_label)
+    return first_error, receipt
+
+
 def validate_selected_position_route(execution):
     """Check the bounded construction envelope, before source-specific admission.
 

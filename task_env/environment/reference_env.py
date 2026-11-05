@@ -34,7 +34,7 @@ from .types import ExecutionFaultV1, StageUnavailableError, attach_execution_fau
 from .lifecycle import EpisodeExecutionState, SingleTaskLifecycleAdapter, TaskLifecycleAdapter
 from .types import ControlCommand, SnapshotRequest, TaskCompositionSpec, TaskEvaluation
 from ..planners.completion import ExpertExecutionInfo
-from ..runtime.sessions.api import PROFILE, materialize
+from ..runtime.sessions.api import PROFILE, close_session_and_runtime_owner, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 from ..runtime.sessions.source import (
     position_frame_bindings_from_artifact as _position_frame_bindings_from_artifact,
@@ -3068,27 +3068,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             session_was_materialized = self.session is not None
             active_session, self.session = self.session, None
             if active_session is not None:
-                try:
-                    active_session.close()
-                except BaseException as error:
-                    if first_error is None:
-                        first_error = error
-                    else:
-                        first_error.add_note(
-                            f'mixed-control session close also failed: {type(error).__name__}: {error}'
-                        )
-                self._mixed_close_receipt = getattr(active_session, 'close_receipt', None)
-                try:
-                    close_owner = getattr(active_session, 'close_runtime_owner', None)
-                    if callable(close_owner):
-                        close_owner()
-                except BaseException as error:
-                    if first_error is None:
-                        first_error = error
-                    else:
-                        first_error.add_note(
-                            f'mixed-control Runtime owner close also failed: {type(error).__name__}: {error}'
-                        )
+                first_error, self._mixed_close_receipt = close_session_and_runtime_owner(
+                    active_session, first_error=first_error,
+                    session_error_label='mixed-control session close',
+                    owner_error_label='mixed-control Runtime owner close',
+                    capture_close_receipt=True,
+                )
             receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
             try:
                 if receipt is not None:
@@ -3152,22 +3137,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if not getattr(self, 'position_profile', False):
             first_error = None
             session, self.session = self.session, None
-            if session is not None:
-                try:
-                    session.close()
-                except BaseException as error:
-                    first_error = error
-                try:
-                    close_owner = getattr(session, 'close_runtime_owner', None)
-                    if callable(close_owner):
-                        close_owner()
-                except BaseException as error:
-                    if first_error is None:
-                        first_error = error
-                    else:
-                        first_error.add_note(
-                            f'Runtime owner close after session close also failed: {type(error).__name__}: {error}'
-                        )
+            first_error, _ = close_session_and_runtime_owner(
+                session, first_error=first_error,
+                session_error_label='session close',
+                owner_error_label='Runtime owner close after session close',
+            )
             receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
             try:
                 if receipt is not None:
@@ -3222,21 +3196,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 first_error, 'camera consumer close after Position finalization', error,
             )
         session, self.session = self.session, None
-        if session is not None:
-            try:
-                session.close()
-            except BaseException as error:
-                first_error = retain_cleanup_error(
-                    first_error, 'RuntimeSession close after Position finalization', error,
-                )
-            try:
-                close_owner = getattr(session, 'close_runtime_owner', None)
-                if callable(close_owner):
-                    close_owner()
-            except BaseException as error:
-                first_error = retain_cleanup_error(
-                    first_error, 'Runtime owner close after Position finalization', error,
-                )
+        first_error, _ = close_session_and_runtime_owner(
+            session, first_error=first_error,
+            session_error_label='RuntimeSession close after Position finalization',
+            owner_error_label='Runtime owner close after Position finalization',
+        )
         if first_error is not None:
             raise first_error
 

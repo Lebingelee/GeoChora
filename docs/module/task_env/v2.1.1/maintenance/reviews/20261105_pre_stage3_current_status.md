@@ -4,6 +4,8 @@
 
 **续作诊断修复**：R02c／R06b 的 hook 和 R04b／R04c 的合成测试指向实际 environment owner，避免写到兼容导出模块而无法拦截调用。R06b 合成测试适配当前 materialization 参数；仅该合成 fixture 模拟干净工作树，真实 worker 的冻结校验未放宽。禁止原生导入的 R06b 双 episode 与六种故障路径为 7 passed（59.15 秒），不构成物理验证。前六次尝试中的失败保留在 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/renewed-diagnostic-owner-001` 至 `007`；其中相机合成测试因禁止导入 `scene` 而未完成，不能将其记作通过。七次墙时合计 73.19 秒／新预算 3000 秒；本次使用 timeout 和外部 time，未采集进程树峰值 RSS，不能证明 RSS 门限。21 份生成的 source closure 逐文件 SHA 核对后保留两个唯一闭包、删除 19 份副本；清单在 `renewed-diagnostic-owner-source-copy-ledger.json`。后续测试应继续使用资源采样监督器。
 
+**续作关闭职责**：selected、mixed 和 Position 的 session／runtime owner 关闭顺序、第一故障及后续异常说明统一交 `runtime.sessions.api`；环境仍负责路线特定收尾及回执发布。工作树上无引擎检查 146 passed（8.025 秒，峰值采样约 283 MiB）；mixed／leaf 假 provider 7 passed（5.222 秒，峰值采样约 242 MiB）。另一次 mixed 尝试因缺少合成 MJCF 环境变量有 2 项失败、5 项通过（4.698 秒），补齐原路径后重跑通过。三次均使用进程树采样监督器并确认进程组退出；详见 ignored `renewed-session-close-001` 至 `003`。上述本轮新离线预算累计 91.135 秒，测试身份为提交前工作树；提交后仍需核对干净 HEAD。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。

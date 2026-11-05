@@ -4,6 +4,58 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.mark.parametrize('route', ['selected', 'mixed', 'position'])
+def test_reference_close_preserves_resource_order_and_primary_fault(route):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    events = []
+    class Session:
+        close_receipt = {'session_closed': True}
+
+        def close(self):
+            events.append('session')
+            raise RuntimeError('session failure')
+
+        def close_runtime_owner(self):
+            events.append('owner')
+            raise ValueError('owner failure')
+
+    def camera_close():
+        events.append('camera')
+        raise LookupError('camera failure')
+
+    def close_source():
+        events.append('source')
+
+    def close_task():
+        events.append('task')
+        return {'closed': True}
+
+    env = SimpleNamespace(
+        mixed_control_profile=route == 'mixed', position_profile=route == 'position',
+        session=Session(), _mixed_episode_end=object(), _execution_fault=None,
+        recorder=None, value={'source': SimpleNamespace(
+            execution_source_receipt=SimpleNamespace(close=close_source))},
+        binding=SimpleNamespace(close_task_resources=close_task),
+        _mixed_close_receipt=None, _published_position_state=None,
+        _close_camera_consumer=camera_close,
+    )
+    expected_error = LookupError if route == 'position' else RuntimeError
+    with pytest.raises(expected_error) as raised:
+        SelectedReferenceEnv._close_reference_resources(env)
+    assert env.session is None
+    assert events == (['camera', 'session', 'owner'] if route == 'position'
+                      else ['session', 'owner', 'source', 'task'])
+    notes = getattr(raised.value, '__notes__', [])
+    assert any('owner failure' in note for note in notes)
+    if route == 'position':
+        assert any('session failure' in note for note in notes)
+    if route == 'mixed':
+        assert env._mixed_close_receipt == {
+            'session_closed': True, 'task_resource_close_receipt': {'closed': True},
+        }
+
+
 @pytest.mark.parametrize(('joint_data', 'sampler', 'capture'), [
     ({'n_dof': 0}, None, False),
     ({'n_dof': 1}, None, True),
