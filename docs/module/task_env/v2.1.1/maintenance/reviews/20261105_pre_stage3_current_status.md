@@ -6,6 +6,8 @@
 
 **续作关闭职责**：selected、mixed 和 Position 的 session／runtime owner 关闭顺序、第一故障及后续异常说明统一交 `runtime.sessions.api`；环境仍负责路线特定收尾及回执发布。工作树上无引擎检查 146 passed（8.025 秒，峰值采样约 283 MiB）；mixed／leaf 假 provider 7 passed（5.222 秒，峰值采样约 242 MiB）。另一次 mixed 尝试因缺少合成 MJCF 环境变量有 2 项失败、5 项通过（4.698 秒），补齐原路径后重跑通过。三次均使用进程树采样监督器并确认进程组退出；详见 ignored `renewed-session-close-001` 至 `003`。上述本轮新离线预算累计 91.135 秒，测试身份为提交前工作树；提交后仍需核对干净 HEAD。
 
+源码提交 `13a8d3c9` 后干净 tracked HEAD 上重跑无引擎检查：146 passed（8.003 秒，进程树峰值采样约 289 MiB，进程组已退出）；完整命令和资源记录保存在 ignored `renewed-session-close-clean-13a8d3c9`。新离线预算累计 99.138／3000 秒。mixed／leaf 检查仍是提交前工作树证据；本页更新未改变生产源码。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
