@@ -31,3 +31,23 @@ def test_boundary_calls_only_public_reader_and_fails_when_unavailable():
     boundary._physics = SimpleNamespace()
     with pytest.raises(StageUnavailableError, match='unavailable'):
         boundary.read_model_snapshot()
+
+
+def test_legacy_free_joint_public_readback_is_detached_and_names_frames():
+    from task_env.runtime.sessions.common import _SessionValues
+    session = object.__new__(_SessionValues)
+    session._require_reset = lambda: None
+    session._provider = 'mujoco'
+    session._provider_materialization_id = 'mat'
+    session._source = SimpleNamespace(source_closure_digest='closure')
+    session._episode_id = 'episode'
+    session._reset_sample_id = 'sample'
+    session._snapshot_with_native_free_joints = lambda: (
+        SimpleNamespace(control_step=0, simulation_time=0.0),
+        {'cube-v1': ((1., 2., 3., 1., 0., 0., 0.), (0.,) * 6)})
+    result = session.snapshot_free_joint_native_v1()
+    assert result['velocity_frame'] == 'world_linear_body_local_angular'
+    assert result['joints']['cube-v1']['velocity'] == [0.] * 6
+    assert result['reset_sample_id'] == 'sample'
+    result['joints']['cube-v1']['velocity'][0] = 1.
+    assert session.snapshot_free_joint_native_v1()['joints']['cube-v1']['velocity'] == [0.] * 6

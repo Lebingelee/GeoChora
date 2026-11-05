@@ -376,6 +376,35 @@ class _SessionValues:
             f'{self._provider} does not expose a typed free-joint readback through this RuntimeSession'
         )
 
+    def snapshot_free_joint_native_v1(self):
+        """Publish owned free-joint values from the current legacy CPU boundary.
+
+        The velocity convention matches the existing MuJoCo-compatible free
+        joint projection: world linear velocity and body-local angular velocity.
+        This does not advance simulation and is not an actuator-force sensor.
+        Native-I/O providers with body COM readbacks use ``snapshot_v1`` instead.
+        """
+        self._require_reset()
+        state, free = self._snapshot_with_native_free_joints()
+        rows = {}
+        for name, value in free.items():
+            if not isinstance(value, tuple) or len(value) != 2:
+                raise ValueError('provider requires the typed body-COM free-joint projection')
+            position, velocity = value
+            if (len(position) != 7 or len(velocity) != 6
+                    or any(not math.isfinite(float(v)) for v in (*position, *velocity))):
+                raise ValueError(f'free-joint native readback is invalid: {name}')
+            rows[name] = {'position_xyz_quaternion_wxyz': [float(v) for v in position],
+                          'velocity': [float(v) for v in velocity]}
+        return {'schema_version': 'free-joint-native-readback-v1',
+                'provider': self._provider, 'materialization_id': self._provider_materialization_id,
+                'source_closure_digest': self._source.source_closure_digest,
+                'episode_id': self._episode_id, 'reset_sample_id': self._reset_sample_id,
+                'control_step': state.control_step, 'simulation_time_s': state.simulation_time,
+                'position_units': 'm and quaternion_wxyz',
+                'velocity_units': 'm/s and rad/s',
+                'velocity_frame': 'world_linear_body_local_angular', 'joints': rows}
+
     def snapshot_v1(
         self,
         *,
