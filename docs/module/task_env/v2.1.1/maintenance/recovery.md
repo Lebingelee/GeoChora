@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3b attempt001已复审，需聚焦返工
+## 当前：3b attempt002完整包已准备，尚未派发
 
-3a接收决定不变。Sol对3b attempt001决定[REWORK_REQUIRED_3B](reviews/20261105_3b_attempt001_sol_review.md)，原技术结果THREE_B_TECHNICAL_PARTIAL保留；普通attempt_count=1，不进入3c。三条指定路线各完成公开10步及独立读回，但短窗正向位移门三者均失败；部分模型／记录要求尚未充分验证。6.2 pip路线真实启动并关闭，维护者另装6.1但本轮未运行。独立FK与R3重构表明两CPU目标方向／TCP映射一致，下沉在hold段已开始，尚不能归为新代码回归；launcher路径上下文丢失已离线复现。下一步按[聚焦返工分析](../planning/stage3-3b-rework-analysis.md)准备完整002包，当前无包／派发／native。详见[执行摘要](reviews/20261105_3b_attempt001_execution.md)及ignored原始返包。
+3a接收决定不变。Sol对3b attempt001决定[REWORK_REQUIRED_3B](reviews/20261105_3b_attempt001_sol_review.md)，原技术结果THREE_B_TECHNICAL_PARTIAL保留；普通attempt_count=1，不进入3c。三条指定路线各完成公开10步及独立读回，但短窗正向位移门三者均失败；部分模型／记录要求尚未充分验证。6.2 pip路线真实启动并关闭，维护者另装6.1但本轮未运行。独立FK与R3重构表明两CPU目标方向／TCP映射一致，下沉在hold段已开始，尚不能归为新代码回归；launcher路径上下文丢失已离线复现。按[聚焦返工分析](../planning/stage3-3b-rework-analysis.md)完成[002完整包](../planning/stage3-3b-attempt002.md)准备，count仍1、active_packages为空，等待维护者手动转发。首组三组CPU因果控制采用双锁内临时detached旧基线并恢复当前主题分支，不新建branch/worktree；先在ignored登记start，恢复后才改tracked编排。原N08不改，6.1辅助仅主线完成且明确有余时；Sol无native/SDK launcher/自动消息。详见[执行摘要](reviews/20261105_3b_attempt001_execution.md)及ignored原始返包。
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 

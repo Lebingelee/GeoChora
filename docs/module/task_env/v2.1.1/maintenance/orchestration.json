@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G03_3B_REWORK_REQUIRED_AFTER_SOL_REVIEW",
+  "status": "G03_3B_ATTEMPT002_PREPARED_NOT_DISPATCHED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,17 +31,24 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "AWAITING_COMPLETE_REWORK_PACKAGE",
-    "package_id": null,
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_id": "V211_G03_3b_attempt002",
     "attempt_count_now": 1,
     "attempt_planned": 2,
     "assigned_agent": null,
     "target_thread": null,
-    "planning_ref": "../planning/stage3-3b-rework-analysis.md",
+    "planning_ref": "../planning/stage3-3b-attempt002.md",
     "sol_review_ref": "reviews/20261105_3b_attempt001_sol_review.md",
-    "assignment": "Analysis only. Maintainer manually forwards a separately frozen complete package. No automatic execution/native/3c."
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002",
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/prompt.md",
+    "prompt_sha256": "6996ed22990d41ba807b59f4e214099ec49167c63d410e690d129a9fdcd210c9",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/input-snapshot.json",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002/manifest.json",
+    "expected_active_minutes": "120-180",
+    "total_wall_minutes": 240,
+    "assignment": "Maintainer manually forwards to one Terra/Luna. Causal controls before tracked edits; restore stage branch then register attempt2. Preparation consumes no attempt."
   },
-  "next_action": "Sol复审3b attempt001为REWORK_REQUIRED_3B，原PARTIAL和三路线真实闭环保留。先区分初始下沉、驱动响应与短窗oracle前提，再补launcher上下文、物性/记录缺项；准备完整普通attempt002后维护者手动转发，当前未准备/未派发，不进入3c。",
+  "next_action": "3b普通attempt002完整包已准备未派发，当前count=1。维护者手动转发后先锁内同checkout旧/新MuJoCo因果对照，恢复主题分支再修实际owner与launcher/typed-state/物性缺项；旧N08不改，必要时交可审阅oracle proposal，不自动003或3c。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,

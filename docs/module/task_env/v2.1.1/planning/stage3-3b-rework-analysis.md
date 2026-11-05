@@ -2,6 +2,10 @@
 
 2026-11-05，Sol分析，非执行包。[独立复审](../maintenance/reviews/20261105_3b_attempt001_sol_review.md)决定REWORK_REQUIRED_3B；attempt_count=1、无活动writer，不自动attempt002或3c。原FAIL、全部native成果和过程偏差保留。
 
+## 002准备后的执行入口
+
+维护者随后要求构建002完整包，现已[准备未派发](stage3-3b-attempt002.md)，count仍1。以下是准备前分析；基线控制的准确实施方式由002包冻结为同checkout、双锁内临时detached旧输入后恢复主题分支，不采用第二只读Core副本，不新增branch/worktree。原N08保持，oracle修订只能交证据proposal待审。本分析不追加进活动执行窗口。
+
 ## 先诊断首要矛盾
 
 当前证据：三路线先hold下沉约2.4–2.55mm，再在上移段继续下沉约1.23–1.29mm；两CPU source FK与实测TCP一致，R3目标逐项重构差0且方向向上。不能据此认定改代码造成TCP新偏移，也不能将三后端同方向失败拆成三项solver根因。
