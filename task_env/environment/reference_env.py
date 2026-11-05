@@ -11,7 +11,6 @@ from typing import Any
 from collections.abc import Mapping
 from pathlib import Path
 import hashlib
-import json
 from types import SimpleNamespace
 from uuid import uuid4
 import numpy as np
@@ -3473,28 +3472,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def _recorded_execution_configuration(self):
-        """Retain the selected public inputs required for same-source replay."""
-        resolved = getattr(self, 'resolved_public_config', None)
-        if resolved is None:
-            return {'env_id': self.uid, 'provider': self.provider,
-                    'backend': self.backend, 'horizon': self.horizon}
-        execution = {'physics_provider': resolved.physics_provider,
-                     'physics_backend': resolved.environment.runtime.backend,
-                     'physics_device': resolved.physics_device,
-                     'render_default': resolved.render_default.to_mapping()}
-        if resolved.source_delivery_manifest is not None:
-            execution['source_delivery_manifest'] = resolved.source_delivery_manifest
-        task = dict(resolved.task_parameters)
-        if resolved.controller_profile is not None:
-            task['controller_profile'] = resolved.controller_profile
-        return {'env_id': self.uid, 'execution': execution,
-                'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+        from ..recorders.reference_provenance import recorded_execution_configuration
+        return recorded_execution_configuration(
+            uid=self.uid, provider=self.provider, backend=self.backend, horizon=self.horizon,
+            resolved=getattr(self, 'resolved_public_config', None),
+        )
 
     def start_recording(self, path):
-        from ..trajectory.canonical.contracts import EpisodeMetadata
         from ..trajectory.canonical.execution import ExecutionRecorder
-        from ..runtime.sessions.provenance import provider_build_identity
-        from ..runtime.sessions import common as session_common
         if (self.session is None or self.state.control_step != 0 or self.recorder is not None
                 or self._stopped or self._position_episode_end is not None
                 or self._mixed_episode_end is not None):
@@ -3545,63 +3530,26 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         path = Path(path)
         if path.exists():
             raise FileExistsError(path)
-        config = self.value['resolved_configuration']
-        # Provenance describes the source at recording start. Reuse that same
-        # snapshot for every boundary, and take a new snapshot on a new recording.
-        from ..recorders import reference_provenance
-        self._recording_adapter_source_sha256 = reference_provenance.source_snapshot(__file__)
-        binding_sources = reference_provenance.callable_source_snapshots({
-            'observation_source': self.binding.observation_projection,
-            'observation_space_source': self.binding.observation_space_factory,
-            'action_source': self.binding.prepare_action,
-            'action_space_source': self.binding.action_space_factory,
-        })
-        source_provenance = {
-            'construction': digest(config), 'adapter': self._recording_adapter_source_sha256,
-            'coordinator_source': reference_provenance.source_snapshot(reference_provenance.__file__),
-            **binding_sources,
-            'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
-            'resolved_configuration_json': json.dumps(config, sort_keys=True),
-            'execution_configuration_json': json.dumps(self._recorded_execution_configuration(), sort_keys=True),
-        }
-        if 'source_revision' in self.value:
-            runtime_source = self.value['source']
-            runtime_source_xml = runtime_source.scene_source.xml.encode()
-            source_provenance.update({
-                'geochora_revision': str(self.value['source_revision']),
-                'artifact_identity': self.artifact.identity_hash,
-                'controller_identity': self.controller.identity,
-                'solution_identity': self._active_solution_identity(),
-                'runtime_source_id': runtime_source.scene_source.source_id,
-                'runtime_source_xml_sha256': hashlib.sha256(runtime_source_xml).hexdigest(),
-            })
-            if runtime_source.source_closure_digest is not None:
-                source_provenance['runtime_source_closure_digest'] = runtime_source.source_closure_digest
-            source_provenance.update({f"source_sha256:{name}": value
-                                      for name, value in self.value.get('source_sha256', {}).items()})
-            source_receipt = getattr(runtime_source, 'execution_source_receipt', None)
-            if source_receipt is not None:
-                source_provenance['runtime_execution_source_receipt_json'] = json.dumps(
-                    source_receipt.to_mapping(), sort_keys=True,
-                )
+        from ..recorders.reference_provenance import (
+            selected_recording_metadata, selected_source_provenance,
+        )
+        execution_configuration = self._recorded_execution_configuration()
         solution_identity = self._active_solution_identity()
-        metadata = EpisodeMetadata('canonical-trajectory-metadata-v0', self.artifact.identity_hash,
-            self.sample, self.realized, self.execution,
-            {'build': str(provider_build_identity(self.provider))},
-            source_provenance,
-            self.artifact.timebase, self.controller.identity, solution_identity,
-            digest({'readiness': solution_identity}),
-            digest({'action_schema': dict(self.metadata['action_schema'])}),
-            self.sample.task_seed, 'regression')
+        self._recording_adapter_source_sha256, source_provenance = selected_source_provenance(
+            adapter_path=__file__, binding=self.binding, value=self.value, artifact=self.artifact,
+            controller_identity=self.controller.identity, solution_identity=solution_identity,
+            execution_configuration=execution_configuration,
+        )
         owners = self._owners()
-        recipe = {'factory': type(self).__module__ + '.' + type(self).__name__,
-            'artifact': self.artifact.to_mapping(), 'resolved_configuration': config,
-            'execution_configuration': self._recorded_execution_configuration(),
-            'stages': ['reference'], 'cadence': 'selected-native-stream-v1',
-            'owner_schema': {k: {'version': v['version'], 'source_sha256': v['source_sha256'],
-                'fields': list(v['fields'])} for k, v in owners['owners'].items()},
-            'd0_reconstructible': False, 'qualification': 'NOT_REQUALIFIED',
-            'owner_snapshot_scope': 'observation receipt; controller/expert restoration not implemented'}
+        metadata, recipe = selected_recording_metadata(
+            artifact=self.artifact, sample=self.sample, realized=self.realized,
+            execution=self.execution, provider=self.provider, source_provenance=source_provenance,
+            controller_identity=self.controller.identity, solution_identity=solution_identity,
+            action_schema=self.metadata['action_schema'],
+            factory=type(self).__module__ + '.' + type(self).__name__,
+            configuration=self.value['resolved_configuration'],
+            execution_configuration=execution_configuration, owners=owners,
+        )
         if self.binding.recorder_mode == 'canonical':
             from ..trajectory.canonical.contracts import CanonicalRecorder
             recorder = CanonicalRecorder(metadata, self._boundary())

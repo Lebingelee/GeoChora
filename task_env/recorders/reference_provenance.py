@@ -33,6 +33,94 @@ def callable_source_snapshot(callback):
     return callable_source_snapshots({'source': callback})['source']
 
 
+def recorded_execution_configuration(*, uid, provider, backend, horizon, resolved):
+    """Project public execution inputs needed for same-source replay."""
+    if resolved is None:
+        return {'env_id': uid, 'provider': provider, 'backend': backend, 'horizon': horizon}
+    execution = {'physics_provider': resolved.physics_provider,
+                 'physics_backend': resolved.environment.runtime.backend,
+                 'physics_device': resolved.physics_device,
+                 'render_default': resolved.render_default.to_mapping()}
+    if resolved.source_delivery_manifest is not None:
+        execution['source_delivery_manifest'] = resolved.source_delivery_manifest
+    task = dict(resolved.task_parameters)
+    if resolved.controller_profile is not None:
+        task['controller_profile'] = resolved.controller_profile
+    return {'env_id': uid, 'execution': execution,
+            'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+
+
+def selected_source_provenance(*, adapter_path, binding, value, artifact,
+                               controller_identity, solution_identity,
+                               execution_configuration):
+    """Snapshot recorder provenance once, before the first recorded boundary."""
+    from ..runtime.sessions import common as session_common
+
+    config = value['resolved_configuration']
+    adapter_hash = source_snapshot(adapter_path)
+    binding_sources = callable_source_snapshots({
+        'observation_source': binding.observation_projection,
+        'observation_space_source': binding.observation_space_factory,
+        'action_source': binding.prepare_action,
+        'action_space_source': binding.action_space_factory,
+    })
+    provenance = {
+        'construction': digest(config), 'adapter': adapter_hash,
+        'coordinator_source': source_snapshot(__file__), **binding_sources,
+        'interval_source': source_snapshot(session_common.__file__),
+        'resolved_configuration_json': json.dumps(config, sort_keys=True),
+        'execution_configuration_json': json.dumps(execution_configuration, sort_keys=True),
+    }
+    if 'source_revision' in value:
+        source = value['source']
+        provenance.update({
+            'geochora_revision': str(value['source_revision']),
+            'artifact_identity': artifact.identity_hash,
+            'controller_identity': controller_identity,
+            'solution_identity': solution_identity,
+            'runtime_source_id': source.scene_source.source_id,
+            'runtime_source_xml_sha256': sha256(source.scene_source.xml.encode()).hexdigest(),
+        })
+        if source.source_closure_digest is not None:
+            provenance['runtime_source_closure_digest'] = source.source_closure_digest
+        provenance.update({f'source_sha256:{name}': item
+                           for name, item in value.get('source_sha256', {}).items()})
+        receipt = getattr(source, 'execution_source_receipt', None)
+        if receipt is not None:
+            provenance['runtime_execution_source_receipt_json'] = json.dumps(
+                receipt.to_mapping(), sort_keys=True,
+            )
+    return adapter_hash, provenance
+
+
+def selected_recording_metadata(*, artifact, sample, realized, execution, provider,
+                                source_provenance, controller_identity,
+                                solution_identity, action_schema, factory,
+                                configuration, execution_configuration, owners):
+    """Build canonical episode metadata and its existing replay recipe."""
+    from ..runtime.sessions.provenance import provider_build_identity
+    from ..trajectory.canonical.contracts import EpisodeMetadata
+
+    metadata = EpisodeMetadata(
+        'canonical-trajectory-metadata-v0', artifact.identity_hash,
+        sample, realized, execution, {'build': str(provider_build_identity(provider))},
+        source_provenance, artifact.timebase, controller_identity, solution_identity,
+        digest({'readiness': solution_identity}),
+        digest({'action_schema': dict(action_schema)}), sample.task_seed, 'regression',
+    )
+    recipe = {'factory': factory, 'artifact': artifact.to_mapping(),
+              'resolved_configuration': configuration,
+              'execution_configuration': execution_configuration,
+              'stages': ['reference'], 'cadence': 'selected-native-stream-v1',
+              'owner_schema': {key: {'version': item['version'],
+                                     'source_sha256': item['source_sha256'],
+                                     'fields': list(item['fields'])}
+                               for key, item in owners['owners'].items()},
+              'd0_reconstructible': False, 'qualification': 'NOT_REQUALIFIED',
+              'owner_snapshot_scope': 'observation receipt; controller/expert restoration not implemented'}
+    return metadata, recipe
+
+
 def append_selected_transition(recorder, *, recorder_mode, record_native_substeps,
                                timebase, control_step, substeps, request, canonical,
                                target, applied, reward, terminated, truncated, stage,
