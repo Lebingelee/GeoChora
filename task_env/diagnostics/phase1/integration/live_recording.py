@@ -4,10 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 from time import perf_counter
-from .grasp_height_probe import context
-from .stable_grasp import worker
 from .replay_preparation import snapshot
-from ..p1_2_runtime import execution
 from ....trajectory.canonical.contracts import EpisodeMetadata, BoundaryRecord, TransitionRecord
 from ....trajectory.canonical.execution import ExecutionRecorder
 from ....trajectory.canonical.streaming import (
@@ -32,6 +29,8 @@ def storage_policy(variant):
 
 class LiveRecording:
     def __init__(self, value, provider, session, audit, sample, realized, state, feedback, info, *, output):
+        from .stable_grasp import worker
+        from ..p1_2_runtime import execution
         self.value,self.provider,self.audit,self.output=value,provider,audit,output
         self.session=session
         lifecycle = getattr(value['solution'], 'lifecycle', None)
@@ -147,6 +146,8 @@ class LiveRecording:
 
 
 def main():
+    from .grasp_height_probe import context
+    from .stable_grasp import worker
     p=argparse.ArgumentParser();p.add_argument('--provider',choices=('geophys','mujoco'),required=True)
     p.add_argument('--rate',type=int,choices=(500,100,50),required=True)
     p.add_argument('--output',type=Path,required=True);p.add_argument('--limit',type=int)

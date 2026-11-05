@@ -16,20 +16,6 @@ import numpy as np
 from . import live_recording as recording_module
 from .live_recording import LiveRecording
 from .provenance import execution_identity
-from ..frequency_grasp import run as frequency_run
-from ..frequency_grasp.arm_schedule import RampedArmAudit, ramped_control_interval
-from ..frequency_grasp.cadence import validate_native_cadence
-from ..frequency_grasp.native import AppliedStepObserver, NativeObserver
-from ..nutassembly_r5_architecture import tracking_worker as worker
-from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspCandidateV2
-from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3
-from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5
-from ....tasks.nut_assembly.guarded_authorization_candidate import (
-    NutAssemblyGuardedAuthorizationCandidateV1,
-)
-from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import (
-    NutAssemblyGuardedAuthorizationCandidateV2,
-)
 from ....controllers.canonical.contracts import digest
 from .diagnostic_shadow import POLICY_ID as DIAGNOSTIC_SHADOW_POLICY_ID
 from .diagnostic_shadow import SOURCE_SHA256 as DIAGNOSTIC_SHADOW_SOURCE_SHA256
@@ -150,6 +136,12 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: 
             DIAGNOSTIC_OBSERVATION if diagnostic_observation else OUTCOME_COMPLETION))
     if construction_route != "historical":
         raise ValueError("unknown NutAssembly construction route")
+    from ..frequency_grasp import run as frequency_run
+    from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspCandidateV2
+    from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3
+    from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5
+    from ....tasks.nut_assembly.guarded_authorization_candidate import NutAssemblyGuardedAuthorizationCandidateV1
+    from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import NutAssemblyGuardedAuthorizationCandidateV2
     value = frequency_run.context(rate, "arm_ramp_native_grip", provider=provider)
     old_solution_identity = value["solution_identity"]
     old_controller_identity = value["controller_identity"]
@@ -205,6 +197,7 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: 
 
 def _validate_cross_provider_contract(value: dict, contract: dict) -> None:
     """Fail closed if the frozen runner no longer implements campaign V2."""
+    from ..nutassembly_r5_architecture import tracking_worker as worker
     auth = contract["close_authorization"]
     task = contract["task"]
     physical = contract["physical_validity"]
@@ -257,6 +250,22 @@ def run(*, provider: str, rate: int, output: Path,
             raise ValueError("acceptance contract file identity mismatch")
         contract_sha256 = hashlib.sha256(contract_bytes).hexdigest()
     recording_module.storage_policy(recording_storage_variant)
+    # The historical runner depends on retired task internals. Resolve them only
+    # after argument validation and before creating evidence or loading a provider.
+    try:
+        from ..nutassembly_r5_architecture import tracking_worker as worker
+    except ModuleNotFoundError as error:
+        if not (error.name or '').startswith('task_env.tasks.nut_assembly.'):
+            raise
+        from ....environment.types import StageUnavailableError
+        raise StageUnavailableError(
+            'historical FULL lifecycle diagnostic requires retired NutAssembly task internals; '
+            'use a frozen historical checkout or the current public task example'
+        ) from error
+    from ..frequency_grasp import run as frequency_run
+    from ..frequency_grasp.arm_schedule import RampedArmAudit, ramped_control_interval
+    from ..frequency_grasp.cadence import validate_native_cadence
+    from ..frequency_grasp.native import AppliedStepObserver, NativeObserver
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     value = context(rate, trajectory_candidate, provider=provider,

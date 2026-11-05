@@ -349,3 +349,13 @@ def test_lifecycle_runner_rejects_unknown_storage_before_creating_evidence(tmp_p
         run(provider='mujoco', rate=500, output=output,
             recording_storage_variant='unknown')
     assert not output.exists()
+
+
+def test_retired_lifecycle_runner_reports_unavailable_before_evidence(tmp_path):
+    from task_env.diagnostics.phase1.integration.lifecycle_full import run
+    from task_env.environment.types import StageUnavailableError
+
+    output = tmp_path / 'must-not-exist'
+    with pytest.raises(StageUnavailableError, match='retired NutAssembly task internals'):
+        run(provider='mujoco', rate=500, output=output)
+    assert not output.exists()
