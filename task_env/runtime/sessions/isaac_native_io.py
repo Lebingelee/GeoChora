@@ -861,6 +861,53 @@ class IsaacSimNativeRuntimeIOV1:
                 link_paths = self._articulation.link_paths
                 if len(link_paths) != 1 or len(link_paths[0]) != len(link_names):
                     raise ValueError('public Isaac articulation link paths do not match link names')
+                # Capture the actual solver Jacobian and link-frame poses at
+                # the same bootstrap boundary. This is a read-only model
+                # witness; it neither advances physics nor treats USD axes as
+                # if they were runtime solver output.
+                with backend_utils.use_backend('tensor', raise_on_fallback=True):
+                    import numpy as np
+                    before_kinematic = (int(SimulationManager.get_num_physics_steps()),
+                                        float(SimulationManager.get_simulation_time()))
+                    jacobian = np.asarray(self._articulation.get_jacobian_matrices().numpy(), dtype=np.float64)
+                    if (jacobian.ndim != 4 or jacobian.shape[0] != 1
+                            or jacobian.shape[1] not in (len(link_names) - 1, len(link_names))
+                            or jacobian.shape[2] != 6
+                            or jacobian.shape[3] not in (len(self._dof_names), len(self._dof_names) + 6)
+                            or not np.isfinite(jacobian).all()):
+                        raise ValueError(f'public Isaac Jacobian has unexpected shape or values: {jacobian.shape}')
+                    tensor_view = SimulationManager.get_physics_simulation_view()
+                    if tensor_view is None:
+                        raise ValueError('public Isaac physics tensor simulation view is unavailable')
+                    link_pose_rows = []
+                    for link_name, link_path in zip(link_names, link_paths[0], strict=True):
+                        # RigidPrim's constructor can author optional PhysX
+                        # APIs. A tensor-only view keeps this readback from
+                        # changing the source stage or provider model.
+                        link_view = tensor_view.create_rigid_body_view(str(link_path))
+                        transform = np.asarray(link_view.get_transforms().numpy(), dtype=np.float64)
+                        if transform.shape != (1, 7) or not np.isfinite(transform).all():
+                            raise ValueError(f'public Isaac link tensor pose unavailable: {link_name}')
+                        position = transform[0, :3].tolist()
+                        orientation = transform[0, [6, 3, 4, 5]].tolist()
+                        link_pose_rows.append({'name': str(link_name), 'path': str(link_path),
+                                               'position_world_m': list(position),
+                                               'orientation_world_wxyz': list(orientation)})
+                    after_kinematic = (int(SimulationManager.get_num_physics_steps()),
+                                       float(SimulationManager.get_simulation_time()))
+                    if after_kinematic != before_kinematic:
+                        raise RuntimeError('public Isaac model readback advanced physics')
+                    self._build_layout_facts['native_kinematic_model_witness'] = {
+                        'schema_version': 'isaac-public-kinematic-model-witness-v1',
+                        'provenance': 'native_effective_public_tensor',
+                        'sample_phase': 'physics_bootstrap_before_reset',
+                        'link_order': list(link_names), 'dof_order': list(self._dof_names),
+                        'link_world_poses': link_pose_rows, 'jacobian': jacobian[0].tolist(),
+                        'jacobian_shape': list(jacobian.shape),
+                        'before_counter': list(before_kinematic), 'after_counter': list(after_kinematic),
+                        'physics_step_index': int(SimulationManager.get_num_physics_steps()),
+                        'simulation_time_s': float(SimulationManager.get_simulation_time()),
+                    }
                 mass_paths = {f'link:{name}': str(path) for name, path in zip(link_names, link_paths[0], strict=True)}
                 mass_paths.update({semantic: _native_prim_path(self._source.bodies[semantic], entry_prim)
                                    for semantic in self._free_views})
