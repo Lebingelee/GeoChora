@@ -92,3 +92,6 @@ Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一
 2026-11-05当前推进：3a attempt001经[独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；attempt002准备不消耗新attempt。Isaac6.1／6.2兼容实现和5.1延期按[兼容规划](isaac-deployment-compatibility.md)在3a接收后的3b完整包安排，七阶段依赖不变。
 
 2026-11-05：3a attempt002核心恢复已有限接收，整体仍未接收、已执行2次。[003前重评](stage3-3a-attempt003-reassessment.md)已完成，最后[完整003包](stage3-3a-execution.md#attempt003-complete-package)已准备，等待维护者指定并手动转发，尚未实施／消耗第三次；180分钟总墙时内收口整个3a，未获接收必须人工诊断。不将三后端原生验证倒加到3a。
+
+
+2026-11-05最新复审：attempt003整体THREE_A_PARTIAL，经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)不接收，3a转HUMAN_DIAGNOSIS_REQUIRED／attempt_count=3。真实MuJoCo/worker及metadata有界结果保留，F06来源预检与versioned/nested完整生产consumer待维护者人工诊断。第三次窗口关闭，无下个普通包，不自动004／续003或进入3b；前文准备状态保留历史时点。

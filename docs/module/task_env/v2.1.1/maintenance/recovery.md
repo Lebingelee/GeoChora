@@ -2,7 +2,13 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 3a attempt002：核心恢复已由Sol有界接收
+## 当前：3a第三次未接收，必须人工诊断
+
+Sol对attempt003／3d10b357作出 **NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED**，详见[独立复审](reviews/20261105_3a_attempt003_sol_review.md)。最终PickCube31／Nut19真实MuJoCo CPU、隔离worker PickCube和同请求H5 metadata事实保留；Sol核对110输出／20提交文件hash、最终日志并独立5项离线通过，native为0。
+
+整体3a仍未通过：F06真实factory在pxr guard处先于selected preflight停止，不能认定SDK或资产缺失；versioned Controller／StateRequirements／nested完整selected生产source消费证据不足。attempt_count=3，active_packages为空、无普通候选包；第三次已关闭，不因180分钟未用满而续时。等待维护者主导人工诊断及后续明确授权，不自动attempt004、改名续作、创建／消息诊断对话或进入3b。原包与旧证据不改写，002核心恢复不重开。
+
+## 历史：3a attempt002核心恢复已由Sol有界接收
 
 Sol决定 `ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY`：PickCube31／Nut19真实MuJoCo3.8.1 CPU公开创建、reset、各10步和close的核心恢复通过；各推进0.10秒，实际source闭包及具名映射、已复现worker错误回收得到有界修复。源码／原生日志和manifest已核对，Sol独立5项离线检查通过，没有重跑native或历史大组。详见[独立复审](reviews/20261105_3a_attempt002_sol_review.md)。
 

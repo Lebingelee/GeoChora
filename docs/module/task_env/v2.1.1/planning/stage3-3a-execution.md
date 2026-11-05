@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt002核心恢复已获Sol有界接收，3a整体仍待收口；首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt003整体未获Sol接收、已到三次上限，须维护者人工诊断；002核心恢复保留。首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -92,3 +92,8 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 若改变MuJoCo构建/reset/admission（预计如此），稳定源码上以公开factory、原Solution和真实MuJoCo3.8.1 CPU对PickCube31／Nut19各reset+10step+close，有限值与0.10秒推进；否则按真实调用链理由复用002，不重跑完整task-success或物理reader。结果按整个3a出口交Sol独立审阅，不再以局部CORE_PASS作为完成。
 
 003是最后一次普通attempt，窗口结束未完成就停止；若Sol复审后整体仍未接收，必须维护者主导人工诊断，无attempt004、换名续包、关闭后续003或自动诊断对话。技术结果保持REPORTED_PENDING_SOL_REVIEW；通过也只解锁3b下一包准备。输出为新ignored目录workspace/maintenance/v211_g03_3a_attempt003及一份短执行摘要，保留旧证据原字节、保护untracked和子模块pins，不推送／合并。
+
+
+## attempt003复审后：停止普通执行，等待人工诊断
+
+执行输出3d10b357经[Sol独立复审](../maintenance/reviews/20261105_3a_attempt003_sol_review.md)决定NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED。两任务及worker的真实MuJoCo短程与metadata事实保留，Sol独立5项离线通过；主要未决仅F06真实来源预检边界、versioned/nested完整selected生产consumer证据。当前3a状态HUMAN_DIAGNOSIS_REQUIRED／attempt_count=3，active_packages为空，无普通候选；上节完整包准备和预算是已结束的冻结历史，不继续派发。维护者主导人工诊断并决定后续授权前，不再实施、补验证或自动第四次；3b/3c仍PLANNED。

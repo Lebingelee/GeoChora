@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G02_ACCEPTED_BOUNDED_STAGE2_REFERENCE",
+  "status": "G03_3A_HUMAN_DIAGNOSIS_REQUIRED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,55 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": {
-    "substage": "3a",
-    "package_id": "V211_G03_3a_attempt003",
-    "status": "REPORTED_PENDING_SOL_REVIEW",
-    "assigned_agent": null,
-    "target_thread": null,
-    "planning_ref": "../planning/stage3-3a-execution.md#attempt003-complete-package",
-    "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
-    "assignment": "Maintainer designates one Terra or Luna and manually forwards this final complete package. No executor designated or dispatch by Sol.",
-    "preparation_consumes_attempt": false,
-    "planned_attempt": 3,
-    "attempt_count_now": 2,
-    "last_ordinary_attempt": true,
-    "reassessment_ref": "../planning/stage3-3a-attempt003-reassessment.md",
-    "human_diagnosis_required_if_not_accepted": true,
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003",
-    "package_revision": 1,
-    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/prompt.md",
-    "prompt_sha256": "e851bf8fd673ae37d4cd2e0eb0452d14702f33a17e8b562966810e2716c9e937",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/manifest.json",
-    "input_snapshot_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/input-snapshot.json",
-    "input_head_ref": "input-snapshot.json frozen after Sol preparation documentation commit",
-    "expected_duration_minutes": "90-120 active; hard total wall 180",
-    "execution_budget": {
-      "total_wall_minutes": 180,
-      "expected_active_minutes": "90-120",
-      "single_test_group_minutes": 15,
-      "cumulative_validation_minutes": 60,
-      "cumulative_native_minutes": 30,
-      "rss_process_tree_gib": 8,
-      "new_output_mib": 256,
-      "single_log_mib": 16,
-      "native_routes": [
-        "mujoco/cpu"
-      ],
-      "physics_steps": 2000,
-      "native_launch_count_limit": null,
-      "native_launch_limit_reason": "Reruns within one live window are bounded by cumulative time/steps; no one-launch cap.",
-      "gpu_starts": 0,
-      "isaac_app_starts": 0,
-      "geophys_native_starts": 0,
-      "render_starts": 0,
-      "additional_worktrees": 0,
-      "native_authorization": "Designated executor only after maintainer manual forwarding, only affected MuJoCo CPU regression; Sol preparation native remains zero."
-    },
-    "completion_priority": "Close actual declarations -> concrete production adapter build checks -> same receipt for whole3a; reuse bounded002 core recovery and unaffected evidence.",
-    "acceptance_cases_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/acceptance-cases.json"
-  },
-  "next_action": "003整体技术结果THREE_A_PARTIAL，执行者已返包；维护者手动转交Sol独立复审。若未接收，由维护者组织人工诊断；不自动attempt004或进入3b。",
+  "next_candidate": null,
+  "next_action": "Sol独立复审不接收整体3a，第三次普通窗口已关闭。保留MuJoCo/worker/metadata有界结果；等待维护者主导人工诊断D1 F06来源预检边界与D2 versioned/nested完整consumer。无普通候选包，不自动attempt004、重置计数或进入3b。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -743,7 +696,7 @@
             "1d",
             "2c"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "HUMAN_DIAGNOSIS_REQUIRED",
           "attempt_count": 3,
           "attempts": [
             {
@@ -785,44 +738,61 @@
             {
               "attempt": 3,
               "package_id": "V211_G03_3a_attempt003",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_PARTIAL_HUMAN_DIAGNOSIS_REQUIRED",
               "started_at": "2026-11-05T17:55:47+08:00",
               "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "2825c5749326fcca60845dde5cae21f9cfcd04ad",
               "result": "THREE_A_PARTIAL",
               "summary_ref": "reviews/20261105_3a_attempt003_execution.md",
-              "writer_ownership": "released upon final commit and report",
+              "writer_ownership": "released; no ordinary continuation authorized",
               "implementation_finished_at": "2026-11-05T18:49:02+08:00",
-              "finished_at": null,
-              "final_timing_ref": "workspace/maintenance/v211_g03_3a_attempt003/output-manifest.json"
+              "finished_at": "2026-11-05T19:01:16.330448+08:00",
+              "final_timing_ref": "workspace/maintenance/v211_g03_3a_attempt003/output-manifest.json",
+              "output_head": "3d10b3570f69d2c09400a2e8d06029e2a5bb844b",
+              "prompt_sha256": "e851bf8fd673ae37d4cd2e0eb0452d14702f33a17e8b562966810e2716c9e937",
+              "package_manifest_sha256": "f154056d71ae926377c6cb8cdcc7c1c514830940b8e4d78d7814fded8fef1bce",
+              "sol_review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
+              "review_decision": "NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED",
+              "reported_window_minutes": 65.49,
+              "reported_native_substeps_derived": 1000
             }
           ],
           "assigned_agent": null,
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003",
-          "package_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64",
+          "package_sha256": "f154056d71ae926377c6cb8cdcc7c1c514830940b8e4d78d7814fded8fef1bce",
           "input_head": "2825c5749326fcca60845dde5cae21f9cfcd04ad",
-          "output_head": null,
+          "output_head": "3d10b3570f69d2c09400a2e8d06029e2a5bb844b",
           "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "Attempt003 connected request-specific layout checks and verified bounded MuJoCo paths; whole 3a remains partial pending independent review, notably F06 source-bound preflight and versioned production-consumer evidence.",
+          "last_observation": "Sol independently verified manifests, final CPU/worker logs and five guarded offline checks; bounded results retained, whole3a not accepted. Final ordinary window exhausted; maintainer-led human diagnosis required for F06 production-source preflight and versioned/nested complete selected consumer.",
           "evidence_refs": [
             "reviews/20261105_3a_attempt002_execution.md",
             "reviews/20261105_3a_attempt001_sol_review.md",
             "reviews/20261105_3a_attempt002_sol_review.md",
-            "reviews/20261105_3a_attempt003_execution.md"
+            "reviews/20261105_3a_attempt003_execution.md",
+            "reviews/20261105_3a_attempt003_sol_review.md"
           ],
           "commits": [
             "32397283e635148788848c0c009e5223d40333df",
-            "42dfcda57757d6d14bd963f692f6bd9154a974f3"
+            "42dfcda57757d6d14bd963f692f6bd9154a974f3",
+            "3d10b3570f69d2c09400a2e8d06029e2a5bb844b"
           ],
           "review_decision": {
-            "status": "REPORTED_PENDING_SOL_REVIEW",
+            "status": "NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED",
             "reviewer": "Sol",
-            "whole_3a_accepted": false
+            "date": "2026-11-05",
+            "review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
+            "whole_3a_accepted": false,
+            "bounded_results_retained": [
+              "ordinary MuJoCo CPU PickCube31/Nut19 reset10stepsclose",
+              "MuJoCo isolated-worker PickCube31 reset10stepsclose",
+              "same-request layout receipt and H5 metadata readback"
+            ],
+            "ordinary_execution_stopped": true
           },
           "blockers": [
-            "F06 real source cannot reach selected preflight under the frozen offline guard; configuration/dependency evidence is not full source admission.",
-            "Existing versioned Controller/StateRequirements projection lacks an end-to-end selected production-source consumer proof."
+            "D1: F06 real source stops at pxr guard before selected preflight; missing SDK/assets not established, Isaac helper only synthetic source.",
+            "D2: existing versioned Controller/StateRequirements/nested declarations lack a complete selected production-source consumer proof."
           ]
         },
         {
@@ -1207,18 +1177,30 @@
   },
   "last_reviewed_package": {
     "substage": "3a",
-    "package_id": "V211_G03_3a_attempt002",
-    "status": "REVIEWED_ACCEPTED_BOUNDED_CORE_RECOVERY",
-    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+    "package_id": "V211_G03_3a_attempt003",
+    "status": "REVIEWED_PARTIAL_HUMAN_DIAGNOSIS_REQUIRED",
+    "assigned_agent": null,
     "target_thread": null,
-    "assignment": "Maintainer forwarded revision 2; execution reported and Sol review pending.",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
-    "planning_ref": "../planning/stage3-3a-execution.md",
-    "expected_active_minutes": "90-120",
+    "planning_ref": "../planning/stage3-3a-execution.md#attempt003-complete-package",
+    "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
+    "assignment": "Completed maintainer-designated Terra window; returned and released. No further executor assigned.",
+    "preparation_consumes_attempt": false,
+    "planned_attempt": 3,
+    "attempt_count_now": 3,
+    "last_ordinary_attempt": true,
+    "reassessment_ref": "../planning/stage3-3a-attempt003-reassessment.md",
+    "human_diagnosis_required_if_not_accepted": true,
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003",
+    "package_revision": 1,
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/prompt.md",
+    "prompt_sha256": "e851bf8fd673ae37d4cd2e0eb0452d14702f33a17e8b562966810e2716c9e937",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/manifest.json",
+    "input_snapshot_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/input-snapshot.json",
+    "input_head_ref": "input-snapshot.json frozen after Sol preparation documentation commit",
+    "expected_duration_minutes": "90-120 active; hard total wall 180",
     "execution_budget": {
       "total_wall_minutes": 180,
+      "expected_active_minutes": "90-120",
       "single_test_group_minutes": 15,
       "cumulative_validation_minutes": 60,
       "cumulative_native_minutes": 30,
@@ -1230,25 +1212,22 @@
       ],
       "physics_steps": 2000,
       "native_launch_count_limit": null,
-      "native_launch_limit_reason": "Reruns bounded by time and cumulative physical steps, not a one-launch cap.",
+      "native_launch_limit_reason": "Reruns within one live window are bounded by cumulative time/steps; no one-launch cap.",
       "gpu_starts": 0,
       "isaac_app_starts": 0,
       "geophys_native_starts": 0,
       "render_starts": 0,
       "additional_worktrees": 0,
-      "native_authorization": "Maintainer runtime-first request; executor only after manual forwarding; Sol preparation native remains zero."
+      "native_authorization": "Designated executor only after maintainer manual forwarding, only affected MuJoCo CPU regression; Sol preparation native remains zero."
     },
-    "preparation_consumes_attempt": false,
-    "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
-    "package_revision": 2,
-    "supersedes_unexecuted_revision": {
-      "revision": 1,
-      "manifest_sha256": "5e3c459d035c2286ea21edf7ba9fae237bb0f3076159d4aac088909a42a0d225",
-      "archive_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/archive/V211_G03_3a_attempt002_r1_20261105"
-    },
-    "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence.",
-    "sol_review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
-    "review_decision": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY"
+    "completion_priority": "Close actual declarations -> concrete production adapter build checks -> same receipt for whole3a; reuse bounded002 core recovery and unaffected evidence.",
+    "acceptance_cases_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt003/acceptance-cases.json",
+    "input_head": "2825c5749326fcca60845dde5cae21f9cfcd04ad",
+    "output_head": "3d10b3570f69d2c09400a2e8d06029e2a5bb844b",
+    "package_manifest_sha256": "f154056d71ae926377c6cb8cdcc7c1c514830940b8e4d78d7814fded8fef1bce",
+    "output_manifest_sha256": "9c4d889186e01e16f1113d03bff8248bd3b8c43d98b0a436da875fa9db02f3c8",
+    "sol_review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
+    "review_decision": "NOT_ACCEPTED_3A_HUMAN_DIAGNOSIS_REQUIRED"
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
@@ -1257,5 +1236,19 @@
     "after_third_unaccepted": "STOP_ORDINARY_EXECUTION_REQUIRE_MAINTAINER_LED_HUMAN_DIAGNOSIS",
     "automatic_new_diagnostic_thread": false,
     "reference": "../../../../../.agents/skills/geochora/references/goal-orchestration.md"
+  },
+  "human_diagnosis": {
+    "substage": "3a",
+    "status": "REQUIRED_NOT_STARTED",
+    "required_after_attempt": 3,
+    "review_ref": "reviews/20261105_3a_attempt003_sol_review.md",
+    "ordinary_execution_allowed": false,
+    "automatic_thread_creation": false,
+    "automatic_dispatch": false,
+    "blockers": [
+      "D1_F06_SOURCE_PREFLIGHT_BOUNDARY",
+      "D2_VERSIONED_SELECTED_CONSUMER"
+    ],
+    "authority": "Explicit maintainer three-attempt rule and goal-orchestration Skill; further work requires maintainer-led human diagnosis and authorization."
   }
 }
