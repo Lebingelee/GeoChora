@@ -4,6 +4,46 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_position_materialization_preparation_binds_exact_source_and_rejects_invalid(monkeypatch):
+    from task_env.runtime.sessions import source as source_owner
+    from task_env.runtime.sessions.control import (
+        ControlBinding, ControlBindingPlanV1, prepare_position_control_materialization,
+    )
+
+    scene = object()
+    source = SimpleNamespace(scene_definition=scene)
+    artifact = object()
+    plan = ControlBindingPlanV1('control-binding-plan-v1', 'b' * 64, (), ())
+    binding = ControlBinding('panda-v1/gripper', 0.08)
+    value = {'source': source}
+    observed = []
+    def joints(actual_scene, actual_artifact, actual_source):
+        assert (actual_scene, actual_artifact, actual_source) == (scene, artifact, source)
+        observed.append('joints')
+        return {'j': 'native-j'}
+    def frames(actual_artifact, actual_source):
+        assert (actual_artifact, actual_source) == (artifact, source)
+        observed.append('frames')
+        return {'f': 'native-f'}
+    monkeypatch.setattr(source_owner, 'position_joint_bindings_from_artifact', joints)
+    monkeypatch.setattr(source_owner, 'position_frame_bindings_from_artifact', frames)
+    def select(actual_value):
+        assert actual_value is value
+        observed.append('selector')
+        return binding
+    kwargs = dict(source=source, artifact=artifact, profiles=(), leaf_position=False,
+                  plan=plan, select_binding=select, value=value)
+    result = prepare_position_control_materialization(**kwargs)
+    assert result == (plan, {'j': 'native-j'}, {'f': 'native-f'}, binding)
+    assert observed == ['joints', 'frames', 'selector']
+    observed.clear()
+    with pytest.raises(ValueError, match='leaf route'):
+        prepare_position_control_materialization(**{**kwargs, 'leaf_position': True})
+    assert observed == []
+    with pytest.raises(TypeError, match='exact ControlBinding'):
+        prepare_position_control_materialization(**{**kwargs, 'select_binding': lambda _: object()})
+
+
 def test_reset_execution_binding_preserves_exact_route_and_requested_seed():
     from dataclasses import replace
     from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1

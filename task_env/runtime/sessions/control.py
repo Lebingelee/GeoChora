@@ -481,6 +481,33 @@ class ControlBinding:
         if self.opening_range_m!=.08:raise ValueError('only audited 0.08m tendon gripper mapping implemented')
 
 
+def prepare_position_control_materialization(
+    *, source, artifact, profiles, leaf_position, plan, select_binding, value,
+):
+    """Prepare the task's Position bindings before a provider is materialized."""
+    from .source import position_frame_bindings_from_artifact, position_joint_bindings_from_artifact
+
+    scene = source.scene_definition
+    if leaf_position:
+        if plan is not None:
+            raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')
+    else:
+        if plan is None:
+            plan = compile_control_binding_plan(
+                scene, tuple(profile.controller_binding() for profile in profiles),
+            )
+        if not isinstance(plan, ControlBindingPlanV1):
+            raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
+    joint_bindings = position_joint_bindings_from_artifact(scene, artifact, source)
+    frame_bindings = position_frame_bindings_from_artifact(artifact, source)
+    if not callable(select_binding):
+        raise TypeError('Position control requires its declared ControlBinding selector')
+    binding = select_binding(value)
+    if type(binding) is not ControlBinding:
+        raise TypeError('Position control selector must return an exact ControlBinding')
+    return plan, joint_bindings, frame_bindings, binding
+
+
 _C02B_R1_GEO_PHYS_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
 _C02B_R1_ARTIFACT_IDENTITY = '97e0f33d06bc58831a946e3a0cdf277f3f52efe5b2bcf801192a965631c90efd'
 _C02B_R1_SCENE_IDENTITY = '047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e'

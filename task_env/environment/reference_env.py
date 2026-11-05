@@ -37,7 +37,6 @@ from ..runtime.sessions.api import close_session_and_runtime_owner, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 from ..runtime.sessions.source import (
     position_frame_bindings_from_artifact as _position_frame_bindings_from_artifact,
-    position_joint_bindings_from_artifact,
 )
 
 METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
@@ -1493,35 +1492,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             nonlocal failure_phase
             failure_phase = 'session_materialization'
             if self.position_profile:
-                from ..runtime.sessions.control import (
-                    ControlBindingPlanV1,
-                    compile_control_binding_plan,
-                )
+                from ..runtime.sessions.control import prepare_position_control_materialization
                 self.position_scene = self.value['source'].scene_definition
-                self.position_plan = self.value.get('controller_binding_plan')
-                if self.leaf_position_profile:
-                    if self.position_plan is not None:
-                        raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')
-                else:
-                    if self.position_plan is None:
-                        self.position_plan = compile_control_binding_plan(
-                            self.position_scene,
-                            tuple(profile.controller_binding() for profile in self.position_profiles),
-                        )
-                    if not isinstance(self.position_plan, ControlBindingPlanV1):
-                        raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
-                self.position_joint_bindings = position_joint_bindings_from_artifact(
-                    self.position_scene, self.artifact, self.value['source'],
-                )
-                self.position_frame_bindings = _position_frame_bindings_from_artifact(
-                    self.artifact, self.value['source'],
-                )
                 select_binding = self.binding.position_control_binding
-                if not callable(select_binding):
-                    raise TypeError('Position control requires its declared ControlBinding selector')
-                position_binding = select_binding(self.value)
-                if type(position_binding) is not ControlBinding:
-                    raise TypeError('Position control selector must return an exact ControlBinding')
+                (self.position_plan, self.position_joint_bindings,
+                 self.position_frame_bindings, position_binding) = prepare_position_control_materialization(
+                    source=self.value['source'], artifact=self.artifact,
+                    profiles=self.position_profiles, leaf_position=self.leaf_position_profile,
+                    plan=self.value.get('controller_binding_plan'),
+                    select_binding=select_binding, value=self.value,
+                )
                 if self.leaf_position_profile:
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
