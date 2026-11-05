@@ -69,10 +69,26 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 
 本轮实现42dfcda5经[Sol复审](../maintenance/reviews/20261105_3a_attempt002_sol_review.md)有界接收为ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY。两任务真实MuJoCo CPU公开创建/reset/10步/close已通过；Sol仅独立5项相关离线检查，不再启动原生。上节runtime-first为已完成窗口的安排，不能继续派发原attempt002。
 
-3a整体仍PARTIAL_CORE_RUNTIME_RECOVERED、已执行2次。剩余按实际声明求交和已有adapter的具体构建检查点做有界评估，先复用原owner／已过证据，不造oracle框架、不铺开全对象边界矩阵；尚无attempt003完整包或执行。第三次前遵循既定根因／可行性重评，只研究实际未决问题。GeoPhys/Isaac原生、物性及完整三路线验证交3b，不倒加为3a提前运行门。已接收的MuJoCo核心恢复在代码未受影响时直接引用。旧G02／前置维护不重开。
+3a整体仍PARTIAL_CORE_RUNTIME_RECOVERED、已执行2次。剩余按实际声明求交和已有adapter的具体构建检查点做有界评估，先复用原owner／已过证据，不造oracle框架、不铺开全对象边界矩阵；最后003完整包准备见末节，尚未执行。第三次前遵循既定根因／可行性重评，只研究实际未决问题。GeoPhys/Isaac原生、物性及完整三路线验证交3b，不倒加为3a提前运行门。已接收的MuJoCo核心恢复在代码未受影响时直接引用。旧G02／前置维护不重开。
 
 ## attempt003前重评与最后窗口
 
 维护者再次明确三次上限：003是最后一次普通窗口，若整体3a未接收则必须停止普通执行并进行人工诊断，不自动第四次。已完成[本次重评与调度](stage3-3a-attempt003-reassessment.md)：比较两次实际窗口、原协议和当前生产owner，记录官方／开源对照，选择实际需求汇总→准确adapter构建检查→同一回执的一次整体收口。不将已解决reset重做，也不在3a提前实施4a或3b物理矩阵。
 
-当前可进入最小完整包准备，但尚未冻结／派发attempt003，attempt_count保持2。投放前必须固定需求来源、具体消费点和完整3a验收路径；若确需外部输入先解决，不先消耗最后窗口。预计主动90–120分钟、墙时180分钟，适用预算待完整包冻结；剩余判断及安排以该重评页为准。
+003完整包现已按重评固定，见下节；尚未指定执行者／派发，attempt_count保持2。准确输入在本次准备文档提交后的外部snapshot冻结；本页准备不授权Sol运行native。
+
+
+<a id="attempt003-complete-package"></a>
+## attempt003完整包：最后窗口，准备完成待维护者转发
+
+完整包为主工作区handoffs/V211_G03_3a_attempt003；当前PREPARED_NOT_DISPATCHED，一个执行者待维护者指定，active_packages为空，3a仍PARTIAL_CORE_RUNTIME_RECOVERED／attempt_count=2。沿当前阶段分支与checkout，不创建分支／worktree。实际实现基线42dfcda5；准确input HEAD在本次Sol文档提交后的外部snapshot冻结，不回退到实现提交。input verifier一次核对后，实际开工才登记第三次。
+
+固定的实现单元是：api.assess_selected_request汇总实际Artifact/source、ControllerBindingV1.feedback_requirements／ControlBindingPlan、已有Scene具名通道及StateRequirements，复用logical assembly resolver；CapabilityAssessment原owner替换通用constructor名字放行逻辑；MuJoCo实际model映射、GeoPhys公开boundary映射、Isaac原USD／DOF检查由各adapter构建消费；同一request关联的静态assessment及后续有界检查事实经原环境查询/info和Recorder metadata读回。静态能判定直接判定，需要原生的项有准确检查才pending，无检查则拒绝；不因layout匹配升级物性或Qualification。不设计新框架或新typed/nested语言。
+
+原20case全部追踪，实际验证只补六组：现有声明正负consumer、具体build helper真实消费、三route共同selection/admission及准确unavailable、同一metadata JSON/H5读回、受影响MuJoCo主路回归、完整3a返包。GeoPhys依赖冲突和Isaac SDK缺失如实拒绝，SDK终端fixture只证明离线接线，不能绕过source/assessment/helper。已有F06身份／证据直接引用，真实三后端运行和物性仍是3b，typed执行仍是4a/4b。旧codec／worker／历史大组不受影响就复用。
+
+预计主动90–120分钟、总墙时180分钟含等待／文档／提交／返包；0–10分钟一次核对和方法阅读，10–70分钟核心接线，70–120分钟聚焦验证与必要CPU回归，120–150分钟实际失败修复，150–180分钟终验及交付。验证累计60分钟，单组15分钟；仅受影响MuJoCo CPU累计30分钟／2000原生substeps，含reset/settle/失败重试，同窗口允许多次修复。RSS8GiB、输出256MiB／单日志16MiB；不安装下载，GPU/Isaac App/GeoPhys native/render均0。CPU仅实际运行期间按既有双锁串行，Sol准备native0。
+
+若改变MuJoCo构建/reset/admission（预计如此），稳定源码上以公开factory、原Solution和真实MuJoCo3.8.1 CPU对PickCube31／Nut19各reset+10step+close，有限值与0.10秒推进；否则按真实调用链理由复用002，不重跑完整task-success或物理reader。结果按整个3a出口交Sol独立审阅，不再以局部CORE_PASS作为完成。
+
+003是最后一次普通attempt，窗口结束未完成就停止；若Sol复审后整体仍未接收，必须维护者主导人工诊断，无attempt004、换名续包、关闭后续003或自动诊断对话。技术结果保持REPORTED_PENDING_SOL_REVIEW；通过也只解锁3b下一包准备。输出为新ignored目录workspace/maintenance/v211_g03_3a_attempt003及一份短执行摘要，保留旧证据原字节、保护untracked和子模块pins，不推送／合并。

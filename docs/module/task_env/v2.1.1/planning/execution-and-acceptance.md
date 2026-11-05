@@ -91,4 +91,4 @@ Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一
 
 2026-11-05当前推进：3a attempt001经[独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；attempt002准备不消耗新attempt。Isaac6.1／6.2兼容实现和5.1延期按[兼容规划](isaac-deployment-compatibility.md)在3a接收后的3b完整包安排，七阶段依赖不变。
 
-2026-11-05：3a attempt002核心恢复已有限接收，整体仍未接收、已执行2次。当前[003前重评](stage3-3a-attempt003-reassessment.md)已记录，只准备最后完整收口方案，尚未封包／派发；不将三后端原生验证倒加到3a。
+2026-11-05：3a attempt002核心恢复已有限接收，整体仍未接收、已执行2次。[003前重评](stage3-3a-attempt003-reassessment.md)已完成，最后[完整003包](stage3-3a-execution.md#attempt003-complete-package)已准备，等待维护者指定并手动转发，尚未实施／消耗第三次；180分钟总墙时内收口整个3a，未获接收必须人工诊断。不将三后端原生验证倒加到3a。

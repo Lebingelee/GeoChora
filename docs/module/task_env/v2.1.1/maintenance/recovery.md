@@ -6,7 +6,7 @@
 
 Sol决定 `ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY`：PickCube31／Nut19真实MuJoCo3.8.1 CPU公开创建、reset、各10步和close的核心恢复通过；各推进0.10秒，实际source闭包及具名映射、已复现worker错误回收得到有界修复。源码／原生日志和manifest已核对，Sol独立5项离线检查通过，没有重跑native或历史大组。详见[独立复审](reviews/20261105_3a_attempt002_sol_review.md)。
 
-3a整体仍 `PARTIAL_CORE_RUNTIME_RECOVERED`／attempt_count=2；剩余只先收口实际声明求交与具体adapter构建检查点，不扩展安全／边界矩阵。已完成[003前重评与最后窗口安排](../planning/stage3-3a-attempt003-reassessment.md)，目前尚未冻结／派发003；第三次整体未接收必须人工诊断，不自动第四次。GeoPhys／Isaac原生仍交3b，Isaac兼容版本安排不变，不重开已接收核心恢复。
+3a整体仍 `PARTIAL_CORE_RUNTIME_RECOVERED`／attempt_count=2；剩余只先收口实际声明求交与具体adapter构建检查点，不扩展安全／边界矩阵。已完成[003前重评与最后窗口安排](../planning/stage3-3a-attempt003-reassessment.md)，最后[完整003包](../planning/stage3-3a-execution.md#attempt003-complete-package)现已准备，等待维护者指定单一执行者并手动转发；尚未派发／消耗第三次。第三次整体未接收必须人工诊断，不自动第四次。GeoPhys／Isaac原生仍交3b，Isaac兼容版本安排不变，不重开已接收核心恢复。
 
 ## 历史：3a attempt001：Sol已复审，需返工
 
