@@ -69,6 +69,19 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
 - Do not read provider-private solver or renderer state to compensate for a
   missing public capability.
 
+## Diagnostics and core code
+
+- Follow the [diagnostic and code-boundary standard](docs/global/diagnostics-and-code-boundaries.md)
+  for all core classes/functions, including Env, Controller, provider and renderer adapters.
+- Implement experiments outside Core using normal APIs, composition/wrappers,
+  diagnostic subclasses or scoped test injection. Do not add experiment/test-name
+  branches, probe switches or imports from diagnostics/tests to production paths.
+- Keep legitimate capability, validation, fault and lifecycle checks. Existing
+  diagnostic coupling is recorded for the v2.1.1 integration closeout; do not
+  begin a broad decoupling campaign or extend old diagnostic branches by default.
+- Subsequent execution packages reference this standard and identify the home
+  of any new diagnostic code. Preserve one owner for state, stepping and teardown.
+
 ## Capability and evidence language
 
 - State the exact task, provider, backend, source identity, and exercised

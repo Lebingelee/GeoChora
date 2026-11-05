@@ -4,6 +4,8 @@
 
 ## 当前决定：前置核心收尾已有限接收
 
+维护者最新安排：先落实[诊断与代码边界规范](../../../../global/diagnostics-and-code-boundaries.md)，本轮不再全面解耦。后续环境、Controller、provider和renderer开发从外部诊断，不向核心新增实验／测试分支；现存已确认耦合登记在[规划第2.6节](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)，在版本准备进入7a集成时集中处理，并在稳定源码上验证。有限接收不表示诊断完全隔离，规则更新也不表示代码已整改。当前仅完成规范／规划更新，G03未启动。
+
 `V211_PRE_STAGE3_CLOSEOUT_120MIN_001`返包`99de88abd6d3f464de0d5c9c98362813f52252c9`经[Sol复审](reviews/20261105_pre_stage3_closeout_120min_sol_review.md)，决定 **ACCEPTED_BOUNDED_PRE_STAGE3_CORE_CLOSEOUT**：C1核心职责、C2当前文档、V受影响行为在限定范围通过，本次前置核心收尾结束，不再追加持续拆分窗口。runtime不依赖具体Nut Solution，任务侧保留检查；R05b普通reset不持有Solution，兼容Expert按需创建。Sol独立R05b检查25 passed／1 deselected，核对执行者182 passed／1 deselected及Nut物理／同次reader结果，并接受有调用链差异依据的PickCube和Nut证据复用。详见[原返包](reviews/20261105_pre_stage3_closeout_120min_001.md)。
 
 真实R05b provider、新安装及其他未验证能力继续保留限制，环境类更广整理不等于已完成；它们不重开本次限定收尾。可另行准备阶段3分支和3a包，但目前未创建或执行，G03仍未开始。以下派包计划与旧记录保留当时身份，不覆盖本段决定。

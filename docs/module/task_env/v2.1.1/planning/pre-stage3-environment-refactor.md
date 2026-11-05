@@ -135,6 +135,36 @@ C1先完成依赖归位，再修其直接影响的消费者；不将其扩大成
 
 最终仅按**C1核心边界、C2当前文档、V受影响行为**逐项列已完成／具体未完成／明确延期，提交一份短报告及相关本地commit，状态`REPORTED_PENDING_REVIEW`并释放窗口。已接受的R1与旧运行身份保留，不再把全部内容混成一组G0–G5 PARTIAL；C1确有阻塞就如实列出，不能用延期字样替代完成。Sol据实际diff和证据判断本次前置维护能否收尾；本节不保证到时自动通过。
 
+<a id="diagnostic-policy-and-final-cleanup"></a>
+
+### 2.6 后续诊断规范与v2.1.1收尾解耦（维护者最新安排）
+
+维护者于2026-11-05明确：现存耦合不局限于reference_env，本轮先确定诊断与代码规范，不立即再开全面解耦窗口。阶段3–6还将涉及Controller、provider和renderer重构，新增工作必须遵守[仓库诊断与核心边界规范](../../../../global/diagnostics-and-code-boundaries.md)；既存问题登记后，在v2.1.1准备集成收尾时合理解耦。
+
+当前安排取代“现在继续清理到Env很短”或“全部遗留只是可选美化”两种理解。第2.5节的核心有限接收保留；诊断隔离与组合职责仍是版本收尾要处理的结构目标，不伪称已全部完成，也不作为启动G03前的另一轮大重构。
+
+后续包须明确诊断代码的位置和方式：正常接口／Recorder优先；需要干预时用外部包装、诊断子类和小范围重写，或既有注入接口及局部fixture。核心不得新增实验名、测试类、临时路径或probe开关的if-else；正式能力、输入、来源、feedback、fault和生命周期检查继续保留。禁止将任务策略塞进通用组件，不为缩短文件造多层helper或第二套Runtime。具体判断与工作流程只在上述全局规范维护，此处不复制第二套规则。
+
+#### 已证实的遗留样例
+
+核对源码为`3c0c73ee`，只登记已检查的边界，不称全库审计；位置以符号为准，不冻结易漂移行号。
+
+| 位置 | 当前用途／消费者 | 版本收尾的处置方向 |
+| --- | --- | --- |
+| `environment.reference_env.SelectedReferenceEnv.__init__`与`_prepare_reference_reset`中的diagnostic_profile | C05c cadence诊断binding选择`nutassembly-gripper-cadence-v1`，Env负责诊断provider限制、互斥和向runtime传递；普通任务不默认启用 | 实验选择与适配归外部诊断驱动／子类，Env保留正常组件组合；物理能力和来源限制仍由正式runtime检查 |
+| `SelectedReferenceEnv._record_leaf_position_transition` | 真实记录实现已在recorders；当前检索到两个diagnostic测试消费这个历史私有桥接方法 | 测试直接覆盖recorder的真实owner，迁移确认无实际消费者后删除测试专用桥接，不改变记录语义 |
+| `runtime.sessions.control.materialize_control`和`runtime.sessions.api._diagnostic_manifest` | 通用runtime中仍有诊断profile参数及Nut cadence实验命名准入；不等于本轮已解决的R05b正式反馈路线 | 分开实验选择和正式物理准入，外置实验代码，保留来源、provider、Controller和能力拒绝；不得靠删除严格约束或开放任意manifest来解耦 |
+
+Controller、renderer及其他模块是否有同类问题尚未逐项审查。阶段3–6触及相应owner时，记录确有证据的项目：位置、用途、真实消费者、目标owner、保留／迁移理由。能够在原修改单元安全归位的可随正常重构处理；否则保持现有行为并登记，不扩大旧诊断分支，不为每个发现另开诊断或资源审计窗口。
+
+#### 集中收尾的位置与出口
+
+在G07/7a集成开始时，先对阶段3–6涉及的核心边界和登记项集中分类、合理解耦，再稳定源码进行7a后续代表回归和7b矩阵。不等到7c只改文档时再做大段源码移动。该工作放入既有7a包，不新增阶段或独立并行工程。
+
+收尾判断是：生产路径不依赖diagnostics／tests；实验行为由外部驱动、包装／子类或局部fixture承接；核心不按实验／测试名字分派；正常功能、拒绝语义、唯一状态／推进／资源owner及针对性回归保留。正式产品检查保留，任务专用策略归task，诊断专用代码外置。依据职责与真实消费者验收，不设文件行数或helper数量指标，不机械删除所有if-else；未完成项目写具体缺口，不把规则落地当作代码已解耦。
+
+本轮仅补规范、导航与规划，不改生产源码、不运行引擎、不启动G03。后续G03包必须引用规范；阶段3分支和实际派包仍按维护者手动转交流程安排。
+
 ## 三、统一环境类的完成标准
 
 当前两条路线的差异不止类名：BaseTaskEnv经bootstrap构建RuntimeBoundary，SelectedReferenceEnv经materialize构建RuntimeSession；两者的action／observation、seed、done、故障和close语义也不能假定相同。
@@ -151,6 +181,8 @@ C1先完成依赖归位，再修其直接影响的消费者；不将其扩大成
 6. 若遇到需要新增provider能力／阶段3–6协议才能实现的交集，列明具体缺口；除维护者已明确延期的并行适配外，保留既有有效行为，不把额外能力工程塞进本次重构。旧并行owner与历史证据保留，不以`num_env=1`、串行循环或现存注册宣称统一路线并行可用。G06原有目标不因此降低。
 
 ## 四、诊断隔离规则
+
+诊断的实现选择、代码评审和后续工作流程以[全局规范](../../../../global/diagnostics-and-code-boundaries.md)为准；本版既存耦合的登记和收尾安排见第2.6节。本节原要求保留，不据此立即重启全部旧诊断整改。
 
 维护性诊断程序和说明集中在 `task_env/diagnostics/<topic>/`；具体run、临时脚本、原始数据和分析输出留在ignored workspace的独立目录。每个实验说明记录问题、参考闭环、控制变量、调用模块／方法、命令、观测及结论边界。
 

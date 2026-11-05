@@ -19,6 +19,10 @@ Current source, production callers, and qualified evidence define behavior. Cano
 
 Before adding behavior, identify its owner and public API, find the existing implementation and production callers, inspect the relevant tests, reproduce the limitation, and decide whether the change fixes, extends, or composes that owner. A new Runtime, Recorder, Controller, task factory, provider abstraction, or Skill requires a concrete reason existing owners cannot support the behavior.
 
+## Diagnostics and code boundaries
+
+The [diagnostic development standard](diagnostics-and-code-boundaries.md) governs experiments against every Core owner. Diagnostic drivers, wrappers, subclasses and scoped fixtures consume the real owner; production modules must not depend on diagnostic/test implementations or select behavior by experiment name. Legitimate capability, source, feedback, fault and lifecycle checks remain product behavior. Existing coupling is tracked for the v2.1.1 integration closeout; establishing this rule does not claim that all current modules are already decoupled.
+
 ## Capability and publishing
 
 The [v2.1.0 matrix](../module/task_env/v2.1.0/capabilities/capability-matrix.json) records exact bounded task/provider/source/backend intersections. `IMPLEMENTED`, `TESTED_BOUNDED`, `PARTIAL`, `NOT_RUN`, and `DEFERRED` are not interchangeable. The v1.1.0 release matrix and historical decisions remain version-scoped. The v2.1.0 local tag is now verified as a source baseline; original candidate-state records remain scoped to their closeout time. Tag existence does not establish remote publication or new Qualification. The [v2.1.1 plan](../module/task_env/v2.1.1/README.md) proposes ownership-preserving protocol extensions; its draft contracts and NOT_RUN targets do not change current provider capability.

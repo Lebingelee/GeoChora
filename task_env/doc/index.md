@@ -2,9 +2,9 @@
 
 ## v2.1.1 新手入口与当前范围
 
-从[安装与启动指南](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)选择新克隆或已有安装路径，并查看解释器、simulator／renderer、资产与启动脚本的要求。该指南标明尚未验证的新安装和 native 路线；[实施要求](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)中的环境统一与完整文档仍在进行。
+从[安装与启动指南](../../docs/module/task_env/v2.1.1/guides/installation-and-start.md)选择新克隆或已有安装路径，并查看解释器、simulator／renderer、资产与启动脚本的要求。该指南标明尚未验证的新安装和native路线；[实施记录](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md)中的单环境生命周期与限定核心收尾已有限接收，更广整理仍有边界。
 
-下列新手和自定义任务文档已按当前接口重写。Empty、Pendulum 和 TwoWheel 仍使用独立的 classic 生命周期；selected 与 classic 的统一尚未完成。Pendulum 本次验收范围为单环境；旧并行 API、注册和脚本保留，不代表统一路线已适配。并行适配和真实多环境验证留待阶段6，不以单 slot 或静默降级代替。
+Empty、Pendulum和TwoWheel已使用统一`SelectedReferenceEnv`及共同episode owner，`BaseTaskEnv`是同对象兼容导出；组件RuntimeBoundary与selected RuntimeSession仍有各自接线。Pendulum范围为单环境；旧并行API、注册和脚本保留，不代表统一路线已适配。并行适配和真实多环境验证留待阶段6，不以单slot或静默降级代替。
 
 TaskEnv现有文档按使用场景导航：
 
@@ -15,6 +15,7 @@ TaskEnv现有文档按使用场景导航：
 | 任务开发者 | [自定义任务构建指南](自定义任务构建指南.md) | 从声明式示例理解任务、reset、评价与 Solution |
 | 资产开发者 | [资产导入与二次开发指南](资产导入与二次开发指南.md) | 注册 world、robot、object 并接入 assembly |
 | API 使用者 | [API Reference](api/index.md) | 查找公开、扩展、兼容和内部接口的适用范围 |
+| 排查／维护开发者 | [诊断与代码边界规范](../../docs/global/diagnostics-and-code-boundaries.md)、[诊断目录](../diagnostics/README.md) | 外部驱动、包装／继承、局部注入与核心职责；诊断代码如何动工和归位 |
 
 ## 推荐阅读顺序
 

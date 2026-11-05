@@ -6,6 +6,7 @@
 ## 7a：NutAssembly 复用与调用者兼容
 
 - **输入／依赖：**4c、5c、6c，阶段 1 的任务／配置兼容决定。
+- **诊断耦合收口：**先按[代码与诊断规范](../../../../global/diagnostics-and-code-boundaries.md)及[登记清单](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)分类阶段3–6涉及的核心边界，将实验选择／探针／测试专用兼容归外部驱动、包装／子类或真实功能owner。保留正式准入、feedback、fault和唯一生命周期，不按行数机械拆分；该工作纳入本包，不新增阶段。完成代码归位后再进行代表回归和7b稳定输入冻结，不到7c才大幅修改源码。未完成边界如实交付，不以文档规则代替解耦结果。
 - **工作：**在 NutAssembly 已支持后端复用公共构造、配置、施控、reset、render、obs 和记录；核对受影响 TaskDefinition／旧 BaseTaskEnv alias／examples／LIBERO 代表 caller 及 learner／vector wrapper 边界。
 - **检查：**无 PickCube 名称／Panda维度硬编码泄漏；具名通道与Robot组件binding复用，任务差异留 task；fixed-space consumer 对 action 变更有明确处理，未迁 caller 有保留路径。选最小相关检查，不要求完整训练和全部 A123 重跑。
 - **交付／出口：**代表性真实复用、受影响兼容结果和明确未迁列表；不宣布所有任务已统一，也不移除 2.x 承诺保留的 import 名称。

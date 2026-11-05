@@ -14,6 +14,10 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 
 ## 顺序与最小出口
 
+### 后续开发的诊断与代码边界
+
+阶段3起的执行包引用[诊断开发与核心代码规范](../../../../global/diagnostics-and-code-boundaries.md)，说明新增诊断放在哪里、如何从外部观察或干预；不新增核心实验／测试if-else，不将正式feedback、fault或来源检查误删。既存耦合按[维护规划第2.6节](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记，当前不重开全面解耦；准备进入7a集成时集中合理归位，再在稳定源码上执行后续验证。七阶段编号、依赖和已有有限接收不变，本文更新不启动阶段3。
+
 默认按表逐项推进；依赖列描述技术前置。必要的协议跨页审阅不另算子阶段。
 
 | ID | 依赖 | Goal / 完成条件 |
