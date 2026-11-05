@@ -2,11 +2,15 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 当前：3a已由Sol接收，诊断001关闭
+## 当前：3b完整包已准备，尚未派发
+
+3a接收和原attempt历史保持。维护者要求开始下一步；Sol已准备[3b attempt001完整安排](../planning/stage3-3b-execution.md)，覆盖消费级依赖修复、Isaac6.1/6.2共同部署与身份，以及三后端真实物性/readback闭环。维护者澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖，本包修正准入范围，不改pin或升级环境。3b仍PLANNED／attempt0、active_packages为空；准确输入与预算在外部snapshot冻结，等待维护者手动转交单一Terra／Luna。Sol无native、source解析或自动消息，不启动3c。
+
+## 3a已由Sol接收，诊断001关闭
 
 诊断001输出6b11123e经[Sol独立复审](reviews/20261105_3a_diagnostic_attempt001_sol_review.md)决定 **ACCEPTED_3A_ROUTING_ADMISSION**，3a整体在配置／环境准入／已有声明与具体构建检查接线／同请求回执范围通过。真实Position和leaf生产来源consumer、required缺Frame拒绝、H5 metadata及最终PickCube31／Nut19 MuJoCo CPU短程均有证据；F06真实目标依赖不满足时已在加载USD前准确拒绝，source未评估明确保留。Sol核对215输出／10提交文件hash，独立5项guard离线通过，未解析来源或运行native。
 
-普通attempt_count=3、diagnostic_attempt_count=1，原三次失败／局部接收记录不改写，诊断D1/D2关闭、active_packages为空。3b仅具备完整包准备条件，仍PLANNED／attempt0、无派发执行；真实三后端／物性及Isaac6.1/6.2兼容留3b。进程树RSS未测及首次source命令cwd偏差已保留说明，不为补账本重跑。
+普通attempt_count=3、diagnostic_attempt_count=1，原三次失败／局部接收记录不改写，诊断D1/D2关闭、active_packages为空。3b完整包已另行准备，仍PLANNED／attempt0、无派发执行；真实三后端／物性及Isaac6.1/6.2兼容留3b。进程树RSS未测及首次source命令cwd偏差已保留说明，不为补账本重跑。
 
 ## 历史：诊断001由维护者指定并准备
 

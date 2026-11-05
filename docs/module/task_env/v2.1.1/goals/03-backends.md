@@ -19,6 +19,8 @@
 <a id="3b"></a>
 ## 3b：首批三后端的场景翻译和公开反馈
 
+2026-11-05：[attempt001完整包](../planning/stage3-3b-execution.md)已准备，尚未派发，仍PLANNED／attempt0。消费级依赖按维护者澄清修正：GeoPhys原生solver不因未选择的MuJoCo solver依赖而拒绝。与Isaac6.1/6.2共用适配及三条真实数值闭环同包实施；本段不表示代码已完成或native通过。
+
 - **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1未安装时运行层保留NOT_RUN，不追溯改动3a attempt001门。
 - **工作：**在各 adapter 内消费统一模型，公开 native mapping、realized reset、单位／坐标转换、状态和时间；使用各自公开 API，报告无法表达或未测量项。按源约束编译具名通道和嵌套语义映射，不提前宣称阶段4命令已实现。
 - **检查：**三路线从 make_env 真实构建→reset→施控／step→state→记录／读回→close；检查实体／关节、质量／惯性及声明的约束／传动与初始化。源码／设备身份和错误关闭可核实。资产检查分别覆盖输入物理合法性、native映射/readback、reset/短程数值行为；每项有quantity-specific oracle/容差，required未测量不能通过，optional保留原因；cube约5%惯量差不自动修正。

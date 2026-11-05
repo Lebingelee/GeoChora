@@ -27,6 +27,8 @@
 
 ## 实施顺序与验收边界
 
+当前3a已独立接收，[3b attempt001完整包](stage3-3b-execution.md)已准备未派发。消费级依赖按实际host／engine／solver与worker角色判断；Core host安装清单不直接等于Isaac worker必需清单。真正required缺项继续拒绝，不能用未选GeoPhys/Taichi路线依赖误报SDK缺失。维护者已澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖；本包在原preflight owner修正，不改pin或混装环境。以下早期协调顺序保留历史。
+
 3a attempt001按原包复审，新增反馈不倒加门。attempt002先修普通reset闭包与原能力／worker缺口。3a独立接收后，3b完整包先纳入上述路径、SDK识别、6.1／6.2共同接口与准确身份接线，再在单独授权的native预算内验证三路线。不得以本规划开启3b、安装或native。
 
 离线门覆盖两种部署、带空格路径、参数转发、pip缺失但SDK有效、SDK与版本不符、未知版本、required API／schema缺失、真实版本贯通及旧codec／资产hash兼容。正例通过既有生产consumer，以外部fixture替代SDK，不以目录名或伪版本自证。6.2按3b实际可用环境完成原门；6.1无本地SDK时实现和离线检查可先完成，运行层单列NOT_RUN，不能声称已验证支持或因此把实现推迟到未来版。旧F06启动18步只代表所属历史基线，不硬套所有SDK。

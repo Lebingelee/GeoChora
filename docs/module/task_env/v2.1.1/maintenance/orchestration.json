@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-05",
-  "status": "G03_3A_ACCEPTED_WAITING_3B_PACKAGE",
+  "status": "G03_3B_PACKAGE_PREPARED_NOT_DISPATCHED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -31,17 +31,25 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3b",
-    "status": "ELIGIBLE_AWAITING_COMPLETE_PACKAGE",
-    "package_id": null,
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_id": "V211_G03_3b_attempt001",
     "assigned_agent": null,
     "target_thread": null,
-    "planning_ref": "../goals/03-backends.md#3b",
+    "planning_ref": "../planning/stage3-3b-execution.md",
     "compatibility_ref": "../planning/isaac-deployment-compatibility.md",
     "dependency_3a_accepted": true,
     "attempt_count_now": 0,
-    "assignment": "Only package preparation is eligible; no3b package frozen, executor designation or dispatch."
+    "attempt_planned": 1,
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001",
+    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/prompt.md",
+    "prompt_sha256": "a4e99dc1af905af46033784d472bef16a65a220e26af6d2893371bce3839f4db",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/input-snapshot.json",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt001/manifest.json",
+    "expected_active_minutes": "150-210",
+    "total_wall_minutes": 240,
+    "assignment": "Maintainer designates one Terra/Luna and manually forwards; Sol preparation does not dispatch, run native or consume attempt."
   },
-  "next_action": "3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收，普通历史3次及诊断1次分别保留。下一步可准备3b完整包，包含三后端真实翻译/readback与Isaac6.1/6.2部署兼容；3b仍PLANNED/attempt0，无派发或执行，不自动进入后续阶段。",
+  "next_action": "3a已接收；3b完整attempt001包已准备，等待维护者指定单一执行者并手动转发。3b仍PLANNED/attempt0，无writer或native启动；先修消费级依赖与Isaac6.1/6.2共同接线，再三路线物性/真实闭环，报告后Sol复审，不自动3c。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1281,5 +1289,11 @@
     "resolved_by": "V211_G03_3a_diagnostic_attempt001",
     "diagnosis": "DIAGNOSIS_RESOLVED",
     "whole_3a_accepted": true
+  },
+  "stage3_dependency_clarification": {
+    "date": "2026-11-05",
+    "authority": "Maintainer: GeoPhys only consumes MuJoCo when its MuJoCo solver route is selected; native solver does not conflict with Core MuJoCo.",
+    "implementation_status": "PLANNED_IN_3B_ATTEMPT001",
+    "policy": "Use resolved host/engine/solver and actual source/worker consumer dependencies; preserve checks for genuinely required dependencies. No submodule/pin/requirements change."
   }
 }
