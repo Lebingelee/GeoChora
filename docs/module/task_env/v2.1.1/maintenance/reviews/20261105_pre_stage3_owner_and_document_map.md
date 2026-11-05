@@ -6,6 +6,8 @@
 
 同日 `2fd30a47` 又将 selected 录制配置、来源快照及 metadata／recipe 组装归到既有 recorder owner，并完成无引擎回归；由于生产录制代码更新，之前的物理运行仅属于 `1d8cabdc`，不能当作该新提交的物理结果。
 
+同日 `f3601bdd` 将 F05 source-bound runtime 准入类型从 Position task builder 收归 runtime；旧 builder 导出保持同对象，runtime 分类不再反向导入该 builder。DG04 冻结 delivery manifest 缺失导致正向合成检查未完成，参见[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)；下表对此反向导入的描述为旧检查点。
+
 ## 原功能到当前 owner
 
 | 原功能／输入 | 当前通用 owner | 任务、诊断和真实调用者 | 尚需复核的边界 |
