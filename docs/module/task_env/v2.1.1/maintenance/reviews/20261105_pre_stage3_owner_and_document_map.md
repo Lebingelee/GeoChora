@@ -8,6 +8,8 @@
 
 同日 `f3601bdd` 将 F05 source-bound runtime 准入类型从 Position task builder 收归 runtime；旧 builder 导出保持同对象，runtime 分类不再反向导入该 builder。DG04 冻结 delivery manifest 缺失导致正向合成检查未完成，参见[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)；下表对此反向导入的描述为旧检查点。
 
+后续在外部已有目录按 SHA 找到 DG04 原件；`3f7ab45d` 修正 F05 对共享 R3 profile 的读取并通过无引擎合成 DG04 路线。上述“缺失”仅指原本硬编码的 checkout 内位置；真实 Isaac／物理仍未验证。
+
 ## 原功能到当前 owner
 
 | 原功能／输入 | 当前通用 owner | 任务、诊断和真实调用者 | 尚需复核的边界 |
