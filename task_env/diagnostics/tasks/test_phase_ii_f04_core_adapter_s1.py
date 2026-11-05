@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 
 import numpy as np
 import pytest
@@ -385,6 +386,23 @@ def test_f04_attempt003_worker_opening_uses_real_core_normalized_action_route(
                    for name in (set(sys.modules) - before_modules) for prefix in forbidden)
 
 
+@pytest.fixture(scope="module")
+def f04_tamper_deliveries(tmp_path_factory):
+    """Reuse one isolated delivery per family and remove it after this module."""
+    source = (Path(__file__).resolve().parents[3] /
+              "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets")
+    with tempfile.TemporaryDirectory(prefix="f04-tamper-", dir=tmp_path_factory.getbasetemp()) as tmp:
+        copies = {}
+
+        def delivery(family):
+            if family not in copies:
+                copies[family] = Path(tmp) / family
+                shutil.copytree(source / family, copies[family])
+            return copies[family]
+
+        yield delivery
+
+
 @pytest.mark.parametrize("family,mutated_relative", (
     ("local_official_panda_r009", "metadata/physx_task_scene_recipe.json"),
     ("local_official_panda_r009", "metadata/f04_local_usd_checker.py"),
@@ -393,16 +411,15 @@ def test_f04_attempt003_worker_opening_uses_real_core_normalized_action_route(
     ("local_menagerie_panda_r009", "support/official/report.json"),
     ("local_menagerie_panda_r009", "support/converter_manifest.json"),
 ))
-def test_f04_local_delivery_tampering_fails_core_loader(tmp_path, family, mutated_relative):
+def test_f04_local_delivery_tampering_fails_core_loader(f04_tamper_deliveries, family, mutated_relative):
     from task_env.assembly.usd_delivery import load_usd_asset_delivery
 
-    root = (Path(__file__).resolve().parents[3] /
-            "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets" /
-            family)
-    copied = tmp_path / family
-    shutil.copytree(root, copied)
+    copied = f04_tamper_deliveries(family)
     target = copied / mutated_relative
     original = target.read_bytes()
-    target.write_bytes(original + b"\n# F04 S1 tamper\n")
-    with pytest.raises((ValueError, OSError)):
-        load_usd_asset_delivery(copied / "usd_delivery.json")
+    try:
+        target.write_bytes(original + b"\n# F04 S1 tamper\n")
+        with pytest.raises((ValueError, OSError)):
+            load_usd_asset_delivery(copied / "usd_delivery.json")
+    finally:
+        target.write_bytes(original)

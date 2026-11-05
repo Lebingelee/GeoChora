@@ -12,3 +12,5 @@
 | NutAssembly seed 19，horizon 6000 | 2377 transitions，外部 Solution 与任务报告成功，计划路线完成；H5 SHA-256 `136b9e39cc690bb2afbd55199017cb32ad811cd7e57fa4fba251c74f5e509ff7` | PASS，2378 boundaries、11885 原生子步；时间间隔与 target/applied 身份通过。 |
 
 reader 在独立进程运行，输出报告未加载 native 模块。此结果只覆盖上述两条 MuJoCo CPU 路线及其记录读取，不构成 D0、Qualification、其他 provider 或全新安装验收。此前源码的证据不重标；此前续作的新职责调整仍待 Sol 独立复审。Marker 构造、F06 任务与 runtime 职责、诊断归位和完整新手入口等保留项仍按规划判断，阶段3未开始。
+
+F04 篡改测试后续改为每个 pytest worker、每种来源按需复用一份临时副本；每个用例在 `finally` 恢复被篡改文件，module fixture 结束时删除副本。六种实际篡改用例在禁止引擎导入的进程中 **6 passed**；受监控输出峰值 248783523 bytes，结束后输出目录约 2657 bytes。输出及 supervisor 记录位于 ignored `workspace/maintenance/v211_pre_stage3_continue_marker_20261105/f04-reuse-verification-20261105/`。该修改仅针对测试，不重标上述物理运行的源码身份。
