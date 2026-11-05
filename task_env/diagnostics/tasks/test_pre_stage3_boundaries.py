@@ -4,6 +4,40 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.mark.parametrize('session_fails', [False, True])
+def test_mixed_close_receipt_failure_does_not_skip_remaining_cleanup(session_fails):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    calls = []
+    class Session:
+        def close(self):
+            calls.append('session')
+            if session_fails:
+                raise RuntimeError('session failure')
+
+        @property
+        def close_receipt(self):
+            calls.append('receipt')
+            raise LookupError('receipt failure')
+
+        def close_runtime_owner(self):
+            calls.append('owner')
+
+    env = SimpleNamespace(
+        mixed_control_profile=True, session=Session(), _mixed_episode_end=object(),
+        _execution_fault=None, recorder=None, _mixed_close_receipt=None,
+        value={'source': SimpleNamespace(execution_source_receipt=SimpleNamespace(
+            close=lambda: calls.append('source')))},
+        binding=SimpleNamespace(close_task_resources=lambda: calls.append('task')),
+    )
+    with pytest.raises(RuntimeError if session_fails else LookupError) as raised:
+        SelectedReferenceEnv._close_reference_resources(env)
+    assert calls == ['session', 'receipt', 'owner', 'source', 'task']
+    assert env.session is None
+    if session_fails:
+        assert any('receipt failure' in note for note in raised.value.__notes__)
+
+
 @pytest.mark.parametrize('route', ['selected', 'mixed', 'position'])
 def test_reference_close_preserves_resource_order_and_primary_fault(route):
     from task_env.environment.reference_env import SelectedReferenceEnv

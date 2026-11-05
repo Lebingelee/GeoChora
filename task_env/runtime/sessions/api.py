@@ -60,7 +60,12 @@ def close_session_and_runtime_owner(
         session.close()
     except BaseException as error:
         retain(error, session_error_label)
-    receipt = getattr(session, 'close_receipt', None) if capture_close_receipt else None
+    receipt = None
+    if capture_close_receipt:
+        try:
+            receipt = getattr(session, 'close_receipt', None)
+        except BaseException as error:
+            retain(error, 'session close receipt read')
     try:
         close_owner = getattr(session, 'close_runtime_owner', None)
         if callable(close_owner):
