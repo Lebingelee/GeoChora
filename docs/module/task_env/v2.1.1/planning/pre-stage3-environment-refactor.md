@@ -8,6 +8,8 @@
 
 > 2026-11-05 后续实现检查点（待Sol复审）：Marker的Controller编译、构造身份和来源文件摘要已部分收回既有assembly owner，示例与Nut通过共同规范Env resolved-config入口组装，示例仍声明其`ReferenceTaskBinding`；R2是否满足新手最短组合待Sol复核。公共factory与来源字节的无引擎检查通过；F06固定任务值已转为受信摘要约束的任务声明并有无引擎拒绝检查，待Sol复审；环境减责及最终物理／独立reader仍待完成，见[后续记录](../maintenance/reviews/20261105_pre_stage3_continuation.md)。
 
+> 2026-11-05 恢复检查点：维护者增加物理步预算并调整当前存储检查口径；`1d8cabdc` 的 PickCube／Nut MuJoCo CPU 代表回归及独立 reader 已通过，`08a728ea` 的显式路径启动器 Pendulum GeoPhys CPU 单步已通过。具体源码身份、预算和局限见[恢复后的验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。后续测试及文档提交不改变上述生产代码，但不将结果重标到新提交；整体职责整理和 Sol 复审仍未完成。
+
 ## 一、已经查明的现状
 
 | 位置 | 当前事实 | 重构含义 |
