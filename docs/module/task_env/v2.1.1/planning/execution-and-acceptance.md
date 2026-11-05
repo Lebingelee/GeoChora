@@ -85,8 +85,10 @@ NutAssembly 用于已有后端的代表性复用；不自动扩为所有任务�
 
 Sol 负责讨论、编排和接收；Luna／Terra 按后续明确授权承担一个完整包。默认一个 writer 和一个 native 执行窗口；尚未指定谁执行哪个阶段，不自动创建线程或发送消息。完整报告与窗口释放后再审核 diff 和证据，PASS 不是自动接收。
 
-按[Goal 编排流程](../../../../../.agents/skills/geochora/references/goal-orchestration.md)，一次 attempt 可包含多次修复与运行；普通子阶段至多三次窗口，第三次前重审根因与官方项目实现。常规修复不因单次测试失败而结束 attempt。执行包有完整预算，不能把“一次启动、失败即停”设成默认。反复同根因且无新假设时归因并向维护者报告。
+按[Goal 编排流程](../../../../../.agents/skills/geochora/references/goal-orchestration.md)，一次 attempt 可包含多次修复与运行；普通子阶段至多三次窗口，第三次是最后一次普通attempt，投放前重审根因与官方项目实现；第三次整体未接收必须停止普通执行并人工诊断，不能自动第四次或换名重置计数。常规修复不因单次测试失败而结束 attempt。执行包有完整预算，不能把“一次启动、失败即停”设成默认。反复同根因且无新假设时归因并向维护者报告。
 
 原始日志、失败、图像和 H5 保持 ignored；跟踪文档仅保存摘要和证据引用。每个有界输出配本地提交，只暂存本包路径。推送、合并、tag、Release、正式 Qualification 不在当前文档授权中。
 
 2026-11-05当前推进：3a attempt001经[独立复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；attempt002准备不消耗新attempt。Isaac6.1／6.2兼容实现和5.1延期按[兼容规划](isaac-deployment-compatibility.md)在3a接收后的3b完整包安排，七阶段依赖不变。
+
+2026-11-05：3a attempt002核心恢复已有限接收，整体仍未接收、已执行2次。当前[003前重评](stage3-3a-attempt003-reassessment.md)已记录，只准备最后完整收口方案，尚未封包／派发；不将三后端原生验证倒加到3a。

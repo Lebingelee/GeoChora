@@ -61,7 +61,9 @@ to the intended successful run; never combine partial runs into a fake pass.
    reassessment below is complete. Include the chosen repair, its validation
    and final substage disposition in one package.
 
-Ordinary substage work has at most **three attempts**. Count completed execution; each substage follows the three-attempt cap.windows in the index, with their success, timebox or external-guidance handoff
+Ordinary substage work has at most **three attempts**; attempt 3 is the last
+ordinary window. Count completed execution windows in the index, with their
+success, timebox or external-guidance handoff
 reason; record repeat tests/native runs under that window. Do not reset the
 count through renamed packages, new threads/branches or preparation rounds.
 Recovery or maintainer-directed contract correction may continue the same
@@ -76,9 +78,12 @@ the plan. An exhausted limit does not make the substage accepted.
 
 ### Post-limit diagnostic conversation
 
-After three unsuccessful ordinary attempts, report the unresolved result.
-Opening diagnostic conversations is discouraged because it consumes maintainer
-attention and usage; resolve routine defects inside existing execution windows.
+If the substage is still not accepted after attempt 3, report the unresolved
+result and stop ordinary execution. **Maintainer-led human diagnosis is required
+before further work**, even if a bounded part was accepted. No automatic fourth
+attempt, renamed successor, or new conversation may bypass this stop.
+Avoid routinely reaching human diagnosis through repeated audits or speculative
+boundary matrices; resolve routine defects inside existing execution windows.
 The maintainer may explicitly open a temporary conversation dedicated to
 locating and resolving a persistent blocker. Do not create or message another
 conversation automatically.
@@ -113,7 +118,8 @@ substage acceptance.
 
 ## Mandatory reassessment before attempt 3
 
-When attempt 2 has not resolved the core issue, Sol first consolidates the
+When the substage remains unaccepted after attempt 2, including when a bounded
+core repair has been accepted, Sol first consolidates the
 actual code/HEAD, earlier diffs, raw failure evidence, checks already passed,
 remaining blockers and hypotheses. Distinguish an implementation defect from
 missing public capability, unavailable external input or an infeasible gate.
@@ -125,6 +131,12 @@ license, dependencies and fit with Geochora ownership. Record concrete links,
 what can be reused/adapted, rejected alternatives and remaining uncertainty;
 also record a negative search result when no suitable implementation exists.
 Reuse existing Core owners before introducing another abstraction.
+
+Separate an actual missing requirement from a stage-boundary misunderstanding
+or an extra review demand. Reuse accepted, unaffected evidence; do not turn the
+reassessment into another full historical audit. Freeze a concrete repair and
+an end-to-end substage acceptance route before dispatch; do not spend the last
+window on an open-ended investigation or accept only another partial slice.
 
 Update the substage planning entry with the root cause supported by evidence,
 chosen approach, patch locations, check sequence, execution budget and a

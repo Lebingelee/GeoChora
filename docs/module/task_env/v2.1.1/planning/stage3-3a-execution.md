@@ -70,3 +70,9 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 本轮实现42dfcda5经[Sol复审](../maintenance/reviews/20261105_3a_attempt002_sol_review.md)有界接收为ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY。两任务真实MuJoCo CPU公开创建/reset/10步/close已通过；Sol仅独立5项相关离线检查，不再启动原生。上节runtime-first为已完成窗口的安排，不能继续派发原attempt002。
 
 3a整体仍PARTIAL_CORE_RUNTIME_RECOVERED、已执行2次。剩余按实际声明求交和已有adapter的具体构建检查点做有界评估，先复用原owner／已过证据，不造oracle框架、不铺开全对象边界矩阵；尚无attempt003完整包或执行。第三次前遵循既定根因／可行性重评，只研究实际未决问题。GeoPhys/Isaac原生、物性及完整三路线验证交3b，不倒加为3a提前运行门。已接收的MuJoCo核心恢复在代码未受影响时直接引用。旧G02／前置维护不重开。
+
+## attempt003前重评与最后窗口
+
+维护者再次明确三次上限：003是最后一次普通窗口，若整体3a未接收则必须停止普通执行并进行人工诊断，不自动第四次。已完成[本次重评与调度](stage3-3a-attempt003-reassessment.md)：比较两次实际窗口、原协议和当前生产owner，记录官方／开源对照，选择实际需求汇总→准确adapter构建检查→同一回执的一次整体收口。不将已解决reset重做，也不在3a提前实施4a或3b物理矩阵。
+
+当前可进入最小完整包准备，但尚未冻结／派发attempt003，attempt_count保持2。投放前必须固定需求来源、具体消费点和完整3a验收路径；若确需外部输入先解决，不先消耗最后窗口。预计主动90–120分钟、墙时180分钟，适用预算待完整包冻结；剩余判断及安排以该重评页为准。

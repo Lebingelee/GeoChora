@@ -127,16 +127,20 @@ For a maintainer-authorized goal covering multiple substages, follow the
 [goal orchestration procedure](references/goal-orchestration.md): locate each
 substage's implementation details in its planning document, aim for research
 and implementation in attempt 1 and review/acceptance in attempt 2, and cap
-ordinary substage work at three execution windows. Each window may contain multiple; each ordinary substage follows the three-window cap.repair and validation runs; count those runs separately from attempts. Before attempt 3, reassess the actual blockers,
+ordinary substage work at three execution windows. Each window may contain
+multiple repair and validation runs; count those runs separately from attempts.
+Attempt 3 is the last ordinary window. Before it, reassess the actual blockers,
 research relevant open-source implementations and decide whether the original
 acceptance remains achievable. Track Luna through periodic read-only checks;
 prepare future work privately during report cleanup, then independently verify
 the completed handoff before dispatch. This procedure does not itself create a
 goal or start/message additional agents.
 
-If three ordinary attempts still do not meet acceptance, report the blocker.
-Avoid routinely opening diagnostic conversations: they consume maintainer
-attention and usage. The maintainer may explicitly designate a temporary
+If attempt 3 still does not meet the substage's acceptance, stop ordinary
+execution and require maintainer-led human diagnosis before further work.
+Do not start attempt 4, rename the work, or reset the count. Avoid reaching
+this state through repeated audits or speculative boundary matrices; resolve
+routine defects inside the existing execution window. The maintainer may designate a temporary
 diagnostic conversation; its diagnostic attempts have no fixed count limit,
 but each still needs a concrete repair objective, timebox and evidence. Use the
 [post-limit diagnostic handoff](references/goal-orchestration.md#post-limit-diagnostic-conversation)

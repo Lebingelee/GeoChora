@@ -31,16 +31,21 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3a",
-    "package_id": null,
-    "status": "REMAINING_SCOPE_ASSESSMENT_REQUIRED",
+    "package_id": "V211_G03_3a_attempt003",
+    "status": "REASSESSED_AWAITING_COMPLETE_PACKAGE",
     "assigned_agent": null,
     "target_thread": null,
-    "planning_ref": "../planning/stage3-3a-execution.md",
+    "planning_ref": "../planning/stage3-3a-attempt003-reassessment.md",
     "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
-    "assignment": "No attempt003 package prepared or dispatched; assess only remaining declaration/build-check owners before the third attempt.",
-    "preparation_consumes_attempt": false
+    "assignment": "Final ordinary attempt; reassessment recorded, but no complete package frozen, no executor designated and no dispatch.",
+    "preparation_consumes_attempt": false,
+    "planned_attempt": 3,
+    "attempt_count_now": 2,
+    "last_ordinary_attempt": true,
+    "reassessment_ref": "../planning/stage3-3a-attempt003-reassessment.md",
+    "human_diagnosis_required_if_not_accepted": true
   },
-  "next_action": "核心恢复已有限接收。先只评估剩余3a声明求交／具体构建检查点，按第三次前规则收敛最小包；不重做本轮MuJoCo或历史验收，尚未准备／派发attempt003；3b未开始。",
+  "next_action": "Sol按003前重评固定实际需求来源、具体构建检查消费点和完整3a出口，再冻结最后完整包。未派发、未消耗attempt003；不重做已接收核心或历史审计。003仍未接收则停止普通执行并人工诊断，不自动第四次。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1199,5 +1204,13 @@
     "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence.",
     "sol_review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
     "review_decision": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY"
+  },
+  "last_attempt_policy": {
+    "ordinary_attempt_limit": 3,
+    "attempt_is_execution_window": true,
+    "final_attempt_requires_reassessment": true,
+    "after_third_unaccepted": "STOP_ORDINARY_EXECUTION_REQUIRE_MAINTAINER_LED_HUMAN_DIAGNOSIS",
+    "automatic_new_diagnostic_thread": false,
+    "reference": "../../../../../.agents/skills/geochora/references/goal-orchestration.md"
   }
 }
