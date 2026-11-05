@@ -36,6 +36,8 @@ mixed interval 的结构化 transition、target／applied 投影及 stepwise 记
 
 修复 selected 构造完成 task value 后、Env 发布前的回收缺口：控制器、action／observation space 或元数据初始化失败时，依次尝试关闭来源快照和 task 资源，保留首个构造异常、附加清理错误及 `selected_construction` fault。已有 scalar binding 拒绝复用同一回收路径。工作树无引擎组合 268 passed、4 deselected（14.279 秒）；假 provider／LIBERO V8 合成组合 5 passed（3.160 秒）；早期定向故障检查 3 passed（1.116 秒）。均有进程树采样且进程组退出；原始记录在 ignored `renewed-construction-cleanup-001` 至 `003`。新离线预算累计 323.915／3000 秒；此为提交前工作树证据，不代表物理验证。
 
+源码提交 `779f1977` 后干净 tracked HEAD 重跑无引擎组合：268 passed、4 deselected，监督墙时 15.401 秒，进程树峰值采样约 293 MiB，进程组已退出；原始记录在 ignored `renewed-construction-cleanup-clean-779f1977`。新离线预算累计 339.316／3000 秒。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
