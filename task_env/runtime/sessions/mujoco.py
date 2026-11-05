@@ -91,13 +91,24 @@ def _mujoco_model_facts(model, mj):
     for i in range(model.njnt):
         joints.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, i), 'id': i,
                        'type': int(model.jnt_type[i]), 'axis_body': model.jnt_axis[i].tolist(),
-                       'limited': bool(model.jnt_limited[i]), 'range': model.jnt_range[i].tolist()})
+                       'limited': bool(model.jnt_limited[i]), 'range': model.jnt_range[i].tolist(),
+                       'child_body_id': int(model.jnt_bodyid[i]),
+                       'qpos_address': int(model.jnt_qposadr[i]), 'dof_address': int(model.jnt_dofadr[i])})
     actuators = []
     for i in range(model.nu):
         actuators.append({'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_ACTUATOR, i), 'id': i,
                           'transmission_type': int(model.actuator_trntype[i]),
                           'transmission_ids': model.actuator_trnid[i].tolist(),
-                          'gear': model.actuator_gear[i].tolist()})
+                          'gear': model.actuator_gear[i].tolist(),
+                          'gain_type': int(model.actuator_gaintype[i]),
+                          'bias_type': int(model.actuator_biastype[i]),
+                          'dynamics_type': int(model.actuator_dyntype[i]),
+                          'gain_parameters': model.actuator_gainprm[i].tolist(),
+                          'bias_parameters': model.actuator_biasprm[i].tolist(),
+                          'control_limited': bool(model.actuator_ctrllimited[i]),
+                          'control_range': model.actuator_ctrlrange[i].tolist(),
+                          'force_limited': bool(model.actuator_forcelimited[i]),
+                          'force_range': model.actuator_forcerange[i].tolist()})
     equality = [{'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_EQUALITY, i),
                  'type': int(model.eq_type[i]), 'object1_id': int(model.eq_obj1id[i]),
                  'object2_id': int(model.eq_obj2id[i]), 'active': bool(model.eq_active0[i]),
