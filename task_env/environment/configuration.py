@@ -294,6 +294,34 @@ def _layered_execution_selection(*, provider, backend, device, renderer, runtime
     return selection, defaults
 
 
+def resolve_candidate_execution_selection(*, provider, backend, source, execution_spec=None):
+    """Resolve an existing advanced candidate without inventing a registered task config."""
+    from ..artifacts import ExecutionSpecV1
+    if (provider, backend) != ('mujoco', 'cpu'):
+        raise ValueError('candidate execution context is limited to the existing MuJoCo CPU route')
+    if source.config.runtime.backend != backend:
+        raise ValueError('candidate source backend differs from its execution selection')
+    renderer = RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None)
+    device = 'cpu'
+    if execution_spec is not None:
+        if type(execution_spec) is not ExecutionSpecV1:
+            raise TypeError('candidate execution must be an ExecutionSpecV1')
+        execution_spec.validate()
+        if (execution_spec.physics_provider, execution_spec.physics_backend) != (provider, backend):
+            raise ValueError('candidate execution provider/backend differs from its selection')
+        if execution_spec.render_default.provider != 'none' or execution_spec.camera_overrides:
+            raise ValueError('candidate selected execution context requires state-only rendering')
+        renderer, device = execution_spec.render_default, execution_spec.physics_device or 'cpu'
+    selection, _ = _layered_execution_selection(provider=provider, backend=backend, device=device,
+        renderer=renderer, runtime=source.config.runtime, selected=False)
+    if execution_spec is not None:
+        selection = replace(selection, physics_profile=execution_spec.physics_profile,
+                            provider_seed=execution_spec.provider_seed,
+                            determinism_mode=execution_spec.determinism_mode)
+    selection.validate()
+    return selection
+
+
 def _resolve_selected_config(environment_type, config):
     """Normalize selected legacy fields at the common configuration boundary."""
     supplied = config if isinstance(config, ResolvedSelectedConfig) else None

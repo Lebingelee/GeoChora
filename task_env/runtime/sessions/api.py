@@ -1493,6 +1493,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                     or plan.scene_identity_hash != source.scene_definition.identity_hash):
                 raise ValueError('Controller binding plan is not compiled for the selected Scene')
             declared_bindings = plan.controller_bindings
+            projected_feedback = project_controller_feedback(plan)
         selected = bind_selected_controller(value, binding=binding,
                                             provider=selection.physics_provider,
                                             backend=selection.physics_backend)

@@ -647,6 +647,11 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         manifest = config.source_delivery_manifest
         binding = cls.selected_binding(config)
         if provider == 'isaacsim':
+            from ...runtime.sessions.provenance import preflight_interpreter_before_source
+            preflight_interpreter_before_source(
+                config.execution_spec_v2,
+                requested=(None if config.requested_execution_json is None
+                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
             environment = (_nut_aligned_environment_config(config.environment)
                            if profile in _PICKCUBE_R3_PROFILES else config.environment)
             initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,

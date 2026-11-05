@@ -315,6 +315,40 @@ class DeploymentPreflightError(ValueError):
         super().__init__(f'{self.phase}: {reason}; request={self.request_identity}')
 
 
+def inspect_selected_interpreter(selection):
+    """Read and assess one selected interpreter without importing provider SDKs."""
+    environment = probe_interpreter_environment(selection.interpreter)
+    return environment, assess_declared_dependencies(selection.physics_provider, environment)
+
+
+def preflight_interpreter_before_source(selection, *, requested, task_uid):
+    """Reject unavailable interpreter dependencies before source construction."""
+    from .transport import request_identity
+    facts = {'selection': selection.to_mapping(), 'requested': requested, 'task_uid': task_uid,
+             'artifact_identity': None, 'source_id': None, 'source_closure': None,
+             'controller_identities': None}
+    receipt = {'schema_version': 'deployment-preflight-v1',
+               'request_identity': request_identity(facts), 'phase': 'static_preflight',
+               'identity_scope': 'selection_only_source_not_evaluated', 'identity_facts': facts,
+               'requested': requested, 'resolved': selection.to_mapping(), 'environment': None,
+               'dependency': {'status': 'unknown', 'reason': 'not checked'},
+               'assessment': None, 'native_effective': {'status': 'unknown',
+                   'reason': 'native build/readback not run'}, 'evidence': 'none'}
+    if selection.interpreter is None:
+        receipt['dependency'] = {'status': 'unavailable', 'reason': 'interpreter path not configured'}
+        raise DeploymentPreflightError('interpreter_unavailable', receipt)
+    try:
+        environment, dependency = inspect_selected_interpreter(selection)
+    except ValueError as error:
+        receipt['dependency'] = {'status': 'unavailable', 'reason': str(error)}
+        raise DeploymentPreflightError('environment_probe_failed', receipt) from error
+    receipt['environment'] = environment
+    receipt['dependency'] = dependency
+    if receipt['dependency']['status'] != 'available':
+        raise DeploymentPreflightError('dependency_' + receipt['dependency']['status'], receipt)
+    return environment, receipt['dependency']
+
+
 def describe_execution_selection(selection, *, requested, task_uid, artifact, source, controller, seed):
     """Return a request-bound selection; native effective values remain unknown."""
     from .transport import request_identity, source_binding_facts
@@ -379,13 +413,12 @@ def preflight_selected_deployment(selection, *, requested, task_uid, artifact, s
         assess('unavailable')
         raise DeploymentPreflightError('interpreter_unavailable', receipt)
     try:
-        environment = probe_interpreter_environment(selection.interpreter)
+        environment, dependency = inspect_selected_interpreter(selection)
     except ValueError as error:
         receipt['dependency'] = {'status': 'unavailable', 'reason': str(error)}
         assess('unavailable')
         raise DeploymentPreflightError('environment_probe_failed', receipt) from error
     receipt['environment'] = environment
-    dependency = assess_declared_dependencies(selection.physics_provider, environment)
     receipt['dependency'] = dependency
     # Bind the actual interpreter, package versions, origins and source
     # declaration digests into the request before capability assessment.

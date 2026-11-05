@@ -33,11 +33,11 @@
     "substage": "3a",
     "attempt_series": "diagnostic",
     "package_id": "V211_G03_3a_diagnostic_attempt001",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "assigned_agent": "Terra; maintainer manual forwarding",
+    "status": "REPORTED_PENDING_SOL_REVIEW",
+    "assigned_agent": null,
     "target_thread": null,
     "planned_diagnostic_attempt": 1,
-    "diagnostic_attempt_count_now": 0,
+    "diagnostic_attempt_count_now": 1,
     "ordinary_attempt_count_preserved": 3,
     "preparation_consumes_attempt": false,
     "planning_ref": "../planning/stage3-3a-diagnostic-001.md",
@@ -72,7 +72,7 @@
     },
     "assignment": "Explicit maintainer-designated diagnostic001; manual forwarding to Terra, no dispatch by Sol. Implementation/scoped validation authorized within frozen package; ordinary3 remains unchanged."
   },
-  "next_action": "维护者已明确指定诊断attempt，完整V211_G03_3a_diagnostic_attempt001准备完成待手动转交Terra。普通3次历史与未接收结果保留，诊断计数0，尚未实施。按已确认3a范围最小修复和聚焦验证，120分钟硬窗口；报告后Sol独立复审，不自动3b或后续窗口。",
+  "next_action": "诊断001执行者报告DIAGNOSIS_RESOLVED及THREE_A_TECHNICAL_PASS，待维护者手动转交Sol独立复审；不自动接收、续包或进入3b。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -738,7 +738,7 @@
             "1d",
             "2c"
           ],
-          "status": "DIAGNOSTIC_PREPARED_NOT_DISPATCHED",
+          "status": "REPORTED_PENDING_SOL_REVIEW",
           "attempt_count": 3,
           "attempts": [
             {
@@ -806,13 +806,14 @@
           "output_head": "3d10b3570f69d2c09400a2e8d06029e2a5bb844b",
           "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "Maintainer discussed stage boundaries, tests/SHA and time, then explicitly requested a Terra diagnostic package. Diagnostic001 prepared; ordinary3 results preserved, no dispatch/native.",
+          "last_observation": "Diagnostic001 reports source-free F06 dependency refusal, actual Position/leaf consumer and request-bound H5 plus bounded MuJoCo regression; pending Sol review.",
           "evidence_refs": [
             "reviews/20261105_3a_attempt002_execution.md",
             "reviews/20261105_3a_attempt001_sol_review.md",
             "reviews/20261105_3a_attempt002_sol_review.md",
             "reviews/20261105_3a_attempt003_execution.md",
-            "reviews/20261105_3a_attempt003_sol_review.md"
+            "reviews/20261105_3a_attempt003_sol_review.md",
+            "reviews/20261105_3a_diagnostic_attempt001_execution.md"
           ],
           "commits": [
             "32397283e635148788848c0c009e5223d40333df",
@@ -836,8 +837,24 @@
             "D1: F06 real source stops at pxr guard before selected preflight; missing SDK/assets not established, Isaac helper only synthetic source.",
             "D2: existing versioned Controller/StateRequirements/nested declarations lack a complete selected production-source consumer proof."
           ],
-          "diagnostic_attempt_count": 0,
-          "diagnostic_attempts": []
+          "diagnostic_attempt_count": 1,
+          "diagnostic_attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G03_3a_diagnostic_attempt001",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T19:53:05+08:00",
+              "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "1284afea430b000022563260f67d92c976d41d65",
+              "diagnosis": "DIAGNOSIS_RESOLVED",
+              "technical_result": "THREE_A_TECHNICAL_PASS",
+              "summary_ref": "reviews/20261105_3a_diagnostic_attempt001_execution.md",
+              "writer_ownership": "released upon final commit and report",
+              "implementation_finished_at": "2026-11-05T20:09:03+08:00",
+              "finished_at": null,
+              "final_timing_ref": "workspace/maintenance/v211_g03_3a_diagnostic_attempt001/output-manifest.json"
+            }
+          ]
         },
         {
           "id": "3b",

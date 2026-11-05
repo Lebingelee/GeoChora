@@ -696,6 +696,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if camera_observation_config is not None and len(profiles) != 1:
             env.close()
             raise ValueError('R04a camera observation is bounded to the existing single Panda Position source')
+        if (provider, backend) == ('mujoco', 'cpu') and camera_observation_config is None:
+            from .configuration import resolve_candidate_execution_selection
+            try:
+                env._candidate_execution_selection = resolve_candidate_execution_selection(
+                    provider=provider, backend=backend, source=env.value['source'], execution_spec=execution_spec)
+            except BaseException:
+                env.close()
+                raise
         return env
 
     @classmethod
@@ -723,7 +731,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if bool(getattr(env, 'fixed_attachment_leaf_position_profile', False)) != bool(fixed_attachment):
             env.close()
             raise TypeError('leaf candidate attachment opt-in was not preserved by the selected environment')
+        from .configuration import resolve_candidate_execution_selection
+        try:
+            env._candidate_execution_selection = resolve_candidate_execution_selection(
+                provider=provider, backend=backend, source=env.value['source'])
+        except BaseException:
+            env.close()
+            raise
         return env
+
+    def _selected_execution_context(self):
+        resolved = getattr(self, 'resolved_public_config', None)
+        if resolved is not None:
+            return resolved.execution_spec_v2, resolved.requested_execution_json
+        return getattr(self, '_candidate_execution_selection', None), None
 
     @classmethod
     def from_mixed_control_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=6000):
@@ -1369,16 +1390,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
-        resolved = getattr(self, 'resolved_public_config', None)
-        selection = None if resolved is None else resolved.execution_spec_v2
+        selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
         if selection is not None:
             import json
             from ..runtime.sessions.provenance import (
                 DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
             )
-            requested = (None if resolved.requested_execution_json is None
-                         else json.loads(resolved.requested_execution_json))
+            requested = None if requested_json is None else json.loads(requested_json)
             facts = dict(requested=requested, task_uid=self.uid, artifact=self.artifact,
                          source=self.value['source'],
                          controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
@@ -1900,7 +1919,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             observation, info, evaluation = build_selected_observation(self, state)
         else:
             observation, info, evaluation = self.binding.observation_projection(self, state)
-        if getattr(self, 'resolved_public_config', None) is not None:
+        if self._selected_execution_context()[0] is not None:
             info = dict(info)
             info['execution_configuration_v1'] = self.get_execution_receipt()
         return observation, info, evaluation
@@ -3394,14 +3413,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         else:
             receipt = getattr(self, '_deployment_receipt', None)
             if receipt is None:
-                resolved = getattr(self, 'resolved_public_config', None)
-                if resolved is None or resolved.execution_spec_v2 is None:
+                selection, requested_json = self._selected_execution_context()
+                if selection is None:
                     raise StageUnavailableError('execution receipt is unavailable on this compatibility route')
                 from ..runtime.sessions.provenance import describe_execution_selection
-                requested = (None if resolved.requested_execution_json is None
-                             else json.loads(resolved.requested_execution_json))
+                requested = None if requested_json is None else json.loads(requested_json)
                 receipt = describe_execution_selection(
-                    resolved.execution_spec_v2, requested=requested, task_uid=self.uid,
+                    selection, requested=requested, task_uid=self.uid,
                     artifact=self.artifact, source=self.value['source'],
                     controller=self.value.get('controller', self.value.get('leaf_plan')), seed=None,
                 )
@@ -3543,13 +3561,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if not isinstance(value, Mapping):
             raise TypeError('task recording metadata hook must return a mapping')
         result = dict(value)
-        if getattr(self, 'resolved_public_config', None) is not None:
+        if self._selected_execution_context()[0] is not None:
             result['execution_configuration_v1'] = self.get_execution_receipt()
         return result
 
     def _position_record_metadata(self):
         from ..recorders.position_metadata import position_record_metadata
         result = position_record_metadata(self)
-        if getattr(self, 'resolved_public_config', None) is not None:
+        if self._selected_execution_context()[0] is not None:
             result['execution_configuration_v1'] = self.get_execution_receipt()
         return result

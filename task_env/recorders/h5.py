@@ -293,6 +293,11 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         # independent readers can bind a deployment-specific reset/source
         # identity without changing the generic H5 v3 trajectory ABI.
         result["task_context"] = dict(task_context)
+    execution_receipt = metadata.get("execution_configuration_v1")
+    if execution_receipt is not None:
+        if not isinstance(execution_receipt, Mapping):
+            raise ValueError("execution configuration receipt must be a mapping")
+        result["execution_configuration_v1"] = dict(execution_receipt)
     return result
 
 
