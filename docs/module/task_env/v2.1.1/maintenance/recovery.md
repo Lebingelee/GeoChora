@@ -113,3 +113,5 @@ Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交
 - `docs/maintenance/20261030_runtime_route_diagnostic_handoff.md` SHA-256 `18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61`。
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
 - attempt001和attempt002窗口已释放；2026-11-05较长续作的实际完成和窗口释放以本次报告为准。不得干扰其他用户的原生运行。本项不授权新的三后端九格、2b attempt3、Isaac native或阶段3。
+
+2026-11-06：3b 普通 attempt002 已返包、writer 已释放，等待 Sol 独立复审；技术结果 PARTIAL，原 N08 FAIL，ORACLE_REVIEW_REQUIRED。不要自动启动 attempt003 或 3c。具体证据、已知偏差与下一步见 [002 执行摘要](reviews/20261105_3b_attempt002_execution.md)。维护者提出的装配树通用重力补偿目前仅为[设计](../planning/gravity-compensation-assembly-tree.md)，不应误认为当前 Panda 有界实现已支持任意夹爪。

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-05",
-  "status": "G03_3B_ATTEMPT002_PREPARED_NOT_DISPATCHED",
+  "updated_date": "2026-11-06",
+  "status": "G03_3B_ATTEMPT002_REPORTED_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -48,7 +48,7 @@
     "total_wall_minutes": 240,
     "assignment": "Maintainer manually forwards to one Terra/Luna. Causal controls before tracked edits; restore stage branch then register attempt2. Preparation consumes no attempt."
   },
-  "next_action": "3b普通attempt002完整包已准备未派发，当前count=1。维护者手动转发后先锁内同checkout旧/新MuJoCo因果对照，恢复主题分支再修实际owner与launcher/typed-state/物性缺项；旧N08不改，必要时交可审阅oracle proposal，不自动003或3c。",
+  "next_action": "Maintainer manually forwards attempt002 to Sol for independent review; no automatic attempt003 or 3c.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -840,8 +840,8 @@
           "dependencies": [
             "3a"
           ],
-          "status": "REWORK_REQUIRED_3B",
-          "attempt_count": 1,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -860,6 +860,21 @@
               "review_decision": "REWORK_REQUIRED_3B",
               "package_manifest_sha256": "f1cdcb0467f4613e9c3f61003aa18a22b89f212c83466aede3383f981ba46ff4",
               "elapsed_to_final_state_seconds": 4320.329173
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G03_3b_attempt002",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-05T23:04:47.929214+08:00",
+              "executor": "Terra thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "470c3ef90bf2179916733f0049444bedefe07e3d",
+              "result": "THREE_B_TECHNICAL_PARTIAL",
+              "oracle_disposition": "ORACLE_REVIEW_REQUIRED",
+              "implementation_commit": "be88c5cd4ac823c997040d3166f7ea14e069b610",
+              "report_ref": "reviews/20261105_3b_attempt002_execution.md",
+              "writer_ownership": "released upon delivery documentation commit",
+              "native_ownership": "released; no further physics",
+              "review_decision": null
             }
           ],
           "assigned_agent": null,
@@ -869,12 +884,13 @@
           "output_head": "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Sol verified239 output hashes; independent12 guarded tests, readback/FK/R3 reconstruction and launcher fixture. Hold drift precedes upward action; CPU target reconstruction error0, no canonical Controller/source math diff. Three-way native run not repeated by Sol.",
+          "last_observation": "Attempt002: matched old/current MuJoCo trajectories; original three-route N08 remains FAIL; launcher and F06 T+1 witness repaired; explicitly authorized default-off bounded Panda gravity support tested separately.",
           "evidence_refs": [
             "reviews/20261105_3b_attempt001_execution.md",
             "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md",
             "reviews/20261105_3b_attempt001_sol_review.md",
-            "../planning/stage3-3b-rework-analysis.md"
+            "../planning/stage3-3b-rework-analysis.md",
+            "reviews/20261105_3b_attempt002_execution.md"
           ],
           "commits": [
             "d5731655",
@@ -890,9 +906,9 @@
             "qualification": false
           },
           "blockers": [
-            "Frozen N08 failed; causal distinction between initial sag/new regression/oracle prerequisites remains open",
-            "App launcher metadata/worker -I/-S discard SDK Python path context",
-            "Required physical/reset/mapping and same-run qdot/semantic recording evidence incomplete"
+            "Original N08 FAIL; oracle revision requires independent review",
+            "Required native physical and constraint readback remains incomplete",
+            "General assembly-tree gravity selection is design only"
           ]
         },
         {

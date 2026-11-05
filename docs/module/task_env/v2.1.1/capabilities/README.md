@@ -19,3 +19,5 @@
 - 本矩阵不等同正式 Qualification 或 Release，也不扩权未验证 source／solver／renderer 组合。
 
 相关完成条件只在[执行与验收](../planning/execution-and-acceptance.md)及对应 Goal 维护。矩阵链接那里，不再复制第二套门。原始 H5／图片／日志保持 ignored，保留失败和真实运行身份。
+
+Panda 本体重力补偿的 MuJoCo CPU 进程内有界运行和不支持组合见[指南](../guides/panda-gravity-compensation.md)。这是新增实现与有限证据，待独立复审，不自动提升本矩阵任何最终能力格。

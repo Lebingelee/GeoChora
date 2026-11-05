@@ -37,3 +37,5 @@
 ## 验收与限制
 
 每条路线的 source／provider／runtime／device 和实际 exercised intersection 记录到[矩阵](../capabilities/README.md)。若修复要求 provider 公共 API 或新 pin，先按[工作包规则](../planning/execution-and-acceptance.md)冻结范围。不得穿透私有字段或把模型读取能力缺口交给任务脚本规避。
+
+2026-11-06 更新：普通 3b attempt002 已执行并返包待独立复审，count=2，技术结果 **THREE_B_TECHNICAL_PARTIAL / ORACLE_REVIEW_REQUIRED**。同输入 MuJoCo 新旧轨迹一致，冻结 N08 三路线仍失败；launcher 与同次 qdot 记录已有修复。维护者另行授权了默认关闭、仅限 Panda 和 MuJoCo CPU 的重力补偿，其实验不改变原 N08。通用装配树选择仍是[设计提案](../planning/gravity-compensation-assembly-tree.md)，不是已支持能力。详见[执行摘要](../maintenance/reviews/20261105_3b_attempt002_execution.md)；不自动启动 003 或 3c。

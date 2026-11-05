@@ -34,3 +34,7 @@ MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与
 ## 文档边界
 
 本目录拥有 v2.1.1 的规划及已确认语义协议；v2.1.0 保留来源版本行为。每项协议只在对应 `contracts/` 页面维护，Goal 引用它并记录具体实施与验收。实现后再更新 API、指南和矩阵，不能把设计基线当成现有可调用 API。系统归属仍服从[架构](../../../global/architecture.md)与[ownership](../../../global/ownership.md)。
+
+## 本体重力补偿（待独立复审）
+
+维护者已授权实施默认关闭的 [Panda 本体重力补偿](guides/panda-gravity-compensation.md)。当前仅 MuJoCo CPU 进程内 selected PickCube／Nut 路线有界实现；原 3b 默认关闭的 N08 历史失败保留，其他 provider 的开启请求不支持。
