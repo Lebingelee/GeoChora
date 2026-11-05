@@ -44,6 +44,8 @@ selected／Position／leaf／mixed 控制器分类、writer 唯一性及来源�
 
 Position 回归的 7 次相同 Panda 源快照构建收敛为模块级 1 份共享副本；来源仍通过原 68 文件、固定 revision 和 closure SHA 检查，测试前后再核对一次 closure，模块退出时清理该副本。工作树双锁 CPU 源导入／合成控制检查两次均为 9 passed，监督墙时分别 1.384、1.371 秒；最终一次监督输出峰值约 32.7 MiB，退出后无残留 Panda 快照，进程组和双锁均释放。原日志在 ignored `renewed-position-reuse-001`、`002`。本续作双锁 CPU 墙时累计 13.598 秒；此验证未运行 Isaac／GPU 或物理 rollout，提交后需固定源码身份。
 
+测试提交 `bccf4f43` 后干净 tracked HEAD 重跑：9 passed，监督墙时 1.361 秒、输出峰值约 32.7 MiB，退出后源快照数为零，进程组和两把锁均释放；记录在 ignored `renewed-position-reuse-clean-bccf4f43`。本续作双锁 CPU 墙时累计 14.959 秒。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
