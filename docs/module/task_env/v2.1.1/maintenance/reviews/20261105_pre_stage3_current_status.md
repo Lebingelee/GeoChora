@@ -28,6 +28,8 @@ Position materialization 的控制计划、source joint／frame 映射及 task �
 
 mixed／Position 的 v3 录制文件路径、覆盖拒绝、recorder 创建和成功开始后的发布归 recorder owner；环境仍保持 episode 准入、任务 metadata、Stop 与 fault 次序。工作树无引擎组合 264 passed、4 deselected（13.720 秒），另有 mixed／leaf 合成检查 4 passed（5.210 秒），覆盖开始失败重试、已有文件保护、metadata 失败不发布、追加／最终化故障及记录绑定。首次组合遗漏两个已知原生排除项而被引擎防护拦截，263 passed、2 failed、2 deselected（15.572 秒）；补排后 263 passed、4 deselected（14.055 秒），再加入 Position 新断言得到上述 264 项。记录在 ignored `renewed-record-begin-001` 至 `004`；均为提交前工作树，含资源采样且进程组退出。新离线预算累计 283.941／3000 秒。
 
+源码提交 `a406ad82` 后干净 tracked HEAD 重跑无引擎组合：264 passed、4 deselected，监督墙时 14.002 秒、峰值采样约 286 MiB，进程组已退出；原始记录在 ignored `renewed-record-begin-clean-a406ad82`。新离线预算累计 297.943／3000 秒。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
