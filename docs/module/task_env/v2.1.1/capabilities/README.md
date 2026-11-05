@@ -4,7 +4,7 @@
 
 当前已存在的实现和有界结果继续查询 [v2.1.0 matrix](../../v2.1.0/capabilities/capability-matrix.json)。新目标 NOT_RUN 不否认那些历史结果，也不把历史 native 结果升级为当前 renderer／控制／并行证据。
 
-3a attempt002 的 PickCube31／Nut19 在真实 MuJoCo CPU 各完成 10 步有界运行，待 Sol 复审；不提升最终矩阵或资格。见[执行摘要](../maintenance/reviews/20261105_3a_attempt002_execution.md)。
+3a attempt002 的 PickCube31／Nut19 在真实MuJoCo3.8.1 CPU各完成公开创建/reset/10步/close，已获[Sol有界接收核心恢复](../maintenance/reviews/20261105_3a_attempt002_sol_review.md)。3a整体尚未接收；不提升三后端目标、最终九格或资格。
 
 3a attempt001经[Sol复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；没有新增native或qualified证据，不提升矩阵状态。Isaac6.1／6.2列入v2.1.1共同路线实现，5.1延期；按[兼容规划](../planning/isaac-deployment-compatibility.md)分列实现／离线／逐版本native状态，当前6.1 native为NOT_RUN。
 

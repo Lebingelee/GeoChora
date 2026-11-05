@@ -1,6 +1,6 @@
 # G03/3a：接手核对与首包实施安排
 
-2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt001已复审需返工；首包与首次返工准备均属历史。当前维护者安排见末节runtime-first。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
+2026-11-05，Sol。历史准备状态：`PREPARED_NOT_DISPATCHED`。当前attempt002核心恢复已获Sol有界接收，3a整体仍待收口；首包与返工安排均保留为历史，实时结论见末节独立复审。原执行摘要见[执行摘要](../maintenance/reviews/20261105_3a_attempt001_execution.md)。本页记录3a实施落点与首包准备历史；阶段出口仍以[Goal03](../goals/03-backends.md#3a)、[执行表](execution-and-acceptance.md)及已确认五协议为准。attempt001已实施且需返工，没有3a接收结论。
 
 ## 接手与分支
 
@@ -64,3 +64,9 @@ PickCube/Nut现有task physics_dt=0.002s、control_substeps=5、control/obs cade
 预计主动90–120分钟、总墙时180分钟；先核对直接输入，最迟第60分钟开始第一次真实构建尝试并在窗口内修复。仅执行者在维护者手动转发后可运行MuJoCo CPU，原生累计30分钟／2000物理步（含失败／reset／settle），全部验证累计60分钟、单组15分钟；RSS8GiB、输出256MiB。仅原生期间沿既有双锁串行，GPU/render/App/GeoPhys原生0，禁止下载／安装。Sol准备中native仍0。三后端完整验证与Isaac6.1/6.2兼容仍在3b，未启动3b。
 
 原revision 1完整包保留于主工作区handoffs/archive/V211_G03_3a_attempt002_r1_20261105；当前根目录prompt、snapshot和manifest冻结本revision的输入及预算。一个writer、本地明确路径提交、报告真实运行结果与剩余项后释放，维护者手动交Sol复审。准备不增加attempt计数。
+
+## attempt002独立复审后：只收口剩余3a
+
+本轮实现42dfcda5经[Sol复审](../maintenance/reviews/20261105_3a_attempt002_sol_review.md)有界接收为ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY。两任务真实MuJoCo CPU公开创建/reset/10步/close已通过；Sol仅独立5项相关离线检查，不再启动原生。上节runtime-first为已完成窗口的安排，不能继续派发原attempt002。
+
+3a整体仍PARTIAL_CORE_RUNTIME_RECOVERED、已执行2次。剩余按实际声明求交和已有adapter的具体构建检查点做有界评估，先复用原owner／已过证据，不造oracle框架、不铺开全对象边界矩阵；尚无attempt003完整包或执行。第三次前遵循既定根因／可行性重评，只研究实际未决问题。GeoPhys/Isaac原生、物性及完整三路线验证交3b，不倒加为3a提前运行门。已接收的MuJoCo核心恢复在代码未受影响时直接引用。旧G02／前置维护不重开。

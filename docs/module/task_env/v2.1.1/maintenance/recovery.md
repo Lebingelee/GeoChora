@@ -2,9 +2,11 @@
 
 更新时间：2026-11-05。按[协议确认收据](20261103_protocol_baseline_confirmation.md)、[执行表](../planning/execution-and-acceptance.md)及本页恢复当前状态。
 
-## 3a attempt002：真实 MuJoCo CPU 恢复待复审
+## 3a attempt002：核心恢复已由Sol有界接收
 
-`V211_G03_3a_attempt002` 已返包，PickCube seed31 与 Nut seed19 各经公开 factory、reset、10步及 close 在真实 MuJoCo CPU 完成，均推进0.10秒。来源快照绑定实际引用文件与导入字节；具名映射和异常worker回复已作有界修复。全3a未自行接收，逐能力oracle、嵌套／typed、其他后端及资格仍未覆盖。详见[执行摘要](reviews/20261105_3a_attempt002_execution.md)，维护者手动交Sol审阅；不自动进入3b。
+Sol决定 `ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY`：PickCube31／Nut19真实MuJoCo3.8.1 CPU公开创建、reset、各10步和close的核心恢复通过；各推进0.10秒，实际source闭包及具名映射、已复现worker错误回收得到有界修复。源码／原生日志和manifest已核对，Sol独立5项离线检查通过，没有重跑native或历史大组。详见[独立复审](reviews/20261105_3a_attempt002_sol_review.md)。
+
+3a整体仍 `PARTIAL_CORE_RUNTIME_RECOVERED`／attempt_count=2；剩余只先收口实际声明求交与具体adapter构建检查点，不扩展安全／边界矩阵。GeoPhys／Isaac原生和完整三后端闭环仍交3b；Isaac6.1／6.2兼容与5.1延期范围不变。尚未准备或派发attempt003，不重做已接收核心恢复，不自动进入3b。
 
 ## 历史：3a attempt001：Sol已复审，需返工
 

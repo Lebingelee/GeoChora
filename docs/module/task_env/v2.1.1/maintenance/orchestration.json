@@ -31,48 +31,16 @@
   "active_packages": [],
   "next_candidate": {
     "substage": "3a",
-    "package_id": "V211_G03_3a_attempt002",
-    "status": "REPORTED_PENDING_SOL_REVIEW",
-    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+    "package_id": null,
+    "status": "REMAINING_SCOPE_ASSESSMENT_REQUIRED",
+    "assigned_agent": null,
     "target_thread": null,
-    "assignment": "Maintainer forwarded revision 2; execution reported and Sol review pending.",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
     "planning_ref": "../planning/stage3-3a-execution.md",
-    "expected_active_minutes": "90-120",
-    "execution_budget": {
-      "total_wall_minutes": 180,
-      "single_test_group_minutes": 15,
-      "cumulative_validation_minutes": 60,
-      "cumulative_native_minutes": 30,
-      "rss_process_tree_gib": 8,
-      "new_output_mib": 256,
-      "single_log_mib": 16,
-      "native_routes": [
-        "mujoco/cpu"
-      ],
-      "physics_steps": 2000,
-      "native_launch_count_limit": null,
-      "native_launch_limit_reason": "Reruns bounded by time and cumulative physical steps, not a one-launch cap.",
-      "gpu_starts": 0,
-      "isaac_app_starts": 0,
-      "geophys_native_starts": 0,
-      "render_starts": 0,
-      "additional_worktrees": 0,
-      "native_authorization": "Maintainer runtime-first request; executor only after manual forwarding; Sol preparation native remains zero."
-    },
-    "preparation_consumes_attempt": false,
-    "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
-    "package_revision": 2,
-    "supersedes_unexecuted_revision": {
-      "revision": 1,
-      "manifest_sha256": "5e3c459d035c2286ea21edf7ba9fae237bb0f3076159d4aac088909a42a0d225",
-      "archive_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/archive/V211_G03_3a_attempt002_r1_20261105"
-    },
-    "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence."
+    "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
+    "assignment": "No attempt003 package prepared or dispatched; assess only remaining declaration/build-check owners before the third attempt.",
+    "preparation_consumes_attempt": false
   },
-  "next_action": "维护者转交 attempt002 报告，由 Sol 独立审阅两例真实 MuJoCo CPU 恢复及尚未完成的3a范围；不自动进入3b。",
+  "next_action": "核心恢复已有限接收。先只评估剩余3a声明求交／具体构建检查点，按第三次前规则收敛最小包；不重做本轮MuJoCo或历史验收，尚未准备／派发attempt003；3b未开始。",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -738,7 +706,7 @@
             "1d",
             "2c"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "PARTIAL_CORE_RUNTIME_RECOVERED",
           "attempt_count": 2,
           "attempts": [
             {
@@ -760,34 +728,51 @@
             {
               "attempt": 2,
               "package_id": "V211_G03_3a_attempt002",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED_CORE_RECOVERY",
               "started_at": "2026-11-05T16:45:38+08:00",
               "executor": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "81e257cbef6c3469ba23fadcfe481d93b114f4d1",
               "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
               "result": "CORE_RUNTIME_RECOVERY_PASS",
               "summary_ref": "reviews/20261105_3a_attempt002_execution.md",
-              "writer_ownership": "released after commit and report"
+              "writer_ownership": "released after commit and report",
+              "output_head": "42dfcda57757d6d14bd963f692f6bd9154a974f3",
+              "finished_at": "2026-11-05T16:56:28+08:00",
+              "sol_review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY",
+              "reported_window_minutes": 10.8,
+              "reported_native_substeps_derived": 400,
+              "package_revision": 2,
+              "package_manifest_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64"
             }
           ],
           "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
           "package_sha256": "023f98791403b74a5a2f3837a5654f6d22d0dcdcc88baadf7aa2d5837f311b64",
           "input_head": "81e257cbef6c3469ba23fadcfe481d93b114f4d1",
-          "output_head": null,
+          "output_head": "42dfcda57757d6d14bd963f692f6bd9154a974f3",
           "expected_duration_minutes": "90–120; hard 180",
           "execution_budget": null,
-          "last_observation": "attempt002: real MuJoCo CPU PickCube31 and Nut19 each completed reset, 10 steps and close; broader 3a pending Sol review.",
+          "last_observation": "Sol accepted bounded ordinary MuJoCo CPU recovery after source/log audit and five focused guarded offline checks; no Sol native rerun; remaining 3a declaration/build-check closure only.",
           "evidence_refs": [
-            "reviews/20261105_3a_attempt002_execution.md"
+            "reviews/20261105_3a_attempt002_execution.md",
+            "reviews/20261105_3a_attempt001_sol_review.md",
+            "reviews/20261105_3a_attempt002_sol_review.md"
           ],
           "commits": [
-            "32397283e635148788848c0c009e5223d40333df"
+            "32397283e635148788848c0c009e5223d40333df",
+            "42dfcda57757d6d14bd963f692f6bd9154a974f3"
           ],
-          "review_decision": null,
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY",
+            "reviewer": "Sol",
+            "date": "2026-11-05",
+            "review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
+            "whole_3a_accepted": false
+          },
           "blockers": [
-            "Per-capability build oracle and broader nested/typed assessment remain incomplete.",
-            "GeoPhys and Isaac native routes have not been exercised."
+            "Actual task/source/Controller required declaration intersection is not fully closed for the selected three-route scope.",
+            "Required unknown needs a concrete existing adapter mapping/build check; generic function-name whitelist remains insufficient."
           ]
         },
         {
@@ -1154,7 +1139,7 @@
     }
   ],
   "stage3_handoff": {
-    "status": "SOL_REVIEWED_3A_REWORK_REQUIRED",
+    "status": "SOL_REVIEWED_BOUNDED_CORE_RUNTIME_RECOVERY",
     "reviewed_input_head": "7bfe53828762d2eda1d7a566caa82d74dcc00d42",
     "handoff_ref": "20261105_stage3_sol_handoff.md",
     "external_package": "V211_G03_sol_handoff",
@@ -1169,5 +1154,50 @@
     "prepared_package_id": "V211_G03_3a_attempt002",
     "writer_check": "Terra reported writer/processes released; Sol reviewed exact output HEAD; no automatic assignment or messaging.",
     "native_checks_performed": false
+  },
+  "last_reviewed_package": {
+    "substage": "3a",
+    "package_id": "V211_G03_3a_attempt002",
+    "status": "REVIEWED_ACCEPTED_BOUNDED_CORE_RECOVERY",
+    "assigned_agent": "Terra-designated Codex thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+    "target_thread": null,
+    "assignment": "Maintainer forwarded revision 2; execution reported and Sol review pending.",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002",
+    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/manifest.json",
+    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_attempt002/input-snapshot.json#/input_head",
+    "planning_ref": "../planning/stage3-3a-execution.md",
+    "expected_active_minutes": "90-120",
+    "execution_budget": {
+      "total_wall_minutes": 180,
+      "single_test_group_minutes": 15,
+      "cumulative_validation_minutes": 60,
+      "cumulative_native_minutes": 30,
+      "rss_process_tree_gib": 8,
+      "new_output_mib": 256,
+      "single_log_mib": 16,
+      "native_routes": [
+        "mujoco/cpu"
+      ],
+      "physics_steps": 2000,
+      "native_launch_count_limit": null,
+      "native_launch_limit_reason": "Reruns bounded by time and cumulative physical steps, not a one-launch cap.",
+      "gpu_starts": 0,
+      "isaac_app_starts": 0,
+      "geophys_native_starts": 0,
+      "render_starts": 0,
+      "additional_worktrees": 0,
+      "native_authorization": "Maintainer runtime-first request; executor only after manual forwarding; Sol preparation native remains zero."
+    },
+    "preparation_consumes_attempt": false,
+    "prompt_sha256": "f06c86748e5560351315d5649a28db07c1eee7364181b9fdfde7cfff1d053931",
+    "package_revision": 2,
+    "supersedes_unexecuted_revision": {
+      "revision": 1,
+      "manifest_sha256": "5e3c459d035c2286ea21edf7ba9fae237bb0f3076159d4aac088909a42a0d225",
+      "archive_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/archive/V211_G03_3a_attempt002_r1_20261105"
+    },
+    "completion_priority": "Read actual referenced assets; fix source/reset/materialize; real MuJoCo CPU public build/reset/10 control steps/close for PickCube31 and Nut19; reuse unaffected evidence.",
+    "sol_review_ref": "reviews/20261105_3a_attempt002_sol_review.md",
+    "review_decision": "ACCEPTED_BOUNDED_3A_CORE_RUNTIME_RECOVERY"
   }
 }
