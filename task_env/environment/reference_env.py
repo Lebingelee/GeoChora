@@ -1436,6 +1436,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if not getattr(self, 'position_profile', False):
                 seed = self.binding.reset_seed(seed)
             self.solution = self.value.get('solution')
+            if self._native_feedback_profile is not None and self.solution is not None:
+                self.binding.validate_external_solution(self.value, self.solution)
             self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
             self.dual_entity_position = len(self.position_profiles) == 2
@@ -1511,8 +1513,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     native_feedback_profile=self._native_feedback_profile,
                     selected_controller=(self.controller
                                          if self._native_feedback_profile is not None else None),
-                    selected_solution=(external_solution or self.solution
-                                       if self._native_feedback_profile is not None else None),
                     native_feedback_gripper_control_hz=(
                         self.value['resolved_configuration'].get('gripper_control_hz')
                         if self._native_feedback_profile is not None else None

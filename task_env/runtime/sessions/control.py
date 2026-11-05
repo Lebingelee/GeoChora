@@ -745,7 +745,6 @@ def materialize_control(
     session_admission_input=None,
     native_feedback_profile=None,
     selected_controller=None,
-    selected_solution=None,
     native_feedback_gripper_control_hz=None,
 ):
     from ...artifacts import ExecutionSpecV1
@@ -949,17 +948,15 @@ def materialize_control(
     if diagnostic_profile is not None and native_feedback_profile is not None:
         raise ValueError('diagnostic and normal native-feedback admissions are mutually exclusive')
     if native_feedback_profile is not None:
-        import hashlib
         from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
         from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
         from ...controllers.canonical.gripper_execution import EqualRateGripperServo, NativeRateGripperServo
-        from ...tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
         from ...controllers.canonical.contracts import digest
         expected_controller_identity = {
             # Pin the post-refactor source-bound identities. The independent
             # field, source, provider and resource checks remain mandatory.
-            100: '081685dc897132168173cf176bdaeecc81aa1bf72c4180677d34571616424801',
-            500: 'e0540a9e0ceaff8865704114a88983f113333ed3a736b9e81749617c92147a85',
+            100: '94c148b14915a0637bfaf572c101ba2980b93b43c88b0a3a9ccd39785a1d679d',
+            500: '7cdf5c3c91ab3ec78dc3fa740fce1cbca7c229a0bf36b1d13c5da3a9c75cc4ec',
         }
         expected_inner_type = {
             100: EqualRateGripperServo,
@@ -988,26 +985,10 @@ def materialize_control(
                     actual_controller.reference_lead_limit_rad, actual_controller.inner_physics_dt_s,
                     actual_controller.dls_damping, actual_controller.rotation_row_weight) !=
                     (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
-                or actual_controller.gripper_config.force_limit_N != 10.0
-                or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
-                or selected_solution.identity != 'ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b'
-                or selected_solution.require_native_feedback_contract is not True
-                or digest(asdict(selected_solution.config)) !=
-                    '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
-                or selected_solution.base_controller_identity !=
-                    '6571627a613f60a0e9d221e5ef1557899b4aa793b81d4d7c0202abc1ee075184'
-                or selected_solution.control_dt != 0.01
-                or selected_solution.physics_dt_s != 0.002
-                or selected_solution.source_closure_digest is not None
-                or selected_solution.provider != execution.physics_provider
-                or selected_solution.task_artifact_hash != artifact.identity_hash
-                or selected_solution.source_id != source.scene_source.source_id
-                or selected_solution.source_xml_sha256 != hashlib.sha256(
-                    source.scene_source.xml.encode('utf-8')
-                ).hexdigest()):
+                or actual_controller.gripper_config.force_limit_N != 10.0):
             raise ValueError(
                 'R05b normal profile requires the exact admitted R3 Controller, 10 N cap, '
-                'NutAssembly Solution identity, and selected 100/500 Hz law'
+                'and selected 100/500 Hz law'
             )
         if source.config.runtime.backend != execution.backend:
             raise ValueError('R05b selected Controller/source backend mismatch')

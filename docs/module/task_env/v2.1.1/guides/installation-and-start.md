@@ -15,6 +15,11 @@
 
 在选定解释器中可用 `python --version` 和 `python -m pip show mujoco taichi-forge` 检查已安装发行包元数据；找不到 `geophys` 发行包不代表源码路径不可用。GeoPhys 的实际来源由下面的 `--geophys-src` 显式指定。不要凭上述元数据推断 native 任务成功。本轮未验证新克隆后的完整安装，也没有执行下载或安装。
 
+### 准备路线的区别
+
+- **新克隆**：先取得与 checkout 对应的子模块（例如在 checkout 中运行 `git submodule update --init --recursive`），再按所选 provider 准备隔离解释器、SDK、依赖与任务资产。先检查上表的依赖冲突；本轮没有验证全新安装，不承诺一组 requirements 可以同时满足全部后端。
+- **复用已有环境**：保留已有解释器和 SDK，核对它们与本 checkout 及所选资产匹配，再按下节显式传入 Python、Core 与 GeoPhys 源码路径。启动器不会安装或替换它们。
+
 ## 启动一个已有安装的单环境
 
 `examples/start.py` 只转调现有示例或 scalar public factory，不安装依赖、不自动切 provider。脚本、解释器和 `--geophys-src` 均需指向本次希望使用的安装；`--core` 默认是脚本所在 checkout，若显式提供其他 checkout 会报错。

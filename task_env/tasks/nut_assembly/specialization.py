@@ -587,7 +587,23 @@ def _validate_external_solution(value, solution):
         "source_xml_sha256": hashlib.sha256(value["source"].scene_source.xml.encode()).hexdigest(),
         "base_controller_identity": value["recipe"]["base_controller_identity"],
     }
-    if (not solution.require_native_feedback_contract
+    native_profile = value["recipe"].get("native_feedback_profile") is not None
+    if native_profile:
+        from ...controllers.canonical.contracts import digest
+        if type(solution) is not NutAssemblyOutcomeSolutionV1:
+            raise TypeError("NutAssembly native feedback requires the exact Outcome Solution V1")
+        if (solution.identity != 'ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b'
+                or digest(asdict(solution.config)) !=
+                    '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
+                or solution.base_controller_identity !=
+                    '6571627a613f60a0e9d221e5ef1557899b4aa793b81d4d7c0202abc1ee075184'
+                or solution.control_dt != 0.01 or solution.physics_dt_s != 0.002
+                or solution.source_closure_digest is not None):
+            raise ValueError("NutAssembly external Solution identity does not match the frozen native profile")
+    if (solution.require_native_feedback_contract is not True
+            or solution.config != value["solution_config"]
+            or solution.control_dt != value["artifact"].timebase.control_dt
+            or solution.physics_dt_s != value["artifact"].timebase.physics_dt
             or any(getattr(solution, name) != expected_value for name, expected_value in expected.items())):
         raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
 

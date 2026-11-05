@@ -260,7 +260,7 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
                     value['artifact'], _execution(), source=source,
                     binding=ControlBinding('panda-v1/gripper', .08),
                     native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
+                    selected_controller=controller,
                     native_feedback_gripper_control_hz=500,
                 )
         finally:
@@ -273,76 +273,83 @@ def test_normal_profile_rejects_wrong_live_controller_or_law_before_materializat
                     value['artifact'], _execution(), source=source,
                     binding=ControlBinding('panda-v1/gripper', .08),
                     native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
+                    selected_controller=controller,
                     native_feedback_gripper_control_hz=500,
                 )
         finally:
             actual_controller.config = original_config
-        original_solution_identity = value['solution'].identity
-        value['solution'].identity = '0' * 64
-        try:
-            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
-                materialize_control(
-                    value['artifact'], _execution(), source=source,
-                    binding=ControlBinding('panda-v1/gripper', .08),
-                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
-                    native_feedback_gripper_control_hz=500,
-                )
-        finally:
-            value['solution'].identity = original_solution_identity
-        original_solution_config = value['solution'].config
-        value['solution'].config = replace(
-            original_solution_config,
-            translation_speed_m_s=original_solution_config.translation_speed_m_s + 0.01,
-        )
-        try:
-            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
-                materialize_control(
-                    value['artifact'], _execution(), source=source,
-                    binding=ControlBinding('panda-v1/gripper', .08),
-                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=controller, selected_solution=value['solution'],
-                    native_feedback_gripper_control_hz=500,
-                )
-        finally:
-            value['solution'].config = original_solution_config
         with pytest.raises(ValueError, match='exact admitted R3 Controller'):
             materialize_control(
                 value['artifact'], _execution(), source=source,
                 binding=ControlBinding('panda-v1/gripper', .08),
                 native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                selected_controller=controller, selected_solution=value['solution'],
+                selected_controller=controller,
                 native_feedback_gripper_control_hz=100,
             )
     finally:
         receipt.close()
 
 
-def test_normal_profile_rejects_missing_or_subclassed_solution_before_materialization(monkeypatch):
-    from task_env.runtime.sessions import api
-    from task_env.runtime.sessions.control import ControlBinding, materialize_control
+@pytest.mark.parametrize("rate", [100, 500])
+def test_runtime_materializes_profile_without_solution(monkeypatch, rate):
+    from task_env.runtime.sessions import control
+
+    value = build_native_feedback_reference(backend='cpu', gripper_control_hz=rate,
+                                            include_solution=False)
+    receipt = value['source'].execution_source_receipt
+    session = SimpleNamespace()
+    calls = []
+    monkeypatch.setattr(control, 'materialize',
+                        lambda *args, **kwargs: calls.append((args, kwargs)) or session)
+    try:
+        result = control.materialize_control(
+            value['artifact'], _execution(), source=value['source'],
+            binding=control.ControlBinding('panda-v1/gripper', .08),
+            native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
+            selected_controller=value['controller'], native_feedback_gripper_control_hz=rate,
+        )
+        assert result is session
+        assert len(calls) == 1
+        assert result._force_feedback_required is True
+    finally:
+        receipt.close()
+
+
+def test_nut_binding_rejects_wrong_solution_type_identity_config_and_time():
+    from task_env.tasks.nut_assembly import specialization
     from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
 
     value = build_native_feedback_reference(backend='cpu', gripper_control_hz=500)
     receipt = value['source'].execution_source_receipt
+    solution = value['solution']
     class SubstitutedSolution(NutAssemblyOutcomeSolutionV1):
         pass
     substitute = object.__new__(SubstitutedSolution)
-    substitute.__dict__.update(value['solution'].__dict__)
-    calls = []
-    monkeypatch.setattr(api, '_materialize_admitted', lambda *_args, **_kwargs: calls.append('native'))
+    substitute.__dict__.update(solution.__dict__)
     try:
-        for solution in (None, substitute):
-            with pytest.raises(ValueError, match='exact admitted R3 Controller'):
-                materialize_control(
-                    value['artifact'], _execution(), source=value['source'],
-                    binding=ControlBinding('panda-v1/gripper', .08),
-                    native_feedback_profile=R05B_NATIVE_FEEDBACK_PROFILE,
-                    selected_controller=value['controller'], selected_solution=solution,
-                    native_feedback_gripper_control_hz=500,
-                )
-        assert calls == []
+        specialization._validate_external_solution(value, solution)
+        for wrong in (None, substitute):
+            with pytest.raises(TypeError):
+                specialization._validate_external_solution(value, wrong)
+        original_identity = solution.identity
+        solution.identity = '0' * 64
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.identity = original_identity
+        original_config = solution.config
+        solution.config = replace(original_config,
+                                  translation_speed_m_s=original_config.translation_speed_m_s + 0.01)
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.config = original_config
+        original_source = solution.source_id
+        solution.source_id = 'wrong-source'
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
+        solution.source_id = original_source
+        solution.control_dt += 0.001
+        with pytest.raises(ValueError, match='identity does not match'):
+            specialization._validate_external_solution(value, solution)
     finally:
         receipt.close()
 
