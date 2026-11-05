@@ -16,6 +16,8 @@
 
 reset 重建后的执行路线、配置和种子一致性检查转入已有 `reference_binding`，环境保留实际 reset 编排。工作树的无引擎检查 204 passed、2 deselected（13.236 秒），mixed／leaf 合成检查 8 passed（5.860 秒）；两次均有进程树资源采样并确认进程组退出，原始记录在 ignored `renewed-reset-execution-001`、`002`。包含路线／种子篡改及不关闭现有 session 的拒绝检查，不构成真实物理结果。新离线预算累计 166.128／3000 秒；提交后需核对源码身份。
 
+源码提交 `36e975dc` 后干净 tracked HEAD 重跑无引擎检查：204 passed、2 deselected，监督墙时 13.260 秒，进程树峰值采样约 292 MiB，进程组已退出；原始记录在 ignored `renewed-reset-execution-clean-36e975dc`。新离线预算累计 179.388／3000 秒。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。
