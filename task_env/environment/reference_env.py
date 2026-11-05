@@ -3593,7 +3593,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.recorder, self.recording_path, self._position_episode_end, reason, position=True,
                 leaf=self.leaf_position_profile, camera=self.camera_observation_config is not None,
             )
-        from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')
         if self.binding.recorder_mode == 'canonical' and self._execution_fault is not None:
@@ -3601,17 +3600,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 'cannot finalize a faulted selected recording as a complete trajectory; '
                 'reset is required'
             )
-        value = self.recorder.freeze(reason)
-        if self.binding.recorder_mode == 'canonical':
-            from ..trajectory.canonical.h5 import save, load
-            save(self.recording_path, value)
-            identical = load(self.recording_path).to_mapping() == value.to_mapping()
-            if not identical:
-                raise ValueError('P1.6 canonical outer trajectory roundtrip mismatch')
-            return {'logical_mapping_exact': identical,
-                    'scope': 'canonical-v0 outer boundary; no native-substep or D0 claim'}
-        save_streaming(self.recording_path, value)
-        return verify_roundtrip(self.recording_path, value)
+        from ..recorders.reference_provenance import finalize_selected_recording
+        return finalize_selected_recording(
+            self.recorder, self.recording_path, recorder_mode=self.binding.recorder_mode,
+            reason=reason,
+        )
 
     def get_record_metadata(self):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""

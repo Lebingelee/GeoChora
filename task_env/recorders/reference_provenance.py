@@ -121,6 +121,24 @@ def selected_recording_metadata(*, artifact, sample, realized, execution, provid
     return metadata, recipe
 
 
+def finalize_selected_recording(recorder, path, *, recorder_mode, reason):
+    """Persist a completed selected recording and verify its stored contents."""
+    value = recorder.freeze(reason)
+    if recorder_mode == 'canonical':
+        from ..trajectory.canonical.h5 import save, load
+
+        save(path, value)
+        identical = load(path).to_mapping() == value.to_mapping()
+        if not identical:
+            raise ValueError('P1.6 canonical outer trajectory roundtrip mismatch')
+        return {'logical_mapping_exact': identical,
+                'scope': 'canonical-v0 outer boundary; no native-substep or D0 claim'}
+    from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
+
+    save_streaming(path, value)
+    return verify_roundtrip(path, value)
+
+
 def append_selected_transition(recorder, *, recorder_mode, record_native_substeps,
                                timebase, control_step, substeps, request, canonical,
                                target, applied, reward, terminated, truncated, stage,
