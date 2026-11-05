@@ -22,6 +22,8 @@ Position materialization 的控制计划、source joint／frame 映射及 task �
 
 源码提交 `6872928e` 后干净 tracked HEAD 重跑无引擎组合：205 passed、2 deselected，监督墙时 14.945 秒、进程树峰值采样约 277 MiB，进程组已退出；原始记录在 ignored `renewed-position-binding-clean-6872928e`。新离线预算累计 234.551／3000 秒。
 
+后续修复旧 Position 文件的三个过期合成替身，保留原力反馈和 fault 断言：其中两项无引擎 2 passed（0.833 秒）；该文件在双锁、禁 Isaac／CUDA 的 GeoPhys CPU 源构造与合成控制条件下完整重跑 9 passed（3.428 秒）。首次双锁运行 8 passed、1 failed（3.713 秒），失败的旧 Env 替身修复后重跑；两个 worker 均退出并释放两把锁。该验证不是物理 rollout。14 个生成的 Panda 资产副本逐文件 SHA 核对后保留 1 份，其他 13 份删除，证据见 ignored `renewed-position-cpu-source-copy-ledger.json`。新离线累计 235.384／3000 秒；两次双锁 CPU 墙时合计 7.141 秒单独计入 native 预算。此段对应提交前工作树。
+
 2026-11-05；源码检查点 `2afe9d88`，本页只补充交接状态。维护 goal 仍在进行；本页不是 Sol 接收决定或阶段3启动授权。运行身份、失败与原始输出位置以[恢复后的验证记录](20261105_pre_stage3_resumed_physical_checks.md)为准。
 
 后续检查点：`27af77bf` 为文档／skill／账本更新后的源码状态，较 `f06ee2f5` 无生产代码变更。原 pytest 总墙时超限及追加预算问题仍待维护者决定；先释放本次 writer，准备部分结果供维护者按原手动流程转交 Sol。恢复实施时重新固定 HEAD、资源与锁状态，不把此交接当作整项维护完成。

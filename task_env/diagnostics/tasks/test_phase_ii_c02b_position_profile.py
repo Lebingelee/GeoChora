@@ -406,6 +406,7 @@ def test_invalid_groups_wrong_identity_and_duplicate_or_stale_targets_reject_bef
 
 
 def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypatch):
+    from task_env.artifacts.execution import ResetSample
     from task_env.runtime.sessions.mujoco import _MuJoCoSession
     from task_env.runtime.sessions.geophys import _GeoPhysSession
 
@@ -420,6 +421,7 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     sentinel = ForceCopySentinel()
     mujoco = object.__new__(_MuJoCoSession)
     mujoco._force_feedback_required = False
+    mujoco._mixed_actuator_plan = None
     mujoco._closed = False
     mujoco._reset_done = False
     mujoco._reset_plan_gate_required = False
@@ -454,7 +456,13 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     mujoco._realized = lambda _sample: (setattr(mujoco, '_reset_done', True) or 'reset')
     mujoco.snapshot = lambda: 'state'
 
-    sample = SimpleNamespace(joint_position={}, poses_world={})
+    sample = ResetSample.create(
+        schema_version='reset-sample-v0', task_artifact_hash='a' * 64,
+        sampler_id='position-sentinel', sampler_version='v1', task_seed=31,
+        joint_position={}, poses_world={},
+        velocity_policy='zero_named_joint_and_entity_velocities',
+        control_policy='arm_targets_at_initial_joints_gripper_open', settle_steps=0,
+    )
     assert mujoco.reset(sample) == 'reset'
     assert mujoco.step() == 'state'
     assert len(mj_steps) == 5
@@ -484,41 +492,33 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
 
 
 def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypatch, tmp_path):
-    from types import MethodType
     from task_env.tasks.reference_env import SelectedReferenceEnv
     from task_env.runtime.sessions import control as control_sessions
 
     scene = _a05_scene()
     _declared_source, artifact, _reset_plan, _source, _ = _candidate(scene, tmp_path)
     before = SimpleNamespace(control_step=0, simulation_time=0.0)
-    selected = SimpleNamespace(
-        _execution_fault=None,
-        _stopped=False,
-        horizon=10,
-        position_profile=True,
-        session=SimpleNamespace(snapshot=lambda: before),
-        controller=object(),
-        position_plan=object(),
-        typed_state=object(),
-        position_scene=scene,
-        position_joint_bindings={},
-        position_frame_bindings={},
-        state=before,
-        artifact=artifact,
-        recorder=None,
-    )
-    selected._latch_fault = MethodType(SelectedReferenceEnv._latch_fault, selected)
-    selected._recording_counts = SelectedReferenceEnv._recording_counts
-    selected._fault_transition_status = MethodType(
-        SelectedReferenceEnv._fault_transition_status.__func__, selected,
-    )
+    selected = object.__new__(SelectedReferenceEnv)
+    selected.horizon = 10
+    selected.position_profile = True
+    selected.session = SimpleNamespace(snapshot=lambda: before)
+    selected.controller = object()
+    selected.position_plan = object()
+    selected.typed_state = object()
+    selected.position_scene = scene
+    selected.position_joint_bindings = {}
+    selected.position_frame_bindings = {}
+    selected.state = before
+    selected.artifact = artifact
+    selected.recorder = None
+    selected._close_camera_consumer = lambda: None
 
     def fail_after_dispatch_start(*_args, **_kwargs):
         raise RuntimeError('injected position interval failure')
 
     monkeypatch.setattr(control_sessions, 'execute_position_control_interval', fail_after_dispatch_start)
     with pytest.raises(RuntimeError, match='injected position interval failure'):
-        SelectedReferenceEnv._step_position_profile(selected, object())
+        selected._step_position_profile(object())
     assert selected._execution_fault is not None
     assert selected._execution_fault.phase == 'position_control_compute_apply_step'
     assert selected._stopped is True
@@ -527,18 +527,14 @@ def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypa
 def test_selected_position_profile_rejects_legacy_action_before_mode_mutation():
     from task_env.tasks.reference_env import SelectedReferenceEnv
 
-    selected = SimpleNamespace(
-        _closed=False,
-        _execution_fault=None,
-        binding=SimpleNamespace(external_actions=True),
-        _episode_mode=None,
-        position_profile=True,
-        position_plan=object(),
-        _stopped=False,
-        session=object(),
-        state=SimpleNamespace(control_step=0),
-        horizon=10,
-    )
+    selected = object.__new__(SelectedReferenceEnv)
+    selected.binding = SimpleNamespace(external_actions=True, external_solution_actions=False)
+    selected._episode_mode = None
+    selected.position_profile = True
+    selected.position_plan = object()
+    selected.session = object()
+    selected.state = SimpleNamespace(control_step=0)
+    selected.horizon = 10
     with pytest.raises(TypeError, match='requires a StructuredActionRequestV1'):
         SelectedReferenceEnv.step(selected, np.zeros(8))
     assert selected._episode_mode is None
