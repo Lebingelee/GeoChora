@@ -64,6 +64,19 @@ def _geophys_model_facts(compiled):
             'equalities': equality, 'tendons': tendons}
 
 
+def _geophys_effective_model_facts(snapshot, names):
+    """Bind provider-local IDs to the names of the same materialization."""
+    if snapshot.get('schema_version') != 'rigid-model-snapshot-v1':
+        raise ValueError('unsupported GeoPhys effective model snapshot')
+    result = deepcopy(snapshot)
+    for group, name_map in (('bodies', names.bodies), ('joints', names.joints),
+                            ('actuators', names.actuators)):
+        by_id = {int(index): str(name) for name, index in name_map.items()}
+        for row in result[group]:
+            row['name'] = by_id.get(row['id'])
+    return result
+
+
 def check_geophys_named_layout(names, data, source, boundary):
     """Resolve selected MJCF names and scalar/free addresses in public model data."""
     result = {'joints': {}, 'free_joints': {}, 'bodies': {}, 'frames': {}, 'actuators': {}}
@@ -167,7 +180,9 @@ class _GeoPhysSession(_SessionValues):
                 'provider': 'geophys', 'source_id': source.scene_source.source_id,
                 'source_closure': source.source_closure_digest, 'objects': checked,
                 'materialization_id': self.provider_materialization_id,
-                'physical_model': _geophys_model_facts(compiled)}
+                'physical_model': _geophys_model_facts(compiled),
+                'effective_physical_model': _geophys_effective_model_facts(
+                    self._boundary.read_model_snapshot(), names)}
         except BaseException:
             self._boundary.close()
             raise

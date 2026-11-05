@@ -86,6 +86,13 @@ class GeoPhysRuntimeBoundary:
     def initial_state(self) -> EpisodePhysicsState:
         return self._initial_state
 
+    def read_model_snapshot(self) -> dict:
+        """Return the provider's owned effective model values without stepping."""
+        reader = getattr(self._physics, "read_model_snapshot", None)
+        if not callable(reader):
+            raise StageUnavailableError("GeoPhys effective model snapshot is unavailable")
+        return reader()
+
     def apply_reset_state(
         self,
         state: EpisodePhysicsState,
