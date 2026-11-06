@@ -2,7 +2,7 @@
 
 规划标识：`V211_G04_CONTROL`。3 个子阶段，依据[控制协议](../contracts/control-and-feedback.md)及[已确认基线](../maintenance/20261103_protocol_baseline_confirmation.md)，扩展既有 Robot／Scene／ControlGroup、canonical contracts、ControlBinding、R3 和 session。2c 成功参考不自动成为迁移后成功。
 
-2026-11-06编排修订安排（维护者已采纳）：本Goal继续以原4a／4b／4c主线和出口为准。[装配Panda](../planning/stage4-assembled-panda.md)是v2.1.1附加集成用例，不再逐项追加为4a–4c的接收条件。建议在4b主能力稳定后取得空载／夹爪／补偿的首次代表证据，4c可提供已匹配的PickCube成功参考，两个任务完整复用由7a收口；未完成的附加项单列状态，不掩盖共享控制能力缺陷，也不取代原三后端effort、BodyWrench或Controller reset门。当前仅规划，均attempt0。
+2026-11-06编排修订安排（维护者已采纳）：本Goal继续以原4a／4b／4c主线和出口为准。[装配Panda](../planning/stage4-assembled-panda.md)是v2.1.1附加集成用例，不再逐项追加为4a–4c的接收条件。建议在4b主能力稳定后取得空载／夹爪／补偿的首次代表证据，4c可提供已匹配的PickCube成功参考，两个任务完整复用由7a收口；未完成的附加项单列状态，不掩盖共享控制能力缺陷，也不取代原三后端effort、BodyWrench或Controller reset门。4a已执行两次且未接收，[主审与第三次前重评](../maintenance/reviews/20261106_4a_attempt002_sol_reassessment.md)待维护者讨论；4b、4c仍PLANNED／attempt0。
 
 <a id="4a"></a>
 ## 4a：控制主体、typed 命令、公共反馈与模型

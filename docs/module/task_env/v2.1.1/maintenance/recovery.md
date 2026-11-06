@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3c001有界接收，G03限定范围收尾
+## 当前：4a 两次未接收，第三次前重评待讨论
+
+G03 的 3a／3b／3c 有界接收保持。G04/4a 普通 attempt001、002 均已执行并完整返包，count=2；002 部分实现提交 `0e229a72`，不代表 4a 已接收。Sol 的[独立主审与第三次前重评](reviews/20261106_4a_attempt002_sol_reassessment.md)区分真实生产接线缺口、原 4a 规划门和 4b 才执行的物理验证，保留两个窗口的历史边界事件及未测。维护者要求先讨论是否进入 003 及其范围，本次不派包、不启动 003；4b/4c 仍 PLANNED。状态与两次记录见[编排索引](orchestration.json)。
+
+## 历史：3c001有界接收，G03限定范围收尾
 
 3c经[Sol独立复审](reviews/20261106_3c_attempt001_sol_review.md)接收为ACCEPTED_BOUNDED_3C_RESET_REBUILD，count=1，不需002。五段同一Env链、固定观测／Core流、旧输入拒绝、故障恢复和逐episode H5均满足冻结出口；仅覆盖显式PickCube profile及四条声明边。3a、[3b](reviews/20261106_3b_attempt003_sol_review.md)及3c各自有界接收，G03限定范围收尾，原N08 FAIL保留。6.1辅助App启动／版本成立但close超时，完整兼容未通过。active_packages=[]；等待维护者后续安排，不自动进入阶段4或push／merge／tag。
 

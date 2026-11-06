@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_ACCEPTED_BOUNDED_STAGE3",
+  "status": "G04_4A_REASSESSMENT_AFTER_ATTEMPT002",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer accepted revised planning and requested G04 takeover in a new Sol conversation. Complete manual handoff, then new Sol verifies actual state and prepares the original 4a package/phase branch plan; no implementation or automatic dispatch.",
+  "next_action": "Maintainer requested independent reassessment and discussion before deciding whether to issue final ordinary 4a attempt003; no automatic package, dispatch or native.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1030,21 +1030,76 @@
             "2c",
             "3c"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
-          "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
-          "blockers": []
+          "status": "REWORK_REQUIRED_4A_REASSESSMENT",
+          "attempt_count": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G04_4a_attempt001",
+              "status": "REVIEWED_NOT_ACCEPTED",
+              "result": "PARTIAL/BLOCKED",
+              "input_head": "842e1efd8268a6a99d075640a30840c2eeb4918f",
+              "output_head": "842e1efd8268a6a99d075640a30840c2eeb4918f",
+              "prompt_sha256": "f7f36705aee9c9067ff9c6245e1f2cc64bba63c2579be32223a0a8b218b9582c",
+              "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt001/prompt.md",
+              "summary": "Initial early stop and two recoveries in the same attempt; pure/fake evidence and uncommitted drafts retained for attempt002. Earlier private solver search output and at least two unauthorized source parses preserved.",
+              "report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt001_continuation2/report.md",
+              "initial_report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt001/report.md",
+              "first_continuation_report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt001_continuation/report.md"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G04_4a_attempt002",
+              "status": "REVIEWED_NOT_ACCEPTED",
+              "result": "PARTIAL/BLOCKED",
+              "input_head": "842e1efd8268a6a99d075640a30840c2eeb4918f",
+              "output_head": "0e229a72b306938d545e0c10a7939f8f2548abe1",
+              "prompt_sha256": "8d4a104fc936b41dc5e3f628d1886c83a6937146bd4772282cf54a62f21c3a71",
+              "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt002/prompt.md",
+              "summary": "Partial pre-native physical contracts, selected candidate wiring, guarded pure/fake validation; real physical RuntimeSession port and executable 4b plan remain unresolved.",
+              "report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt002/report.md",
+              "output_manifest_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt002/output-manifest.json",
+              "sol_review_ref": "reviews/20261106_4a_attempt002_sol_reassessment.md",
+              "commit": "0e229a72b306938d545e0c10a7939f8f2548abe1",
+              "native_starts": 0,
+              "physics_steps": 0
+            }
+          ],
+          "assigned_agent": "Terra; manual dispatch; writer released",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt002/prompt.md",
+          "package_sha256": "8d4a104fc936b41dc5e3f628d1886c83a6937146bd4772282cf54a62f21c3a71",
+          "input_head": "842e1efd8268a6a99d075640a30840c2eeb4918f",
+          "output_head": "0e229a72b306938d545e0c10a7939f8f2548abe1",
+          "expected_duration_minutes": "180–300 active estimate; 360 wall limit; actual wall 50.9; active unknown",
+          "execution_budget": {
+            "native_starts": 0,
+            "provider_init": 0,
+            "physics_steps": 0,
+            "gpu_starts": 0,
+            "source_parsing": "bounded pure source under dual locks, 30 min"
+          },
+          "last_observation": "2026-11-06 Sol reviewed 119 manifest entries and actual implementation, independently reran 19 guarded pure/fake tests; 4a unaccepted, 003 not prepared or dispatched pending maintainer discussion.",
+          "evidence_refs": [
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt002/report.md",
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt002/case-matrix.md",
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt002/4b-plan.md",
+            "reviews/20261106_4a_attempt002_sol_reassessment.md"
+          ],
+          "commits": [
+            "0e229a72b306938d545e0c10a7939f8f2548abe1"
+          ],
+          "review_decision": {
+            "status": "REWORK_REQUIRED_4A_REASSESSMENT",
+            "reviewer": "Sol",
+            "date": "2026-11-06",
+            "review_ref": "reviews/20261106_4a_attempt002_sol_reassessment.md",
+            "substage_accepted": false
+          },
+          "blockers": [
+            "Actual physical RuntimeSession admission and build/write boundary not implemented; 4a vs 4b exit interpretation needs explicit discussion.",
+            "4b plan needs frozen oracles, preconditions and resources, with unverified native requirements distinguished from 4a planning.",
+            "Last ordinary attempt requires agreed permissions, scope, feasible original gates and a complete package before dispatch."
+          ]
         },
         {
           "id": "4b",
@@ -1458,17 +1513,18 @@
       "4b": "actual three-provider 7+2 effort, shared controllers/direct effort, real bounded BodyWrench and combination",
       "4c": "Controller/input-spec reset switching, state cleanup and migrated PickCube success"
     },
-    "implementation_started": false,
-    "ordinary_attempts_started": 0,
-    "prepared_execution_package": false,
+    "implementation_started": true,
+    "ordinary_attempts_started": 2,
+    "prepared_execution_package": true,
     "auxiliary_use_case_ref": "../planning/assembled-panda-use-case.json",
     "auxiliary_schedule_status": "MAINTAINER_CONFIRMED_PLANNING",
     "auxiliary_schedule_summary": "4a requirement consumer; 4b mainline stabilized before earliest scoped tracking/gripper/gravity check; reuse 4c references; full two-task configuration/Solution use-case integration at 7a; 7b affected-input checks only.",
     "auxiliary_case_is_original_g04_exit_gate": false,
     "maintainer_robot_requirements_preserved": true,
     "original_g04_protocol_gates_preserved": true,
-    "branch_policy": "Documentation only on current G03 branch; future execution branch/input inherits accepted G03 under phase policy; no branch/merge/dispatch performed.",
-    "scheduling_authority": "Maintainer accepted clarified plan and requested new Sol stage4 handoff on 2026-11-06."
+    "branch_policy": "codex/v211-stage4 created at accepted G03 HEAD; same checkout and branch retained across 4a–4c; no merge, push or new worktree.",
+    "scheduling_authority": "Maintainer accepted clarified plan and requested new Sol stage4 handoff on 2026-11-06.",
+    "attempt003_prepared": false
   },
   "version_auxiliary_use_cases": [
     {
