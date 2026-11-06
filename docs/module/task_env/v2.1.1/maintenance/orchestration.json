@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Await maintainer direction after bounded G03 closeout; no automatic stage4, new attempt, push, merge or Qualification.",
+  "next_action": "G04 planning updated per maintainer correction; prepare and freeze one complete 4a package before manual dispatch. No implementation, native, new execution thread or automatic stage4 start authorized by this planning update.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1040,8 +1040,10 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
+          "evidence_refs": [
+            "../planning/stage4-assembled-panda.md"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1062,8 +1064,10 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
+          "evidence_refs": [
+            "../planning/stage4-assembled-panda.md"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1084,8 +1088,10 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
+          "evidence_refs": [
+            "../planning/stage4-assembled-panda.md"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1444,5 +1450,37 @@
     "stage4_started": false,
     "qualification": false,
     "automatic_dispatch": false
+  },
+  "stage4_planning": {
+    "date": "2026-11-06",
+    "status": "SCOPE_UPDATED_PLANNED_NOT_DISPATCHED",
+    "authority": "Maintainer explicit five-point correction and request to revise stage4 planning/documents",
+    "planning_ref": "../planning/stage4-assembled-panda.md",
+    "goal_ref": "../goals/04-control.md",
+    "implementation_started": false,
+    "ordinary_attempts_started": 0,
+    "prepared_execution_package": false,
+    "new_robot_owner": "task_env/robots/",
+    "proposed_class": "AssembledPandaAgent (not implemented)",
+    "acceptance_focus": [
+      "task-feasible unloaded TCP tracking accuracy",
+      "reuse existing arm and gripper controller algorithms with robot-specific model/config",
+      "actual normal task configuration selects the robot class",
+      "same per-task Solution algorithm/strategy and task success"
+    ],
+    "not_required": [
+      "one-to-one integrated Panda assembly or physical parameter equivalence",
+      "same initial joint angles or numeric trajectory",
+      "same-live-Env robot-body replacement as a new reset gate",
+      "arbitrary dexterous-hand/mobile-base matrix"
+    ],
+    "accuracy_and_feasible_domain": "Freeze from task requirements in complete 4a package before execution; no invented threshold here",
+    "phase_allocation": {
+      "4a": "Robot class/config/TCP/control-model and selected connected-body scope; freeze accuracy/domain cases",
+      "4b": "shared Controller/gripper, gravity contribution and actual unloaded tracking",
+      "4c": "two tasks x two robot configurations full representative success and independent readback"
+    },
+    "existing_g04_protocol_gates_preserved": true,
+    "branch_policy": "This change is documentation on existing G03 branch; G04 execution branch/input must inherit accepted G03 and be settled at package preparation. No new branch or merge performed."
   }
 }

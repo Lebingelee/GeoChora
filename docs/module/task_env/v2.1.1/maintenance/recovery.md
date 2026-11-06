@@ -4,6 +4,8 @@
 
 3c经[Sol独立复审](reviews/20261106_3c_attempt001_sol_review.md)接收为ACCEPTED_BOUNDED_3C_RESET_REBUILD，count=1，不需002。五段同一Env链、固定观测／Core流、旧输入拒绝、故障恢复和逐episode H5均满足冻结出口；仅覆盖显式PickCube profile及四条声明边。3a、[3b](reviews/20261106_3b_attempt003_sol_review.md)及3c各自有界接收，G03限定范围收尾，原N08 FAIL保留。6.1辅助App启动／版本成立但close超时，完整兼容未通过。active_packages=[]；等待维护者后续安排，不自动进入阶段4或push／merge／tag。
 
+后续规划：维护者已明确新装配Panda的需求，见[阶段4细化](../planning/stage4-assembled-panda.md)。新类位于robot目录，两任务经配置选择，复用原Controller／夹爪控制和各任务Solution；先验收任务可行域内空载TCP跟踪，再完整任务成功，不做原／新机器人物性等价研究。4a–4c仍PLANNED／attempt0，仅文档更新，无已派实施包；当前代码仍不支持该新机器人或通用子树补偿。
+
 ## 历史：3b003与条件3c001准备时
 
 维护者要求一次将两个Goal包交Terra顺序实施；[连续安排](../planning/stage3-3b003-3c001-sequential-execution.md)明确仅在3b全部required技术通过、提交／报告冻结及资源释放后，绑定其实际HEAD开始3c；Sol最后分别独立复审，中间不伪记3b已接收。3b count仍2／REWORK_REQUIRED_3B，3c count0／PLANNED，active_packages=[]，准备不计次数。最后普通[3b003重评](../planning/stage3-3b-attempt003-reassessment.md)已完成；[3c首包](../planning/stage3-3c-attempt001.md)固定公开reset入口、opt-in observation、随机流、四条实际切换边及fault恢复。外部包入口在维护者工作区handoffs/V211_G03_3b003_3c001_bundle，精确3b输入见其snapshot，3c未来SHA不预造。

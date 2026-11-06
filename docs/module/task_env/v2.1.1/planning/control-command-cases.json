@@ -112,6 +112,90 @@
       "execution_status": "DESIGN_ONLY_NOT_RUN"
     },
     {
+      "kind": "positive_design",
+      "context_refs": [
+        "goals/04-control.md",
+        "planning/stage4-assembled-panda.md"
+      ],
+      "execution_status": "DESIGN_ONLY_NOT_RUN",
+      "id": "P6",
+      "substage": "4a",
+      "purpose": "新Panda类由两个正式任务的机器人配置实际消费",
+      "input": {
+        "robot_owner": "task_env/robots/; planned AssembledPandaAgent",
+        "tasks": [
+          "PickCube",
+          "NutAssembly"
+        ],
+        "selection": "existing public factory with task robot configuration; no new task UID",
+        "tcp": "gripper center interpreted by the selected robot model"
+      },
+      "expected": "Normal selected bindings/source/materialization consume the new Robot class; existing arm/gripper algorithms reused. Class/export/registration alone cannot pass. Source/model/config identities belong to the actual selected robot; no physical equality with integrated Panda required."
+    },
+    {
+      "kind": "positive_design",
+      "context_refs": [
+        "goals/04-control.md",
+        "planning/stage4-assembled-panda.md"
+      ],
+      "execution_status": "DESIGN_ONLY_NOT_RUN",
+      "id": "P7",
+      "substage": "4b",
+      "purpose": "任务可行域内空载TCP跟踪及自身模型本体补偿",
+      "input": {
+        "source": "assembled robot own mass/COM, joints and mount",
+        "compensation": "explicit selected root-connected robot bodies; no automatic task-object payload",
+        "measurement": "hold, point changes and representative feasible task path; task-required pose semantics",
+        "oracle": "4a freezes task-required accuracy, cadence, speed and feasible region before execution"
+      },
+      "expected": "Measure actual TCP tracking against declared task requirements and confirm applied gravity contribution; robot-specific controller/model parameters allowed. No old/new mass, friction, drive, initial-q or trajectory equality gate. No arbitrary high precision threshold inferred from prior 3b experiment."
+    },
+    {
+      "kind": "positive_design",
+      "context_refs": [
+        "goals/04-control.md",
+        "planning/stage4-assembled-panda.md"
+      ],
+      "execution_status": "DESIGN_ONLY_NOT_RUN",
+      "id": "P8",
+      "substage": "4b",
+      "purpose": "新装配复用现有夹爪控制方式",
+      "input": {
+        "controller": "existing gripper algorithm actually consumed by the task control route",
+        "robot_mapping": "opening and feedback to mounted gripper joints/actuators; preserve actual tendon/mimic",
+        "checks": [
+          "open",
+          "close",
+          "representative grasp/release"
+        ]
+      },
+      "expected": "Existing control algorithm operates the mounted gripper with correct physical opening and feedback; parameters/mapping may differ. No duplicate gripper controller or renamed position control as new effort proof."
+    },
+    {
+      "kind": "positive_design",
+      "context_refs": [
+        "goals/04-control.md",
+        "planning/stage4-assembled-panda.md"
+      ],
+      "execution_status": "DESIGN_ONLY_NOT_RUN",
+      "id": "P9",
+      "substage": "4c",
+      "purpose": "只改机器人配置，各任务原Solution完成任务",
+      "input": {
+        "tasks": [
+          "PickCube",
+          "NutAssembly"
+        ],
+        "robots": [
+          "existing integrated Panda",
+          "new assembled Panda"
+        ],
+        "solution_policy": "same algorithm and strategy parameters per task; actual binding identities refreshed",
+        "first_native_candidate": "MuJoCo CPU; representative PickCube31/Nut19 placements verified feasible at 4a"
+      },
+      "expected": "Four representative complete task loops with actual success and independent recording readback; tasks keep success predicates/business logic, Solution has no robot-UID strategy branch. Config selection constructs the chosen robot; same-live-Env robot replacement is not an extra gate. Existing Controller-reset input-spec cases remain required."
+    },
+    {
       "id": "N1",
       "kind": "negative_design",
       "purpose": "未经声明多个writer覆盖同一通道",
@@ -227,5 +311,12 @@
       "expected": "ACK proves only write; required measurement rejects/faults, optional returns typed reason; position never becomes measured contact force.",
       "execution_status": "DESIGN_ONLY_NOT_RUN"
     }
-  ]
+  ],
+  "maintainer_scope_update": {
+    "date": "2026-11-06",
+    "reference": "planning/stage4-assembled-panda.md",
+    "authority": "Explicit maintainer correction: task-feasible unloaded TCP accuracy, existing gripper controller and embodiment-independent task Solution; new Panda class under robots, no original-Panda physical equality.",
+    "status": "PLANNED_NOT_RUN",
+    "preserved": "Original P1-P5/N1-N7 protocol cases and G04 typed command/BodyWrench/three-provider gates unchanged."
+  }
 }

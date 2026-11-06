@@ -2,6 +2,8 @@
 
 当前状态：3a、[3b003](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)及[3c001](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)均经Sol按各自冻结范围独立接收，G03有界收尾。3b count=3、原N08 FAIL保留；3c count=1、ACCEPTED_BOUNDED_3C_RESET_REBUILD，不需002。未验证交集保持原状态；等待维护者安排，不自动派新包或进入阶段4。
 
+阶段4当前只更新规划：[装配Panda与Solution复用](stage4-assembled-panda.md)按维护者纠正纳入4a–4c。新Robot类由两任务配置正常消费；验收看自身模型下的空载TCP跟踪、现有夹爪控制和原Solution任务成功，不设与一体Panda物性等价门。4a执行前冻结任务可行域和精度口径。全部4a–4c仍PLANNED／attempt0、无实施包派发，原typed effort／BodyWrench及Controller reset出口不变。
+
 历史状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收；3b attempt002经[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)为REWORK_REQUIRED_3B、attempt_count=2，已测TCP有界补偿及launcher／F06记录修复保留，整体未接收。[003前重评](stage3-3b-attempt003-reassessment.md)及[条件3c首包](stage3-3c-attempt001.md)已准备未派发；维护者授权两包一次转交、按[连续安排](stage3-3b003-3c001-sequential-execution.md)技术通过后顺序实施，Sol最后分别复审，3c及后续尚未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 
 ### 2026-11-04 G02/2b 中止与 2c 文档封存
@@ -34,9 +36,9 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 3a | 1c、1d、2c | [03](../goals/03-backends.md)：配置解析、能力交集、拒绝与配置回执接通 |
 | 3b | 3a | 三后端公开构建／reset／step／state／close，含资产映射与数值检查 |
 | 3c | 3b | 同一 public Env 的代表性 A→B→A、Core随机流连续、故障重建、旧数据失效和资源回收 |
-| 4a | 1c、2c、3c | [04](../goals/04-control.md)：typed JointEffort／BodyWrench、嵌套主体、反馈／模型、时间及组合后唯一提交落地 |
-| 4b | 4a | R3／关节参考／direct effort 的7＋2映射在三后端成立；有界BodyWrench、显式叠加和驱动冲突检查 |
-| 4c | 4b | reset 切 Controller，输入契约可识别，observation 固定，Solution 重新复核 |
+| 4a | 1c、2c、3c | [04](../goals/04-control.md)：typed JointEffort／BodyWrench、嵌套主体、公共模型与唯一提交；新Panda类、两任务配置／TCP／夹爪绑定及补偿子段；冻结任务精度和可行域 |
+| 4b | 4a | 原三后端7＋2及BodyWrench门；复用Controller验证新装配空载跟踪、夹爪和实际重力贡献，先MuJoCo CPU代表，不求旧／新物性等价 |
+| 4c | 4b | 原Controller reset输入切换／固定obs门；两任务各用同一Solution在两机器人配置完成代表成功与独立读回，配置换本体不追加live Env本体切换门 |
 | 5a | 1d、3c、4c | [05](../goals/05-rendering.md)：公开 scene data／原生绑定接入既有 renderer |
 | 5b | 5a | 首批路线窗口和离屏 RGB 分别验收，相机可配置，render 不推进物理 |
 | 5c | 5b | reset 首帧、step 同步图像、renderer 切换及一个跨组合成立 |
@@ -47,7 +49,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 7b | 7a | 冻结输入下 PickCube 三后端×三 seed 任务成功与独立记录检查；切换／render／batch 组合分别收口 |
 | 7c | 7b | API／指南／矩阵／Skills／恢复页与实际证据一致；版本未决项明确 |
 
-初建时全部22项为 `PLANNED`、attempt为0；现1a–1d及2a–2c均有相应有界接收，维护者已确认五协议实施基线，3a在诊断001后已接收（普通三次历史保留）；3b已执行两次且整体待收口，3c及阶段4–7子项未执行；原2b扩展包失败及中止记录保留。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal 页面记录结果摘要，不复制第二套状态表。
+初建时全部22项为 `PLANNED`、attempt为0；现1a–1d、2a–2c及3a–3c均有相应有界接收，维护者已确认五协议实施基线；3a普通三次及诊断一次、3b三次、3c一次的历史分别保留。阶段4–7尚未执行；原2b扩展包失败及中止记录不改写。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal页面记录结果摘要，不复制第二套状态表。
 
 阶段 2 若证明必需修复属于后续公共协议 owner，先记录根因、最小提前实施范围和依赖影响，经维护者确认后更新执行表；可复用修复不重复实施。不得以无变化重试、私有状态或更改任务判定跨过阻塞。
 
