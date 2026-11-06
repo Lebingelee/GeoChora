@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G04_4A_ATTEMPT003_PREPARED",
+  "status": "G04_4A_ACCEPTED_BOUNDED_4B_PLANNED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,13 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": {
-    "package_id": "V211_G04_4a_attempt003",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "package_manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/manifest.json",
-    "ordinary_attempt_count_prior": 2
-  },
-  "next_action": "Maintainer may manually transfer the frozen final ordinary attempt003 package to the existing executor. The 4a gate preserves typed wrench and accurate capability boundaries; three-backend actual effort remains 4b. Sol reviews returned evidence. No automatic dispatch, 4b, diagnostic or native by Sol.",
+  "next_candidate": null,
+  "next_action": "4a independently accepted within its declared bounds; await maintainer direction before preparing and manually transferring a complete 4b package. No automatic 4b execution, native, messages, new chat or phase 5.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1035,8 +1030,8 @@
             "2c",
             "3c"
           ],
-          "status": "REWORK_REQUIRED_4A_REASSESSMENT",
-          "attempt_count": 2,
+          "status": "ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT",
+          "attempt_count": 3,
           "attempts": [
             {
               "attempt": 1,
@@ -1069,22 +1064,48 @@
               "native_starts": 0,
               "physics_steps": 0,
               "recovery_ref": "reviews/20261106_4a_attempt002_recovery_sol_review.md"
+            },
+            {
+              "attempt": 3,
+              "package_id": "V211_G04_4a_attempt003",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
+              "result": "TECHNICAL_PASS; SOL_ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT",
+              "input_head": "0d978d0291997ad81167bcafd3c10bb6be975daf",
+              "output_head": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
+              "prompt_sha256": "8f1d62eff4f7494a95d57b83a2f164a1b22aa25db10d06efe2f1486f5add3d4d",
+              "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/prompt.md",
+              "report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt003/report.md",
+              "output_manifest_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt003/output-manifest.json",
+              "sol_review_ref": "reviews/20261106_4a_attempt003_sol_review.md",
+              "commit": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
+              "native_starts": 9,
+              "physics_substeps": 35,
+              "source_scope": "A05 MuJoCo 3.8.1 CPU implicitfast; ACK is not measured force"
             }
           ],
-          "assigned_agent": "Terra; manual dispatch; writer released",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt002/prompt.md",
-          "package_sha256": "8d4a104fc936b41dc5e3f628d1886c83a6937146bd4772282cf54a62f21c3a71",
-          "input_head": "842e1efd8268a6a99d075640a30840c2eeb4918f",
-          "output_head": "cfb006f44ee761ae29e248def249d405d5498216",
-          "expected_duration_minutes": "180–300 active estimate; 360 wall limit; actual wall 50.9; active unknown",
+          "assigned_agent": "Terra; manually dispatched; writer released",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/prompt.md",
+          "package_sha256": "8f1d62eff4f7494a95d57b83a2f164a1b22aa25db10d06efe2f1486f5add3d4d",
+          "input_head": "0d978d0291997ad81167bcafd3c10bb6be975daf",
+          "output_head": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
+          "expected_duration_minutes": "180–300 active estimated, 360 wall limit; actual 24m30s wall; active/wait unknown",
           "execution_budget": {
-            "native_starts": 0,
-            "provider_init": 0,
-            "physics_steps": 0,
+            "scope": "MuJoCo 3.8.1 CPU; dual locks",
+            "native_process_seconds_max": 180,
+            "native_minutes_max": 30,
+            "source_minutes_max": 30,
+            "physics_substeps_max": 300,
+            "cpu_threads_max": 8,
+            "process_tree_rss_gib_max": 8,
             "gpu_starts": 0,
-            "source_parsing": "bounded pure source under dual locks, 30 min"
+            "renderer_starts": 0,
+            "output_gib_max": 1,
+            "actual_native_processes": 9,
+            "actual_physics_substeps": 35,
+            "actual_native_and_source_wall_upper_bound_s": 10.766,
+            "actual_process_tree_rss": "unknown"
           },
-          "last_observation": "2026-11-06 maintainer requested final ordinary attempt003 and authorized executor bounded minimum MuJoCo CPU native; Sol completed updated reassessment and prepared the self-contained package for manual transfer. 4a not accepted; count remains 2; no writer or native started by preparation.",
+          "last_observation": "2026-11-06 Sol reviewed final 003: 678/678 output hashes matched; native08/09 code hashes matched final HEAD, public route source and ACK scope confirmed; independent guarded 16 pure/fake tests passed. ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT, count=3; 4b/4c planned, no auto-dispatch.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/report.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/case-matrix.md",
@@ -1094,26 +1115,27 @@
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/4b-plan.md",
             "reviews/20261106_4a_attempt002_recovery_sol_review.md",
             "reviews/20261106_4a_wrench_cross_backend_followup.md",
-            "../planning/stage4-4a-attempt003-reassessment.md"
+            "../planning/stage4-4a-attempt003-reassessment.md",
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/report.md",
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/case-matrix.md",
+            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/4b-plan.md",
+            "reviews/20261106_4a_attempt003_sol_review.md"
           ],
           "commits": [
             "0e229a72b306938d545e0c10a7939f8f2548abe1",
             "5ff5a025",
-            "cfb006f4"
+            "cfb006f4",
+            "105219eda7161e7292d0d8c2ce478c49bdb4eca2"
           ],
           "review_decision": {
-            "status": "REWORK_REQUIRED_4A",
+            "status": "ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT",
             "reviewer": "Sol",
             "date": "2026-11-06",
-            "review_ref": "reviews/20261106_4a_attempt002_recovery_sol_review.md",
-            "substage_accepted": false,
-            "bounded_scope": "A05 MuJoCo source-bound build, named joint mapping, single/split and effort+wrench submission/write ACK; not physics or sustained wrench acceptance."
+            "review_ref": "reviews/20261106_4a_attempt003_sol_review.md",
+            "substage_accepted": true,
+            "bounded_scope": "4a typed contracts, nested binding, public model, composition/one authority and conditional 4b validation plan; actual representative source A05 MuJoCo 3.8.1 CPU implicitfast build/write ACK, no independent force measurement."
           },
-          "blockers": [
-            "MuJoCo physical adapter projects body wrench only once then repeats the initial generalized force across changing substeps while advertising body-frame/point and hold support; fix or safely reject unsupported semantics.",
-            "4b conditional candidate plan remains unapproved; provider APIs and model/force readers still require future implementation and preflight.",
-            "A05 candidate and proposed 4b hand scenario use different force frame and moment reference; prevent treating native05 as the planned offset-force case, and freeze explicit input semantics."
-          ],
+          "blockers": [],
           "continuation": {
             "package_id": "V211_G04_4a_attempt002_recovery",
             "status": "REVIEWED_NOT_ACCEPTED",
@@ -1133,7 +1155,7 @@
           },
           "prepared_package": {
             "package_id": "V211_G04_4a_attempt003",
-            "status": "PREPARED_NOT_DISPATCHED",
+            "status": "EXECUTED_REVIEWED_ACCEPTED_BOUNDED",
             "ordinary_attempt_count_prior": 2,
             "manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/manifest.json",
             "planning_ref": "../planning/stage4-4a-attempt003-reassessment.md",
@@ -1142,8 +1164,18 @@
             "expected_duration": "180–300 active minutes, 360 wall minutes including waits",
             "budget": "MuJoCo 3.8.1 CPU only; cumulative native 30 min, source 30 min, <=300 substeps, per process <=180 sec, <=8 CPU, <=8 GiB RSS, no GPU/render, output <=1 GiB; dual locks.",
             "fallback": "Correctly implement declared MuJoCo subset or genuinely reject unsupported wrench production semantics while meeting original 4a contracts and documenting 4b plan.",
-            "dispatched": false
-          }
+            "dispatched": true,
+            "input_head": "0d978d0291997ad81167bcafd3c10bb6be975daf",
+            "prompt_sha256": "8f1d62eff4f7494a95d57b83a2f164a1b22aa25db10d06efe2f1486f5add3d4d",
+            "output_head": "105219eda7161e7292d0d8c2ce478c49bdb4eca2"
+          },
+          "limitations": [
+            "3-backend 7+2 actual effort, physical wrench and measurement remain 4b.",
+            "MuJoCo BodyWrench native execution only A05 source, CPU implicitfast; other provider physical profiles and other integrators unaccepted.",
+            "Position drive contributions and constrained finger pairing remain explicit; UI concurrency unsupported; physical Recorder remains unavailable.",
+            "4b plan candidate thresholds, model/readback providers, 41 builds/600-step budget and ignored fixture require a separately frozen package and preflight.",
+            "4c controller reset switching and migrated PickCube success remain unverified."
+          ]
         },
         {
           "id": "4b",
@@ -1451,15 +1483,15 @@
   "last_reviewed_package": {
     "substage": "4a",
     "attempt_series": "ordinary",
-    "attempt": 2,
-    "package_id": "V211_G04_4a_attempt002_recovery",
-    "status": "REVIEWED_NOT_ACCEPTED",
-    "input_head": "53ca8deeaf69e139876b08d2b00caa3ecabcdea0",
-    "output_head": "cfb006f44ee761ae29e248def249d405d5498216",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt002_recovery/prompt.md",
-    "review_ref": "reviews/20261106_4a_attempt002_recovery_sol_review.md",
-    "review_decision": "REWORK_REQUIRED_4A",
-    "assignment": "Maintainer-forwarded authorized continuation of attempt002; returned and released; independent Sol review complete."
+    "attempt": 3,
+    "package_id": "V211_G04_4a_attempt003",
+    "status": "REVIEWED_ACCEPTED_BOUNDED",
+    "input_head": "0d978d0291997ad81167bcafd3c10bb6be975daf",
+    "output_head": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/prompt.md",
+    "review_ref": "reviews/20261106_4a_attempt003_sol_review.md",
+    "review_decision": "ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT",
+    "assignment": "Maintainer forwarded executor package, writer released; independent Sol review complete."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
@@ -1558,7 +1590,7 @@
       "4c": "Controller/input-spec reset switching, state cleanup and migrated PickCube success"
     },
     "implementation_started": true,
-    "ordinary_attempts_started": 2,
+    "ordinary_attempts_started": 3,
     "prepared_execution_package": true,
     "auxiliary_use_case_ref": "../planning/assembled-panda-use-case.json",
     "auxiliary_schedule_status": "MAINTAINER_CONFIRMED_PLANNING",

@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：4a 未接收，最后普通 attempt003 已准备
+## 当前：4a 有界接收，4b 等待维护者安排
 
-G03 的 3a／3b／3c 有界接收保持。G04/4a 普通 attempt001、002 均未整体接收，count=2；002 授权续作输出 `cfb006f4` 已返包并释放。Sol [独立主审](reviews/20261106_4a_attempt002_recovery_sol_review.md)有界保留 A05/MuJoCo 提交与写入 ACK 证据，但发现持续 BodyWrench 在一个区间内未随姿态变化重新投影，当前对该能力的声明不能接收。原 001、002 和续作证据均保留；实施 Goal 完成不等于 4a 接收。维护者现要求准备最后普通 attempt003，并授权实施者在双锁和冻结预算内进行最小 MuJoCo CPU build／reset／短步验证；[第三次前重评和收口方案](../planning/stage4-4a-attempt003-reassessment.md)已完成。工作包等待维护者手动转发，准备不计次数、不自动启动，4b/4c 仍 PLANNED。
+G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。三后端实际 7＋2、普通物体／Robot body 外力物理验证与 Recorder 留 4b；Controller reset 和迁移后 PickCube 成功留 4c。4b/4c 为 PLANNED、attempt0；等待维护者安排，不自动派包或运行 native。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
