@@ -2,7 +2,7 @@
 
 ## 当前：4a 有界接收，4b 等待维护者安排
 
-G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。三后端实际 7＋2、普通物体／Robot body 外力物理验证与 Recorder 留 4b；Controller reset 和迁移后 PickCube 成功留 4c。4b/4c 为 PLANNED、attempt0；等待维护者安排，不自动派包或运行 native。
+G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。三后端实际 7＋2、普通物体／Robot body 外力物理验证与 Recorder 留 4b；Controller reset 和迁移后 PickCube 成功留 4c。4b/4c 为 PLANNED、attempt0；[4a复盘及4b准备经验](20261106_4a_retrospective_for_4b.md)已记录，本轮未建立4b prompt，不自动派包或运行 native。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 

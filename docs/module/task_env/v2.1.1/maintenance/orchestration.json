@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "4a independently accepted within its declared bounds; await maintainer direction before preparing and manually transferring a complete 4b package. No automatic 4b execution, native, messages, new chat or phase 5.",
+  "next_action": "4a independently accepted; 4a retrospective and 4b preparation inputs documented. After maintainer direction, prepare one complete 4b package with concrete original gates, public-route feasibility, authorization, resources and evidence; manual transfer only. No execution or 4b prompt in the retrospective turn.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1193,8 +1193,10 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
-          "evidence_refs": [],
+          "last_observation": "2026-11-06 maintainer requested 4a retrospective before 4b prompt. Sol recorded evidence-based lessons and 4b preparation inputs; no 4b prompt, implementation, writer or native started.",
+          "evidence_refs": [
+            "20261106_4a_retrospective_for_4b.md"
+          ],
           "commits": [],
           "review_decision": null,
           "blockers": []
