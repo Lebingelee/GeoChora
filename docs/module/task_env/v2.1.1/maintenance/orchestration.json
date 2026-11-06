@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G04_4A_ATTEMPT002_RECOVERY_REVIEWED_REWORK_REQUIRED",
+  "status": "G04_4A_ATTEMPT003_PREPARED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,8 +29,13 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Sol independent review found a BodyWrench substep semantics defect; 4a remains unaccepted at count 2. Discuss final ordinary attempt003 with the maintainer before preparing or dispatching it; no automatic 4b, native or conversation.",
+  "next_candidate": {
+    "package_id": "V211_G04_4a_attempt003",
+    "status": "PREPARED_NOT_DISPATCHED",
+    "package_manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/manifest.json",
+    "ordinary_attempt_count_prior": 2
+  },
+  "next_action": "Maintainer may manually transfer the frozen final ordinary attempt003 package to the existing executor. The 4a gate preserves typed wrench and accurate capability boundaries; three-backend actual effort remains 4b. Sol reviews returned evidence. No automatic dispatch, 4b, diagnostic or native by Sol.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1079,7 +1084,7 @@
             "gpu_starts": 0,
             "source_parsing": "bounded pure source under dual locks, 30 min"
           },
-          "last_observation": "2026-11-06 additional read-only Sol review found A05 candidate and 4b hand plan differ in force frame and moment reference; a guarded pure arithmetic probe confirms distinct moments. GeoPhys/Isaac new physical profiles remain unimplemented or unverified, not shown to share the MuJoCo port defect. 4a remains unaccepted at count 2.",
+          "last_observation": "2026-11-06 maintainer requested final ordinary attempt003 and authorized executor bounded minimum MuJoCo CPU native; Sol completed updated reassessment and prepared the self-contained package for manual transfer. 4a not accepted; count remains 2; no writer or native started by preparation.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/report.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/case-matrix.md",
@@ -1088,7 +1093,8 @@
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/report.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/4b-plan.md",
             "reviews/20261106_4a_attempt002_recovery_sol_review.md",
-            "reviews/20261106_4a_wrench_cross_backend_followup.md"
+            "reviews/20261106_4a_wrench_cross_backend_followup.md",
+            "../planning/stage4-4a-attempt003-reassessment.md"
           ],
           "commits": [
             "0e229a72b306938d545e0c10a7939f8f2548abe1",
@@ -1124,6 +1130,19 @@
             "sol_review_ref": "reviews/20261106_4a_attempt002_recovery_sol_review.md",
             "native_starts": 7,
             "physics_substeps": 35
+          },
+          "prepared_package": {
+            "package_id": "V211_G04_4a_attempt003",
+            "status": "PREPARED_NOT_DISPATCHED",
+            "ordinary_attempt_count_prior": 2,
+            "manifest_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/manifest.json",
+            "planning_ref": "../planning/stage4-4a-attempt003-reassessment.md",
+            "input_head_and_prompt_sha256": "Frozen in external package manifest after preparation commit.",
+            "authorized_executor": "Terra/Luna manually selected by maintainer; no automatic messaging.",
+            "expected_duration": "180–300 active minutes, 360 wall minutes including waits",
+            "budget": "MuJoCo 3.8.1 CPU only; cumulative native 30 min, source 30 min, <=300 substeps, per process <=180 sec, <=8 CPU, <=8 GiB RSS, no GPU/render, output <=1 GiB; dual locks.",
+            "fallback": "Correctly implement declared MuJoCo subset or genuinely reject unsupported wrench production semantics while meeting original 4a contracts and documenting 4b plan.",
+            "dispatched": false
           }
         },
         {
@@ -1549,7 +1568,7 @@
     "original_g04_protocol_gates_preserved": true,
     "branch_policy": "codex/v211-stage4 created at accepted G03 HEAD; same checkout and branch retained across 4a–4c; no merge, push or new worktree.",
     "scheduling_authority": "Maintainer accepted clarified plan and requested new Sol stage4 handoff on 2026-11-06.",
-    "attempt003_prepared": false
+    "attempt003_prepared": true
   },
   "version_auxiliary_use_cases": [
     {

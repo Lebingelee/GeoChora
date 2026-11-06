@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：4a 续作主审未接收，等待维护者讨论
+## 当前：4a 未接收，最后普通 attempt003 已准备
 
-G03 的 3a／3b／3c 有界接收保持。G04/4a 普通 attempt001、002 均未整体接收，count=2；002 授权续作输出 `cfb006f4` 已返包并释放。Sol [独立主审](reviews/20261106_4a_attempt002_recovery_sol_review.md)有界保留 A05/MuJoCo 提交与写入 ACK 证据，但发现持续 BodyWrench 在一个区间内未随姿态变化重新投影，当前对该能力的声明不能接收。原 001、002 和续作证据均保留；实施 Goal 完成不等于 4a 接收。维护者要求续作未接收后再讨论 003；当前未准备／派发 003，4b/4c 仍 PLANNED。
+G03 的 3a／3b／3c 有界接收保持。G04/4a 普通 attempt001、002 均未整体接收，count=2；002 授权续作输出 `cfb006f4` 已返包并释放。Sol [独立主审](reviews/20261106_4a_attempt002_recovery_sol_review.md)有界保留 A05/MuJoCo 提交与写入 ACK 证据，但发现持续 BodyWrench 在一个区间内未随姿态变化重新投影，当前对该能力的声明不能接收。原 001、002 和续作证据均保留；实施 Goal 完成不等于 4a 接收。维护者现要求准备最后普通 attempt003，并授权实施者在双锁和冻结预算内进行最小 MuJoCo CPU build／reset／短步验证；[第三次前重评和收口方案](../planning/stage4-4a-attempt003-reassessment.md)已完成。工作包等待维护者手动转发，准备不计次数、不自动启动，4b/4c 仍 PLANNED。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
