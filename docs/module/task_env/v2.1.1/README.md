@@ -2,7 +2,7 @@
 
 日期：2026-11-06。G03的3a、3b、3c均已按各自冻结范围独立接收，阶段3有界收尾。3b为[ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION](maintenance/reviews/20261106_3b_attempt003_sol_review.md)，原N08 FAIL保留；3c为[ACCEPTED_BOUNDED_3C_RESET_REBUILD](maintenance/reviews/20261106_3c_attempt001_sol_review.md)，覆盖显式PickCube state-only profile的四条指定切换边及故障处置，不需attempt002。6.1辅助App已验证启动／版本，close超时，完整兼容未通过。等待维护者后续安排，不自动进入阶段4或提升Qualification。
 
-2026-11-06阶段4规划补充：[装配Panda与Solution复用](planning/stage4-assembled-panda.md)按维护者纠正，以新Robot类、两任务配置选择、空载TCP精度和现有夹爪控制为核心；不要求与一体Panda物性／拼接等价。4a–4c仍PLANNED／attempt0，未派包或开始实现，G03接收不变。
+2026-11-06规划重评：原G04统一控制命令、三后端effort／BodyWrench及Controller reset主线完整保留。[装配Panda](planning/stage4-assembled-panda.md)改为本版附加集成用例，建议4b能力稳定后早检查、7a两任务Solution完整收口；排期待维护者审阅，不作为4a–4c新增接收门。新Robot类／空载TCP精度／夹爪控制及不做物性等价的需求保留。仍PLANNED／未派包，G03接收不变。
 
 历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 

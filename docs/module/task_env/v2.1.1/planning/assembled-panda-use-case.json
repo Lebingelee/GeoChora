@@ -1,0 +1,56 @@
+{
+  "schema_version": "geochora-v211-auxiliary-use-case-plan-v1",
+  "use_case_id": "V211_UC_ASSEMBLED_PANDA",
+  "title": "装配Panda、空载跟踪与Solution复用",
+  "status": "PLANNED_NOT_RUN",
+  "requirements_authority": "Maintainer five-point correction: new Panda class under robots; task-feasible unloaded gripper-center TCP tracking; existing controller/gripper reuse; per-task original Solution; no integrated-Panda physical equivalence.",
+  "scheduling_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+  "planning_ref": "planning/stage4-assembled-panda.md",
+  "scope_level": "v2.1.1 auxiliary integration use case, separate from original G04 exit gates",
+  "original_g04_required_gate": false,
+  "implementation_started": false,
+  "new_substage_or_attempt_series": false,
+  "proposed_first_native_route": "MuJoCo CPU / fixed base / one assembled Panda",
+  "proposed_full_closeout": "7a",
+  "early_validation": "After original 4b capabilities stabilize, only within an already frozen complete package and separate budget; otherwise carry case work to 7a.",
+  "checkpoints": [
+    {
+      "id": "AP-C1",
+      "purpose": "新Robot描述类与正式配置消费",
+      "implementation_owner": "task_env/robots and existing task selected bindings/source construction",
+      "proposed_schedule": "4b auxiliary work when packaged; complete by 7a",
+      "expected": "New Panda class is actually consumed by normal task configuration; shared controller/gripper algorithms, source and TCP bindings reused. Registration alone cannot pass.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AP-C2",
+      "purpose": "空载跟踪及所选连通本体补偿",
+      "proposed_schedule": "First representative check after 4b main capabilities stabilize; close remaining evidence at 7a",
+      "expected": "Own-model gravity contribution is composed once and actual gripper-center tracking meets pre-frozen task requirements in a feasible region. No equality with old mass/friction/drive/initial-q/trajectory required; no automatic task-object payload.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AP-C3",
+      "purpose": "现有夹爪控制方式复用",
+      "proposed_schedule": "With AP-C2; complete by 7a",
+      "expected": "Normal open/close and representative grasp/release with correct opening/feedback and actual source constraints; no duplicate gripper control implementation.",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "AP-C4",
+      "purpose": "两任务配置换机器人、原Solution完整复用",
+      "proposed_schedule": "7a complete integration; reuse matching 4c successful references; 7b affected-input checks only",
+      "coverage": [
+        "PickCube / original Panda",
+        "PickCube / assembled Panda",
+        "NutAssembly / original Panda",
+        "NutAssembly / assembled Panda"
+      ],
+      "expected": "Per-task same Solution algorithm/strategy and success predicates, actual task success, independent same-run record readback and close in each covered intersection. Four coverage cells do not require four fresh native runs when existing evidence still matches.",
+      "status": "NOT_RUN"
+    }
+  ],
+  "acceptance_policy": "Separate auxiliary-case decision. Original G04 commands, three-provider 7+2 effort, BodyWrench, input-spec reset and PickCube success gates remain unchanged. Shared-capability defects affect their original gate; case-specific adaptation or incomplete evidence remains explicit through proposed 7a closeout. Do not silently discard the case or claim full version completion from a G04 pass.",
+  "implementation_and_validation_authority": "Future complete package manually dispatched by maintainer; this document does not start execution.",
+  "qualified_capability": false
+}

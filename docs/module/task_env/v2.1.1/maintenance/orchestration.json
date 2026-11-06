@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "G04 planning updated per maintainer correction; prepare and freeze one complete 4a package before manual dispatch. No implementation, native, new execution thread or automatic stage4 start authorized by this planning update.",
+  "next_action": "Review the proposed auxiliary use-case placement while preserving original G04 mainline. Prepare the original 4a complete package only when requested; no implementation or automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1040,10 +1040,8 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
-          "evidence_refs": [
-            "../planning/stage4-assembled-panda.md"
-          ],
+          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
+          "evidence_refs": [],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1064,10 +1062,8 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
-          "evidence_refs": [
-            "../planning/stage4-assembled-panda.md"
-          ],
+          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
+          "evidence_refs": [],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1088,10 +1084,8 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 maintainer clarified assembled Panda scope; planning updated only. New Robot class, task-feasible unloaded TCP accuracy, existing gripper reuse and per-task Solution reuse; no physical equivalence requirement, implementation or dispatch.",
-          "evidence_refs": [
-            "../planning/stage4-assembled-panda.md"
-          ],
+          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
+          "evidence_refs": [],
           "commits": [],
           "review_decision": null,
           "blockers": []
@@ -1272,7 +1266,8 @@
           "evidence_refs": [],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [],
+          "auxiliary_use_case_schedule_proposal": "V211_UC_ASSEMBLED_PANDA full integration closeout; pending maintainer schedule review; original 7a work retained."
         },
         {
           "id": "7b",
@@ -1453,34 +1448,37 @@
   },
   "stage4_planning": {
     "date": "2026-11-06",
-    "status": "SCOPE_UPDATED_PLANNED_NOT_DISPATCHED",
-    "authority": "Maintainer explicit five-point correction and request to revise stage4 planning/documents",
-    "planning_ref": "../planning/stage4-assembled-panda.md",
-    "goal_ref": "../goals/04-control.md",
+    "status": "ORIGINAL_MAINLINE_RESTORED_AUXILIARY_SCHEDULE_PROPOSED",
+    "authority": "Maintainer requested reassessment: assembled Panda is a version-level test use case, not the G04 mainline.",
+    "original_goal_ref": "../goals/04-control.md",
+    "original_control_cases_ref": "../planning/control-command-cases.json",
+    "mainline": {
+      "4a": "nested subjects, typed JointEffort/BodyWrench/load slots, public state/model, contribution and unique submission contracts",
+      "4b": "actual three-provider 7+2 effort, shared controllers/direct effort, real bounded BodyWrench and combination",
+      "4c": "Controller/input-spec reset switching, state cleanup and migrated PickCube success"
+    },
     "implementation_started": false,
     "ordinary_attempts_started": 0,
     "prepared_execution_package": false,
-    "new_robot_owner": "task_env/robots/",
-    "proposed_class": "AssembledPandaAgent (not implemented)",
-    "acceptance_focus": [
-      "task-feasible unloaded TCP tracking accuracy",
-      "reuse existing arm and gripper controller algorithms with robot-specific model/config",
-      "actual normal task configuration selects the robot class",
-      "same per-task Solution algorithm/strategy and task success"
-    ],
-    "not_required": [
-      "one-to-one integrated Panda assembly or physical parameter equivalence",
-      "same initial joint angles or numeric trajectory",
-      "same-live-Env robot-body replacement as a new reset gate",
-      "arbitrary dexterous-hand/mobile-base matrix"
-    ],
-    "accuracy_and_feasible_domain": "Freeze from task requirements in complete 4a package before execution; no invented threshold here",
-    "phase_allocation": {
-      "4a": "Robot class/config/TCP/control-model and selected connected-body scope; freeze accuracy/domain cases",
-      "4b": "shared Controller/gripper, gravity contribution and actual unloaded tracking",
-      "4c": "two tasks x two robot configurations full representative success and independent readback"
-    },
-    "existing_g04_protocol_gates_preserved": true,
-    "branch_policy": "This change is documentation on existing G03 branch; G04 execution branch/input must inherit accepted G03 and be settled at package preparation. No new branch or merge performed."
-  }
+    "auxiliary_use_case_ref": "../planning/assembled-panda-use-case.json",
+    "auxiliary_schedule_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+    "auxiliary_schedule_summary": "4a requirement consumer; 4b mainline stabilized before earliest scoped tracking/gripper/gravity check; reuse 4c references; full two-task configuration/Solution use-case integration at 7a; 7b affected-input checks only.",
+    "auxiliary_case_is_original_g04_exit_gate": false,
+    "maintainer_robot_requirements_preserved": true,
+    "original_g04_protocol_gates_preserved": true,
+    "branch_policy": "Documentation only on current G03 branch; future execution branch/input inherits accepted G03 under phase policy; no branch/merge/dispatch performed."
+  },
+  "version_auxiliary_use_cases": [
+    {
+      "id": "V211_UC_ASSEMBLED_PANDA",
+      "status": "PLANNED_NOT_RUN",
+      "planning_ref": "../planning/stage4-assembled-panda.md",
+      "checklist_ref": "../planning/assembled-panda-use-case.json",
+      "scheduling_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+      "earliest_native_checkpoint": "after original 4b capabilities stabilize and only when packaged",
+      "proposed_full_closeout": "7a",
+      "counts_as_new_substage": false,
+      "qualification": false
+    }
+  ]
 }

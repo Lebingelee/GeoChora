@@ -13,7 +13,7 @@
 7. 同一 public Env 构建／reset 可选择执行组合；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
 8. observation 构建后保持结构、shape、dtype、单位、坐标及字段语义；为非刚体表示和设备数据保留扩展边界。
 
-2026-11-06阶段4需求补充：[新装配Panda](stage4-assembled-panda.md)由`task_env/robots/`中的新类集中描述，两个正式任务通过配置选择，复用既有Controller与夹爪控制。目标是夹爪中心TCP在任务可行域内的空载跟踪精度及各任务原Solution成功，不要求拼接、物性或数值轨迹复刻一体Panda。该项按4a配置／模型、4b控制／补偿、4c任务复用落地，不增加子阶段或重开G03；当前尚未实施。
+2026-11-06重新编排建议：[装配Panda](stage4-assembled-panda.md)是本版附加集成用例，原G04的typed命令、三后端effort／BodyWrench及Controller reset主线保持。建议4a作接口需求审阅，4b主能力稳定后早做空载／夹爪／补偿检查，4c有效PickCube参考复用，7a完成两任务原Solution在原／新机器人上的完整复用，7b仅按输入变化定向复核。新类仍置于`task_env/robots/`并由任务配置消费；不要求物性等价。排期待维护者审阅，不增加子阶段或重开G03；当前未实施。
 
 ## 已确定的架构边界
 
