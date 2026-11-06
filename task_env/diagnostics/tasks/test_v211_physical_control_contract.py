@@ -144,6 +144,14 @@ def test_mujoco_physical_port_rechecks_resolved_values_and_duplicate():
     with pytest.raises(ValueError, match='equality is not active'):
         port.write(admitted)
     assert data.qfrc_applied[0] == 0
+    port.equality_ids = ()
+    def concurrent_write(*args):
+        data.qfrc_applied[0] = 7.
+        return np.array([1.])
+    port._project_current = concurrent_write
+    with pytest.raises(RuntimeError, match='changed before owned write'):
+        port.write(admitted)
+    assert data.qfrc_applied[0] == 7. and port.pending is None
 
 
 def test_mujoco_physical_interval_clears_buffer_on_advance_failure():
@@ -156,12 +164,13 @@ def test_mujoco_physical_interval_clears_buffer_on_advance_failure():
     session = object.__new__(_MuJoCoSession)
     session._require_reset = lambda: None
     session._artifact = SimpleNamespace(timebase=SimpleNamespace(control_substeps=5))
-    session._model, session._data = object(), SimpleNamespace(qfrc_applied=np.array([1.]))
+    session._model, session._data = object(), SimpleNamespace(qfrc_applied=np.array([1.]), xfrc_applied=np.zeros((1, 6)))
     def fail_step(*args):
         raise RuntimeError('simulated native step failure')
     session._mj = SimpleNamespace(mj_step=fail_step)
     port = object.__new__(MuJoCoPhysicalPort)
     port.session, port.pending, port.pending_values = session, 'boundary', np.array([1.])
+    port.pending_joints, port.pending_wrenches = np.array([1.]), ()
     session._physical_port = port
     with pytest.raises(RuntimeError, match='simulated native step failure'):
         session.step()
@@ -210,6 +219,23 @@ def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
     model.actuator_biasprm[0, 1] = 0.
     with pytest.raises(ValueError, match='range, gear or position drive'):
         MuJoCoPhysicalPort(session, execution)
+    # A valid body binding must reject an unverified RK4 model before write.
+    from task_env.controllers.canonical.physical_commands import PhysicalBodyBindingV1
+    model.actuator_biasprm[0, 1] = -1.
+    body = PhysicalBodyBindingV1('physical-body-binding-v1', 'arm', 'base',
+                                FrameReference('arm','base'), 'native-body', ('controller-a',))
+    body_binding = replace(binding, bodies=(body,))
+    body_plan = compile_physical_control_binding(original.scene, original.root, original.children, body_binding)
+    controller.binding = body_binding
+    source.bodies = {'arm/base': 'native-body'}
+    model.body = lambda name: SimpleNamespace(id=1)
+    model.opt = SimpleNamespace(integrator=1)
+    mj.mjtIntegrator = SimpleNamespace(mjINT_IMPLICITFAST=3)
+    body_execution = PhysicalControlExecutionV1(body_plan, (controller,), body_plan.scene,
+        {'arm/drive': object()}, {'arm/base': FrameReference('arm','base')},
+        StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    with pytest.raises(ValueError, match='implicitfast integrator'):
+        MuJoCoPhysicalPort(session, body_execution)
 
 
 def test_mujoco_physical_preflight_rejects_missing_or_wrong_dependency(monkeypatch):
@@ -529,7 +555,8 @@ def test_eight_actions_map_to_seven_torques_and_constrained_finger_pair():
         prepare_physical_command_batch(plan,bad,expected_context=context,assessment=assessment, joint_build_receipt=_joint_receipt(plan,context))
 
 
-def test_selected_env_production_step_uses_single_fake_session_write():
+@pytest.mark.parametrize('bad_ack', [False, True])
+def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     """Exercise the real selected step owner; fake I/O never advances physics."""
     from types import SimpleNamespace
     from task_env.artifacts.state import (CanonicalStateViewV2, CanonicalStatePublicationV2,
@@ -562,6 +589,7 @@ def test_selected_env_production_step_uses_single_fake_session_write():
         physical_control_generation = 1
         writes = 0
         advances = 0
+        aborts = 0
         provenance = 'synthetic_fixture'
         assessment_phase = 'static_preflight'
         def snapshot_v2(self, **kwargs): return publication
@@ -576,8 +604,10 @@ def test_selected_env_production_step_uses_single_fake_session_write():
             self.writes += 1
             assert resolved.joints[0].value == pytest.approx(2.3, abs=1e-12)
             return PhysicalControlReceiptV1('physical-control-receipt-v1',context,
-                resolved.input_batch.identity_hash,'native_write_ack',
+                '0'*64 if bad_ack else resolved.input_batch.identity_hash,'native_write_ack',
                 resolved.accepted_receipt.contribution_ids,'fake-terminal','per-channel')
+        def abort_physical_control(self):
+            self.aborts += 1
         def step(self):
             self.advances += 1
             return SimpleNamespace(control_step=1, simulation_time=.01)
@@ -603,6 +633,11 @@ def test_selected_env_production_step_uses_single_fake_session_write():
     assert (env.session.writes, env.session.advances) == (0, 0)
     # Explicit mock of the downstream native receipt: this is not build evidence.
     env.session.provenance = 'native_build'
+    if bad_ack:
+        with pytest.raises(ValueError, match='invalid write acknowledgement'):
+            env.step((.25,))
+        assert (env.session.writes, env.session.advances, env.session.aborts) == (1, 0, 1)
+        return
     result = env.step((.25,))
     assert result[:4] == ({'x':1.},.5,False,False)
     assert result[4]['physical_control_v1']['native_write_ack']['stage'] == 'native_write_ack'

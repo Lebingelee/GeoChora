@@ -203,6 +203,26 @@ def _rotate(quat, vector):
     return tuple(v + 2*(w*a+b) for v, a, b in zip(vector, uv, uuv, strict=True))
 
 
+def resolve_body_wrench_at_poses(item, body_frame, poses):
+    """Resolve the declared total moment about its reference at current poses.
+
+    The application point does not add a second moment to a torque already
+    declared about another reference. It remains explicit for the equivalent
+    point-wrench transformation and for validating the requested frame.
+    """
+    origin = poses[body_frame].position
+    expression, point_frame = poses[item.expressed_in], poses[item.point_frame]
+    reference_frame = poses[item.moment_reference_frame]
+    force = _rotate(expression.quaternion_wxyz, item.force_N)
+    torque_reference = _rotate(expression.quaternion_wxyz, item.torque_Nm)
+    point = _add(point_frame.position, _rotate(point_frame.quaternion_wxyz, item.point))
+    reference = _add(reference_frame.position,
+                     _rotate(reference_frame.quaternion_wxyz, item.moment_reference))
+    torque_point = _add(torque_reference, _cross(_sub(reference, point), force))
+    torque_origin = _add(torque_point, _cross(_sub(point, origin), force))
+    return origin, force, torque_origin
+
+
 def prepare_physical_command_batch(compiled, batch, *, expected_context,
                                    assessment, registered_extensions=(),
                                    topology_sha256=None, state=None, body_build_receipt=None,
@@ -355,17 +375,7 @@ def prepare_physical_command_batch(compiled, batch, *, expected_context,
                 origin = poses[body.body_frame].position
                 force_total, torque_total = (0., 0., 0.), (0., 0., 0.)
                 for item in items:
-                    expression, point_frame = poses[item.expressed_in], poses[item.point_frame]
-                    reference_frame = poses[item.moment_reference_frame]
-                    force = _rotate(expression.quaternion_wxyz, item.force_N)
-                    torque_reference = _rotate(expression.quaternion_wxyz, item.torque_Nm)
-                    point = _add(point_frame.position, _rotate(point_frame.quaternion_wxyz, item.point))
-                    reference = _add(reference_frame.position,
-                                     _rotate(reference_frame.quaternion_wxyz, item.moment_reference))
-                    # Torque is specified about the declared reference. Shift it
-                    # to the application point, then to the body origin.
-                    torque_point = _add(torque_reference, _cross(_sub(reference, point), force))
-                    torque_origin = _add(torque_point, _cross(_sub(point, origin), force))
+                    _origin, force, torque_origin = resolve_body_wrench_at_poses(item, body.body_frame, poses)
                     force_total, torque_total = _add(force_total, force), _add(torque_total, torque_origin)
             except KeyError as exc:
                 raise ValueError(f'required body wrench frame is unavailable: {exc.args[0]}') from exc

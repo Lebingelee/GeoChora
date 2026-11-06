@@ -228,6 +228,12 @@ class _MuJoCoSession(_SessionValues):
     def apply_physical_command_batch(self, resolved):
         return self._physical_port.write(resolved)
 
+    def abort_physical_control(self):
+        """Discard this session's pending physical batch after an interval fault."""
+        port = getattr(self, '_physical_port', None)
+        if port is not None and port.pending is not None:
+            port.finish_interval()
+
     def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
         self._mixed_actuator_plan = mixed_actuator_plan
@@ -1859,6 +1865,15 @@ class _MuJoCoSession(_SessionValues):
         if type(sample) is not ResetSample:
             raise TypeError('legacy MuJoCo RuntimeSession requires ResetSample v0 before reset')
         self._validate_sample(sample)
+        physical_port = getattr(self, '_physical_port', None)
+        if physical_port is not None:
+            if (np.any(self._data.xfrc_applied)
+                    or (physical_port.pending is None and np.any(self._data.qfrc_applied))
+                    or (physical_port.pending is not None
+                        and not np.array_equal(self._data.qfrc_applied, physical_port.pending_values))):
+                raise RuntimeError('physical reset cannot clear a foreign force buffer')
+            if physical_port.pending is not None:
+                physical_port.finish_interval()
         self._begin_reset()
         self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
@@ -2755,7 +2770,7 @@ class _MuJoCoSession(_SessionValues):
                 raise RuntimeError('physical interval requires exactly one fresh batch')
             try:
                 for _ in range(self._artifact.timebase.control_substeps):
-                    self._data.qfrc_applied[:] = physical_port.pending_values
+                    physical_port.refresh_substep()
                     self._mj.mj_step(self._model, self._data)
                     self._native_steps += 1
                 self._mj.mj_forward(self._model, self._data)
@@ -2936,6 +2951,9 @@ class _MuJoCoSession(_SessionValues):
 
     def close(self):
         if not self._closed:
+            physical_port = getattr(self, '_physical_port', None)
+            if physical_port is not None and physical_port.pending is not None:
+                physical_port.finish_interval()
             if self._mixed_actuator_plan is not None:
                 self._last_close_receipt = {
                     'schema_version': 'runtime-close-v1',

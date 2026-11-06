@@ -2343,6 +2343,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
 
         def on_failure(phase, error):
+            abort = getattr(self.session, 'abort_physical_control', None)
+            if attempted and callable(abort):
+                try:
+                    abort()
+                except BaseException as cleanup_error:
+                    error.add_note('physical batch cleanup also failed: '
+                                   f'{type(cleanup_error).__name__}: {cleanup_error}')
             self._latch_fault(phase, error, before_state=before, after_state=None,
                 interval_attempted=attempted, interval_completed=completed,
                 native_substeps_expected=self.artifact.timebase.control_substeps,

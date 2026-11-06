@@ -18,6 +18,8 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 未接收的 002 recovery 增加了该候选的 MuJoCo 3.8.1 CPU physical profile 路线；物化前检查依赖版本与 source 身份。相同 session 在 native build 后核对名称、轴、actuator 力限／gear、tendon 和 equality，将已准入关节贡献与 hand wrench 合并写入广义力缓冲；position drive 保留，显式完整 PD 与未协调 position drive 仍拒绝。source actuator 力域用于约束声明的 direct contribution；保留的 position drive 可叠加，二者总和不受该 direct contribution 界限保证。2026-11-06 在 source closure `aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47` 完成单 Controller effort、双 Controller effort 和 effort 加 hand wrench 的各一次 5 子步短运行，确认提交与写入回执；ACK 不是力测量，尚未完成 4b 物理效果验证。其他 provider 的 physical reset 仍拒绝；合成映射不能授权真实写入，旧 position 路线保持原身份。
 
+attempt003 修正持续 BodyWrench：Controller 在 outer boundary 提交一次原始 typed 命令，MuJoCo session 在每个 physics substep 用当前构型刷新运动学和 Jacobian，将各声明的表达 frame、作用点与力矩参考重新解析后，与 joint effort 合并并替换自有缓冲；正常 interval、异常、reset 与 close 清理可辨认的自有贡献。该路线对 BodyWrench 目前只准入 source-bound `implicitfast` 积分器；其他积分器写入前拒绝。非空或被外部修改的力缓冲拒绝，未提供与 UI/其他 writer 并发叠加能力；冲突时不覆盖被改写的槽位，其混合归属和剩余力不能推断，须结束该故障 session。`torque_Nm` 是关于声明的 `moment_reference` 的总力矩：力矩参考为作用点且为零时，偏置力在 body 原点有 `r×F` 力矩；参考为 body 原点且总矩为零时，不再额外加该项。上述 002 的实际候选使用 body frame 和 body origin 参考，不能当作 world force、作用点零矩的 4b 案例。新逐子步语义有定向 fake 和 A05/implicitfast 有界 session 证据，未证明其他 provider、其他 source／积分器的物理效果。
+
 | 操作 | v2.1.1 目标 | 责任与边界 |
 | --- | --- | --- |
 | make_env／配置 | 查询并选择合法 physics／solver／renderer／Controller／batch 组合 | 复用 registry 和配置解析，Core→任务类→YAML→调用方 |

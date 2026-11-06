@@ -16,7 +16,7 @@ from ...controllers.canonical.physical_commands import (
     PhysicalJointBuildReceiptV1,
 )
 from .physical_control import (PhysicalControlExecutionV1, ResolvedPhysicalBatchV1,
-                               prepare_physical_command_batch)
+                               prepare_physical_command_batch, resolve_body_wrench_at_poses)
 
 
 def _same(a, b):
@@ -117,6 +117,7 @@ class MuJoCoPhysicalPort:
             else:
                 raise ValueError('unsupported compiled physical transmission')
         bodies = {}
+        body_frames = {}
         for body in binding.bodies:
             if source.bodies.get(f'{body.entity_id}/{body.body_id}') != body.native_body:
                 raise ValueError('physical body differs from source mapping')
@@ -124,11 +125,26 @@ class MuJoCoPhysicalPort:
             if body_id <= 0:
                 raise ValueError('physical wrench target must be a non-world body')
             bodies[(body.entity_id, body.body_id)] = body_id
+            body_frames[(body.entity_id, body.body_id)] = body.body_frame
+        if binding.bodies and int(model.opt.integrator) != int(mj.mjtIntegrator.mjINT_IMPLICITFAST):
+            raise ValueError('physical body wrench requires the verified MuJoCo implicitfast integrator')
+        frame_handles = {}
+        for semantic, reference in execution.frame_bindings.items():
+            if semantic in source.bodies:
+                frame_handles[reference] = ('body', session._bodies[semantic])
+            elif semantic in source.frames:
+                frame_handles[reference] = ('site', session._frames[semantic])
+            else:
+                raise ValueError('physical frame lacks a compiled native mapping')
         self.session, self.execution, self.binding = session, execution, binding
         self.dofs, self.bodies = dofs, bodies
+        self.body_frames, self.frame_handles = body_frames, frame_handles
         self.equality_ids = tuple(equality_ids)
         self.pending = None
         self.pending_values = None
+        self.pending_joints = None
+        self.pending_wrenches = ()
+        self.kinematics_refreshes = 0
         self.consumed = set()
 
     def _binding(self, binding):
@@ -204,21 +220,80 @@ class MuJoCoPhysicalPort:
         for item in resolved.joints:
             key = (item.entity_id, item.joint_id, item.dof_id)
             values[self.dofs[key]] += item.value * next(c.sign for c in self.binding.channels if c.target_key == key)
-        for item in resolved.body_wrenches:
-            s._mj.mj_applyFT(s._model, s._data, np.asarray(item.force_world_N),
-                np.asarray(item.torque_at_body_origin_world_Nm), np.asarray(item.body_origin_world_m),
-                self.bodies[(item.entity_id, item.body_id)], values)
-        if not np.isfinite(values).all():
+        raw_wrenches = resolved.input_batch.body_wrenches
+        for item in raw_wrenches:
+            key = (item.entity_id, item.body_id)
+            needed = (item.expressed_in, item.point_frame, item.moment_reference_frame, self.body_frames[key])
+            if any(frame not in self.frame_handles for frame in needed):
+                raise ValueError('physical wrench frame has no native mapping')
+        projected = self._project_current(values, raw_wrenches)
+        if not np.isfinite(projected).all():
             raise ValueError('physical projection produced nonfinite generalized force')
-        s._data.qfrc_applied[:] = values
+        if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
+            raise RuntimeError('physical force buffer changed before owned write')
+        s._data.qfrc_applied[:] = projected
         self.pending = context.identity_hash
-        self.pending_values = values
+        self.pending_values = projected
+        self.pending_joints = values
+        self.pending_wrenches = raw_wrenches
         self.consumed.add(context.identity_hash)
         return PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             resolved.input_batch.identity_hash, 'native_write_ack', resolved.accepted_receipt.contribution_ids,
             'mujoco-qfrc-applied', 'generalized-force')
 
+    def _project_current(self, joints, wrenches):
+        """Use fresh public kinematics and each declared frame at this substep."""
+        values = np.array(joints, dtype=float, copy=True)
+        if not wrenches:
+            return values
+        s = self.session
+        if int(s._model.opt.integrator) != int(s._mj.mjtIntegrator.mjINT_IMPLICITFAST):
+            raise ValueError('physical body wrench requires the verified MuJoCo implicitfast integrator')
+        s._mj.mj_kinematics(s._model, s._data)
+        s._mj.mj_comPos(s._model, s._data)
+        self.kinematics_refreshes += 1
+        from .common import pose
+        poses = {}
+        for item in wrenches:
+            key = (item.entity_id, item.body_id)
+            for frame in (item.expressed_in, item.point_frame, item.moment_reference_frame, self.body_frames[key]):
+                if frame in poses:
+                    continue
+                kind, index = self.frame_handles[frame]
+                if kind == 'body':
+                    poses[frame] = pose(s._data.xpos[index], s._data.xquat[index])
+                else:
+                    quaternion = np.zeros(4)
+                    s._mj.mju_mat2Quat(quaternion, s._data.site_xmat[index])
+                    poses[frame] = pose(s._data.site_xpos[index], quaternion)
+            origin, force, torque = resolve_body_wrench_at_poses(item, self.body_frames[key], poses)
+            s._mj.mj_applyFT(s._model, s._data, np.asarray(force), np.asarray(torque),
+                             np.asarray(origin), self.bodies[key], values)
+        if not np.isfinite(values).all():
+            raise ValueError('physical projection produced nonfinite generalized force')
+        return values
+
+    def refresh_substep(self):
+        """Replace this port's contribution without accumulating or stealing a buffer."""
+        s = self.session
+        if self.pending is None or self.pending_values is None:
+            raise RuntimeError('physical interval requires exactly one fresh batch')
+        if not np.array_equal(s._data.qfrc_applied, self.pending_values) or np.any(s._data.xfrc_applied):
+            raise RuntimeError('physical force buffer changed during owned interval')
+        projected = self._project_current(self.pending_joints, self.pending_wrenches)
+        if not np.array_equal(s._data.qfrc_applied, self.pending_values) or np.any(s._data.xfrc_applied):
+            raise RuntimeError('physical force buffer changed during projection')
+        s._data.qfrc_applied[:] = projected
+        self.pending_values = projected
+
     def finish_interval(self):
-        self.session._data.qfrc_applied[:] = 0
+        data = self.session._data
+        if self.pending_values is not None:
+            # Clear only slots that still contain the exact value owned by this
+            # port. A concurrent foreign overwrite is left untouched and is a fault.
+            owned = np.equal(data.qfrc_applied, self.pending_values)
+            data.qfrc_applied[owned] = 0
         self.pending = None
         self.pending_values = None
+        self.pending_joints = None
+        self.pending_wrenches = ()
