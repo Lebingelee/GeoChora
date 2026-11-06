@@ -1262,6 +1262,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         return self._execution_fault
 
+    @property
+    def reset_failure_receipt(self):
+        """Return an owned record of reset effects; unknown writes are not rollback."""
+        from copy import deepcopy
+        return deepcopy(getattr(self, '_reset_failure_receipt', None))
+
     def get_runtime_progress_receipt(self):
         if not getattr(self, 'mixed_control_profile', False) or self.session is None:
             raise StageUnavailableError('mixed runtime progress is unavailable on this selected route')
@@ -1473,11 +1479,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         previous_session, self.session = self.session, None
         previous_value = self.value
         previous_session_close_attempted = False
+        reset_effects = {'schema_version': 'selected-reset-failure-effects-v1',
+                         'previous_session_present': previous_session is not None,
+                         'previous_session_close_attempted': False,
+                         'previous_session_close_completed': False,
+                         'replacement_materialization_attempted': False,
+                         'reset_write_attempted': False, 'reset_write_status': 'not_attempted',
+                         'replacement_session_close_attempted': False,
+                         'replacement_session_close_completed': False}
         failure_phase = 'camera_reset_close'
 
         def prepare():
             nonlocal seed, previous_session_close_attempted, failure_phase
             if switching:
+                self._reset_failure_receipt = None
                 self._switch_rng_state = switch_candidate.rng_state
                 self._switch_task_seed = switch_candidate.task_seed
                 self._switch_provider_seed = switch_candidate.provider_seed
@@ -1490,7 +1505,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'reset_close'
             if previous_session is not None:
                 previous_session_close_attempted = True
+                reset_effects['previous_session_close_attempted'] = True
                 previous_session.close()
+                reset_effects['previous_session_close_completed'] = True
                 if self._mixed_control_candidate:
                     self._mixed_close_receipt = previous_session.close_receipt
             previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
@@ -1595,6 +1612,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def materialize_runtime():
             nonlocal failure_phase
             failure_phase = 'session_materialization'
+            if switching:
+                reset_effects['replacement_materialization_attempted'] = True
 
             def start_worker():
                 from ..runtime.sessions.transport import (
@@ -1698,6 +1717,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 bind_selected_build_checks(deployment_receipt, self.session.build_layout_facts,
                     materialization_id=self.session.provider_materialization_id)
             failure_phase = 'runtime_reset'
+            if switching:
+                reset_effects['reset_write_attempted'] = True
+                reset_effects['reset_write_status'] = 'unknown'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 self.realized = self.session.reset_plan(reset_plan)
@@ -1705,6 +1727,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.realized = self.session.reset_plan(self._mixed_reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
+            if switching:
+                reset_effects['reset_write_status'] = 'completed'
             self._compiled_layout_post_reset = None
             if self.binding.post_reset_session_validator is not None:
                 self._compiled_layout_post_reset = self.binding.post_reset_session_validator(
@@ -1859,21 +1883,31 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     add_note(f'selected reset camera cleanup also failed: {cleanup_error!r}')
             failed_session, self.session = self.session, None
             if failed_session is not None:
+                if switching:
+                    reset_effects['replacement_session_close_attempted'] = True
                 try:
                     failed_session.close()
+                    if switching:
+                        reset_effects['replacement_session_close_completed'] = True
                 except BaseException as cleanup_error:
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected reset cleanup also failed: {cleanup_error!r}')
             if previous_session is not None and not previous_session_close_attempted:
                 previous_session_close_attempted = True
+                if switching:
+                    reset_effects['previous_session_close_attempted'] = True
                 try:
                     previous_session.close()
+                    if switching:
+                        reset_effects['previous_session_close_completed'] = True
                 except BaseException as cleanup_error:
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
             if switching:
+                self._reset_failure_receipt = {**reset_effects, 'failure_phase': failure_phase}
+                error.reset_failure_receipt = self.reset_failure_receipt
                 # A candidate can own a source lease even if closing the old
                 # session fails before it is installed on this environment.
                 seen = set()

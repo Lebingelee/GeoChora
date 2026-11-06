@@ -86,6 +86,9 @@ def test_synthetic_partial_advance_fault_blocks_step_and_preserves_record(monkey
         with pytest.raises(RuntimeError, match='synthetic partial advance'):
             env.step(action)
         assert env.execution_fault.physical_progress == 'partially_advanced'
+        assert env.execution_fault.simulation_time_before_s == 0.0
+        assert env.execution_fault.simulation_time_after_s == pytest.approx(0.002)
+        assert env.execution_fault.transition_status in {'incomplete', 'not_recorded'}
         assert not env.recorder.transitions
         with pytest.raises(RuntimeError, match='fault'):
             env.step(action)
@@ -174,6 +177,11 @@ def test_partial_reset_write_failure_reports_fault_and_releases_session(monkeypa
             env.reset(seed=31)
         assert events == ['old session close','partial write','new session close']
         assert env.session is None and env.execution_fault.phase == 'runtime_reset'
+        assert env.execution_fault.physical_progress == 'not_advanced'
+        assert env.reset_failure_receipt['previous_session_close_completed']
+        assert env.reset_failure_receipt['replacement_session_close_completed']
+        assert env.reset_failure_receipt['reset_write_attempted']
+        assert env.reset_failure_receipt['reset_write_status'] == 'unknown'
         assert env._published_position_obs is None
         with pytest.raises(RuntimeError,match='fault'):
             env.step([0.]*8)
