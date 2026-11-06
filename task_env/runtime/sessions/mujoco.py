@@ -205,6 +205,29 @@ def check_mujoco_named_layout(model, mj, source):
 
 
 class _MuJoCoSession(_SessionValues):
+    def bind_physical_control(self, execution):
+        """Bind one verified physical profile to this materialized session."""
+        if getattr(self, '_physical_port', None) is not None or self._reset_done:
+            raise ValueError('physical port must be bound once before reset')
+        from .mujoco_physical import MuJoCoPhysicalPort
+        self._physical_port = MuJoCoPhysicalPort(self, execution)
+        self.physical_control_generation = execution.generation
+
+    def assess_physical_control(self, binding):
+        return self._physical_port.assessment(binding)
+
+    def physical_joint_build_receipt(self, binding):
+        return self._physical_port.joints(binding)
+
+    def physical_body_build_receipt(self, binding):
+        return self._physical_port.body(binding)
+
+    def physical_buffer_policy(self, binding):
+        return self._physical_port.policy(binding)
+
+    def apply_physical_command_batch(self, resolved):
+        return self._physical_port.write(resolved)
+
     def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
         self._mixed_actuator_plan = mixed_actuator_plan
@@ -2726,6 +2749,21 @@ class _MuJoCoSession(_SessionValues):
 
     def step(self):
         self._require_reset()
+        physical_port = getattr(self, '_physical_port', None)
+        if physical_port is not None:
+            if physical_port.pending is None:
+                raise RuntimeError('physical interval requires exactly one fresh batch')
+            try:
+                for _ in range(self._artifact.timebase.control_substeps):
+                    self._data.qfrc_applied[:] = physical_port.pending_values
+                    self._mj.mj_step(self._model, self._data)
+                    self._native_steps += 1
+                self._mj.mj_forward(self._model, self._data)
+                self._control_step += 1
+                self._state_revision += 1
+                return self.snapshot()
+            finally:
+                physical_port.finish_interval()
         if self._mixed_actuator_plan is not None:
             if self._mixed_fault is not None:
                 raise RuntimeError('mixed actuator MuJoCo session is fault-latched')

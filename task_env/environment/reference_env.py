@@ -1388,10 +1388,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
         from .reference_binding import prepare_selected_reset
-        if self.binding.physical_control_profile is not None:
-            # No current Core session implements the physical assessment,
-            # build-mapping and batch-write port. Do not materialize a provider
-            # on a declaration alone; a future adapter must add a real preflight.
+        if self.binding.physical_control_profile is not None and (
+                (self.provider, self.backend) != ('mujoco', 'cpu')
+                or not self.position_profile):
             raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
@@ -1688,6 +1687,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 # later be replaced independently of this live session.
                 self._materialized_position_control_binding = position_binding
                 self._materialized_position_control_selector = select_binding
+                if self.binding.physical_control_profile is not None:
+                    profile = self.binding.physical_control_profile(self)
+                    bind_physical = getattr(self.session, 'bind_physical_control', None)
+                    if not callable(bind_physical):
+                        raise StageUnavailableError('RuntimeSession does not expose a physical-control build port')
+                    bind_physical(profile)
             elif self._mixed_control_candidate:
                 self.position_profile = False
                 self.session = materialize(

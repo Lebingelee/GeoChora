@@ -14,7 +14,9 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ## 需形成的公共体验
 
-4a 开发中的 Position candidate 提供 `panda-direct-effort-v1`、`panda-split-direct-effort-v1`、`panda-direct-effort-wrench-v1` 与 `panda-direct-effort-object-wrench-v1` 物理控制声明；前两项分别由单个或两个 Controller 以 8 个具名输入产生 7 个臂力矩与经静态 tendon 声明分配的两路 finger 力，后两项分别另声明 hand 或静态 peg 的外力输入。模型的零偏置只定义直接力输入，并非 Panda 动力学；静态 peg 的声明不证明自由物体的受力运动。versioned candidate 也可显式携带 `physical_execution`；预检核对 Scene、Artifact、source closure 和状态名称。以上为未接收的构造与 fake 终端证据：当前 Core 尚无实现该端口的 RuntimeSession，选择该声明后 reset 预检会在物化 provider 前明确拒绝；合成映射不能授权会话写入。已有 Position 证据不因此成为 7＋2 effort 实测。
+4a 开发中的 Position candidate 提供 `panda-direct-effort-v1`、`panda-split-direct-effort-v1`、`panda-direct-effort-wrench-v1` 与 `panda-direct-effort-object-wrench-v1` 物理控制声明；前两项分别由单个或两个 Controller 以 8 个具名输入产生 7 个臂力矩与 tendon 声明分配的两路 finger 力，后两项分别另声明 hand 或静态 peg 的外力输入。模型的零偏置只定义直接力输入，并非 Panda 动力学；静态 peg 的声明不证明自由物体的受力运动。versioned candidate 也可显式携带 `physical_execution`；预检核对 Scene、Artifact、source closure 和状态名称。
+
+未接收的 002 recovery 增加了该候选的 MuJoCo CPU physical profile 路线。相同 session 在 native build 后核对名称、轴、actuator 力限／gear、tendon 和 equality，将已准入关节贡献与 hand wrench 合并写入广义力缓冲；position drive 保留，显式完整 PD 与未协调 position drive 仍拒绝。source actuator 力域用于约束声明的 direct contribution；保留的 position drive 可叠加，二者总和不受该 direct contribution 界限保证。2026-11-06 在 source closure `aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47` 完成单 Controller effort、双 Controller effort 和 effort 加 hand wrench 的各一次 5 子步短运行，确认提交与写入回执；ACK 不是力测量，尚未完成 4b 物理效果验证。其他 provider 的 physical reset 仍拒绝；合成映射不能授权真实写入，旧 position 路线保持原身份。
 
 | 操作 | v2.1.1 目标 | 责任与边界 |
 | --- | --- | --- |

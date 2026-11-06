@@ -101,6 +101,117 @@ def test_synthetic_mapping_is_never_native_build_evidence():
             assessment=native, joint_build_receipt=_joint_receipt(plan, context))
 
 
+def test_mujoco_physical_port_rechecks_resolved_values_and_duplicate():
+    """A synthetic port tests rejection only; it is not native evidence."""
+    import numpy as np
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.mujoco_physical import MuJoCoPhysicalPort
+
+    plan, context, effort, _ = _case()
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
+                                   (effort('force-a', 1),), (), ())
+    data = SimpleNamespace(qfrc_applied=np.zeros(1), xfrc_applied=np.zeros((1, 6)))
+    session = SimpleNamespace(_require_open=lambda: None, _require_reset=lambda: None,
+        state_boundary_identity=lambda: context.boundary,
+        snapshot_v2=lambda **kwargs: SimpleNamespace(view=SimpleNamespace(
+            boundary=context.boundary, sample_clock=context.clock)),
+        _artifact=SimpleNamespace(timebase=SimpleNamespace(control_dt=.01)),
+        _data=data, _model=SimpleNamespace(nv=1), provider_materialization_id='material-a')
+    port = object.__new__(MuJoCoPhysicalPort)
+    port.session, port.binding = session, plan.binding
+    port.execution = SimpleNamespace(compiled=plan, scene=plan.scene, generation=1,
+                                      joint_bindings={}, frame_bindings={}, requirements=None)
+    port.dofs, port.bodies = {plan.binding.channels[0].target_key: 0}, {}
+    port.equality_ids = ()
+    port.pending, port.pending_values, port.consumed = None, None, set()
+    admitted = prepare_physical_command_batch(plan, batch, expected_context=context,
+        assessment=port.assessment(plan.binding), joint_build_receipt=port.joints(plan.binding))
+    forged = replace(admitted, joints=(replace(admitted.joints[0], value=2.),))
+    with pytest.raises(ValueError, match='independent session admission'):
+        port.write(forged)
+    assert data.qfrc_applied[0] == 0
+    ack = port.write(admitted)
+    assert ack.stage == 'native_write_ack' and data.qfrc_applied[0] == 1
+    with pytest.raises(ValueError, match='stale, duplicated or already pending'):
+        port.write(admitted)
+    port.finish_interval()
+    assert data.qfrc_applied[0] == 0
+    with pytest.raises(ValueError, match='stale, duplicated or already pending'):
+        port.write(admitted)
+    port.consumed.clear()
+    port.equality_ids = (0,)
+    data.eq_active = np.array([0])
+    with pytest.raises(ValueError, match='equality is not active'):
+        port.write(admitted)
+    assert data.qfrc_applied[0] == 0
+
+
+def test_mujoco_physical_interval_clears_buffer_on_advance_failure():
+    """Exercise the adapter's failure cleanup without a native model."""
+    import numpy as np
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.mujoco import _MuJoCoSession
+    from task_env.runtime.sessions.mujoco_physical import MuJoCoPhysicalPort
+
+    session = object.__new__(_MuJoCoSession)
+    session._require_reset = lambda: None
+    session._artifact = SimpleNamespace(timebase=SimpleNamespace(control_substeps=5))
+    session._model, session._data = object(), SimpleNamespace(qfrc_applied=np.array([1.]))
+    def fail_step(*args):
+        raise RuntimeError('simulated native step failure')
+    session._mj = SimpleNamespace(mj_step=fail_step)
+    port = object.__new__(MuJoCoPhysicalPort)
+    port.session, port.pending, port.pending_values = session, 'boundary', np.array([1.])
+    session._physical_port = port
+    with pytest.raises(RuntimeError, match='simulated native step failure'):
+        session.step()
+    assert session._data.qfrc_applied[0] == 0
+    assert port.pending is None and port.pending_values is None
+
+
+def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
+    """Synthetic compiled layout detects changed source mappings before writing."""
+    import numpy as np
+    from types import SimpleNamespace
+    from task_env.artifacts.state import StateRequirements
+    from task_env.runtime.sessions.mujoco_physical import MuJoCoPhysicalPort
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    original, _, _, _ = _case()
+    binding = replace(original.binding, channels=(replace(original.binding.channels[0], native_drive='position'),))
+    plan = compile_physical_control_binding(original.scene, original.root, original.children, binding)
+    controller = SimpleNamespace(binding=binding, compute=lambda *args: None,
+                                  identity='controller-test', writer_id='controller-a', action_shape=(1,))
+    execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {'arm/drive': object()}, {},
+        StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    source = SimpleNamespace(scene_definition=plan.scene, source_id='source-a',
+        source_closure_digest='b'*64, joints={'arm/drive': 'native-joint'}, free_joints={}, bodies={}, frames={})
+    model = SimpleNamespace(joint=lambda name: SimpleNamespace(id=0), actuator=lambda name: SimpleNamespace(id=0),
+        jnt_type=np.array([3]), jnt_axis=np.array([[0., 0., 1.]]), jnt_dofadr=np.array([0]),
+        actuator_forcelimited=np.array([1]), actuator_forcerange=np.array([[-5., 5.]]),
+        actuator_gear=np.array([[1., 0., 0., 0., 0., 0.]]), actuator_biastype=np.array([1]),
+        actuator_gaintype=np.array([0]), actuator_dyntype=np.array([0]),
+        actuator_gainprm=np.array([[1.]]), actuator_biasprm=np.array([[0., -1., 0.]]),
+        actuator_trntype=np.array([0]), actuator_trnid=np.array([[0, -1]]))
+    mj = SimpleNamespace(mjtJoint=SimpleNamespace(mjJNT_HINGE=3, mjJNT_SLIDE=2),
+        mjtBias=SimpleNamespace(mjBIAS_AFFINE=1), mjtGain=SimpleNamespace(mjGAIN_FIXED=0),
+        mjtDyn=SimpleNamespace(mjDYN_NONE=0), mjtTrn=SimpleNamespace(mjTRN_JOINT=0, mjTRN_TENDON=3))
+    session = SimpleNamespace(_source=source, _artifact=SimpleNamespace(identity_hash='a'*64),
+        _provider='mujoco', _mixed_actuator_plan=None, _model=model, _mj=mj)
+    assert MuJoCoPhysicalPort(session, execution).dofs[binding.channels[0].target_key] == 0
+    model.jnt_axis[0] = (0., 1., 0.)
+    with pytest.raises(ValueError, match='joint axis'):
+        MuJoCoPhysicalPort(session, execution)
+    model.jnt_axis[0] = (0., 0., 1.)
+    model.actuator_gear[0, 0] = 2.
+    with pytest.raises(ValueError, match='range, gear or position drive'):
+        MuJoCoPhysicalPort(session, execution)
+    model.actuator_gear[0, 0] = 1.
+    model.actuator_biasprm[0, 1] = 0.
+    with pytest.raises(ValueError, match='range, gear or position drive'):
+        MuJoCoPhysicalPort(session, execution)
+
+
 @pytest.mark.parametrize('drive', ['position', 'implicit_pd', 'unknown'])
 def test_explicit_pd_rejects_uncoordinated_native_drive(drive):
     original, context, effort, assessment = _case()
@@ -147,6 +258,29 @@ def test_registry_forwards_physical_execution_to_versioned_builder(monkeypatch):
     assert seen[0][1]['physical_execution'] is physical
 
 
+def test_registry_mujoco_selection_requires_physical_profile_and_cpu(monkeypatch, tmp_path):
+    """Routing only: no source construction or provider initialization."""
+    from types import SimpleNamespace
+    from task_env.registry import make_env
+    from task_env.tasks.position_candidate import builder
+
+    sentinel, seen = object(), []
+    def capture(workspace, **kwargs):
+        seen.append((workspace, kwargs))
+        return SimpleNamespace(env=sentinel)
+    monkeypatch.setattr(builder, 'build_position_candidate', capture)
+    config = {'provider': 'mujoco', 'backend': 'cpu',
+              'physical_profile': 'panda-direct-effort-v1', 'source_workspace': tmp_path}
+    assert make_env('panda-position-servo-candidate-v1', config=config) is sentinel
+    assert seen[0][1]['provider'] == 'mujoco'
+    assert seen[0][1]['physical_profile'] == 'panda-direct-effort-v1'
+    with pytest.raises(ValueError, match='admits GeoPhys CPU'):
+        make_env('panda-position-servo-candidate-v1', config={**config, 'physical_profile': None})
+    with pytest.raises(ValueError, match='admits GeoPhys CPU'):
+        make_env('panda-position-servo-candidate-v1', config={**config, 'backend': 'cuda'})
+    assert len(seen) == 1
+
+
 def test_registry_physical_preflight_rejects_foreign_source_before_build(monkeypatch):
     """Actual registry/builder preflight with a substituted input, no provider."""
     from types import SimpleNamespace
@@ -185,9 +319,14 @@ def test_physical_reset_preflight_rejects_before_session_materialization():
     from task_env.environment.types import StageUnavailableError
     env = object.__new__(SelectedReferenceEnv)
     env._closed = False
+    env.provider, env.backend = 'geophys', 'cpu'
     env.binding = SimpleNamespace(physical_control_profile=lambda _env: None)
     env.session = object()
     previous = env.session
+    with pytest.raises(StageUnavailableError, match='physical-control RuntimeSession adapter'):
+        env._prepare_reference_reset()
+    assert env.session is previous
+    env.provider, env.backend, env.position_profile = 'mujoco', 'cpu', False
     with pytest.raises(StageUnavailableError, match='physical-control RuntimeSession adapter'):
         env._prepare_reference_reset()
     assert env.session is previous

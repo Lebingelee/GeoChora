@@ -53,8 +53,6 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         provider = values.get('provider', 'geophys')
         backend = values.get('backend', 'cpu')
         horizon = values.get('horizon', 6000)
-        if provider != 'geophys' or backend != 'cpu':
-            raise ValueError('public Position candidate admits GeoPhys scalar CPU only')
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('Position candidate horizon must be an integer in [1, 6000]')
         camera_config = values.get('camera_observation')
@@ -62,6 +60,9 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if physical_profile not in (None, 'panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
                                      'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1'):
             raise ValueError('unsupported physical control profile')
+        if backend != 'cpu' or (provider != 'geophys' and not (
+                provider == 'mujoco' and physical_profile is not None)):
+            raise ValueError('Position candidate admits GeoPhys CPU, or MuJoCo CPU with a physical profile')
         if physical_profile is not None and camera_config is not None:
             raise ValueError('physical control profile does not admit camera observation')
         if camera_config is not None:
