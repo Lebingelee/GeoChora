@@ -1460,7 +1460,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if (getattr(self, 'position_profile', False) and self.session is not None
                 and self._published_position_typed_state is not None
                 and previous_episode_end is None):
-            previous_episode_end = self.stop('reset')
+            try:
+                previous_episode_end = self.stop('reset')
+            except BaseException as error:
+                if switching:
+                    receipt = getattr(candidate_value.get('source'), 'execution_source_receipt', None)
+                    if receipt is not None:
+                        try:
+                            receipt.close()
+                        except BaseException as cleanup_error:
+                            error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
+                raise
         if switching or getattr(self, 'position_profile', False):
             self._position_episode_end = None
             self._position_controller_switch_fault_receipt = None

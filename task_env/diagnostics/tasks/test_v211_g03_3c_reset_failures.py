@@ -220,3 +220,66 @@ def test_each_target_source_reaches_selected_preflight_without_mutation(monkeypa
     finally:
         env.session=None
         env.close()
+
+
+@pytest.mark.parametrize('provider', ['mujoco','geophys','isaacsim'])
+def test_each_real_source_reaches_its_production_materializer_boundary(monkeypatch,provider):
+    from task_env.runtime.sessions import transport
+    env=make_selected()
+    events=[]
+    env.session=SimpleNamespace(close=lambda:events.append('old closed'))
+    routes={
+        'mujoco': {'physics_provider':'mujoco','physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},
+        'geophys': {'physics_provider':'geophys','physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},
+        'isaacsim': {'physics_provider':'isaacsim','physics_backend':'cuda','physics_device':'cuda:0','deployment':'isolated_worker',
+                     'interpreter':'/home/lly/Program_Files/Geochora/workspace/environments/isaacsim-6.2.0/bin/python',
+                     'source_delivery_manifest':'/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'},
+    }
+    observed=[]
+    def reject_materializer(artifact,execution,**kwargs):
+        observed.append((execution.physics_provider,artifact.identity_hash,kwargs['source'].source_closure_digest))
+        raise RuntimeError('synthetic materializer terminal failure')
+    def reject_worker(*args,**kwargs):
+        payload = kwargs.get('payload', args[1] if len(args)>1 else None)
+        observed.append(('isaacsim',payload['facts']['artifact_identity'],payload['facts']['source_closure']))
+        raise RuntimeError('synthetic worker terminal failure')
+    monkeypatch.setattr('task_env.environment.reference_env.materialize_control',reject_materializer)
+    monkeypatch.setattr(transport,'start_selected_worker',reject_worker)
+    try:
+        with pytest.raises(RuntimeError,match='synthetic .* terminal failure'):
+            env.reset(seed=31,options={'execution':routes[provider]})
+        assert events==['old closed'] and len(observed)==1 and observed[0][0]==provider
+        assert len(observed[0][1])==len(observed[0][2])==64
+        assert env.execution_fault.phase=='session_materialization'
+        assert env.reset_failure_receipt['previous_session_close_completed']
+        assert env.reset_failure_receipt['replacement_materialization_attempted']
+        assert not env.reset_failure_receipt['reset_write_attempted']
+    finally:
+        env.close()
+
+
+def test_failed_old_position_stop_releases_candidate_source(monkeypatch):
+    from task_env.runtime.sessions import provenance
+    env=make_selected()
+    old=SimpleNamespace(close=lambda:pytest.fail('old session must not be closed'))
+    env.session=old
+    env.position_profile=True
+    env._published_position_typed_state=object()
+    seen=[]
+    original=provenance.preflight_selected_deployment
+    def capture(*args,**kwargs):
+        seen.append(kwargs['source'].execution_source_receipt)
+        return original(*args,**kwargs)
+    monkeypatch.setattr(provenance,'preflight_selected_deployment',capture)
+    monkeypatch.setattr(env,'stop',lambda reason: (_ for _ in ()).throw(RuntimeError('synthetic stop failure')))
+    try:
+        with pytest.raises(RuntimeError,match='synthetic stop failure'):
+            env.reset(seed=31)
+        assert env.session is old and len(seen)==1
+        assert not seen[0].snapshot_root.exists()
+        assert not hasattr(env,'_switch_rng_state')
+    finally:
+        env.session=None
+        env._published_position_typed_state=None
+        env._published_position_state=None
+        env.close()
