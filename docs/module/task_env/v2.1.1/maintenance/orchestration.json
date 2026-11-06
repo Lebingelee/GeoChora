@@ -1079,7 +1079,7 @@
             "gpu_starts": 0,
             "source_parsing": "bounded pure source under dual locks, 30 min"
           },
-          "last_observation": "2026-11-06 Sol independently reviewed recovery: 530 manifest members matched; 4 selected guarded pure/fake tests passed; separate fake interval probe confirmed the session holds the initial wrench projection as configuration changes. 4a not accepted; A05 MuJoCo submission/write ACK evidence remains bounded and reusable.",
+          "last_observation": "2026-11-06 additional read-only Sol review found A05 candidate and 4b hand plan differ in force frame and moment reference; a guarded pure arithmetic probe confirms distinct moments. GeoPhys/Isaac new physical profiles remain unimplemented or unverified, not shown to share the MuJoCo port defect. 4a remains unaccepted at count 2.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/report.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002/case-matrix.md",
@@ -1087,7 +1087,8 @@
             "reviews/20261106_4a_attempt002_sol_reassessment.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/report.md",
             "../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/4b-plan.md",
-            "reviews/20261106_4a_attempt002_recovery_sol_review.md"
+            "reviews/20261106_4a_attempt002_recovery_sol_review.md",
+            "reviews/20261106_4a_wrench_cross_backend_followup.md"
           ],
           "commits": [
             "0e229a72b306938d545e0c10a7939f8f2548abe1",
@@ -1104,7 +1105,8 @@
           },
           "blockers": [
             "MuJoCo physical adapter projects body wrench only once then repeats the initial generalized force across changing substeps while advertising body-frame/point and hold support; fix or safely reject unsupported semantics.",
-            "4b conditional candidate plan remains unapproved; provider APIs and model/force readers still require future implementation and preflight."
+            "4b conditional candidate plan remains unapproved; provider APIs and model/force readers still require future implementation and preflight.",
+            "A05 candidate and proposed 4b hand scenario use different force frame and moment reference; prevent treating native05 as the planned offset-force case, and freeze explicit input semantics."
           ],
           "continuation": {
             "package_id": "V211_G04_4a_attempt002_recovery",
