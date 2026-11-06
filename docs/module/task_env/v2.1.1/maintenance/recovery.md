@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5a 经独立主审有界接收
+## 当前：G05 5b attempt001 独立主审，需返工
+
+[5b attempt001 主审](reviews/20261107_5b_attempt001_sol_review.md)决定 `REWORK_REQUIRED_5B`，count=1。MuJoCo 窗口和 RGB 的独立图像/颜色证据未闭合；GeoPhys 所测 camera clipping/生产路线未闭合；Isaac renderer-facing 状态与公开 physics state 不一致，window/RGB 被拒。真实失败、部分证据和先前 5a 有界接收保留；5c 仍 PLANNED。准备返工包不消耗 attempt，不自动派发或进入阶段6。
+
+## 历史：G05 5a 经独立主审有界接收
 
 [5a attempt002 主审](reviews/20261107_5a_attempt002_sol_review.md)决定 `ACCEPTED_BOUNDED_5A_RENDER_BINDING`，普通 count=2。真实范围为单 Env PickCube、MuJoCo CPU 与 renderer-only 模型，001 的返工历史和原始证据保留；窗口/RGB、同步 observation、renderer 切换、GeoPhys/Isaac native 与 cross 均未验证。5b/5c 为 PLANNED、count=0，后续工作包需明确授权并由维护者手动转发；不自动进入阶段6或发布。
 
