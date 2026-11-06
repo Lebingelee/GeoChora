@@ -2140,10 +2140,75 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             info['execution_configuration_v1'] = self.get_execution_receipt()
         return observation, info, evaluation
 
+    def bind_visual_state(self, camera):
+        """Bind an independent MuJoCo visual model to the latest published state.
+
+        Explicit update is separate from task RGB and never advances physics.
+        This bounded route is available after a MuJoCo CPU Position reset.
+        """
+        self._episode_execution_state().require_open('environment is closed')
+        if (self.provider, self.backend) != ('mujoco', 'cpu') or not getattr(self, 'position_profile', False):
+            raise ValueError('visual binding requires a MuJoCo CPU Position publication')
+        publication = self._published_position_typed_state
+        if publication is None or self._execution_fault is not None:
+            raise RuntimeError('visual binding requires a successfully published state')
+        if getattr(self, '_visual_state_session', None) is not None:
+            raise RuntimeError('visual state is already bound; reset or close first')
+        from ..artifacts import ExecutionSpecV1, RendererSelectionV1
+        from ..render.camera import (DynamicCameraRenderSourceV2, V211_DYNAMIC_PROFILE,
+                                     V211_PHYSICS_PROFILE, create_dynamic_camera_session)
+        source = DynamicCameraRenderSourceV2.from_runtime_source(
+            self.value['source'], artifact=self.artifact, joint_bindings=self.position_joint_bindings,
+            frame_bindings=self.position_frame_bindings)
+        selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl',
+                                        V211_DYNAMIC_PROFILE, None)
+        execution = ExecutionSpecV1('execution-spec-v1', 'mujoco', 'cpu', V211_PHYSICS_PROFILE,
+                                    self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
+        session = create_dynamic_camera_session(camera, execution, source=source,
+                                                initial_state=publication.view)
+        self._visual_state_session = session
+        return session.last_sync
+
+    def sync_visual_state(self):
+        """Consume the latest successful Env publication without advancing it."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        publication = self._published_position_typed_state
+        if session is None or publication is None or self._execution_fault is not None:
+            raise RuntimeError('visual state binding and published boundary are required')
+        return session.sync_state(publication.view)
+
+    def visual_model_info(self):
+        """Describe the currently bound renderer-only visual model."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            raise RuntimeError('visual state is not bound')
+        return session.visual_model_info()
+
+    def visual_body_pose(self, entity_id, frame_id):
+        """Read an owned renderer body-origin world pose for a bound Frame."""
+        self._episode_execution_state().require_open('environment is closed')
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            raise RuntimeError('visual state is not bound')
+        return session.visual_body_pose(entity_id, frame_id)
+
     def _close_camera_consumer(self):
         consumer, self._camera_consumer = self._camera_consumer, None
-        if consumer is not None:
-            consumer.close()
+        visual, self._visual_state_session = getattr(self, '_visual_state_session', None), None
+        first = None
+        for resource in (consumer, visual):
+            if resource is not None:
+                try:
+                    resource.close()
+                except BaseException as error:
+                    if first is None:
+                        first = error
+                    else:
+                        first.add_note(f'visual cleanup also failed: {error!r}')
+        if first is not None:
+            raise first
 
     def step(self, action):
         component_lifecycle = None

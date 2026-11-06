@@ -69,3 +69,10 @@ MuJoCo 的独立版本化自由体和 Robot hand fixture 分别验证实际外�
 MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=True`，在 `reset(options={'controller': 'r3-pose'})` 或 `'joint'` 时选择控制器；需要调节参数时可用 `{'controller': {'kind': 'joint', 'parameters': {'kp': 120.0}}}`。`physical_action_spec()` 返回当前输入语义、参数、身份和 generation；用 `bind_physical_action(values)` 生成该 episode 的输入并交给 `step`。旧 episode 的输入即使 shape 相同也会拒绝。`action_space_policy='fixed_semantic'` 在破坏已有 session 前拒绝不同语义；这个候选是单环境标量接口，不承诺原生 batch。
 
 `reset_for_solution` / `step_with_solution` 可将既有 PickCube Solution 的绝对位姿送入 R3 reference 和具名关节 effort。该路线使用对应 MuJoCo source 的状态相关质量矩阵与 bias、禁用原生 position drive，并复用 Generic H5 v3 Recorder；记录的 ACK 和 admitted effort 不等于独立测力。seed 31 原任务成功和 A→B→A 证据经[独立主审](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)有界接收，不扩展为其他 seed、source 或后端资格。任务 profile 将 MJCF actuator8 编写的 ±5 N 运行时配置为 ±10 N，与原 2c 任务配置一致；该成功不证明 ±5 N 条件。详情见 [4c 计划](../planning/stage4-4c-attempt001.md)和该 attempt 的 ignored 原始证据。
+
+<a id="visual-state-binding"></a>
+## 5a 显式 visual-state 绑定（待独立主审）
+
+`pickcube-physical-candidate-v1` 的 MuJoCo CPU Position 路线成功 reset 后，可将 `CameraGeometry` 交给 `env.bind_visual_state(camera)`，再用 `env.sync_visual_state()` 消费最新已发布的 typed boundary。`env.visual_model_info()` 返回 source closure、具名几何／材质／相机／灯光、renderer-only 所有权和限制；`env.visual_body_pose(entity_id, frame_id)` 返回拥有的 body-origin world pose 副本。这个显式入口属于已有 Env 和 camera owner，独立 visual model 只复制 CPU 状态并运行同步 kinematics，不调用 physics step 或 Controller。reset／close 清理自有 renderer；不转移 physics 所有权。
+
+此候选要求同一 Scene／Artifact／source closure 的具名 scalar Joint、floating Joint 和 Frame；floating body 使用米、右手系、world body origin、wxyz，四元数正负等价。重复、缺失、错来源、stale 或不支持的变形表示拒绝。该接口是 binding-only：构造用的 camera geometry 不构成 RGB 请求；对该 profile 的 capture 明确拒绝，RGB 能力为 unknown。普通旧 camera 路径、state-only 默认和旧 codec 保持原语义。当前证据仅覆盖 seed 31、MuJoCo 3.8.1 CPU、同一 PickCube source、单 Env 的两次边界；结果待 Sol 主审，不宣称窗口、正式离屏 RGB、同步 observation、renderer 切换或 GeoPhys／Isaac／cross 支持。runtime finger cap ±10 N 与 source ±5 N 的既有边界不变。

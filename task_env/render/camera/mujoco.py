@@ -14,7 +14,7 @@ from ...observations.canonical_camera.images import (
 from .source import (
     DynamicCameraRenderSourceV1,
     RenderStateProjectionV1,
-    RenderStateSyncReceiptV1,
+    RenderStateSyncReceiptV1, RenderStateSyncReceiptV2,
     RenderVisualInstanceBindingV1,
     project_render_state_v1,
 )
@@ -210,6 +210,22 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             world = root.find('worldbody')
             if world is None:
                 raise ValueError('D03 render source lacks the existing MJCF worldbody')
+            if source.schema_version == 'camera-dynamic-source-v2':
+                # Generate stable names at lowering time, before native IDs exist.
+                # They are scoped by the source/geometry identity, not inferred
+                # from physics ordinals. Existing authored names remain intact.
+                if any(node.tag in {'flex', 'flexcomp', 'composite', 'skin'} for node in root.iter()):
+                    raise ValueError('deformable visual representations are unsupported')
+                existing = {node.get('name') for node in root.iter('geom') if node.get('name')}
+                for index, geom in enumerate(world.iter('geom')):
+                    if geom.get('name') is None:
+                        name = f'geochora_v211_geom_{index}'
+                        if name in existing:
+                            raise ValueError('generated visual geometry name collides with source')
+                        geom.set('name', name)
+                        existing.add(name)
+            self._source_camera_names = tuple(node.get('name') or 'unnamed' for node in world.iter('camera'))
+            self._source_light_names = tuple(node.get('name') or 'unnamed' for node in world.iter('light'))
             self._native_camera_name = 'geochora_d03_camera'
             if any(node.get('name') == self._native_camera_name for node in root.iter('camera')):
                 raise ValueError('D03 renderer camera name collides with the materialized source')
@@ -237,6 +253,7 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             self._camera_index = self._model.camera(self._native_camera_name).id
             self._joint_qpos_addresses = self._resolve_joint_addresses()
             self._body_ids = self._resolve_body_ids()
+            self._free_qpos_addresses = self._resolve_free_addresses()
             self._visual_instance_bindings = self._resolve_visual_instances()
             if self._entity_segmentation_enabled:
                 frame_body_bindings = tuple(
@@ -258,9 +275,12 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             if initial_projection.geometry_version != source.geometry_version:
                 raise ValueError('initial render projection uses another geometry version')
             self._consume_projection(initial_projection)
-        except Exception:
+        except BaseException as error:
             if self._renderer is not None:
-                self._renderer.close()
+                try:
+                    self._renderer.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'renderer cleanup also failed: {cleanup_error!r}')
             self._renderer = self._model = self._data = None
             self._closed = True
             raise
@@ -312,6 +332,20 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             addresses[(binding.entity_id, binding.joint_id)] = int(self._model.jnt_qposadr[joint_id])
         return addresses
 
+    def _resolve_free_addresses(self):
+        result = {}
+        for entity, joint, native, frame_entity, frame_id in getattr(self._source, 'free_bindings', ()):
+            joint_id = int(self._model.joint(native).id)
+            body_id = self._body_ids[(frame_entity, frame_id)]
+            if (int(self._model.jnt_type[joint_id]) != int(self._mj.mjtJoint.mjJNT_FREE)
+                    or int(self._model.jnt_bodyid[joint_id]) != body_id
+                    or int(self._model.body_parentid[body_id]) != 0):
+                raise ValueError('free Joint must bind its named world-child body origin')
+            result[(frame_entity, frame_id)] = int(self._model.jnt_qposadr[joint_id])
+        if len(result) != len(getattr(self._source, 'free_bindings', ())):
+            raise ValueError('multiple free Joints cannot own the same render body')
+        return result
+
     def _resolve_body_ids(self):
         return {
             (binding.entity_id, binding.frame_id): int(self._model.body(binding.native_body_name).id)
@@ -342,6 +376,50 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             ))
         return tuple(result)
 
+    def capture(self, state):
+        if self._source.schema_version == 'camera-dynamic-source-v2':
+            raise RuntimeError('v211 visual binding does not admit RGB capture')
+        return super().capture(state)
+
+    def visual_model_info(self):
+        """Describe renderer-owned model resources without exposing native handles."""
+        if self._closed:
+            raise RuntimeError('camera session is closed')
+        def names(kind, count):
+            return tuple(self._mj.mj_id2name(self._model, kind, i) or f'unnamed#{i}' for i in range(count))
+        return {
+            'ownership': 'renderer-only model/data/context; physics not borrowed',
+            'device_policy': 'CPU state copied to renderer-owned qpos; synchronous kinematics',
+            'geometry_version': self._source.geometry_version,
+            'source_closure_digest': self._source.source_closure_digest,
+            'geometries': names(self._mj.mjtObj.mjOBJ_GEOM, self._model.ngeom),
+            'materials': names(self._mj.mjtObj.mjOBJ_MATERIAL, self._model.nmat),
+            'cameras': names(self._mj.mjtObj.mjOBJ_CAMERA, self._model.ncam),
+            'lights': names(self._mj.mjtObj.mjOBJ_LIGHT, self._model.nlight),
+            'source_camera_names': self._source_camera_names,
+            'source_light_names': self._source_light_names,
+            'added_camera': self._native_camera_name,
+            'added_fallback_light': not self._source_light_names,
+            'geometry_materials': tuple({
+                'geometry': self._mj.mj_id2name(self._model, self._mj.mjtObj.mjOBJ_GEOM, i) or f'unnamed#{i}',
+                'material': (None if int(self._model.geom_matid[i]) < 0 else
+                             self._mj.mj_id2name(self._model, self._mj.mjtObj.mjOBJ_MATERIAL,
+                                                 int(self._model.geom_matid[i]))),
+                'rgba': tuple(float(x) for x in self._model.geom_rgba[i]),
+            } for i in range(self._model.ngeom)),
+            'visual_bindings': tuple(item.to_mapping() for item in self._visual_instance_bindings),
+            'limitations': ('rigid bodies only', 'no solver step', 'no async/shared state',
+                            'camera output not qualified by visual binding'),
+        }
+
+    def visual_body_pose(self, entity_id, frame_id):
+        """Return an owned world body-origin pose from renderer-only kinematics."""
+        if self._closed:
+            raise RuntimeError('camera session is closed')
+        body_id = self._body_ids[(entity_id, frame_id)]
+        return (tuple(float(x) for x in self._data.xpos[body_id]),
+                tuple(float(x) for x in self._data.xquat[body_id]))
+
     def sync_state(self, state):
         if self._closed:
             raise RuntimeError('camera session is closed')
@@ -360,6 +438,13 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         episode_transition = episode_key != self._active_episode_key
         if not episode_transition and materialization != self._materialization_identity:
             raise ValueError('dynamic camera refused state from another provider materialization')
+        if previous is not None and self._source.schema_version == 'camera-dynamic-source-v2':
+            if materialization != self._materialization_identity:
+                raise ValueError('visual binding refused another provider materialization')
+            if not episode_transition and projection.publication_version != previous.publication_version:
+                if (boundary.state_revision <= previous.state_boundary.state_revision
+                        or projection.sample_clock.simulation_time_s < previous.sample_clock.simulation_time_s):
+                    raise ValueError('visual binding refused stale state revision or clock')
         if previous is not None:
             if episode_transition:
                 if episode_key in self._seen_episode_keys:
@@ -381,27 +466,37 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         transforms_updated = previous is None or projection.transform_version != previous.transform_version
         old_qpos = self._data.qpos.copy() if transforms_updated else None
         old_time = float(self._data.time) if transforms_updated else None
-        if transforms_updated:
-            for entity_id, joint_id, _native_name, position in projection.joint_positions:
-                address = self._joint_qpos_addresses[(entity_id, joint_id)]
-                self._data.qpos[address] = position
-            self._data.time = float(projection.sample_clock.simulation_time_s)
-            self._mj.mj_kinematics(self._model, self._data)
         try:
-            position_error, quaternion_error = self._validate_frame_poses(projection)
-        except Exception:
             if transforms_updated:
-                self._data.qpos[:] = old_qpos
-                self._data.time = old_time
+                for entity_id, joint_id, _native_name, position in projection.joint_positions:
+                    address = self._joint_qpos_addresses[(entity_id, joint_id)]
+                    self._data.qpos[address] = position
+                poses = {(entity, frame): (position, quaternion)
+                         for entity, frame, _native, position, quaternion in projection.frame_poses}
+                for key, address in self._free_qpos_addresses.items():
+                    position, quaternion = poses[key]
+                    self._data.qpos[address:address + 7] = (*position, *quaternion)
+                self._data.time = float(projection.sample_clock.simulation_time_s)
                 self._mj.mj_kinematics(self._model, self._data)
+            position_error, quaternion_error = self._validate_frame_poses(projection)
+        except BaseException as error:
+            if transforms_updated:
+                try:
+                    self._data.qpos[:] = old_qpos
+                    self._data.time = old_time
+                    self._mj.mj_kinematics(self._model, self._data)
+                except BaseException as cleanup_error:
+                    error.add_note(f'renderer state restoration also failed: {cleanup_error!r}')
             raise
         if episode_transition:
             self._seen_episode_keys.add(episode_key)
             self._active_episode_key = episode_key
             self._materialization_identity = materialization
         self._last_projection = projection
-        self._last_sync = RenderStateSyncReceiptV1(
-            'render-state-sync-receipt-v1', self._consumer_id,
+        receipt_type = RenderStateSyncReceiptV2 if self._source.schema_version == 'camera-dynamic-source-v2' else RenderStateSyncReceiptV1
+        receipt_version = 'render-state-sync-receipt-v2' if receipt_type is RenderStateSyncReceiptV2 else 'render-state-sync-receipt-v1'
+        self._last_sync = receipt_type(
+            receipt_version, self._consumer_id,
             projection.source_identity_hash, projection.geometry_version,
             projection.publication_version, projection.transform_version,
             projection.state_boundary, projection.sample_clock,
@@ -426,8 +521,9 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             )
             maximum_position_error = max(maximum_position_error, position_error)
             maximum_quaternion_error = max(maximum_quaternion_error, quaternion_error)
-            if (position_error > D03_FRAME_POSITION_ATOL_M
-                    or quaternion_error > D03_FRAME_QUATERNION_SIGN_INVARIANT_L2_ATOL):
+            position_limit = 1e-5 if self._source.schema_version == 'camera-dynamic-source-v2' else D03_FRAME_POSITION_ATOL_M
+            quaternion_limit = 1e-5 if self._source.schema_version == 'camera-dynamic-source-v2' else D03_FRAME_QUATERNION_SIGN_INVARIANT_L2_ATOL
+            if position_error > position_limit or quaternion_error > quaternion_limit:
                 raise ValueError(
                     f'D03 renderer Frame pose disagrees with Canonical State for '
                     f'{entity_id}/{frame_id} -> {native_body}: '
@@ -581,6 +677,8 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
 
     def close(self):
         if not self._closed:
-            self._renderer.close()
-            self._renderer = self._model = self._data = None
+            renderer, self._renderer = self._renderer, None
+            self._model = self._data = None
             self._closed = True
+            if renderer is not None:
+                renderer.close()
