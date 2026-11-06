@@ -1,0 +1,11 @@
+# G03 3b ordinary attempt003 — execution report
+
+Technical result: `THREE_B_TECHNICAL_PASS_REVISED_N08_V2`; independent Sol review remains pending. Input Core `d27c5d6c8e12f0835b8e3fc56040971b6d41166f`; GeoPhys `dc2685e28c6c916fb6403a2342c04e0d2520aef7`. Final Core HEAD is the commit containing this report. Attempt count remains 3. The 3c package has not started at this commit.
+
+The GeoPhys public effective-model snapshot and Core consumer are implemented; required source/native model, reset, constraint, production rejection, 10-transition recordings and readers are documented in the ignored execution output. Final affected regression: 79 passed. Isaac real 6.2 recordings were made at Core `076c751f`; later commits did not affect that route. Real 6.1 App was not run. Original N08 remains FAIL; revised direction response passes with matched runs.
+
+Final Panda MuJoCo Nut hold covers 350 transitions / 351 boundaries: maximum TCP height error 1.42037e-8 m; first-substep output versus calculated gravity support differs by at most 5.95632e-6 N m; no clipping. All 1,850 recorded contribution receipts across three gravity runs were checked. These are provider actuator outputs, not a TaskEnv force sensor.
+
+Per Sol's 2026-11-06 clarification relayed by the maintainer, N09 is assessed at all 11 published boundaries and G01 at all 351 published boundaries; geometry evidence supports the precondition only over recorded boundaries and corresponding reconstruction. Unobserved cube/external-object substep poses and contacts do not prove continuous-time no-contact. G02–G04 and N07 retain their specified substep checks. General assembly-tree compensation is future work, not part of this bounded implementation.
+
+Original window: 02:25:44–06:25:44 +08 on 2026-11-06. Maintainer authorized report, document commit, release and binding after the deadline, with no additional old-window implementation or native validation. Actual completion and post-deadline duration are in `workspace/maintenance/v211_g03_3b_attempt003/final-state.json`; waiting and resource limitations are not erased. Detailed results, H5/reader identities, numeric results, known deviations, resource accounting and release receipt are in that ignored output directory.

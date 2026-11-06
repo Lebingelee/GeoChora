@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B003_3C001_PREPARED_CONDITIONAL_SERIES",
+  "status": "G03_3B_REPORTED_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,26 +30,13 @@
   },
   "active_packages": [],
   "next_candidate": {
-    "substage": "3b",
-    "status": "PREPARED_NOT_DISPATCHED",
-    "package_id": "V211_G03_3b_attempt003",
-    "attempt_count_now": 2,
-    "attempt_planned": 3,
-    "assigned_agent": "Terra, maintainer-designated same execution conversation",
-    "target_thread": null,
-    "planning_ref": "../planning/stage3-3b-attempt003-reassessment.md",
-    "sol_review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3b_attempt003",
-    "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle",
-    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/prompt.md",
-    "input_head_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/input-snapshot.json",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/manifest.json",
-    "manifest_digest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/manifest.sha256",
-    "expected_active_minutes": "120-180",
-    "total_wall_minutes": 240,
-    "assignment": "Maintainer manually forwards complete dual bundle. Last ordinary3b attempt; all required technical gates pass before conditional3c. Sol reviews both independently after serial implementation."
+    "substage": "3c",
+    "status": "CONDITIONAL_BIND_PENDING",
+    "package_id": "V211_G03_3c_attempt001",
+    "attempt_count_now": 0,
+    "attempt_planned": 1
   },
-  "next_action": "Maintainer manually forwards dual bundle to Terra. Preparation spends no attempt. 3b ordinary003 must technically pass all revised prospective gates and release before binding/start of conditional3c001; both await independent Sol review afterward. No automatic dispatch or stage4.",
+  "next_action": "Bind released 3b technical result to 3c actual input, verify package, then start 3c attempt001; both await independent Sol review.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -841,8 +828,8 @@
           "dependencies": [
             "3a"
           ],
-          "status": "REWORK_REQUIRED_3B",
-          "attempt_count": 2,
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 3,
           "attempts": [
             {
               "attempt": 1,
@@ -885,6 +872,21 @@
                 "production launcher context and F06 T+1 measured-state recording repair",
                 "source-bound Panda MuJoCo CPU gravity calculation and final short public-loop behavior"
               ]
+            },
+            {
+              "attempt": 3,
+              "package_id": "V211_G03_3b_attempt003",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-06T02:25:44.233948+08:00",
+              "executor": "Terra thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
+              "input_head": "d27c5d6c8e12f0835b8e3fc56040971b6d41166f",
+              "result": "THREE_B_TECHNICAL_PASS_REVISED_N08_V2",
+              "provider_commit": "dc2685e28c6c916fb6403a2342c04e0d2520aef7",
+              "report_ref": "reviews/20261106_3b_attempt003_execution.md",
+              "writer_ownership": "released at final documentation commit",
+              "native_ownership": "released after recorded runs",
+              "sol_acceptance": "PENDING_SOL_REVIEW",
+              "closeout_after_original_deadline": true
             }
           ],
           "assigned_agent": null,
@@ -894,7 +896,7 @@
           "output_head": "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Sol independently confirmed no matched MuJoCo TCP regression; final gravity-on PickCube/Nut short loops rise without clipping. Bounded fixes accepted; final gravity recording/steady run and required physical/reset/constraint/rejection evidence remain incomplete. Generic assembly-tree selection is a future extension, not a new 3b blocker.",
+          "last_observation": "Technical evidence complete within the clarified N09/G01 published-boundary scope; final report and release after original deadline under maintainer authorization. Sol independent review pending.",
           "evidence_refs": [
             "reviews/20261105_3b_attempt001_execution.md",
             "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md",
@@ -902,7 +904,8 @@
             "../planning/stage3-3b-rework-analysis.md",
             "reviews/20261105_3b_attempt002_execution.md",
             "reviews/20261106_3b_attempt002_sol_review.md",
-            "../planning/gravity-compensation-assembly-tree.md"
+            "../planning/gravity-compensation-assembly-tree.md",
+            "reviews/20261106_3b_attempt003_execution.md"
           ],
           "commits": [
             "d5731655",
@@ -921,12 +924,7 @@
             "scope": "Matched MuJoCo old/current no-regression finding, launcher/F06 recording fix, and bounded final Panda gravity-on short behavior accepted; required remainder unresolved. Original N08 failures immutable.",
             "qualification": false
           },
-          "blockers": [
-            "Required solver-effective model readback lacks an established GeoPhys public contract on the inspected route; finalize upstream/Core ownership before final attempt",
-            "Some required model/reset/constraint and missing API/schema/DOF rejection evidence remains incomplete",
-            "Final bounded Panda gravity same-run H5 and final steady-state verification incomplete",
-            "Freeze independently justified direction-response cases separately from hold/accuracy; retain original N08 FAIL history"
-          ],
+          "blockers": [],
           "prepared_package": {
             "package_id": "V211_G03_3b_attempt003",
             "status": "PREPARED_NOT_DISPATCHED",

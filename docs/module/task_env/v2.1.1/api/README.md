@@ -35,3 +35,7 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 ## Panda 重力选项（待独立复审）
 
 selected 构造的 `controller.gravity_compensation` 是可选布尔值，默认关闭；当前开启仅支持 MuJoCo CPU 进程内的 PickCube／NutAssembly 位置驱动，其他选择拒绝。详细来源、实际执行回执和限幅语义见[重力补偿指南](../guides/panda-gravity-compensation.md)。
+
+MuJoCo／GeoPhys 旧 selected CPU RuntimeSession 的 `snapshot_free_joint_native_v1()` 返回当前边界具名自由关节位置与速度的拥有值副本，含 sample、materialization、时间、单位和速度坐标约定；它不推进物理。该接口不提供力传感数据；基于 USD 的 body-COM 原生读回使用既有 `snapshot_v1` 投影。
+
+GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `RigidSolver.read_model_snapshot()`，从该次物化的有效字段复制 body、joint、actuator、equality 和 tendon 值；session build facts 将 provider ID 绑定到同一来源名称。该快照不推进物理，缺失字段明确标注 unavailable。Isaac F06 另保存同一 bootstrap 边界的公开 Jacobian 和 tensor 连杆姿态，供轴方向与来源独立比较；读取前后物理计数必须一致。这些只读事实不构成跨 provider 功能认证。
