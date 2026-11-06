@@ -23,6 +23,22 @@ def _same(a, b):
     return bool(np.allclose(a, b, rtol=0, atol=1e-12))
 
 
+def preflight_physical_mujoco(execution, artifact, source):
+    """Reject foreign declarations or missing dependency before materialization."""
+    from importlib import metadata
+    from ...environment.types import StageUnavailableError
+    if type(execution) is not PhysicalControlExecutionV1:
+        raise TypeError('physical session requires an exact execution profile')
+    execution.validate_source(scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+    try:
+        version = metadata.version('mujoco')
+    except metadata.PackageNotFoundError as error:
+        raise StageUnavailableError('physical MuJoCo dependency is unavailable') from error
+    if version != '3.8.1':
+        raise StageUnavailableError('physical MuJoCo route requires the checked 3.8.1 dependency')
+
+
 class MuJoCoPhysicalPort:
     """One materialization's checked named mapping and single batch authority."""
 

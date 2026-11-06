@@ -1392,6 +1392,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 (self.provider, self.backend) != ('mujoco', 'cpu')
                 or not self.position_profile):
             raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented')
+        if self.binding.physical_control_profile is not None:
+            from ..runtime.sessions.mujoco_physical import preflight_physical_mujoco
+            preflight_physical_mujoco(self.binding.physical_control_profile(self),
+                                      self.artifact, self.value['source'])
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         switch_candidate = None

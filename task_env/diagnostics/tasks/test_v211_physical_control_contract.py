@@ -212,6 +212,32 @@ def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
         MuJoCoPhysicalPort(session, execution)
 
 
+def test_mujoco_physical_preflight_rejects_missing_or_wrong_dependency(monkeypatch):
+    """Preflight checks dependency metadata without importing the native SDK."""
+    from importlib import metadata
+    from types import SimpleNamespace
+    from task_env.environment.types import StageUnavailableError
+    from task_env.runtime.sessions.mujoco_physical import preflight_physical_mujoco
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    execution = object.__new__(PhysicalControlExecutionV1)
+    calls = []
+    monkeypatch.setattr(PhysicalControlExecutionV1, 'validate_source', lambda self, **kwargs: calls.append(kwargs))
+    artifact = SimpleNamespace(identity_hash='a'*64)
+    source = SimpleNamespace(scene_definition=object(), source_id='source-a', source_closure_digest='b'*64)
+    monkeypatch.setattr(metadata, 'version', lambda name: '3.8.1')
+    preflight_physical_mujoco(execution, artifact, source)
+    assert calls[-1]['source'] is source
+    monkeypatch.setattr(metadata, 'version', lambda name: '9.0')
+    with pytest.raises(StageUnavailableError, match='3.8.1'):
+        preflight_physical_mujoco(execution, artifact, source)
+    def absent(name):
+        raise metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(metadata, 'version', absent)
+    with pytest.raises(StageUnavailableError, match='dependency is unavailable'):
+        preflight_physical_mujoco(execution, artifact, source)
+
+
 @pytest.mark.parametrize('drive', ['position', 'implicit_pd', 'unknown'])
 def test_explicit_pd_rejects_uncoordinated_native_drive(drive):
     original, context, effort, assessment = _case()
