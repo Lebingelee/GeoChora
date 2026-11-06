@@ -2,13 +2,13 @@
 
 ## 当前：4a 有界接收，4b 等待维护者安排
 
-G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。三后端实际 7＋2、普通物体／Robot body 外力物理验证与 Recorder 留 4b；Controller reset 和迁移后 PickCube 成功留 4c。4b/4c 为 PLANNED、attempt0；[4a复盘及4b准备经验](20261106_4a_retrospective_for_4b.md)已记录，本轮未建立4b prompt，不自动派包或运行 native。
+G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。4b attempt001 已交付三后端 effort 和普通物体／Robot body 外力候选，Sol [主审](reviews/20261106_4b_attempt001_sol_review.md)因部分实验与最终代码的具体影响关系尚待说明而暂不整体接收；count=1，维护者要求 [attempt002](../planning/stage4-4b-attempt002.md)优先复用证据、完成收尾。active Recorder 物理路线仍有边界；Controller reset 和迁移后 PickCube 成功留 4c，尚未启动。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
 3c经[Sol独立复审](reviews/20261106_3c_attempt001_sol_review.md)接收为ACCEPTED_BOUNDED_3C_RESET_REBUILD，count=1，不需002。五段同一Env链、固定观测／Core流、旧输入拒绝、故障恢复和逐episode H5均满足冻结出口；仅覆盖显式PickCube profile及四条声明边。3a、[3b](reviews/20261106_3b_attempt003_sol_review.md)及3c各自有界接收，G03限定范围收尾，原N08 FAIL保留。6.1辅助App启动／版本成立但close超时，完整兼容未通过。active_packages=[]；等待维护者后续安排，不自动进入阶段4或push／merge／tag。
 
-后续规划重评（维护者已采纳本规划）：[装配Panda](../planning/stage4-assembled-panda.md)是本版附加集成用例，原G04完整主线／出口恢复；建议4b稳定后早检查、7a两任务Solution完整收口，原G04接收不以该用例四交集齐全为前置。新类在robot目录、配置选择、空载精度和现有夹爪／Solution复用、不做物性等价的需求均保留。4a–4c仍PLANNED／attempt0，无已派包；当前代码仍未实现新Robot或通用子树补偿。
+后续规划重评（维护者已采纳本规划）：[装配Panda](../planning/stage4-assembled-panda.md)是本版附加集成用例，原G04完整主线／出口恢复；建议4b稳定后早检查、7a两任务Solution完整收口，原G04接收不以该用例四交集齐全为前置。新类在robot目录、配置选择、空载精度和现有夹爪／Solution复用、不做物性等价的需求均保留。上述计划采纳当时的 4a–4c 为 PLANNED／attempt0；当前进展以本页顶部和编排索引为准。当前代码仍未实现新Robot或通用子树补偿。
 
 人工交接入口：[阶段3收尾与G04 Sol交接](20261106_stage3_closeout_stage4_sol_handoff.md)。准确HEAD、保护输入、必读Skill和故障处理经验在维护者工作区handoffs/V211_G04_sol_handoff；新Sol先读其README全文，不重开旧前置或G02。
 

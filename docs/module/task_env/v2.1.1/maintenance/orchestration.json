@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer to review Sol 4b attempt001 evidence-provenance decision; prepare a single targeted continuation only when directed, reusing unaffected evidence and not starting 4c.",
+  "next_action": "Maintainer may manually forward frozen 4b attempt002; prioritize evidence impact and closeout, reuse unaffected evidence, targeted native only if indispensable, then Sol independent review.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1232,6 +1232,15 @@
             "native_minutes": 360,
             "authority": "Maintainer authorized doubling during attempt001; prior minutes/seconds misreading corrected in ledger",
             "other_limits": "unchanged"
+          },
+          "next_attempt_prepared": {
+            "attempt": 2,
+            "status": "PREPARED_NOT_DISPATCHED",
+            "planning_ref": "../planning/stage4-4b-attempt002.md",
+            "policy": "Evidence impact and closeout first; reuse unaffected evidence; native only for a concrete original gate not resolved by evidence.",
+            "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4b_attempt002",
+            "prompt_hash_ref": "external package manifest.json",
+            "attempt_count_when_started": 2
           }
         },
         {
