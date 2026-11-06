@@ -1,8 +1,8 @@
 # v2.1.1 执行顺序与验收
 
-当前状态：3a、[3b003](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)及[3c001](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)均经Sol按各自冻结范围独立接收，G03有界收尾。4a 经[attempt003独立主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)有界接收，普通count=3；4b／4c仍PLANNED、attempt0。[4a复盘及4b准备经验](../maintenance/20261106_4a_retrospective_for_4b.md)已完成，本次未建立或派发4b prompt。原N08 FAIL及未验证交集保持。
+当前状态（2026-11-06）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收，详见[4a](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)、[4b](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)、[4c](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)主审；原 N08 FAIL、6.1 close 超时及其他已列限制保留。4c 为 MuJoCo CPU 单 Env 切换与 PickCube seed31 成功，非跨后端任务资格。G05 的 5a/5b/5c 尚未执行、attempt0，须以[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)准备实际工作包。
 
-阶段4恢复原[G04](../goals/04-control.md)主线和出口；[装配Panda](stage4-assembled-panda.md)作为本版附加集成用例单列，不再把新类／两任务四交集加成4a–4c完成条件。建议4a审阅表达能力，4b主能力稳定后在预先冻结的附加预算内做首次空载／夹爪／补偿检查，4c参考复用，完整两任务Solution用例由7a收口，7b仅按受影响输入复核。该排期已由维护者采纳；4a已按原出口有界接收，4b、4c及7a仍PLANNED／attempt0。新Robot需求和不做物性等价的约束保留。
+[装配 Panda](stage4-assembled-panda.md)是版本附加集成用例，不新增为 4a–4c 或 G05 接收前置；完整两任务 Solution 用例由 7a 收口。下文旧状态和准备进度是历史时点；实时状态以[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)为准。
 
 历史状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收；3b attempt002经[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)为REWORK_REQUIRED_3B、attempt_count=2，已测TCP有界补偿及launcher／F06记录修复保留，整体未接收。[003前重评](stage3-3b-attempt003-reassessment.md)及[条件3c首包](stage3-3c-attempt001.md)已准备未派发；维护者授权两包一次转交、按[连续安排](stage3-3b003-3c001-sequential-execution.md)技术通过后顺序实施，Sol最后分别复审，3c及后续尚未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 

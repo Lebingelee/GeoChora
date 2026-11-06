@@ -1,8 +1,8 @@
 # TaskEnv v2.1.1 — 协议与实施规划
 
-日期：2026-11-06。G03的3a、3b、3c均已按各自冻结范围独立接收，阶段3有界收尾。3b为[ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION](maintenance/reviews/20261106_3b_attempt003_sol_review.md)，原N08 FAIL保留；3c为[ACCEPTED_BOUNDED_3C_RESET_REBUILD](maintenance/reviews/20261106_3c_attempt001_sol_review.md)，覆盖显式PickCube state-only profile的四条指定切换边及故障处置，不需attempt002。6.1辅助App已验证启动／版本，close超时，完整兼容未通过。等待维护者后续安排，不自动进入阶段4或提升Qualification。
+日期：2026-11-06。G03 的 3a、3b、3c 及 G04 的 4a、4b、4c 均经 Sol 按各自冻结范围独立有界接收；准确当前进度以[编排索引](maintenance/orchestration.json)、[恢复页](maintenance/recovery.md)和各独立主审为准。4c 的范围为 MuJoCo CPU 单 Env reset 切换及迁移后 PickCube seed31 成功；原 N08 FAIL、Isaac 6.1 close 超时、通用装配补偿与未验证交集保留，不外推正式 Qualification。
 
-2026-11-06维护者已采纳重评后的规划并要求新Sol承接阶段4：原G04统一控制命令、三后端effort／BodyWrench及Controller reset主线完整保留。[装配Panda](planning/stage4-assembled-panda.md)是本版附加集成用例，4b能力稳定后早检查、7a两任务Solution完整收口，不作为4a–4c新增接收门。需求保留，仍PLANNED／未派包；交接入口见[阶段3收尾与G04 Sol交接](maintenance/20261106_stage3_closeout_stage4_sol_handoff.md)。
+阶段 5 的 5a/5b/5c 仍为 PLANNED、attempt0，尚无派发；遵循 [G05 原目标](goals/05-rendering.md)及已确认的 render／生命周期协议。装配 Panda 仍为版本附加用例，不替代阶段 5 主线；完整两任务 Solution 用例留 7a。新阶段由维护者按工作流另行交接。
 
 历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
@@ -27,7 +27,7 @@
 
 规划输入 Core：`develop@fd03817c9f6ef8ce9fd68c1db30125efda68e1c8`；GeoPhys pin：`67da1165149486d3ae3e779c13ce31af49e17d50`。本地 `refs/tags/v2.1.0` 指向该 Core；本轮未查询远端或 GitHub Release，不能从旧候选措辞推断当前发布状态。
 
-当前实现与证据仍按 [v2.1.0 API](../v2.1.0/api/public-api.md)和[有界能力矩阵](../v2.1.0/capabilities/capability-matrix.json)理解。selected 渲染仍只准入 state-only；R3 主要输出位置参考；LIBERO 有限定的力矩＋位置混合控制。G02/2a 与 2b 有当前 MuJoCo 原生证据；PickCube seed32 有效运行但任务失败。阶段2接收范围为seed31成功实现、受影响Nut回归及可复现参考，不将原2b扩展包的未过门改为PASS。其余阶段按编排索引保持原状态。
+当前实现与证据仍按 [v2.1.0 API](../v2.1.0/api/public-api.md)和[有界能力矩阵](../v2.1.0/capabilities/capability-matrix.json)理解。selected 渲染仍只准入 state-only；R3 主要输出位置参考；LIBERO 有限定的力矩＋位置混合控制。G02/2a 与 2b 有当前 MuJoCo 原生证据；PickCube seed32 有效运行但任务失败。阶段2接收范围为seed31成功实现、受影响Nut回归及可复现参考，不将原2b扩展包的未过门改为PASS。该段记述旧规划时点，其余阶段实际状态以编排索引及恢复页为准。
 
 F06 历史 9/9 runtime-valid、0/9 task-success，R07 A123 的有界接收与例外、F05 未决研究门均保留。不将 v2.1.1 的目标或后续结果改写进冻结证据。
 
