@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "4a independently accepted; 4a retrospective and 4b preparation inputs documented. After maintainer direction, prepare one complete 4b package with concrete original gates, public-route feasibility, authorization, resources and evidence; manual transfer only. No execution or 4b prompt in the retrospective turn.",
+  "next_action": "Complete the 4b attempt001 package and obtain maintainer authorization for the proposed native/GPU budget and any necessary GeoPhys public-provider change before manual transfer. No automatic dispatch, no Sol native.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1187,19 +1187,22 @@
           "attempt_count": 0,
           "attempts": [],
           "assigned_agent": null,
-          "package_path": null,
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4b_attempt001",
           "package_sha256": null,
           "input_head": null,
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 maintainer requested 4a retrospective before 4b prompt. Sol recorded evidence-based lessons and 4b preparation inputs; no 4b prompt, implementation, writer or native started.",
+          "last_observation": "2026-11-06 maintainer requested a generic lessons Skill and complete 4b attempt001. Sol prepared the 4b plan and proposed package; native/GPU and any GeoPhys pin change require explicit maintainer authorization. No dispatch or execution; attempt count remains zero.",
           "evidence_refs": [
-            "20261106_4a_retrospective_for_4b.md"
+            "20261106_4a_retrospective_for_4b.md",
+            "../planning/stage4-4b-attempt001.md"
           ],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [
+            "AWAITING_MAINTAINER_AUTHORIZATION_FOR_NATIVE_AND_POTENTIAL_GEOPHYS_PIN_CHANGE"
+          ]
         },
         {
           "id": "4c",
