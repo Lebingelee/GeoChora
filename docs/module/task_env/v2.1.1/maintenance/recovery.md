@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3b003有界接收，3c001待Sol独立复审
+## 当前：3c001有界接收，G03限定范围收尾
 
-3b经[Sol独立复审](reviews/20261106_3b_attempt003_sol_review.md)在冻结三路线、澄清后的N09/G01发布边界和有界Panda补偿范围接收，count=3，不需004或人工诊断；原N08 FAIL不变。截止后的维护者授权收尾和实际计量保留。3c绑定实际3b HEAD后已报告技术通过，仍待单独独立审阅，见[3c摘要](reviews/20261106_3c_attempt001_execution.md)。6.1辅助App已启动并核对版本，但close在300秒内未返回，不视为完整兼容通过。active_packages=[]；下一项是审阅已返包3c，不重新派3b或进入阶段4。
+3c经[Sol独立复审](reviews/20261106_3c_attempt001_sol_review.md)接收为ACCEPTED_BOUNDED_3C_RESET_REBUILD，count=1，不需002。五段同一Env链、固定观测／Core流、旧输入拒绝、故障恢复和逐episode H5均满足冻结出口；仅覆盖显式PickCube profile及四条声明边。3a、[3b](reviews/20261106_3b_attempt003_sol_review.md)及3c各自有界接收，G03限定范围收尾，原N08 FAIL保留。6.1辅助App启动／版本成立但close超时，完整兼容未通过。active_packages=[]；等待维护者后续安排，不自动进入阶段4或push／merge／tag。
 
 ## 历史：3b003与条件3c001准备时
 

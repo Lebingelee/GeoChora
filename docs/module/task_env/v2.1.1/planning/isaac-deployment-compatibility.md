@@ -1,12 +1,12 @@
 # Isaac部署兼容：v2.1.1与后续版本范围
 
-2026-11-06当前：3b attempt003经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)在冻结范围有界接收，包括6.2真实F06短程和同次读回；原N08 FAIL保留。6.1／6.2共同部署与版本consumer有离线证据。主目标完成后的6.1独立App实际自报6.1.0-rc.26+release.49347.2d230af4.gl，模块origin与指定安装一致，但SimulationApp.close在300秒内未返回，状态VERSION_VERIFIED_CLOSE_TIMEOUT；只确认启动／版本／来源，完整Env闭环与正常关闭未通过。3c仍待单独复审。
+2026-11-06当前：3b attempt003经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)在冻结范围有界接收，包括6.2真实F06短程和同次读回；原N08 FAIL保留。6.1／6.2共同部署与版本consumer有离线证据。主目标完成后的6.1独立App实际自报6.1.0-rc.26+release.49347.2d230af4.gl，模块origin与指定安装一致，但SimulationApp.close在300秒内未返回，状态VERSION_VERIFIED_CLOSE_TIMEOUT；只确认启动／版本／来源，完整Env闭环与正常关闭未通过。[3c](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)已在显式profile及指定6.2切换边有界接收，不因此扩展6.1状态。
 
 本页保留2026-11-05按维护者反馈及版本化官方资料形成的范围与差异依据，并按实际返包更新实现／运行状态；当前能力边界查[能力矩阵](../capabilities/README.md)。共同接口已接线不等于每个版本都已完成真实闭环。外部反馈调整单保留完整维护者需求和逐项验收，此页是仓库内执行入口。
 
 | 版本 | 本次安排 | 真实运行证据 |
 | --- | --- | --- |
-| 6.2.0／发行包6.2.0.0 | v2.1.1保留既有PhysX state-only路径并修部署可移植性 | 3b公开构建→reset→10步→状态→记录读回已有界接收；当前worker的App／USD清理与受控退出0有3c最终运行定向补证，不声称Kit自然析构已修复或3c整体接收 |
+| 6.2.0／发行包6.2.0.0 | v2.1.1保留既有PhysX state-only路径并修部署可移植性 | 3b短程执行及3c显式profile的MuJoCo↔Isaac6.2切换已有界接收；App／USD清理和受控worker退出0有同次凭据，不声称Kit自然析构已修复 |
 | 6.1.0／发行包6.1.0.0 | v2.1.1实现与6.2共用adapter、部署选择、真实版本回执及同USD／closure消费 | 独立App实际版本6.1.0-rc.26+release.49347.2d230af4.gl，启动／来源已核对；close超时，完整Env闭环未测，不能声明完整6.1兼容通过 |
 | 5.1.0 | 后续版本适配，未指定具体发布号 | 当前不安装、不提前宣称兼容；需初始化／推进／生命周期公共API映射及真实验证 |
 | 其他／未知 | 不自动扩权 | 明确unadmitted或unknown及原因，不猜测版本 |
@@ -29,7 +29,7 @@
 
 ## 实施顺序与验收边界
 
-当前3a及3b已按各自冻结范围独立接收，3c返包待审。消费级依赖按实际host／engine／solver与worker角色判断；Core host安装清单不直接等于Isaac worker必需清单。真正required缺项继续拒绝，不能用未选GeoPhys/Taichi路线依赖误报SDK缺失。维护者已澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖；原preflight owner已修正，不混装环境。本次3b GeoPhys pin更新服务于公共有效模型读回，与其MuJoCo求解路线依赖无关。以下早期协调顺序保留历史。
+当前3a–3c均已按各自冻结范围独立接收。消费级依赖按实际host／engine／solver与worker角色判断；Core host安装清单不直接等于Isaac worker必需清单。真正required缺项继续拒绝，不能用未选GeoPhys/Taichi路线依赖误报SDK缺失。维护者已澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖；原preflight owner已修正，不混装环境。本次3b GeoPhys pin更新服务于公共有效模型读回，与其MuJoCo求解路线依赖无关。以下早期协调顺序保留历史。
 
 3a attempt001按原包复审，新增反馈不倒加门。attempt002先修普通reset闭包与原能力／worker缺口。3a独立接收后，3b完整包先纳入上述路径、SDK识别、6.1／6.2共同接口与准确身份接线，再在单独授权的native预算内验证三路线。不得以本规划开启3b、安装或native。
 

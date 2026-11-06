@@ -2,15 +2,15 @@
 
 历史记录：3b attempt001 已通过公开 factory 在三条指定路线完成 seed31 的10步与独立读回，整体仍为 PARTIAL、待 Sol 复审：三路线短窗正向位移均未过冻结门。PickCube F06 的 `env.step` 接受既有8维绝对世界位姿与开口动作，并复用已绑定 Controller 的结构化投影；其 Recorder 保存该运行的请求、模型和原生确认。其他 Position 路线仍按各自声明要求 typed action。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。
 
-状态：阶段3前维护整体仍为PARTIAL；生命周期R1已获[Sol有限接收](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。`BaseTaskEnv` 已是 `SelectedReferenceEnv` 同对象兼容出口，三个组件任务使用共同 episode owner；源码与无引擎契约已复核，后续的[CPU 代表回归](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)按实际源码提交和路线记录，不扩展到其他组合。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。
+当前状态：阶段3前限定核心收尾及G03的3a–3c均已按各自范围接收，详见[3c独立主审及阶段收尾](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)；生命周期R1已获[Sol有限接收](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。`BaseTaskEnv` 已是 `SelectedReferenceEnv` 同对象兼容出口，三个组件任务使用共同 episode owner；源码与无引擎契约已复核，后续的[CPU 代表回归](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)按实际源码提交和路线记录，不扩展到其他组合。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。
 
 Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 现支持调用方直接传入含来源边界和控制请求的 `ExpertAction`，并在 `observe` 校验五个 native 样本；裸数组仍拒绝。PickCube seed31 与 NutAssembly seed19 已在 MuJoCo CPU 上完成有界物理回归和独立读回，证据及源码身份见[验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
 
-## PickCube state-only reset 切换（待独立复审）
+## PickCube state-only reset 切换（有界接收）
 
 显式选择 `execution.reset_profile="pickcube-state-only-switch-v1"` 后，同一个 PickCube Env 支持在 `reset(options={"execution": target})` 中切换 MuJoCo CPU 与 GeoPhys CPU，或 MuJoCo CPU 与 Isaac 6.2 CUDA；目标配置从该 provider 的默认路由重新解析。此 profile 固定 state／cube 观测，`hand_pose` 是 `panda-v1/ee` 的兼容别名；九关节速度在 info 与记录中保留。每 episode 的 Recorder 必须在切换前 finish。显式 seed 重置 Core 随机流，None 继续已初始化的流，首次 None 初始化新流。预检失败保留旧 episode；开始替换后失败会 fault 并报告已知关闭及未知写入结果。
 
-本包只验证了指定四条边、state-only、单环境、R3 且重力补偿关闭；GeoPhys↔Isaac、其他任务及通用 controller／renderer 切换不在本次范围。详见 [3c 执行摘要](../maintenance/reviews/20261106_3c_attempt001_execution.md)。
+本包只验证了指定四条边、state-only、单环境、R3 且重力补偿关闭；GeoPhys↔Isaac、其他任务及通用 controller／renderer 切换不在本次范围。已获[Sol独立有界接收](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)，不需attempt002；实际用法及故障边界按本节，不外推全任务能力。
 
 ## 需形成的公共体验
 
@@ -38,7 +38,7 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 完成 3／4／5／6 阶段时更新对应 API 与迁移说明，7c 汇总。新示例只能使用已实现并验证的公共入口，不能以概念示例冒充已运行代码。
 
-## Panda 重力选项（待独立复审）
+## Panda 重力选项（有界接收）
 
 selected 构造的 `controller.gravity_compensation` 是可选布尔值，默认关闭；当前开启仅支持 MuJoCo CPU 进程内的 PickCube／NutAssembly 位置驱动，其他选择拒绝。详细来源、实际执行回执和限幅语义见[重力补偿指南](../guides/panda-gravity-compensation.md)。
 

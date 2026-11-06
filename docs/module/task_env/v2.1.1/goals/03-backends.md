@@ -31,7 +31,7 @@
 <a id="3c"></a>
 ## 3c：reset 重建及失败处置
 
-2026-11-06当前：attempt001技术返包待Sol单独独立复审，3b接收不代替3c或整个G03接收。
+2026-11-06当前：attempt001经[Sol独立复审](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)接收为 **ACCEPTED_BOUNDED_3C_RESET_REBUILD**，count=1，不需002。显式PickCube state-only profile在同一Env完成MuJoCo→GeoPhys→MuJoCo→Isaac6.2→MuJoCo，五段各5步和独立H5读回，固定观测／随机流／旧绑定拒绝／合成终端故障及资源关闭符合本包范围。无provider_alias，借用view未实测；不外推其它任务／边／Controller／renderer切换。3a、3b和本3c分别独立接收，G03有界收尾，等待维护者后续安排，不自动阶段4。
 
 - **输入／依赖：**3b；固定 observation 与当前相机需求。
 - **工作：**reset 更换 backend／solver 方案时重建资源与映射；必要时重建 worker，刷新 configuration／materialization／episode 代次并使旧状态失效。保持同一个public Env对象，内部可重建session/worker/App；不能用用户close/make_env替代切换。

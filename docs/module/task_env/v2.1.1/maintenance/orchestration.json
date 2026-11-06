@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B_ACCEPTED_3C_PENDING_SOL_REVIEW",
+  "status": "G03_ACCEPTED_BOUNDED_STAGE3",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Sol independently reviews the already reported 3c001; no new 3b attempt or automatic stage4.",
+  "next_action": "Await maintainer direction after bounded G03 closeout; no automatic stage4, new attempt, push, merge or Qualification.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -948,44 +948,73 @@
           "dependencies": [
             "3b"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "ACCEPTED_BOUNDED_3C_RESET_REBUILD",
           "attempt_count": 1,
           "attempts": [
             {
               "attempt": 1,
               "package_id": "V211_G03_3c_attempt001",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
               "started_at": "2026-11-06T08:49:09.552985+08:00",
               "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
               "provider_commit": "dc2685e28c6c916fb6403a2342c04e0d2520aef7",
               "result": "THREE_C_TECHNICAL_PASS",
-              "sol_acceptance": "PENDING_SOL_REVIEW",
+              "sol_acceptance": "ACCEPTED_BOUNDED_3C_RESET_REBUILD",
               "report_ref": "reviews/20261106_3c_attempt001_execution.md",
               "writer_ownership": "released after final documentation commit",
-              "native_ownership": "released after final native group"
+              "native_ownership": "released after final native group",
+              "output_head": "29855741e4e0075336854a9f7708c67d78a8a0aa",
+              "sol_review_ref": "reviews/20261106_3c_attempt001_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_3C_RESET_REBUILD",
+              "finished_at": "2026-11-06T09:55:27.878060+08:00",
+              "reported_wall_seconds": 3978.325075,
+              "execution_code_head": "af6638684c071749c6ecb19f990b13afdb742cee",
+              "bundle_manifest_sha256": "cb84a71fbfb98e1c2e20e8a9fcbd6becad0ecc0df012bfb7de52a3e69c036d51"
             }
           ],
           "assigned_agent": null,
-          "package_path": null,
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3c_attempt001",
           "package_sha256": null,
           "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
-          "output_head": null,
+          "output_head": "29855741e4e0075336854a9f7708c67d78a8a0aa",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Five-episode explicit PickCube reset chain and independent readers completed; fault fixtures and owner release recorded. Independent Sol review pending.",
+          "last_observation": "2026-11-06 Sol independently verified 220 outputs, public-read five H5 files and checked 30 boundaries, five materializations/requests and PCG64 sequence. 24 guarded checks plus one explicit recovery check passed; one old Position source fixture was blocked by the Sol SDK guard and its executor result retained. Bounded explicit-profile reset/rebuild accepted; no rework or stage4.",
           "evidence_refs": [
-            "reviews/20261106_3c_attempt001_execution.md"
+            "reviews/20261106_3c_attempt001_execution.md",
+            "reviews/20261106_3c_attempt001_sol_review.md"
           ],
-          "commits": [],
-          "review_decision": null,
+          "commits": [
+            "4f22b28d",
+            "bd678582",
+            "91c99d8c",
+            "af6638684c071749c6ecb19f990b13afdb742cee",
+            "29855741e4e0075336854a9f7708c67d78a8a0aa"
+          ],
+          "review_decision": {
+            "status": "ACCEPTED_BOUNDED_3C_RESET_REBUILD",
+            "reviewer": "Sol",
+            "date": "2026-11-06",
+            "review_ref": "reviews/20261106_3c_attempt001_sol_review.md",
+            "whole_frozen_3c_accepted": true,
+            "rework_required": false,
+            "attempt002_required": false,
+            "scope": "PickCube explicit state-only switch profile, R3, single environment, gravity off; MuJoCo CPU ↔ GeoPhys CPU and MuJoCo CPU ↔ Isaac 6.2 CUDA; fixed observation, RNG, stale bound inputs, failure and per-episode record/close contracts.",
+            "borrowed_provider_alias_exercised": false,
+            "native_fault_injection": false,
+            "isaac_natural_destruction_fixed": false,
+            "six_one_full_compatibility": false,
+            "qualification": false
+          },
           "blockers": [],
           "prepared_package": {
             "package_id": "V211_G03_3c_attempt001",
-            "status": "PREPARED_CONDITIONAL_NOT_STARTED",
+            "status": "EXECUTED_REVIEWED_ACCEPTED",
             "planning_ref": "../planning/stage3-3c-attempt001.md",
             "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle",
-            "input_head": null
-          }
+            "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af"
+          },
+          "package_hash_reason": "The shared frozen bundle manifest and actual predecessor binding identify this package; no separate per-substage manifest."
         }
       ]
     },
@@ -1320,54 +1349,17 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "substage": "3a",
-    "attempt_series": "diagnostic",
-    "package_id": "V211_G03_3a_diagnostic_attempt001",
-    "status": "REVIEWED_ACCEPTED",
-    "assigned_agent": null,
-    "target_thread": null,
-    "planned_diagnostic_attempt": 1,
-    "diagnostic_attempt_count_now": 1,
-    "ordinary_attempt_count_preserved": 3,
-    "preparation_consumes_attempt": false,
-    "planning_ref": "../planning/stage3-3a-diagnostic-001.md",
-    "review_ref": "reviews/20261105_3a_diagnostic_attempt001_sol_review.md",
-    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001",
-    "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/prompt.md",
-    "prompt_sha256": "5788cb4f8ca16412b3cff1e34651cd3a03628c2613b103678e04f4e12beb21f8",
-    "manifest_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/manifest.json",
-    "input_snapshot_ref": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3a_diagnostic_attempt001/input-snapshot.json",
-    "input_head_ref": "Frozen externally after Sol diagnostic preparation documentation commit.",
-    "expected_duration_minutes": "60-90 active; hard wall120; Sol review separately10-15",
-    "execution_budget": {
-      "expected_active_minutes": "60-90",
-      "total_wall_minutes": 120,
-      "cumulative_validation_minutes": 30,
-      "single_test_group_minutes": 10,
-      "cumulative_mujoco_native_minutes": 10,
-      "physics_substeps": 1000,
-      "native_launch_count_limit": null,
-      "source_only_parsing": "OpenUSD and existing GeoPhys Scene parsing allowed to executor in separate group; no physical Runtime/solver/App/GPU init. MuJoCo compilation counted under CPU budget/locks.",
-      "rss_process_tree_gib": 8,
-      "new_output_mib": 128,
-      "single_log_mib": 8,
-      "geophys_physical_native_starts": 0,
-      "isaac_app_starts": 0,
-      "gpu_starts": 0,
-      "render_starts": 0,
-      "install_or_download": 0,
-      "additional_worktrees": 0,
-      "additional_branches": 0,
-      "sol_native_imports_or_runs": 0
-    },
-    "assignment": "Completed manually designated Terra diagnostic001; writer/processes/locks released, Sol review accepted.",
-    "input_head": "1284afea430b000022563260f67d92c976d41d65",
-    "output_head": "6b11123e3293743e01c90ed0ce94e0be450e3833",
-    "sol_review_ref": "reviews/20261105_3a_diagnostic_attempt001_sol_review.md",
-    "review_decision": "ACCEPTED_3A_ROUTING_ADMISSION",
-    "whole_3a_accepted": true,
-    "package_manifest_sha256": "68c7748a443177b7550382f387a627e2783287a27e342ede8e38457cf30cc6e6",
-    "output_manifest_sha256": "a7da114c2415c22abb682599bacc5a96b30f1fb59a451c0ff504158007c8c9a5"
+    "substage": "3c",
+    "attempt_series": "ordinary",
+    "attempt": 1,
+    "package_id": "V211_G03_3c_attempt001",
+    "status": "REVIEWED_ACCEPTED_BOUNDED",
+    "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
+    "output_head": "29855741e4e0075336854a9f7708c67d78a8a0aa",
+    "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3c_attempt001",
+    "review_ref": "reviews/20261106_3c_attempt001_sol_review.md",
+    "review_decision": "ACCEPTED_BOUNDED_3C_RESET_REBUILD",
+    "assignment": "Maintainer-forwarded Terra implementation; returned and released; independent Sol review complete."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
@@ -1406,7 +1398,7 @@
     {
       "substage": "3c",
       "package_id": "V211_G03_3c_attempt001",
-      "status": "REPORTED_PENDING_SOL_REVIEW",
+      "status": "REVIEWED_ACCEPTED_BOUNDED",
       "attempt_count_now": 1,
       "attempt_planned": 1,
       "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3c_attempt001",
@@ -1415,7 +1407,9 @@
       "actual_input_binding": "Executor-only bind-3c-input.py after final3b report/commit/release",
       "prerequisite": "Full THREE_B_TECHNICAL_PASS_REVISED_N08_V2; no unresolved required case; pending Sol review preserved",
       "expected_active_minutes": "120-180",
-      "total_wall_minutes": 240
+      "total_wall_minutes": 240,
+      "sol_review_ref": "reviews/20261106_3c_attempt001_sol_review.md",
+      "output_head": "29855741e4e0075336854a9f7708c67d78a8a0aa"
     }
   ],
   "serial_execution_exception": {
@@ -1430,5 +1424,25 @@
     "predecessor_technical_all_pass_required": true,
     "predecessor_failure": "3c NOT_STARTED; final ordinary3b goes human diagnosis",
     "reference": "../planning/stage3-3b003-3c001-sequential-execution.md"
+  },
+  "stage3_closeout": {
+    "date": "2026-11-06",
+    "reviewer": "Sol",
+    "status": "ACCEPTED_BOUNDED_STAGE3",
+    "substages": {
+      "3a": "ACCEPTED_3A_ROUTING_ADMISSION",
+      "3b": "ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION",
+      "3c": "ACCEPTED_BOUNDED_3C_RESET_REBUILD"
+    },
+    "review_refs": [
+      "reviews/20261105_3a_diagnostic_attempt001_sol_review.md",
+      "reviews/20261106_3b_attempt003_sol_review.md",
+      "reviews/20261106_3c_attempt001_sol_review.md"
+    ],
+    "original_N08": "FAIL_PRESERVED",
+    "six_one_auxiliary": "VERSION_VERIFIED_CLOSE_TIMEOUT; full Env loop not tested",
+    "stage4_started": false,
+    "qualification": false,
+    "automatic_dispatch": false
   }
 }

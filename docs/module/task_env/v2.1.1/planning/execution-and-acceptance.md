@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-当前状态：3b003经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)按冻结范围接收为ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION，count=3；原N08 FAIL保留，新N08-v2及澄清后的N09/G01已核对。3c001已报告技术通过，仍待单独独立复审，见[执行摘要](../maintenance/reviews/20261106_3c_attempt001_execution.md)。不自动派新包或进入阶段4。
+当前状态：3a、[3b003](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)及[3c001](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)均经Sol按各自冻结范围独立接收，G03有界收尾。3b count=3、原N08 FAIL保留；3c count=1、ACCEPTED_BOUNDED_3C_RESET_REBUILD，不需002。未验证交集保持原状态；等待维护者安排，不自动派新包或进入阶段4。
 
 历史状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收；3b attempt002经[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)为REWORK_REQUIRED_3B、attempt_count=2，已测TCP有界补偿及launcher／F06记录修复保留，整体未接收。[003前重评](stage3-3b-attempt003-reassessment.md)及[条件3c首包](stage3-3c-attempt001.md)已准备未派发；维护者授权两包一次转交、按[连续安排](stage3-3b003-3c001-sequential-execution.md)技术通过后顺序实施，Sol最后分别复审，3c及后续尚未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 
