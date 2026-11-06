@@ -69,3 +69,13 @@ def test_target_config_is_not_inherited_from_previous_route():
     with pytest.raises(ValueError):
         prepare_switch_reset(PickCubeReferenceEnv, initial, None, first.rng_state,
                              {'physics_provider': 'geophys', 'reset_profile': 'different'})
+
+
+def test_first_unseeded_reset_initializes_a_core_rng_without_fixed_seed():
+    from task_env.environment.reset_switch import prepare_switch_reset
+    initial = resolve_task_env_config(PickCubeReferenceEnv, selected(reset_profile=PROFILE))
+    candidate = prepare_switch_reset(PickCubeReferenceEnv, initial, None, None, None)
+    assert 0 <= candidate.task_seed < 2**31
+    assert candidate.rng_state['bit_generator'] == 'PCG64'
+    continuation = prepare_switch_reset(PickCubeReferenceEnv, initial, None, candidate.rng_state, None)
+    assert continuation.rng_state != candidate.rng_state

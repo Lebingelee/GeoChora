@@ -1402,8 +1402,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             target = None if options is None else options.get('execution')
             requested_seed = None if seed is _RESET_SEED_UNSET else seed
             rng_state = getattr(self, '_switch_rng_state', None)
-            if requested_seed is None and rng_state is None:
-                requested_seed = 31
             switch_candidate = prepare_switch_reset(type(self), resolved, requested_seed, rng_state, target)
             seed = switch_candidate.task_seed
             options, mixed_reset_plan, mixed_reset_sample = {}, None, None

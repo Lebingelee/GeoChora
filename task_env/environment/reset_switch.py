@@ -61,9 +61,8 @@ def prepare_switch_reset(environment_type, current, seed, rng_state, execution):
         task_seed = seed
     else:
         rng = np.random.default_rng()
-        if rng_state is None:
-            raise ValueError('a continuing reset requires an initialized Core RNG')
-        rng.bit_generator.state = deepcopy(rng_state)
+        if rng_state is not None:
+            rng.bit_generator.state = deepcopy(rng_state)
         task_seed = int(rng.integers(0, 2**31, dtype=np.int64))
     # Both existing runtime execution contracts admit the task seed as their
     # provider seed.  This pure mapping consumes no additional Core RNG value.
