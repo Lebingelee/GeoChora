@@ -700,21 +700,27 @@ def _source_input(scene_module, tmp_path, scene_definition, artifact, *, source_
     return source, imported, closure_digest, panda_digest, len(panda_files)
 
 
-def _physical_source_input(tmp_path, scene_definition, artifact):
+def _physical_source_input(tmp_path, scene_definition, artifact, *, xml_mutator=None):
     """Resolve source bytes for the explicit physical profile; native mapping is pending."""
     from task_env.runtime.sessions.source import source_asset_bytes
 
     root, panda_files, panda_digest = _copy_panda_snapshot_from_xml(
         tmp_path / 'panda-snapshot', scene_definition)
     xml = _compose_scene_source(scene_definition, root, physics_dt=artifact.timebase.physics_dt)
+    if xml_mutator is not None:
+        xml = xml_mutator(xml)
     projected = project_scene_definition_v3_to_mjcf(xml, scene_definition)
     closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),
                                       **source_asset_bytes(root, projected)})
     source_id = f'scene-definition-v3:{scene_definition.identity_hash}'
     joints = {f'{a.entity_id}/{j.joint_id}': j.joint_id
-              for a in scene_definition.articulations or () for j in a.joints if j.kind != 'fixed'}
+              for a in scene_definition.articulations or () for j in a.joints
+              if j.kind in {'revolute', 'continuous', 'prismatic'}}
+    free_joints = {f'{j.child_frame.entity_id}/{j.child_frame.frame_id}': j.joint_id
+                   for a in scene_definition.articulations or () for j in a.joints if j.kind == 'floating'}
     bodies = {f'{frame.entity_id}/{frame.frame_id}': frame.frame_id
-              for frame in scene_definition.frames or () if frame.frame_kind == 'runtime'}
+              for frame in scene_definition.frames or ()
+              if frame.frame_kind == 'runtime' and frame.frame_id != 'world'}
     config = resolve_env_config(
         task_uid='phase-ii-d01a-microprobe', scene_uid='phase-ii-d01a-microprobe',
         runtime={'backend': 'cpu', 'physics_dt': 0.002, 'control_substeps': 1, 'prewarm': False},
@@ -722,7 +728,7 @@ def _physical_source_input(tmp_path, scene_definition, artifact):
     source = RuntimeSource(
         task_artifact_hash=artifact.identity_hash,
         scene_source=TaskSceneSource(xml, root, source_id), joints=joints, bodies=bodies,
-        frames={}, free_joints={}, joint_targets={}, open_actuators=(),
+        frames={}, free_joints=free_joints, joint_targets={}, open_actuators=(),
         composition=TaskCompositionSpec('phase-ii-d01a-microprobe', 'phase-ii-d01a-microprobe'),
         config=config, scene=_MicroprobeScene(), agents=(), objects=(),
         scene_definition=scene_definition, source_closure_digest=closure)

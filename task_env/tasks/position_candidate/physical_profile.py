@@ -27,10 +27,14 @@ PANDA_DIRECT_EFFORT_PROFILE = 'panda-direct-effort-v1'
 PANDA_EFFORT_WRENCH_PROFILE = 'panda-direct-effort-wrench-v1'
 PANDA_EFFORT_OBJECT_WRENCH_PROFILE = 'panda-direct-effort-object-wrench-v1'
 PANDA_SPLIT_EFFORT_PROFILE = 'panda-split-direct-effort-v1'
+PANDA_FIXED_FRAME_POINT_WRENCH_PROFILE = 'panda-fixed-frame-point-wrench-v1'
 
 
-def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_target=None, split=False):
+def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_target=None, split=False,
+                                        fixed_frame_point=False, entity_id='panda-main', native_drive='position'):
     """Build named 7+2 commands from eight direct-effort inputs; no native I/O."""
+    if native_drive not in {'position', 'disabled'}:
+        raise ValueError('Panda effort profile requires a declared native drive mode')
     from ...assembly.assets import _source_closure_digest
     from ...runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
 
@@ -40,7 +44,7 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
     if closure != source.source_closure_digest:
         raise ValueError('physical profile source closure differs from its actual bytes')
     names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
-    owner, entity = 'panda-direct-effort', 'panda-main'
+    owner, entity = 'panda-direct-effort', entity_id
     definitions = {j.joint_id: j for a in scene.articulations or ()
                    if a.entity_id == entity for j in a.joints}
     if any(name not in definitions or source.joints.get(f'{entity}/{name}') != name for name in names):
@@ -98,10 +102,11 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
             entity, name, 'dof0', joint.kind, axis, joint.parent_frame, 1,
             'N*m' if arm else 'N', effort_limit, f'actuator{i+1}' if arm else 'actuator8',
             f'arm-transmission-{i+1}' if arm else 'split-transmission', coefficient,
-            native_limit, 'position'))
+            native_limit, native_drive))
     bodies = ()
     if wrench_target is not None:
-        targets = {'hand': (entity, 'hand'), 'object': ('square-peg-instance', 'peg1')}
+        targets = {'hand': (entity, 'hand'), 'object': ('square-peg-instance', 'peg1'),
+                   'probe': ('probe', 'probe_body')}
         if wrench_target not in targets:
             raise ValueError('unknown physical wrench target')
         body_entity, body_name = targets[wrench_target]
@@ -142,8 +147,22 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
         controllers += (LinearEffortControllerV1(profile, binding, model),)
     if wrench_target is not None:
         frame = FrameReference(body_entity, body_name)
+        expression_frame = FrameReference('square-peg-instance', 'peg1') if fixed_frame_point else frame
+        if fixed_frame_point and (wrench_target not in {'hand', 'probe'}
+                                  or source.bodies.get('square-peg-instance/peg1') != 'peg1'):
+            raise ValueError('fixed-frame point wrench requires the source-bound peg and hand')
+        if fixed_frame_point:
+            peg = root_xml.find("./worldbody/body[@name='peg1']")
+            if (peg is None or peg.find('joint') is not None or peg.find('freejoint') is not None
+                    or peg.get('mocap', 'false').lower() not in {'false', '0'}):
+                raise ValueError('fixed-frame point wrench requires a fixed world child')
+        point_frame = expression_frame if wrench_target == 'probe' else frame
+        # The fixed peg origin is (0.58, 0.045, 0.522) in this versioned
+        # Scene; native preflight must verify its world pose before use.
+        point = (-0.57, -0.045, 0.478) if wrench_target == 'probe' else (0.01, 0., 0.)
         wrench_profile = WrenchControlProfileV1('wrench-control-profile-v1', 'candidate-body-wrench',
-            body_entity, body_name, frame, (0.01, 0., 0.), frame, (0., 0., 0.), frame, 'exclusive')
+            body_entity, body_name, expression_frame, point, point_frame,
+            point if fixed_frame_point else (0., 0., 0.), point_frame, 'exclusive')
         controllers += (WrenchControllerV1(wrench_profile, binding),)
     fields = tuple(StateFieldRequirement('state-field-requirement-v1', field, 'joint', entity, name,
         'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
@@ -151,10 +170,19 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
     if wrench_target is not None:
         fields += (StateFieldRequirement('state-field-requirement-v1', 'frame_pose_world', 'frame',
             body_entity, body_name, 'required', 'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query'),)
+    if fixed_frame_point:
+        fields += (StateFieldRequirement('state-field-requirement-v1', 'frame_pose_world', 'frame',
+            'square-peg-instance', 'peg1', 'required', 'evaluation_boundary',
+            'meter+quaternion_wxyz', 'frame_pose_query'),)
     requirements = StateRequirements('state-requirements-v1', 'controller', owner, fields)
-    joint_bindings = {f'{a.entity_id}/{j.joint_id}': j for a in scene.articulations or ()
-                      for j in a.joints if j.kind != 'fixed'}
-    frame_bindings = {name: FrameReference(*name.split('/', 1)) for name in (*source.bodies, *source.frames)}
+    definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
+                             for j in a.joints if j.kind != 'fixed'}
+    joint_bindings = {semantic: definitions_by_native[native]
+                      for semantic, native in (*source.joints.items(), *source.free_joints.items())}
+    frame_bindings = {name: (artifact.legacy_frame_bindings[name]
+                             if name in artifact.legacy_frame_bindings
+                             else FrameReference(*name.split('/', 1)))
+                      for name in (*source.bodies, *source.frames)}
     execution = PhysicalControlExecutionV1(compiled, controllers, scene, joint_bindings,
                                             frame_bindings, requirements, 1)
     execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,

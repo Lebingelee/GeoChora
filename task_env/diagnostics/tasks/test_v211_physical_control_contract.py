@@ -236,6 +236,19 @@ def test_mujoco_physical_build_mapping_checks_axis_gear_and_drive():
         StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
     with pytest.raises(ValueError, match='implicitfast integrator'):
         MuJoCoPhysicalPort(session, body_execution)
+    # The isolated fixture must set the provider's actuation-disable bit,
+    # without changing tendon/equality declarations or the original XML.
+    session._artifact.artifact_id = 'pickcube-mjcf-physical-effort-no-drive-v1'
+    session._build_layout_facts = {}
+    model.opt = SimpleNamespace(disableflags=0)
+    mj.mjtDisableBit = SimpleNamespace(mjDSBL_ACTUATION=4)
+    controller.binding = original.binding
+    source.bodies, source.frames = {}, {}
+    isolated = PhysicalControlExecutionV1(original, (controller,), original.scene,
+        {'arm/drive': object()}, {}, StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    MuJoCoPhysicalPort(session, isolated)
+    assert model.opt.disableflags == 4
+    assert session._build_layout_facts['physical_drive_override']['source_mjcf_modified'] is False
 
 
 def test_mujoco_physical_preflight_rejects_missing_or_wrong_dependency(monkeypatch):
@@ -371,7 +384,7 @@ def test_physical_reset_preflight_rejects_before_session_materialization():
     from task_env.environment.types import StageUnavailableError
     env = object.__new__(SelectedReferenceEnv)
     env._closed = False
-    env.provider, env.backend = 'geophys', 'cpu'
+    env.provider, env.backend = 'isaacsim', 'cpu'
     env.binding = SimpleNamespace(physical_control_profile=lambda _env: None)
     env.session = object()
     previous = env.session

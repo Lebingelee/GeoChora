@@ -544,6 +544,30 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._last_readback: NativeRuntimeReadbackV1 | None = None
         self._position_applied_boundary_ids = set()
 
+    def bind_physical_control(self, execution):
+        if getattr(self, '_physical_port', None) is not None or self._reset_done:
+            raise ValueError('physical port must be bound once before reset')
+        from .isaac_physical import IsaacF06PhysicalPort
+        self._physical_port = IsaacF06PhysicalPort(self, execution)
+        self.physical_control_generation = execution.generation
+
+    def assess_physical_control(self, binding):
+        return self._physical_port.assessment(binding)
+
+    def physical_joint_build_receipt(self, binding):
+        return self._physical_port.joints(binding)
+
+    def physical_buffer_policy(self, binding):
+        return self._physical_port.policy(binding)
+
+    def apply_physical_command_batch(self, resolved):
+        return self._physical_port.write(resolved)
+
+    def abort_physical_control(self):
+        port = getattr(self, '_physical_port', None)
+        if port is not None:
+            port.finish_interval()
+
     @property
     def native_interval_evidence(self):
         """Return owned, serializable evidence for the last native interval."""
@@ -564,6 +588,9 @@ class UsdCoreRuntimeSession(_SessionValues):
         current.validate_binding(self._artifact, self._execution_spec_v1, self._source)
 
     def reset(self, sample: ResetSample) -> RealizedInitialState:
+        port = getattr(self, '_physical_port', None)
+        if port is not None and port.pending is not None:
+            raise RuntimeError('cannot reset with a pending physical interval')
         self._begin_reset()
         self._validate_sample(sample)
         self._assert_native_identity()
@@ -585,6 +612,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._native_step_count = 0
         self._position_applied_boundary_ids.clear()
         self._last_native_position_ack = None
+        if getattr(self, '_physical_port', None) is not None:
+            # Preserve the native F06 position drives at the reset targets;
+            # the independently declared effort is an additional contribution.
+            from ...controllers.canonical.contracts import digest
+            target_id = digest({'schema': 'f06-physical-reset-hold-v1',
+                                'reset_sample_id': sample.sample_id, 'targets': targets})
+            ack = self._native_io.write_position_targets(target_id, targets)
+            if type(ack) is not NativePositionWriteAckV1:
+                raise TypeError('physical reset hold requires a native position acknowledgement')
+            ack.validate(target_id, targets)
+            self._last_native_position_ack = ack
         self._last_interval_advances = ()
         self._last_interval_advance_attempts = 0
         return self._realized(sample)
@@ -669,6 +707,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         )
 
     def step(self) -> CanonicalStateView:
+        port = getattr(self, '_physical_port', None)
+        if port is None:
+            return self._step_native_interval()
+        if port.pending is None:
+            raise RuntimeError('physical interval requires exactly one fresh batch')
+        try:
+            return self._step_native_interval()
+        finally:
+            port.finish_interval()
+
+    def _step_native_interval(self) -> CanonicalStateView:
         self._require_reset()
         self._assert_native_identity()
         dt = float(self._artifact.timebase.physics_dt)
@@ -718,9 +767,14 @@ class UsdCoreRuntimeSession(_SessionValues):
     def close(self) -> None:
         if not self._closed:
             try:
-                self._native_io.close()
+                port = getattr(self, '_physical_port', None)
+                if port is not None and port.pending is not None:
+                    port.finish_interval()
             finally:
-                self._closed = True
+                try:
+                    self._native_io.close()
+                finally:
+                    self._closed = True
 
     def close_runtime_owner(self) -> None:
         """Close process-scoped provider resources only when the Env is done."""

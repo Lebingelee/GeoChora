@@ -58,7 +58,9 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         camera_config = values.get('camera_observation')
         physical_profile = values.get('physical_profile')
         if physical_profile not in (None, 'panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
-                                     'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1'):
+                                     'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1',
+                                     'panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
+                                     'panda-direct-effort-home-v1'):
             raise ValueError('unsupported physical control profile')
         if backend != 'cpu' or (provider != 'geophys' and not (
                 provider == 'mujoco' and physical_profile is not None)):

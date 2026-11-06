@@ -476,7 +476,12 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
 
     root = Path(workspace).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    scene = _a05_scene()
+    if physical_profile == 'panda-free-body-point-wrench-v1':
+        from task_env.artifacts import PoseWorld
+        from .free_body_fixture import fixture_scene
+        scene = fixture_scene()
+    else:
+        scene = _a05_scene()
     legacy, _ = _artifact_and_sample(scene)
     legacy = replace(
         legacy,
@@ -485,6 +490,31 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         artifact_version=POSITION_CANDIDATE_VERSION,
         timebase=Timebase(0.002, 5, 0.01),
     )
+    if physical_profile in ('panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
+                            'panda-direct-effort-home-v1'):
+        # A distinct Artifact makes the home reset explicit; it does not alter
+        # the original A05 candidate or its source constraints and drives.
+        home = (0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853)
+        positions = dict(legacy.initialization.joint_position)
+        positions.update({f'panda-main/joint{i}': value for i, value in enumerate(home, 1)})
+        positions.update({'panda-main/finger_joint1': 0.038, 'panda-main/finger_joint2': 0.038})
+        legacy = replace(legacy, artifact_id='panda-fixed-frame-point-wrench-home-v1',
+                         task_id='panda-fixed-frame-point-wrench-home', artifact_version='v1',
+                         initialization=replace(legacy.initialization, joint_position=positions))
+        if physical_profile == 'panda-direct-effort-home-v1':
+            legacy = replace(legacy, artifact_id='panda-direct-effort-home-v1',
+                             task_id='panda-direct-effort-home', artifact_version='v1')
+    if physical_profile == 'panda-free-body-point-wrench-v1':
+        entities = tuple(replace(entity, kind='movable', geometry='source_asset',
+                                 parameters_si={'mass_kg': 0.08})
+                         if entity.semantic_id == 'probe' else entity for entity in legacy.world.entities)
+        legacy = replace(legacy, artifact_id='panda-free-body-point-wrench-v1',
+                         task_id='panda-free-body-point-wrench', artifact_version='v1',
+                         world=replace(legacy.world, entities=entities),
+                         initialization=replace(legacy.initialization,
+                             poses_world={'probe/probe_body': PoseWorld((0., 0., 1.), (1., 0., 0., 0.))}),
+                         semantics=replace(legacy.semantics, required_poses=tuple(
+                             name for name in legacy.semantics.required_poses if name != 'probe/world')))
     task_source = replace(
         _task_source(scene), task_id=legacy.task_id, version=legacy.artifact_version,
     )
@@ -499,10 +529,16 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         if imported is None:
             raise ValueError('Position candidate source import evidence is incomplete')
     elif physical_profile in ('panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
-                              'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1'):
+                              'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1',
+                              'panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
+                              'panda-direct-effort-home-v1'):
         from .source import _physical_source_input
+        mutator = None
+        if physical_profile == 'panda-free-body-point-wrench-v1':
+            from .free_body_fixture import compose_fixture_xml
+            mutator = compose_fixture_xml
         source, closure_digest, panda_digest, panda_file_count = _physical_source_input(
-            root / 'source-closure', scene, legacy)
+            root / 'source-closure', scene, legacy, xml_mutator=mutator)
     else:
         raise ValueError('unsupported physical control profile')
     if len(closure_digest) != 64 or len(panda_digest) != 64:
@@ -528,9 +564,14 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     if physical_profile is not None:
         from .physical_profile import build_panda_direct_effort_execution
         target = {'panda-direct-effort-v1': None, 'panda-direct-effort-wrench-v1': 'hand',
-                  'panda-direct-effort-object-wrench-v1': 'object', 'panda-split-direct-effort-v1': None}[physical_profile]
+                  'panda-direct-effort-object-wrench-v1': 'object', 'panda-split-direct-effort-v1': None,
+                  'panda-fixed-frame-point-wrench-v1': 'hand',
+                  'panda-free-body-point-wrench-v1': 'probe',
+                  'panda-direct-effort-home-v1': None}[physical_profile]
         physical_execution = build_panda_direct_effort_execution(
-            scene, artifact, source, wrench_target=target, split=physical_profile == 'panda-split-direct-effort-v1')
+            scene, artifact, source, wrench_target=target, split=physical_profile == 'panda-split-direct-effort-v1',
+            fixed_frame_point=physical_profile in ('panda-fixed-frame-point-wrench-v1',
+                                                  'panda-free-body-point-wrench-v1'))
 
     def build(_provider):
         profile = PandaPositionServoProfileV1.from_source(artifact, source)

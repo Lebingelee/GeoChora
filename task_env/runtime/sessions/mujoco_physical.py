@@ -55,6 +55,8 @@ class MuJoCoPhysicalPort:
         if session._provider != 'mujoco' or session._mixed_actuator_plan is not None:
             raise ValueError('physical port requires a scalar MuJoCo session')
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
+        drive_mode = ('disabled' if getattr(session._artifact, 'artifact_id', None) == 'pickcube-mjcf-physical-effort-no-drive-v1'
+                      else 'position')
         groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
         for channel in binding.channels:
             semantic = f'{channel.entity_id}/{channel.joint_id}'
@@ -88,7 +90,7 @@ class MuJoCoPhysicalPort:
                     or float(model.actuator_gainprm[actuator, 0]) <= 0
                     or float(model.actuator_biasprm[actuator, 1]) >= 0
                     or float(model.actuator_biasprm[actuator, 2]) > 0
-                    or any(channel.native_drive != 'position' for channel, _ in group)):
+                    or any(channel.native_drive != drive_mode for channel, _ in group)):
                 raise ValueError('compiled actuator range, gear or position drive differs')
             trn = int(model.actuator_trntype[actuator])
             target = int(model.actuator_trnid[actuator][0])
@@ -116,6 +118,16 @@ class MuJoCoPhysicalPort:
                 equality_ids.append(matches[0])
             else:
                 raise ValueError('unsupported compiled physical transmission')
+        if drive_mode == 'disabled':
+            bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
+            before = int(model.opt.disableflags)
+            model.opt.disableflags = before | bit
+            if not int(model.opt.disableflags) & bit:
+                raise ValueError('MuJoCo public option did not disable source actuation')
+            session._build_layout_facts['physical_drive_override'] = {
+                'schema_version': 'mujoco-public-drive-isolation-v1', 'actuator_ids': sorted(actuator_ids),
+                'before_disableflags': before, 'after_disableflags': int(model.opt.disableflags),
+                'source_mjcf_modified': False, 'api': 'mjOption.disableflags/mjDSBL_ACTUATION'}
         bodies = {}
         body_frames = {}
         for body in binding.bodies:

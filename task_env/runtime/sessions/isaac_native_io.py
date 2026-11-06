@@ -308,6 +308,69 @@ def _tensor_rows(value, *, width: int, label: str) -> tuple[tuple[float, ...], .
     return result
 
 
+def _verify_f06_public_joint_axes(stage, usd_physics, witness):
+    """Compare authored joint frames with same-boundary public Jacobian axes."""
+    import numpy as np
+    def rotation(q):
+        w, x, y, z = (float(v) for v in q)
+        norm = math.sqrt(w*w + x*x + y*y + z*z)
+        if not math.isfinite(norm) or abs(norm - 1.) > 1e-4:
+            raise ValueError('F06 axis witness quaternion is not normalized')
+        w, x, y, z = (v / norm for v in (w, x, y, z))
+        return np.array([[1-2*(y*y+z*z), 2*(x*y-z*w), 2*(x*z+y*w)],
+                         [2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w)],
+                         [2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y)]])
+    order = witness['dof_order']
+    links = witness['link_order']
+    poses = {row['path']: row for row in witness['link_world_poses']}
+    jac = np.asarray(witness['jacobian'], dtype=float)
+    if jac.ndim != 3 or jac.shape[1] != 6 or not np.isfinite(jac).all():
+        raise ValueError('F06 public Jacobian shape differs from the axis witness')
+    result = {}
+    for prim in stage.Traverse():
+        name = prim.GetName()
+        if name not in order:
+            continue
+        if prim.IsA(usd_physics.RevoluteJoint):
+            joint, kind = usd_physics.RevoluteJoint(prim), 'revolute'
+        elif prim.IsA(usd_physics.PrismaticJoint):
+            joint, kind = usd_physics.PrismaticJoint(prim), 'prismatic'
+        else:
+            raise ValueError(f'F06 named DOF lacks a scalar USD joint: {name}')
+        if name in result:
+            raise ValueError('F06 source has duplicate named DOFs')
+        children = joint.GetBody1Rel().GetTargets()
+        if len(children) != 1 or str(children[0]) not in poses:
+            raise ValueError('F06 joint child is absent from the public link witness')
+        pose = poses[str(children[0])]
+        link_index = links.index(pose['name'])
+        row = link_index - (1 if jac.shape[0] == len(links)-1 else 0)
+        column = order.index(name) + (jac.shape[2]-len(order))
+        if row < 0 or row >= jac.shape[0] or column < 0 or column >= jac.shape[2]:
+            raise ValueError('F06 native Jacobian indexing differs from its public names')
+        q = joint.GetLocalRot1Attr().Get()
+        quaternion = [float(q.GetReal()), *(float(v) for v in q.GetImaginary())]
+        token = str(joint.GetAxisAttr().Get())
+        if token not in {'X', 'Y', 'Z'}:
+            raise ValueError('F06 USD joint axis token is invalid')
+        source_axis = rotation(pose['orientation_world_wxyz']) @ rotation(quaternion) @ np.eye(3)[{'X':0, 'Y':1, 'Z':2}[token]]
+        native_axis = jac[row, 3:6, column] if kind == 'revolute' else jac[row, 0:3, column]
+        length = float(np.linalg.norm(native_axis))
+        if length <= 1e-6:
+            raise ValueError('F06 native Jacobian axis is unobservable')
+        native_axis = native_axis / length
+        error = math.atan2(float(np.linalg.norm(np.cross(source_axis, native_axis))),
+                           float(np.dot(source_axis, native_axis)))
+        if error > 1e-5:
+            raise ValueError(f'F06 USD and public Jacobian axis differ: {name} {error}')
+        result[name] = {'kind': kind, 'source_path': str(prim.GetPath()), 'child_path': str(children[0]),
+                        'source_axis_world': source_axis.tolist(), 'native_axis_world': native_axis.tolist(),
+                        'error_rad': error}
+    if set(result) != set(order):
+        raise ValueError('F06 USD axis witness does not cover all native DOFs')
+    return {'schema_version': 'f06-public-source-native-axis-witness-v1', 'rows': result}
+
+
 def _read_f06_public_physical_model(articulation, free_views):
     """Read F06 link/free-body mass properties through public tensor views."""
     import numpy as np
@@ -706,6 +769,11 @@ class IsaacSimNativeRuntimeIOV1:
                     if self._dg04_native and semantic == 'free-cube/free_cube':
                         self._body_views[path] = RigidPrim(path, max_contact_count=32)
                         self._body_views[path].set_enabled_contact_tracking(True, threshold=0.0)
+                    elif (self._f06_pickcube and semantic == 'cube-v1' and self._artifact.artifact_id in {
+                            'pickcube-f06-physical-effort-fixture-v1',
+                            'pickcube-f06-physical-effort-no-drive-v1'}):
+                        self._body_views[path] = RigidPrim(path, max_contact_count=64)
+                        self._body_views[path].set_enabled_contact_tracking(True, threshold=0.0)
                     else:
                         self._body_views[path] = RigidPrim(path)
                 self._frame_views[semantic] = self._body_views[path]
@@ -754,6 +822,22 @@ class IsaacSimNativeRuntimeIOV1:
                         "local_position_m": list(local_pose.position),
                         "local_orientation_wxyz": list(local_pose.quaternion_wxyz),
                     }
+            # The versioned force-observation fixture owns explicit public
+            # contact reporters on every robot rigid body. The original F06
+            # position route remains unchanged.
+            self._f06_robot_contact_views = {}
+            if (self._f06_pickcube and self._artifact.artifact_id in {
+                    'pickcube-f06-physical-effort-fixture-v1',
+                    'pickcube-f06-physical-effort-no-drive-v1'}):
+                robot_prefix = str(entry_prim).rstrip('/') + '/panda/'
+                for prim in self._stage.Traverse():
+                    path = str(prim.GetPath())
+                    if path.startswith(robot_prefix) and prim.HasAPI(UsdPhysics.RigidBodyAPI):
+                        view = RigidPrim(path, max_contact_count=64)
+                        view.set_enabled_contact_tracking(True, threshold=0.0)
+                        self._f06_robot_contact_views[path] = view
+                if len(self._f06_robot_contact_views) < 9:
+                    raise ValueError('F06 physical fixture lacks robot contact reporters')
             for semantic in self._source.free_joints:
                 body_path = _native_prim_path(self._source.bodies[semantic], entry_prim)
                 self._free_views[semantic] = self._body_views[body_path]
@@ -908,6 +992,8 @@ class IsaacSimNativeRuntimeIOV1:
                         'physics_step_index': int(SimulationManager.get_num_physics_steps()),
                         'simulation_time_s': float(SimulationManager.get_simulation_time()),
                     }
+                self._build_layout_facts['native_joint_axis_witness'] = _verify_f06_public_joint_axes(
+                    self._stage, UsdPhysics, self._build_layout_facts['native_kinematic_model_witness'])
                 mass_paths = {f'link:{name}': str(path) for name, path in zip(link_names, link_paths[0], strict=True)}
                 mass_paths.update({semantic: _native_prim_path(self._source.bodies[semantic], entry_prim)
                                    for semantic in self._free_views})
@@ -966,6 +1052,7 @@ class IsaacSimNativeRuntimeIOV1:
             # traceback. Detach it and release views before closing Kit.
             primary.__traceback__ = None
             self._free_views.clear()
+            self._f06_robot_contact_views = {}
             self._frame_views.clear()
             self._frame_local_poses.clear()
             self._frame_pose_readback_receipts.clear()
@@ -1124,6 +1211,44 @@ class IsaacSimNativeRuntimeIOV1:
             },
             'cross_engine_material_equivalence_claimed': False,
         }
+
+    def _read_f06_robot_contact_witness(self):
+        """Read bounded public contacts for every source robot body after a step."""
+        views = getattr(self, '_f06_robot_contact_views', None)
+        if not views:
+            raise RuntimeError('F06 robot contact reporters are unavailable')
+        rows = []
+        for path, view in sorted(views.items()):
+            result = view.get_raw_contact_data(dt=float(self._artifact.timebase.physics_dt))
+            if type(result) is not tuple or len(result) != 7:
+                raise ValueError('F06 public robot contact result has unexpected shape')
+            counts, starts = result[4].numpy().tolist(), result[5].numpy().tolist()
+            if len(counts) != 1 or len(starts) != 1:
+                raise ValueError('F06 contact reporter does not represent one robot body')
+            count, start = int(counts[0]), int(starts[0])
+            if count < 0 or count >= 64 or start < 0:
+                raise ValueError('F06 robot contact reporter is invalid or at capacity')
+            rows.append({'body_path': path, 'count': count})
+        cube_view = self._free_views.get('cube-v1')
+        if cube_view is None:
+            raise ValueError('F06 contact diagnostic lacks its known cube body')
+        cube_result = cube_view.get_raw_contact_data(dt=float(self._artifact.timebase.physics_dt))
+        if type(cube_result) is not tuple or len(cube_result) != 7:
+            raise ValueError('F06 public cube contact result has unexpected shape')
+        cube_counts, cube_starts = cube_result[4].numpy().tolist(), cube_result[5].numpy().tolist()
+        if len(cube_counts) != 1 or len(cube_starts) != 1:
+            raise ValueError('F06 cube contact reporter does not represent one body')
+        cube_count, cube_start = int(cube_counts[0]), int(cube_starts[0])
+        if cube_count < 0 or cube_count >= 64 or cube_start < 0:
+            raise ValueError('F06 cube contact reporter is invalid or at capacity')
+        cube_actor_paths = (cube_view.get_actor_paths_from_ids(
+            cube_result[6].to('cpu')[cube_start:cube_start + cube_count]) if cube_count else [])
+        if len(cube_actor_paths) != cube_count:
+            raise ValueError('F06 cube contact actor paths do not cover the raw contacts')
+        return {'schema_version': 'f06-public-robot-contact-witness-v1',
+                'known': True, 'capacity_per_body': 64, 'rows': rows,
+                'total_contacts': sum(row['count'] for row in rows),
+                'cube_contact_count': cube_count, 'cube_contact_actor_paths': list(cube_actor_paths)}
 
     def _read_dg04_contact_witness(self) -> dict[str, object]:
         """Read public raw contacts and select only the frozen support collider."""
@@ -1734,6 +1859,88 @@ class IsaacSimNativeRuntimeIOV1:
             raise
 
 
+    def disable_f06_physical_drives(self):
+        """Disable implicit PD through the public tensor API for the exact fixture."""
+        if (self._closed or not self._f06_pickcube or self._artifact.artifact_id
+                != 'pickcube-f06-physical-effort-no-drive-v1'
+                or getattr(self, '_physical_drives_disabled', False)):
+            raise ValueError('native drive isolation requires the exact fresh F06 fixture')
+        from isaacsim.core.experimental.utils import backend as backend_utils
+        names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1',)
+        indices = [self._dof_index[name] for name in names]
+        with backend_utils.use_backend('tensor', raise_on_fallback=True):
+            before_stiffness, before_damping = self._articulation.get_dof_gains()
+            before = {'stiffness': list(_tensor_rows(before_stiffness, width=len(self._dof_names), label='F06 pre-isolation stiffness')[0]),
+                      'damping': list(_tensor_rows(before_damping, width=len(self._dof_names), label='F06 pre-isolation damping')[0])}
+            self._articulation.set_dof_gains([0.0]*8, [0.0]*8, dof_indices=indices, update_default_gains=False)
+            self._sync()
+            stiffness, damping = self._articulation.get_dof_gains()
+            after_stiffness = _tensor_rows(stiffness, width=len(self._dof_names), label='F06 isolated stiffness')[0]
+            after_damping = _tensor_rows(damping, width=len(self._dof_names), label='F06 isolated damping')[0]
+        if any(abs(after_stiffness[index]) > 1e-8 or abs(after_damping[index]) > 1e-8 for index in indices):
+            raise ValueError('F06 public gain readback did not confirm native drive isolation')
+        self._physical_drives_disabled = True
+        return {'schema_version': 'f06-public-drive-isolation-v1', 'names': list(names),
+                'before': before, 'after_stiffness': list(after_stiffness),
+                'after_damping': list(after_damping), 'source_usd_modified': False,
+                'api': 'Articulation.set_dof_gains tensor'}
+
+    def read_f06_physical_drive_gains(self):
+        """Read the live public tensor gains without changing the physics clock."""
+        if not getattr(self, '_physical_drives_disabled', False):
+            raise RuntimeError('F06 physical drives have not been isolated')
+        from isaacsim.core.experimental.utils import backend as backend_utils
+        before = self._counter()
+        with backend_utils.use_backend('tensor', raise_on_fallback=True):
+            stiffness, damping = self._articulation.get_dof_gains()
+            result = {'stiffness': list(_tensor_rows(stiffness, width=len(self._dof_names), label='F06 live stiffness')[0]),
+                      'damping': list(_tensor_rows(damping, width=len(self._dof_names), label='F06 live damping')[0])}
+        if self._counter() != before:
+            raise RuntimeError('F06 gain readback advanced physics')
+        return result
+
+    def write_physical_effort(self, values):
+        """Apply one F06 source-bound effort interval through the public API."""
+        import math
+        expected = {f'joint{i}' for i in range(1, 8)} | {'finger_joint1'}
+        if (self._closed or self._episode_origin_step is None or not self._f06_pickcube
+                or getattr(self, '_physical_effort_fault', False)
+                or getattr(self, '_physical_effort_pending', None) is not None):
+            raise RuntimeError('F06 physical effort requires an available reset interval')
+        if (not isinstance(values, dict) or set(values) != expected
+                or any(isinstance(v, bool) or not math.isfinite(float(v)) for v in values.values())):
+            raise ValueError('F06 physical effort requires the eight finite named active DOFs')
+        names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1',)
+        if any(abs(float(values[name])) > (250.0 if name.startswith('joint') else 5.0)
+               for name in names):
+            raise ValueError('F06 direct effort exceeds its separately declared bound')
+        indices = [self._dof_index[name] for name in names]
+        efforts = [float(values[name]) for name in names]
+        # Reserve the interval before the setter: it may partially write and
+        # still raise, so the Env's abort path must attempt to clear it.
+        self._physical_effort_pending = (indices, efforts)
+        try:
+            self._articulation.set_dof_efforts(efforts, dof_indices=indices)
+            self._sync()
+        except BaseException:
+            self._physical_effort_fault = True
+            raise
+
+    def clear_physical_effort(self):
+        """Clear the owned direct contribution; a failed clear faults the owner."""
+        pending = getattr(self, '_physical_effort_pending', None)
+        if pending is None:
+            return
+        try:
+            indices, _efforts = pending
+            self._articulation.set_dof_efforts([0.0] * len(indices), dof_indices=indices)
+            self._sync()
+        except BaseException:
+            self._physical_effort_fault = True
+            raise
+        finally:
+            self._physical_effort_pending = None
+
     def advance(self) -> NativeAdvanceReceiptV1:
         if self._closed or self._episode_origin_step is None:
             raise RuntimeError("Isaac advance requires an active reset episode")
@@ -1741,6 +1948,11 @@ class IsaacSimNativeRuntimeIOV1:
         attempted_index = self._native_step_count + 1
         native_adaptation_application = None
         try:
+            pending = getattr(self, '_physical_effort_pending', None)
+            if pending is not None:
+                indices, efforts = pending
+                self._articulation.set_dof_efforts(efforts, dof_indices=indices)
+                self._sync()
             self._manager.step(steps=1, update_fabric=False)
             self._sync()
             if self._dg04_native or self._f06_pickcube:
@@ -1818,6 +2030,8 @@ class IsaacSimNativeRuntimeIOV1:
                     'native_drive_api': 'PhysicsDriveAPI:linear',
                 }
                 if self._f06_pickcube:
+                    if getattr(self, '_f06_robot_contact_views', None):
+                        native_adaptation_application['public_robot_contacts'] = self._read_f06_robot_contact_witness()
                     native_adaptation_application.update({
                         'projected_joint_force_N': float(projected_joint_force),
                         'public_projected_joint_force_api': (
@@ -1830,6 +2044,8 @@ class IsaacSimNativeRuntimeIOV1:
                         self._read_dg04_contact_witness()
                     )
         except BaseException as error:
+            if getattr(self, '_physical_effort_pending', None) is not None:
+                self._physical_effort_fault = True
             error.add_note(
                 f"one native physics step was attempted; pre-step counter={before!r}; "
                 f"DG04 native adaptation receipt={native_adaptation_application!r}"
@@ -1864,6 +2080,7 @@ class IsaacSimNativeRuntimeIOV1:
         except BaseException as error:
             primary = error
         self._free_views.clear()
+        self._f06_robot_contact_views = {}
         self._frame_views.clear()
         self._frame_local_poses.clear()
         self._frame_pose_readback_receipts.clear()

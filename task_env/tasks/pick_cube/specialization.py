@@ -356,7 +356,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile="r3_continuous_v1",
-                          resolved_config=None, task_config=None):
+                          resolved_config=None, task_config=None, physical_fixture=False):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
         raise ValueError("F06 Isaac freezes the existing r3_continuous_v1 profile")
@@ -371,6 +371,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                              controller_profile=controller_profile, resolved_config=resolved_config, task_config=task_config)
     runtime_input = build_pickcube_isaac_runtime_input_v1(
         delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
+        physical_fixture=physical_fixture,
     )
     manifest_path = Path(delivery_manifest).resolve(strict=True)
     panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
@@ -846,7 +847,7 @@ def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
 
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
-    task_config=None,
+    task_config=None, physical_fixture=False,
 ) -> UsdRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
 
@@ -864,6 +865,20 @@ def build_pickcube_isaac_runtime_input_v1(
 
     task_config = _configuration() if task_config is None else task_config
     legacy_artifact = build_artifact(task_config=task_config)
+    if physical_fixture not in (False, 'coexist', 'effort-only'):
+        raise ValueError('F06 physical fixture must select coexist or effort-only')
+    if physical_fixture:
+        # The source and task recipe remain unchanged. This versioned Artifact
+        # starts the coupled fingers inside their limits for force observation.
+        positions = dict(legacy_artifact.initialization.joint_position)
+        positions.update({'panda-v1/finger_joint1': .02, 'panda-v1/finger_joint2': .02})
+        legacy_artifact = replace(legacy_artifact,
+            artifact_id=('pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist'
+                         else 'pickcube-f06-physical-effort-no-drive-v1'),
+            initialization=replace(legacy_artifact.initialization, joint_position=positions,
+                                   reset_validity=('f06-physical-effort-interior-fingers-v1'
+                                                   if physical_fixture == 'coexist'
+                                                   else 'f06-physical-effort-no-drive-v1')))
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
         task_config, legacy_artifact,
     )

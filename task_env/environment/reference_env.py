@@ -1389,13 +1389,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._episode_execution_state().require_open('environment is closed')
         from .reference_binding import prepare_selected_reset
         if self.binding.physical_control_profile is not None and (
-                (self.provider, self.backend) != ('mujoco', 'cpu')
+                (self.provider, self.backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}
                 or not self.position_profile):
             raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented')
         if self.binding.physical_control_profile is not None:
-            from ..runtime.sessions.mujoco_physical import preflight_physical_mujoco
-            preflight_physical_mujoco(self.binding.physical_control_profile(self),
-                                      self.artifact, self.value['source'])
+            if self.provider == 'mujoco':
+                from ..runtime.sessions.mujoco_physical import preflight_physical_mujoco as preflight_physical
+            elif self.provider == 'geophys':
+                from ..runtime.sessions.geophys_physical import preflight_physical_geophys as preflight_physical
+            else:
+                from ..runtime.sessions.isaac_physical import preflight_physical_isaac as preflight_physical
+            preflight_physical(self.binding.physical_control_profile(self), self.artifact, self.value['source'])
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         switch_candidate = None

@@ -60,6 +60,8 @@ class GeoPhysRuntimeBoundary:
         self._ctrl_range = np.asarray(ctrl_range, dtype=np.float32).copy()
         self._actuator_force_limit_overrides: dict[int, float] = {}
         self._simulation_time = 0.0
+        self._generalized_effort_pending = False
+        self._generalized_effort_fault = False
         self._capture_static_world_children = bool(capture_static_world_children)
         if self._capture_static_world_children:
             (self._static_world_child_body_ids,
@@ -93,6 +95,103 @@ class GeoPhysRuntimeBoundary:
             raise StageUnavailableError("GeoPhys effective model snapshot is unavailable")
         return reader()
 
+    def read_actuator_outputs_enabled(self, actuator_ids):
+        """Read the public enabled flags for a bounded physical fixture."""
+        reader = getattr(self._physics, 'read_actuator_enabled', None)
+        if not callable(reader):
+            raise StageUnavailableError('GeoPhys public actuator state is unavailable')
+        ids = tuple(actuator_ids)
+        if not ids or len(set(ids)) != len(ids) or any(type(i) is not int or i < 0 for i in ids):
+            raise ValueError('actuator state requires unique nonnegative IDs')
+        return tuple(bool(reader(i)) for i in ids)
+
+    def isolate_actuator_outputs_for_physical_fixture(self, actuator_ids):
+        """Use the bounded diagnostic public API for a versioned effort fixture."""
+        setter = getattr(self._physics, 'set_actuator_enabled', None)
+        reader = getattr(self._physics, 'read_actuator_enabled', None)
+        if not callable(setter) or not callable(reader):
+            raise StageUnavailableError('GeoPhys public actuator isolation is unavailable')
+        ids = tuple(actuator_ids)
+        if not ids or len(set(ids)) != len(ids) or any(type(i) is not int or i < 0 for i in ids):
+            raise ValueError('actuator isolation requires unique nonnegative IDs')
+        before = tuple(bool(reader(i)) for i in ids)
+        if not all(before):
+            raise ValueError('actuator isolation requires all source drives initially active')
+        attempted = []
+        try:
+            for index in ids:
+                attempted.append(index)
+                setter(index, False)
+            after = tuple(bool(reader(i)) for i in ids)
+            if any(after):
+                raise ValueError('GeoPhys public actuator isolation did not persist')
+        except BaseException as error:
+            for index in reversed(attempted):
+                try:
+                    setter(index, True)
+                except BaseException as cleanup_error:
+                    error.add_note(f'actuator isolation restore failed at {index}: {cleanup_error!r}')
+            raise
+        return {'schema_version': 'geophys-public-drive-isolation-v1', 'actuator_ids': list(ids),
+                'before_enabled': list(before), 'after_enabled': list(after),
+                'source_mjcf_modified': False, 'scope': 'bounded versioned physical fixture',
+                'api': 'set_actuator_enabled/read_actuator_enabled'}
+
+    def query_contact_geometry(self):
+        """Query provider-owned current contact geometry without advancing time."""
+        reader = getattr(self._physics, 'query_contact_geometry', None)
+        if not callable(reader):
+            raise StageUnavailableError('GeoPhys current contact geometry is unavailable')
+        return reader()
+
+    def enable_contact_observation(self, *, sink=None):
+        """Opt in to the provider's synchronous contact observation contract."""
+        enable = getattr(self._physics, 'enable_contact_observation', None)
+        if not callable(enable):
+            raise StageUnavailableError('GeoPhys contact observation is unavailable')
+        return enable(sink=sink)
+
+    def read_contact_observation(self):
+        reader = getattr(self._physics, 'read_contact_observation', None)
+        if not callable(reader):
+            raise StageUnavailableError('GeoPhys contact observation is unavailable')
+        return reader()
+
+    def write_generalized_effort(self, values) -> None:
+        """Replace one boundary-owned interval of provider generalized effort.
+
+        This is a commanded input, not a measured force. The owning session must
+        serialize this operation with stepping, reset, and any other force writer.
+        """
+        if self._generalized_effort_fault or self._generalized_effort_pending:
+            raise RuntimeError('generalized effort boundary is faulted or already occupied')
+        raw = np.asarray(values)
+        count = int(getattr(self._physics, 'n_dof', 0))
+        if (raw.shape != (count,) or raw.dtype.kind not in {'i', 'u', 'f'}
+                or not np.isfinite(raw).all()
+                or np.any(np.abs(raw) > np.finfo(np.float32).max)):
+            raise ValueError('generalized effort requires one finite value per native DOF')
+        setter = getattr(self._physics, 'set_qfrc_applied', None)
+        if not callable(setter):
+            raise StageUnavailableError('GeoPhys generalized effort setter is unavailable')
+        self._generalized_effort_pending = True
+        try:
+            setter(np.asarray(raw, dtype=np.float32))
+        except BaseException:
+            self._generalized_effort_fault = True
+            raise
+
+    def clear_generalized_effort(self) -> None:
+        """Clear the interval owned by this boundary, including after a fault."""
+        if not self._generalized_effort_pending:
+            return
+        try:
+            self._physics.set_qfrc_applied(np.zeros(int(self._physics.n_dof), dtype=np.float32))
+        except BaseException:
+            self._generalized_effort_fault = True
+            raise
+        self._generalized_effort_pending = False
+
     def apply_reset_state(
         self,
         state: EpisodePhysicsState,
@@ -100,6 +199,8 @@ class GeoPhysRuntimeBoundary:
         refresh_actuator_force: bool = False,
         static_world_child_poses: Mapping[int, tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> ActuatorForceMeasurementV1 | None:
+        if self._generalized_effort_pending or self._generalized_effort_fault:
+            raise RuntimeError('cannot reset with pending or faulted generalized effort')
         if static_world_child_poses and not self._capture_static_world_children:
             raise StageUnavailableError(
                 "static world-child reset overrides require an articulated runtime boundary"

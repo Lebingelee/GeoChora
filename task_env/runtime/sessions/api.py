@@ -1162,8 +1162,15 @@ def _validate_v1_materialization_source(
         }
         if any(len(roots) != 1 for roots in roots_by_entity.values()):
             raise ValueError('bounded dual Position materialization requires two independent single-root Entities')
-    if artifact.initialization.poses_world:
-        raise ValueError('D01b v1 materialization does not yet admit free-body pose reset fields')
+    if set(artifact.initialization.poses_world) != set(source.free_joints):
+        raise ValueError('free-body reset poses must exactly match source free-joint bindings')
+    for semantic, native in source.free_joints.items():
+        frame = artifact.legacy_frame_bindings.get(semantic)
+        matches = [joint for articulation in scene.articulations or () for joint in articulation.joints
+                   if joint.kind == 'floating' and joint.joint_id == native
+                   and joint.child_frame == frame]
+        if len(matches) != 1:
+            raise ValueError('free-body reset pose must bind one canonical floating Joint')
     if not set(artifact.semantics.required_joints) <= set(source.joints):
         raise ValueError('RuntimeSource does not bind every required TaskArtifact v1 Joint')
 

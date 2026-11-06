@@ -268,7 +268,7 @@ class PandaPositionServoProfileV1:
     def from_source(cls, artifact, source, *, config: ActionConfig | None = None,
                     nullspace_reference_gain=0.0,
                     arm_tracking_method='canonical_position_v1',
-                    arm_tracking_profile=None):
+                    arm_tracking_profile=None, entity_id='panda-main'):
         if not isinstance(artifact, TaskArtifactV1):
             raise TypeError('PositionServoV1 requires TaskArtifactV1')
         if artifact.timebase.physics_dt != 0.002 or artifact.timebase.control_substeps != 5 or artifact.timebase.control_dt != 0.01:
@@ -282,12 +282,14 @@ class PandaPositionServoProfileV1:
             raise ValueError('PositionServoV1 source ID is not bound to its Scene')
         if not isinstance(source.source_closure_digest, str) or len(source.source_closure_digest) != 64:
             raise ValueError('PositionServoV1 requires a source closure digest')
-        if any(source.joints.get(name) != native for name, native in _EXPECTED_JOINT_BINDINGS.items()):
+        expected_joints = {f'{entity_id}/{name}': name for name in _JOINT_IDS}
+        expected_targets = {f'{entity_id}/joint{i}': f'actuator{i}' for i in range(1, 8)}
+        if any(source.joints.get(name) != native for name, native in expected_joints.items()):
             raise ValueError('PositionServoV1 requires exact Panda arm/finger Joint source bindings')
-        if source.bodies.get('panda-main/hand') != 'hand':
+        if source.bodies.get(f'{entity_id}/hand') != 'hand':
             raise ValueError('PositionServoV1 hand state must bind to the actual hand body')
         if (any(source.joint_targets.get(name) != actuator
-                for name, actuator in _EXPECTED_TARGET_BINDINGS.items())
+                for name, actuator in expected_targets.items())
                 or 'actuator8' not in tuple(source.open_actuators)):
             raise ValueError('PositionServoV1 requires exact actuator1–7 and actuator8 source bindings')
 
@@ -299,7 +301,7 @@ class PandaPositionServoProfileV1:
         )
         model = PandaKinematics(materialized_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
         return cls(
-            artifact=artifact, source=source, scene=scene, model=model, config=config,
+            artifact=artifact, source=source, scene=scene, model=model, config=config, entity_id=entity_id,
             nullspace_reference_gain=nullspace_reference_gain,
             arm_tracking_method=arm_tracking_method,
             arm_tracking_profile=arm_tracking_profile,

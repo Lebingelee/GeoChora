@@ -214,6 +214,30 @@ class _GeoPhysSession(_SessionValues):
         self._last_actuator_force_measurement = None
         self._last_typed_force_publication = None
 
+    def bind_physical_control(self, execution):
+        if getattr(self, '_physical_port', None) is not None or self._reset_done:
+            raise ValueError('physical port must be bound once before reset')
+        from .geophys_physical import GeoPhysPhysicalPort
+        self._physical_port = GeoPhysPhysicalPort(self, execution)
+        self.physical_control_generation = execution.generation
+
+    def assess_physical_control(self, binding):
+        return self._physical_port.assessment(binding)
+
+    def physical_joint_build_receipt(self, binding):
+        return self._physical_port.joints(binding)
+
+    def physical_buffer_policy(self, binding):
+        return self._physical_port.policy(binding)
+
+    def apply_physical_command_batch(self, resolved):
+        return self._physical_port.write(resolved)
+
+    def abort_physical_control(self):
+        port = getattr(self, '_physical_port', None)
+        if port is not None:
+            port.finish_interval()
+
     def _initialize_mixed_actuator(self, source, names, data):
         """Bind every declared mixed channel to the compiled named GeoPhys model."""
         from ...controllers.canonical.contracts import MixedActuatorPlanV1
@@ -355,6 +379,8 @@ class _GeoPhysSession(_SessionValues):
 
     def reset(self, sample):
         self._validate_sample(sample)
+        if getattr(self, '_physical_port', None) is not None and self._physical_port.pending is not None:
+            raise RuntimeError('cannot reset with pending physical effort')
         if self._mixed_actuator_plan is not None:
             self._preflight_mixed_reset(sample)
         self._begin_reset()
@@ -1049,6 +1075,19 @@ class _GeoPhysSession(_SessionValues):
 
     def step(self):
         self._require_reset()
+        physical_port = getattr(self, '_physical_port', None)
+        if physical_port is not None:
+            if physical_port.pending is None:
+                raise RuntimeError('physical interval requires exactly one fresh batch')
+            try:
+                count = int(self._artifact.timebase.control_substeps)
+                self._boundary.step(substeps=count)
+                self._native_steps += count
+                self._control_step += 1
+                self._state_revision += 1
+                return self.snapshot()
+            finally:
+                physical_port.finish_interval()
         if self._mixed_actuator_plan is not None:
             if self._mixed_fault is not None:
                 raise RuntimeError('mixed actuator GeoPhys session is fault-latched')
@@ -1082,6 +1121,9 @@ class _GeoPhysSession(_SessionValues):
 
     def close(self):
         if not self._closed:
+            port = getattr(self, '_physical_port', None)
+            if port is not None and port.pending is not None:
+                port.finish_interval()
             failure = None
             boundary_close_completed = False
             source_receipt_close_completed = None

@@ -1654,6 +1654,7 @@ class _MuJoCoSession(_SessionValues):
             'revolute': self._mj.mjtJoint.mjJNT_HINGE,
             'continuous': self._mj.mjtJoint.mjJNT_HINGE,
             'prismatic': self._mj.mjtJoint.mjJNT_SLIDE,
+            'floating': self._mj.mjtJoint.mjJNT_FREE,
         }
         for articulation in scene.articulations or ():
             for joint in articulation.joints:
@@ -1690,6 +1691,13 @@ class _MuJoCoSession(_SessionValues):
                     raise ValueError(
                         f'canonical Joint {joint.joint_id!r} type/child binding differs in MuJoCo'
                     )
+                if joint.kind == 'floating':
+                    matches = [semantic for semantic, native in self._source.free_joints.items()
+                               if native == joint.joint_id
+                               and self._artifact.legacy_frame_bindings.get(semantic) == joint.child_frame]
+                    if len(matches) != 1:
+                        raise ValueError('canonical floating Joint differs from its source binding')
+                    continue
                 if not np.allclose(
                     self._model.jnt_axis[joint_id], joint.axis, rtol=0.0, atol=1.0e-9,
                 ):

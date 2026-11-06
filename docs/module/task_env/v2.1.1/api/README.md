@@ -53,3 +53,13 @@ selected 构造的 `controller.gravity_compensation` 是可选布尔值，默认
 MuJoCo／GeoPhys 旧 selected CPU RuntimeSession 的 `snapshot_free_joint_native_v1()` 返回当前边界具名自由关节位置与速度的拥有值副本，含 sample、materialization、时间、单位和速度坐标约定；它不推进物理。该接口不提供力传感数据；基于 USD 的 body-COM 原生读回使用既有 `snapshot_v1` 投影。
 
 GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `RigidSolver.read_model_snapshot()`，从该次物化的有效字段复制 body、joint、actuator、equality 和 tendon 值；session build facts 将 provider ID 绑定到同一来源名称。该快照不推进物理，缺失字段明确标注 unavailable。Isaac F06 另保存同一 bootstrap 边界的公开 Jacobian 和 tensor 连杆姿态，供轴方向与来源独立比较；读取前后物理计数必须一致。这些只读事实不构成跨 provider 功能认证。
+
+## 4b 物理控制候选（待独立主审）
+
+版本化 PickCube physical candidate 通过既有 factory、SelectedReferenceEnv 和 RuntimeSession 提供 MuJoCo、GeoPhys CPU 与 Isaac F06 的 Panda 七臂及受源约束的成对双指 effort；直接贡献的限幅不代表与保留的原生 position drive 叠加后的总力。每个 interval 的贡献由 session 持有、逐子步重施并清理；重复贡献、无效映射和未经协调的完整 PD 与活动 drive 组合被拒绝。原 source 的 tendon、equality 和 mimic 不变，不能由此推断两根手指可独立任意施力。
+
+同一共享 Controller 可使用具名关节参考或 R3 末端参考。质量矩阵版本采用各 source 在指定初态公开读回的固定降维矩阵，限定 0.15 rad／0.019 m 状态邻域，并只在声明的 cadence 和原生 drive 已禁用的有界 fixture 中使用；它不是通用动力学模型或力传感器。MuJoCo／GeoPhys 使用公开 actuator 隔离，Isaac 使用公开增益接口，原始 source 未改写。直接 effort 路线仍允许按声明与 source drive 共存。
+
+MuJoCo 的独立版本化自由体和 Robot hand fixture 分别验证实际外力响应与 world force、body-local 偏置点和点参考矩的语义；手部旋转后逐子步更新 frame 和 Jacobian。自由体与手部证据不代表其他 provider 的 BodyWrench 物理验证。所有物理响应为运动观察，ACK、计算力矩及公开模型读回不作为独立测力。
+
+实施证据、失败与限制以本地 `workspace/maintenance/v211_g04_4b_attempt001/` 交付报告为准；该候选尚待 Sol 独立主审，不改变既有已接收范围。
