@@ -1388,6 +1388,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
         from .reference_binding import prepare_selected_reset
+        if self.binding.physical_control_profile is not None:
+            # No current Core session implements the physical assessment,
+            # build-mapping and batch-write port. Do not materialize a provider
+            # on a declaration alone; a future adapter must add a real preflight.
+            raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         switch_candidate = None
@@ -2118,6 +2123,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
+        if self.binding.physical_control_profile is not None:
+            return self._prepare_physical_control(action)
         if getattr(self, 'mixed_control_profile', False):
             return self._prepare_mixed_control(action)
         from ..controllers.canonical.contracts import StructuredActionRequestV1
@@ -2157,6 +2164,184 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
         return self._prepare_reference_step(action)
+
+    def _prepare_physical_control(self, action):
+        """Prepare one named physical interval through the selected session."""
+        from ..artifacts.state import CanonicalStatePublicationV1, CanonicalStatePublicationV2
+        from ..controllers.canonical.physical_commands import PhysicalCommandContextV1, PhysicalControlReceiptV1
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, prepare_physical_command_batch
+
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or episode already stopped')
+        if self.state.control_step >= self.horizon:
+            raise RuntimeError('selected physical-control horizon is exhausted')
+        if self.recorder is not None and getattr(self.recorder, 'active', False):
+            raise StageUnavailableError('physical-control recording is not yet admitted')
+        profile = self.binding.physical_control_profile(self)
+        if type(profile) is not PhysicalControlExecutionV1:
+            raise TypeError('selected physical route requires an admitted physical execution profile')
+        plan = profile.compiled.binding
+        source = self.value['source']
+        if (self.artifact.identity_hash != plan.artifact_sha256
+                or getattr(source, 'source_id', None) != plan.source_id
+                or getattr(source, 'source_closure_digest', None) != plan.source_closure_sha256):
+            raise ValueError('selected physical execution source or Artifact differs from binding')
+        assess = getattr(self.session, 'assess_physical_control', None)
+        write = getattr(self.session, 'apply_physical_command_batch', None)
+        if not callable(assess) or not callable(write):
+            raise StageUnavailableError('RuntimeSession does not expose an admitted physical-control port')
+        if getattr(self.session, 'physical_control_generation', None) != profile.generation:
+            raise ValueError('physical-control session generation differs from profile')
+        publication = self.session.snapshot_v2(scene=profile.scene,
+            joint_bindings=profile.joint_bindings, frame_bindings=profile.frame_bindings,
+            requirements=profile.requirements)
+        if type(publication) is not CanonicalStatePublicationV2:
+            raise TypeError('physical Controller needs a typed state publication')
+        if not publication.lifetime.may_be_retained:
+            raise ValueError('physical Controller requires an owned state snapshot')
+        view = publication.view
+        if view.boundary != self.session.state_boundary_identity():
+            raise ValueError('physical Controller state is stale')
+        view.validate_against_scene(profile.scene)
+        view.validate_requirements(profile.requirements)
+        clock_tolerance = _boundary_interval_clock_tolerance(
+            self.state.simulation_time, view.sample_clock.simulation_time_s,
+            self.artifact.timebase.control_dt, self.artifact.timebase.control_dt, 1)
+        if (self.state.control_step != view.boundary.control_step
+                or abs(float(self.state.simulation_time) - view.sample_clock.simulation_time_s) > clock_tolerance):
+            raise ValueError('selected and typed state clocks differ')
+        context = PhysicalCommandContextV1('physical-command-context-v1', plan.source_id,
+            plan.source_closure_sha256, plan.artifact_sha256, view.boundary, view.sample_clock,
+            0, profile.generation, self.artifact.timebase.control_dt, self.artifact.timebase.control_dt)
+        if getattr(self, '_last_physical_submission', None) == context.identity_hash:
+            raise ValueError('physical command interval was already submitted')
+        assessment = assess(plan)
+        if getattr(assessment, 'phase', None) not in {'native_build', 'runtime'}:
+            raise ValueError('physical session write requires native-build or runtime capability assessment')
+        if len(profile.controllers) == 1 and not isinstance(action, Mapping):
+            actions = {profile.controllers[0].identity: action}
+        elif isinstance(action, Mapping):
+            actions = dict(action)
+        else:
+            raise TypeError('multiple physical Controllers require identity-keyed actions')
+        if set(actions) != {controller.identity for controller in profile.controllers}:
+            raise ValueError('physical action must cover every bound Controller exactly once')
+        from ..controllers.canonical.physical_commands import PhysicalCommandBatchV1
+        parts = tuple(controller.compute(actions[controller.identity], view, context)
+                      for controller in profile.controllers)
+        if any(type(part) is not PhysicalCommandBatchV1 or part.context != context for part in parts):
+            raise ValueError('physical Controller returned a foreign or untyped batch')
+        for controller, part in zip(profile.controllers, parts, strict=True):
+            if any(item.contribution.owner_id != controller.writer_id
+                   for item in (*part.joint_efforts, *part.body_wrenches, *part.extensions)):
+                raise ValueError('physical Controller contribution owner differs from binding')
+        batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
+            tuple(item for part in parts for item in part.joint_efforts),
+            tuple(item for part in parts for item in part.body_wrenches),
+            tuple(item for part in parts for item in part.extensions))
+        submitted = PhysicalControlReceiptV1('physical-control-receipt-v1', context,
+            batch.identity_hash, 'submitted', tuple(item.contribution.contribution_id
+            for item in (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)),
+            'core-selected', 'per-channel')
+        buffer_policy = None
+        if any(item.contribution.persistence == 'hold_reapply'
+               for item in (*batch.joint_efforts, *batch.body_wrenches)):
+            get_buffer_policy = getattr(self.session, 'physical_buffer_policy', None)
+            if not callable(get_buffer_policy):
+                raise StageUnavailableError('RuntimeSession has no held-load buffer policy')
+            buffer_policy = get_buffer_policy(plan)
+        joint_receipt = None
+        if batch.joint_efforts:
+            get_joint_receipt = getattr(self.session, 'physical_joint_build_receipt', None)
+            if not callable(get_joint_receipt):
+                raise StageUnavailableError('RuntimeSession has no verified physical joint mapping')
+            joint_receipt = get_joint_receipt(plan)
+        body_receipt = None
+        if batch.body_wrenches:
+            get_body_receipt = getattr(self.session, 'physical_body_build_receipt', None)
+            if not callable(get_body_receipt):
+                raise StageUnavailableError('RuntimeSession has no verified physical body mapping')
+            body_receipt = get_body_receipt(plan)
+        if any(getattr(receipt, 'provenance', None) != 'native_build'
+               for receipt in (joint_receipt, body_receipt) if receipt is not None):
+            raise ValueError('synthetic mapping cannot authorize a session write')
+        resolved = prepare_physical_command_batch(profile.compiled, batch, expected_context=context,
+                                                   assessment=assessment, state=view,
+                                                   body_build_receipt=body_receipt,
+                                                   joint_build_receipt=joint_receipt,
+                                                   buffer_policy=buffer_policy)
+        before = self.state
+        attempted = False
+        completed = False
+        ack = None
+
+        def apply_control():
+            nonlocal attempted, ack
+            # Mark before the one session write; a partial failure cannot be replayed.
+            self._last_physical_submission = context.identity_hash
+            attempted = True
+            ack = write(resolved)
+            if (type(ack) is not PhysicalControlReceiptV1 or ack.stage != 'native_write_ack'
+                    or ack.context != context or ack.batch_sha256 != batch.identity_hash
+                    or ack.contribution_ids != resolved.accepted_receipt.contribution_ids):
+                raise ValueError('physical RuntimeSession returned an invalid write acknowledgement')
+            return ack
+
+        def advance(_ack):
+            nonlocal completed
+            self.state = self.session.step()
+            completed = True
+            if getattr(self, 'position_profile', False):
+                # The existing selected observation consumes the Position
+                # publication. Refresh it at the new boundary instead of
+                # projecting the pre-command snapshot after the interval.
+                publication_after = self.session.snapshot_v1(
+                    scene=self.position_scene, joint_bindings=self.position_joint_bindings,
+                    frame_bindings=self.position_frame_bindings,
+                    requirements=self._position_requirements())
+                if (type(publication_after) is not CanonicalStatePublicationV1
+                        or not publication_after.lifetime.may_be_retained
+                        or publication_after.view.boundary != self.session.state_boundary_identity()
+                        or publication_after.view.boundary.control_step != self.state.control_step
+                        or abs(publication_after.view.sample_clock.simulation_time_s
+                               - float(self.state.simulation_time)) > clock_tolerance):
+                    raise ValueError('physical control post-step publication is stale or foreign')
+                self.typed_state = publication_after
+
+        def evaluate(_state):
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info = dict(self.info)
+            self.info['physical_control_v1'] = {
+                'submitted_batch': batch.to_mapping(),
+                'submitted': submitted.to_mapping(),
+                'accepted': resolved.accepted_receipt.to_mapping(),
+                'native_write_ack': ack.to_mapping(),
+            }
+            return self.evaluation
+
+        def publish(_control, _state, _evaluation, _observation):
+            terminated, truncated = self._episode_execution_state().step_outcome(
+                task_terminated=bool(self.evaluation.failure), task_truncated=False,
+                control_step=self.state.control_step, horizon=self.horizon)
+            self._episode_mode = 'external'
+            self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
+            if getattr(self, 'position_profile', False):
+                self._published_position_state = self.state
+                self._published_position_typed_state = self.typed_state
+                self._published_position_obs = self.obs
+                self._published_position_info = dict(self.info)
+                self._published_position_evaluation = self.evaluation
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+
+        def on_failure(phase, error):
+            self._latch_fault(phase, error, before_state=before, after_state=None,
+                interval_attempted=attempted, interval_completed=completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                transition_status='not_recorded')
+
+        return dict(apply_control=apply_control, advance=advance, read_state=lambda: self.state,
+                    evaluate=evaluate, observe=lambda _state: self.obs,
+                    publish=publish, on_failure=on_failure)
 
     def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
         operations = self._prepare_mixed_control(action, proposal=proposal, observer_solution=observer_solution)

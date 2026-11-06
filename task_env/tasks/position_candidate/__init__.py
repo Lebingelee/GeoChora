@@ -19,8 +19,8 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if kwargs or render_mode is not None:
             raise ValueError('Position candidate rejects render_mode and extra keyword arguments')
         if 'versioned_input' in values:
-            if set(values) - {'versioned_input', 'horizon', 'controller_config'}:
-                raise ValueError('versioned Position candidate admits only versioned_input, horizon and controller_config')
+            if set(values) - {'versioned_input', 'horizon', 'controller_config', 'physical_execution'}:
+                raise ValueError('versioned Position candidate has unsupported configuration fields')
             from .builder import (
                 F04PositionCandidateInputV1,
                 F05NativePositionCandidateInputV1,
@@ -41,12 +41,15 @@ class PositionCandidateEnv(SelectedReferenceEnv):
                     controller_config = ActionConfig(**controller_config)
                 if type(controller_config) is not ActionConfig:
                     raise TypeError('controller_config must be the exact ActionConfig contract')
+            options = {}
+            if 'physical_execution' in values:
+                options['physical_execution'] = values['physical_execution']
             return build_versioned_position_candidate(
                 versioned_input, horizon=horizon, environment_type=cls,
-                controller_config=controller_config,
+                controller_config=controller_config, **options,
             ).env
-        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation'}:
-            raise ValueError('Position candidate config admits provider/backend/horizon/source_workspace and opt-in camera_observation only')
+        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation', 'physical_profile'}:
+            raise ValueError('Position candidate has unsupported configuration fields')
         provider = values.get('provider', 'geophys')
         backend = values.get('backend', 'cpu')
         horizon = values.get('horizon', 6000)
@@ -55,6 +58,12 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('Position candidate horizon must be an integer in [1, 6000]')
         camera_config = values.get('camera_observation')
+        physical_profile = values.get('physical_profile')
+        if physical_profile not in (None, 'panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
+                                     'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1'):
+            raise ValueError('unsupported physical control profile')
+        if physical_profile is not None and camera_config is not None:
+            raise ValueError('physical control profile does not admit camera observation')
         if camera_config is not None:
             from ...observations.canonical_camera.consumer import CameraObservationConfigV1
 
@@ -75,9 +84,10 @@ class PositionCandidateEnv(SelectedReferenceEnv):
             raise ValueError('source_workspace must be fresh or empty; existing source bytes are preserved')
         from .builder import build_position_candidate
 
+        options = {} if physical_profile is None else {'physical_profile': physical_profile}
         return build_position_candidate(
             workspace, provider=provider, horizon=horizon, environment_type=cls,
-            camera_observation_config=camera_config,
+            camera_observation_config=camera_config, **options,
         ).env
 
 

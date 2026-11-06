@@ -274,7 +274,7 @@ def _versioned_position_candidate_kind(input_v1):
 def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
-                                       controller_config=None):
+                                       controller_config=None, physical_execution=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
     if type(input_v1) not in (F04PositionCandidateInputV1,
                               F05NativePositionCandidateInputV1,
@@ -295,6 +295,13 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
+    if physical_execution is not None:
+        from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+        if type(physical_execution) is not PhysicalControlExecutionV1:
+            raise TypeError('physical_execution must be the exact physical control execution contract')
+        physical_execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
+            source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
+            source=source)
     native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
     position_config = input_v1.action_config if type(input_v1) in (
         F05Dg02GeoPhysUsdCandidateInputV1, F05Dg04IsaacNativeCandidateInputV1,
@@ -361,6 +368,9 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
                 'controller': profile.identity,
                 'drive_receipt': (None if native_drive_receipt is None
                                   else native_drive_receipt.identity_sha256),
+                **({'physical_binding': physical_execution.compiled.binding.identity_hash,
+                    'physical_controllers': [item.identity for item in physical_execution.controllers]}
+                   if physical_execution is not None else {}),
                 'kinematics_source_sha256': input_v1.kinematics_source_sha256,
             }),
             'resolved_configuration': {
@@ -418,11 +428,19 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
             },
         )
 
+    action_schema = REFERENCE_POSE_ACTION_SCHEMA
+    action_space_factory = reference_pose_action_space
+    if physical_execution is not None:
+        action_schema = {'schema_version': 'physical-control-actions-v1',
+                         'controllers': [{'identity': item.identity,
+                                          'shape': list(item.action_shape)}
+                                         for item in physical_execution.controllers]}
+        action_space_factory = physical_execution.action_space
     binding = ReferenceTaskBinding(
         position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
         classify_position_input=_versioned_position_candidate_kind,
-        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        action_schema=action_schema, action_space_factory=action_space_factory,
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=lambda _artifact, _seed: input_v1.reset_plan.reset_sample,
@@ -432,6 +450,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         ),
         external_actions=True, interval_mode='grouped', recorder_mode='execution',
         reset_seed=fixed_seed,
+        physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
     )
     env = environment_type.from_position_candidate(
         binding, provider=input_v1.execution.physics_provider,
@@ -451,7 +470,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
 
 def build_position_candidate(workspace: Path | str, *, provider: str, horizon: int = 6000,
                              environment_type=SelectedReferenceEnv,
-                             camera_observation_config=None):
+                             camera_observation_config=None, physical_profile=None):
     """Build one source-identified candidate through SelectedReferenceEnv's existing binding."""
     import importlib
 
@@ -473,10 +492,20 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     reset_plan = sample_episode_reset_plan(
         task_source, scene, artifact, task_seed=POSITION_CANDIDATE_SEED,
     )
-    source, imported, closure_digest, panda_digest, panda_file_count = _source_input(
-        importlib.import_module('scene'), root / 'source-closure', scene, legacy,
-    )
-    if imported is None or len(closure_digest) != 64 or len(panda_digest) != 64:
+    if physical_profile is None:
+        source, imported, closure_digest, panda_digest, panda_file_count = _source_input(
+            importlib.import_module('scene'), root / 'source-closure', scene, legacy,
+        )
+        if imported is None:
+            raise ValueError('Position candidate source import evidence is incomplete')
+    elif physical_profile in ('panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
+                              'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1'):
+        from .source import _physical_source_input
+        source, closure_digest, panda_digest, panda_file_count = _physical_source_input(
+            root / 'source-closure', scene, legacy)
+    else:
+        raise ValueError('unsupported physical control profile')
+    if len(closure_digest) != 64 or len(panda_digest) != 64:
         raise ValueError('Position candidate source import/closure evidence is incomplete')
     source_config = replace(
         source.config,
@@ -495,6 +524,13 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     plan = compile_control_binding_plan(scene, (
         PandaPositionServoProfileV1.from_source(artifact, source).controller_binding(),
     ))
+    physical_execution = None
+    if physical_profile is not None:
+        from .physical_profile import build_panda_direct_effort_execution
+        target = {'panda-direct-effort-v1': None, 'panda-direct-effort-wrench-v1': 'hand',
+                  'panda-direct-effort-object-wrench-v1': 'object', 'panda-split-direct-effort-v1': None}[physical_profile]
+        physical_execution = build_panda_direct_effort_execution(
+            scene, artifact, source, wrench_target=target, split=physical_profile == 'panda-split-direct-effort-v1')
 
     def build(_provider):
         profile = PandaPositionServoProfileV1.from_source(artifact, source)
@@ -513,9 +549,16 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
                 'source_closure': source.source_closure_digest,
                 'profile': profile.identity,
                 'plan': plan.identity_hash,
+                **({'physical_binding': physical_execution.compiled.binding.identity_hash,
+                    'physical_controllers': [item.identity for item in physical_execution.controllers]}
+                   if physical_execution is not None else {}),
             }),
             'resolved_configuration': {
                 'provider': _provider, 'backend': 'cpu', 'profile_id': profile.profile_id,
+                **({'physical_profile': physical_profile,
+                    'physical_binding': physical_execution.compiled.binding.identity_hash,
+                    'physical_controllers': [item.identity for item in physical_execution.controllers]}
+                   if physical_execution is not None else {}),
             },
             'source_revision': 'C02b-E-diagnostic-candidate-v1',
             'source_sha256': {'source_closure': source.source_closure_digest},
@@ -529,10 +572,17 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
             )
         return seed
 
+    action_schema = REFERENCE_POSE_ACTION_SCHEMA
+    action_space_factory = reference_pose_action_space
+    if physical_execution is not None:
+        action_schema = {'schema_version': 'physical-control-actions-v1',
+                         'controllers': [{'identity': item.identity, 'shape': list(item.action_shape)}
+                                         for item in physical_execution.controllers]}
+        action_space_factory = physical_execution.action_space
     binding = ReferenceTaskBinding(
         position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
-        action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
+        action_schema=action_schema, action_space_factory=action_space_factory,
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
@@ -544,6 +594,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         interval_mode='grouped',
         recorder_mode='execution',
         reset_seed=fixed_seed,
+        physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
     )
     env = environment_type.from_position_candidate(
         binding, provider=provider, backend='cpu', horizon=horizon,

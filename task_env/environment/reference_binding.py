@@ -170,6 +170,7 @@ class ReferenceTaskBinding:
     legacy_position_expert_admission: Callable | None = None
     reset_runtime_input: Callable | None = None
     position_control_binding: Callable | None = None
+    physical_control_profile: Callable | None = None
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
     build_receives_binding: bool = False
@@ -216,6 +217,8 @@ class ReferenceTaskBinding:
             raise ValueError('reset runtime input selector must be callable when supplied')
         if self.position_control_binding is not None and not callable(self.position_control_binding):
             raise ValueError('position control binding selector must be callable when supplied')
+        if self.physical_control_profile is not None and not callable(self.physical_control_profile):
+            raise ValueError('physical control profile selector must be callable when supplied')
         if (self.legacy_position_expert_admission is not None
                 and not callable(self.legacy_position_expert_admission)):
             raise ValueError('legacy Position expert admission must be callable when supplied')

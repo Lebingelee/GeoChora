@@ -14,6 +14,8 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ## 需形成的公共体验
 
+4a 开发中的 Position candidate 提供 `panda-direct-effort-v1`、`panda-split-direct-effort-v1`、`panda-direct-effort-wrench-v1` 与 `panda-direct-effort-object-wrench-v1` 物理控制声明；前两项分别由单个或两个 Controller 以 8 个具名输入产生 7 个臂力矩与经静态 tendon 声明分配的两路 finger 力，后两项分别另声明 hand 或静态 peg 的外力输入。模型的零偏置只定义直接力输入，并非 Panda 动力学；静态 peg 的声明不证明自由物体的受力运动。versioned candidate 也可显式携带 `physical_execution`；预检核对 Scene、Artifact、source closure 和状态名称。以上为未接收的构造与 fake 终端证据：当前 Core 尚无实现该端口的 RuntimeSession，选择该声明后 reset 预检会在物化 provider 前明确拒绝；合成映射不能授权会话写入。已有 Position 证据不因此成为 7＋2 effort 实测。
+
 | 操作 | v2.1.1 目标 | 责任与边界 |
 | --- | --- | --- |
 | make_env／配置 | 查询并选择合法 physics／solver／renderer／Controller／batch 组合 | 复用 registry 和配置解析，Core→任务类→YAML→调用方 |

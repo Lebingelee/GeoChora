@@ -1,0 +1,660 @@
+"""Provider-free contract tests; no native source or session initialization."""
+from dataclasses import replace
+import pytest
+
+from task_env.artifacts import FrameReference
+from task_env.artifacts.contracts import CapabilityAssessmentRowV1, CapabilityAssessmentV1
+from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+from task_env.controllers.canonical.physical_commands import (
+    PhysicalCommandContextV1, ContributionPolicyV1, JointEffortV1,
+    PhysicalJointChannelV1, PhysicalControlBindingV1, PhysicalCommandBatchV1,
+    PhysicalJointBuildReceiptV1,
+)
+from task_env.runtime.sessions.physical_control import (
+    compile_physical_control_binding, prepare_physical_command_batch,
+)
+from task_env.diagnostics.tasks.test_phase_ii_01_r01b_logical_resolution import (
+    _scene_v3, _primary_closure,
+)
+
+
+def _joint_receipt(plan, context):
+    return PhysicalJointBuildReceiptV1('physical-joint-build-receipt-v1',
+        plan.binding.identity_hash, plan.binding.source_closure_sha256,
+        context.boundary.provider_materialization_id, plan.binding.channels, 'synthetic_fixture')
+
+
+def _case():
+    scene = _scene_v3()
+    root, _, _, _, catalog = _primary_closure(scene)
+    channel = PhysicalJointChannelV1(
+        'physical-joint-channel-v1', ('robot', 'arm-drive-joint'), ('controller-a',),
+        'arm', 'drive', 'dof0', 'revolute', (0, 0, 1), FrameReference('arm', 'base'),
+        1, 'N*m', (-5, 5), 'native-a', 'direct-a', 1, (-5, 5), 'disabled',
+    )
+    binding = PhysicalControlBindingV1('physical-control-binding-v1', scene.identity_hash,
+        'a'*64, 'source-a', 'b'*64, root.logical_content_sha256, (channel,))
+    plan = compile_physical_control_binding(scene, root, catalog, binding)
+    boundary = StateBoundaryIdentity('state-boundary-identity-v1', 'episode-a',
+        'reset-'+'d'*64, scene.identity_hash, 'instance-a', 'material-a', 0, 0)
+    clock = StateSampleClock('state-sample-clock-v1', 'evaluation_boundary', 0, 0.0)
+    context = PhysicalCommandContextV1('physical-command-context-v1', 'source-a',
+        'b'*64, 'a'*64, boundary, clock, 0, 1, .01, .01)
+    def effort(cid, value, composition='sum'):
+        policy = ContributionPolicyV1('physical-contribution-policy-v1', cid, cid,
+            'controller-a', composition, 'reject_outside', 'one_interval')
+        return JointEffortV1('joint-effort-v1', context, policy, 'arm', 'drive', 'dof0',
+            'revolute', (0,0,1), FrameReference('arm','base'), 1, 'N*m', value,
+            (-5,5), 'direct_effort')
+    def assessment(*capabilities):
+        if 'joint_effort' in capabilities:
+            capabilities = (*capabilities, 'transmission', 'native_drive_state')
+        return CapabilityAssessmentV1('capability-assessment-v1', binding.identity_hash,
+            'static_preflight', tuple(CapabilityAssessmentRowV1(
+                'capability-assessment-row-v1', name, f'binding:{binding.identity_hash}',
+                'required', 'supported', 'implemented', 'available', 'none',
+                'static_preflight', 'synthetic test declaration', None, None)
+                for name in capabilities))
+    return plan, context, effort, assessment
+
+
+def test_nested_binding_explicit_sum_and_stale_rejected():
+    plan, context, effort, assessment = _case()
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
+                                    (effort('force-a', 1.25), effort('force-b', 2.0)), (), ())
+    resolved = prepare_physical_command_batch(plan, batch, expected_context=context,
+                                               assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan,context))
+    assert resolved.joints[0].value == pytest.approx(3.25, abs=1e-12)
+    assert resolved.accepted_receipt.stage == 'accepted'
+    with pytest.raises(ValueError, match='stale or foreign'):
+        prepare_physical_command_batch(plan, batch, expected_context=replace(context, generation=2),
+                                       assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan,context))
+    conflict = replace(batch, joint_efforts=(effort('force-a', 1, 'exclusive'), effort('force-b', 1)))
+    with pytest.raises(ValueError, match='declared sum'):
+        prepare_physical_command_batch(plan, conflict, expected_context=context,
+                                       assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan,context))
+
+
+def test_binding_roundtrip_and_unknown_capability_fail_closed():
+    plan, context, effort, assessment = _case()
+    assert PhysicalControlBindingV1.from_mapping(plan.binding.to_mapping()) == plan.binding
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (effort('force-a', 1),), (), ())
+    with pytest.raises(ValueError, match='build mapping receipt'):
+        prepare_physical_command_batch(plan, batch, expected_context=context, assessment=assessment('joint_effort'))
+    with pytest.raises(ValueError, match='incomplete'):
+        prepare_physical_command_batch(plan, batch, expected_context=context, assessment=assessment(), joint_build_receipt=_joint_receipt(plan,context))
+    assert PhysicalCommandBatchV1.from_mapping(batch.to_mapping()) == batch
+
+
+def test_synthetic_mapping_is_never_native_build_evidence():
+    plan, context, effort, assessment = _case()
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
+                                   (effort('force-a', 1),), (), ())
+    declared = assessment('joint_effort', 'sum')
+    result = prepare_physical_command_batch(plan, batch, expected_context=context,
+        assessment=declared, joint_build_receipt=_joint_receipt(plan, context))
+    assert result.mapping_provenance == ('synthetic_fixture',)
+    native = replace(declared, phase='native_build',
+                     rows=tuple(replace(row, phase='native_build') for row in declared.rows))
+    with pytest.raises(ValueError, match='synthetic mapping cannot support'):
+        prepare_physical_command_batch(plan, batch, expected_context=context,
+            assessment=native, joint_build_receipt=_joint_receipt(plan, context))
+
+
+@pytest.mark.parametrize('drive', ['position', 'implicit_pd', 'unknown'])
+def test_explicit_pd_rejects_uncoordinated_native_drive(drive):
+    original, context, effort, assessment = _case()
+    binding = replace(original.binding, channels=(replace(original.binding.channels[0], native_drive=drive),))
+    plan = compile_physical_control_binding(original.scene, original.root, original.children, binding)
+    old = assessment('joint_effort', 'sum')
+    capability = replace(old, request_identity=binding.identity_hash,
+        rows=tuple(replace(row, object_ref=f'binding:{binding.identity_hash}') for row in old.rows))
+    command = replace(effort('full-pd', 1.), controller_law='explicit_full_pd')
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (command,), (), ())
+    with pytest.raises(ValueError, match='uncoordinated native drive'):
+        prepare_physical_command_batch(plan, batch, expected_context=context,
+            assessment=capability, joint_build_receipt=_joint_receipt(plan, context))
+
+
+def test_explicit_pd_with_disabled_native_drive_is_admitted():
+    plan, context, effort, assessment = _case()
+    command = replace(effort('full-pd', 1.), controller_law='explicit_full_pd')
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (command,), (), ())
+    result = prepare_physical_command_batch(plan, batch, expected_context=context,
+        assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan, context))
+    assert result.joints[0].value == 1.
+
+
+def test_registry_forwards_physical_execution_to_versioned_builder(monkeypatch):
+    """Routing only: the builder and input are substituted, not source evidence."""
+    from types import SimpleNamespace
+    from task_env.registry import make_env
+    from task_env.tasks.position_candidate import builder
+
+    candidate = object.__new__(builder.F04PositionCandidateInputV1)
+    monkeypatch.setattr(builder.F04PositionCandidateInputV1, 'validate', lambda self: None)
+    physical = object()
+    sentinel = object()
+    seen = []
+    def capture(value, **kwargs):
+        seen.append((value, kwargs))
+        return SimpleNamespace(env=sentinel)
+    monkeypatch.setattr(builder, 'build_versioned_position_candidate', capture)
+    result = make_env('panda-position-servo-candidate-v1', config={
+        'versioned_input': candidate, 'physical_execution': physical, 'horizon': 8})
+    assert result is sentinel
+    assert seen[0][0] is candidate
+    assert seen[0][1]['physical_execution'] is physical
+
+
+def test_registry_physical_preflight_rejects_foreign_source_before_build(monkeypatch):
+    """Actual registry/builder preflight with a substituted input, no provider."""
+    from types import SimpleNamespace
+    from task_env.artifacts.state import StateRequirements
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    from task_env.registry import make_env
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+    from task_env.tasks.position_candidate.builder import F04PositionCandidateInputV1
+
+    plan, _, _, _ = _case()
+    req = ControllerModelRequirementV1('controller-model-requirement-v1', 'affine-example',
+        'geochora', 'v1', 'stdlib', 'source-a', 'b'*64, ('arm/drive',), ('rad',),
+        'joint_bias', ('N*m',), 'joint-axis', 'evaluation_boundary', .01, 0.,
+        'pure_no_physics_step', 'controller-a', 'none', 'required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1', req, (0.,), (0.,), (0.,))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1', 'controller-a',
+        ('action',), ('arm/drive',), ((1.,),), req)
+    controller = LinearEffortControllerV1(profile, plan.binding, model)
+    execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {}, {},
+        StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    candidate = object.__new__(F04PositionCandidateInputV1)
+    object.__setattr__(candidate, 'artifact', SimpleNamespace(identity_hash='a'*64))
+    object.__setattr__(candidate, 'runtime_source', SimpleNamespace(
+        scene_definition=plan.scene, source_id='foreign', source_closure_digest='b'*64))
+    monkeypatch.setattr(F04PositionCandidateInputV1, 'validate', lambda self: None)
+    with pytest.raises(ValueError, match='Scene, Artifact, or source'):
+        make_env('panda-position-servo-candidate-v1', config={
+            'versioned_input': candidate, 'physical_execution': execution})
+
+
+def test_physical_reset_preflight_rejects_before_session_materialization():
+    """Exercise preparation only: no reset, provider initialization, or source parsing."""
+    from types import SimpleNamespace
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.environment.types import StageUnavailableError
+    env = object.__new__(SelectedReferenceEnv)
+    env._closed = False
+    env.binding = SimpleNamespace(physical_control_profile=lambda _env: None)
+    env.session = object()
+    previous = env.session
+    with pytest.raises(StageUnavailableError, match='physical-control RuntimeSession adapter'):
+        env._prepare_reference_reset()
+    assert env.session is previous
+
+
+def test_wrench_fixed_oracle_uses_frame_and_offset_without_provider():
+    from math import sqrt
+    from task_env.artifacts.contracts import PoseWorld
+    from task_env.artifacts.state import CanonicalStateViewV2, TypedFrameStateValue
+    from task_env.controllers.canonical.physical_commands import BodyWrenchV1, PhysicalBodyBindingV1, PhysicalBodyBuildReceiptV1
+    scene = _scene_v3()
+    root, _, _, _, catalog = _primary_closure(scene)
+    body = PhysicalBodyBindingV1('physical-body-binding-v1', 'arm', 'tool-body',
+                                 FrameReference('arm', 'base'), 'native-body', ('caller',))
+    binding = PhysicalControlBindingV1('physical-control-binding-v1', scene.identity_hash,
+        'a'*64, 'source-a', 'b'*64, root.logical_content_sha256, (), (body,))
+    plan = compile_physical_control_binding(scene, root, catalog, binding)
+    boundary = StateBoundaryIdentity('state-boundary-identity-v1', 'episode-a',
+        'reset-'+'d'*64, scene.identity_hash, 'instance-a', 'material-a', 0, 0)
+    clock = StateSampleClock('state-sample-clock-v1', 'evaluation_boundary', 0, 0.)
+    context = PhysicalCommandContextV1('physical-command-context-v1', 'source-a',
+        'b'*64, 'a'*64, boundary, clock, 0, 1, .01, .01)
+    state = CanonicalStateViewV2('canonical-state-v2', 'SI_right_handed_z_up_wxyz',
+        boundary, clock, (), (
+            TypedFrameStateValue('typed-frame-state-v1', FrameReference('arm','base'),
+                                 PoseWorld((0,0,0), (1,0,0,0))),
+            TypedFrameStateValue('typed-frame-state-v1', FrameReference('arm','tool'),
+                                 PoseWorld((0,0,0), (sqrt(.5),0,0,sqrt(.5)))),
+        ), ())
+    policy = ContributionPolicyV1('physical-contribution-policy-v1', 'load-a', 'effect-a',
+                                   'caller', 'exclusive', 'reject_outside', 'one_interval')
+    wrench = BodyWrenchV1('body-wrench-v1', context, policy, 'arm', 'tool-body',
+        FrameReference('arm','tool'), (1,0,0), FrameReference('arm','base'),
+        (1,0,0), FrameReference('arm','base'), (1,0,0), (0,0,0))
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context, (), (wrench,), ())
+    caps = ('body_force', 'body_torque', 'body_frame', 'body_offset_point')
+    assessment = CapabilityAssessmentV1('capability-assessment-v1', binding.identity_hash,
+        'static_preflight', tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1', c,
+        f'binding:{binding.identity_hash}', 'required', 'supported', 'implemented', 'available',
+        'none', 'static_preflight', 'synthetic test declaration', None, None) for c in caps))
+    body_receipt = PhysicalBodyBuildReceiptV1('physical-body-build-receipt-v1', binding.identity_hash,
+        'b'*64, 'material-a', (body,), 'synthetic_fixture')
+    result = prepare_physical_command_batch(plan, batch, expected_context=context,
+        assessment=assessment, state=state, body_build_receipt=body_receipt)
+    assert result.body_wrenches[0].force_world_N == pytest.approx((0, 1, 0), abs=1e-12)
+    assert result.body_wrenches[0].torque_at_body_origin_world_Nm == pytest.approx((0, 0, 1), abs=1e-12)
+    with pytest.raises(ValueError, match='frame state is stale'):
+        stale = replace(state, boundary=replace(boundary, state_revision=1))
+        prepare_physical_command_batch(plan, batch, expected_context=context,
+                                       assessment=assessment, state=stale, body_build_receipt=body_receipt)
+    # Reference differs from point: torque is about reference, not the point.
+    shifted = replace(wrench, point=(0, 0, 0), moment_reference=(1, 0, 0))
+    shifted_batch = replace(batch, body_wrenches=(shifted,))
+    shifted_result = prepare_physical_command_batch(plan, shifted_batch, expected_context=context,
+        assessment=assessment, state=state, body_build_receipt=body_receipt)
+    assert shifted_result.body_wrenches[0].torque_at_body_origin_world_Nm == pytest.approx((0, 0, 1), abs=1e-12)
+    with pytest.raises(ValueError, match='build mapping receipt'):
+        prepare_physical_command_batch(plan, batch, expected_context=context, assessment=assessment, state=state)
+
+
+def test_pure_controller_consumes_named_state_and_replaceable_model():
+    from task_env.artifacts.state import CanonicalStateViewV2, TypedJointStateValue, StateRequirements
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    plan, context, _, assessment = _case()
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
+        'affine-example', 'geochora', 'v1', 'stdlib', 'source-a', 'b'*64,
+        ('arm/drive',), ('rad',), 'joint_bias', ('N*m',), 'joint-axis',
+        'evaluation_boundary', .01, 0., 'pure_no_physics_step', 'controller-a',
+        'none', 'required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement,
+                                   (0.5,), (2.,), (3.,))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1', 'controller-a',
+        ('action',), ('arm/drive',), ((4.,),), requirement)
+    controller = LinearEffortControllerV1(profile, plan.binding, model)
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+    execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {}, {},
+        StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    execution.validate_source(scene=plan.scene, artifact_sha256='a'*64,
+                              source_id='source-a', source_closure_sha256='b'*64)
+    assert execution.action_space().shape == (1,)
+    with pytest.raises(ValueError, match='Scene, Artifact, or source'):
+        execution.validate_source(scene=plan.scene, artifact_sha256='a'*64,
+                                  source_id='foreign', source_closure_sha256='b'*64)
+    from types import SimpleNamespace
+    source = SimpleNamespace(joints={'arm/drive': 'native'}, free_joints={}, bodies={}, frames={})
+    with pytest.raises(ValueError, match='exactly cover selected source names'):
+        execution.validate_source(scene=plan.scene, artifact_sha256='a'*64,
+            source_id='source-a', source_closure_sha256='b'*64, source=source)
+    joint = TypedJointStateValue('typed-joint-state-v1', 'arm', 'drive', 'revolute',
+        'radian', (.1,), 'radian_per_second', (.2,))
+    state = CanonicalStateViewV2('canonical-state-v2', 'SI_right_handed_z_up_wxyz',
+        context.boundary, context.clock, (joint,), (), ())
+    batch = controller.compute((.25,), state, context)
+    # 4*.25 + (.5 + 2*.1 + 3*.2) = 2.3 N*m.
+    assert batch.joint_efforts[0].value == pytest.approx(2.3, abs=1e-12)
+    resolved = prepare_physical_command_batch(plan, batch, expected_context=context,
+                                               assessment=assessment('joint_effort'), joint_build_receipt=_joint_receipt(plan,context))
+    assert resolved.joints[0].value == pytest.approx(2.3, abs=1e-12)
+    with pytest.raises(ValueError, match='state is stale'):
+        controller.compute((.25,), state, replace(context, boundary=replace(context.boundary, state_revision=1)))
+    with pytest.raises(ValueError, match='model cadence'):
+        controller.compute((.25,), state, replace(context, cadence_s=.02))
+
+
+def test_eight_actions_map_to_seven_torques_and_constrained_finger_pair():
+    """Synthetic source declarations only; coefficients are not Panda native evidence."""
+    import json
+    from pathlib import Path
+    from task_env.artifacts import (SceneDefinition, JointReference, LogicalAssemblyV1,
+        LogicalAssemblyScenePinV1, LogicalAssemblyEntityMemberV1,
+        LogicalAssemblyNestedMemberV1, LogicalAssemblySubcomponentReferenceV1)
+    from task_env.artifacts.state import CanonicalStateViewV2, TypedJointStateValue
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    fixture = Path(__file__).with_name('fixtures')/'phase_ii_d01a'/'a05_scene_definition_v3.json'
+    scene = SceneDefinition.from_mapping(json.loads(fixture.read_text()))
+    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
+                                     scene.schema_version, scene.identity_hash)
+    names = tuple(f'joint{i}' for i in range(1,8)) + ('finger_joint1', 'finger_joint2')
+    refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
+        (name,), 'joint', JointReference('panda-main', name)) for name in names)
+    child = LogicalAssemblyV1('logical-assembly-v1', 'panda-subtree', 'r1', pin, refs)
+    root = LogicalAssemblyV1('logical-assembly-v1', 'panda-root', 'r1', pin, (
+        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), 'panda-main',
+                                      'panda-v1', 'mujoco-menagerie-panda'),
+        LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',), child.assembly_id,
+                                      child.revision, child.logical_content_sha256)))
+    definitions = {j.joint_id:j for a in scene.articulations for j in a.joints}
+    # Fixture joint-frame axes independently rotated into their parent frames.
+    parent_axes = ((0,0,1),(0,1,0),(0,-1,0),(0,-1,0),(0,1,0),
+                   (0,-1,0),(0,-1,0),(0,1,0),(0,-1,0))
+    channels = tuple(PhysicalJointChannelV1('physical-joint-channel-v1', ('robot', name),
+        ('panda-controller',), 'panda-main', name, 'dof0', definitions[name].kind,
+        parent_axes[i], definitions[name].parent_frame, 1,
+        'N*m' if i < 7 else 'N', (-10,10), f'actuator-{i}' if i < 7 else 'tendon',
+        f'direct-{i}' if i < 7 else 'paired-fingers', 1., (-10,10), 'disabled')
+        for i, name in enumerate(names))
+    binding = PhysicalControlBindingV1('physical-control-binding-v1', scene.identity_hash,
+        'a'*64, 'synthetic-source', 'b'*64, root.logical_content_sha256, channels)
+    plan = compile_physical_control_binding(scene, root, {(child.assembly_id, child.revision):child}, binding)
+    boundary = StateBoundaryIdentity('state-boundary-identity-v1', 'episode-a', 'reset-'+'d'*64,
+        scene.identity_hash, 'instance-a', 'material-a', 0, 0)
+    clock = StateSampleClock('state-sample-clock-v1', 'evaluation_boundary', 0, 0.)
+    context = PhysicalCommandContextV1('physical-command-context-v1', 'synthetic-source',
+        'b'*64, 'a'*64, boundary, clock, 0, 1, .01, .01)
+    keys = tuple(f'panda-main/{name}' for name in names)
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1', 'affine-example',
+        'geochora','v1','stdlib','synthetic-source','b'*64,keys,('rad',)*7+('m',)*2,
+        'joint_bias',('N*m',)*7+('N',)*2,'joint-axis','evaluation_boundary',.01,0.,
+        'pure_no_physics_step','panda-controller','none','required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, (0.,)*9, (0.,)*9, (0.,)*9)
+    matrix = tuple(tuple(1. if col == (row if row < 7 else 7) else 0.
+                         for col in range(8)) for row in range(9))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1','panda-controller',
+        tuple(f'input-{i}' for i in range(8)),keys,matrix,requirement)
+    controller = LinearEffortControllerV1(profile,binding,model)
+    state_joints = tuple(TypedJointStateValue('typed-joint-state-v1','panda-main',name,
+        definitions[name].kind, 'radian' if i < 7 else 'meter', (0.,),
+        'radian_per_second' if i < 7 else 'meter_per_second', (0.,)) for i,name in enumerate(names))
+    state = CanonicalStateViewV2('canonical-state-v2','SI_right_handed_z_up_wxyz',boundary,clock,state_joints,(),())
+    action = (1.,2.,3.,4.,5.,6.,7.,8.)
+    batch = controller.compute(action,state,context)
+    caps = ('joint_effort','transmission','native_drive_state')
+    assessment = CapabilityAssessmentV1('capability-assessment-v1',binding.identity_hash,
+        'static_preflight',tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1',c,
+        f'binding:{binding.identity_hash}','required','supported','implemented','available',
+        'none','static_preflight','synthetic fixture only',None,None) for c in caps))
+    result = prepare_physical_command_batch(plan,batch,expected_context=context,assessment=assessment, joint_build_receipt=_joint_receipt(plan,context))
+    by_name = {item.joint_id:item.value for item in result.joints}
+    assert tuple(by_name[name] for name in names) == (*action[:7],8.,8.)
+    bad = replace(batch, joint_efforts=(*batch.joint_efforts[:-1], replace(batch.joint_efforts[-1], value=7.)))
+    with pytest.raises(ValueError, match='not representable'):
+        prepare_physical_command_batch(plan,bad,expected_context=context,assessment=assessment, joint_build_receipt=_joint_receipt(plan,context))
+
+
+def test_selected_env_production_step_uses_single_fake_session_write():
+    """Exercise the real selected step owner; fake I/O never advances physics."""
+    from types import SimpleNamespace
+    from task_env.artifacts.state import (CanonicalStateViewV2, CanonicalStatePublicationV2,
+        StateViewLifetime, StateRequirements, TypedJointStateValue)
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_commands import PhysicalControlReceiptV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+    plan, context, _, assessment = _case()
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1','affine-example',
+        'geochora','v1','stdlib','source-a','b'*64,('arm/drive',),('rad',),'joint_bias',
+        ('N*m',),'joint-axis','evaluation_boundary',.01,0.,'pure_no_physics_step',
+        'controller-a','none','required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1',requirement,(.5,),(2.,),(3.,))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1','controller-a',('action',),
+                                     ('arm/drive',),((4.,),),requirement)
+    controller = LinearEffortControllerV1(profile,plan.binding,model)
+    scene = _scene_v3()
+    requirements = StateRequirements('state-requirements-v1','controller','controller-a',())
+    execution = PhysicalControlExecutionV1(plan,(controller,),scene,{}, {},requirements,1)
+    joint = TypedJointStateValue('typed-joint-state-v1','arm','drive','revolute','radian',(.1,),
+                                  'radian_per_second',(.2,))
+    view = CanonicalStateViewV2('canonical-state-v2','SI_right_handed_z_up_wxyz',
+                                context.boundary,context.clock,(joint,),(),())
+    lifetime = StateViewLifetime('state-view-lifetime-v1','material-a',context.boundary,0,
+                                 'owned_snapshot','retained')
+    publication = CanonicalStatePublicationV2('canonical-state-publication-v2',view,lifetime)
+    class FakeSession:
+        physical_control_generation = 1
+        writes = 0
+        advances = 0
+        provenance = 'synthetic_fixture'
+        assessment_phase = 'static_preflight'
+        def snapshot_v2(self, **kwargs): return publication
+        def state_boundary_identity(self): return context.boundary
+        def assess_physical_control(self, binding):
+            value = assessment('joint_effort')
+            return replace(value, phase=self.assessment_phase,
+                           rows=tuple(replace(row, phase=self.assessment_phase) for row in value.rows))
+        def physical_joint_build_receipt(self, binding):
+            return replace(_joint_receipt(plan,context), provenance=self.provenance)
+        def apply_physical_command_batch(self, resolved):
+            self.writes += 1
+            assert resolved.joints[0].value == pytest.approx(2.3, abs=1e-12)
+            return PhysicalControlReceiptV1('physical-control-receipt-v1',context,
+                resolved.input_batch.identity_hash,'native_write_ack',
+                resolved.accepted_receipt.contribution_ids,'fake-terminal','per-channel')
+        def step(self):
+            self.advances += 1
+            return SimpleNamespace(control_step=1, simulation_time=.01)
+    env = object.__new__(SelectedReferenceEnv)
+    env._uses_component_assembly = False
+    env._episode_mode = None
+    env.binding = SimpleNamespace(external_solution_actions=False,external_actions=True,
+        physical_control_profile=lambda _env:execution,
+        observation_projection=lambda _env,_state: ({'x':1.}, {}, SimpleNamespace(failure=False,reward=.5)))
+    env.artifact = SimpleNamespace(identity_hash='a'*64,timebase=SimpleNamespace(control_dt=.01,control_substeps=1))
+    env.value = {'source':SimpleNamespace(source_id='source-a',source_closure_digest='b'*64)}
+    env.state = SimpleNamespace(control_step=0,simulation_time=0.)
+    env.session = FakeSession()
+    env.recorder = None
+    env.horizon = 3
+    env.mixed_control_profile = False
+    with pytest.raises(ValueError, match='native-build or runtime capability assessment'):
+        env.step((.25,))
+    assert (env.session.writes, env.session.advances) == (0, 0)
+    env.session.assessment_phase = 'native_build'
+    with pytest.raises(ValueError, match='synthetic mapping cannot authorize'):
+        env.step((.25,))
+    assert (env.session.writes, env.session.advances) == (0, 0)
+    # Explicit mock of the downstream native receipt: this is not build evidence.
+    env.session.provenance = 'native_build'
+    result = env.step((.25,))
+    assert result[:4] == ({'x':1.},.5,False,False)
+    assert result[4]['physical_control_v1']['native_write_ack']['stage'] == 'native_write_ack'
+    assert (env.session.writes, env.session.advances) == (1,1)
+    # Re-present the same pre-advance boundary to test duplicate submission.
+    env.state = SimpleNamespace(control_step=0, simulation_time=0.)
+    with pytest.raises(ValueError, match='already submitted'):
+        env.step((.25,))
+    assert (env.session.writes, env.session.advances) == (1,1)
+
+
+def test_reconstructed_invalid_binding_cannot_bypass_scene_resolution():
+    from task_env.runtime.sessions.physical_control import CompiledPhysicalBindingV1
+    plan, context, effort, assessment = _case()
+    invalid_channel = replace(plan.binding.channels[0], component_path=('robot','not-a-joint'))
+    invalid = replace(plan.binding, channels=(invalid_channel,))
+    forged = CompiledPhysicalBindingV1(invalid, plan.scene, plan.root, plan.children)
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1',context,(effort('force-a',1),),(),())
+    with pytest.raises(ValueError, match='does not resolve'):
+        prepare_physical_command_batch(forged,batch,expected_context=context,assessment=assessment('joint_effort'))
+
+
+def test_numpy_gym_actions_accept_real_values_and_reject_invalid_dtype():
+    import numpy as np
+    from task_env.artifacts.state import CanonicalStateViewV2, TypedJointStateValue
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    plan, context, _, _ = _case()
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1','affine-example',
+        'geochora','v1','stdlib','source-a','b'*64,('arm/drive',),('rad',),'joint_bias',
+        ('N*m',),'joint-axis','evaluation_boundary',.01,0.,'pure_no_physics_step',
+        'controller-a','none','required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1',requirement,(0.,),(0.,),(0.,))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1','controller-a',('action',),
+                                     ('arm/drive',),((1.,),),requirement)
+    controller = LinearEffortControllerV1(profile,plan.binding,model)
+    joint = TypedJointStateValue('typed-joint-state-v1','arm','drive','revolute','radian',(0.,),
+                                  'radian_per_second',(0.,))
+    state = CanonicalStateViewV2('canonical-state-v2','SI_right_handed_z_up_wxyz',
+                                 context.boundary,context.clock,(joint,),(),())
+    assert controller.compute(np.array([0.25],dtype=np.float32),state,context).joint_efforts[0].value == .25
+    for invalid in (np.array([True]), np.array(['1']), np.array([float('nan')]), np.ones((1,1))):
+        with pytest.raises(ValueError, match='shape or finite'):
+            controller.compute(invalid,state,context)
+
+
+def test_hold_extension_duplicate_and_measurement_fail_closed():
+    from task_env.controllers.canonical.physical_commands import (BodyWrenchV1,
+        PhysicalBufferPolicyV1, PhysicalMeasurementV1, PhysicalControlReceiptV1,
+        TypedLoadExtensionV1, require_physical_measurement)
+    plan, context, effort, assessment = _case()
+    joint = effort('load-a',1.)
+    held = replace(joint, contribution=replace(joint.contribution,persistence='hold_reapply'))
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1',context,(held,),(),())
+    capability = assessment('joint_effort','sum','hold_reapply')
+    with pytest.raises(ValueError, match='buffer policy|clear/add or replace'):
+        prepare_physical_command_batch(plan,batch,expected_context=context,assessment=capability,
+                                       joint_build_receipt=_joint_receipt(plan,context))
+    safe = PhysicalBufferPolicyV1('physical-buffer-policy-v1',plan.binding.identity_hash,
+                                  'material-a','clear_then_add','each_native_step','clear_before_new_episode')
+    result = prepare_physical_command_batch(plan,batch,expected_context=context,assessment=capability,
+                                            joint_build_receipt=_joint_receipt(plan,context),buffer_policy=safe)
+    assert result.joints[0].value == 1.
+    with pytest.raises(ValueError, match='stale or foreign'):
+        prepare_physical_command_batch(plan,batch,expected_context=replace(context,generation=2),
+            assessment=capability,joint_build_receipt=_joint_receipt(plan,context),buffer_policy=safe)
+    with pytest.raises(ValueError, match='buffer operation'):
+        replace(safe,operation='add')
+    wrench = BodyWrenchV1('body-wrench-v1',context,
+        replace(joint.contribution,contribution_id='wrench-a'), 'arm','body-a',
+        FrameReference('arm','base'),(0,0,0),FrameReference('arm','base'),
+        (0,0,0),FrameReference('arm','base'),(1,0,0),(0,0,0))
+    with pytest.raises(ValueError, match='same physical effect'):
+        PhysicalCommandBatchV1('physical-command-batch-v1',context,(joint,),(wrench,),())
+    with pytest.raises((TypeError,ValueError)):
+        replace(wrench,expressed_in=None)
+    extension = TypedLoadExtensionV1('typed-load-extension-v1',context,
+        replace(joint.contribution,contribution_id='ext-a',physical_effect_id='ext-effect'),
+        'example','pressure-v1','required','arm','e'*64,'surface-a',(3,),
+        'N',FrameReference('arm','base'),'f'*64)
+    extbatch = PhysicalCommandBatchV1('physical-command-batch-v1',context,(),(),(extension,))
+    extcap = assessment('load_extension:example/pressure-v1')
+    with pytest.raises(ValueError, match='topology is stale'):
+        prepare_physical_command_batch(plan,extbatch,expected_context=context,assessment=extcap,topology_sha256='0'*64)
+    with pytest.raises(ValueError, match='unknown required'):
+        prepare_physical_command_batch(plan,extbatch,expected_context=context,assessment=extcap,topology_sha256='e'*64)
+    unavailable = PhysicalMeasurementV1('physical-measurement-v1',context,'load-a','sensor-a',
+        'unavailable',(),'N*m',context.clock,'sensor missing')
+    assert require_physical_measurement(unavailable,context=context,contribution_id='load-a',required=False).reason == 'sensor missing'
+    with pytest.raises(ValueError, match='required physical measurement unavailable'):
+        require_physical_measurement(unavailable,context=context,contribution_id='load-a',required=True)
+    ack = PhysicalControlReceiptV1('physical-control-receipt-v1',context,'a'*64,'native_write_ack',('load-a',),'adapter','N*m')
+    with pytest.raises(ValueError, match='receipt stage'):
+        replace(ack,stage='measured')
+    with pytest.raises(TypeError, match='typed measurement'):
+        require_physical_measurement(ack,context=context,contribution_id='load-a',required=True)
+    estimate = replace(unavailable,kind='estimated',value=(1.,),reason=None)
+    with pytest.raises(ValueError, match='distinct feedback kinds'):
+        require_physical_measurement(estimate,context=context,contribution_id='load-a',required=True)
+
+
+def test_selected_env_composes_independent_effort_and_wrench_once():
+    """Real selected step with two pure Controllers, synthetic session, no physics."""
+    import numpy as np
+    from types import SimpleNamespace
+    from task_env.artifacts.contracts import PoseWorld
+    from task_env.artifacts.state import (CanonicalStateViewV2, CanonicalStatePublicationV2,
+        StateViewLifetime, StateRequirements, TypedJointStateValue, TypedFrameStateValue)
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_commands import PhysicalControlReceiptV1, PhysicalBodyBindingV1, PhysicalBodyBuildReceiptV1
+    from task_env.controllers.canonical.physical_controller import (LinearEffortProfileV1, LinearEffortControllerV1,
+        WrenchControlProfileV1, WrenchControllerV1)
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+    original, context, _, _ = _case()
+    body = PhysicalBodyBindingV1('physical-body-binding-v1','arm','body-a',FrameReference('arm','base'),'native-body',('external-force',))
+    binding = replace(original.binding,bodies=(body,))
+    plan = compile_physical_control_binding(original.scene, original.root, original.children,binding)
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1','affine-example',
+        'geochora','v1','stdlib','source-a','b'*64,('arm/drive',),('rad',),'joint_bias',
+        ('N*m',),'joint-axis','evaluation_boundary',.01,0.,'pure_no_physics_step','controller-a','none','required')
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1',requirement,(0.,),(0.,),(0.,))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1','controller-a',('action',),('arm/drive',),((1.,),),requirement)
+    arm = LinearEffortControllerV1(profile,binding,model)
+    wp = WrenchControlProfileV1('wrench-control-profile-v1','external-force','arm','body-a',
+        FrameReference('arm','base'),(0.,0.,0.),FrameReference('arm','base'),
+        (0.,0.,0.),FrameReference('arm','base'),'exclusive')
+    wrench = WrenchControllerV1(wp,binding)
+    execution = PhysicalControlExecutionV1(plan,(arm,wrench),original.scene,{}, {},
+        StateRequirements('state-requirements-v1','controller','controller-a',()),1)
+    joint = TypedJointStateValue('typed-joint-state-v1','arm','drive','revolute','radian',(0.,),
+                                  'radian_per_second',(0.,))
+    frame = TypedFrameStateValue('typed-frame-state-v1',FrameReference('arm','base'),PoseWorld((0,0,0),(1,0,0,0)))
+    view = CanonicalStateViewV2('canonical-state-v2','SI_right_handed_z_up_wxyz',context.boundary,context.clock,(joint,),(frame,),())
+    lifetime = StateViewLifetime('state-view-lifetime-v1','material-a',context.boundary,0,'owned_snapshot','retained')
+    publication = CanonicalStatePublicationV2('canonical-state-publication-v2',view,lifetime)
+    caps = ('joint_effort','transmission','native_drive_state','body_force','body_torque','body_frame','body_offset_point')
+    assessment = CapabilityAssessmentV1('capability-assessment-v1',binding.identity_hash,'native_build',
+        tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1',c,f'binding:{binding.identity_hash}',
+        'required','supported','implemented','available','none','native_build','synthetic terminal',None,None) for c in caps))
+    class FakeSession:
+        physical_control_generation = 1
+        writes = 0
+        def snapshot_v2(self, **kwargs): return publication
+        def state_boundary_identity(self): return context.boundary
+        def assess_physical_control(self, b): return assessment
+        def physical_joint_build_receipt(self, b):
+            return replace(_joint_receipt(plan,context), provenance='native_build')
+        def physical_body_build_receipt(self, b):
+            return PhysicalBodyBuildReceiptV1('physical-body-build-receipt-v1',binding.identity_hash,'b'*64,
+                                               'material-a',(body,),'native_build')  # mocked, not a native build
+        def apply_physical_command_batch(self, result):
+            self.writes += 1
+            assert result.joints[0].value == 2.
+            assert result.body_wrenches[0].force_world_N == pytest.approx((1.,0.,0.),abs=1e-12)
+            return PhysicalControlReceiptV1('physical-control-receipt-v1',context,result.input_batch.identity_hash,
+                'native_write_ack',result.accepted_receipt.contribution_ids,'fake-terminal','per-channel')
+        def step(self): return SimpleNamespace(control_step=1,simulation_time=.01)
+    env = object.__new__(SelectedReferenceEnv)
+    env._uses_component_assembly = False
+    env._episode_mode = None
+    env.binding = SimpleNamespace(external_solution_actions=False,external_actions=True,
+        physical_control_profile=lambda _env:execution,
+        observation_projection=lambda _env,_state: ({}, {}, SimpleNamespace(failure=False,reward=0.)))
+    env.artifact = SimpleNamespace(identity_hash='a'*64,timebase=SimpleNamespace(control_dt=.01,control_substeps=1))
+    env.value = {'source':SimpleNamespace(source_id='source-a',source_closure_digest='b'*64)}
+    env.state = SimpleNamespace(control_step=0,simulation_time=0.)
+    env.session = FakeSession()
+    env.recorder = None
+    env.horizon = 3
+    env.mixed_control_profile = False
+    result = env.step({arm.identity:np.array([2.],dtype=np.float32), wrench.identity:np.array([1.,0.,0.,0.,0.,0.])})
+    assert env.session.writes == 1
+    assert len(result[4]['physical_control_v1']['submitted_batch']['joint_efforts']) == 1
+    assert len(result[4]['physical_control_v1']['submitted_batch']['body_wrenches']) == 1
+
+
+def test_disjoint_named_controllers_can_form_one_interval():
+    from task_env.artifacts import JointReference
+    from task_env.artifacts.state import CanonicalStateViewV2, TypedJointStateValue
+    from task_env.controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from task_env.controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    from task_env.diagnostics.tasks.test_phase_ii_01_r01b_logical_resolution import _assembly, _sub, _entity_member
+    scene = _scene_v3()
+    root = _assembly(scene,'two-controller-root',(
+        _entity_member('arm'),_entity_member('hand'),
+        _sub(('arm','joint'),JointReference('arm','drive'),'joint'),
+        _sub(('hand','joint'),JointReference('hand','drive'),'joint')))
+    channels = tuple(PhysicalJointChannelV1('physical-joint-channel-v1',(entity,'joint'),(f'{entity}-controller',),
+        entity,'drive','dof0','revolute',(0,0,1),FrameReference(entity,'base'),1,'N*m',(-5,5),
+        f'{entity}-actuator',f'{entity}-transmission',1.,(-5,5),'disabled') for entity in ('arm','hand'))
+    binding = PhysicalControlBindingV1('physical-control-binding-v1',scene.identity_hash,
+        'a'*64,'source-a','b'*64,root.logical_content_sha256,channels)
+    plan = compile_physical_control_binding(scene,root,{},binding)
+    boundary = StateBoundaryIdentity('state-boundary-identity-v1','episode-a','reset-'+'d'*64,
+        scene.identity_hash,'instance-a','material-a',0,0)
+    clock = StateSampleClock('state-sample-clock-v1','evaluation_boundary',0,0.)
+    context = PhysicalCommandContextV1('physical-command-context-v1','source-a','b'*64,'a'*64,
+                                       boundary,clock,0,1,.01,.01)
+    state = CanonicalStateViewV2('canonical-state-v2','SI_right_handed_z_up_wxyz',boundary,clock,
+        tuple(TypedJointStateValue('typed-joint-state-v1',e,'drive','revolute','radian',(0.,),
+                                  'radian_per_second',(0.,)) for e in ('arm','hand')),(),())
+    parts = []
+    for entity,value in (('arm',1.5),('hand',-2.)):
+        owner = f'{entity}-controller'; joint = f'{entity}/drive'
+        requirement = ControllerModelRequirementV1('controller-model-requirement-v1','affine-example',
+            'geochora','v1','stdlib','source-a','b'*64,(joint,),('rad',),'joint_bias',('N*m',),
+            'joint-axis','evaluation_boundary',.01,0.,'pure_no_physics_step',owner,'none','required')
+        model = AffineJointBiasModelV1('affine-joint-bias-model-v1',requirement,(0.,),(0.,),(0.,))
+        profile = LinearEffortProfileV1('linear-effort-profile-v1',owner,('action',),(joint,),((1.,),),requirement)
+        parts.append(LinearEffortControllerV1(profile,binding,model).compute((value,),state,context))
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1',context,
+        tuple(x for part in parts for x in part.joint_efforts),(),())
+    caps = ('joint_effort','transmission','native_drive_state')
+    assessment = CapabilityAssessmentV1('capability-assessment-v1',binding.identity_hash,'static_preflight',
+        tuple(CapabilityAssessmentRowV1('capability-assessment-row-v1',name,f'binding:{binding.identity_hash}',
+        'required','supported','implemented','available','none','static_preflight','synthetic declaration',None,None) for name in caps))
+    result = prepare_physical_command_batch(plan,batch,expected_context=context,assessment=assessment,
+                                             joint_build_receipt=_joint_receipt(plan,context))
+    assert {(x.entity_id,x.value) for x in result.joints} == {('arm',1.5),('hand',-2.)}

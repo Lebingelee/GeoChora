@@ -439,6 +439,39 @@ def _copy_panda_snapshot(
     return root, files, digest
 
 
+def _copy_panda_snapshot_from_xml(root: Path, scene_definition: SceneDefinition):
+    """Stage the pinned Panda's bounded XML references without importing a provider.
+
+    This proves source bytes only. The runtime importer must still independently
+    verify its own dependency set and canonical/native mapping at build time.
+    """
+    from task_env.runtime.sessions.source import source_asset_bytes
+
+    manifest = PandaAgent().asset_manifest()
+    asset = _asset_definition_from_manifest(manifest)
+    if (asset.asset_id, asset.asset_version) not in {
+            (item.asset_id, item.asset_version) for item in scene_definition.assets if item == asset}:
+        raise ValueError('Scene does not bind the pinned Panda asset declaration')
+    source_path = manifest.mjcf_sources[0].resolve()
+    revision = subprocess.check_output(
+        ['git', '-C', str(source_path.parent.parent), 'rev-parse', 'HEAD'], text=True).strip()
+    if revision != manifest.source_revision or revision != MENAGERIE_REVISION:
+        raise ValueError('Panda source revision differs from the pinned asset')
+    xml = source_path.read_bytes()
+    files = {'panda.xml': xml, **source_asset_bytes(source_path.parent, xml.decode('utf-8'))}
+    digest = _source_closure_digest(files)
+    receipt = json.loads((FIXTURE_ROOT / 'panda_source_receipt.json').read_text())
+    if (len(files) != 68 or digest != receipt['source_closure_digest']
+            or digest != EXPECTED_PANDA_CLOSURE):
+        raise ValueError('Panda static source closure differs from its pinned receipt')
+    root.mkdir(parents=True, exist_ok=True)
+    for logical, content in files.items():
+        destination = root.joinpath(*logical.split('/'))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+    return root, files, digest
+
+
 def _compose_scene_source(
     scene_definition: SceneDefinition,
     source_root: Path,
@@ -665,6 +698,35 @@ def _source_input(scene_module, tmp_path, scene_definition, artifact, *, source_
         digest_override=digest_override,
     )
     return source, imported, closure_digest, panda_digest, len(panda_files)
+
+
+def _physical_source_input(tmp_path, scene_definition, artifact):
+    """Resolve source bytes for the explicit physical profile; native mapping is pending."""
+    from task_env.runtime.sessions.source import source_asset_bytes
+
+    root, panda_files, panda_digest = _copy_panda_snapshot_from_xml(
+        tmp_path / 'panda-snapshot', scene_definition)
+    xml = _compose_scene_source(scene_definition, root, physics_dt=artifact.timebase.physics_dt)
+    projected = project_scene_definition_v3_to_mjcf(xml, scene_definition)
+    closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),
+                                      **source_asset_bytes(root, projected)})
+    source_id = f'scene-definition-v3:{scene_definition.identity_hash}'
+    joints = {f'{a.entity_id}/{j.joint_id}': j.joint_id
+              for a in scene_definition.articulations or () for j in a.joints if j.kind != 'fixed'}
+    bodies = {f'{frame.entity_id}/{frame.frame_id}': frame.frame_id
+              for frame in scene_definition.frames or () if frame.frame_kind == 'runtime'}
+    config = resolve_env_config(
+        task_uid='phase-ii-d01a-microprobe', scene_uid='phase-ii-d01a-microprobe',
+        runtime={'backend': 'cpu', 'physics_dt': 0.002, 'control_substeps': 1, 'prewarm': False},
+        render={'camera_obs': False})
+    source = RuntimeSource(
+        task_artifact_hash=artifact.identity_hash,
+        scene_source=TaskSceneSource(xml, root, source_id), joints=joints, bodies=bodies,
+        frames={}, free_joints={}, joint_targets={}, open_actuators=(),
+        composition=TaskCompositionSpec('phase-ii-d01a-microprobe', 'phase-ii-d01a-microprobe'),
+        config=config, scene=_MicroprobeScene(), agents=(), objects=(),
+        scene_definition=scene_definition, source_closure_digest=closure)
+    return source, closure, panda_digest, len(panda_files)
 
 
 def _task_source(scene) -> TaskSourceV1:
