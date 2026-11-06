@@ -34,12 +34,19 @@ _PROCESS_APP_OWNER: "IsaacSimAppOwnerV1 | None" = None
 
 DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1 = "isaac-headless-default-v1"
 F06_ISAAC_APP_LAUNCH_PROFILE_V1 = "f06-headless-no-render-v1"
+V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 = "v211-headed-camera-v1"
 _ISAAC_APP_LAUNCH_PROFILE_OVERRIDES = {
     DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1: {},
     F06_ISAAC_APP_LAUNCH_PROFILE_V1: {
         "renderer": "MinimalRendering",
         "minimal_shading_mode": 4,
         "disable_viewport_updates": True,
+    },
+    V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1: {
+        "headless": False,
+        "enable_cameras": True,
+        "multi_gpu": False,
+        "max_gpu_count": 1,
     },
 }
 
@@ -625,13 +632,18 @@ class IsaacSimNativeRuntimeIOV1:
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
                  app_owner: IsaacSimAppOwnerV1, *,
-                 dg04_native_input=None, f06_pickcube_input=None):
+                 dg04_native_input=None, f06_pickcube_input=None,
+                 observer_render_request=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
         if type(source) is not UsdRuntimeSourceV1 or type(lease) is not UsdSnapshotLeaseV1:
             raise TypeError("Isaac native I/O requires verified USD RuntimeSource and owned snapshot lease")
         self._artifact, self._execution, self._source = artifact, execution, source
         self._lease, self._app_owner = lease, app_owner
+        self._observer_render_request = observer_render_request
+        self._observer_sensor = None
+        self._observer_path = None
+        self._observer_faulted = False
         self._dg04_native_input = dg04_native_input
         self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
         self._f06_pickcube_input = f06_pickcube_input
@@ -2067,6 +2079,224 @@ class IsaacSimNativeRuntimeIOV1:
             native_adaptation_application=native_adaptation_application,
         )
 
+    def capture_observer(self, camera, state):
+        """Capture the published F06 boundary through the existing App/scene owner."""
+        if self._closed or self._observer_faulted or self._observer_render_request is None:
+            raise RuntimeError('Isaac observer is unavailable or faulted')
+        from ...observations.canonical_camera import CameraGeometry, resolve_camera, CanonicalCameraObservation
+        from ...observations.canonical_camera.images import normalize_rgb
+        if type(camera) is not CameraGeometry:
+            raise TypeError('Isaac observer requires CameraGeometry')
+        camera.validate()
+        initial = self._observer_render_request.camera
+        if (camera.task_artifact_hash != self._artifact.identity_hash or
+                (camera.width, camera.height, camera.rgb, camera.depth, camera.rgb_layout, camera.rgb_dtype) !=
+                (initial.width, initial.height, True, False, 'HWC', 'float32')):
+            raise ValueError('Isaac observer camera changed the admitted output contract')
+        try:
+            return self._capture_observer_admitted(camera, state, resolve_camera, normalize_rgb,
+                                                   CanonicalCameraObservation)
+        except BaseException as error:
+            self._observer_faulted = True
+            try:
+                self._close_observer()
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac observer cleanup also failed: {cleanup_error!r}')
+            raise
+
+    def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb, observation_type):
+        import json
+        import uuid
+        import numpy as np
+        import omni.replicator.core as rep
+        import omni.timeline
+        import omni.usd
+        from pxr import Gf, UsdGeom
+        from isaacsim.sensors.experimental.rtx import RtxCamera, CameraSensor
+        from ...artifacts import RendererSelectionV1
+        from ...render.camera.source import CameraCaptureIdentityV1
+
+        metadata = resolve_camera(camera, state)
+        timeline = omni.timeline.get_timeline_interface()
+        before = self._counter()
+        timeline.pause()
+        if timeline.is_playing():
+            self._app_owner.app.update()
+        if timeline.is_playing() or self._counter() != before:
+            raise RuntimeError('Isaac pause confirmation changed the physics clock')
+        # A reset can update tensor state after the last PhysX-to-Fabric
+        # publication.  Flush the public kinematic/Fabric interfaces before
+        # rendering, without advancing the native simulation clock.
+        from omni.physxfabric import get_physx_fabric_interface
+        fabric = get_physx_fabric_interface()
+        force_update = getattr(fabric, 'force_update', None)
+        if not callable(force_update):
+            raise RuntimeError('Isaac observer requires a public Fabric force-update operation')
+        view = self._manager.get_physics_simulation_view()
+        if view is None:
+            raise RuntimeError('Isaac observer requires the live physics simulation view')
+        view.update_articulations_kinematic()
+        force_update(0.0, 0.0)
+        self._sync()
+        if self._counter() != before:
+            raise RuntimeError('Isaac Fabric update advanced the physics clock')
+        if self._observer_sensor is None:
+            path = '/GeoChoraObserver_' + uuid.uuid4().hex
+            self._observer_path = path
+            authoring = RtxCamera(path, tick_rate=0.0)
+            self._observer_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
+                                                 annotators=['rgb'])
+        stage = omni.usd.get_context().get_stage()
+        if stage is None or stage != self._stage:
+            raise RuntimeError('Isaac observer lost its leased USD stage')
+        prim = stage.GetPrimAtPath(self._observer_path)
+        if not prim or not prim.IsValid():
+            raise RuntimeError('Isaac observer camera prim is unavailable')
+        usd_camera = UsdGeom.Camera(prim)
+        focal = 24.0
+        vertical = 2.0 * focal * math.tan(camera.fov_y / 2.0)
+        usd_camera.GetFocalLengthAttr().Set(focal)
+        usd_camera.GetVerticalApertureAttr().Set(vertical)
+        usd_camera.GetHorizontalApertureAttr().Set(vertical * camera.width / camera.height)
+        usd_camera.GetClippingRangeAttr().Set(Gf.Vec2f(camera.near, camera.far))
+        world = np.asarray(metadata.T_world_from_camera, dtype=np.float64).copy()
+        world[:3, :3] = world[:3, :3] @ np.diag([1.0, -1.0, -1.0])
+        xform = UsdGeom.Xformable(prim)
+        xform.ClearXformOpOrder()
+        op = xform.AddTransformOp()
+        op.Set(Gf.Matrix4d(*[float(value) for value in world.T.reshape(-1)]))
+        actual = np.asarray(UsdGeom.XformCache().GetLocalToWorldTransform(prim)).T
+        if not np.allclose(actual, world, atol=1e-6, rtol=0):
+            raise RuntimeError('Isaac realized observer camera transform differs from the request')
+        data = None
+        for _ in range(8):
+            rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0, wait_for_render=True)
+            if timeline.is_playing() or self._counter() != before:
+                raise RuntimeError('Isaac observer rendering advanced physics or left the timeline playing')
+            data, _info = self._observer_sensor.get_data('rgb')
+            if data is not None:
+                break
+        if data is None:
+            raise RuntimeError('Isaac observer RGB did not complete within the bounded render wait')
+        self._verify_observer_fabric(state, world)
+        rgb = np.array(data.numpy(), copy=True)
+        selection = RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
+                                        'v211_isaac_rtx_observer_v1', 'cuda:0')
+        capability = {'schema': 'v211-isaac-rtx-observer-v1', 'sdk': '6.2.0.0',
+                      'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy'}
+        capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
+                                                  separators=(',', ':')).encode()).hexdigest()
+        identity = CameraCaptureIdentityV1(
+            'camera-capture-identity-v1', camera.task_artifact_hash, camera.camera_id,
+            camera.identity_hash, self._source.source_closure_digest, self._execution.identity_hash,
+            selection, capability_hash, state.boundary, state.sample_clock, ('rgb',), camera.capture_phase)
+        identity.validate()
+        return observation_type(normalize_rgb(rgb, camera), None, metadata, identity)
+
+    def _verify_observer_fabric(self, state, camera_world):
+        """Reject a frame unless the public renderer-facing poses match publication."""
+        import numpy as np
+        import isaacsim.core.experimental.utils.backend as backend_utils
+        from isaacsim.core.experimental.prims import XformPrim
+
+        expected = {(item.frame.entity_id, item.frame.frame_id): item.pose_world
+                    for item in state.frames}
+        delivery = self._source.scene_source.loaded_delivery.delivery
+        checks = []
+        for semantic, native in {**self._source.bodies, **self._source.frames}.items():
+            frame = self._artifact.legacy_frame_bindings.get(semantic)
+            if frame is None or (frame.entity_id, frame.frame_id) not in expected:
+                raise RuntimeError(f'Isaac observer lacks a published frame for {semantic!r}')
+            pose = expected[(frame.entity_id, frame.frame_id)]
+            checks.append((_native_prim_path(native, delivery.entry_prim), pose.position,
+                           pose.quaternion_wxyz, semantic))
+        if not checks:
+            raise RuntimeError('Isaac observer has no source-bound Fabric frames to verify')
+        with backend_utils.use_backend('usdrt', raise_on_unsupported=True, raise_on_fallback=True):
+            for path, position, quaternion, semantic in checks:
+                actual_position, actual_quaternion = XformPrim(path).get_world_poses()
+                actual_position = np.asarray(actual_position.numpy()).reshape(-1, 3)[0]
+                actual_quaternion = np.asarray(actual_quaternion.numpy()).reshape(-1, 4)[0]
+                p_error = float(np.linalg.norm(actual_position - np.asarray(position)))
+                q_error = min(float(np.linalg.norm(actual_quaternion - np.asarray(quaternion))),
+                              float(np.linalg.norm(actual_quaternion + np.asarray(quaternion))))
+                if p_error > 1e-4 or q_error > 1e-4:
+                    raise RuntimeError(f'Isaac renderer-facing frame {semantic!r} differs from published state: '
+                                       f'{p_error:g} m, {q_error:g} quaternion L2')
+            position, quaternion = XformPrim(self._observer_path).get_world_poses()
+            position = np.asarray(position.numpy()).reshape(-1, 3)[0]
+            quaternion = np.asarray(quaternion.numpy()).reshape(-1, 4)[0]
+        w, x, y, z = quaternion / np.linalg.norm(quaternion)
+        rotation = np.asarray(((1-2*(y*y+z*z), 2*(x*y-z*w), 2*(x*z+y*w)),
+                               (2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w)),
+                               (2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y))))
+        if (not np.allclose(position, camera_world[:3, 3], atol=1e-4, rtol=0) or
+                not np.allclose(rotation, camera_world[:3, :3], atol=1e-4, rtol=0)):
+            raise RuntimeError('Isaac renderer-facing camera pose differs from the requested camera')
+
+    def present_observer(self):
+        """Present the observer camera in Isaac's headed viewport without physics."""
+        if self._closed or self._observer_faulted or self._observer_sensor is None:
+            raise RuntimeError('Isaac observer presentation requires a completed capture')
+        try:
+            import omni.timeline
+            from isaacsim.core.rendering_manager import RenderingEvent, RenderingManager, ViewportManager
+            before = self._counter()
+            windows = ViewportManager.get_viewport_windows()
+            if not windows:
+                raise RuntimeError('Isaac headed viewport is unavailable')
+            ViewportManager.set_camera(self._observer_path)
+            observed = []
+            callback_id = RenderingManager.register_callback(
+                RenderingEvent.NEW_FRAME, callback=lambda *args, **kwargs: observed.append(True))
+            try:
+                RenderingManager.render()
+            finally:
+                RenderingManager.deregister_callback(callback_id)
+            if self._counter() != before or omni.timeline.get_timeline_interface().is_playing():
+                raise RuntimeError('Isaac viewport update advanced physics or left the timeline playing')
+            if not observed:
+                raise RuntimeError('Isaac viewport did not report a rendered-frame event')
+            realized = ViewportManager.get_camera()
+            if str(realized.GetPrim().GetPath()) != self._observer_path:
+                raise RuntimeError('Isaac viewport did not retain the requested observer camera')
+            return {'backend': 'Isaac Sim native viewport', 'camera_prim': self._observer_path,
+                    'viewport_titles': [str(window.title) for window in windows],
+                    'event_pump': 'RenderingManager.render', 'new_frame_events': len(observed),
+                    'physics_counter': list(before), 'window_id': None}
+        except BaseException as error:
+            self._observer_faulted = True
+            try:
+                self._close_observer()
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac observer cleanup after presentation failure also failed: {cleanup_error!r}')
+            raise
+
+    def invalidate_observer(self):
+        self._observer_faulted = True
+        self._close_observer()
+
+    def _close_observer(self):
+        sensor, self._observer_sensor = self._observer_sensor, None
+        path, self._observer_path = self._observer_path, None
+        primary = None
+        if sensor is not None:
+            try:
+                sensor.detach_annotators('rgb')
+            except BaseException as error:
+                primary = error
+        if path is not None and self._stage is not None:
+            try:
+                if self._stage.GetPrimAtPath(path):
+                    self._stage.RemovePrim(path)
+            except BaseException as error:
+                if primary is None:
+                    primary = error
+                else:
+                    primary.add_note(f'Isaac observer prim cleanup also failed: {error!r}')
+        if primary is not None:
+            raise primary
+
     def close(self) -> None:
         if self._closed:
             return
@@ -2075,10 +2305,17 @@ class IsaacSimNativeRuntimeIOV1:
 
         primary = None
         try:
+            self._close_observer()
+        except BaseException as error:
+            primary = error
+        try:
             from isaacsim.core.experimental.utils import app as app_utils
             app_utils.stop()
         except BaseException as error:
-            primary = error
+            if primary is None:
+                primary = error
+            else:
+                primary.add_note(f'Isaac stop after observer cleanup also failed: {error!r}')
         self._free_views.clear()
         self._f06_robot_contact_views = {}
         self._frame_views.clear()
@@ -2128,7 +2365,8 @@ class IsaacSimNativeRuntimeIOV1:
 
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *,
-                                  dg04_native_input=None, f06_pickcube_input=None):
+                                  dg04_native_input=None, f06_pickcube_input=None,
+                                  observer_render_request=None):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
     dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
@@ -2164,14 +2402,16 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                 or f06_pickcube_input.execution.identity_hash != execution.identity_hash
                 or f06_pickcube_input.runtime_source is not source):
             raise ValueError('F06 Isaac adapter input differs from the exact artifact/execution/source')
-    owner = _process_app_owner(launch_profile_id=(F06_ISAAC_APP_LAUNCH_PROFILE_V1
-                                                   if f06_pickcube else None))
+    launch_profile = (V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 if observer_render_request is not None
+                      else F06_ISAAC_APP_LAUNCH_PROFILE_V1 if f06_pickcube else None)
+    owner = _process_app_owner(launch_profile_id=launch_profile)
     lease = source.scene_source.acquire_snapshot()
     try:
         return IsaacSimNativeRuntimeIOV1(
             artifact, execution, source, lease, owner,
             dg04_native_input=dg04_native_input,
             f06_pickcube_input=f06_pickcube_input,
+            observer_render_request=observer_render_request,
         )
     except BaseException as primary:
         # Constructor cleanup owns the lease/App when startup begins; this is

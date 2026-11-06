@@ -16,8 +16,9 @@ from ..tools.processing import RenderProcessor
 class TaskEnvRenderProvider:
     """Lazy adapter from a TaskEnv render source to the existing visualizers."""
 
-    def __init__(self, *, render_source: object, config: object) -> None:
-        if render_source is None:
+    def __init__(self, *, render_source: object, config: object, frame_capture=None,
+                 frame_presenter=None) -> None:
+        if render_source is None and frame_capture is None:
             raise ValueError("TaskEnv UI rendering requires a render source")
         self._render_source = render_source
         self._config = config
@@ -28,6 +29,65 @@ class TaskEnvRenderProvider:
         self._canvas = None
         self._closed = False
         self._frame_submission_enabled = True
+        self._frame_capture = frame_capture
+        self._frame_presenter = frame_presenter
+        self._window_image = None
+        self._window_label = None
+        self._window_closed_by_user = False
+        self._last_frame_receipt = None
+
+    @property
+    def last_frame_receipt(self):
+        return self._last_frame_receipt
+
+    def invalidate_frame(self):
+        self._last_frame_receipt = None
+
+    def _capture_owned_frame(self):
+        frame = self._frame_capture()
+        self._last_frame_receipt = {
+            'camera': frame.metadata.to_mapping(),
+            'capture_identity': frame.capture_identity.to_mapping(),
+            'completion': 'synchronous native readback and owned host copy',
+            'layout': 'HWC', 'dtype': 'float32', 'range': [0, 1], 'channels': 'RGB',
+            'color_space': 'unverified native framebuffer encoding',
+        }
+        return np.array(frame.rgb, dtype=np.float32, copy=True, order='C')
+
+    def _present_owned_frame(self):
+        # Window resources belong to this existing UI provider.  The camera
+        # session owns the native renderer and its completed host frame.
+        if self._window_closed_by_user:
+            raise RuntimeError('observer window was closed')
+        if self._window is None:
+            import tkinter as tk
+            window = tk.Tk()
+            try:
+                window.title('GeoChora MuJoCo observer')
+                label = tk.Label(window, borderwidth=0, highlightthickness=0)
+                label.pack()
+                def closed():
+                    self._window_closed_by_user = True
+                    self._close_window()
+                window.protocol('WM_DELETE_WINDOW', closed)
+            except BaseException:
+                window.destroy()
+                raise
+            self._window, self._window_label = window, label
+        frame = self._capture_owned_frame()
+        import tkinter as tk
+        pixels = np.rint(np.clip(frame, 0, 1) * 255).astype(np.uint8)
+        ppm = f'P6\n{frame.shape[1]} {frame.shape[0]}\n255\n'.encode() + pixels.tobytes()
+        self._window_image = tk.PhotoImage(data=ppm, format='PPM', master=self._window)
+        self._window_label.configure(image=self._window_image)
+        self._window.update_idletasks()
+        self._window.update()
+        if self._window_closed_by_user:
+            raise RuntimeError('observer window was closed during event processing')
+        self._last_frame_receipt['presentation'] = {
+            'event_pump': 'Tk update', 'completion': 'synchronous Tk image update',
+            'window_id': int(self._window.winfo_id()),
+        }
 
     @property
     def visualizer(self):
@@ -93,6 +153,11 @@ class TaskEnvRenderProvider:
         window = self._window
         self._window = None
         self._canvas = None
+        if self._frame_capture is not None:
+            self._window_label = self._window_image = None
+            if window is not None:
+                window.destroy()
+            return
         close = getattr(window, "close", None)
         if not callable(close):
             close = getattr(window, "destroy", None)
@@ -177,6 +242,25 @@ class TaskEnvRenderProvider:
     def render(self, *, mode: RenderMode, snapshot: object) -> np.ndarray | None:
         del snapshot
         self._require_open()
+        if self._frame_capture is not None:
+            self.invalidate_frame()
+            if mode is RenderMode.RGB_ARRAY:
+                return self._capture_owned_frame()
+            if mode is RenderMode.HUMAN:
+                try:
+                    if self._frame_presenter is None:
+                        self._present_owned_frame()
+                    else:
+                        self._capture_owned_frame()
+                        self._last_frame_receipt['presentation'] = self._frame_presenter()
+                except BaseException as error:
+                    self.invalidate_frame()
+                    try:
+                        self._close_window()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'observer window cleanup also failed: {cleanup_error!r}')
+                    raise
+                return None
         if mode is RenderMode.RGB_ARRAY:
             return self._render_rgb()
         if mode is RenderMode.HUMAN:
@@ -188,6 +272,7 @@ class TaskEnvRenderProvider:
         if self._closed:
             return
         self._closed = True
+        self.invalidate_frame()
         self._close_window()
         self._visualizer = None
 

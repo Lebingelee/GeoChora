@@ -844,13 +844,22 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _session_admission_input=None, _native_feedback_profile=None) -> RuntimeSession:
+                _session_admission_input=None, _native_feedback_profile=None,
+                _observer_render_request=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if _observer_render_request is not None:
+        from ...render.base.contracts import ObserverRenderRequestV1
+        if type(_observer_render_request) is not ObserverRenderRequestV1:
+            raise TypeError('observer render requirement must use ObserverRenderRequestV1')
+        _observer_render_request.validate(artifact=artifact, physics_provider=execution.physics_provider,
+                                          physics_backend=execution.physics_backend)
     admission_route = _session_admission_input_route(_session_admission_input)
+    if _observer_render_request is not None and admission_route != 'f06_pickcube':
+        raise ValueError('Isaac observer request requires the exact F06 input')
     _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
     _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
     _f05_dg04_isaac_native_input = _session_admission_input if admission_route == 'f05_dg04' else None
@@ -877,6 +886,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         native_io = create_isaac_native_runtime_io(
             artifact, declared_execution, source,
             f06_pickcube_input=_f06_pickcube_isaac_input,
+            observer_render_request=_observer_render_request,
         )
         from .native_io import UsdCoreRuntimeSession
         try:

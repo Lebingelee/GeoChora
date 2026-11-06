@@ -245,10 +245,11 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             self._model = mujoco.MjModel.from_xml_string(
                 ET.tostring(root, encoding='unicode'), assets=assets,
             )
-            if camera.depth:
+            from .api import V211_RGB_PROFILE
+            if camera.depth or getattr(manifest, 'render_profile', None) == V211_RGB_PROFILE:
                 extent = float(self._model.stat.extent)
                 if not math.isfinite(extent) or extent <= 0:
-                    raise ValueError('D04 optical-Z depth requires a finite positive MuJoCo model extent')
+                    raise ValueError('camera clipping requires a finite positive MuJoCo model extent')
                 # MuJoCo scales these visual clipping distances by model extent.
                 self._model.vis.map.znear = camera.near / extent
                 self._model.vis.map.zfar = camera.far / extent
@@ -393,9 +394,27 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
 
     def capture(self, state):
         self._require_trustworthy()
-        if self._source.schema_version == 'camera-dynamic-source-v2':
+        from .api import V211_DYNAMIC_PROFILE
+        if self._manifest.render_profile == V211_DYNAMIC_PROFILE:
             raise RuntimeError('v211 visual binding does not admit RGB capture')
-        return super().capture(state)
+        try:
+            return super().capture(state)
+        except BaseException as error:
+            # Capture may have changed native camera/context state.  Never
+            # expose an old receipt or continue using the affected owner.
+            if self._source.schema_version == 'camera-dynamic-source-v2':
+                self._faulted = True
+                self._last_projection = self._last_sync = None
+                try:
+                    self.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'renderer close after capture failure also failed: {cleanup_error!r}')
+            raise
+
+    @property
+    def camera_geometry_identity(self):
+        self._require_trustworthy()
+        return self._geometry.identity_hash
 
     def visual_model_info(self):
         """Describe renderer-owned model resources without exposing native handles."""

@@ -12,6 +12,7 @@ from .source import DynamicCameraRenderSourceV1, DynamicCameraRenderSourceV2, pr
 
 PROFILE = 'p1_4_native_camera_cpu_v0'
 V211_DYNAMIC_PROFILE = 'v211_mujoco_cpu_render_binding_v1'
+V211_RGB_PROFILE = 'v211_mujoco_cpu_native_rgb_v1'
 V211_PHYSICS_PROFILE = 'mujoco-scene-v3-runtime-v1'
 D03_PHYSICS_PROFILE = 'geophys-scene-v3-runtime-v1'
 D03_DYNAMIC_PROFILE = 'd03_mujoco_native_dynamic_opengl_v1'
@@ -116,9 +117,21 @@ def v211_dynamic_render_manifest():
         (), 'implementation_only_no_qualification')
 
 
+def v211_rgb_render_manifest():
+    """Separate RGB admission; the earlier binding-only profile stays unchanged."""
+    return ProviderCapabilityManifest(
+        'provider-capability-v0', 'mujoco', provider_build_identity('mujoco')['manifest_version'],
+        'v211-native-rgb-v1', 'native-opengl', 'mujoco-cpu-to-mujoco-native-opengl',
+        V211_RGB_PROFILE, 'best_effort',
+        (CapabilityClaim('rgb_camera', 'implemented', 'task_env/render/camera/dynamic-v2'),),
+        (), 'implementation_only_no_qualification')
+
+
 def _dynamic_manifest_for_profile(profile):
     if profile == V211_DYNAMIC_PROFILE:
         return v211_dynamic_render_manifest()
+    if profile == V211_RGB_PROFILE:
+        return v211_rgb_render_manifest()
     if profile == D03_DYNAMIC_PROFILE:
         return dynamic_render_manifest()
     if profile == D04_DYNAMIC_PROFILE:
@@ -148,7 +161,7 @@ def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
               and type(source) is DynamicCameraRenderSourceV1)
     v211 = (execution.physics_provider == 'mujoco' and execution.physics_backend == 'cpu'
             and execution.physics_profile == V211_PHYSICS_PROFILE
-            and selected.profile == V211_DYNAMIC_PROFILE
+            and selected.profile in {V211_DYNAMIC_PROFILE, V211_RGB_PROFILE}
             and type(source) is DynamicCameraRenderSourceV2)
     if (not (legacy or v211) or selected.provider != 'mujoco'
             or selected.backend != 'native-opengl' or selected.device is not None
@@ -164,11 +177,13 @@ def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
         raise CapabilityAdmissionError('dynamic camera manifest does not match the admitted profile route')
     claims = {claim.name: claim.status for claim in actual.capabilities}
     requested = tuple(name for name, enabled in (('rgb_camera', camera.rgb), ('depth_camera', camera.depth)) if enabled)
-    if v211:
+    if v211 and selected.profile == V211_DYNAMIC_PROFILE:
         # Geometry config supplies a render context only; no RGB request is admitted.
         if not camera.rgb or camera.depth:
             raise CapabilityAdmissionError('v211 visual binding requires RGB camera geometry without capture admission')
         requested = ()
+    if selected.profile == V211_RGB_PROFILE and (not camera.rgb or camera.depth):
+        raise CapabilityAdmissionError('v211 native RGB profile requires RGB without depth')
     if selected.profile == D04_ENTITY_SEGMENTATION_PROFILE:
         requested += ('entity_instance_segmentation',)
     missing = [name for name in requested if claims.get(name) != 'implemented' or name in actual.known_unsupported]

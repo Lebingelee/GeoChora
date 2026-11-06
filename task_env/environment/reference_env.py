@@ -362,6 +362,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         from ..render import RenderUnavailableError, normalize_render_mode
 
+        if getattr(self, '_selected_observer_camera', None) is not None:
+            self._episode_execution_state().require_open('environment is closed')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            return self._ui_render_provider.render(mode=normalized, snapshot=None)
+
         requested_mode = mode
         if requested_mode is None:
             requested_mode = self.render_mode or "human"
@@ -1730,6 +1737,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                         session_admission_input=self.value.get('session_admission_input'),
+                        observer_render_request=getattr(self, '_observer_render_request', None),
                     )
                 # Preserve what was actually materialized; the task binding can
                 # later be replaced independently of this live session.
@@ -2140,7 +2148,80 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             info['execution_configuration_v1'] = self.get_execution_receipt()
         return observation, info, evaluation
 
-    def bind_visual_state(self, camera):
+    def _configure_selected_observer(self, render_mode, camera):
+        from types import SimpleNamespace
+        from ..render import TaskEnvRenderProvider
+        if camera.task_artifact_hash != self.artifact.identity_hash:
+            raise ValueError('observer camera TaskArtifact linkage mismatch')
+        self.render_mode = render_mode
+        self._selected_observer_camera = camera
+        if self.provider == 'isaacsim':
+            from ..render.base.contracts import ObserverRenderRequestV1
+            request = ObserverRenderRequestV1(camera, render_mode, 'isaacsim', 'rtx')
+            request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
+            self._observer_render_request = request
+        self._ui_render_provider = TaskEnvRenderProvider(
+            render_source=None, config=SimpleNamespace(width=camera.width, height=camera.height),
+            frame_capture=self._capture_selected_observer,
+            frame_presenter=self._present_selected_observer if self.provider == 'isaacsim' else None)
+        self.metadata = dict(self.metadata)
+        self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
+                             render_backend=('isaacsim-rtx' if self.provider == 'isaacsim' else 'mujoco-native-opengl'))
+
+    def _capture_selected_observer(self):
+        publication = self._published_position_typed_state
+        if publication is None or self._execution_fault is not None:
+            raise RuntimeError('observer requires a successfully published state')
+        if self.provider == 'isaacsim':
+            return self.session.capture_observer(self._selected_observer_camera, publication.view)
+        if getattr(self, '_visual_state_session', None) is None:
+            self.bind_visual_state(self._selected_observer_camera, capture=True)
+        if self._visual_state_session.camera_geometry_identity != self._selected_observer_camera.identity_hash:
+            raise RuntimeError('bound visual session does not match the observer camera')
+        return self._visual_state_session.capture(publication.view)
+
+    def _present_selected_observer(self):
+        publication = self._published_position_typed_state
+        if publication is None or self._execution_fault is not None:
+            raise RuntimeError('observer requires a successfully published state')
+        return self.session.present_observer(publication.view)
+
+    def set_observer_camera(self, camera):
+        """Replace the observer camera without modifying any task camera."""
+        from ..observations.canonical_camera import CameraGeometry
+        if not isinstance(camera, CameraGeometry):
+            raise TypeError('observer must be CameraGeometry')
+        camera.validate()
+        previous = getattr(self, '_selected_observer_camera', None)
+        if previous is None:
+            raise RuntimeError('observer rendering was not configured at construction')
+        if (camera.task_artifact_hash != self.artifact.identity_hash or
+                (camera.width, camera.height, camera.rgb, camera.depth, camera.rgb_layout, camera.rgb_dtype) !=
+                (previous.width, previous.height, True, False, 'HWC', 'float32')):
+            raise ValueError('observer camera must preserve artifact and output contract')
+        self._ui_render_provider.invalidate_frame()
+        session = getattr(self, '_visual_state_session', None)
+        if session is not None:
+            session.close()
+            self._visual_state_session = None
+        self._selected_observer_camera = camera
+
+    def render_receipt(self):
+        self._episode_execution_state().require_open('environment is closed')
+        provider = getattr(self, '_ui_render_provider', None)
+        if provider is None or provider.last_frame_receipt is None:
+            raise RuntimeError('no completed observer render')
+        publication = self._published_position_typed_state
+        identity = provider.last_frame_receipt['capture_identity']
+        if (publication is None or self._execution_fault is not None or
+                identity['state_boundary'] != publication.view.boundary.to_mapping() or
+                identity['camera_geometry_identity_hash'] != self._selected_observer_camera.identity_hash):
+            provider.invalidate_frame()
+            raise RuntimeError('observer render receipt no longer matches the current publication')
+        import copy
+        return copy.deepcopy(provider.last_frame_receipt)
+
+    def bind_visual_state(self, camera, *, capture=False):
         """Bind an independent MuJoCo visual model to the latest published state.
 
         Explicit update is separate from task RGB and never advances physics.
@@ -2155,13 +2236,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if getattr(self, '_visual_state_session', None) is not None:
             raise RuntimeError('visual state is already bound; reset or close first')
         from ..artifacts import ExecutionSpecV1, RendererSelectionV1
-        from ..render.camera import (DynamicCameraRenderSourceV2, V211_DYNAMIC_PROFILE,
+        if type(capture) is not bool:
+            raise TypeError('capture must be bool')
+        from ..render.camera import (DynamicCameraRenderSourceV2, V211_DYNAMIC_PROFILE, V211_RGB_PROFILE,
                                      V211_PHYSICS_PROFILE, create_dynamic_camera_session)
         source = DynamicCameraRenderSourceV2.from_runtime_source(
             self.value['source'], artifact=self.artifact, joint_bindings=self.position_joint_bindings,
             frame_bindings=self.position_frame_bindings)
         selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl',
-                                        V211_DYNAMIC_PROFILE, None)
+                                        V211_RGB_PROFILE if capture else V211_DYNAMIC_PROFILE, None)
         execution = ExecutionSpecV1('execution-spec-v1', 'mujoco', 'cpu', V211_PHYSICS_PROFILE,
                                     self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
         session = create_dynamic_camera_session(camera, execution, source=source,
@@ -3612,8 +3695,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def _close_reference_resources(self):
+        ui_provider, self._ui_render_provider = getattr(self, '_ui_render_provider', None), None
+        ui_error = None
+        if ui_provider is not None:
+            try:
+                ui_provider.close()
+            except BaseException as error:
+                ui_error = error
         if getattr(self, 'mixed_control_profile', False):
-            first_error = None
+            first_error = ui_error
             try:
                 # A latched interval fault can leave the Recorder at the
                 # prior complete T/T+1 boundary. Do not synthesize a stop
@@ -3628,7 +3718,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                               if self._mixed_episode_end is not None else 'environment_close')
                     self.finish_recording(reason)
             except BaseException as error:
-                first_error = error
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'mixed-control finalization also failed: {error!r}')
             session_was_materialized = self.session is not None
             active_session, self.session = self.session, None
             if active_session is not None:
@@ -3735,7 +3828,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if first_error is not None:
                 raise first_error
             return
-        first_error = None
+        first_error = ui_error
 
         def retain_cleanup_error(primary, label, cleanup_error):
             if primary is None:

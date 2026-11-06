@@ -794,6 +794,7 @@ def materialize_control(
     native_feedback_profile=None,
     selected_controller=None,
     native_feedback_gripper_control_hz=None,
+    observer_render_request=None,
 ):
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
@@ -1217,6 +1218,7 @@ def materialize_control(
         _diagnostic_profile=diagnostic_profile,
         _session_admission_input=session_admission_input,
         _native_feedback_profile=native_feedback_profile,
+        _observer_render_request=observer_render_request,
     )
     if f04_native:
         try:

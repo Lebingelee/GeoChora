@@ -25,6 +25,29 @@ class RenderBackendName(str, Enum):
 
 
 @dataclass(frozen=True)
+class ObserverRenderRequestV1:
+    """Source-bound observer request, assessed before native materialization."""
+    camera: object
+    mode: str
+    provider: str
+    backend: str
+
+    def validate(self, *, artifact, physics_provider, physics_backend):
+        from ...observations.canonical_camera import CameraGeometry
+        if type(self.camera) is not CameraGeometry:
+            raise TypeError('observer request requires CameraGeometry')
+        self.camera.validate()
+        if (self.camera.task_artifact_hash != artifact.identity_hash or
+                not self.camera.rgb or self.camera.depth or
+                self.camera.rgb_layout != 'HWC' or self.camera.rgb_dtype != 'float32'):
+            raise ValueError('observer request does not match its artifact and RGB contract')
+        if (self.provider, self.backend, physics_provider, physics_backend) != (
+                'isaacsim', 'rtx', 'isaacsim', 'cuda'):
+            raise ValueError('unsupported observer request and physics route')
+        normalize_render_mode(self.mode)
+
+
+@dataclass(frozen=True)
 class RenderBackendCapabilities:
     """Stable capability description exposed before a renderer is created."""
 

@@ -30,8 +30,20 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
         values = {} if config is None else dict(config)
-        if kwargs or render_mode is not None or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy'}:
+        observer_camera = kwargs.pop('observer_camera', None)
+        if kwargs or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy'}:
             raise ValueError('PickCube physical candidate rejects unsupported configuration')
+        if render_mode is not None:
+            from ...render.base.contracts import normalize_render_mode
+            from ...observations.canonical_camera import CameraGeometry
+            render_mode = normalize_render_mode(render_mode).value
+            if not isinstance(observer_camera, CameraGeometry):
+                raise ValueError('rendering requires an explicit observer CameraGeometry')
+            observer_camera.validate()
+            if not observer_camera.rgb or observer_camera.depth or observer_camera.rgb_layout != 'HWC' or observer_camera.rgb_dtype != 'float32':
+                raise ValueError('observer requires HWC float32 RGB without depth')
+        elif observer_camera is not None:
+            raise ValueError('observer camera requires a configured render mode')
         provider, backend = values.get('provider', 'mujoco'), values.get('backend', 'cpu')
         horizon, seed = values.get('horizon', 8), values.get('seed', 31)
         drive_mode, control_kind = values.get('drive_mode', 'coexist'), values.get('control_kind', 'direct')
@@ -50,6 +62,8 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
             raise ValueError('reference effort requires the isolated drive fixture')
         if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu')}:
             raise ValueError('PickCube MJCF physical candidate admits MuJoCo or GeoPhys CPU')
+        if render_mode is not None and ((provider, backend) != ('mujoco', 'cpu') or not reset_switch):
+            raise ValueError('this observer currently admits only MuJoCo CPU with reset switching')
         if type(horizon) is not int or not 1 <= horizon <= 6000 or type(seed) is not int or seed < 0:
             raise ValueError('PickCube physical candidate requires a valid horizon and seed')
         workspace = values.get('source_workspace')
@@ -58,9 +72,19 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
         root = Path(workspace).resolve()
         if root.exists() and any(root.iterdir()):
             raise ValueError('PickCube physical source_workspace must be fresh or empty')
-        return _build_candidate(root, provider=provider, horizon=horizon, seed=seed, environment_type=cls,
-                                drive_mode=drive_mode, control_kind=control_kind, reset_switch=reset_switch,
-                                space_policy=space_policy)
+        env = _build_candidate(root, provider=provider, horizon=horizon, seed=seed, environment_type=cls,
+                               drive_mode=drive_mode, control_kind=control_kind, reset_switch=reset_switch,
+                               space_policy=space_policy)
+        if render_mode is not None:
+            try:
+                env._configure_selected_observer(render_mode, observer_camera)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'candidate observer construction cleanup failed: {cleanup_error!r}')
+                raise
+        return env
 
 
 def _pickcube_mjcf_scene(task_config):

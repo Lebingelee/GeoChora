@@ -653,6 +653,53 @@ class UsdCoreRuntimeSession(_SessionValues):
     def snapshot(self) -> CanonicalStateView:
         return self._snapshot_with_native_free_joints()[0]
 
+    def capture_observer(self, camera, state):
+        """Capture only the currently published boundary through the native owner."""
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('observer request does not match the current state boundary')
+        capture = getattr(self._native_io, 'capture_observer', None)
+        if not callable(capture):
+            raise RuntimeError('native Runtime I/O has no admitted observer capture')
+        before = self._native_io.read_state()
+        try:
+            result = capture(camera, state)
+            after = self._native_io.read_state()
+            if state.boundary != self.state_boundary_identity() or before != after:
+                raise RuntimeError('physics state or boundary changed during observer capture')
+        except BaseException as error:
+            invalidate = getattr(self._native_io, 'invalidate_observer', None)
+            if callable(invalidate):
+                try:
+                    invalidate()
+                except BaseException as cleanup_error:
+                    error.add_note(f'observer invalidation also failed: {cleanup_error!r}')
+            raise
+        return result
+
+    def present_observer(self, state):
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('observer presentation does not match the current state boundary')
+        present = getattr(self._native_io, 'present_observer', None)
+        if not callable(present):
+            raise RuntimeError('native Runtime I/O has no admitted observer presentation')
+        try:
+            result = present()
+            if state.boundary != self.state_boundary_identity():
+                raise RuntimeError('physics boundary changed during observer presentation')
+        except BaseException as error:
+            invalidate = getattr(self._native_io, 'invalidate_observer', None)
+            if callable(invalidate):
+                try:
+                    invalidate()
+                except BaseException as cleanup_error:
+                    error.add_note(f'observer invalidation also failed: {cleanup_error!r}')
+            raise
+        return result
+
     def read_contact_observation(self) -> dict[str, object]:
         """Read the provider's last DG02 diagnostic contact sample without advancing time."""
         self._assert_native_identity()
