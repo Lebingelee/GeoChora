@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：4b 有界接收，4c 准备人工转发
+## 当前：G04 三子阶段分别有界接收
 
-G03 及 G04/4a 先前有界接收不变。4b attempt002 经 [Sol 独立主审](reviews/20261106_4b_attempt002_sol_review.md)以 `ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL` 接收，count=2。001 的真实三后端 effort／参考和 MuJoCo 代表外力以 002 路径关联补强，不外推独立测力、全 source 或任务成功；原失败和各项限制保留。[4c attempt001](../planning/stage4-4c-attempt001.md)为同 Env Controller reset、active Recorder 和迁移后 PickCube 成功准备，尚未执行、未自动派发。
+G03 与 G04/4a、4b 原有界接收不变。4c attempt001 经 [Sol 独立主审](reviews/20261106_4c_attempt001_sol_review.md)按 MuJoCo CPU 单 Env Controller reset 切换和迁移后 PickCube seed31 成功作 `ACCEPTED_BOUNDED_4C_RESET_PICKCUBE`，count=1。任务运行时夹爪 cap ±10 N 与 source 编写值 ±5 N 的差别、外力切换及跨后端未覆盖项均见审查；GeoPhys 独立诊断未完成。不得自动进入阶段5、push 或 merge。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
