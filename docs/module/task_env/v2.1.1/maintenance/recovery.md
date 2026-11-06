@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5a attempt001 已主审，需有界返工
+## 当前：G05 5a 经独立主审有界接收
+
+[5a attempt002 主审](reviews/20261107_5a_attempt002_sol_review.md)决定 `ACCEPTED_BOUNDED_5A_RENDER_BINDING`，普通 count=2。真实范围为单 Env PickCube、MuJoCo CPU 与 renderer-only 模型，001 的返工历史和原始证据保留；窗口/RGB、同步 observation、renderer 切换、GeoPhys/Isaac native 与 cross 均未验证。5b/5c 为 PLANNED、count=0，后续工作包需明确授权并由维护者手动转发；不自动进入阶段6或发布。
+
+## 历史：G05 5a attempt001 已主审，需有界返工
 
 5a attempt001 的 MuJoCo CPU PickCube renderer-only 代表绑定与独立双状态证据保留；Sol 发现渲染更新及恢复均失败时不可信 visual pose 仍可读取，决定 [REWORK_REQUIRED_5A](reviews/20261106_5a_attempt001_sol_review.md)，普通 count=1。5b/5c 仍 PLANNED、count=0；后续另备一次完整返工包，未派发，不自动启动。前包 writer 和 native 已释放；保护输入、两 pin 不变。阶段5继续复用 `codex/v211-stage5` checkout。
 

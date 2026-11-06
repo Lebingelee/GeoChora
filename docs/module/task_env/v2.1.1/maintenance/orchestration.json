@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G05_5A_ATTEMPT001_REWORK_REQUIRED",
+  "status": "G05_5A_ACCEPTED_BOUNDED_5B_PLANNED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,8 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "Prepare one bounded 5a attempt002 after independent review; retain affected evidence and obtain any new execution authorization before manual dispatch. 5b remains planned.",
+  "next_candidate": "5b",
+  "next_action": "Prepare a complete 5b package for maintainer authorization and manual forwarding; separately prove window and offscreen RGB for first three native routes.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1318,8 +1318,8 @@
             "3c",
             "4c"
           ],
-          "status": "REWORK_REQUIRED_5A",
-          "attempt_count": 1,
+          "status": "ACCEPTED_BOUNDED_5A_RENDER_BINDING",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -1333,44 +1333,60 @@
               "report_ref": "../../../../../workspace/maintenance/v211_g05_5a_attempt001/report.md",
               "sol_review_ref": "reviews/20261106_5a_attempt001_sol_review.md",
               "review_decision": "REWORK_REQUIRED_5A"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G05_5a_attempt002",
+              "package_manifest_sha256": "73b32a75c55e3be7c72d1cbc96d83cfa16fa156357e4958387a735b707cc9306",
+              "prompt_sha256": "f37614ce35460b579c15f5c6e857ae7e9581e777184e9341e3b3ce1c6e474ab6",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
+              "result": "PASS_BOUNDED_REPRESENTATIVE_BINDING",
+              "input_head": "2c5d87d33ec8d3bc69e39f3adc00b9baee116849",
+              "output_head": "3eee8e1e19cd7078964b0495961773c90f690f24",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5a_attempt002/report.md",
+              "sol_review_ref": "reviews/20261107_5a_attempt002_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_5A_RENDER_BINDING"
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5a_attempt001/",
-          "package_sha256": "29737348738ba5cf452f0a40f7d1ab7fa8221bbd47e5a828f2b7054a27be5c69",
-          "input_head": "3ca161c41340d6015be4fc949ac43771c233ee1c",
-          "output_head": "90a46f968dcdcb663659ebb9562390f2ebf02639",
-          "expected_duration_minutes": "180-300 active, 480 wall maximum",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5a_attempt002/",
+          "package_sha256": "73b32a75c55e3be7c72d1cbc96d83cfa16fa156357e4958387a735b707cc9306",
+          "input_head": "2c5d87d33ec8d3bc69e39f3adc00b9baee116849",
+          "output_head": "3eee8e1e19cd7078964b0495961773c90f690f24",
+          "expected_duration_minutes": "60-120 active, 180 wall maximum",
           "execution_budget": {
-            "wall_minutes": 480,
-            "source_seconds": 7200,
-            "native_seconds": 7200,
+            "wall_minutes": 180,
+            "source_seconds": 1800,
+            "native_seconds": 1800,
             "native_worker_seconds": 600,
-            "physical_substeps": 5000,
+            "physical_substeps": 2000,
             "cpu_threads": 8,
             "process_tree_rss_gib": 8,
             "gpu_vram_gib": 4,
-            "new_ignored_output_gib": 2
+            "new_ignored_output_gib": 1
           },
-          "last_observation": "Sol reviewed commit and evidence; failure plus failed restoration leaves renderer model accessible. Rework required; representative real binding preserved.",
+          "last_observation": "Sol accepted 5a bounded PickCube MuJoCo CPU renderer-only binding; failure restoration now fails closed. Window/RGB/GeoPhys/Isaac/cross remain unverified.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5a_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5a_attempt001/gates.json",
             "../../../../../workspace/maintenance/v211_g05_5a_attempt001/release-receipt.json",
-            "reviews/20261106_5a_attempt001_sol_review.md"
+            "reviews/20261106_5a_attempt001_sol_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt002/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt002/gates.json",
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt002/release-receipt.json",
+            "reviews/20261107_5a_attempt002_sol_review.md"
           ],
           "commits": [
-            "90a46f968dcdcb663659ebb9562390f2ebf02639"
+            "90a46f968dcdcb663659ebb9562390f2ebf02639",
+            "3eee8e1e19cd7078964b0495961773c90f690f24"
           ],
           "review_decision": {
-            "status": "REWORK_REQUIRED_5A",
+            "status": "ACCEPTED_BOUNDED_5A_RENDER_BINDING",
             "reviewer": "Sol",
-            "date": "2026-11-06",
-            "review_ref": "reviews/20261106_5a_attempt001_sol_review.md"
+            "date": "2026-11-07",
+            "review_ref": "reviews/20261107_5a_attempt002_sol_review.md"
           },
-          "blockers": [
-            "Renderer update and failed restoration leave untrusted visual pose accessible; fail closed and validate affected paths."
-          ]
+          "blockers": []
         },
         {
           "id": "5b",
