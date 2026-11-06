@@ -1,6 +1,6 @@
 # G04/4c attempt001：Controller reset 与迁移后 PickCube
 
-状态：准备人工转发；4b 已有界接收。执行与接收分离：维护者手动转交单一实施会话，Sol 独立主审。依赖原 [4c 目标](../goals/04-control.md#4c)、[控制协议](../contracts/control-and-feedback.md)和 [4b 审查](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。外部包 snapshot 为实际执行输入及预算的权威，本文不改变原目标。
+状态：attempt001 已执行，证据待 Sol 独立主审；4b 已有界接收。执行与接收分离：维护者手动转交单一实施会话，Sol 独立主审。依赖原 [4c 目标](../goals/04-control.md#4c)、[控制协议](../contracts/control-and-feedback.md)和 [4b 审查](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。外部包 snapshot 为实际执行输入及预算的权威，本文不改变原目标。
 
 ## 已知真实缺口及优先次序
 

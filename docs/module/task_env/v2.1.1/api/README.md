@@ -63,3 +63,9 @@ GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `
 MuJoCo 的独立版本化自由体和 Robot hand fixture 分别验证实际外力响应与 world force、body-local 偏置点和点参考矩的语义；手部旋转后逐子步更新 frame 和 Jacobian。自由体与手部证据不代表其他 provider 的 BodyWrench 物理验证。所有物理响应为运动观察，ACK、计算力矩及公开模型读回不作为独立测力。
 
 各次直接 effort 和外力实验的中间版本证据已按实际受影响路径作有界关联；最终版本的参考 Controller 对照不代替逐输入实验。具体接受范围及原失败见[002 独立主审](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。
+
+## 4c reset 控制候选（待独立主审）
+
+MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=True`，在 `reset(options={'controller': 'r3-pose'})` 或 `'joint'` 时选择控制器；需要调节参数时可用 `{'controller': {'kind': 'joint', 'parameters': {'kp': 120.0}}}`。`physical_action_spec()` 返回当前输入语义、参数、身份和 generation；用 `bind_physical_action(values)` 生成该 episode 的输入并交给 `step`。旧 episode 的输入即使 shape 相同也会拒绝。`action_space_policy='fixed_semantic'` 在破坏已有 session 前拒绝不同语义；这个候选是单环境标量接口，不承诺原生 batch。
+
+`reset_for_solution` / `step_with_solution` 可将既有 PickCube Solution 的绝对位姿送入 R3 reference 和具名关节 effort。该路线使用对应 MuJoCo source 的状态相关质量矩阵与 bias、禁用原生 position drive，并复用 Generic H5 v3 Recorder；记录的 ACK 和 admitted effort 不等于独立测力。seed 31 的单次原任务成功和 A→B→A 证据等待独立主审，不扩展为其他 seed、source 或后端资格。详情见 [4c 计划](../planning/stage4-4c-attempt001.md)和该 attempt 的 ignored 原始证据。

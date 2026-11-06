@@ -31,7 +31,8 @@ PANDA_FIXED_FRAME_POINT_WRENCH_PROFILE = 'panda-fixed-frame-point-wrench-v1'
 
 
 def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_target=None, split=False,
-                                        fixed_frame_point=False, entity_id='panda-main', native_drive='position'):
+                                        fixed_frame_point=False, entity_id='panda-main', native_drive='position',
+                                        gripper_force_limit=None):
     """Build named 7+2 commands from eight direct-effort inputs; no native I/O."""
     if native_drive not in {'position', 'disabled'}:
         raise ValueError('Panda effort profile requires a declared native drive mode')
@@ -79,6 +80,14 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
         if len(pair) != 2 or not all(math.isfinite(v) for v in pair) or not pair[0] < 0 < pair[1]:
             raise ValueError('Panda actuator requires a finite signed force range')
         limits.append(pair)
+    if gripper_force_limit is not None:
+        if (getattr(artifact, 'artifact_id', None) != 'pickcube-mjcf-physical-effort-task-v1'
+                or native_drive != 'disabled' or float(gripper_force_limit) != 10.
+                or limits[7] != (-5., 5.)):
+            raise ValueError('task gripper force override requires its exact source and isolated fixture')
+        # The selected PickCube R3 task uses a 10 N runtime gripper force cap;
+        # this changes no authored MJCF bytes and preserves the 1:2 pair map.
+        limits[7] = (-10., 10.)
     instance = next(x for x in scene.entities if x.entity_id == entity)
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
                                      scene.schema_version, scene.identity_hash)

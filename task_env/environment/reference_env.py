@@ -1371,6 +1371,24 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self._format_component_reset(component_lifecycle, result, seed)
         return result
 
+    def physical_action_spec(self):
+        """Return the currently committed reset-scoped physical action identity."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is None:
+            raise StageUnavailableError('this route does not support physical reset selection')
+        self._episode_execution_state().require_open('environment is closed')
+        return selection.describe()
+
+    def bind_physical_action(self, values):
+        """Bind scalar action values to the current physical spec and generation."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is None:
+            raise StageUnavailableError('this route does not support physical reset selection')
+        self._episode_execution_state().require_open('environment is closed')
+        action = selection.bind_action(values)
+        selection.validate_action(action)
+        return action
+
     def reset_for_solution(self, solution, *, seed=_RESET_SEED_UNSET, options=None):
         """Reset this selected route for one caller-owned Solution instance.
 
@@ -1388,6 +1406,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
         from .reference_binding import prepare_selected_reset
+        physical_selection = getattr(self, '_physical_reset_selection', None)
+        physical_candidate = None
+        if physical_selection is not None:
+            if options is not None and (not isinstance(options, Mapping) or set(options) - {'controller'}):
+                raise ValueError('physical reset options support only controller')
+            requested_controller = None if options is None else options.get('controller')
+            physical_candidate = physical_selection.prepare(requested_controller)
+            options = None
         if self.binding.physical_control_profile is not None and (
                 (self.provider, self.backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}
                 or not self.position_profile):
@@ -1399,7 +1425,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..runtime.sessions.geophys_physical import preflight_physical_geophys as preflight_physical
             else:
                 from ..runtime.sessions.isaac_physical import preflight_physical_isaac as preflight_physical
-            preflight_physical(self.binding.physical_control_profile(self), self.artifact, self.value['source'])
+            profile = (physical_candidate.execution if physical_candidate is not None
+                       else self.binding.physical_control_profile(self))
+            preflight_physical(profile, self.artifact, self.value['source'])
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         switch_candidate = None
@@ -1530,6 +1558,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 reset_effects['previous_session_close_completed'] = True
                 if self._mixed_control_candidate:
                     self._mixed_close_receipt = previous_session.close_receipt
+            if physical_candidate is not None:
+                physical_selection.commit(physical_candidate)
+                self.action_space = physical_selection.action_space()
+                self.metadata['physical_action_spec_v1'] = physical_selection.describe()
+                if physical_candidate.kind == 'r3-pose':
+                    from ..controllers.canonical.contracts import REFERENCE_POSE_ACTION_SCHEMA
+                    self.metadata['action_schema'] = dict(REFERENCE_POSE_ACTION_SCHEMA)
+                else:
+                    self.metadata['action_schema'] = {'schema_id': 'physical-joint-reference-v1',
+                        'controller_kind': 'absolute_joint', 'dimension': 8}
+                self._last_physical_opening_target = None
+                self._last_physical_submission = None
             previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
             failure_phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
@@ -1781,6 +1821,25 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 else:
                     for profile in self.position_profiles:
                         profile.reset(self.typed_state, self.position_plan)
+                if physical_candidate is not None:
+                    execution = physical_candidate.execution
+                    publication = self.session.snapshot_v2(
+                        scene=execution.scene, joint_bindings=execution.joint_bindings,
+                        frame_bindings=execution.frame_bindings, requirements=execution.requirements)
+                    if (not publication.lifetime.may_be_retained
+                            or publication.view.boundary != self.session.state_boundary_identity()
+                            or publication.view.boundary.control_step != 0):
+                        raise ValueError('physical Controller reset requires the realized initial boundary')
+                    for controller in execution.controllers:
+                        bind_model = getattr(controller, 'bind_model', None)
+                        if callable(bind_model):
+                            source_model = getattr(self.session, 'physical_source_dynamics_model', None)
+                            if not callable(source_model):
+                                raise StageUnavailableError('selected session has no source dynamics model')
+                            bind_model(source_model())
+                        initialize = getattr(controller, 'reset_from_realized_state', None)
+                        if callable(initialize):
+                            initialize(publication.view)
                 self.feedback = None
             elif self.mixed_control_profile:
                 self.feedback = None
@@ -1796,6 +1855,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
+            if physical_candidate is not None:
+                self.info['physical_action_spec_v1'] = physical_selection.describe()
             if switching:
                 self.info['reset_switch_v1'] = {
                     'schema_version': 'pickcube-reset-switch-receipt-v1',
@@ -1857,6 +1918,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self.position_profile:
                 from ..recorders.position_metadata import position_record_reset_info
                 self._position_reset_info = position_record_reset_info(self)
+                if physical_candidate is not None:
+                    self._position_reset_info['physical_action_spec_v1'] = physical_selection.describe()
                 self.info.update(self._position_reset_info)
                 self._publish_task_position_execution_info(self.info)
                 if previous_episode_end is not None:
@@ -2137,6 +2200,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
         if self.binding.physical_control_profile is not None:
+            selection = getattr(self, '_physical_reset_selection', None)
+            if selection is not None:
+                action = selection.validate_action(action)
+                try:
+                    return self._prepare_physical_control(action)
+                except BaseException as error:
+                    self._latch_fault('physical_control_preparation', error, before_state=self.state)
+                    raise
             return self._prepare_physical_control(action)
         if getattr(self, 'mixed_control_profile', False):
             return self._prepare_mixed_control(action)
@@ -2178,7 +2249,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._episode_mode = 'external'
         return self._prepare_reference_step(action)
 
-    def _prepare_physical_control(self, action):
+    def _prepare_physical_control(self, action, *, proposal=None, observer_solution=None):
         """Prepare one named physical interval through the selected session."""
         from ..artifacts.state import CanonicalStatePublicationV1, CanonicalStatePublicationV2
         from ..controllers.canonical.physical_commands import PhysicalCommandContextV1, PhysicalControlReceiptV1
@@ -2188,8 +2259,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('reset required or episode already stopped')
         if self.state.control_step >= self.horizon:
             raise RuntimeError('selected physical-control horizon is exhausted')
-        if self.recorder is not None and getattr(self.recorder, 'active', False):
-            raise StageUnavailableError('physical-control recording is not yet admitted')
+        if (self.recorder is not None and getattr(self.recorder, 'active', False)
+                and getattr(self, '_physical_reset_selection', None) is None):
+            raise StageUnavailableError('physical-control recording requires reset-scoped selection')
         profile = self.binding.physical_control_profile(self)
         if type(profile) is not PhysicalControlExecutionV1:
             raise TypeError('selected physical route requires an admitted physical execution profile')
@@ -2287,6 +2359,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         attempted = False
         completed = False
         ack = None
+        record_append_attempted = False
+        recording_before = self._recording_counts(self.recorder)
 
         def apply_control():
             nonlocal attempted, ack
@@ -2324,21 +2398,45 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def evaluate(_state):
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info = dict(self.info)
+            selection = getattr(self, '_physical_reset_selection', None)
+            if selection is not None:
+                spec = selection.describe()
+                if spec['kind'] == 'r3-pose':
+                    self._last_physical_opening_target = .04 * (float(np.clip(action[-1], -1., 1.)) + 1.)
+                else:
+                    self._last_physical_opening_target = float(action[-1])
+                self.info['physical_action_spec_v1'] = spec
+                self.info['state_boundary_identity'] = self.typed_state.view.boundary.to_mapping()
+                self._publish_task_position_execution_info(self.info)
             self.info['physical_control_v1'] = {
                 'submitted_batch': batch.to_mapping(),
                 'submitted': submitted.to_mapping(),
                 'accepted': resolved.accepted_receipt.to_mapping(),
+                'admitted_joint_efforts': [asdict(item) for item in resolved.joints],
                 'native_write_ack': ack.to_mapping(),
             }
             return self.evaluation
 
         def publish(_control, _state, _evaluation, _observation):
+            nonlocal record_append_attempted
             terminated, truncated = self._episode_execution_state().step_outcome(
                 task_terminated=bool(self.evaluation.failure), task_truncated=False,
                 control_step=self.state.control_step, horizon=self.horizon)
-            self._episode_mode = 'external'
+            self._episode_mode = 'external_solution' if proposal is not None else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
+            if proposal is not None:
+                observer_solution.observe(self.obs, float(self.evaluation.reward), terminated, truncated, self.info)
+                self.info.update(selected_policy_execution_complete=bool(observer_solution.done),
+                                 selected_policy_execution_failed=bool(observer_solution.failed),
+                                 expert_failure_reason=observer_solution.failure_reason)
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                from ..recorders.physical_metadata import record_physical_transition
+                record_append_attempted = True
+                record_physical_transition(self, action, batch, resolved, ack,
+                                           terminated=terminated, truncated=truncated)
             if getattr(self, 'position_profile', False):
+                self._last_position_terminated = terminated
+                self._last_position_truncated = truncated
                 self._published_position_state = self.state
                 self._published_position_typed_state = self.typed_state
                 self._published_position_obs = self.obs
@@ -2357,7 +2455,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._latch_fault(phase, error, before_state=before, after_state=None,
                 interval_attempted=attempted, interval_completed=completed,
                 native_substeps_expected=self.artifact.timebase.control_substeps,
-                transition_status='not_recorded')
+                transition_status=self._fault_transition_status(
+                    self.recorder, recording_before, append_attempted=record_append_attempted))
 
         return dict(apply_control=apply_control, advance=advance, read_state=lambda: self.state,
                     evaluate=evaluate, observe=lambda _state: self.obs,
@@ -2556,6 +2655,24 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('cannot mix external Solution and other selected execution modes')
         if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
             raise RuntimeError('external Solution already stopped')
+        if getattr(self, '_physical_reset_selection', None) is not None:
+            if self.physical_action_spec()['kind'] != 'r3-pose':
+                raise ValueError('the selected Solution requires the R3 pose input spec')
+            from ..planners.contracts import ExpertAction, validate_caller_solution_action
+            try:
+                proposal = solution.act(self.obs, self.info)
+                if type(proposal) is not ExpertAction:
+                    raise TypeError('physical external Solution must return ExpertAction')
+                validate_caller_solution_action(proposal,
+                    boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'), control_request_mode='position')
+                action = self._physical_reset_selection.validate_action(self.bind_physical_action(proposal.action))
+                operations = self._prepare_physical_control(action, proposal=proposal, observer_solution=solution)
+            except BaseException as error:
+                self._latch_fault('physical_external_solution_proposal', error, before_state=self.state)
+                raise
+            return self._episode_execution_state().execute_interval(**operations)
         if getattr(self, 'mixed_control_profile', False):
             try:
                 proposal = solution.act(self.obs, self.info)
@@ -2605,6 +2722,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         computes, applies, steps or appends a transition; the next ordinary
         ``step`` is the first opportunity for the new instance to control.
         """
+        if getattr(getattr(self, 'binding', None), 'physical_control_profile', None) is not None:
+            raise StageUnavailableError('physical Controllers can only change at reset')
         if self._closed:
             raise RuntimeError('cannot switch a closed selected environment')
         if self._execution_fault is not None:
@@ -3595,6 +3714,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             last_transition=getattr(self, 'last_position_transition', None),
             runtime_step=lambda: self.state.control_step, payload=payload,
         )
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            details['position_compatibility_controller_identity'] = details['controller_identity']
+            details['controller_identity'] = selection.describe()['controller_identity']
+            details['profile_id'] = selection.describe()['kind']
+            details['physical_action_spec_v1'] = selection.describe()
         if task_success is _INFER_POSITION_TASK_SUCCESS:
             success = (None if self._published_position_evaluation is None
                        else bool(self._published_position_evaluation.success))
@@ -3614,6 +3739,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             payload=details,
             event_sequence=event_sequence,
             task_success=success,
+            solution_completed=(bool(self._external_solution_owner.done)
+                                if selection is not None and self._external_solution_owner is not None
+                                else None),
         )
 
     def stop(self, reason='external_stop'):
@@ -3703,7 +3831,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise RuntimeError('reset() must complete before Stop')
 
         def create_end():
-            end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(reason)
+            selection = getattr(self, '_physical_reset_selection', None)
+            if selection is not None and reason in {'solution_completed', 'solution_failed'}:
+                solution = self._external_solution_owner
+                if solution is None or (reason == 'solution_completed' and not solution.done) or (
+                        reason == 'solution_failed' and not solution.failed):
+                    raise ValueError('physical Solution stop reason differs from its actual outcome')
+            end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
+                reason, selected_reasons=selection is not None)
             if self._execution_fault is not None:
                 fault = self._execution_fault
                 self._position_episode_end = self._make_position_episode_end(
@@ -3820,6 +3955,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         self._materialized_position_control_selector,
                     )
                 )
+                if getattr(self, '_physical_reset_selection', None) is not None:
+                    from ..recorders.physical_metadata import physical_record_metadata
+                    record_metadata = physical_record_metadata(self, record_metadata)
                 return record_metadata
             self.recording_path, self.recorder = begin_structured_recording(
                 path, horizon=self.horizon, observation=self.obs,

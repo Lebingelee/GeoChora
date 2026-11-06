@@ -46,6 +46,36 @@ def test_r3_pose_reference_flows_to_named_servo_once_per_boundary():
         controller.compute((.5, 0., .6, 1., 0., 0., 0., 0.), state, context)
 
 
+def test_r3_reset_initializes_from_realized_named_state_before_first_action():
+    from dataclasses import replace
+    plan, context, _, _ = _case()
+    names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+    joints = tuple(TypedJointStateValue('typed-joint-state-v1', 'panda-v1', name,
+        'revolute' if i < 7 else 'prismatic', 'radian' if i < 7 else 'meter',
+        (.02*i,), 'radian_per_second' if i < 7 else 'meter_per_second', (.001*i,))
+        for i, name in enumerate(names))
+    frame = TypedFrameStateValue('typed-frame-state-v1', FrameReference('panda-v1', 'ee'),
+                                 PoseWorld((.4, .1, .7), (1., 0., 0., 0.)))
+    state = CanonicalStateViewV2('canonical-state-v2', 'SI_right_handed_z_up_wxyz',
+                                  context.boundary, context.clock, joints, (frame,), ())
+    calls=[]
+    class Ref:
+        identity='a'*64
+        def reset(self, value): calls.append(value)
+        def compute_reference(self, *args): raise AssertionError('must not compute during reset')
+    servo=object.__new__(JointReferenceEffortControllerV1)
+    servo.binding,servo.writer_id,servo.identity=plan.binding,'controller-a','b'*64
+    servo._linear=SimpleNamespace(action_shape=(8,))
+    controller=R3ReferenceEffortControllerV1(Ref(),servo,entity_id='panda-v1',end_frame_id='ee',opening_range_m=.08)
+    controller._episode_id, controller._next_step = 'old-episode', 27
+    controller.reset_from_realized_state(state)
+    assert len(calls)==1 and calls[0].joint_position['panda-v1/joint7']==pytest.approx(.12)
+    assert calls[0].joint_velocity['panda-v1/finger_joint2']==pytest.approx(.008)
+    assert controller._next_step==0 and controller._episode_id==state.boundary.episode_id
+    with pytest.raises(ValueError,match='state sample and control boundary index disagree'):
+        controller.reset_from_realized_state(replace(state,boundary=replace(state.boundary,control_step=1)))
+
+
 def test_unequal_finger_pd_outputs_project_to_equal_constraint_effort():
     from dataclasses import replace
     from task_env.controllers.canonical.r3_effort import ConstrainedPairEffortControllerV1

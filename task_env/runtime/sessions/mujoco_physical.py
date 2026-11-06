@@ -55,7 +55,9 @@ class MuJoCoPhysicalPort:
         if session._provider != 'mujoco' or session._mixed_actuator_plan is not None:
             raise ValueError('physical port requires a scalar MuJoCo session')
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
-        drive_mode = ('disabled' if getattr(session._artifact, 'artifact_id', None) == 'pickcube-mjcf-physical-effort-no-drive-v1'
+        artifact_id = getattr(session._artifact, 'artifact_id', None)
+        drive_mode = ('disabled' if artifact_id in {'pickcube-mjcf-physical-effort-no-drive-v1',
+                                                    'pickcube-mjcf-physical-effort-task-v1'}
                       else 'position')
         groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
         for channel in binding.channels:
@@ -81,6 +83,17 @@ class MuJoCoPhysicalPort:
                 raise ValueError('physical transmissions alias one native actuator')
             actuator_ids.add(actuator)
             first = group[0][0]
+            if artifact_id == 'pickcube-mjcf-physical-effort-task-v1' and first.native_actuator == 'actuator8':
+                if (len(group) != 2 or first.native_range != (-10., 10.)
+                        or not bool(model.actuator_forcelimited[actuator])
+                        or not _same(model.actuator_forcerange[actuator], (-5., 5.))):
+                    raise ValueError('task gripper force cap differs from the checked source')
+                # Match the existing PickCube R3 position route's public
+                # runtime 10 N force-limit configuration; source bytes stay fixed.
+                model.actuator_forcerange[actuator] = (-10., 10.)
+                session._build_layout_facts['physical_gripper_force_cap'] = {
+                    'schema_version': 'pickcube-runtime-gripper-cap-v1', 'source_range_N': [-5., 5.],
+                    'configured_range_N': [-10., 10.], 'source_mjcf_modified': False}
             if (not bool(model.actuator_forcelimited[actuator])
                     or not _same(model.actuator_forcerange[actuator], first.native_range)
                     or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))

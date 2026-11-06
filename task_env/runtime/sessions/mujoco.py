@@ -205,6 +205,13 @@ def check_mujoco_named_layout(model, mj, source):
 
 
 class _MuJoCoSession(_SessionValues):
+    def physical_source_dynamics_model(self):
+        """Create a source-bound, no-step model for the current physical episode."""
+        if getattr(self, '_physical_port', None) is None:
+            raise ValueError('source dynamics requires an admitted physical port')
+        from .mujoco_dynamics import MuJoCoSourceDynamicsV1
+        return MuJoCoSourceDynamicsV1(self)
+
     def bind_physical_control(self, execution):
         """Bind one verified physical profile to this materialized session."""
         if getattr(self, '_physical_port', None) is not None or self._reset_done:

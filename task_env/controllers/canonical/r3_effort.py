@@ -41,8 +41,9 @@ class R3ReferenceEffortControllerV1:
     """
     def __init__(self, reference, servo, *, entity_id, end_frame_id, opening_range_m):
         from .mass_matrix_effort import MassMatrixEffortControllerV1
+        from .dynamic_mass_effort import DynamicMassEffortControllerV1
         if type(servo) not in (JointReferenceEffortControllerV1, ConstrainedPairEffortControllerV1,
-                               MassMatrixEffortControllerV1):
+                               MassMatrixEffortControllerV1, DynamicMassEffortControllerV1):
             raise TypeError('R3 effort composition requires a shared joint-reference effort servo')
         if (not callable(getattr(reference, 'reset', None))
                 or not callable(getattr(reference, 'compute_reference', None))
@@ -66,6 +67,31 @@ class R3ReferenceEffortControllerV1:
     @property
     def action_shape(self):
         return (8,)
+
+    def bind_model(self, model):
+        bind = getattr(self.servo, 'bind_model', None)
+        if not callable(bind):
+            raise ValueError('this R3 effort servo does not accept a dynamic model')
+        bind(model)
+
+    def reset_from_realized_state(self, state):
+        """Initialize R3 memory at the actual newly published reset boundary."""
+        if state.boundary.control_step != 0:
+            raise ValueError('R3 effort reset requires the initial realized boundary')
+        joints = {j.joint_id: j for j in state.joints if j.entity_id == self.entity_id}
+        names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+        frames = [f for f in state.frames if f.frame.entity_id == self.entity_id
+                  and f.frame.frame_id == self.end_frame_id]
+        if set(joints) != set(names) or len(frames) != 1:
+            raise ValueError('R3 effort reset requires nine Panda joints and its end frame')
+        q = {f'panda-v1/{name}': float(joints[name].position[0]) for name in names}
+        qd = {f'panda-v1/{name}': float(joints[name].velocity[0]) for name in names}
+        if not all(math.isfinite(x) for x in (*q.values(), *qd.values())):
+            raise ValueError('R3 effort reset state contains nonfinite joint values')
+        adapted = SimpleNamespace(control_step=0, joint_position=q, joint_velocity=qd,
+                                  pose_world={'panda-v1/ee': frames[0].pose_world})
+        self.reference.reset(adapted)
+        self._episode_id, self._next_step = state.boundary.episode_id, 0
 
     def compute(self, action, state, context):
         if state.boundary != context.boundary or state.sample_clock != context.clock:
@@ -161,3 +187,22 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
     else:
         controller = servo
     return replace(direct_execution, controllers=(controller,), requirements=requirements)
+
+
+def build_dynamic_reference_effort_execution(direct_execution, *, reference_kind, cadence_s,
+                                             r3_reference=None, end_frame_id='ee',
+                                             kp=120., kd=22., finger_kp=1200., finger_kd=35.):
+    """Build a source-dynamics joint or R3 reference from the existing binding."""
+    from dataclasses import replace
+    from .dynamic_mass_effort import DynamicMassEffortControllerV1
+    template = build_reference_effort_execution(direct_execution, reference_kind=reference_kind,
+                                                r3_reference=r3_reference, end_frame_id=end_frame_id)
+    servo = DynamicMassEffortControllerV1(direct_execution.compiled.binding, cadence_s=cadence_s,
+        kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd)
+    if reference_kind == 'r3-pose':
+        controller = R3ReferenceEffortControllerV1(r3_reference, servo,
+            entity_id=direct_execution.compiled.binding.channels[0].entity_id,
+            end_frame_id=end_frame_id, opening_range_m=.08)
+    else:
+        controller = servo
+    return replace(template, controllers=(controller,))
