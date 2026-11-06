@@ -1,6 +1,8 @@
 # TaskEnv v2.1.1 — 协议与实施规划
 
-日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
+日期：2026-11-06。3b attempt003 与 3c attempt001 已报告技术通过，均等待 Sol 分别独立复审；原 N08 FAIL 保留。3c 仅覆盖显式 PickCube state-only profile 下的四条指定切换边。详见 [3b 执行摘要](maintenance/reviews/20261106_3b_attempt003_execution.md)及 [3c 执行摘要](maintenance/reviews/20261106_3c_attempt001_execution.md)。不表示阶段4或 Qualification 已获接收。
+
+历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
 ## 版本目标
 

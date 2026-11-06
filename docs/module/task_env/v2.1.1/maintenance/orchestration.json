@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B_REPORTED_PENDING_SOL_REVIEW",
+  "status": "G03_3B_3C_REPORTED_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,14 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": {
-    "substage": "3c",
-    "status": "CONDITIONAL_BIND_PENDING",
-    "package_id": "V211_G03_3c_attempt001",
-    "attempt_count_now": 0,
-    "attempt_planned": 1
-  },
-  "next_action": "Bind released 3b technical result to 3c actual input, verify package, then start 3c attempt001; both await independent Sol review.",
+  "next_candidate": null,
+  "next_action": "Sol independently reviews 3b003 and 3c001; no automatic stage4 or new attempt.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -938,23 +932,37 @@
           "dependencies": [
             "3b"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
+          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G03_3c_attempt001",
+              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "started_at": "2026-11-06T08:49:09.552985+08:00",
+              "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
+              "provider_commit": "dc2685e28c6c916fb6403a2342c04e0d2520aef7",
+              "result": "THREE_C_TECHNICAL_PASS",
+              "sol_acceptance": "PENDING_SOL_REVIEW",
+              "report_ref": "reviews/20261106_3c_attempt001_execution.md",
+              "writer_ownership": "released after final documentation commit",
+              "native_ownership": "released after final native group"
+            }
+          ],
           "assigned_agent": null,
           "package_path": null,
           "package_sha256": null,
-          "input_head": null,
+          "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
+          "last_observation": "Five-episode explicit PickCube reset chain and independent readers completed; fault fixtures and owner release recorded. Independent Sol review pending.",
+          "evidence_refs": [
+            "reviews/20261106_3c_attempt001_execution.md"
+          ],
           "commits": [],
           "review_decision": null,
-          "blockers": [
-            "Do not start until final3b full technical PASS, frozen report/commit/release and actual input binding; maintainer-authorized serial execution, Sol review remains pending"
-          ],
+          "blockers": [],
           "prepared_package": {
             "package_id": "V211_G03_3c_attempt001",
             "status": "PREPARED_CONDITIONAL_NOT_STARTED",
@@ -1382,12 +1390,12 @@
     {
       "substage": "3c",
       "package_id": "V211_G03_3c_attempt001",
-      "status": "PREPARED_CONDITIONAL_NOT_STARTED",
-      "attempt_count_now": 0,
+      "status": "REPORTED_PENDING_SOL_REVIEW",
+      "attempt_count_now": 1,
       "attempt_planned": 1,
       "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3c_attempt001",
       "planning_ref": "../planning/stage3-3c-attempt001.md",
-      "input_head": null,
+      "input_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
       "actual_input_binding": "Executor-only bind-3c-input.py after final3b report/commit/release",
       "prerequisite": "Full THREE_B_TECHNICAL_PASS_REVISED_N08_V2; no unresolved required case; pending Sol review preserved",
       "expected_active_minutes": "120-180",

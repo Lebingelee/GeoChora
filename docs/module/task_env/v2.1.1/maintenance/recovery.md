@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：3b003与条件3c001完整包已准备，待维护者一次转交
+## 当前：3b003 与 3c001 技术返包待 Sol 独立复审
+
+3b 在澄清后的已发布边界口径下报告技术通过，并在截止后经维护者授权完成收口；3c 绑定实际 3b HEAD 后启动并报告技术通过。两个原报告各自保留，原 N08 FAIL 不变；详见 [3b 摘要](reviews/20261106_3b_attempt003_execution.md)及 [3c 摘要](reviews/20261106_3c_attempt001_execution.md)。独立审阅和阶段4尚未开始。
+
+## 历史：3b003与条件3c001准备时
 
 维护者要求一次将两个Goal包交Terra顺序实施；[连续安排](../planning/stage3-3b003-3c001-sequential-execution.md)明确仅在3b全部required技术通过、提交／报告冻结及资源释放后，绑定其实际HEAD开始3c；Sol最后分别独立复审，中间不伪记3b已接收。3b count仍2／REWORK_REQUIRED_3B，3c count0／PLANNED，active_packages=[]，准备不计次数。最后普通[3b003重评](../planning/stage3-3b-attempt003-reassessment.md)已完成；[3c首包](../planning/stage3-3c-attempt001.md)固定公开reset入口、opt-in observation、随机流、四条实际切换边及fault恢复。外部包入口在维护者工作区handoffs/V211_G03_3b003_3c001_bundle，精确3b输入见其snapshot，3c未来SHA不预造。
 
@@ -126,4 +130,4 @@ Pendulum本次先完成单环境规范路线；统一Env并行尚未适配，交
 - 两项保持untracked；不stage、不删锁文件、不清理raw。
 - attempt001和attempt002窗口已释放；2026-11-05较长续作的实际完成和窗口释放以本次报告为准。不得干扰其他用户的原生运行。本项不授权新的三后端九格、2b attempt3、Isaac native或阶段3。
 
-2026-11-06：3b 普通 attempt002 已返包、writer 已释放，等待 Sol 独立复审；技术结果 PARTIAL，原 N08 FAIL，ORACLE_REVIEW_REQUIRED。不要自动启动 attempt003 或 3c。具体证据、已知偏差与下一步见 [002 执行摘要](reviews/20261105_3b_attempt002_execution.md)。维护者提出的装配树通用重力补偿目前仅为[设计](../planning/gravity-compensation-assembly-tree.md)，不应误认为当前 Panda 有界实现已支持任意夹爪。
+历史记录（002 返包时）：2026-11-06：3b 普通 attempt002 已返包、writer 已释放，等待 Sol 独立复审；技术结果 PARTIAL，原 N08 FAIL，ORACLE_REVIEW_REQUIRED。不要自动启动 attempt003 或 3c。具体证据、已知偏差与下一步见 [002 执行摘要](reviews/20261105_3b_attempt002_execution.md)。维护者提出的装配树通用重力补偿目前仅为[设计](../planning/gravity-compensation-assembly-tree.md)，不应误认为当前 Panda 有界实现已支持任意夹爪。
