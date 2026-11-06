@@ -2167,6 +2167,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         session = create_dynamic_camera_session(camera, execution, source=source,
                                                 initial_state=publication.view)
         self._visual_state_session = session
+        self._visual_binding_last_close = None
+        self._visual_binding_last_fault = False
         return session.last_sync
 
     def sync_visual_state(self):
@@ -2177,6 +2179,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if session is None or publication is None or self._execution_fault is not None:
             raise RuntimeError('visual state binding and published boundary are required')
         return session.sync_state(publication.view)
+
+    def visual_binding_status(self):
+        """Report visual binding fault and renderer cleanup without exposing handles."""
+        session = getattr(self, '_visual_state_session', None)
+        if session is None:
+            return {'bound': False, 'faulted': getattr(self, '_visual_binding_last_fault', False),
+                    'close': getattr(self, '_visual_binding_last_close', None)}
+        return {'bound': not session._closed, 'faulted': bool(getattr(session, '_faulted', False)),
+                'close': dict(session.close_status)}
 
     def visual_model_info(self):
         """Describe the currently bound renderer-only visual model."""
@@ -2207,6 +2218,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         first = error
                     else:
                         first.add_note(f'visual cleanup also failed: {error!r}')
+                finally:
+                    if resource is visual:
+                        self._visual_binding_last_close = dict(visual.close_status)
+                        self._visual_binding_last_fault = bool(getattr(visual, '_faulted', False))
         if first is not None:
             raise first
 

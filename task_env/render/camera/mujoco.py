@@ -183,6 +183,9 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         self._renderer = None
         self._last_projection = None
         self._last_sync = None
+        self._faulted = False
+        self._close_status = 'open'
+        self._close_error = None
         self._has_rendered = False
         self._last_render_thread_id = None
         initial_boundary = initial_projection.state_boundary
@@ -276,29 +279,41 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
                 raise ValueError('initial render projection uses another geometry version')
             self._consume_projection(initial_projection)
         except BaseException as error:
-            if self._renderer is not None:
-                try:
-                    self._renderer.close()
-                except BaseException as cleanup_error:
-                    error.add_note(f'renderer cleanup also failed: {cleanup_error!r}')
-            self._renderer = self._model = self._data = None
-            self._closed = True
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'renderer cleanup also failed: {cleanup_error!r}')
             raise
 
     @property
     def consumer_id(self):
         return self._consumer_id
 
+    def _require_trustworthy(self):
+        if getattr(self, '_faulted', False):
+            raise RuntimeError('camera session is faulted; visual state and receipts are invalid')
+        if self._closed:
+            raise RuntimeError('camera session is closed; visual state and receipts are invalid')
+
+    @property
+    def close_status(self):
+        """Actual renderer cleanup outcome, including an unsuccessful close."""
+        return {'status': getattr(self, '_close_status', 'open'),
+                'error': getattr(self, '_close_error', None)}
+
     @property
     def last_sync(self):
+        self._require_trustworthy()
         return self._last_sync
 
     @property
     def last_consumed_publication_version(self):
+        self._require_trustworthy()
         return None if self._last_projection is None else self._last_projection.publication_version
 
     @property
     def last_consumed_transform_version(self):
+        self._require_trustworthy()
         return None if self._last_projection is None else self._last_projection.transform_version
 
     @property
@@ -377,6 +392,7 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         return tuple(result)
 
     def capture(self, state):
+        self._require_trustworthy()
         if self._source.schema_version == 'camera-dynamic-source-v2':
             raise RuntimeError('v211 visual binding does not admit RGB capture')
         return super().capture(state)
@@ -480,13 +496,27 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
                 self._mj.mj_kinematics(self._model, self._data)
             position_error, quaternion_error = self._validate_frame_poses(projection)
         except BaseException as error:
-            if transforms_updated:
+            restored = False
+            if transforms_updated and previous is not None:
                 try:
                     self._data.qpos[:] = old_qpos
                     self._data.time = old_time
                     self._mj.mj_kinematics(self._model, self._data)
+                    # Restoring qpos alone does not establish derived transforms.
+                    self._validate_frame_poses(previous)
+                    restored = True
                 except BaseException as cleanup_error:
                     error.add_note(f'renderer state restoration also failed: {cleanup_error!r}')
+            # Pose checks do not prove every renderer-derived field was restored.
+            # A failed post-effect update therefore always requires rebuilding.
+            if restored:
+                error.add_note('previous frame poses restored; renderer binding still requires rebuild')
+            self._faulted = True
+            self._last_projection = self._last_sync = None
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'renderer close after fault also failed: {cleanup_error!r}')
             raise
         if episode_transition:
             self._seen_episode_keys.add(episode_key)
@@ -677,8 +707,15 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
 
     def close(self):
         if not self._closed:
-            renderer, self._renderer = self._renderer, None
+            renderer, self._renderer = getattr(self, '_renderer', None), None
             self._model = self._data = None
             self._closed = True
+            self._close_status = 'not_allocated' if renderer is None else 'close_attempted'
             if renderer is not None:
-                renderer.close()
+                try:
+                    renderer.close()
+                except BaseException as error:
+                    self._close_status = 'close_failed_unknown_release'
+                    self._close_error = f'{type(error).__name__}: {error}'
+                    raise
+                self._close_status = 'closed'
