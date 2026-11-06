@@ -1,5 +1,6 @@
 """Shared value checks/projection only; no solver abstraction."""
 from collections.abc import Mapping
+from dataclasses import dataclass, asdict
 import math
 import xml.etree.ElementTree as ET
 from uuid import uuid4
@@ -29,6 +30,28 @@ from ...artifacts.execution import (
     EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSampleV1,
 )
 from ...controllers.canonical.contracts import digest
+
+
+@dataclass(frozen=True)
+class LegacyStateBoundaryIdentity:
+    """Identity for legacy source publications, which have no canonical Scene."""
+    schema_version: str
+    episode_id: str
+    reset_sample_id: str
+    artifact_identity_hash: str
+    source_id: str
+    source_closure_digest: str
+    scene_instance_id: str
+    provider_materialization_id: str
+    control_step: int
+    state_revision: int
+
+    def to_mapping(self):
+        return asdict(self)
+
+    @property
+    def boundary_id(self):
+        return 'state-boundary-' + digest(self.to_mapping())
 
 
 def pose(position, quaternion):
@@ -214,6 +237,28 @@ class _SessionValues:
         if self._episode_id is None:
             raise RuntimeError('RuntimeSession has no active episode identity')
         return self._episode_id
+
+    def state_boundary_identity(self):
+        """Return the current owned evaluation-boundary identity without advancing."""
+        self._require_reset()
+        if isinstance(self._artifact, TaskArtifactV1):
+            boundary = StateBoundaryIdentity(
+                'state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
+                self._artifact.scene_identity_hash, self._scene_instance_id,
+                self._provider_materialization_id, self._control_step, self._state_revision,
+            )
+            boundary.validate()
+        else:
+            closure = self._source.source_closure_digest
+            if not isinstance(closure, str) or len(closure) != 64:
+                raise ValueError('legacy state boundary requires source closure identity')
+            boundary = LegacyStateBoundaryIdentity(
+                'legacy-state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
+                self._artifact.identity_hash, self._source.scene_source.source_id, closure,
+                self._scene_instance_id, self._provider_materialization_id,
+                self._control_step, self._state_revision,
+            )
+        return boundary
 
     def _require_open(self):
         if self._closed:

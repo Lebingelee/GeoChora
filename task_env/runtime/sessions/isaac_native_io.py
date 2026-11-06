@@ -1900,6 +1900,14 @@ class IsaacSimNativeRuntimeIOV1:
         self._runtime_owner_closed = True
         self._app_owner.close()
 
+    def close_receipt(self):
+        """Owned close facts from the App and USD snapshot lease owners."""
+        return {'schema_version': 'isaac-native-close-v1',
+                'native_io_closed': self._closed,
+                'runtime_owner_close_requested': self._runtime_owner_closed,
+                'usd_snapshot_lease_closed': self._lease.closed,
+                'app_owner': self._app_owner.close_receipt()}
+
 
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *,

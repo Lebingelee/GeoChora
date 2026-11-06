@@ -345,6 +345,8 @@ def _resolve_selected_config(environment_type, config):
         config["task"] = dict(supplied.task_parameters)
         if supplied.gravity_compensation:
             config["controller"] = {"gravity_compensation": True}
+        if supplied.reset_profile is not None:
+            config["execution"]["reset_profile"] = supplied.reset_profile
         if supplied.controller_profile is not None:
             config["task"]["controller_profile"] = supplied.controller_profile
     if isinstance(config, (str, Path)):
@@ -375,7 +377,7 @@ def _resolve_selected_config(environment_type, config):
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
-                      "deployment", "interpreter", "native_dt"},
+                      "deployment", "interpreter", "native_dt", "reset_profile"},
         "episode": {"horizon"},
         "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
                 | set(environment_type.selected_parameter_limits),
@@ -447,6 +449,12 @@ def _resolve_selected_config(environment_type, config):
     profile = sections["task"].get("controller_profile", default_profile)
     if profile is not None and profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
+    reset_profile = execution_defaults.get('reset_profile')
+    if reset_profile is not None and (
+            reset_profile != 'pickcube-state-only-switch-v1'
+            or environment_type.uid != 'pick-cube-p16-reference-v1'
+            or profile != 'r3_continuous_v1' or gravity_compensation):
+        raise ValueError('reset profile requires PickCube R3 without gravity compensation')
     params = []
     for key, (lower, upper) in environment_type.selected_parameter_limits.items():
         if key not in sections["task"]:
@@ -502,6 +510,7 @@ def _resolve_selected_config(environment_type, config):
         physics_device=device,
         controller_profile=profile,
         gravity_compensation=gravity_compensation,
+        reset_profile=reset_profile,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,

@@ -1382,15 +1382,43 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
         from .reference_binding import prepare_selected_reset
-        seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
-            self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
-            mixed=self._mixed_control_candidate, position=getattr(self, 'position_profile', False),
-            has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
-            artifact=self.artifact, value=self.value,
-        )
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
-        selection, requested_json = self._selected_execution_context()
+        switch_candidate = None
+        candidate_value = None
+        candidate_binding = self.binding
+        resolved = getattr(self, 'resolved_public_config', None)
+        switching = getattr(resolved, 'reset_profile', None) == 'pickcube-state-only-switch-v1'
+        if switching:
+            from .reset_switch import prepare_switch_reset
+            if options is not None and (not isinstance(options, Mapping) or set(options) - {'execution'}):
+                raise ValueError('reset options support only execution')
+            target = None if options is None else options.get('execution')
+            requested_seed = None if seed is _RESET_SEED_UNSET else seed
+            rng_state = getattr(self, '_switch_rng_state', None)
+            if requested_seed is None and rng_state is None:
+                requested_seed = 31
+            switch_candidate = prepare_switch_reset(type(self), resolved, requested_seed, rng_state, target)
+            seed = switch_candidate.task_seed
+            options, mixed_reset_plan, mixed_reset_sample = {}, None, None
+            candidate_binding = type(self).selected_binding(switch_candidate.config)
+            selection = switch_candidate.config.execution_spec_v2
+            requested_json = switch_candidate.config.requested_execution_json
+            if selection.deployment == 'isolated_worker':
+                from ..runtime.sessions.provenance import preflight_interpreter_before_source
+                import json
+                preflight_interpreter_before_source(selection, requested=json.loads(requested_json), task_uid=self.uid)
+            candidate_value = candidate_binding.build_seeded(
+                switch_candidate.config.physics_provider,
+                switch_candidate.config.environment.runtime.backend, seed, self.horizon)
+        else:
+            seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
+                self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
+                mixed=self._mixed_control_candidate, position=getattr(self, 'position_profile', False),
+                has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
+                artifact=self.artifact, value=self.value,
+            )
+            selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
         if selection is not None:
             import json
@@ -1401,9 +1429,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
                 requested = dict(requested or {})
                 requested['controller'] = {'gravity_compensation': True}
-            facts = dict(requested=requested, task_uid=self.uid, artifact=self.artifact,
-                         source=self.value['source'],
-                         controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
+            preflight_value = candidate_value if switching else self.value
+            facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
+                         source=preflight_value['source'],
+                         controller=preflight_value.get('controller', preflight_value.get('leaf_plan')), seed=seed)
             if selection.deployment == 'isolated_worker':
                 if (self._mixed_control_candidate or self.leaf_position_profile
                         or self.dual_entity_position or self._diagnostic_profile is not None
@@ -1411,14 +1440,24 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     receipt = describe_execution_selection(selection, **facts)
                     receipt['phase'] = 'static_preflight'
                     raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
-            deployment_receipt = preflight_selected_deployment(
-                selection, **facts, binding=self.binding, value=self.value)
+            try:
+                deployment_receipt = preflight_selected_deployment(
+                    selection, **facts, binding=candidate_binding, value=preflight_value)
+            except BaseException as error:
+                if switching:
+                    receipt = getattr(candidate_value.get('source'), 'execution_source_receipt', None)
+                    if receipt is not None:
+                        try:
+                            receipt.close()
+                        except BaseException as cleanup_error:
+                            error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
+                raise
         previous_episode_end = self._position_episode_end
         if (getattr(self, 'position_profile', False) and self.session is not None
                 and self._published_position_typed_state is not None
                 and previous_episode_end is None):
             previous_episode_end = self.stop('reset')
-        if getattr(self, 'position_profile', False):
+        if switching or getattr(self, 'position_profile', False):
             self._position_episode_end = None
             self._position_controller_switch_fault_receipt = None
             self._pending_position_switch = None
@@ -1438,6 +1477,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def prepare():
             nonlocal seed, previous_session_close_attempted, failure_phase
+            if switching:
+                self._switch_rng_state = switch_candidate.rng_state
+                self._switch_task_seed = switch_candidate.task_seed
+                self._switch_provider_seed = switch_candidate.provider_seed
+                self._switch_generation = getattr(self, '_switch_generation', 0) + 1
+                if (not hasattr(self, '_switch_topology_generation')
+                        or self.provider != switch_candidate.config.physics_provider):
+                    self._switch_topology_generation = getattr(self, '_switch_topology_generation', 0) + 1
             self._deployment_receipt = deployment_receipt
             self._close_camera_consumer()
             failure_phase = 'reset_close'
@@ -1449,7 +1496,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
             failure_phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
-            if self._mixed_control_candidate and self._mixed_initial_value_pending:
+            if switching:
+                self.binding = candidate_binding
+                self.resolved_public_config = switch_candidate.config
+                self.provider = switch_candidate.config.physics_provider
+                self.backend = switch_candidate.config.environment.runtime.backend
+                self.value = candidate_value
+                self.artifact = candidate_value['artifact']
+                self._declared_execution_spec_v1 = candidate_value.get('execution_spec_v1')
+            elif self._mixed_control_candidate and self._mixed_initial_value_pending:
                 self._mixed_initial_value_pending = False
             elif self._mixed_control_candidate:
                 self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
@@ -1533,6 +1588,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.binding, self.value, self._declared_execution_spec_v1,
                 seed=seed, provider=self.provider, backend=self.backend,
             )
+            if switching:
+                from dataclasses import replace
+                self.execution = replace(self.execution, provider_seed=switch_candidate.provider_seed)
 
         def materialize_runtime():
             nonlocal failure_phase
@@ -1688,6 +1746,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
+            if switching:
+                self.info['reset_switch_v1'] = {
+                    'schema_version': 'pickcube-reset-switch-receipt-v1',
+                    'task_seed': switch_candidate.task_seed,
+                    'provider_seed': self.execution.provider_seed,
+                    'task_seed_algorithm': switch_candidate.seed_algorithm,
+                    'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
+                    'provider': self.provider,
+                    'configuration_generation': self._switch_generation,
+                    'topology_generation': self._switch_topology_generation,
+                }
             if self.mixed_control_profile:
                 realization = self.value['reset_realizations'].get(self.sample.sample_id)
                 if not isinstance(realization, dict):
@@ -1804,6 +1873,19 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
+            if switching:
+                # A candidate can own a source lease even if closing the old
+                # session fails before it is installed on this environment.
+                seen = set()
+                for value in (candidate_value, previous_value):
+                    receipt = getattr(value.get('source'), 'execution_source_receipt', None)
+                    if receipt is None or id(receipt) in seen:
+                        continue
+                    seen.add(id(receipt))
+                    try:
+                        receipt.close()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'selected reset source cleanup also failed: {cleanup_error!r}')
             self._latch_fault(failure_phase, error)
 
         return dict(
@@ -3217,7 +3299,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 add_note(f'{label} also failed: {type(cleanup_error).__name__}: {cleanup_error}')
             return primary
 
-        if self._published_position_state is not None:
+        if self._published_position_state is not None and self._execution_fault is None:
             try:
                 if self._position_episode_end is None:
                     self.stop('environment_close')
@@ -3448,7 +3530,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     artifact=self.artifact, source=self.value['source'],
                     controller=self.value.get('controller', self.value.get('leaf_plan')), seed=None,
                 )
-        return json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
+        result = json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
+        if getattr(getattr(self, 'resolved_public_config', None), 'reset_profile', None) == 'pickcube-state-only-switch-v1' and hasattr(self, '_switch_generation'):
+            result['reset_switch_v1'] = {
+                'configuration_generation': self._switch_generation,
+                'topology_generation': self._switch_topology_generation,
+                'task_seed': self._switch_task_seed,
+                'provider_seed': self._switch_provider_seed,
+                'task_seed_algorithm': 'pickcube-reset-seed-v1',
+                'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
+            }
+        return result
 
     def _recorded_execution_configuration(self):
         from ..recorders.reference_provenance import recorded_execution_configuration

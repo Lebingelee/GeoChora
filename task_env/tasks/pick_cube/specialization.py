@@ -667,6 +667,17 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         else:
             env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding)
         env.resolved_public_config = config
+        if config.reset_profile is not None:
+            from ...observations.selected_reference import switch_observation_space
+            env.observation_space = switch_observation_space()
+            env.metadata['observation_schema'] = {
+                'schema_version': config.reset_profile,
+                'hand_pose_frame': 'panda-v1/ee',
+                'joint_order': [*(f'panda-v1/joint{i}' for i in range(1, 8)),
+                                'panda-v1/finger_joint1', 'panda-v1/finger_joint2'],
+                'joint_position_units': ['rad'] * 7 + ['m'] * 2,
+                'joint_velocity_units': ['rad/s'] * 7 + ['m/s'] * 2,
+            }
         return env
 
 

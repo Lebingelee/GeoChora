@@ -728,6 +728,10 @@ class UsdCoreRuntimeSession(_SessionValues):
         if callable(close_owner):
             close_owner()
 
+    def worker_close_receipt(self):
+        get_receipt = getattr(self._native_io, 'close_receipt', None)
+        return get_receipt() if callable(get_receipt) else None
+
 
 __all__ = [
     'UsdCoreRuntimeSession', 'NativeAdvanceReceiptV1', 'NativePositionWriteAckV1',

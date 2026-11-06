@@ -580,8 +580,11 @@ class ResolvedSelectedConfig:
     execution_spec_v2: ExecutionSpecV2 | None = None
     requested_execution_json: str | None = None
     gravity_compensation: bool = False
+    reset_profile: str | None = None
 
     def __post_init__(self) -> None:
+        if self.reset_profile not in (None, 'pickcube-state-only-switch-v1'):
+            raise ValueError('unsupported selected reset profile')
         if type(self.gravity_compensation) is not bool:
             raise TypeError('selected gravity_compensation must be a boolean')
         if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:

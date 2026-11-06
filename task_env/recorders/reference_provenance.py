@@ -51,6 +51,8 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
         execution.update({name: getattr(selection, name) for name in route_names})
     if resolved.source_delivery_manifest is not None:
         execution['source_delivery_manifest'] = resolved.source_delivery_manifest
+    if getattr(resolved, 'reset_profile', None) is not None:
+        execution['reset_profile'] = resolved.reset_profile
     task = dict(resolved.task_parameters)
     if resolved.controller_profile is not None:
         task['controller_profile'] = resolved.controller_profile

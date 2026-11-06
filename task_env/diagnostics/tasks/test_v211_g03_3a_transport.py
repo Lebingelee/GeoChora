@@ -262,3 +262,69 @@ def test_malformed_json_reply_terminates_owned_worker(tmp_path):
         session.snapshot()
     assert process.poll() is not None
     session.close()
+
+
+def test_isaac_worker_terminal_exit_flushes_before_process_exit(monkeypatch):
+    from task_env.runtime.sessions import worker
+    seen=[]
+    class Stream:
+        def flush(self): seen.append('flush')
+    monkeypatch.setattr(worker.sys, 'stdout', Stream())
+    monkeypatch.setattr(worker.sys, 'stderr', Stream())
+    def exit_stub(code):
+        seen.append(('exit',code))
+        raise RuntimeError('terminal exit captured')
+    monkeypatch.setattr(worker.os, '_exit', exit_stub)
+    with pytest.raises(RuntimeError,match='terminal exit captured'):
+        worker._exit_after_isaac_cleanup()
+    assert seen == ['flush','flush',('exit',0)]
+
+
+def test_remote_close_surfaces_worker_abnormal_exit():
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.transport import RemoteSession
+    session=object.__new__(RemoteSession)
+    session._closed=False
+    session._sock=SimpleNamespace(close=lambda: None)
+    session._process=SimpleNamespace(wait=lambda timeout: -11,returncode=-11)
+    session._call=lambda *args: None
+    with pytest.raises(RuntimeError,match='exited abnormally: -11'):
+        session.close()
+    assert session._closed
+
+
+def test_remote_close_preserves_first_error_if_worker_also_exits_abnormally():
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.transport import RemoteSession
+    session=object.__new__(RemoteSession)
+    session._closed=False
+    session._sock=SimpleNamespace(close=lambda: None)
+    session._process=SimpleNamespace(wait=lambda timeout: -11,returncode=-11)
+    def fail(*args): raise ValueError('original owner close failure')
+    session._call=fail
+    with pytest.raises(ValueError,match='original owner close failure') as caught:
+        session.close()
+    assert any('exited abnormally: -11' in note for note in caught.value.__notes__)
+
+
+def test_worker_close_failure_returns_nonzero_and_preserves_remote_error(tmp_path):
+    broken=WORKER.replace("with open(sys.argv[2], 'a') as f: f.write('close\\n')",
+                          "raise RuntimeError('synthetic close failure')")
+    broken=broken.replace("serve_session(sock, FakeSession(), 'a' * 64)",
+                          "sys.exit(0 if serve_session(sock, FakeSession(), 'a' * 64) else 1)")
+    session,process,_=_spawn(tmp_path,code=broken)
+    with pytest.raises(Exception,match='synthetic close failure'):
+        session.close()
+    assert process.poll()==1
+
+
+def test_isaac_controlled_exit_preserves_nonzero(monkeypatch):
+    from task_env.runtime.sessions import worker
+    seen=[]
+    def exit_stub(code):
+        seen.append(code)
+        raise RuntimeError('exit captured')
+    monkeypatch.setattr(worker.os,'_exit',exit_stub)
+    with pytest.raises(RuntimeError,match='exit captured'):
+        worker._exit_after_isaac_cleanup(1)
+    assert seen==[1]

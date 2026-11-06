@@ -562,3 +562,31 @@ def test_selected_position_profile_rejects_legacy_action_before_mode_mutation():
     with pytest.raises(TypeError, match='requires a StructuredActionRequestV1'):
         SelectedReferenceEnv.step(selected, np.zeros(8))
     assert selected._episode_mode is None
+
+
+def test_old_owned_position_publication_rejected_by_new_materialization(position_candidate):
+    scene, candidate = position_candidate
+    _, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    old = _typed_publication(scene, reset_plan)
+    old_mapping = old.to_mapping()
+    profile.reset(old, plan)
+    from task_env.runtime.sessions.control import prepare_structured_action
+    _, request = prepare_structured_action(plan, _request(plan))[0]
+    _, target = profile.compute(old, request, plan)
+    boundary = replace(old.view.boundary, episode_id='episode-next',
+                       scene_instance_id='scene-instance-next',
+                       provider_materialization_id='mujoco-materialization-next')
+    fresh = replace(old, view=replace(old.view, boundary=boundary),
+                    lifetime=replace(old.lifetime, boundary=boundary,
+                                     owner_id=boundary.provider_materialization_id))
+    fresh.validate()
+    assert old.lifetime.may_be_retained and old.to_mapping() == old_mapping
+    joints,frames = _bindings(scene, source)
+    session = _PositionSessionProbe(fresh, profile=profile, plan=plan, scene=scene, reset_plan=reset_plan)
+    with pytest.raises(ValueError, match='stale for the RuntimeSession'):
+        apply_position_control_target(session, target, controller_profile=profile, plan=plan,
+                                      publication=old, scene=scene, joint_bindings=joints,
+                                      frame_bindings=frames)
+    assert not session.apply_calls

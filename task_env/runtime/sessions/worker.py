@@ -217,6 +217,7 @@ def main():
     handed_off = False
     source = None
     early_app_owner = None
+    completed = False
     try:
         if request.get('kind') != 'build' or not isinstance(payload, dict) or request_identity(payload) != identity:
             raise ValueError('worker build request identity mismatch')
@@ -231,7 +232,7 @@ def main():
             early_app_owner.open(f06_compatibility=True)
         session, handlers, source = _materialize_selected(payload)
         handed_off = True
-        serve_session(sock, session, identity, handlers=handlers)
+        completed = serve_session(sock, session, identity, handlers=handlers)
     except BaseException as error:
         if not handed_off:
             try:
@@ -247,7 +248,28 @@ def main():
         if early_app_owner is not None:
             early_app_owner.close()
         sock.close()
+    if isinstance(payload, dict) and payload.get('selection', {}).get('physics_provider') == 'isaacsim':
+        return 0 if completed else 1
+    return None
+
+
+def _exit_after_isaac_cleanup(exit_code=0):
+    """Terminate the isolated SDK process only after all owner cleanup and ACK.
+
+    Kit 6.2 may segfault in CPython's later module finalization even when
+    SimulationApp.close has returned.  The worker is the process owner; it
+    flushes its output and leaves only after session, App, source and socket
+    cleanup have completed. This does not apply to a failed cleanup path.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+    os._exit(int(exit_code))
 
 
 if __name__ == '__main__':
-    main()
+    exit_code = main()
+    if exit_code is not None:
+        _exit_after_isaac_cleanup(exit_code)

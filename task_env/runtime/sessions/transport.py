@@ -229,7 +229,8 @@ def serve_session(sock, session, request_identity, *, handlers=None):
             try:
                 if method == 'close':
                     cleanup()
-                    result = None
+                    receipt = getattr(session, 'worker_close_receipt', None)
+                    result = receipt() if callable(receipt) else None
                 elif method in _PROPERTIES and method in properties:
                     result = getattr(session, method)
                 elif method in _METHODS and method in methods:
@@ -255,7 +256,7 @@ def serve_session(sock, session, request_identity, *, handlers=None):
                             materialization_id=materialization, episode_id=_episode(session) if method != 'close' else None)
             _send(sock, response)
             if method == 'close':
-                return
+                return response['error'] is None
     finally:
         cleanup()
 
@@ -267,6 +268,7 @@ class RemoteSession:
         self._sock.settimeout(timeout)
         self._request_identity, self._sequence, self._closed = request_identity, 0, False
         self._episode_id = None
+        self._close_receipt = None
         try:
             ready = _receive(sock)
             if ready.get('request_identity') != request_identity:
@@ -387,8 +389,11 @@ class RemoteSession:
     def close(self):
         if self._closed:
             return
+        primary = None
         try:
-            self._call('close')
+            self._close_receipt = self._call('close')
+        except BaseException as error:
+            primary = error
         finally:
             self._closed = True
             self._sock.close()
@@ -396,6 +401,20 @@ class RemoteSession:
                 self._process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 self._terminate()
+            if self._process.returncode:
+                error = RuntimeError(f'runtime worker exited abnormally: {self._process.returncode}')
+                if primary is None:
+                    primary = error
+                else:
+                    primary.add_note(str(error))
+        if primary is not None:
+            raise primary
+
+    @property
+    def close_receipt(self):
+        if self._closed:
+            return self._close_receipt
+        return self._call('close_receipt') if 'close_receipt' in self._properties else None
 
 
 def request_identity(payload):
