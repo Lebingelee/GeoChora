@@ -18,7 +18,7 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 未接收的 002 recovery 增加了该候选的 MuJoCo 3.8.1 CPU physical profile 路线；物化前检查依赖版本与 source 身份。相同 session 在 native build 后核对名称、轴、actuator 力限／gear、tendon 和 equality，将已准入关节贡献与 hand wrench 合并写入广义力缓冲；position drive 保留，显式完整 PD 与未协调 position drive 仍拒绝。source actuator 力域用于约束声明的 direct contribution；保留的 position drive 可叠加，二者总和不受该 direct contribution 界限保证。2026-11-06 在 source closure `aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47` 完成单 Controller effort、双 Controller effort 和 effort 加 hand wrench 的各一次 5 子步短运行，确认提交与写入回执；ACK 不是力测量，该次 4a 运行当时尚未完成 4b 物理效果验证。该 002 历史 A05 Position candidate 的其他 provider physical reset 当时仍拒绝；这一时点结论不覆盖后续 PickCube physical candidate。合成映射不能授权真实写入，旧 position 路线保持原身份。
 
-Sol 已按 [attempt003 独立主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)有界接收原 4a 控制契约和条件性 4b 方案；真实三后端物理施力与实测力仍未验收。
+Sol 已按 [attempt003 独立主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)有界接收原 4a 控制契约和条件性 4b 方案；4b 后续有界接收三后端 effort 和 MuJoCo 代表外力；独立测力未证明。
 
 attempt003 修正持续 BodyWrench：Controller 在 outer boundary 提交一次原始 typed 命令，MuJoCo session 在每个 physics substep 用当前构型刷新运动学和 Jacobian，将各声明的表达 frame、作用点与力矩参考重新解析后，与 joint effort 合并并替换自有缓冲；正常 interval、异常、reset 与 close 清理可辨认的自有贡献。该路线对 BodyWrench 目前只准入 source-bound `implicitfast` 积分器；其他积分器写入前拒绝。非空或被外部修改的力缓冲拒绝，未提供与 UI/其他 writer 并发叠加能力；冲突时不覆盖被改写的槽位，其混合归属和剩余力不能推断，须结束该故障 session。`torque_Nm` 是关于声明的 `moment_reference` 的总力矩：力矩参考为作用点且为零时，偏置力在 body 原点有 `r×F` 力矩；参考为 body 原点且总矩为零时，不再额外加该项。上述 002 的实际候选使用 body frame 和 body origin 参考，不能当作 world force、作用点零矩的 4b 案例。新逐子步语义有定向 fake 和 A05/implicitfast 有界 session 证据，未证明其他 provider、其他 source／积分器的物理效果。
 
@@ -54,7 +54,7 @@ MuJoCo／GeoPhys 旧 selected CPU RuntimeSession 的 `snapshot_free_joint_native
 
 GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `RigidSolver.read_model_snapshot()`，从该次物化的有效字段复制 body、joint、actuator、equality 和 tendon 值；session build facts 将 provider ID 绑定到同一来源名称。该快照不推进物理，缺失字段明确标注 unavailable。Isaac F06 另保存同一 bootstrap 边界的公开 Jacobian 和 tensor 连杆姿态，供轴方向与来源独立比较；读取前后物理计数必须一致。这些只读事实不构成跨 provider 功能认证。
 
-## 4b 物理控制候选（待独立主审）
+## 4b 有界物理控制路线
 
 版本化 `pickcube-physical-candidate-v1`（MuJoCo／GeoPhys CPU）和 `pickcube-isaac-physical-candidate-v1`（Isaac Sim 6.2／CUDA、F06）通过既有 factory、SelectedReferenceEnv 和 RuntimeSession 提供 Panda 七臂及受源约束的成对双指 effort；直接贡献的限幅不代表与保留的原生 position drive 叠加后的总力。每个 interval 的贡献由 session 持有并清理；MuJoCo／Isaac 逐子步重施各自的有效写入，GeoPhys 保持本 interval 的公开广义力并在结束时清零，其独立 `hold_reapply` 声明当前拒绝。重复贡献、无效映射和未经协调的完整 PD 与活动 drive 组合被拒绝。原 source 的 tendon、equality 和 mimic 不变，不能由此推断两根手指可独立任意施力。
 
@@ -62,4 +62,4 @@ GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `
 
 MuJoCo 的独立版本化自由体和 Robot hand fixture 分别验证实际外力响应与 world force、body-local 偏置点和点参考矩的语义；手部旋转后逐子步更新 frame 和 Jacobian。自由体与手部证据不代表其他 provider 的 BodyWrench 物理验证。所有物理响应为运动观察，ACK、计算力矩及公开模型读回不作为独立测力。
 
-各次直接 effort 和外力实验的中间版本证据正在按实际受影响路径做有界关联；最终版本的参考 Controller 对照不代替逐输入实验。001 的实现与证据关联仍需按[独立主审](../maintenance/reviews/20261106_4b_attempt001_sol_review.md)核对；本候选尚待 Sol 独立主审，不改变既有已接收范围。
+各次直接 effort 和外力实验的中间版本证据已按实际受影响路径作有界关联；最终版本的参考 Controller 对照不代替逐输入实验。具体接受范围及原失败见[002 独立主审](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。

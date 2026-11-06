@@ -1183,8 +1183,8 @@
           "dependencies": [
             "4a"
           ],
-          "status": "REWORK_REQUIRED_4B_EVIDENCE_PROVENANCE",
-          "attempt_count": 1,
+          "status": "ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -1194,13 +1194,22 @@
               "executor_status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
               "sol_decision": "REWORK_REQUIRED_4B_EVIDENCE_PROVENANCE",
               "review_ref": "reviews/20261106_4b_attempt001_sol_review.md"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G04_4b_attempt002",
+              "input_head": "4d60ac8edee84ada4c250e87137fb07e32d74ab3",
+              "output_head": "168db6410a1c2721aeefa8160d9c32c7664b8cf5",
+              "executor_status": "TECHNICAL_PASS_PENDING_SOL_REVIEW",
+              "sol_decision": "ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL",
+              "review_ref": "reviews/20261106_4b_attempt002_sol_review.md"
             }
           ],
           "assigned_agent": "Terra (maintainer manually forwarded existing implementation session)",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4b_attempt001",
           "package_sha256": "917e685efca0a1913f8c462a1d8be2150581869720a141fa42111227219b5616",
           "input_head": "c111569447ce89254e959b4d60fe250ca90b010b",
-          "output_head": "a7181de4a454bf95079b9a84c37ad338c66edabb",
+          "output_head": "168db6410a1c2721aeefa8160d9c32c7664b8cf5",
           "expected_duration_minutes": "360–540 active; 600 wall maximum",
           "execution_budget": {
             "source_minutes": 180,
@@ -1214,19 +1223,19 @@
             "isaac_gpu_min_free_mib": 4096,
             "isaac_gpu_min_free_during_run_mib": 512
           },
-          "last_observation": "Sol independently checked output manifest, representative evidence and guarded pure tests. Final-version shared controllers have bounded real directional evidence; direct-effort per-axis and MuJoCo wrench runs used intermediate code and require path-specific impact analysis or targeted affected evidence.",
+          "last_observation": "2026-11-06 Sol accepted bounded original 4b after 002 path-specific evidence association; original failures and limits remain. No native rerun by Sol.",
           "evidence_refs": [
             "20261106_4a_retrospective_for_4b.md",
             "../planning/stage4-4b-attempt001.md",
-            "reviews/20261106_4b_attempt001_sol_review.md"
+            "reviews/20261106_4b_attempt001_sol_review.md",
+            "reviews/20261106_4b_attempt002_sol_review.md"
           ],
           "commits": [
-            "a7181de4a454bf95079b9a84c37ad338c66edabb"
+            "a7181de4a454bf95079b9a84c37ad338c66edabb",
+            "168db6410a1c2721aeefa8160d9c32c7664b8cf5"
           ],
-          "review_decision": "REWORK_REQUIRED_4B_EVIDENCE_PROVENANCE",
-          "blockers": [
-            "Intermediate-to-output source changes have not yet been proven irrelevant for every required direct-effort and BodyWrench physical evidence path."
-          ],
+          "review_decision": "ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL",
+          "blockers": [],
           "execution_budget_amendment": {
             "source_minutes": 360,
             "native_minutes": 360,
@@ -1235,7 +1244,7 @@
           },
           "next_attempt_prepared": {
             "attempt": 2,
-            "status": "PREPARED_NOT_DISPATCHED",
+            "status": "EXECUTED_REVIEWED",
             "planning_ref": "../planning/stage4-4b-attempt002.md",
             "policy": "Evidence impact and closeout first; reuse unaffected evidence; native only for a concrete original gate not resolved by evidence.",
             "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4b_attempt002",
@@ -1259,11 +1268,19 @@
           "output_head": null,
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "2026-11-06 original G04 work and exit gates restored; assembled Panda is a separate version-level auxiliary use case. Scheduling proposal: early checks after 4b main capabilities stabilize, full two-task integration at 7a. No implementation or dispatch.",
-          "evidence_refs": [],
+          "last_observation": "4b accepted; attempt001 prepared for manual handoff; preparation does not count as execution.",
+          "evidence_refs": [
+            "../planning/stage4-4c-attempt001.md"
+          ],
           "commits": [],
           "review_decision": null,
-          "blockers": []
+          "blockers": [],
+          "next_attempt_prepared": {
+            "attempt": 1,
+            "status": "PREPARED_NOT_DISPATCHED",
+            "planning_ref": "../planning/stage4-4c-attempt001.md",
+            "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4c_attempt001"
+          }
         }
       ]
     },
@@ -1525,11 +1542,11 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G04_4b_attempt001",
-    "status": "REWORK_REQUIRED_4B_EVIDENCE_PROVENANCE",
-    "output_head": "a7181de4a454bf95079b9a84c37ad338c66edabb",
-    "sol_review_ref": "reviews/20261106_4b_attempt001_sol_review.md",
-    "note": "Prior bounded evidence retained; prove unchanged paths or selectively revalidate affected original gates."
+    "package_id": "V211_G04_4b_attempt002",
+    "status": "ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL",
+    "output_head": "168db6410a1c2721aeefa8160d9c32c7664b8cf5",
+    "sol_review_ref": "reviews/20261106_4b_attempt002_sol_review.md",
+    "note": "Bounded 4b accepted; retain negative outcomes, provenance limits and 4c obligations."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,

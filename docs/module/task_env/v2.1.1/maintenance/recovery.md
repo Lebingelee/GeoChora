@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：4a 有界接收，4b 等待维护者安排
+## 当前：4b 有界接收，4c 准备人工转发
 
-G03 的 3a／3b／3c 有界接收保持。G04/4a attempt003 交付 `105219ed`，经 [Sol 独立主审](reviews/20261106_4a_attempt003_sol_review.md)按原控制契约／统一消费和条件性 4b 规划出口作 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`，普通 count=3；001、002 及其续作的未接收结果和越界历史保留。MuJoCo body-wrench 真实构造／写入 ACK 范围仅 A05／3.8.1 CPU／implicitfast，fake 子步回归通过，ACK 不是实测力。4b attempt001 已交付三后端 effort 和普通物体／Robot body 外力候选，Sol [主审](reviews/20261106_4b_attempt001_sol_review.md)因部分实验与最终代码的具体影响关系尚待说明而暂不整体接收；count=1，维护者要求 [attempt002](../planning/stage4-4b-attempt002.md)优先复用证据、完成收尾。active Recorder 物理路线仍有边界；Controller reset 和迁移后 PickCube 成功留 4c，尚未启动。
+G03 及 G04/4a 先前有界接收不变。4b attempt002 经 [Sol 独立主审](reviews/20261106_4b_attempt002_sol_review.md)以 `ACCEPTED_BOUNDED_4B_PHYSICAL_CONTROL` 接收，count=2。001 的真实三后端 effort／参考和 MuJoCo 代表外力以 002 路径关联补强，不外推独立测力、全 source 或任务成功；原失败和各项限制保留。[4c attempt001](../planning/stage4-4c-attempt001.md)为同 Env Controller reset、active Recorder 和迁移后 PickCube 成功准备，尚未执行、未自动派发。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
