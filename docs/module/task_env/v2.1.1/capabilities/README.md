@@ -1,6 +1,6 @@
 # v2.1.1 能力与验收矩阵
 
-3b attempt002 已由[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)，整体 REWORK_REQUIRED_3B。三路线默认关闭下的短程执行与读回、F06九关节速度记录及Panda MuJoCo CPU开启补偿的最终短程行为有界接收；原 N08 三路线 FAIL保留，最终补偿记录及required物性等未闭合。6.2 native 状态仍按有限范围记 PARTIAL，6.1 保持 NOT_RUN；不提升最终能力格或 Qualification。
+3b attempt003 经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)接收为 **ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION**：冻结三路线的实际模型／reset／执行／同次记录读回，以及Panda MuJoCo CPU开启补偿的最终350步保持与两任务方向检查已闭合。新N08-v2通过，原N08三路线FAIL保留；不外推全任务或跨后端重力补偿。3c仍待单独复审。6.1辅助App状态为VERSION_VERIFIED_CLOSE_TIMEOUT，仅启动／版本有真实证据，完整运行和正常关闭未通过；不提升最终能力格或Qualification。
 
 [capability-matrix.json](capability-matrix.json) 是本版本唯一能力／目标矩阵。当前为规划矩阵：所有新目标 `NOT_RUN`，实现状态为 `NOT_STARTED`，证据引用为空。五协议已获维护者确认为实施基线，设计批准与实现／运行状态分列；本次不提升targets或最终cells状态。阶段状态另由[编排索引](../maintenance/orchestration.json)维护；它不授予能力。
 
@@ -8,7 +8,7 @@
 
 3a attempt002 的 PickCube31／Nut19 在真实MuJoCo3.8.1 CPU各完成公开创建/reset/10步/close，已获[Sol有界接收核心恢复](../maintenance/reviews/20261105_3a_attempt002_sol_review.md)。该段为attempt002时点；3a其后已由Sol有限接收，不因此提升三后端目标、最终九格或资格。
 
-3a attempt001经[Sol复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工；没有新增native或qualified证据，不提升矩阵状态。Isaac6.1／6.2列入v2.1.1共同路线实现，5.1延期；按[兼容规划](../planning/isaac-deployment-compatibility.md)分列实现／离线／逐版本native状态，当前6.1 native为NOT_RUN。
+历史3a attempt001经[Sol复审](../maintenance/reviews/20261105_3a_attempt001_sol_review.md)需返工，该次没有新增native或qualified证据。Isaac6.1／6.2列入v2.1.1共同路线实现，5.1延期；按[兼容规划](../planning/isaac-deployment-compatibility.md)分列实现／离线／逐版本native状态。当前6.1有真实辅助启动证据，但完整Env闭环未测、App关闭超时，不能继续笼统写成从未启动或完整兼容通过。
 
 ## 更新规则
 

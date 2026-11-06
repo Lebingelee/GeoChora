@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G03_3B_3C_REPORTED_PENDING_SOL_REVIEW",
+  "status": "G03_3B_ACCEPTED_3C_PENDING_SOL_REVIEW",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Sol independently reviews 3b003 and 3c001; no automatic stage4 or new attempt.",
+  "next_action": "Sol independently reviews the already reported 3c001; no new 3b attempt or automatic stage4.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -822,7 +822,7 @@
           "dependencies": [
             "3a"
           ],
-          "status": "REPORTED_PENDING_SOL_REVIEW",
+          "status": "ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION",
           "attempt_count": 3,
           "attempts": [
             {
@@ -865,12 +865,13 @@
                 "matched MuJoCo old/current causal controls",
                 "production launcher context and F06 T+1 measured-state recording repair",
                 "source-bound Panda MuJoCo CPU gravity calculation and final short public-loop behavior"
-              ]
+              ],
+              "package_manifest_sha256": "47f71cc70f7fdcd66ef5fa12a03a2677c1824dee37b8f5db8ab77873ffcd4187"
             },
             {
               "attempt": 3,
               "package_id": "V211_G03_3b_attempt003",
-              "status": "REPORTED_PENDING_SOL_REVIEW",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
               "started_at": "2026-11-06T02:25:44.233948+08:00",
               "executor": "Terra thread 01a1a797-a07e-73b2-b7ad-743b659227c9",
               "input_head": "d27c5d6c8e12f0835b8e3fc56040971b6d41166f",
@@ -879,18 +880,23 @@
               "report_ref": "reviews/20261106_3b_attempt003_execution.md",
               "writer_ownership": "released at final documentation commit",
               "native_ownership": "released after recorded runs",
-              "sol_acceptance": "PENDING_SOL_REVIEW",
-              "closeout_after_original_deadline": true
+              "sol_acceptance": "ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION",
+              "closeout_after_original_deadline": true,
+              "output_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
+              "sol_review_ref": "reviews/20261106_3b_attempt003_sol_review.md",
+              "review_decision": "ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION",
+              "numeric_oracles_sha256": "1f0d62dd97d4dd79d31d1edbe199d30c9b8df8140a64e3dba867e0b405385847",
+              "bundle_manifest_sha256": "cb84a71fbfb98e1c2e20e8a9fcbd6becad0ecc0df012bfb7de52a3e69c036d51"
             }
           ],
           "assigned_agent": null,
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b_attempt002",
-          "package_sha256": "47f71cc70f7fdcd66ef5fa12a03a2677c1824dee37b8f5db8ab77873ffcd4187",
-          "input_head": "470c3ef90bf2179916733f0049444bedefe07e3d",
-          "output_head": "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle/3b_attempt003",
+          "package_sha256": null,
+          "input_head": "d27c5d6c8e12f0835b8e3fc56040971b6d41166f",
+          "output_head": "305b1fa5f99e3430b8e71ee6d0ed61586f6556af",
           "expected_duration_minutes": null,
           "execution_budget": null,
-          "last_observation": "Technical evidence complete within the clarified N09/G01 published-boundary scope; final report and release after original deadline under maintainer authorization. Sol independent review pending.",
+          "last_observation": "2026-11-06 Sol independently audited 354 outputs, recomputed model/readback and paired/gravity H5 facts, and passed 14 guarded offline checks. Accepted frozen three-route execution and bounded Panda MuJoCo gravity; original N08 FAIL preserved, 6.1 close timed out, 3c remains pending separate review.",
           "evidence_refs": [
             "reviews/20261105_3b_attempt001_execution.md",
             "../../../../../workspace/maintenance/v211_g03_3b_attempt001/report.md",
@@ -899,32 +905,42 @@
             "reviews/20261105_3b_attempt002_execution.md",
             "reviews/20261106_3b_attempt002_sol_review.md",
             "../planning/gravity-compensation-assembly-tree.md",
-            "reviews/20261106_3b_attempt003_execution.md"
+            "reviews/20261106_3b_attempt003_execution.md",
+            "reviews/20261106_3b_attempt003_sol_review.md"
           ],
           "commits": [
             "d5731655",
             "2c565f5336d3cb1ff700f98db2b238f01ad86ab9",
             "be88c5cd4ac823c997040d3166f7ea14e069b610",
-            "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e"
+            "5a3d6c7d4a5dc306ad2de4612694ea86259ea12e",
+            "4e392f56",
+            "076c751f",
+            "9af222f0",
+            "071dc540",
+            "305b1fa5f99e3430b8e71ee6d0ed61586f6556af"
           ],
           "review_decision": {
-            "status": "REWORK_REQUIRED_3B",
+            "status": "ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION",
             "reviewer": "Sol",
             "date": "2026-11-06",
-            "review_ref": "reviews/20261106_3b_attempt002_sol_review.md",
-            "whole_3b_accepted": false,
-            "bounded_gravity_short_behavior_accepted": true,
-            "final_gravity_recording_or_general_assembly_support_accepted": false,
-            "scope": "Matched MuJoCo old/current no-regression finding, launcher/F06 recording fix, and bounded final Panda gravity-on short behavior accepted; required remainder unresolved. Original N08 failures immutable.",
-            "qualification": false
+            "review_ref": "reviews/20261106_3b_attempt003_sol_review.md",
+            "whole_frozen_3b_accepted": true,
+            "original_N08": "FAIL_PRESERVED",
+            "final_bounded_gravity_recording_accepted": true,
+            "general_assembly_support_accepted": false,
+            "scope": "Frozen MuJoCo CPU, GeoPhys native rigid CPU and Isaac 6.2 PhysX CUDA execution/model/reset/readback; revised N08-v2 and clarified N09/G01; final source-bound Panda MuJoCo in-process gravity holding/direction with same-run H5. No general task success or 6.1 full compatibility claim.",
+            "three_c_accepted": false,
+            "qualification": false,
+            "whole_3b_accepted": true
           },
           "blockers": [],
           "prepared_package": {
             "package_id": "V211_G03_3b_attempt003",
-            "status": "PREPARED_NOT_DISPATCHED",
+            "status": "EXECUTED_REVIEWED_ACCEPTED",
             "planning_ref": "../planning/stage3-3b-attempt003-reassessment.md",
             "bundle_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G03_3b003_3c001_bundle"
-          }
+          },
+          "package_hash_reason": "3b003 has no separate package manifest; attempt 3 records the shared frozen bundle manifest and its numeric-oracle hash. The older 002 manifest hash is preserved on attempt 2."
         },
         {
           "id": "3c",

@@ -19,15 +19,19 @@
 <a id="3b"></a>
 ## 3b：首批三后端的场景翻译和公开反馈
 
+2026-11-06当前：attempt003经[Sol独立复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)接收为 **ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION**，普通count=3。required物性／reset／约束／缺项拒绝、三路线公开短程及同次H5、最终Panda MuJoCo CPU补偿350步保持已闭合；原N08 FAIL保留，不代表跨后端补偿或完整任务成功。6.1辅助App启动／版本已核实，但close超时，完整Env闭环未测。下列001／002及准备记录保持其历史时点。
+
 2026-11-05：[attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)已返包，技术结果THREE_B_TECHNICAL_PARTIAL，经[Sol独立复审](../maintenance/reviews/20261105_3b_attempt001_sol_review.md)决定REWORK_REQUIRED_3B。三路线10步与同次读回已执行，但冻结N08短窗方向门均FAIL；其他required物性与读回项目部分未完成。GeoPhys原生solver的准入不再因未选MuJoCo solver而拒绝，6.2 pip路线已实测、6.1仍NOT_RUN。按[返工分析](../planning/stage3-3b-rework-analysis.md)准备的[002完整包](../planning/stage3-3b-attempt002.md)现已冻结待手动转发，count仍1、未执行。先CPU因果对照，修launcher/typed-state/物性缺项，原N08不改；不自动派发或3c。
 
-- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中先实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1尚未执行运行层验证，保留NOT_RUN，不追溯改动3a attempt001门。
+- **输入／依赖：**3a；真实资产与 source、既有原生适配例外、1a 数值检查范围。新增反馈按[兼容规划](../planning/isaac-deployment-compatibility.md)在完整3b包中实现6.1／6.2共同路线、SDK部署与真实版本身份；5.1延期。6.1辅助App证据与未测完整Env闭环分列，不追溯改动3a attempt001门。
 - **工作：**在各 adapter 内消费统一模型，公开 native mapping、realized reset、单位／坐标转换、状态和时间；使用各自公开 API，报告无法表达或未测量项。按源约束编译具名通道和嵌套语义映射，不提前宣称阶段4命令已实现。
 - **检查：**三路线从 make_env 真实构建→reset→施控／step→state→记录／读回→close；检查实体／关节、质量／惯性及声明的约束／传动与初始化。源码／设备身份和错误关闭可核实。资产检查分别覆盖输入物理合法性、native映射/readback、reset/短程数值行为；每项有quantity-specific oracle/容差，required未测量不能通过，optional保留原因；cube约5%惯量差不自动修正。
 - **交付／出口：**三后端协议的真实最小连续执行；不声称同源模型严格等价、全任务支持或 task-success 已完成。
 
 <a id="3c"></a>
 ## 3c：reset 重建及失败处置
+
+2026-11-06当前：attempt001技术返包待Sol单独独立复审，3b接收不代替3c或整个G03接收。
 
 - **输入／依赖：**3b；固定 observation 与当前相机需求。
 - **工作：**reset 更换 backend／solver 方案时重建资源与映射；必要时重建 worker，刷新 configuration／materialization／episode 代次并使旧状态失效。保持同一个public Env对象，内部可重建session/worker/App；不能用用户close/make_env替代切换。
