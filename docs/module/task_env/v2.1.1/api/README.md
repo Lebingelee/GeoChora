@@ -71,10 +71,17 @@ MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=Tr
 `reset_for_solution` / `step_with_solution` 可将既有 PickCube Solution 的绝对位姿送入 R3 reference 和具名关节 effort。该路线使用对应 MuJoCo source 的状态相关质量矩阵与 bias、禁用原生 position drive，并复用 Generic H5 v3 Recorder；记录的 ACK 和 admitted effort 不等于独立测力。seed 31 原任务成功和 A→B→A 证据经[独立主审](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)有界接收，不扩展为其他 seed、source 或后端资格。任务 profile 将 MJCF actuator8 编写的 ±5 N 运行时配置为 ±10 N，与原 2c 任务配置一致；该成功不证明 ±5 N 条件。详情见 [4c 计划](../planning/stage4-4c-attempt001.md)和该 attempt 的 ignored 原始证据。
 
 <a id="visual-state-binding"></a>
-## 5a 显式 visual-state 绑定（待独立主审）
+## 5a 显式 visual-state 绑定（有界接收）
 
 `pickcube-physical-candidate-v1` 的 MuJoCo CPU Position 路线成功 reset 后，可将 `CameraGeometry` 交给 `env.bind_visual_state(camera)`，再用 `env.sync_visual_state()` 消费最新已发布的 typed boundary。`env.visual_model_info()` 返回 source closure、具名几何／材质／相机／灯光、renderer-only 所有权和限制；`env.visual_body_pose(entity_id, frame_id)` 返回拥有的 body-origin world pose 副本。这个显式入口属于已有 Env 和 camera owner，独立 visual model 只复制 CPU 状态并运行同步 kinematics，不调用 physics step 或 Controller。reset／close 清理自有 renderer；不转移 physics 所有权。
 
-此候选要求同一 Scene／Artifact／source closure 的具名 scalar Joint、floating Joint 和 Frame；floating body 使用米、右手系、world body origin、wxyz，四元数正负等价。重复、缺失、错来源、stale 或不支持的变形表示拒绝。该接口是 binding-only：构造用的 camera geometry 不构成 RGB 请求；对该 profile 的 capture 明确拒绝，RGB 能力为 unknown。普通旧 camera 路径、state-only 默认和旧 codec 保持原语义。当前证据仅覆盖 seed 31、MuJoCo 3.8.1 CPU、同一 PickCube source、单 Env 的两次边界；结果待 Sol 主审，不宣称窗口、正式离屏 RGB、同步 observation、renderer 切换或 GeoPhys／Isaac／cross 支持。runtime finger cap ±10 N 与 source ±5 N 的既有边界不变。
+此候选要求同一 Scene／Artifact／source closure 的具名 scalar Joint、floating Joint 和 Frame；floating body 使用米、右手系、world body origin、wxyz，四元数正负等价。重复、缺失、错来源、stale 或不支持的变形表示拒绝。该接口是 binding-only：构造用的 camera geometry 不构成 RGB 请求；对该 profile 的 capture 明确拒绝，RGB 能力为 unknown。普通旧 camera 路径、state-only 默认和旧 codec 保持原语义。seed 31、MuJoCo 3.8.1 CPU、同一 PickCube source、单 Env 的两次边界已由 [Sol 有界接收](../maintenance/reviews/20261107_5a_attempt002_sol_review.md)；此结果不证明窗口、正式离屏 RGB、同步 observation、renderer 切换或 GeoPhys／Isaac／cross 支持。runtime finger cap ±10 N 与 source ±5 N 的既有边界不变。
 
 视觉更新或其结果验证失败时，renderer binding 进入 fault 并尝试关闭自有资源；即便回滚后的 Frame poses 可核对，也须重建 binding，因为这不能证明所有 renderer 派生字段均已恢复。故障后不再提供 pose、sync、capture 或旧 receipt 作为当前结果；已返回给调用者的旧 receipt 只表示它原来的历史边界。`env.visual_binding_status()` 报告 fault 与 renderer close 的实际状态，close 失败时释放结果为 unknown；physics Env 不因该 renderer 故障被关闭。reset 后可重新 bind，已有其他 owner 不受此绑定清理影响。
+
+<a id="observer-candidate"></a>
+## 5b observer 候选（未完成验收）
+
+MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；RGB 为拥有的 HWC float32 数组，窗口与任务 observation 分离。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
+
+5b attempt001 的窗口和图像未被接收，见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；上述候选及本次有界检查均不代表三路线 5b 已接收。GeoPhys 原生窗口／RGB、同步 task observation、renderer 切换和 cross 组合不由这些候选自动建立。

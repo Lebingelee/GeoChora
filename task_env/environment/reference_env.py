@@ -2163,7 +2163,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._ui_render_provider = TaskEnvRenderProvider(
             render_source=None, config=SimpleNamespace(width=camera.width, height=camera.height),
             frame_capture=self._capture_selected_observer,
-            frame_presenter=self._present_selected_observer if self.provider == 'isaacsim' else None)
+            frame_presenter=self._present_selected_observer if self.provider == 'isaacsim' else None,
+            frame_color_space=('GL_LINEAR framebuffer RGB; uncalibrated primaries and input assets'
+                               if self.provider == 'mujoco' else 'unverified native framebuffer encoding'))
         self.metadata = dict(self.metadata)
         self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
                              render_backend=('isaacsim-rtx' if self.provider == 'isaacsim' else 'mujoco-native-opengl'))

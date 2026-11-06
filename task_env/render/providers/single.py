@@ -17,7 +17,7 @@ class TaskEnvRenderProvider:
     """Lazy adapter from a TaskEnv render source to the existing visualizers."""
 
     def __init__(self, *, render_source: object, config: object, frame_capture=None,
-                 frame_presenter=None) -> None:
+                 frame_presenter=None, frame_color_space='unverified native framebuffer encoding') -> None:
         if render_source is None and frame_capture is None:
             raise ValueError("TaskEnv UI rendering requires a render source")
         self._render_source = render_source
@@ -31,6 +31,7 @@ class TaskEnvRenderProvider:
         self._frame_submission_enabled = True
         self._frame_capture = frame_capture
         self._frame_presenter = frame_presenter
+        self._frame_color_space = frame_color_space
         self._window_image = None
         self._window_label = None
         self._window_closed_by_user = False
@@ -50,7 +51,7 @@ class TaskEnvRenderProvider:
             'capture_identity': frame.capture_identity.to_mapping(),
             'completion': 'synchronous native readback and owned host copy',
             'layout': 'HWC', 'dtype': 'float32', 'range': [0, 1], 'channels': 'RGB',
-            'color_space': 'unverified native framebuffer encoding',
+            'color_space': self._frame_color_space,
         }
         return np.array(frame.rgb, dtype=np.float32, copy=True, order='C')
 

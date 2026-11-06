@@ -101,3 +101,119 @@ def test_usd_observer_rejects_changed_native_state(monkeypatch):
     monkeypatch.setattr(session, 'state_boundary_identity', lambda: 'current')
     with pytest.raises(RuntimeError, match='physics state or boundary changed'):
         session.capture_observer(object(), SimpleNamespace(boundary='current'))
+
+
+def test_mujoco_rgb_rejects_unverified_framebuffer_encoding(monkeypatch):
+    """An sRGB-enabled or unavailable framebuffer cannot claim the linear profile."""
+    import ctypes
+    import ctypes.util
+    from task_env.render.camera.mujoco import MuJoCoDynamicCameraSession
+
+    class Function:
+        def __init__(self, function):
+            self.function = function
+        def __call__(self, *args):
+            return self.function(*args)
+
+    def library(*, encoding=0x2601, enabled=False, error=0):
+        def integer(_name, output):
+            ctypes.cast(output, ctypes.POINTER(ctypes.c_int))[0] = 1
+        def attachment(_target, _attachment, _name, output):
+            ctypes.cast(output, ctypes.POINTER(ctypes.c_int))[0] = encoding
+        return SimpleNamespace(glIsEnabled=Function(lambda _name: enabled),
+            glGetIntegerv=Function(integer), glGetFramebufferAttachmentParameteriv=Function(attachment),
+            glGetError=Function(lambda: error))
+
+    monkeypatch.setattr(ctypes.util, 'find_library', lambda _name: 'GL')
+    monkeypatch.setattr(ctypes, 'CDLL', lambda _name: library())
+    MuJoCoDynamicCameraSession._verify_linear_framebuffer()
+    monkeypatch.setattr(ctypes, 'CDLL', lambda _name: library(enabled=True))
+    with pytest.raises(RuntimeError, match='linear-encoded'):
+        MuJoCoDynamicCameraSession._verify_linear_framebuffer()
+    monkeypatch.setattr(ctypes, 'CDLL', lambda _name: library(encoding=0x8C40))
+    with pytest.raises(RuntimeError, match='linear-encoded'):
+        MuJoCoDynamicCameraSession._verify_linear_framebuffer()
+    monkeypatch.setattr(ctypes.util, 'find_library', lambda _name: None)
+    with pytest.raises(RuntimeError, match='cannot be checked'):
+        MuJoCoDynamicCameraSession._verify_linear_framebuffer()
+
+
+def test_mujoco_encoding_failure_faults_and_closes_renderer(monkeypatch):
+    from task_env.render.camera.api import V211_RGB_PROFILE
+    from task_env.render.camera.mujoco import MuJoCoDynamicCameraSession
+    from task_env.render.camera.mujoco import CameraSessionValues
+
+    session = object.__new__(MuJoCoDynamicCameraSession)
+    session._manifest = SimpleNamespace(render_profile=V211_RGB_PROFILE)
+    session._source = SimpleNamespace(schema_version='camera-dynamic-source-v2')
+    session._last_projection = session._last_sync = object()
+    closed = []
+    monkeypatch.setattr(session, '_require_trustworthy', lambda: None)
+    monkeypatch.setattr(CameraSessionValues, 'capture', lambda *_args: object())
+    monkeypatch.setattr(session, '_verify_linear_framebuffer',
+                        lambda: (_ for _ in ()).throw(RuntimeError('encoding unavailable')))
+    monkeypatch.setattr(session, 'close', lambda: closed.append(True))
+    with pytest.raises(RuntimeError, match='encoding unavailable'):
+        session.capture(object())
+    assert session._faulted and session._last_projection is None and session._last_sync is None
+    assert closed == [True]
+
+
+def test_isaac_observer_clock_regression_invalidates_runtime():
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
+    native = object.__new__(IsaacSimNativeRuntimeIOV1)
+    native._episode_origin_step = 18
+    native._episode_origin_time = .036
+    native._counter = lambda: (0, 0.0)
+    with pytest.raises(RuntimeError, match='changed the physics clock'):
+        native._check_observer_clock((18, .036), playing=False, operation='observer rendering')
+    assert native._observer_runtime_invalid
+    assert native._episode_origin_step is None and native._episode_origin_time is None
+    native._closed = False
+    with pytest.raises(RuntimeError, match='rebuild required'):
+        native.write_reset(None, ())
+
+
+def test_isaac_owner_rejects_stopped_app_before_rebuild():
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1
+    owner = IsaacSimAppOwnerV1()
+    owner._app = SimpleNamespace(is_running=lambda: False)
+    with pytest.raises(RuntimeError, match='new worker is required'):
+        owner.open()
+
+
+def test_isaac_clock_failure_invalidates_shared_app_owner():
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1, IsaacSimNativeRuntimeIOV1
+    owner = IsaacSimAppOwnerV1()
+    owner._app = SimpleNamespace(is_running=lambda: True)
+    native = object.__new__(IsaacSimNativeRuntimeIOV1)
+    native._app_owner = owner
+    native._episode_origin_step, native._episode_origin_time = 18, .036
+    native._counter = lambda: (0, 0.0)
+    with pytest.raises(RuntimeError, match='changed the physics clock'):
+        native._check_observer_clock((18, .036), playing=False, operation='capture')
+    with pytest.raises(RuntimeError, match='new worker is required'):
+        owner.open()
+
+
+def test_isaac_viewport_rejects_stale_camera_and_wrong_projection():
+    import math
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
+    width, height, fov, near, far = 320, 240, math.pi / 3, .01, 10.
+    world = np.eye(4)
+    world[:3, 3] = [.6, -1.1, .85]
+    contract = (world, width, height, fov, near, far)
+    focal = 1. / math.tan(fov / 2.)
+    projection = [0.] * 16
+    projection[0], projection[5] = focal * height / width, focal
+    projection[10], projection[14] = near / (far-near), near*far / (far-near)
+    correct = {'view': np.linalg.inv(world).T.reshape(-1).tolist(),
+               'projection': projection, 'resolution': (width, height)}
+    matches = IsaacSimNativeRuntimeIOV1._viewport_frame_matches_observer
+    assert matches(correct, contract)
+    assert not matches({**correct, 'view': np.eye(4).reshape(-1).tolist()}, contract)
+    assert not matches({**correct, 'resolution': (1280, 720)}, contract)
+    wrong_projection = projection.copy()
+    wrong_projection[14] = .02
+    assert not matches({**correct, 'projection': wrong_projection}, contract)
+    assert not matches({'resolution': (width, height)}, contract)

@@ -124,6 +124,7 @@ class IsaacSimAppOwnerV1:
         self._closed = False
         self._process_lifetime_holds = 0
         self._close_requested = False
+        self._runtime_invalidation_reason = None
         self.start_attempts = 0
         self.close_attempts = 0
         self._close_attempted = False
@@ -155,6 +156,13 @@ class IsaacSimAppOwnerV1:
     def open(self, *, f06_compatibility=False):
         if self._closed or self._close_attempted:
             raise RuntimeError("Isaac App owner cannot reopen after close")
+        if self._runtime_invalidation_reason is not None:
+            raise RuntimeError('Isaac App runtime is invalid; a new worker is required: '
+                               + self._runtime_invalidation_reason)
+        if self._app is not None:
+            is_running = getattr(self._app, 'is_running', None)
+            if callable(is_running) and not is_running():
+                raise RuntimeError('Isaac App stopped after window closure; a new worker is required')
         if self._app is not None and f06_compatibility and self.sdk_identity is None:
             raise RuntimeError('already-open Isaac App lacks F06 version verification')
         if self._app is None:
@@ -219,6 +227,13 @@ class IsaacSimAppOwnerV1:
                     )
                 raise
         return self._app
+
+    def invalidate_runtime(self, reason: str) -> None:
+        """Reject new scene leases when the process App has lost its runtime state."""
+        if not isinstance(reason, str) or not reason:
+            raise ValueError('Isaac runtime invalidation requires a reason')
+        if self._runtime_invalidation_reason is None:
+            self._runtime_invalidation_reason = reason
 
     def close(self) -> None:
         if self._closed or self._close_attempted:
@@ -1639,6 +1654,8 @@ class IsaacSimNativeRuntimeIOV1:
                     position_targets: tuple[tuple[int, str, float], ...]) -> NativeResetWriteReceiptV1:
         if self._closed:
             raise RuntimeError("Isaac native I/O is closed")
+        if getattr(self, '_observer_runtime_invalid', False):
+            raise RuntimeError('Isaac runtime was invalidated after the native clock regressed; rebuild required')
         sample.validate()
         if set(sample.joint_position) != set(self._source.joints):
             raise ValueError("reset joint sample differs from exact USD RuntimeSource mapping")
@@ -2104,6 +2121,18 @@ class IsaacSimNativeRuntimeIOV1:
                 error.add_note(f'Isaac observer cleanup also failed: {cleanup_error!r}')
             raise
 
+    def _check_observer_clock(self, before, *, playing, operation):
+        """A native clock regression means the scene/App was stopped, not a physics step."""
+        after = self._counter()
+        if after != before or playing:
+            self._observer_runtime_invalid = True
+            self._episode_origin_step = self._episode_origin_time = None
+            owner = getattr(self, '_app_owner', None)
+            if owner is not None:
+                owner.invalidate_runtime(f'{operation}: before={before!r}, after={after!r}, playing={playing!r}')
+            raise RuntimeError(f'Isaac {operation} changed the physics clock or resumed the timeline: '
+                               f'before={before!r}, after={after!r}, playing={playing!r}')
+
     def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb, observation_type):
         import json
         import uuid
@@ -2122,8 +2151,7 @@ class IsaacSimNativeRuntimeIOV1:
         timeline.pause()
         if timeline.is_playing():
             self._app_owner.app.update()
-        if timeline.is_playing() or self._counter() != before:
-            raise RuntimeError('Isaac pause confirmation changed the physics clock')
+        self._check_observer_clock(before, playing=timeline.is_playing(), operation='pause confirmation')
         # A reset can update tensor state after the last PhysX-to-Fabric
         # publication.  Flush the public kinematic/Fabric interfaces before
         # rendering, without advancing the native simulation clock.
@@ -2138,8 +2166,8 @@ class IsaacSimNativeRuntimeIOV1:
         view.update_articulations_kinematic()
         force_update(0.0, 0.0)
         self._sync()
-        if self._counter() != before:
-            raise RuntimeError('Isaac Fabric update advanced the physics clock')
+        self._check_observer_clock(before, playing=timeline.is_playing(), operation='Fabric update')
+        published_bodies = self._publish_observer_body_transforms()
         if self._observer_sensor is None:
             path = '/GeoChoraObserver_' + uuid.uuid4().hex
             self._observer_path = path
@@ -2171,14 +2199,15 @@ class IsaacSimNativeRuntimeIOV1:
         data = None
         for _ in range(8):
             rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0, wait_for_render=True)
-            if timeline.is_playing() or self._counter() != before:
-                raise RuntimeError('Isaac observer rendering advanced physics or left the timeline playing')
+            self._check_observer_clock(before, playing=timeline.is_playing(), operation='observer rendering')
             data, _info = self._observer_sensor.get_data('rgb')
             if data is not None:
                 break
         if data is None:
             raise RuntimeError('Isaac observer RGB did not complete within the bounded render wait')
-        self._verify_observer_fabric(state, world)
+        self._verify_observer_fabric(state, world, published_bodies)
+        self._observer_camera_contract = (world.copy(), camera.width, camera.height,
+                                          camera.fov_y, camera.near, camera.far)
         rgb = np.array(data.numpy(), copy=True)
         selection = RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
                                         'v211_isaac_rtx_observer_v1', 'cuda:0')
@@ -2193,7 +2222,39 @@ class IsaacSimNativeRuntimeIOV1:
         identity.validate()
         return observation_type(normalize_rgb(rgb, camera), None, metadata, identity)
 
-    def _verify_observer_fabric(self, state, camera_world):
+    def _publish_observer_body_transforms(self):
+        """Copy public PhysX body poses to renderer-facing Fabric without stepping."""
+        import numpy as np
+        import isaacsim.core.experimental.utils.backend as backend_utils
+        from isaacsim.core.experimental.prims import RigidPrim, XformPrim
+        from pxr import UsdPhysics
+
+        before = self._counter()
+        entry = str(self._source.scene_source.loaded_delivery.delivery.entry_prim).rstrip('/')
+        paths = sorted((str(prim.GetPath()) for prim in self._stage.Traverse()
+                        if str(prim.GetPath()).startswith(entry + '/')
+                        and prim.HasAPI(UsdPhysics.RigidBodyAPI)),
+                       key=lambda path: (path.count('/'), path))
+        if not paths:
+            raise RuntimeError('Isaac observer has no source-bound rigid bodies')
+        bodies = []
+        for path in paths:
+            rigid = RigidPrim(path)
+            with backend_utils.use_backend('tensor', raise_on_unsupported=True, raise_on_fallback=True):
+                position, quaternion = rigid.get_world_poses()
+            p = np.asarray(position.numpy()).reshape(-1, 3)[0].copy()
+            q = np.asarray(quaternion.numpy()).reshape(-1, 4)[0].copy()
+            if not np.isfinite(p).all() or not np.isfinite(q).all():
+                raise RuntimeError(f'Isaac observer body pose is non-finite: {path}')
+            bodies.append((path, p, q))
+        for path, p, q in bodies:
+            with backend_utils.use_backend('usdrt', raise_on_unsupported=True, raise_on_fallback=True):
+                XformPrim(path).set_world_poses(positions=[p.tolist()], orientations=[q.tolist()])
+        self._sync()
+        self._check_observer_clock(before, playing=False, operation='observer body publication')
+        return bodies
+
+    def _verify_observer_fabric(self, state, camera_world, published_bodies=()):
         """Reject a frame unless the public renderer-facing poses match publication."""
         import numpy as np
         import isaacsim.core.experimental.utils.backend as backend_utils
@@ -2213,6 +2274,13 @@ class IsaacSimNativeRuntimeIOV1:
         if not checks:
             raise RuntimeError('Isaac observer has no source-bound Fabric frames to verify')
         with backend_utils.use_backend('usdrt', raise_on_unsupported=True, raise_on_fallback=True):
+            for path, position, quaternion in published_bodies:
+                p, q = XformPrim(path).get_world_poses()
+                p = np.asarray(p.numpy()).reshape(-1, 3)[0]
+                q = np.asarray(q.numpy()).reshape(-1, 4)[0]
+                if (np.linalg.norm(p - position) > 1e-4 or
+                        min(np.linalg.norm(q - quaternion), np.linalg.norm(q + quaternion)) > 1e-4):
+                    raise RuntimeError(f'Isaac observer body publication changed before completion: {path}')
             for path, position, quaternion, semantic in checks:
                 actual_position, actual_quaternion = XformPrim(path).get_world_poses()
                 actual_position = np.asarray(actual_position.numpy()).reshape(-1, 3)[0]
@@ -2234,35 +2302,65 @@ class IsaacSimNativeRuntimeIOV1:
                 not np.allclose(rotation, camera_world[:3, :3], atol=1e-4, rtol=0)):
             raise RuntimeError('Isaac renderer-facing camera pose differs from the requested camera')
 
+    @staticmethod
+    def _viewport_frame_matches_observer(info, contract):
+        """Check the camera and projection of an actually delivered viewport frame."""
+        import numpy as np
+        world, width, height, fov_y, near, far = contract
+        view, projection = info.get('view'), info.get('projection')
+        if view is None or projection is None or tuple(info.get('resolution', ())) != (width, height):
+            return False
+        expected_view = np.linalg.inv(world).T.reshape(-1)
+        expected_focal = 1.0 / math.tan(fov_y / 2.0)
+        return bool(np.allclose(np.asarray(view), expected_view, rtol=0, atol=1e-4)
+                    and math.isclose(float(projection[0]), expected_focal * height / width, abs_tol=1e-4)
+                    and math.isclose(float(projection[5]), expected_focal, abs_tol=1e-4)
+                    and math.isclose(float(projection[10]), near / (far - near), abs_tol=1e-5)
+                    and math.isclose(float(projection[14]), near * far / (far - near), abs_tol=1e-5))
+
     def present_observer(self):
         """Present the observer camera in Isaac's headed viewport without physics."""
         if self._closed or self._observer_faulted or self._observer_sensor is None:
             raise RuntimeError('Isaac observer presentation requires a completed capture')
         try:
             import omni.timeline
-            from isaacsim.core.rendering_manager import RenderingEvent, RenderingManager, ViewportManager
+            from isaacsim.core.rendering_manager import RenderingManager, ViewportManager
             before = self._counter()
             windows = ViewportManager.get_viewport_windows()
             if not windows:
                 raise RuntimeError('Isaac headed viewport is unavailable')
+            viewport = ViewportManager.get_viewport_api()
+            contract = getattr(self, '_observer_camera_contract', None)
+            if viewport is None or contract is None:
+                raise RuntimeError('Isaac viewport lacks the completed observer camera contract')
+            _world, width, height, _fov_y, _near, _far = contract
+            delivered = []
+            subscription = viewport.subscribe_to_frame_change(lambda *_args: delivered.append(True))
+            previous_number = viewport.frame_info.get('frame_number', -1)
             ViewportManager.set_camera(self._observer_path)
-            observed = []
-            callback_id = RenderingManager.register_callback(
-                RenderingEvent.NEW_FRAME, callback=lambda *args, **kwargs: observed.append(True))
-            try:
+            ViewportManager.set_resolution((width, height))
+            matched = []
+            for _ in range(16):
                 RenderingManager.render()
-            finally:
-                RenderingManager.deregister_callback(callback_id)
-            if self._counter() != before or omni.timeline.get_timeline_interface().is_playing():
-                raise RuntimeError('Isaac viewport update advanced physics or left the timeline playing')
-            if not observed:
-                raise RuntimeError('Isaac viewport did not report a rendered-frame event')
+                self._check_observer_clock(before, playing=omni.timeline.get_timeline_interface().is_playing(),
+                                           operation='viewport update')
+                info = viewport.frame_info
+                number = info.get('frame_number', -1)
+                if (delivered and number > previous_number
+                        and self._viewport_frame_matches_observer(info, contract)):
+                    matched.append(int(number))
+                    previous_number = number
+                    if len(matched) >= 2:
+                        break
+            if len(matched) < 2:
+                raise RuntimeError('Isaac viewport did not deliver two frames with the requested camera and projection')
             realized = ViewportManager.get_camera()
             if str(realized.GetPrim().GetPath()) != self._observer_path:
                 raise RuntimeError('Isaac viewport did not retain the requested observer camera')
             return {'backend': 'Isaac Sim native viewport', 'camera_prim': self._observer_path,
                     'viewport_titles': [str(window.title) for window in windows],
-                    'event_pump': 'RenderingManager.render', 'new_frame_events': len(observed),
+                    'event_pump': 'RenderingManager.render', 'viewport_frame_events': len(delivered),
+                    'matched_viewport_frame_numbers': matched, 'render_resolution': [width, height],
                     'physics_counter': list(before), 'window_id': None}
         except BaseException as error:
             self._observer_faulted = True
@@ -2277,6 +2375,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._close_observer()
 
     def _close_observer(self):
+        self._observer_camera_contract = None
         sensor, self._observer_sensor = self._observer_sensor, None
         path, self._observer_path = self._observer_path, None
         primary = None

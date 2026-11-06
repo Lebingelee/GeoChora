@@ -394,11 +394,14 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
 
     def capture(self, state):
         self._require_trustworthy()
-        from .api import V211_DYNAMIC_PROFILE
+        from .api import V211_DYNAMIC_PROFILE, V211_RGB_PROFILE
         if self._manifest.render_profile == V211_DYNAMIC_PROFILE:
             raise RuntimeError('v211 visual binding does not admit RGB capture')
         try:
-            return super().capture(state)
+            result = super().capture(state)
+            if self._manifest.render_profile == V211_RGB_PROFILE:
+                self._verify_linear_framebuffer()
+            return result
         except BaseException as error:
             # Capture may have changed native camera/context state.  Never
             # expose an old receipt or continue using the affected owner.
@@ -410,6 +413,32 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
                 except BaseException as cleanup_error:
                     error.add_note(f'renderer close after capture failure also failed: {cleanup_error!r}')
             raise
+
+    @staticmethod
+    def _verify_linear_framebuffer():
+        """Reject an unknown GL write encoding before exposing this RGB profile."""
+        import ctypes
+        import ctypes.util
+
+        library = ctypes.util.find_library('GL')
+        if not library:
+            raise RuntimeError('MuJoCo RGB framebuffer encoding cannot be checked')
+        gl = ctypes.CDLL(library)
+        gl.glIsEnabled.argtypes = [ctypes.c_uint]
+        gl.glIsEnabled.restype = ctypes.c_ubyte
+        gl.glGetIntegerv.argtypes = [ctypes.c_uint, ctypes.POINTER(ctypes.c_int)]
+        gl.glGetFramebufferAttachmentParameteriv.argtypes = [
+            ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_int)]
+        gl.glGetError.restype = ctypes.c_uint
+        binding, encoding = ctypes.c_int(), ctypes.c_int()
+        gl.glGetIntegerv(0x8CA6, ctypes.byref(binding))  # GL_FRAMEBUFFER_BINDING
+        gl.glGetFramebufferAttachmentParameteriv(0x8D40, 0x8CE0, 0x8210, ctypes.byref(encoding))
+        srgb = bool(gl.glIsEnabled(0x8DB9))  # GL_FRAMEBUFFER_SRGB
+        error = gl.glGetError()
+        if error or binding.value == 0 or encoding.value != 0x2601 or srgb:  # GL_LINEAR
+            raise RuntimeError('MuJoCo RGB requires a linear-encoded offscreen GL framebuffer '
+                               f'(binding={binding.value}, encoding={encoding.value}, '
+                               f'srgb={srgb}, gl_error={error})')
 
     @property
     def camera_geometry_identity(self):
