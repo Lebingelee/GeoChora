@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G04 三子阶段分别有界接收
+## 当前：G05 5a attempt001 已主审，需有界返工
+
+5a attempt001 的 MuJoCo CPU PickCube renderer-only 代表绑定与独立双状态证据保留；Sol 发现渲染更新及恢复均失败时不可信 visual pose 仍可读取，决定 [REWORK_REQUIRED_5A](reviews/20261106_5a_attempt001_sol_review.md)，普通 count=1。5b/5c 仍 PLANNED、count=0；后续另备一次完整返工包，未派发，不自动启动。前包 writer 和 native 已释放；保护输入、两 pin 不变。阶段5继续复用 `codex/v211-stage5` checkout。
+
+## 历史：G04 三子阶段分别有界接收
 
 G03 与 G04/4a、4b 原有界接收不变。4c attempt001 经 [Sol 独立主审](reviews/20261106_4c_attempt001_sol_review.md)按 MuJoCo CPU 单 Env Controller reset 切换和迁移后 PickCube seed31 成功作 `ACCEPTED_BOUNDED_4C_RESET_PICKCUBE`，count=1。任务运行时夹爪 cap ±10 N 与 source 编写值 ±5 N 的差别、外力切换及跨后端未覆盖项均见审查；4b 中 GeoPhys A05 joint2 方向诊断在首次超时后已通过重跑；Sol 此前误称未完成，已在主审记录更正。不得自动进入阶段5、push 或 merge。
 

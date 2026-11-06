@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-06",
-  "status": "G04_4A_ACCEPTED_BOUNDED_4B_PLANNED",
+  "status": "G05_5A_ATTEMPT001_REWORK_REQUIRED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer may manually forward frozen 4b attempt002; prioritize evidence impact and closeout, reuse unaffected evidence, targeted native only if indispensable, then Sol independent review.",
+  "next_action": "Prepare one bounded 5a attempt002 after independent review; retain affected evidence and obtain any new execution authorization before manual dispatch. 5b remains planned.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1318,21 +1318,59 @@
             "3c",
             "4c"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
-          "package_path": null,
-          "package_sha256": null,
-          "input_head": null,
-          "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
-          "blockers": []
+          "status": "REWORK_REQUIRED_5A",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G05_5a_attempt001",
+              "package_manifest_sha256": "29737348738ba5cf452f0a40f7d1ab7fa8221bbd47e5a828f2b7054a27be5c69",
+              "prompt_sha256": "d91065039e936701d71b18d1a9a3721967a9f2961e3b8b1e27e811c022cd3f16",
+              "status": "REVIEWED_REWORK_REQUIRED",
+              "result": "PASS_BOUNDED_REPRESENTATIVE_BINDING_NOT_ACCEPTED_OVERALL",
+              "input_head": "3ca161c41340d6015be4fc949ac43771c233ee1c",
+              "output_head": "90a46f968dcdcb663659ebb9562390f2ebf02639",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5a_attempt001/report.md",
+              "sol_review_ref": "reviews/20261106_5a_attempt001_sol_review.md",
+              "review_decision": "REWORK_REQUIRED_5A"
+            }
+          ],
+          "assigned_agent": "maintainer-designated manual implementation session",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5a_attempt001/",
+          "package_sha256": "29737348738ba5cf452f0a40f7d1ab7fa8221bbd47e5a828f2b7054a27be5c69",
+          "input_head": "3ca161c41340d6015be4fc949ac43771c233ee1c",
+          "output_head": "90a46f968dcdcb663659ebb9562390f2ebf02639",
+          "expected_duration_minutes": "180-300 active, 480 wall maximum",
+          "execution_budget": {
+            "wall_minutes": 480,
+            "source_seconds": 7200,
+            "native_seconds": 7200,
+            "native_worker_seconds": 600,
+            "physical_substeps": 5000,
+            "cpu_threads": 8,
+            "process_tree_rss_gib": 8,
+            "gpu_vram_gib": 4,
+            "new_ignored_output_gib": 2
+          },
+          "last_observation": "Sol reviewed commit and evidence; failure plus failed restoration leaves renderer model accessible. Rework required; representative real binding preserved.",
+          "evidence_refs": [
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt001/gates.json",
+            "../../../../../workspace/maintenance/v211_g05_5a_attempt001/release-receipt.json",
+            "reviews/20261106_5a_attempt001_sol_review.md"
+          ],
+          "commits": [
+            "90a46f968dcdcb663659ebb9562390f2ebf02639"
+          ],
+          "review_decision": {
+            "status": "REWORK_REQUIRED_5A",
+            "reviewer": "Sol",
+            "date": "2026-11-06",
+            "review_ref": "reviews/20261106_5a_attempt001_sol_review.md"
+          },
+          "blockers": [
+            "Renderer update and failed restoration leave untrusted visual pose accessible; fail closed and validate affected paths."
+          ]
         },
         {
           "id": "5b",
