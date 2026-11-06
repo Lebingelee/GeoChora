@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Complete the 4b attempt001 package and obtain maintainer authorization for the proposed native/GPU budget and any necessary GeoPhys public-provider change before manual transfer. No automatic dispatch, no Sol native.",
+  "next_action": "Maintainer may manually forward the frozen 4b attempt001 Goal package to the existing implementation session. Sol performs independent review after full report and release. Do not automatically dispatch or run native.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1183,7 +1183,7 @@
           "dependencies": [
             "4a"
           ],
-          "status": "PLANNED",
+          "status": "PREPARED_NOT_DISPATCHED",
           "attempt_count": 0,
           "attempts": [],
           "assigned_agent": null,
@@ -1191,18 +1191,27 @@
           "package_sha256": null,
           "input_head": null,
           "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": "2026-11-06 maintainer requested a generic lessons Skill and complete 4b attempt001. Sol prepared the 4b plan and proposed package; native/GPU and any GeoPhys pin change require explicit maintainer authorization. No dispatch or execution; attempt count remains zero.",
+          "expected_duration_minutes": "360–540 active; 600 wall maximum",
+          "execution_budget": {
+            "source_minutes": 180,
+            "native_minutes": 180,
+            "native_process_seconds": 600,
+            "physics_substeps_including_bootstrap": 30000,
+            "cpu_threads": 8,
+            "process_tree_rss_gib": 8,
+            "new_output_gib": 2,
+            "isaac_gpu_process_memory_mib": 6144,
+            "isaac_gpu_min_free_mib": 4096,
+            "isaac_gpu_min_free_during_run_mib": 512
+          },
+          "last_observation": "2026-11-06 maintainer authorized the proposed three-backend native/GPU budget, 30000 cumulative substeps and necessary GeoPhys public changes/pin update, with preference for existing interfaces or Core adapter first. Full package to be manually forwarded; no execution started.",
           "evidence_refs": [
             "20261106_4a_retrospective_for_4b.md",
             "../planning/stage4-4b-attempt001.md"
           ],
           "commits": [],
           "review_decision": null,
-          "blockers": [
-            "AWAITING_MAINTAINER_AUTHORIZATION_FOR_NATIVE_AND_POTENTIAL_GEOPHYS_PIN_CHANGE"
-          ]
+          "blockers": []
         },
         {
           "id": "4c",

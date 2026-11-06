@@ -1,6 +1,6 @@
 # G04/4b attempt001：实施与验证规划
 
-状态：准备中，尚未启动或接收。原始出口以 [G04/4b](../goals/04-control.md#4b) 为准；继承 [4a 有界主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)及其条件性 4b 方案。该方案的 GPU、模型接口、阈值与预算均为候选，4a 主审明确没有批准其实际运行。本规划在不降低原出口的前提下，冻结本次可执行选择；历史方案和证据不修改。
+状态：维护者已授权执行范围和预算，完整包准备中，尚未派发、启动或接收。原始出口以 [G04/4b](../goals/04-control.md#4b) 为准；继承 [4a 有界主审](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)及其条件性 4b 方案。该方案的 GPU、模型接口、阈值与预算均为候选，4a 主审明确没有批准其实际运行。本规划在不降低原出口的前提下，冻结本次可执行选择；历史方案和证据不修改。
 
 ## 出口与当前缺口
 
@@ -11,7 +11,7 @@
 | 路线 | 目标与主要 owner | 本次必须查明并实施 |
 | --- | --- | --- |
 | M | MuJoCo 3.8.1 CPU；Core 的 `task_env/runtime/sessions/mujoco.py`、`mujoco_physical.py` 与相应 Task Artifact | 将真实 7＋2 和所选自由体／hand 样例接入现有工厂及 session；核对每子步 frame、作用点、参考矩和清除，保留 source 约束。 |
-| G | GeoPhys native rigid CPU；GeoPhys 公共 runtime owner 与 Core 的 `task_env/runtime/sessions/geophys.py` | 使用或补齐正式公开的关节 effort、身份／映射与读回能力，再接统一物理命令；不把 `TORQUE` 标签或 position actuator `ctrl` 当作力。必要时修改 GeoPhys 并以本地提交更新 Core gitlink。 |
+| G | GeoPhys native rigid CPU；GeoPhys 公共 runtime owner 与 Core 的 `task_env/runtime/sessions/geophys.py` | 优先复用、继承或在 Core adapter 侧扩展现有公开接口以接入统一物理命令；若公开接口确实无法实现 4b，才对 GeoPhys 做必要的公共接口／owner 修改并以本地提交更新 Core gitlink，说明 adapter 方案不可行的证据。不把 `TORQUE` 标签或 position actuator `ctrl` 当作力。 |
 | I | Isaac Sim 6.2 PhysX CUDA；现有 USD/session 与 `task_env/runtime/sessions/isaac_native_io.py` | 核验本机公开 API、F06 joint/mimic/drive 及生命周期；真实接通 effort 和读回，不把 drive target 或提交 ACK 当测得力。公开 Omni Physics 107 文档仅为候选，不证明本机扩展版本。 |
 
 M/G 参考 PickCube MJCF closure `02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d`；I 参考 F06 USD closure `dc2a87a74963e0ec10f3cf98b3e33cc87226350dde78aeddbc88244a0fbdafc6`；hand 候选 A05 closure `aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47`。每次以实际 source/build receipt 核验，不能把先前 receipt 冒充本次；不更改源关节、tendon、equality 或 mimic 以制造通过。不同 source 的夹爪传动及可实现域分别核实，八维输入的末项是受约束的成对贡献，不保证任意独立双指力。
@@ -28,4 +28,4 @@ M/G 参考 PickCube MJCF closure `02f12b11e8215af606d9eed7f22c411dc5bbd74f7d9563
 
 ## 执行治理
 
-复用同一阶段分支与 checkout，采用一个完整实现窗口；预检、接口补齐、针对性修复、受影响测试与原生重试均在包内，不把单次失败记为新 attempt。冻结授权、双锁、资源和输出快照，以实际版本及显存预检后执行。现有候选要求 ≥10 GiB 空闲显存，但本机显卡总量约 8 GiB，故不可原样作为本窗口门；新资源预算由完整派发包和维护者授权确定。验证全程记录 source/build、每次输入、贡献、ACK、独立读回、时钟、误差、清理、失败和步骤预算；受影响证据才重跑。输出技术完成不等于 Sol 接收，不进入 4c、阶段 5、合并或推送。
+复用同一阶段分支与 checkout，采用一个完整实现窗口；预检、接口补齐、针对性修复、受影响测试与原生重试均在包内，不把单次失败记为新 attempt。冻结授权、双锁、资源和输出快照，以实际版本及显存预检后执行。现有候选要求 ≥10 GiB 空闲显存，但本机显卡总量约 8 GiB，故不可原样作为本窗口门；维护者授权三后端 source/native、Isaac GPU 和必要的 GeoPhys 公共接口及 pin 修改，并要求先考虑现有公开接口及 adapter 侧实现。完整派发包冻结 30000 个物理子步累计上限（含 bootstrap）及其他资源限制；维护者报告 Isaac 6.2 在约 6 GiB 空闲显存下运行，本包尚需核验实际交集。验证全程记录 source/build、每次输入、贡献、ACK、独立读回、时钟、误差、清理、失败和步骤预算；受影响证据才重跑。输出技术完成不等于 Sol 接收，不进入 4c、阶段 5、合并或推送。
