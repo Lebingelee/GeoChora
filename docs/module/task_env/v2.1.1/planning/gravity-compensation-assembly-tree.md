@@ -1,6 +1,6 @@
 # 基于装配树的重力补偿范围（设计提案）
 
-状态：2026-11-06维护者确认本设计方向及新Robot／空载精度／夹爪与Solution复用需求；[装配Panda](stage4-assembled-panda.md)重新定位为本版附加集成用例，建议4b公共能力稳定后早验证、7a完整收口，排期待维护者审阅。原G04命令／三后端effort与BodyWrench／Controller reset门不变。当前通用选择仍未实现或验证；已实现并接收的仅来源绑定Panda一体手，不支持自定义子树或固定附件。3b原N08失败及接收范围不改，不重开G03。当前实现见[003 Sol复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)。
+状态：2026-11-06维护者确认本设计方向及新Robot／空载精度／夹爪与Solution复用需求；[装配Panda](stage4-assembled-panda.md)重新定位为本版附加集成用例，建议4b公共能力稳定后早验证、7a完整收口，排期已由维护者采纳。原G04命令／三后端effort与BodyWrench／Controller reset门不变。当前通用选择仍未实现或验证；已实现并接收的仅来源绑定Panda一体手，不支持自定义子树或固定附件。3b原N08失败及接收范围不改，不重开G03。当前实现见[003 Sol复审](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)。
 
 ## 目标与语义
 

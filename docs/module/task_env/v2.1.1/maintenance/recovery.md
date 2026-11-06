@@ -4,7 +4,9 @@
 
 3c经[Sol独立复审](reviews/20261106_3c_attempt001_sol_review.md)接收为ACCEPTED_BOUNDED_3C_RESET_REBUILD，count=1，不需002。五段同一Env链、固定观测／Core流、旧输入拒绝、故障恢复和逐episode H5均满足冻结出口；仅覆盖显式PickCube profile及四条声明边。3a、[3b](reviews/20261106_3b_attempt003_sol_review.md)及3c各自有界接收，G03限定范围收尾，原N08 FAIL保留。6.1辅助App启动／版本成立但close超时，完整兼容未通过。active_packages=[]；等待维护者后续安排，不自动进入阶段4或push／merge／tag。
 
-后续规划重评（待维护者审阅）：[装配Panda](../planning/stage4-assembled-panda.md)是本版附加集成用例，原G04完整主线／出口恢复；建议4b稳定后早检查、7a两任务Solution完整收口，原G04接收不以该用例四交集齐全为前置。新类在robot目录、配置选择、空载精度和现有夹爪／Solution复用、不做物性等价的需求均保留。4a–4c仍PLANNED／attempt0，无已派包；当前代码仍未实现新Robot或通用子树补偿。
+后续规划重评（维护者已采纳本规划）：[装配Panda](../planning/stage4-assembled-panda.md)是本版附加集成用例，原G04完整主线／出口恢复；建议4b稳定后早检查、7a两任务Solution完整收口，原G04接收不以该用例四交集齐全为前置。新类在robot目录、配置选择、空载精度和现有夹爪／Solution复用、不做物性等价的需求均保留。4a–4c仍PLANNED／attempt0，无已派包；当前代码仍未实现新Robot或通用子树补偿。
+
+人工交接入口：[阶段3收尾与G04 Sol交接](20261106_stage3_closeout_stage4_sol_handoff.md)。准确HEAD、保护输入、必读Skill和故障处理经验在维护者工作区handoffs/V211_G04_sol_handoff；新Sol先读其README全文，不重开旧前置或G02。
 
 ## 历史：3b003与条件3c001准备时
 

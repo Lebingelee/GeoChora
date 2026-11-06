@@ -2,7 +2,7 @@
 
 规划标识：`V211_G04_CONTROL`。3 个子阶段，依据[控制协议](../contracts/control-and-feedback.md)及[已确认基线](../maintenance/20261103_protocol_baseline_confirmation.md)，扩展既有 Robot／Scene／ControlGroup、canonical contracts、ControlBinding、R3 和 session。2c 成功参考不自动成为迁移后成功。
 
-2026-11-06编排修订建议（待维护者审阅）：本Goal继续以原4a／4b／4c主线和出口为准。[装配Panda](../planning/stage4-assembled-panda.md)是v2.1.1附加集成用例，不再逐项追加为4a–4c的接收条件。建议在4b主能力稳定后取得空载／夹爪／补偿的首次代表证据，4c可提供已匹配的PickCube成功参考，两个任务完整复用由7a收口；未完成的附加项单列状态，不掩盖共享控制能力缺陷，也不取代原三后端effort、BodyWrench或Controller reset门。当前仅规划，均attempt0。
+2026-11-06编排修订安排（维护者已采纳）：本Goal继续以原4a／4b／4c主线和出口为准。[装配Panda](../planning/stage4-assembled-panda.md)是v2.1.1附加集成用例，不再逐项追加为4a–4c的接收条件。建议在4b主能力稳定后取得空载／夹爪／补偿的首次代表证据，4c可提供已匹配的PickCube成功参考，两个任务完整复用由7a收口；未完成的附加项单列状态，不掩盖共享控制能力缺陷，也不取代原三后端effort、BodyWrench或Controller reset门。当前仅规划，均attempt0。
 
 <a id="4a"></a>
 ## 4a：控制主体、typed 命令、公共反馈与模型
@@ -44,4 +44,4 @@
 | 4b | 三后端7＋2 effort、共享Controller、direct effort及最小真实BodyWrench与组合执行 | 主能力稳定后，若完整包已冻结该附加范围与预算，建立新Robot消费者并做MuJoCo CPU空载／夹爪／本体补偿代表检查；未纳入或未完成部分转7a用例清单 |
 | 4c | 同一Env至少两种Controller输入规格reset往返、状态清理、固定obs和迁移后PickCube成功 | 优先完成原门；已有精确匹配的成功记录供版本用例复用，新装配短例可提前暴露适配问题，不要求两任务四交集全部通过才接收4c |
 
-本版附加用例完整出口建议由[7a](07-integration.md#7a)负责，排期待维护者审阅，详见[用例计划](../planning/stage4-assembled-panda.md)。附加结果不会把原G04未完成的门变成通过；若附加检查证明缺陷影响共享控制协议或原主线已声明能力，仍须在对应G04 owner修复。
+本版附加用例完整出口建议由[7a](07-integration.md#7a)负责，排期已由维护者采纳，详见[用例计划](../planning/stage4-assembled-panda.md)。附加结果不会把原G04未完成的门变成通过；若附加检查证明缺陷影响共享控制协议或原主线已声明能力，仍须在对应G04 owner修复。

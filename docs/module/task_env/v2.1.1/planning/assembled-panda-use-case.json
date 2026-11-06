@@ -4,7 +4,7 @@
   "title": "装配Panda、空载跟踪与Solution复用",
   "status": "PLANNED_NOT_RUN",
   "requirements_authority": "Maintainer five-point correction: new Panda class under robots; task-feasible unloaded gripper-center TCP tracking; existing controller/gripper reuse; per-task original Solution; no integrated-Panda physical equivalence.",
-  "scheduling_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+  "scheduling_status": "MAINTAINER_CONFIRMED_PLANNING",
   "planning_ref": "planning/stage4-assembled-panda.md",
   "scope_level": "v2.1.1 auxiliary integration use case, separate from original G04 exit gates",
   "original_g04_required_gate": false,
@@ -52,5 +52,6 @@
   ],
   "acceptance_policy": "Separate auxiliary-case decision. Original G04 commands, three-provider 7+2 effort, BodyWrench, input-spec reset and PickCube success gates remain unchanged. Shared-capability defects affect their original gate; case-specific adaptation or incomplete evidence remains explicit through proposed 7a closeout. Do not silently discard the case or claim full version completion from a G04 pass.",
   "implementation_and_validation_authority": "Future complete package manually dispatched by maintainer; this document does not start execution.",
-  "qualified_capability": false
+  "qualified_capability": false,
+  "scheduling_authority": "2026-11-06 maintainer accepted the clarified version-level use-case arrangement and requested G03 closeout/G04 Sol handoff."
 }

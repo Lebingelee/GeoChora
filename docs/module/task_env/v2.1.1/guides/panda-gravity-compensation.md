@@ -23,4 +23,4 @@ env = make_env("nut-assembly-outcome-reference-v1", config={
 
 维护者提出按运动实体装配树显式选择连通子段，以支持纯机械臂和不同末端装配。该通用选择与跨实体补偿**尚未实现**；其来源、自由度和验证边界见[设计提案](../planning/gravity-compensation-assembly-tree.md)。当前开关不能指定子树，也不能启用其他夹爪或灵巧手。
 
-后续[装配Panda版本用例](../planning/stage4-assembled-panda.md)将消费阶段4公共控制／补偿成果，建议4b稳定后早检查、7a完整集成，排期待维护者审阅。它用新装配自身模型验证空载TCP跟踪及夹爪／Solution复用，不要求原／新物性相等，也不替代G04 effort／BodyWrench／Controller reset门。当前支持范围不变，新Robot类及其配置仍未实现。
+后续[装配Panda版本用例](../planning/stage4-assembled-panda.md)将消费阶段4公共控制／补偿成果，建议4b稳定后早检查、7a完整集成，排期已由维护者采纳。它用新装配自身模型验证空载TCP跟踪及夹爪／Solution复用，不要求原／新物性相等，也不替代G04 effort／BodyWrench／Controller reset门。当前支持范围不变，新Robot类及其配置仍未实现。

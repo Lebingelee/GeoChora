@@ -2,7 +2,7 @@
 
 日期：2026-11-06。G03的3a、3b、3c均已按各自冻结范围独立接收，阶段3有界收尾。3b为[ACCEPTED_BOUNDED_3B_NATIVE_EXECUTION](maintenance/reviews/20261106_3b_attempt003_sol_review.md)，原N08 FAIL保留；3c为[ACCEPTED_BOUNDED_3C_RESET_REBUILD](maintenance/reviews/20261106_3c_attempt001_sol_review.md)，覆盖显式PickCube state-only profile的四条指定切换边及故障处置，不需attempt002。6.1辅助App已验证启动／版本，close超时，完整兼容未通过。等待维护者后续安排，不自动进入阶段4或提升Qualification。
 
-2026-11-06规划重评：原G04统一控制命令、三后端effort／BodyWrench及Controller reset主线完整保留。[装配Panda](planning/stage4-assembled-panda.md)改为本版附加集成用例，建议4b能力稳定后早检查、7a两任务Solution完整收口；排期待维护者审阅，不作为4a–4c新增接收门。新Robot类／空载TCP精度／夹爪控制及不做物性等价的需求保留。仍PLANNED／未派包，G03接收不变。
+2026-11-06维护者已采纳重评后的规划并要求新Sol承接阶段4：原G04统一控制命令、三后端effort／BodyWrench及Controller reset主线完整保留。[装配Panda](planning/stage4-assembled-panda.md)是本版附加集成用例，4b能力稳定后早检查、7a两任务Solution完整收口，不作为4a–4c新增接收门。需求保留，仍PLANNED／未派包；交接入口见[阶段3收尾与G04 Sol交接](maintenance/20261106_stage3_closeout_stage4_sol_handoff.md)。
 
 历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
@@ -39,6 +39,6 @@ MuJoCo PickCube seed31 和 NutAssembly seed19 的任务、Solution、runtime 与
 
 本目录拥有 v2.1.1 的规划及已确认语义协议；v2.1.0 保留来源版本行为。每项协议只在对应 `contracts/` 页面维护，Goal 引用它并记录具体实施与验收。实现后再更新 API、指南和矩阵，不能把设计基线当成现有可调用 API。系统归属仍服从[架构](../../../global/architecture.md)与[ownership](../../../global/ownership.md)。
 
-## 本体重力补偿（待独立复审）
+## 本体重力补偿（有界接收）
 
 维护者已授权实施默认关闭的 [Panda 本体重力补偿](guides/panda-gravity-compensation.md)。当前仅 MuJoCo CPU 进程内 selected PickCube／Nut 路线有界实现；原 3b 默认关闭的 N08 历史失败保留，其他 provider 的开启请求不支持。

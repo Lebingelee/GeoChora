@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Review the proposed auxiliary use-case placement while preserving original G04 mainline. Prepare the original 4a complete package only when requested; no implementation or automatic dispatch.",
+  "next_action": "Maintainer accepted revised planning and requested G04 takeover in a new Sol conversation. Complete manual handoff, then new Sol verifies actual state and prepares the original 4a package/phase branch plan; no implementation or automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1267,7 +1267,7 @@
           "commits": [],
           "review_decision": null,
           "blockers": [],
-          "auxiliary_use_case_schedule_proposal": "V211_UC_ASSEMBLED_PANDA full integration closeout; pending maintainer schedule review; original 7a work retained."
+          "auxiliary_use_case_schedule": "Maintainer-confirmed V211_UC_ASSEMBLED_PANDA complete integration at 7a; original 7a work retained; implementation not started."
         },
         {
           "id": "7b",
@@ -1444,11 +1444,12 @@
     "six_one_auxiliary": "VERSION_VERIFIED_CLOSE_TIMEOUT; full Env loop not tested",
     "stage4_started": false,
     "qualification": false,
-    "automatic_dispatch": false
+    "automatic_dispatch": false,
+    "handoff_ref": "20261106_stage3_closeout_stage4_sol_handoff.md"
   },
   "stage4_planning": {
     "date": "2026-11-06",
-    "status": "ORIGINAL_MAINLINE_RESTORED_AUXILIARY_SCHEDULE_PROPOSED",
+    "status": "ORIGINAL_MAINLINE_WITH_CONFIRMED_AUXILIARY_PLAN",
     "authority": "Maintainer requested reassessment: assembled Panda is a version-level test use case, not the G04 mainline.",
     "original_goal_ref": "../goals/04-control.md",
     "original_control_cases_ref": "../planning/control-command-cases.json",
@@ -1461,12 +1462,13 @@
     "ordinary_attempts_started": 0,
     "prepared_execution_package": false,
     "auxiliary_use_case_ref": "../planning/assembled-panda-use-case.json",
-    "auxiliary_schedule_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+    "auxiliary_schedule_status": "MAINTAINER_CONFIRMED_PLANNING",
     "auxiliary_schedule_summary": "4a requirement consumer; 4b mainline stabilized before earliest scoped tracking/gripper/gravity check; reuse 4c references; full two-task configuration/Solution use-case integration at 7a; 7b affected-input checks only.",
     "auxiliary_case_is_original_g04_exit_gate": false,
     "maintainer_robot_requirements_preserved": true,
     "original_g04_protocol_gates_preserved": true,
-    "branch_policy": "Documentation only on current G03 branch; future execution branch/input inherits accepted G03 under phase policy; no branch/merge/dispatch performed."
+    "branch_policy": "Documentation only on current G03 branch; future execution branch/input inherits accepted G03 under phase policy; no branch/merge/dispatch performed.",
+    "scheduling_authority": "Maintainer accepted clarified plan and requested new Sol stage4 handoff on 2026-11-06."
   },
   "version_auxiliary_use_cases": [
     {
@@ -1474,11 +1476,21 @@
       "status": "PLANNED_NOT_RUN",
       "planning_ref": "../planning/stage4-assembled-panda.md",
       "checklist_ref": "../planning/assembled-panda-use-case.json",
-      "scheduling_status": "PROPOSED_FOR_MAINTAINER_REVIEW",
+      "scheduling_status": "MAINTAINER_CONFIRMED_PLANNING",
       "earliest_native_checkpoint": "after original 4b capabilities stabilize and only when packaged",
       "proposed_full_closeout": "7a",
       "counts_as_new_substage": false,
       "qualification": false
     }
-  ]
+  ],
+  "stage4_sol_handoff": {
+    "status": "READY_FOR_MANUAL_HANDOFF",
+    "date": "2026-11-06",
+    "repository_ref": "20261106_stage3_closeout_stage4_sol_handoff.md",
+    "external_package": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_sol_handoff",
+    "implementation_dispatched": false,
+    "g04_attempts_started": 0,
+    "sol_native_runs": 0,
+    "new_execution_threads": 0
+  }
 }

@@ -11,7 +11,7 @@
 - **检查：**无 PickCube 名称／Panda维度硬编码泄漏；具名通道与Robot组件binding复用，任务差异留 task；fixed-space consumer 对 action 变更有明确处理，未迁 caller 有保留路径。选最小相关检查，不要求完整训练和全部 A123 重跑。
 - **交付／出口：**代表性真实复用、受影响兼容结果和明确未迁列表；不宣布所有任务已统一，也不移除 2.x 承诺保留的 import 名称。
 
-附加用例收口建议（2026-11-06，待维护者审阅）：[装配Panda版本用例](../planning/stage4-assembled-panda.md)在4b主能力稳定后先做空载／夹爪／补偿代表检查，完整的新Robot两任务配置接线与Solution复用在本7a同包收口。原／新机器人×PickCube／Nut四种交集分别留有效成功和独立读回；精确匹配的4c参考直接复用，不固定重跑四次。该用例不替代G04三后端effort／BodyWrench／Controller reset，也不替代本节原有诊断耦合和调用者兼容工作；独立状态见[用例清单](../planning/assembled-panda-use-case.json)。
+附加用例收口安排（2026-11-06，维护者已采纳）：[装配Panda版本用例](../planning/stage4-assembled-panda.md)在4b主能力稳定后先做空载／夹爪／补偿代表检查，完整的新Robot两任务配置接线与Solution复用在本7a同包收口。原／新机器人×PickCube／Nut四种交集分别留有效成功和独立读回；精确匹配的4c参考直接复用，不固定重跑四次。该用例不替代G04三后端effort／BodyWrench／Controller reset，也不替代本节原有诊断耦合和调用者兼容工作；独立状态见[用例清单](../planning/assembled-panda-use-case.json)。
 
 <a id="7b"></a>
 ## 7b：稳定输入下的最终矩阵

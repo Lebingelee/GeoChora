@@ -2,7 +2,7 @@
 
 当前状态：3a、[3b003](../maintenance/reviews/20261106_3b_attempt003_sol_review.md)及[3c001](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)均经Sol按各自冻结范围独立接收，G03有界收尾。3b count=3、原N08 FAIL保留；3c count=1、ACCEPTED_BOUNDED_3C_RESET_REBUILD，不需002。未验证交集保持原状态；等待维护者安排，不自动派新包或进入阶段4。
 
-阶段4恢复原[G04](../goals/04-control.md)主线和出口；[装配Panda](stage4-assembled-panda.md)作为本版附加集成用例单列，不再把新类／两任务四交集加成4a–4c完成条件。建议4a审阅表达能力，4b主能力稳定后在预先冻结的附加预算内做首次空载／夹爪／补偿检查，4c参考复用，完整两任务Solution用例由7a收口，7b仅按受影响输入复核。该排期待维护者审阅；4a–4c及7a仍PLANNED／attempt0，无实施包派发。新Robot需求和不做物性等价的约束保留。
+阶段4恢复原[G04](../goals/04-control.md)主线和出口；[装配Panda](stage4-assembled-panda.md)作为本版附加集成用例单列，不再把新类／两任务四交集加成4a–4c完成条件。建议4a审阅表达能力，4b主能力稳定后在预先冻结的附加预算内做首次空载／夹爪／补偿检查，4c参考复用，完整两任务Solution用例由7a收口，7b仅按受影响输入复核。该排期已由维护者采纳；4a–4c及7a仍PLANNED／attempt0，无实施包派发。新Robot需求和不做物性等价的约束保留。
 
 历史状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收；3b attempt002经[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)为REWORK_REQUIRED_3B、attempt_count=2，已测TCP有界补偿及launcher／F06记录修复保留，整体未接收。[003前重评](stage3-3b-attempt003-reassessment.md)及[条件3c首包](stage3-3c-attempt001.md)已准备未派发；维护者授权两包一次转交、按[连续安排](stage3-3b003-3c001-sequential-execution.md)技术通过后顺序实施，Sol最后分别复审，3c及后续尚未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
 
