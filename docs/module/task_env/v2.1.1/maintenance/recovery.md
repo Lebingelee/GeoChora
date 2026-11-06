@@ -2,7 +2,7 @@
 
 ## 当前：G04 三子阶段分别有界接收
 
-G03 与 G04/4a、4b 原有界接收不变。4c attempt001 经 [Sol 独立主审](reviews/20261106_4c_attempt001_sol_review.md)按 MuJoCo CPU 单 Env Controller reset 切换和迁移后 PickCube seed31 成功作 `ACCEPTED_BOUNDED_4C_RESET_PICKCUBE`，count=1。任务运行时夹爪 cap ±10 N 与 source 编写值 ±5 N 的差别、外力切换及跨后端未覆盖项均见审查；GeoPhys 独立诊断未完成。不得自动进入阶段5、push 或 merge。
+G03 与 G04/4a、4b 原有界接收不变。4c attempt001 经 [Sol 独立主审](reviews/20261106_4c_attempt001_sol_review.md)按 MuJoCo CPU 单 Env Controller reset 切换和迁移后 PickCube seed31 成功作 `ACCEPTED_BOUNDED_4C_RESET_PICKCUBE`，count=1。任务运行时夹爪 cap ±10 N 与 source 编写值 ±5 N 的差别、外力切换及跨后端未覆盖项均见审查；4b 中 GeoPhys A05 joint2 方向诊断在首次超时后已通过重跑；Sol 此前误称未完成，已在主审记录更正。不得自动进入阶段5、push 或 merge。
 
 ## 历史：3c001有界接收，G03限定范围收尾
 
