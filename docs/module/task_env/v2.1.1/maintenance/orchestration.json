@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5b accepted within the documented three-route bounded scope. Maintainer revised 5c: select renderer at Env creation and retain until close; same-Env renderer switching deferred, real cross-combination and generic task implementation remain required. 5c remains planned, attempt 0; prepare a separate authorized package when requested. No automatic dispatch, merge, push, tag or publication.",
+  "next_action": "5b accepted within the documented three-route bounded scope. 5c attempt001 package prepared for maintainer review: fixed renderer per Env, synchronized RGB, real cross-combination, generic task implementation. It is not approved or dispatched; attempt count remains zero. No automatic dispatch, merge, push, tag or publication.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,6 +1595,7 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
+          "package_preparation_status": "PREPARED_AWAITING_MAINTAINER_AUTHORIZATION",
           "dependencies": [
             "5b"
           ],
@@ -1602,7 +1603,7 @@
           "attempt_count": 0,
           "attempts": [],
           "assigned_agent": null,
-          "package_path": null,
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt001",
           "package_sha256": null,
           "input_head": null,
           "output_head": null,

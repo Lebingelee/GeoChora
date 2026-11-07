@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：5c 范围已按维护者要求调整，尚未派发
+## 当前：5c attempt001 已准备，等待维护者审阅与授权
+
+维护者要求按已修订范围准备完整 5c attempt001，包入口位于维护者工作区 `handoffs/V211_G05_5c_attempt001/`。准备不算 attempt；本包的执行范围、预算和 provider 改动仍是待批准提议，不自动派发或创建执行对话。开工前执行者须核对包的真实快照、前包 release、writer、保护文件及锁。5c 仍 PLANNED／attempt0，5b 已有界接收，具体以[编排索引](orchestration.json)和[调整后的范围](../planning/stage5-5c-fixed-renderer-scope.md)为准。
+
+## 历史：5c 范围已按维护者要求调整，尚未准备工作包
 
 2026-11-07：renderer 在 Env 创建时选择、维持至 close；同一 Env 的 renderer 切换延后到未排期的后续任务。5c 仍要求同步 RGB、一个真实跨组合和不依赖 PickCube 特判的通用实现，真实验证任务仍是 PickCube。详见[5c 调整后范围](../planning/stage5-5c-fixed-renderer-scope.md)。5c 为 PLANNED／attempt0，未准备或派发执行包；5b 有界接收和历史记录不变。
 
