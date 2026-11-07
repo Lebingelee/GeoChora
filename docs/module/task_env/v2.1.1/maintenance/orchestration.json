@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5c attempt001 independently reviewed: REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION; four real PickCube route results bounded and reusable, process deviations preserved. Await maintainer direction on focused attempt002; no automatic dispatch, merge, push, tag or publication.",
+  "next_action": "V211_G05_5c_attempt002 prepared for maintainer approval and manual forwarding; attempt count remains 1. Focus generic task RGB and declared GeoPhys lighting; try an eligible non-arm component task within approved scope. No automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1620,11 +1620,28 @@
           "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: complete report and release received; offline independent review complete",
-          "evidence_refs": ["reviews/20261108_5c_attempt001_sol_review.md", "workspace/maintenance/v211_g05_5c_attempt001/report.md", "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md"],
-          "commits": ["9d7b14a47ea419d9d825bc18dadbc37eead95f74"],
+          "last_observation": "2026-11-08: maintainer requested focused attempt002 preparation and optional non-arm real verification; package awaits explicit authorization.",
+          "evidence_refs": [
+            "reviews/20261108_5c_attempt001_sol_review.md",
+            "workspace/maintenance/v211_g05_5c_attempt001/report.md",
+            "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md"
+          ],
+          "commits": [
+            "9d7b14a47ea419d9d825bc18dadbc37eead95f74"
+          ],
           "review_decision": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
-          "blockers": ["Generic task RGB currently requires selected Position profile tied to PandaPositionServoProfileV1; actual non-Position public caller rejected", "GeoPhys task capture inherits a single tracking light and headlight assumption; declarative lighting boundary not closed"]
+          "blockers": [
+            "Generic task RGB currently requires selected Position profile tied to PandaPositionServoProfileV1; actual non-Position public caller rejected",
+            "GeoPhys task capture inherits a single tracking light and headlight assumption; declarative lighting boundary not closed"
+          ],
+          "next_candidate_package": {
+            "id": "V211_G05_5c_attempt002",
+            "status": "PREPARED_AWAITING_MAINTAINER_AUTHORIZATION",
+            "attempt_count_before_start": 1,
+            "plan_ref": "../planning/stage5-5c-attempt002.md",
+            "manual_forward_only": true
+          },
+          "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window."
         }
       ]
     },
