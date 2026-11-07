@@ -32,6 +32,43 @@ from .source import UsdRuntimeSourceV1
 _APP_LOCK = RLock()
 _PROCESS_APP_OWNER: "IsaacSimAppOwnerV1 | None" = None
 
+_ISAAC_62_OBSERVER_OCIO_SHA256 = '4a34410a6a94c27eb057c155473abacd66bee79f41c7b9a0c649d44dead6c914'
+_ISAAC_62_OBSERVER_COLOR_SETTINGS = {
+    '/rtx/post/tonemap/op': 6,
+    '/rtx/post/tonemap/colorMode': 0,
+    '/rtx/post/tonemap/enableSrgbToGamma': True,
+    '/rtx/post/tonemap/ocio/display': None,
+    '/rtx/post/tonemap/ocio/view': None,
+    '/rtx/post/colorgrad/enabled': False,
+    '/rtx/post/colorcorr/enabled': False,
+}
+
+
+def _validate_isaac_observer_color_settings(values, ocio_sha256):
+    """Admit only the measured Isaac 6.2 display-transfer configuration."""
+    if any(type(values.get(key)) is not type(expected) or values.get(key) != expected
+           for key, expected in _ISAAC_62_OBSERVER_COLOR_SETTINGS.items()):
+        raise RuntimeError(f'Isaac observer color settings are not qualified: {values!r}')
+    if ocio_sha256 != _ISAAC_62_OBSERVER_OCIO_SHA256:
+        raise RuntimeError('Isaac observer OCIO configuration is not qualified')
+    return {'settings': dict(values), 'ocio_sha256': ocio_sha256,
+            'transfer': 'sRGB after RTX tone mapping; primaries and source assets uncalibrated'}
+
+
+def _read_isaac_observer_color_settings():
+    import carb
+    settings = carb.settings.get_settings()
+    values = {key: settings.get(key) for key in _ISAAC_62_OBSERVER_COLOR_SETTINGS}
+    path = settings.get('/rtx/post/tonemap/ocio/cfgFilePath')
+    if not isinstance(path, str) or not path:
+        raise RuntimeError('Isaac observer OCIO configuration path is unavailable')
+    try:
+        digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError as error:
+        raise RuntimeError('Isaac observer OCIO configuration cannot be read') from error
+    return _validate_isaac_observer_color_settings(values, digest)
+
+
 DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1 = "isaac-headless-default-v1"
 F06_ISAAC_APP_LAUNCH_PROFILE_V1 = "f06-headless-no-render-v1"
 V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 = "v211-headed-camera-v1"
@@ -2174,6 +2211,7 @@ class IsaacSimNativeRuntimeIOV1:
             authoring = RtxCamera(path, tick_rate=0.0)
             self._observer_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
                                                  annotators=['rgb'])
+        color_settings = _read_isaac_observer_color_settings()
         stage = omni.usd.get_context().get_stage()
         if stage is None or stage != self._stage:
             raise RuntimeError('Isaac observer lost its leased USD stage')
@@ -2205,6 +2243,8 @@ class IsaacSimNativeRuntimeIOV1:
                 break
         if data is None:
             raise RuntimeError('Isaac observer RGB did not complete within the bounded render wait')
+        if _read_isaac_observer_color_settings() != color_settings:
+            raise RuntimeError('Isaac observer color settings changed during capture')
         self._verify_observer_fabric(state, world, published_bodies)
         self._observer_camera_contract = (world.copy(), camera.width, camera.height,
                                           camera.fov_y, camera.near, camera.far)
@@ -2212,7 +2252,8 @@ class IsaacSimNativeRuntimeIOV1:
         selection = RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
                                         'v211_isaac_rtx_observer_v1', 'cuda:0')
         capability = {'schema': 'v211-isaac-rtx-observer-v1', 'sdk': '6.2.0.0',
-                      'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy'}
+                      'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy',
+                      'color': color_settings}
         capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
                                                   separators=(',', ':')).encode()).hexdigest()
         identity = CameraCaptureIdentityV1(

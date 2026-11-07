@@ -2168,7 +2168,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             frame_color_space=('GL_LINEAR framebuffer RGB; uncalibrated primaries and input assets'
                                if self.provider == 'mujoco' else
                                'sRGB transfer after ACES; primaries uncalibrated' if self.provider == 'geophys' else
-                               'unverified native framebuffer encoding'))
+                               'sRGB transfer after RTX tone mapping; primaries and source assets uncalibrated'))
         self.metadata = dict(self.metadata)
         self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
                              render_backend=({'isaacsim': 'isaacsim-rtx', 'geophys': 'geophys-rasterizer'}

@@ -429,3 +429,26 @@ def test_geophys_observer_rejects_unshadowed_authored_light(monkeypatch):
     with pytest.raises(RuntimeError, match='cannot preserve authored shadows'):
         session.capture_observer(camera, state)
     assert closed == [True] and session._observer_fault
+
+
+def test_isaac_observer_color_admission_fails_closed():
+    from task_env.runtime.sessions.isaac_native_io import (
+        _ISAAC_62_OBSERVER_COLOR_SETTINGS, _ISAAC_62_OBSERVER_OCIO_SHA256,
+        _validate_isaac_observer_color_settings,
+    )
+    values = dict(_ISAAC_62_OBSERVER_COLOR_SETTINGS)
+    result = _validate_isaac_observer_color_settings(values, _ISAAC_62_OBSERVER_OCIO_SHA256)
+    assert result['ocio_sha256'] == _ISAAC_62_OBSERVER_OCIO_SHA256
+    values['/rtx/post/tonemap/enableSrgbToGamma'] = False
+    with pytest.raises(RuntimeError, match='color settings are not qualified'):
+        _validate_isaac_observer_color_settings(values, _ISAAC_62_OBSERVER_OCIO_SHA256)
+    values = dict(_ISAAC_62_OBSERVER_COLOR_SETTINGS)
+    values['/rtx/post/tonemap/colorMode'] = False
+    with pytest.raises(RuntimeError, match='color settings are not qualified'):
+        _validate_isaac_observer_color_settings(values, _ISAAC_62_OBSERVER_OCIO_SHA256)
+    values = dict(_ISAAC_62_OBSERVER_COLOR_SETTINGS)
+    values['/rtx/post/tonemap/ocio/view'] = 'unqualified-view'
+    with pytest.raises(RuntimeError, match='color settings are not qualified'):
+        _validate_isaac_observer_color_settings(values, _ISAAC_62_OBSERVER_OCIO_SHA256)
+    with pytest.raises(RuntimeError, match='OCIO configuration is not qualified'):
+        _validate_isaac_observer_color_settings(_ISAAC_62_OBSERVER_COLOR_SETTINGS, '0' * 64)
