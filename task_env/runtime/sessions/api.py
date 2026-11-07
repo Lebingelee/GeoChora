@@ -856,9 +856,11 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if type(_observer_render_request) is not ObserverRenderRequestV1:
             raise TypeError('observer render requirement must use ObserverRenderRequestV1')
         _observer_render_request.validate(artifact=artifact, physics_provider=execution.physics_provider,
-                                          physics_backend=execution.physics_backend)
+                                          physics_backend=(execution.physics_backend if type(execution) is ExecutionSpecV1
+                                                           else execution.backend))
     admission_route = _session_admission_input_route(_session_admission_input)
-    if _observer_render_request is not None and admission_route != 'f06_pickcube':
+    if (_observer_render_request is not None and _observer_render_request.provider == 'isaacsim'
+            and admission_route != 'f06_pickcube'):
         raise ValueError('Isaac observer request requires the exact F06 input')
     _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
     _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
@@ -1126,7 +1128,14 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
-    session = _materialize_admitted(artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan)
+    session = _materialize_admitted(artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan,
+                                    observer_render_request=_observer_render_request)
+    if _observer_render_request is not None and _observer_render_request.provider == 'geophys':
+        import hashlib
+        import json
+        session._observer_execution_identity = hashlib.sha256(
+            json.dumps(declared_execution.to_mapping(), sort_keys=True,
+                       separators=(',', ':'), allow_nan=False).encode()).hexdigest()
     if type(declared_execution) is ExecutionSpecV1:
         # Keep the exact V1 declaration alongside the legacy-compatible adapter
         # view. It remains provenance; it is never reconstructed from defaults.
@@ -1337,10 +1346,11 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
-def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None):
+def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None,
+                          observer_render_request=None):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
-        return _GeoPhysSession(artifact, source)
+        return _GeoPhysSession(artifact, source, observer_render_request=observer_render_request)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
         return _MuJoCoSession(artifact, source, mixed_actuator_plan=mixed_actuator_plan)

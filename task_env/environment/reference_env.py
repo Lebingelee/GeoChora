@@ -2155,9 +2155,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise ValueError('observer camera TaskArtifact linkage mismatch')
         self.render_mode = render_mode
         self._selected_observer_camera = camera
-        if self.provider == 'isaacsim':
+        if self.provider in {'isaacsim', 'geophys'}:
             from ..render.base.contracts import ObserverRenderRequestV1
-            request = ObserverRenderRequestV1(camera, render_mode, 'isaacsim', 'rtx')
+            backend = 'rtx' if self.provider == 'isaacsim' else 'rasterizer'
+            request = ObserverRenderRequestV1(camera, render_mode, self.provider, backend)
             request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
             self._observer_render_request = request
         self._ui_render_provider = TaskEnvRenderProvider(
@@ -2165,16 +2166,19 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             frame_capture=self._capture_selected_observer,
             frame_presenter=self._present_selected_observer if self.provider == 'isaacsim' else None,
             frame_color_space=('GL_LINEAR framebuffer RGB; uncalibrated primaries and input assets'
-                               if self.provider == 'mujoco' else 'unverified native framebuffer encoding'))
+                               if self.provider == 'mujoco' else
+                               'sRGB transfer after ACES; primaries uncalibrated' if self.provider == 'geophys' else
+                               'unverified native framebuffer encoding'))
         self.metadata = dict(self.metadata)
         self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
-                             render_backend=('isaacsim-rtx' if self.provider == 'isaacsim' else 'mujoco-native-opengl'))
+                             render_backend=({'isaacsim': 'isaacsim-rtx', 'geophys': 'geophys-rasterizer'}
+                                             .get(self.provider, 'mujoco-native-opengl')))
 
     def _capture_selected_observer(self):
         publication = self._published_position_typed_state
         if publication is None or self._execution_fault is not None:
             raise RuntimeError('observer requires a successfully published state')
-        if self.provider == 'isaacsim':
+        if self.provider in {'isaacsim', 'geophys'}:
             return self.session.capture_observer(self._selected_observer_camera, publication.view)
         if getattr(self, '_visual_state_session', None) is None:
             self.bind_visual_state(self._selected_observer_camera, capture=True)

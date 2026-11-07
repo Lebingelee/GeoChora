@@ -62,8 +62,12 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
             raise ValueError('reference effort requires the isolated drive fixture')
         if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu')}:
             raise ValueError('PickCube MJCF physical candidate admits MuJoCo or GeoPhys CPU')
-        if render_mode is not None and ((provider, backend) != ('mujoco', 'cpu') or not reset_switch):
-            raise ValueError('this observer currently admits only MuJoCo CPU with reset switching')
+        if render_mode is not None:
+            mujoco_observer = (provider, backend) == ('mujoco', 'cpu') and reset_switch
+            geophys_observer = ((provider, backend) == ('geophys', 'cpu') and not reset_switch
+                                and drive_mode == 'effort-only' and control_kind == 'joint')
+            if not (mujoco_observer or geophys_observer):
+                raise ValueError('observer requires MuJoCo reset switching or GeoPhys CPU joint effort')
         if type(horizon) is not int or not 1 <= horizon <= 6000 or type(seed) is not int or seed < 0:
             raise ValueError('PickCube physical candidate requires a valid horizon and seed')
         workspace = values.get('source_workspace')

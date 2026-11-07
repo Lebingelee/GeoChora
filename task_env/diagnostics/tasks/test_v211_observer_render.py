@@ -59,6 +59,10 @@ def test_isaac_observer_request_rejects_unrelated_routes_and_modalities():
     with pytest.raises(ValueError, match='RGB contract'):
         replace(request, camera=replace(camera, depth=True)).validate(
             artifact=artifact, physics_provider='isaacsim', physics_backend='cuda')
+    geo = ObserverRenderRequestV1(camera, 'rgb_array', 'geophys', 'rasterizer')
+    geo.validate(artifact=artifact, physics_provider='geophys', physics_backend='cpu')
+    with pytest.raises(ValueError, match='physics route'):
+        geo.validate(artifact=artifact, physics_provider='geophys', physics_backend='cuda')
 
 
 def test_usd_observer_rejects_stale_boundary_before_native_capture(monkeypatch):
@@ -217,3 +221,211 @@ def test_isaac_viewport_rejects_stale_camera_and_wrong_projection():
     wrong_projection[14] = .02
     assert not matches({**correct, 'projection': wrong_projection}, contract)
     assert not matches({'resolution': (width, height)}, contract)
+
+
+def test_gamma22_output_converts_to_srgb_transfer_and_rejects_invalid():
+    from task_env.render.camera.color import gamma22_to_srgb
+
+    linear = np.array([0., .0031308, .18, .5, 1.], dtype=np.float32)
+    native = np.repeat(np.power(linear, 1. / 2.2)[:, None, None], 3, axis=2)
+    expected = np.array([0., .040449936, .4613561, .73535698, 1.], dtype=np.float32)
+    converted = gamma22_to_srgb(native)
+    np.testing.assert_allclose(converted[:, 0, 0], expected, rtol=0, atol=2e-6)
+    assert converted.dtype == np.float32 and converted.flags.c_contiguous
+    with pytest.raises(ValueError, match='finite HWC float32'):
+        gamma22_to_srgb(np.full((1, 1, 3), np.nan, dtype=np.float32))
+    with pytest.raises(ValueError, match='finite HWC float32'):
+        gamma22_to_srgb(np.full((1, 1, 3), 1.01, dtype=np.float32))
+
+
+def _fake_mjcf_render_source(visualizer):
+    track = SimpleNamespace(light_id='mjcf:light:top', light_type='spot', direction=(0., 0., 1.),
+                            runtime_payload={'mjcf_kind': 'world_trackcom', 'authored_position': (0., 0., 2.)})
+    head = SimpleNamespace(light_type='directional', runtime_payload={'mjcf_kind': 'headlight'})
+    desc = SimpleNamespace(mjcf_light_table=SimpleNamespace(records=(track, head)))
+    return SimpleNamespace(read_render_scene=lambda **_kw: desc, build_visualizer=lambda **_kw: visualizer)
+
+
+def test_geophys_observer_propagates_camera_and_invalidates_on_state_change(monkeypatch):
+    from task_env.diagnostics.tasks.test_v211_render_binding import _values
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.runtime.sessions.geophys import _GeoPhysSession
+
+    source, state = _values()
+    camera = CameraGeometry('camera-observation-v0', source.task_artifact_hash, 'observer', 'world',
+                            IDENTITY, IDENTITY, 3, 2, 1., .1, 10., True, False)
+    calls = []
+    class Visualizer:
+        closed = False
+        def set_camera_pose(self, *value): calls.append(('pose', value))
+        def set_fov(self, value): calls.append(('fov', value))
+        def set_clip_interval(self, near, far): calls.append(('clip', (near, far)))
+        def update_mjcf_light_pose(self, light_id, **value): calls.append(('light', light_id, value))
+        def read_resources(self): return {'material_features': {'missing_required': [], 'unsupported_authored': []},
+                                          'light_features': {'uses_default_sun': False, 'unsupported': []},
+                                          'lighting': {'unshadowed_casting_lights': []}}
+        def read_frame(self, *, synchronized):
+            assert synchronized
+            return np.full((2, 3, 3), .5, dtype=np.float32)
+        def close(self): self.closed = True
+
+    visualizer = Visualizer()
+    session = object.__new__(_GeoPhysSession)
+    session._observer_render_request = object()
+    session._observer_render_source = _fake_mjcf_render_source(visualizer)
+    session._observer_visualizer = None
+    session._observer_fault = False
+    session._source = SimpleNamespace(source_closure_digest='b' * 64)
+    session._observer_execution_identity = 'd' * 64
+    session._observer_com_bodies = [{'name': 'a', 'mass_kg': 1., 'com_body_m': [0., 0., 0.]}]
+    session._observer_com_ids = {'a': 0}
+    session._observer_rest_com = np.zeros(3)
+    session._boundary = SimpleNamespace(read_snapshot=lambda _request: SimpleNamespace(
+        body_xpos=[[1., 0., 0.]], body_xquat=[[1., 0., 0., 0.]]))
+    monkeypatch.setattr(session, '_require_reset', lambda: None)
+    monkeypatch.setattr(session, 'state_boundary_identity', lambda: state.boundary)
+    monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: ('unchanged',))
+    result = session.capture_observer(camera, state)
+    assert result.capture_identity.state_boundary == state.boundary
+    assert result.rgb.shape == (2, 3, 3) and result.rgb.flags.owndata
+    assert ('clip', (.1, 10.)) in calls
+    assert calls[0][0] == 'pose' and ('fov', camera.fov_y * 180 / np.pi) in calls
+    assert np.allclose(calls[1][2]['position'], [1., 0., 2.])
+
+    samples = iter(('before', 'after'))
+    monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: next(samples))
+    with pytest.raises(RuntimeError, match='physics state or boundary changed'):
+        session.capture_observer(camera, state)
+    assert visualizer.closed and session._observer_fault
+    with pytest.raises(RuntimeError, match='requires a new runtime'):
+        session.capture_observer(camera, state)
+
+
+def test_geophys_observer_rejects_degraded_materials_before_capture(monkeypatch):
+    from task_env.diagnostics.tasks.test_v211_render_binding import _values
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.runtime.sessions.geophys import _GeoPhysSession
+
+    source, state = _values()
+    camera = CameraGeometry('camera-observation-v0', source.task_artifact_hash, 'observer', 'world',
+                            IDENTITY, IDENTITY, 3, 2, 1., .1, 10., True, False)
+    closed = []
+    visualizer = SimpleNamespace(
+        read_resources=lambda: {'material_features': {'missing_required': ['alpha_blending']}},
+        close=lambda: closed.append(True))
+    session = object.__new__(_GeoPhysSession)
+    session._observer_render_request = object()
+    session._observer_render_source = _fake_mjcf_render_source(visualizer)
+    session._observer_visualizer = None
+    session._observer_fault = False
+    monkeypatch.setattr(session, '_require_reset', lambda: None)
+    monkeypatch.setattr(session, 'state_boundary_identity', lambda: state.boundary)
+    monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: ('unchanged',))
+    with pytest.raises(RuntimeError, match='alpha_blending'):
+        session.capture_observer(camera, state)
+    assert closed == [True] and session._observer_fault
+
+
+def test_geophys_observer_rejects_default_light_before_capture(monkeypatch):
+    from task_env.diagnostics.tasks.test_v211_render_binding import _values
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.runtime.sessions.geophys import _GeoPhysSession
+
+    source, state = _values()
+    camera = CameraGeometry('camera-observation-v0', source.task_artifact_hash, 'observer', 'world',
+                            IDENTITY, IDENTITY, 3, 2, 1., .1, 10., True, False)
+    closed = []
+    visualizer = SimpleNamespace(
+        read_resources=lambda: {'material_features': {'missing_required': [], 'unsupported_authored': []},
+                                'light_features': {'uses_default_sun': True, 'unsupported': []}},
+        close=lambda: closed.append(True))
+    session = object.__new__(_GeoPhysSession)
+    session._observer_render_request = object()
+    session._observer_render_source = _fake_mjcf_render_source(visualizer)
+    session._observer_visualizer = None
+    session._observer_fault = False
+    monkeypatch.setattr(session, '_require_reset', lambda: None)
+    monkeypatch.setattr(session, 'state_boundary_identity', lambda: state.boundary)
+    monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: ('unchanged',))
+    with pytest.raises(RuntimeError, match='cannot preserve authored lighting'):
+        session.capture_observer(camera, state)
+    assert closed == [True] and session._observer_fault
+
+
+def test_geophys_close_releases_all_resources_after_pending_interval_failure():
+    from task_env.runtime.sessions.geophys import _GeoPhysSession
+
+    events = []
+    def fail_interval():
+        events.append('interval')
+        raise RuntimeError('interval cleanup failed')
+    session = object.__new__(_GeoPhysSession)
+    session._closed = False
+    session._physical_port = SimpleNamespace(pending=object(), finish_interval=fail_interval)
+    session._observer_visualizer = SimpleNamespace(close=lambda: events.append('visualizer'))
+    session._boundary = SimpleNamespace(close=lambda: events.append('boundary'))
+    session._source = SimpleNamespace(
+        execution_source_receipt=SimpleNamespace(close=lambda: events.append('source')),
+        scene_source=SimpleNamespace(source_id='scene'), source_closure_digest='a' * 64)
+    session._provider_materialization_id = 'provider'
+    session._episode_id = 'episode'
+    session._reset_sample_id = 'reset'
+    session._control_step = session._native_steps = 0
+    session._observer_fault = False
+    session._observer_material_report = {}
+    with pytest.raises(RuntimeError, match='interval cleanup failed'):
+        session.close()
+    assert events == ['interval', 'visualizer', 'boundary', 'source']
+    assert session._closed and session._last_close_receipt['boundary_close_completed']
+    assert not session._last_close_receipt['cleanup_completed']
+    with pytest.raises(RuntimeError, match='no current admitted material report'):
+        session.observer_render_facts()
+    session.close()
+    assert len(events) == 4
+
+
+def test_geophys_missing_observer_source_keeps_primary_error_on_close_failure(monkeypatch):
+    import task_env.runtime.sessions.geophys as module
+
+    def fail_close():
+        raise RuntimeError('boundary close failed')
+    runtime = SimpleNamespace(render_source=None, boundary=SimpleNamespace(close=fail_close))
+    monkeypatch.setattr(module._GeoPhysSession, '_initialize_values', lambda *_args: None)
+    monkeypatch.setattr(module, 'bootstrap_task_runtime', lambda **_kwargs: runtime)
+    monkeypatch.setattr(module, 'GeoPhysSourceComposer', lambda *_args, **_kwargs: object())
+    source = SimpleNamespace(config=None, composition=None, scene=None, agents=None, objects=None,
+                             scene_source=None, scene_definition=None, execution_source_receipt=None)
+    with pytest.raises(RuntimeError, match='observer source could not be materialized') as error:
+        module._GeoPhysSession(None, source, observer_render_request=object())
+    assert any('boundary close failed' in note for note in error.value.__notes__)
+
+
+def test_geophys_observer_rejects_unshadowed_authored_light(monkeypatch):
+    from task_env.diagnostics.tasks.test_v211_render_binding import _values
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.runtime.sessions.geophys import _GeoPhysSession
+
+    source, state = _values()
+    camera = CameraGeometry('camera-observation-v0', source.task_artifact_hash, 'observer', 'world',
+                            IDENTITY, IDENTITY, 3, 2, 1., .1, 10., True, False)
+    closed = []
+    visualizer = SimpleNamespace(
+        read_resources=lambda: {'material_features': {'missing_required': [], 'unsupported_authored': []},
+                                'light_features': {'uses_default_sun': False, 'unsupported': []},
+                                'lighting': {'unshadowed_casting_lights': ['mjcf:light:top']}},
+        close=lambda: closed.append(True))
+    session = object.__new__(_GeoPhysSession)
+    session._observer_render_request = object()
+    session._observer_render_source = _fake_mjcf_render_source(visualizer)
+    session._observer_visualizer = None
+    session._observer_fault = False
+    monkeypatch.setattr(session, '_require_reset', lambda: None)
+    monkeypatch.setattr(session, 'state_boundary_identity', lambda: state.boundary)
+    monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: ('unchanged',))
+    with pytest.raises(RuntimeError, match='cannot preserve authored shadows'):
+        session.capture_observer(camera, state)
+    assert closed == [True] and session._observer_fault

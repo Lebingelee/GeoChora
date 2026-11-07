@@ -64,7 +64,7 @@ class TaskEnvRenderProvider:
             import tkinter as tk
             window = tk.Tk()
             try:
-                window.title('GeoChora MuJoCo observer')
+                window.title('GeoChora observer')
                 label = tk.Label(window, borderwidth=0, highlightthickness=0)
                 label.pack()
                 def closed():

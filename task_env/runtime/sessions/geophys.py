@@ -8,6 +8,88 @@ from .common import _SessionValues, pose
 from .geophys_source import GeoPhysSourceComposer
 
 
+def _world_center_of_mass(bodies, name_to_id, positions, quaternions):
+    """Mass-weighted world COM from public compiled values and owned poses."""
+    positions = np.asarray(positions, dtype=np.float64)
+    quaternions = np.asarray(quaternions, dtype=np.float64)
+    names = [row['name'] for row in bodies]
+    if (len(set(names)) != len(names) or set(names) != set(name_to_id) or
+            len(set(name_to_id.values())) != len(names)):
+        raise ValueError('COM requires one named pose for every compiled body')
+    total, weighted = 0., np.zeros(3, dtype=np.float64)
+    for row in bodies:
+        index = int(name_to_id[row['name']])
+        if index < 0 or index >= len(positions) or index >= len(quaternions):
+            raise ValueError('COM body ID is outside the owned pose arrays')
+        mass = float(row['mass_kg'])
+        local = np.asarray(row['com_body_m'], dtype=np.float64)
+        q = quaternions[index]
+        if (mass < 0 or not np.isfinite(mass) or local.shape != (3,) or
+                q.shape != (4,) or not np.isfinite(local).all() or
+                not np.isfinite(q).all() or not np.isfinite(positions[index]).all()):
+            raise ValueError('COM inputs must be finite and masses nonnegative')
+        norm = float(np.linalg.norm(q))
+        if norm < 1e-12:
+            raise ValueError('COM body quaternion is invalid')
+        q = q / norm
+        xyz = q[1:]
+        rotated = local + 2 * np.cross(xyz, np.cross(xyz, local) + q[0] * local)
+        weighted += mass * (positions[index] + rotated)
+        total += mass
+    if total <= 0 or not np.isfinite(total):
+        raise ValueError('COM requires positive finite total mass')
+    return weighted / total
+
+
+def _rest_center_of_mass(bodies, name_to_id, data):
+    """Evaluate the bounded zero-scalar-joint source rest pose without stepping."""
+    parent = np.asarray(data['body_parentid'], dtype=np.int64)
+    local_pos = np.asarray(data['body_pos'], dtype=np.float64)
+    local_quat = np.asarray(data['body_quat'], dtype=np.float64)
+    qpos = np.asarray(data['initial_qpos'], dtype=np.float64)
+    types = np.asarray(data['jnt_type'], dtype=np.int64)
+    addresses = np.asarray(data['jnt_qposadr'], dtype=np.int64)
+    joint_counts = np.asarray(data['body_jntnum'], dtype=np.int64)
+    joint_starts = np.asarray(data['body_jntadr'], dtype=np.int64)
+    count = len(bodies)
+    if (parent.shape != (count,) or local_pos.shape != (count, 3) or
+            local_quat.shape != (count, 4) or not np.isfinite(local_pos).all() or
+            not np.isfinite(local_quat).all() or not np.isfinite(qpos).all()):
+        raise ValueError('unsupported source rest pose arrays')
+    for body in range(count):
+        for joint in range(int(joint_starts[body]), int(joint_starts[body] + joint_counts[body])):
+            kind, address = int(types[joint]), int(addresses[joint])
+            if kind in (2, 3):
+                if address < 0 or address >= len(qpos) or abs(qpos[address]) > 1e-9:
+                    raise ValueError('source rest COM requires zero scalar joint coordinates')
+            elif kind == 0 and parent[body] < 0:
+                if (address < 0 or address + 7 > len(qpos) or
+                    not np.allclose(qpos[address:address+3], local_pos[body], atol=1e-7, rtol=0) or
+                    not np.allclose(qpos[address+3:address+7], local_quat[body], atol=1e-7, rtol=0)):
+                    raise ValueError('source free joint does not match its world rest pose')
+            else:
+                raise ValueError('source rest COM has an unsupported joint')
+    def multiply(a, b):
+        w, x, y, z = a
+        v, s, t, u = b
+        return np.asarray((w*v-x*s-y*t-z*u, w*s+x*v+y*u-z*t,
+                           w*t-x*u+y*v+z*s, w*u+x*t-y*s+z*v))
+    world_pos, world_quat = np.zeros_like(local_pos), np.zeros_like(local_quat)
+    for i in range(count):
+        norm = np.linalg.norm(local_quat[i])
+        if norm < 1e-12 or parent[i] >= i:
+            raise ValueError('source rest body hierarchy is invalid')
+        local = local_quat[i] / norm
+        if parent[i] < 0:
+            world_pos[i], world_quat[i] = local_pos[i], local
+        else:
+            q = world_quat[parent[i]]
+            v = local_pos[i]
+            world_pos[i] = world_pos[parent[i]] + v + 2 * np.cross(q[1:], np.cross(q[1:], v) + q[0] * v)
+            world_quat[i] = multiply(q, local)
+    return _world_center_of_mass(bodies, name_to_id, world_pos, world_quat)
+
+
 def _geophys_model_facts(compiled):
     """Read the public rigid scene passed to GeoPhys materialization.
 
@@ -146,7 +228,7 @@ def check_geophys_named_layout(names, data, source, boundary):
 
 
 class _GeoPhysSession(_SessionValues):
-    def __init__(self, artifact, source):
+    def __init__(self, artifact, source, *, observer_render_request=None):
         self._initialize_values(artifact, source, 'geophys')
         runtime = bootstrap_task_runtime(
             config=source.config, composition=source.composition, scene=source.scene,
@@ -160,8 +242,22 @@ class _GeoPhysSession(_SessionValues):
                 ),
                 execution_source_receipt=source.execution_source_receipt,
             ),
-            create_render_source=False,
+            create_render_source=observer_render_request is not None,
         )
+        self._observer_render_request = observer_render_request
+        self._observer_render_source = runtime.render_source
+        self._observer_visualizer = None
+        self._observer_fault = False
+        self._observer_material_report = None
+        self._observer_light_report = None
+        self._observer_lighting_resources = None
+        if observer_render_request is not None and self._observer_render_source is None:
+            error = RuntimeError('GeoPhys observer source could not be materialized')
+            try:
+                runtime.boundary.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'GeoPhys boundary cleanup also failed: {cleanup_error!r}')
+            raise error
         self._boundary = runtime.boundary
         compiled = runtime.compiled_scene
         names, data = compiled.references.names, compiled.scene_model.joint_data
@@ -183,6 +279,11 @@ class _GeoPhysSession(_SessionValues):
                 'physical_model': _geophys_model_facts(compiled),
                 'effective_physical_model': _geophys_effective_model_facts(
                     self._boundary.read_model_snapshot(), names)}
+            if observer_render_request is not None:
+                self._observer_com_bodies = self._build_layout_facts['physical_model']['bodies']
+                self._observer_com_ids = {str(name): int(index) for name, index in names.bodies.items()}
+                self._observer_rest_com = _rest_center_of_mass(
+                    self._observer_com_bodies, self._observer_com_ids, data)
         except BaseException:
             self._boundary.close()
             raise
@@ -591,6 +692,125 @@ class _GeoPhysSession(_SessionValues):
     def snapshot(self):
         self._require_reset()
         return self._snapshot_with_native_free_joints()[0]
+
+    def capture_observer(self, camera, state):
+        """Capture the published boundary using the existing GeoPhys scene owner."""
+        import hashlib
+        import json
+        import math
+        from ...artifacts import RendererSelectionV1
+        from ...observations.canonical_camera import CanonicalCameraObservation, resolve_camera
+        from ...observations.canonical_camera.images import normalize_rgb
+        from ...render.camera.source import CameraCaptureIdentityV1
+        from ...render.camera.color import gamma22_to_srgb
+
+        self._require_reset()
+        if self._observer_render_request is None or self._observer_render_source is None:
+            raise RuntimeError('GeoPhys observer was not admitted at materialization')
+        if self._observer_fault:
+            raise RuntimeError('GeoPhys observer fault requires a new runtime')
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('observer request does not match the current state boundary')
+        before = self._snapshot_with_native_free_joints()
+        metadata = resolve_camera(camera, state)
+        try:
+            if self._observer_visualizer is None:
+                desc = self._observer_render_source.read_render_scene(backend='rasterizer')
+                table = desc.mjcf_light_table
+                records = () if table is None else table.records
+                spots = [item for item in records if item.runtime_payload.get('mjcf_kind') == 'world_trackcom']
+                if (len(spots) != 1 or any(item.light_type == 'mjcf_unsupported' for item in records)
+                        or sum(item.runtime_payload.get('mjcf_kind') == 'headlight' for item in records) != 1):
+                    raise RuntimeError('GeoPhys observer requires one supported source tracking light and headlight')
+                self._observer_tracking_light = spots[0]
+                self._observer_visualizer = self._observer_render_source.build_visualizer(
+                    backend='rasterizer', use_render_snapshot=False,
+                    use_mjcf_lighting=True, enable_shadow=True,
+                    width=camera.width, height=camera.height,
+                    max_framebuffer_resolution=(camera.width, camera.height),
+                    raster_acceleration='compute', shadow_acceleration='compute',
+                    raster_material_flags={'enable_texture_sampling': True,
+                                           'enable_normal_map': True,
+                                           'enable_alpha_blending': True},
+                    enable_taa=False, enable_fxaa=False, enable_ssao=False)
+            visualizer = self._observer_visualizer
+            resources = visualizer.read_resources()
+            material_report = resources.get('material_features')
+            if not isinstance(material_report, dict):
+                raise RuntimeError('GeoPhys observer cannot verify the material capability report')
+            missing = tuple(material_report.get('missing_required', ()))
+            unsupported = tuple(material_report.get('unsupported_authored', ()))
+            uv_unsupported = tuple(material_report.get('unsupported_texture_uv_transform_channels', ()))
+            orientation_unsupported = tuple(material_report.get('unsupported_texture_orientation_channels', ()))
+            if missing or unsupported or uv_unsupported or orientation_unsupported:
+                raise RuntimeError(f'GeoPhys observer material features are incomplete: '
+                                   f'missing={missing!r}, unsupported={unsupported!r}, '
+                                   f'uv={uv_unsupported!r}, orientation={orientation_unsupported!r}')
+            light_report = resources.get('light_features')
+            if not isinstance(light_report, dict):
+                raise RuntimeError('GeoPhys observer cannot verify authored lighting')
+            if light_report.get('uses_default_sun') or light_report.get('unsupported'):
+                raise RuntimeError('GeoPhys observer cannot preserve authored lighting: '
+                                   f'{light_report!r}')
+            lighting_resources = resources.get('lighting')
+            if (not isinstance(lighting_resources, dict) or
+                    'unshadowed_casting_lights' not in lighting_resources or
+                    lighting_resources['unshadowed_casting_lights']):
+                raise RuntimeError(f'GeoPhys observer cannot preserve authored shadows: {lighting_resources!r}')
+            self._observer_material_report = deepcopy(material_report)
+            self._observer_light_report = deepcopy(light_report)
+            world = np.asarray(metadata.T_world_from_camera, dtype=np.float64)
+            position, forward, up = world[:3, 3], world[:3, 2], -world[:3, 1]
+            visualizer.set_camera_pose(position, position + forward, up)
+            snapshot = self._boundary.read_snapshot(SnapshotRequest(
+                qacc=False, ctrl=False, body_pose=True, site_pose=False, simulation_time=False))
+            current_com = _world_center_of_mass(self._observer_com_bodies, self._observer_com_ids,
+                                                snapshot.body_xpos, snapshot.body_xquat)
+            track = self._observer_tracking_light
+            light_position = np.asarray(track.runtime_payload['authored_position']) + current_com - self._observer_rest_com
+            visualizer.update_mjcf_light_pose(track.light_id, position=light_position, direction=track.direction)
+            visualizer.update_mjcf_light_pose('mjcf:headlight', position=position, direction=-forward)
+            self._observer_lighting_resources = deepcopy(visualizer.read_resources().get('lighting'))
+            visualizer.set_fov(math.degrees(camera.fov_y))
+            visualizer.set_clip_interval(camera.near, camera.far)
+            rgb = np.array(visualizer.read_frame(synchronized=True), dtype=np.float32, copy=True)
+            after = self._snapshot_with_native_free_joints()
+            if before != after or state.boundary != self.state_boundary_identity():
+                raise RuntimeError('physics state or boundary changed during GeoPhys observer capture')
+            execution_hash = getattr(self, '_observer_execution_identity', None)
+            if execution_hash is None:
+                raise RuntimeError('GeoPhys observer requires its declared execution identity')
+            selection = RendererSelectionV1('renderer-selection-v1', 'geophys', 'rasterizer',
+                                            'v211_geophys_cpu_observer_v1', 'cpu')
+            capability = {'schema': 'v211-geophys-raster-observer-v1',
+                          'capture': 'CPU raster read_frame synchronized; owned host copy',
+                          'color': 'sRGB transfer after ACES; primaries uncalibrated'}
+            capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
+                                                       separators=(',', ':')).encode()).hexdigest()
+            identity = CameraCaptureIdentityV1(
+                'camera-capture-identity-v1', camera.task_artifact_hash, camera.camera_id,
+                camera.identity_hash, self._source.source_closure_digest, execution_hash,
+                selection, capability_hash, state.boundary, state.sample_clock, ('rgb',), camera.capture_phase)
+            return CanonicalCameraObservation(normalize_rgb(gamma22_to_srgb(rgb), camera), None, metadata, identity)
+        except BaseException as error:
+            self._observer_fault = True
+            visualizer, self._observer_visualizer = getattr(self, '_observer_visualizer', None), None
+            if visualizer is not None:
+                try:
+                    visualizer.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'GeoPhys observer cleanup also failed: {cleanup_error!r}')
+            raise
+
+    def observer_render_facts(self):
+        """Return the last admitted observer material report as an owned value."""
+        if self._closed or self._observer_fault or self._observer_material_report is None:
+            raise RuntimeError('GeoPhys observer has no current admitted material report')
+        return {'backend': 'geophys-rasterizer',
+                'material_features': deepcopy(self._observer_material_report),
+                'light_features': deepcopy(self._observer_light_report),
+                'lighting': deepcopy(self._observer_lighting_resources),
+                'color_transfer': 'sRGB after ACES; primaries uncalibrated'}
 
     def _capture_actuator_force(self, state):
         self._require_reset()
@@ -1122,17 +1342,32 @@ class _GeoPhysSession(_SessionValues):
     def close(self):
         if not self._closed:
             port = getattr(self, '_physical_port', None)
-            if port is not None and port.pending is not None:
-                port.finish_interval()
             failure = None
+            if port is not None and port.pending is not None:
+                try:
+                    port.finish_interval()
+                except BaseException as error:
+                    failure = error
             boundary_close_completed = False
             source_receipt_close_completed = None
+            visualizer, self._observer_visualizer = getattr(self, '_observer_visualizer', None), None
+            if visualizer is not None:
+                try:
+                    visualizer.close()
+                except BaseException as error:
+                    if failure is None:
+                        failure = error
+                    else:
+                        failure.add_note(f'GeoPhys observer cleanup also failed: {error!r}')
             try:
                 if self._boundary is not None:
                     self._boundary.close()
                 boundary_close_completed = True
             except BaseException as error:
-                failure = error
+                if failure is None:
+                    failure = error
+                else:
+                    failure.add_note(f'GeoPhys boundary cleanup also failed: {error!r}')
             receipt = getattr(self._source, 'execution_source_receipt', None)
             try:
                 if receipt is not None:

@@ -41,8 +41,9 @@ class ObserverRenderRequestV1:
                 not self.camera.rgb or self.camera.depth or
                 self.camera.rgb_layout != 'HWC' or self.camera.rgb_dtype != 'float32'):
             raise ValueError('observer request does not match its artifact and RGB contract')
-        if (self.provider, self.backend, physics_provider, physics_backend) != (
-                'isaacsim', 'rtx', 'isaacsim', 'cuda'):
+        if (self.provider, self.backend, physics_provider, physics_backend) not in {
+                ('isaacsim', 'rtx', 'isaacsim', 'cuda'),
+                ('geophys', 'rasterizer', 'geophys', 'cpu')}:
             raise ValueError('unsupported observer request and physics route')
         normalize_render_mode(self.mode)
 
