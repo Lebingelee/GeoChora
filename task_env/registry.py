@@ -158,7 +158,10 @@ def make_env(
     task_renderer = kwargs.pop('task_renderer', None)
     if (task_rgb_camera is None) != (task_renderer is None):
         raise ValueError('task RGB camera and fixed renderer must be declared together')
-    factory_owns_rgb = bool(getattr(environment_type, 'task_rgb_factory_prepares_runtime', False))
+    factory_owns_rgb = bool(
+        getattr(environment_type, 'task_rgb_factory_prepares_runtime', False)
+        or getattr(environment_type, 'uses_component_task_config', False)
+    )
     if task_rgb_camera is not None and factory_owns_rgb:
         kwargs.update(task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
 
@@ -166,8 +169,11 @@ def make_env(
         if task_rgb_camera is not None and not factory_owns_rgb:
             from .environment.reference_env import SelectedReferenceEnv
             try:
-                if not isinstance(env, SelectedReferenceEnv) or not getattr(env, 'position_profile', False):
-                    raise ValueError('task RGB requires an admitted selected Position environment')
+                if (
+                    not isinstance(env, SelectedReferenceEnv)
+                    or getattr(env, '_uses_component_assembly', False)
+                ):
+                    raise ValueError('task RGB requires an admitted selected-reference environment')
                 env._configure_task_rgb(task_rgb_camera, task_renderer)
             except BaseException as error:
                 try:

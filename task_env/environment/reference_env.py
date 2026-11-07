@@ -199,12 +199,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     compiled_scene
                 )
             self.observation_space = self._observation_builder.observation_space
+            if self._component_task_rgb is not None:
+                self._configure_component_task_rgb_space()
             self.metadata = gym_metadata_dict(
                 self._env_metadata,
                 observation_schema=self._observation_builder.schema,
                 stage="stage4_gym_contract",
             )
             self._configure_render_metadata()
+            if self._component_task_rgb is not None:
+                self._configure_component_task_rgb_metadata()
             reference_profile = _json_value(self.reference_profile())
             if reference_profile:
                 self.metadata["reference_profile"] = reference_profile
@@ -224,6 +228,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 reset_components=self._reset_episode_components,
                 convert_action=self._convert_action,
                 observation_fallback=self._build_observation_fallback,
+                observation_transform=(
+                    self._augment_component_task_rgb
+                    if self._component_task_rgb is not None
+                    else None
+                ),
                 episode_limits=lambda: (
                     self.config.episode.horizon,
                     self.config.episode.ignore_done,
@@ -441,6 +450,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def _reset_episode_components(self, snapshot) -> None:
+        self._last_sensor_snapshot = None
+        self._last_sensor_observation = None
+        self._last_camera_metadata = {}
         if self._robot is not None:
             self._robot.controller.reset(snapshot)
             reset_gripper = getattr(self._robot.gripper, "reset", None)
@@ -487,7 +499,52 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self._sensor_provider is not None:
             sensor_observation = self._sensor_provider.capture(snapshot)
             self._last_camera_metadata = dict(sensor_observation.camera_metadata)
+        self._last_sensor_snapshot = snapshot
+        self._last_sensor_observation = sensor_observation
         return self._observation_builder.build(snapshot, sensor_observation)
+
+    def _augment_component_task_rgb(self, snapshot, observation):
+        """Attach RGB from the same lifecycle snapshot before publication."""
+        task_rgb = self._component_task_rgb
+        if task_rgb is None:
+            return observation
+        if not isinstance(observation, Mapping):
+            raise TypeError("task RGB requires a mapping-valued task observation")
+        result = dict(observation)
+        if "task_rgb" in result:
+            raise ValueError("task observation already contains the reserved task_rgb key")
+        sensor_observation = (
+            self._last_sensor_observation
+            if self._last_sensor_snapshot is snapshot
+            else None
+        )
+        if sensor_observation is None:
+            if self._sensor_provider is None:
+                raise RuntimeError("task RGB was configured without a camera observation provider")
+            sensor_observation = self._sensor_provider.capture(snapshot)
+            self._last_camera_metadata = dict(sensor_observation.camera_metadata)
+            self._last_sensor_snapshot = snapshot
+            self._last_sensor_observation = sensor_observation
+        camera, _renderer, _generation = task_rgb
+        try:
+            frame = sensor_observation.rgb[camera.name]
+        except KeyError as error:
+            raise ValueError(
+                f"synchronous SensorObservation did not publish task camera {camera.name!r}"
+            ) from error
+        image = np.asarray(frame)
+        expected_shape = (camera.height, camera.width, 3)
+        if image.shape != expected_shape or image.dtype != np.float32:
+            raise ValueError(
+                f"task RGB must be float32 HWC with shape {expected_shape}, got "
+                f"{image.dtype} {image.shape}"
+            )
+        if not np.isfinite(image).all() or np.any(image < 0.0) or np.any(image > 1.0):
+            raise ValueError("task RGB must contain finite normalized values in [0, 1]")
+        result["task_rgb"] = np.array(image, dtype=np.float32, order="C", copy=True)
+        if not self.observation_space.contains(result):
+            raise ValueError("task observation with synchronous task RGB violates observation_space")
+        return result
 
     @staticmethod
     def _require_simulation_time_s(snapshot) -> float:
@@ -510,6 +567,39 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 "simulation_time_s": float(simulation_time_s),
             },
             "cameras": cameras,
+        }
+
+    def _component_task_rgb_receipt(
+        self, *, lifecycle, control_step: int, simulation_time_s: float,
+    ):
+        task_rgb = self._component_task_rgb
+        if task_rgb is None:
+            return None
+        camera, _renderer, generation = task_rgb
+        if (
+            self._last_sensor_snapshot is not self._last_snapshot
+            or self._last_sensor_observation is None
+            or camera.name not in self._last_sensor_observation.rgb
+        ):
+            raise RuntimeError("task RGB receipt has no capture for the published lifecycle boundary")
+        return {
+            "schema_version": "task-rgb-observation-v1",
+            "source": "SensorObservation.rgb and camera_metadata",
+            "camera_name": camera.name,
+            "camera": _json_value(asdict(camera)),
+            "renderer": _renderer,
+            "render_backend": self.config.render.backend,
+            "renderer_generation": generation,
+            "observation_boundary": {
+                "episode_id": lifecycle.episode_id,
+                "control_step": int(control_step),
+                "simulation_time_s": float(simulation_time_s),
+            },
+            "capture": {
+                "status": "completed_before_observation_publication",
+                "api": "CameraObservationProvider.capture/read_frame(synchronized=True)",
+                "synchronized": True,
+            },
         }
 
     def _format_step_result(self, lifecycle, result):
@@ -571,6 +661,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         if camera_capture is not None:
             info["camera_capture"] = camera_capture
+        task_rgb_receipt = self._component_task_rgb_receipt(
+            lifecycle=lifecycle,
+            control_step=self._elapsed_steps,
+            simulation_time_s=simulation_time_s,
+        )
+        if task_rgb_receipt is not None:
+            info["task_rgb_v1"] = task_rgb_receipt
         validate_task_info(info, phase="step")
         return result.observation, evaluation.reward, result.terminated, result.truncated, info
 
@@ -906,6 +1003,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             )
             if camera_capture is not None:
                 info["camera_capture"] = camera_capture
+            task_rgb_receipt = self._component_task_rgb_receipt(
+                lifecycle=lifecycle,
+                control_step=self._elapsed_steps,
+                simulation_time_s=simulation_time_s,
+            )
+            if task_rgb_receipt is not None:
+                info["task_rgb_v1"] = task_rgb_receipt
             validate_task_info(info, phase="reset")
             return result.observation, info
         except BaseException as error:
@@ -990,16 +1094,88 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                        getattr(type(self), 'uses_component_task_config', False)
                        or '_task_lifecycle' in self.__dict__)
 
+    @staticmethod
+    def _prepare_component_task_rgb(config, camera, renderer):
+        """Resolve the bounded component RGB route without changing physics."""
+        from .config import CameraSpec
+
+        if not isinstance(config, ResolvedEnvConfig):
+            raise TypeError("component task RGB requires ResolvedEnvConfig")
+        if not isinstance(camera, CameraSpec):
+            raise TypeError("component task RGB camera must be a CameraSpec")
+        if renderer != "geophys":
+            raise ValueError("component task RGB currently admits the fixed GeoPhys renderer only")
+        if config.runtime.backend != "cpu":
+            raise ValueError("component task RGB requires the GeoPhys CPU physics route")
+        if not camera.rgb or camera.depth or camera.rgb_layout != "HWC" or camera.rgb_dtype != "float32":
+            raise ValueError("component task RGB requires HWC float32 RGB without depth")
+        if config.render.camera_obs and config.render.backend != "rasterizer":
+            raise ValueError(
+                "existing component camera observations must already use rasterizer for task RGB"
+            )
+        cameras = list(config.render.cameras)
+        existing = next((item for item in cameras if item.name == camera.name), None)
+        if existing is not None and existing != camera:
+            raise ValueError(
+                f"task RGB camera name {camera.name!r} conflicts with the resolved CameraSpec"
+            )
+        if existing is None:
+            cameras.append(camera)
+        render = replace(
+            config.render,
+            camera_obs=True,
+            backend="rasterizer",
+            cameras=tuple(cameras),
+        )
+        return replace(config, render=render), (camera, renderer, uuid4().hex)
+
+    def _configure_component_task_rgb_space(self) -> None:
+        camera, _renderer, _generation = self._component_task_rgb
+        spaces = dict(self.observation_space.spaces)
+        if "task_rgb" in spaces:
+            raise ValueError("task observation already declares the reserved task_rgb key")
+        spaces["task_rgb"] = Box(
+            low=0.0,
+            high=1.0,
+            shape=(camera.height, camera.width, 3),
+            dtype=np.float32,
+        )
+        self.observation_space = Dict(spaces)
+
+    def _configure_component_task_rgb_metadata(self) -> None:
+        camera, renderer, generation = self._component_task_rgb
+        self.metadata = dict(self.metadata)
+        self.metadata["task_rgb_v1"] = {
+            "schema_version": "task-rgb-observation-v1",
+            "observation_key": "task_rgb",
+            "camera": _json_value(asdict(camera)),
+            "renderer": renderer,
+            "render_backend": self.config.render.backend,
+            "renderer_generation": generation,
+            "color_space": "float32 RGB normalized to [0,1]; primaries and transfer are uncalibrated",
+            "ownership": "owned host copy",
+            "capture": "same RuntimeSnapshot; synchronized raster read completes before publication",
+        }
+
     def _initialize_components(
         self,
         config: ResolvedEnvConfig | None = None,
         *,
         render_mode=None,
         build_runtime: bool = True,
+        task_rgb_camera=None,
+        task_renderer=None,
     ) -> None:
         self._closed = False
         self._last_episode_end = None
         self.config = config if config is not None else self.default_config()
+        if (task_rgb_camera is None) != (task_renderer is None):
+            raise ValueError("task RGB camera and fixed renderer must be declared together")
+        self._component_task_rgb = None
+        if task_rgb_camera is not None:
+            self.config, self._component_task_rgb = self._prepare_component_task_rgb(
+                self.config, task_rgb_camera, task_renderer
+            )
         # Import only the lightweight render contract during environment
         # construction. Concrete renderer backends stay out of the physics
         # bootstrap.
@@ -1043,6 +1219,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._task_lifecycle = None
         self._camera_sensors = ()
         self._sensor_provider = None
+        self._last_sensor_snapshot = None
+        self._last_sensor_observation = None
         self._last_camera_metadata = {}
         self._last_snapshot = None
         self._elapsed_steps = 0
@@ -1126,7 +1304,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False,
                  _execution_spec_v1=None, _mixed_control_candidate=False,
-                 _initial_value=None):
+                 _initial_value=None, task_rgb_camera=None, task_renderer=None):
         self._uses_component_assembly = bool(
             getattr(type(self), 'uses_component_task_config', False)
             or config is not None
@@ -1135,8 +1313,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 is SelectedReferenceEnv.from_reference_config.__func__)
         )
         if self._uses_component_assembly:
-            self._initialize_components(config, render_mode=render_mode, build_runtime=build_runtime)
+            self._initialize_components(
+                config,
+                render_mode=render_mode,
+                build_runtime=build_runtime,
+                task_rgb_camera=task_rgb_camera,
+                task_renderer=task_renderer,
+            )
             return
+        if task_rgb_camera is not None or task_renderer is not None:
+            raise ValueError("selected task RGB is configured through the public make_env factory")
         if render_mode is not None or build_runtime is not True:
             raise ValueError('selected reference rendering and component runtime options require a component task')
         if type(horizon) is not int or not 1 <= horizon <= 6000:
@@ -2216,8 +2402,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..observations.canonical_camera import CameraGeometry
         if type(camera) is not CameraGeometry:
             raise TypeError('task RGB camera must be CameraGeometry')
-        if not getattr(self, 'position_profile', False):
-            raise ValueError('task RGB requires a selected Position publication')
+        if getattr(self, '_uses_component_assembly', False):
+            raise ValueError('selected task RGB cannot be applied to component assembly')
+        if not hasattr(self, 'artifact') or not hasattr(self.artifact, 'identity_hash'):
+            raise ValueError('selected task RGB requires a published TaskArtifact identity')
         camera.validate()
         if camera.task_artifact_hash != self.artifact.identity_hash:
             raise ValueError('task RGB camera TaskArtifact linkage mismatch')

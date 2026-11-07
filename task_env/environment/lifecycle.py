@@ -530,12 +530,16 @@ class TaskLifecycleAdapter:
         task_definition: TaskDefinitionBase | None,
         horizon: int,
         ignore_done: bool,
+        observation_transform: Callable[[RuntimeSnapshot | TaskStateView, Any], Any] | None = None,
     ) -> None:
         if int(horizon) < 1:
             raise ValueError("task lifecycle horizon must be positive")
         self.task_definition = task_definition
         self.horizon = int(horizon)
         self.ignore_done = bool(ignore_done)
+        if observation_transform is not None and not callable(observation_transform):
+            raise TypeError("observation_transform must be callable")
+        self._observation_transform = observation_transform
         rules_method = getattr(task_definition, "temporal_predicate_rules", None)
         rules = tuple(rules_method()) if callable(rules_method) else ()
         self._temporal_predicate_state = _TemporalPredicateCommitState(rules)
@@ -710,13 +714,17 @@ class TaskLifecycleAdapter:
             callable(builder)
             and type(definition).build_observation is not TaskDefinitionBase.build_observation
         ):
-            return builder(view)
-        if fallback is None:
-            raise StageUnavailableError(
-                f"task definition {type(definition).__name__ if definition is not None else 'None'} "
-                "has no observation builder"
-            )
-        return fallback()
+            observation = builder(view)
+        else:
+            if fallback is None:
+                raise StageUnavailableError(
+                    f"task definition {type(definition).__name__ if definition is not None else 'None'} "
+                    "has no observation builder"
+                )
+            observation = fallback()
+        if self._observation_transform is not None:
+            observation = self._observation_transform(state, observation)
+        return observation
 
     def normalize_evaluation(
         self,
@@ -985,6 +993,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         expected_control_dt_s: float | None = None,
         termination_policy: EpisodeTerminationPolicyV1 | None = None,
         episode_state: EpisodeExecutionState | None = None,
+        observation_transform: Callable[[RuntimeSnapshot | TaskStateView, Any], Any] | None = None,
     ) -> None:
         if episode_state is not None and not isinstance(episode_state, EpisodeExecutionState):
             raise TypeError("episode_state must be EpisodeExecutionState")
@@ -993,6 +1002,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             task_definition=task_definition,
             horizon=horizon,
             ignore_done=ignore_done,
+            observation_transform=observation_transform,
         )
         if int(control_substeps) < 1:
             raise ValueError("scalar task lifecycle control_substeps must be positive")

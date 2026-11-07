@@ -8,6 +8,57 @@ from .common import _SessionValues, pose
 from .geophys_source import GeoPhysSourceComposer
 
 
+def _observer_mjcf_light_declaration(table):
+    """Resolve the small MJCF light subset consumed by task RGB rendering."""
+    records = () if table is None else tuple(table.records)
+    ambient_id = 'mjcf:headlight:ambient'
+    headlight_id = 'mjcf:headlight'
+    ambient = tuple(item for item in records if item.light_id == ambient_id)
+    spots = tuple(
+        item for item in records
+        if item.runtime_payload.get('mjcf_kind') == 'world_trackcom'
+    )
+    headlights = tuple(
+        item for item in records
+        if item.runtime_payload.get('mjcf_kind') == 'headlight'
+    )
+    supported_ids = {
+        ambient_id,
+        headlight_id,
+        *(item.light_id for item in spots),
+    }
+    unsupported = tuple(
+        item for item in records
+        if item.light_type == 'mjcf_unsupported' or item.light_id not in supported_ids
+    )
+    duplicate_ids = len({item.light_id for item in records}) != len(records)
+    malformed_supported_lights = (
+        any(item.light_type != 'ambient' for item in ambient)
+        or any(
+            item.light_id != headlight_id or item.light_type != 'directional'
+            for item in headlights
+        )
+        or any(item.light_type != 'spot' for item in spots)
+    )
+    missing_or_ambiguous_baseline = table is not None and (
+        len(ambient) != 1 or len(headlights) != 1
+    )
+    if (
+        unsupported or duplicate_ids or malformed_supported_lights
+        or len(spots) > 1 or missing_or_ambiguous_baseline
+    ):
+        raise RuntimeError(
+            'GeoPhys observer supports zero or one authored trackcom light and '
+            'zero or one headlight; ambiguous or unsupported authored lights are rejected'
+        )
+    return (
+        spots[0] if spots else None,
+        headlights[0] if headlights else None,
+        'no-authored-mjcf-lights' if table is None else 'supported-authored-mjcf-lights',
+        len(records),
+    )
+
+
 def _world_center_of_mass(bodies, name_to_id, positions, quaternions):
     """Mass-weighted world COM from public compiled values and owned poses."""
     positions = np.asarray(positions, dtype=np.float64)
@@ -251,6 +302,10 @@ class _GeoPhysSession(_SessionValues):
         self._observer_material_report = None
         self._observer_light_report = None
         self._observer_lighting_resources = None
+        self._observer_tracking_light = None
+        self._observer_headlight = None
+        self._observer_light_source_mode = None
+        self._observer_authored_light_count = 0
         if observer_render_request is not None and self._observer_render_source is None:
             error = RuntimeError('GeoPhys observer source could not be materialized')
             try:
@@ -696,13 +751,12 @@ class _GeoPhysSession(_SessionValues):
     def _ensure_observer_visualizer(self, camera):
         if self._observer_visualizer is None:
             desc = self._observer_render_source.read_render_scene(backend='rasterizer')
-            table = desc.mjcf_light_table
-            records = () if table is None else table.records
-            spots = [item for item in records if item.runtime_payload.get('mjcf_kind') == 'world_trackcom']
-            if (len(spots) != 1 or any(item.light_type == 'mjcf_unsupported' for item in records)
-                    or sum(item.runtime_payload.get('mjcf_kind') == 'headlight' for item in records) != 1):
-                raise RuntimeError('GeoPhys observer requires one supported source tracking light and headlight')
-            self._observer_tracking_light = spots[0]
+            (
+                self._observer_tracking_light,
+                self._observer_headlight,
+                self._observer_light_source_mode,
+                self._observer_authored_light_count,
+            ) = _observer_mjcf_light_declaration(desc.mjcf_light_table)
             self._observer_visualizer = self._observer_render_source.build_visualizer(
                 backend='rasterizer', use_render_snapshot=False,
                 use_mjcf_lighting=True, enable_shadow=True,
@@ -822,9 +876,11 @@ class _GeoPhysSession(_SessionValues):
             light_report = resources.get('light_features')
             if not isinstance(light_report, dict):
                 raise RuntimeError('GeoPhys observer cannot verify authored lighting')
-            if light_report.get('uses_default_sun') or light_report.get('unsupported'):
-                raise RuntimeError('GeoPhys observer cannot preserve authored lighting: '
-                                   f'{light_report!r}')
+            if light_report.get('unsupported'):
+                raise RuntimeError(f'GeoPhys observer cannot preserve unsupported authored lighting: {light_report!r}')
+            uses_default_sun = bool(light_report.get('uses_default_sun'))
+            if self._observer_light_source_mode == 'supported-authored-mjcf-lights' and uses_default_sun:
+                raise RuntimeError(f'GeoPhys observer substituted a renderer light for authored MJCF lighting: {light_report!r}')
             lighting_resources = resources.get('lighting')
             if (not isinstance(lighting_resources, dict) or
                     'unshadowed_casting_lights' not in lighting_resources or
@@ -832,18 +888,35 @@ class _GeoPhysSession(_SessionValues):
                 raise RuntimeError(f'GeoPhys observer cannot preserve authored shadows: {lighting_resources!r}')
             self._observer_material_report = deepcopy(material_report)
             self._observer_light_report = deepcopy(light_report)
+            self._observer_light_report['source_mode'] = self._observer_light_source_mode
+            self._observer_light_report['authored_record_count'] = self._observer_authored_light_count
             world = np.asarray(metadata.T_world_from_camera, dtype=np.float64)
             position, forward, up = world[:3, 3], world[:3, 2], -world[:3, 1]
             if not task:
                 visualizer.set_camera_pose(position, position + forward, up)
-            snapshot = self._boundary.read_snapshot(SnapshotRequest(
-                qacc=False, ctrl=False, body_pose=True, site_pose=False, simulation_time=False))
-            current_com = _world_center_of_mass(self._observer_com_bodies, self._observer_com_ids,
-                                                snapshot.body_xpos, snapshot.body_xquat)
             track = self._observer_tracking_light
-            light_position = np.asarray(track.runtime_payload['authored_position']) + current_com - self._observer_rest_com
-            visualizer.update_mjcf_light_pose(track.light_id, position=light_position, direction=track.direction)
-            visualizer.update_mjcf_light_pose('mjcf:headlight', position=position, direction=-forward)
+            if track is not None:
+                snapshot = self._boundary.read_snapshot(SnapshotRequest(
+                    qacc=False, ctrl=False, body_pose=True, site_pose=False, simulation_time=False))
+                current_com = _world_center_of_mass(
+                    self._observer_com_bodies,
+                    self._observer_com_ids,
+                    snapshot.body_xpos,
+                    snapshot.body_xquat,
+                )
+                light_position = (
+                    np.asarray(track.runtime_payload['authored_position'])
+                    + current_com - self._observer_rest_com
+                )
+                visualizer.update_mjcf_light_pose(
+                    track.light_id, position=light_position, direction=track.direction
+                )
+            if self._observer_headlight is not None:
+                visualizer.update_mjcf_light_pose(
+                    self._observer_headlight.light_id,
+                    position=position,
+                    direction=-forward,
+                )
             self._observer_lighting_resources = deepcopy(visualizer.read_resources().get('lighting'))
             if task:
                 rgb = np.array(visualizer.read_task_camera_frame(synchronized=True), dtype=np.float32, copy=True)
@@ -862,7 +935,9 @@ class _GeoPhysSession(_SessionValues):
                                             'v211_geophys_cpu_observer_v1', 'cpu')
             capability = {'schema': 'v211-geophys-raster-observer-v1',
                           'capture': 'CPU raster read_frame synchronized; owned host copy',
-                          'color': 'sRGB transfer after ACES; primaries uncalibrated'}
+                          'color': 'sRGB transfer after ACES; primaries uncalibrated',
+                          'lighting_source_mode': self._observer_light_source_mode,
+                          'renderer_uses_default_sun': uses_default_sun}
             capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
                                                        separators=(',', ':')).encode()).hexdigest()
             identity = CameraCaptureIdentityV1(
@@ -887,6 +962,7 @@ class _GeoPhysSession(_SessionValues):
         return {'backend': 'geophys-rasterizer',
                 'material_features': deepcopy(self._observer_material_report),
                 'light_features': deepcopy(self._observer_light_report),
+                'lighting_source_mode': self._observer_light_source_mode,
                 'lighting': deepcopy(self._observer_lighting_resources),
                 'color_transfer': 'sRGB after ACES; primaries uncalibrated'}
 

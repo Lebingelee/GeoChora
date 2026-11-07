@@ -117,7 +117,7 @@ def test_public_factory_adds_camera_to_an_independently_named_selected_task(monk
         def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
             assert not kwargs and render_mode is None
             env = object.__new__(cls)
-            env.position_profile = True
+            env.position_profile = False
             env.provider, env.backend = 'mujoco', 'cpu'
             env.artifact = SimpleNamespace(identity_hash='c' * 64)
             env.observation_space = Dict({'different-state': Box(-1., 1., shape=(3,), dtype=np.float32)})
@@ -130,6 +130,98 @@ def test_public_factory_adds_camera_to_an_independently_named_selected_task(monk
     assert set(env.observation_space.spaces) == {'different-state', 'task_rgb'}
     assert env.metadata['task_rgb_v1']['camera']['camera_id'] == 'independent-camera'
     assert env._task_rgb_config[0] is not camera
+
+
+def test_component_task_rgb_config_is_fixed_and_preserves_physics():
+    from task_env.environment.config import CameraSpec
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.tasks.pendulum import PendulumEnv
+
+    config = PendulumEnv.default_config()
+    camera = CameraSpec('pendulum-task', width=8, height=6)
+    resolved, task_rgb = SelectedReferenceEnv._prepare_component_task_rgb(
+        config, camera, 'geophys'
+    )
+    assert resolved.runtime == config.runtime
+    assert resolved.render.backend == 'rasterizer'
+    assert resolved.render.camera_obs is True
+    assert resolved.render.cameras == (camera,)
+    assert task_rgb[:2] == (camera, 'geophys')
+    with pytest.raises(ValueError, match='GeoPhys renderer only'):
+        SelectedReferenceEnv._prepare_component_task_rgb(config, camera, 'mujoco')
+
+
+def test_component_task_rgb_uses_owned_frame_from_same_snapshot():
+    from types import SimpleNamespace
+    from task_env.environment.gym_compat import Box, Dict
+    from task_env.environment.config import CameraSpec
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    camera = CameraSpec('task', width=4, height=3)
+    source = np.full((3, 4, 3), 0.25, dtype=np.float32)
+    env = object.__new__(SelectedReferenceEnv)
+    env._component_task_rgb = (camera, 'geophys', 'generation-a')
+    env._last_sensor_snapshot = None
+    env._last_sensor_observation = None
+    env._last_camera_metadata = {}
+    snapshot = object()
+    calls = []
+    observation = SimpleNamespace(
+        rgb={'task': source}, camera_metadata={'task': {'synchronized': True}}
+    )
+    env._sensor_provider = SimpleNamespace(
+        capture=lambda actual: calls.append(actual) or observation
+    )
+    env.observation_space = Dict({
+        'state': Box(-1.0, 1.0, shape=(2,), dtype=np.float32),
+        'task_rgb': Box(0.0, 1.0, shape=(3, 4, 3), dtype=np.float32),
+    })
+    state = np.array((0.0, 1.0), dtype=np.float32)
+    actual = env._augment_component_task_rgb(snapshot, {'state': state})
+    assert calls == [snapshot]
+    assert actual['task_rgb'].dtype == np.float32
+    assert actual['task_rgb'].flags.owndata
+    assert not np.shares_memory(actual['task_rgb'], source)
+    assert env._augment_component_task_rgb(snapshot, {'state': state})['task_rgb'].shape == (3, 4, 3)
+    assert calls == [snapshot]
+
+
+def test_geophys_selected_camera_light_contract_is_source_driven():
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.geophys import _observer_mjcf_light_declaration
+
+    def light(light_id, light_type, kind=None):
+        payload = {} if kind is None else {'mjcf_kind': kind}
+        return SimpleNamespace(
+            light_id=light_id, light_type=light_type, runtime_payload=payload
+        )
+
+    tracking = light('mjcf:light:key', 'spot', 'world_trackcom')
+    headlight = light('mjcf:headlight', 'directional', 'headlight')
+    ambient = light('mjcf:headlight:ambient', 'ambient')
+    no_lights = _observer_mjcf_light_declaration(None)
+    assert no_lights[:3] == (None, None, 'no-authored-mjcf-lights')
+    declared = _observer_mjcf_light_declaration(
+        SimpleNamespace(records=(ambient, headlight, tracking))
+    )
+    assert declared == (tracking, headlight, 'supported-authored-mjcf-lights', 3)
+    assert _observer_mjcf_light_declaration(
+        SimpleNamespace(records=(ambient, headlight))
+    )[:2] == (None, headlight)
+    with pytest.raises(RuntimeError, match='ambiguous or unsupported'):
+        _observer_mjcf_light_declaration(
+            SimpleNamespace(records=(ambient, headlight, tracking, tracking))
+        )
+    with pytest.raises(RuntimeError, match='ambiguous or unsupported'):
+        _observer_mjcf_light_declaration(
+            SimpleNamespace(records=(ambient, headlight, light('unknown', 'mjcf_unsupported')))
+        )
+    with pytest.raises(RuntimeError, match='ambiguous or unsupported'):
+        _observer_mjcf_light_declaration(
+            SimpleNamespace(records=(light('mjcf:headlight:ambient', 'directional'), headlight))
+        )
+    with pytest.raises(RuntimeError, match='ambiguous or unsupported'):
+        _observer_mjcf_light_declaration(SimpleNamespace(records=(ambient,)))
 
 
 def test_isaac_color_defaults_do_not_override_incompatible_settings(monkeypatch, tmp_path):
