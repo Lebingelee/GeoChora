@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5b accepted within the documented three-route bounded scope. 5c attempt001 package prepared for maintainer review: fixed renderer per Env, synchronized RGB, real cross-combination, generic task implementation. It is not approved or dispatched; attempt count remains zero. No automatic dispatch, merge, push, tag or publication.",
+  "next_action": "5b accepted within the documented three-route bounded scope. Maintainer approved the complete 5c attempt001 scope and proposed budget, including necessary bounded GeoPhys provider/gitlink changes. Package ready for manual forward; not dispatched, attempt count remains zero. No automatic dispatch, merge, push, tag or publication.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,7 +1595,7 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
-          "package_preparation_status": "PREPARED_AWAITING_MAINTAINER_AUTHORIZATION",
+          "package_preparation_status": "APPROVED_READY_FOR_MANUAL_FORWARD",
           "dependencies": [
             "5b"
           ],

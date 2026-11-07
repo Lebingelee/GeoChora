@@ -1,8 +1,8 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：5c attempt001 已准备，等待维护者审阅与授权
+## 当前：5c attempt001 已获批准，等待维护者人工转发
 
-维护者要求按已修订范围准备完整 5c attempt001，包入口位于维护者工作区 `handoffs/V211_G05_5c_attempt001/`。准备不算 attempt；本包的执行范围、预算和 provider 改动仍是待批准提议，不自动派发或创建执行对话。开工前执行者须核对包的真实快照、前包 release、writer、保护文件及锁。5c 仍 PLANNED／attempt0，5b 已有界接收，具体以[编排索引](orchestration.json)和[调整后的范围](../planning/stage5-5c-fixed-renderer-scope.md)为准。
+维护者要求按已修订范围准备完整 5c attempt001，并明确批准所列执行范围、必要时的限定 GeoPhys provider/gitlink 改动和预算。包入口位于维护者工作区 `handoffs/V211_G05_5c_attempt001/`，由维护者指定实施者并手动转发；不自动派发或创建执行对话。准备不算 attempt；开工前须核对包的真实快照、前包 release、writer、保护文件及锁。5c 仍 PLANNED／attempt0，5b 已有界接收，具体以[编排索引](orchestration.json)和[调整后的范围](../planning/stage5-5c-fixed-renderer-scope.md)为准。
 
 ## 历史：5c 范围已按维护者要求调整，尚未准备工作包
 
