@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b 诊断 002 补充重做已主审，5b 尚未接收
+## 当前：G05 5b 有界接收，5c 尚未开始
+
+[5b Sol 独立主审](reviews/20261107_5b_diagnostic_attempt003_sol_review.md)决定 `ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB`：指定 PickCube MuJoCo CPU、GeoPhys CPU rasterizer 与 Isaac Sim 6.2 路线有界窗口／RGB／相机隔离证据成立，所列颜色、挂载、设备和历史失败限制保留。普通 count=3、诊断窗口 count=4；5c 保持 PLANNED、attempt0，由维护者决定后续，不自动派包或进入阶段6。
+
+## 历史：G05 5b 诊断 002 补充重做已主审，5b 尚未接收
 
 [Sol 独立主审](reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md)决定 `DIAGNOSIS_PARTIAL_5B_NOT_ACCEPTED`，普通 count=3、诊断窗口 count=3。Isaac F06 单个 world-mounted 真实任务相机与 observer 隔离及限定场景图像可辨性有界成立。MuJoCo、GeoPhys 的 task camera 均为 null，不能判各自隔离已通过；窗口及 RGB 有界证据按路径复用。新图像规则的状态偏移误报、旧 C 未过和各项限制保留。继续由维护者主导，不自动派包或进入 5c。
 

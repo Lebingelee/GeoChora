@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-07",
-  "status": "G05_5B_NOT_ACCEPTED_HUMAN_DIAGNOSIS_REQUIRED",
+  "status": "G05_5B_ACCEPTED_BOUNDED_5C_PLANNED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Diagnostic002 rerun reviewed PARTIAL: retain Isaac production world-camera isolation and bounded scene image; under maintainer-led diagnosis resolve route-specific MuJoCo/GeoPhys configured task-camera binding/isolation without automatically requiring 5c observation. No automatic dispatch.",
+  "next_action": "5b accepted within the documented three-route bounded scope; 5c remains planned and requires maintainer direction and a separate authorized package. No automatic dispatch, merge, push, tag or publication.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1394,7 +1394,7 @@
           "dependencies": [
             "5a"
           ],
-          "status": "NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED",
+          "status": "ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB",
           "attempt_count": 3,
           "attempts": [
             {
@@ -1439,23 +1439,24 @@
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt002/",
-          "package_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
-          "input_head": "a34262af95bf9ef65438ece5b2620ff2df553be5",
-          "output_head": "8130549070c4d2941ea866318bf327177fb678e7",
-          "expected_duration_minutes": "360-600 active, 720 wall maximum",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_diagnostic_attempt003",
+          "package_sha256": "97f6e0f6d5e58153081864bc6ddcb4e2139769be486b59d3365261e5059286b3",
+          "input_head": "292a4446aa37b53de2f3103ac96c7f7dc4f6d61b",
+          "output_head": "b9f5bc5e7764667d706a9119188ff6780d78a3e3",
+          "expected_duration_minutes": "240–360 active, 480 wall maximum",
           "execution_budget": {
-            "wall_minutes": 720,
-            "source_seconds": 14400,
-            "native_seconds": 14400,
+            "wall_minutes": 480,
+            "source_seconds": 7200,
+            "native_seconds": 7200,
             "native_worker_seconds": 900,
-            "physical_substeps": 10000,
+            "physical_substeps_reserved": 5000,
             "cpu_threads": 8,
-            "process_tree_rss_gib": 12,
-            "gpu_vram_gib": 6,
-            "new_ignored_output_gib": 5
+            "worker_cgroup_memory_gib": 12,
+            "worker_cgroup_swap_gib": 0,
+            "gpu_vram_policy": "Actual available GPU memory for authorized graphics; sampled peak is not a hard cap.",
+            "new_ignored_output_gib": 3
           },
-          "last_observation": "Diagnostic002 rerun reviewed: 298/298 manifest verified; guarded 26 passed. Isaac F06 world-mounted production task camera isolation and bounded scene image accepted. MuJoCo and GeoPhys task camera configurations are null; route-specific isolation remains unproven. Oracle accepts some counterfactual state offsets; do not claim precise state semantics.",
+          "last_observation": "Sol accepted bounded 5b for PickCube three specified routes. Independently verified 1961/1961 manifest, guarded 27 tests, actual camera matrices, native GeoPhys scene projection, and same-run window/RGB pixels; retain prior Isaac human acceptance and all stated limitations.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
@@ -1486,7 +1487,12 @@
             "reviews/20261107_5b_diagnostic_attempt002_sol_review.md",
             "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/release-receipt.json",
-            "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
+            "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/route-matrix.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/output-manifest.json",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/release-receipt.json",
+            "reviews/20261107_5b_diagnostic_attempt003_sol_review.md"
           ],
           "commits": [
             "a79273d045191d004bc938fd03c87f76661156ff",
@@ -1495,17 +1501,18 @@
             "2b8f82b719880f9eb65cb332b30363c64b034deb",
             "0cfb43efdcf22baac411d244819c47a5863fc7cf",
             "35be7af495c21925ad7a97595fd4fec9c6db36d7",
-            "8130549070c4d2941ea866318bf327177fb678e7"
+            "8130549070c4d2941ea866318bf327177fb678e7",
+            "97aca27f",
+            "d4284034",
+            "b9f5bc5e7764667d706a9119188ff6780d78a3e3"
           ],
           "review_decision": {
-            "status": "DIAGNOSIS_PARTIAL_5B_NOT_ACCEPTED",
+            "status": "ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB",
             "reviewer": "Sol",
             "date": "2026-11-07",
-            "review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
+            "review_ref": "reviews/20261107_5b_diagnostic_attempt003_sol_review.md"
           },
-          "blockers": [
-            "MuJoCo and GeoPhys selected production routes have null task camera configurations; route-specific task/observer isolation is not established."
-          ],
+          "blockers": [],
           "pre_attempt003_reassessment": {
             "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
             "ref": "../planning/stage5-5b-attempt003-reassessment.md",
@@ -1519,7 +1526,7 @@
             "prior_usage": "source and native each conservatively 679.96 seconds; explicit-step reservations 192/10000, ten zero-step CPU diagnostics missed advance reservations; retain limitations",
             "ref": "reviews/20261107_5b_attempt003_resource_review.md"
           },
-          "diagnostic_attempt_count": 3,
+          "diagnostic_attempt_count": 4,
           "diagnostic_attempts": [
             {
               "attempt": 1,
@@ -1559,6 +1566,21 @@
               "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/report.md",
               "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/release-receipt.json",
               "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
+            },
+            {
+              "attempt": 4,
+              "package_id": "V211_G05_5b_diagnostic_attempt003",
+              "window_count_note": "Fourth diagnostic window; named diagnostic attempt003, not ordinary 004.",
+              "status": "REVIEWED_ACCEPTED_BOUNDED",
+              "result": "TECHNICAL_PASS_PENDING_SOL",
+              "input_head": "292a4446aa37b53de2f3103ac96c7f7dc4f6d61b",
+              "output_head": "b9f5bc5e7764667d706a9119188ff6780d78a3e3",
+              "provider_output_head": "1dd9ebdfb5160cbe903aebf026d502b201161a23",
+              "package_prompt_sha256": "88efc3a1477d4cd8ac076bf96921801e796d50dfb3ba8769940a5bee92988e26",
+              "output_manifest_sha256": "c1fa15211a38e79aeb5bea16ca1322424e24b3cba897c3362bfdb0aa165e73e5",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/report.md",
+              "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt003/release-receipt.json",
+              "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt003_sol_review.md"
             }
           ],
           "maintainer_isaac_rgb_review": {
@@ -1776,11 +1798,11 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G04_4c_attempt001",
-    "status": "ACCEPTED_BOUNDED_4C_RESET_PICKCUBE",
-    "output_head": "0f2e9053a32e2cb7058864b3ef18ebd4c91dfbf1",
-    "sol_review_ref": "reviews/20261106_4c_attempt001_sol_review.md",
-    "note": "4a, 4b and 4c individually accepted within their own limits; no automatic stage 5."
+    "package_id": "V211_G05_5b_diagnostic_attempt003",
+    "status": "ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB",
+    "output_head": "b9f5bc5e7764667d706a9119188ff6780d78a3e3",
+    "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt003_sol_review.md",
+    "note": "5b accepted for the stated three PickCube routes; 5c remains PLANNED and not dispatched."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,

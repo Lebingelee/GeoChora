@@ -80,16 +80,16 @@ MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=Tr
 视觉更新或其结果验证失败时，renderer binding 进入 fault 并尝试关闭自有资源；即便回滚后的 Frame poses 可核对，也须重建 binding，因为这不能证明所有 renderer 派生字段均已恢复。故障后不再提供 pose、sync、capture 或旧 receipt 作为当前结果；已返回给调用者的旧 receipt 只表示它原来的历史边界。`env.visual_binding_status()` 报告 fault 与 renderer close 的实际状态，close 失败时释放结果为 unknown；physics Env 不因该 renderer 故障被关闭。reset 后可重新 bind，已有其他 owner 不受此绑定清理影响。
 
 <a id="observer-candidate"></a>
-## 5b observer 候选（未完成验收）
+## 5b observer 路线（有界接收）
 
 MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；RGB 为拥有的 HWC float32 数组，窗口与任务 observation 分离。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。其 RGB 声明为 RTX tone mapping 后的 sRGB 传递函数；采集前后核验指定 RTX 设置和 OCIO 文件摘要，未通过时拒绝该帧。该声明不校准原色或源素材色域。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
 
 此前 Isaac 原生 viewport 的关闭会使共享 App 的物理时钟和运行态失效。当前选定候选使用 headless App 和 GeoChora 自有窗口；正常关闭窗口与 App 崩溃是不同情形，适用证据及限制见[诊断主审](../maintenance/reviews/20261107_5b_diagnostic_attempt002_sol_review.md)。
 
-F06 候选可在 `make_env` 构造时另外提供 `task_camera=CameraGeometry(...)`，当前仅支持一个 world 挂载、与 observer 使用不同 camera ID 的相机，且需与同一 TaskArtifact 关联。每次 reset 的现有 Isaac 场景 owner 会创建该 USD camera；`env.task_camera_binding()` 从当前原生场景核验并读取几何、source、相机路径与状态边界。它是几何绑定，不自动采集 task RGB、depth 或 segmentation；reset 替换场景并重新绑定，close 释放场景。它不表示通用挂载或同步 task observation 已实现。真实场景观察相机运动和读回证据待 Sol 独立审查。
+F06 候选可在 `make_env` 构造时另外提供 `task_camera=CameraGeometry(...)`，当前仅支持一个 world 挂载、与 observer 使用不同 camera ID 的相机，且需与同一 TaskArtifact 关联。每次 reset 的现有 Isaac 场景 owner 会创建该 USD camera；`env.task_camera_binding()` 从当前原生场景核验并读取几何、source、相机路径与状态边界。它是几何绑定，不自动采集 task RGB、depth 或 segmentation；reset 替换场景并重新绑定，close 释放场景。它不表示通用挂载或同步 task observation 已实现。真实场景观察相机运动和读回已在 F06 具体配置下有界接收。
 
-PickCube physical candidate 的 MuJoCo CPU observer 与 GeoPhys CPU rasterizer observer 也可在构造时声明一个 world-mounted `task_camera`。任务相机与 observer 的 ID 必须不同；MuJoCo 当前还要求两者的 clip 和分辨率相同。`task_camera_binding()` 读取各自 renderer owner 的实际 camera；它不创建自动 observation。支持范围和本次真实证据待独立主审。
+PickCube physical candidate 的 MuJoCo CPU observer 与 GeoPhys CPU rasterizer observer 也可在构造时声明一个 world-mounted `task_camera`。任务相机与 observer 的 ID 必须不同；MuJoCo 当前还要求两者的 clip 和分辨率相同。`task_camera_binding()` 读取各自 renderer owner 的实际 camera；它不创建自动 observation。这两条 CPU 路线的真实窗口、相机隔离和 RGB 证据已按各自限定范围独立接收。
 
-PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前真实 source CPU 离屏试验使用了默认灯光，只是探索证据；窗口和完整 5b 路线仍需独立验收，这不代表同步 task observation 已接通。
+PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前使用默认灯光的 CPU 离屏试验仅为探索证据；后续使用源灯光的所选 rasterizer 真实窗口/RGB 和 5b 相机隔离已按限定范围接收，这不代表同步 task observation 已接通。
 
-5b attempt001 的窗口和图像未被接收，见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；上述候选及本次有界检查均不代表三路线 5b 已接收。GeoPhys 原生窗口／RGB、同步 task observation、renderer 切换和 cross 组合不由这些候选自动建立。
+5b attempt001 的未接收历史见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；三路线 5b 当前接收范围与限制见[最终主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)。同步 task observation、renderer 切换和 cross 组合仍属 5c，尚未完成。

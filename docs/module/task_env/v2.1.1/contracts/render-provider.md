@@ -6,6 +6,8 @@
 
 同一 public Env 在 reset 上切换已准入 renderer；内部可重建 render session、worker/App 与资源 lease，窗口／RGB／同步 task RGB 的固定输出契约保持。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。
 
+5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、renderer reset 切换与跨组合仍为 5c 待完成目标。
+
 ## 三项独立完成目标
 
 | 目标 | 用户入口 | 本目标完成条件 | 不构成的证据 |
@@ -55,7 +57,7 @@ renderer 与 physics 的共享 binding、同一 capture frame 和 batch image bu
 
 Camera 固定字段至少包括稳定命名、mount entity/frame、相对 transform 方向、position 单位与 handedness、quaternion 顺序、intrinsic/FOV/projection、resolution、near/far clip、通道/颜色空间、dtype、range、layout、device、owner/lifetime。构建固定字段与 reset 可变化字段分别声明；缺值不静默套用默认。task camera geometry/count、observation shape/dtype/semantic 固定到 env 构建契约，允许 reset 重采样实际 extrinsics 时要把值绑定到 episode identity。窗口尺寸和 observer-camera 拖动不改 task camera。
 
-F06 Isaac 候选的有界几何路径可在构造时声明一个 world 挂载 task camera；现有 session 在 reset 后的当前场景建立 USD camera 并提供核验原生几何的读回，场景替换时重新绑定、关闭时释放。task camera 和 observer ID 必须不同。此路径不自动采集 task observation，也不支持一般动态挂载；其真实证据仍待独立主审。
+F06 Isaac 候选的有界几何路径可在构造时声明一个 world 挂载 task camera；现有 session 在 reset 后的当前场景建立 USD camera 并提供核验原生几何的读回，场景替换时重新绑定、关闭时释放。task camera 和 observer ID 必须不同。此路径不自动采集 task observation，也不支持一般动态挂载；其限定 F06 真实绑定与观察相机隔离已独立有界接收。
 
 建议调用外形（仅设计值）：
 
@@ -96,7 +98,7 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 | 用户关闭窗口/display lost | 不影响独立 task capture | 停止 present；记录 display event | physics/episode 可继续，除非此路线公开 App/window 生命周期无法分离，此时以 typed route fault 明确通知 |
 | borrowed/async completion 未就绪 | 不得消费 | 不得 present incomplete | 等 fence 或返回 pending/error；不能伪造成功 |
 
-## 首批路线与当前能力（静态审计，不是验证）
+## 首批路线实施前静态审计（历史状态，不是当前验证）
 
 | physics route | renderer/capture 路径与公开入口 | 当前状态 | 1d/后续最小工作与 owner |
 | --- | --- | --- | --- |
@@ -105,7 +107,7 @@ Canonical RGB observation 至少公开 H×W×3、RGB channel、明确 sRGB/linea
 | Isaac Sim 6.2.0.0 + PhysX/CUDA:0 | 官方 native camera 候选：Isaac Sim 6.2 sensor/RTX/Replicator APIs；Core 的 `IsaacSimAppOwnerV1` 与 `UsdCoreRuntimeSession` 管 App/session，但无当前 task camera consumer | 精确 App owner 当前 headless、camera-disabled；无 selected PickCube camera/renderer route。官方能力不是本仓库 adapter/evidence | 5a：确认 public adapter + exact 6.2 experimental camera API/依赖/admission；5b：window/display 与 per-worker App lease；5c：synced capture/camera data/fence/RGB。不能以 viewport availability 代替 task RGB |
 | GeoPhys CPU physics × MuJoCo native OpenGL renderer | 已有 `MuJoCoDynamicCameraSession` 从 source closure 构造 render-only MuJoCo model，写 scalar qpos/time，kinematics/camera/light/update/render；不 `mj_step`/`mj_forward` | 当前 dynamic candidate `best_effort`，仅 scalar Scene-v3；PickCube free cube 不可用；历史 evidence 对旧 GeoPhys pin，当前 pin 未验证 | 仍为必达真实跨组合候选，不缩减目标。5a owner `DynamicCameraRenderSourceV1`/typed state→visual mapping；5c owner consumer/Env；未来用无第二 physics advance 的 oracle 检查 free body transform/capture boundary |
 
-### 2026-11-07 G05 / 5b diagnostic update — pending independent Sol review
+### 2026-11-07 G05 / 5b earlier diagnostic update — historical pending review
 
 The diagnostic on Core input `427b862665af5ab79f8cae7068f6d575ce9b6223`, GeoPhys `a6bf45b3422e31dfc632a58948e57fa4b686f1b0`, and Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` demonstrates a bounded Isaac observer candidate. This update records evidence and limitations; it is not 5b acceptance, and stage 5c remains outstanding.
 
