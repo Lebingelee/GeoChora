@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b attempt003 未接收，须维护者主导诊断
+## 当前：G05 5b 诊断 attempt001 部分通过，须返工
+
+[诊断 001 Sol 独立主审](reviews/20261107_5b_diagnostic_attempt001_sol_review.md)决定 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，普通 count=3、诊断 count=1，5b 未接收。Isaac headless 原生帧、独立真实窗口及关窗后继续采集取得有界证据；固定 holdout 未通过，存在任务相机隔离和 stale 证据限制。此次通用 reset 入口对所有 fault 拒绝 rebuild，是独立复现的跨路线回归，须修复；先按实际输入与代码影响复用 CPU 路线证据。维护者继续主导后续诊断，不自动派包或进入 5c。
+
+## 历史：G05 5b attempt003 未接收，转维护者主导诊断
 
 [003 最终主审](reviews/20261107_5b_attempt003_final_sol_review.md)决定 `NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED`，count=3。三路线真实窗口／RGB 有界证据及原资源偏差、未知启动步和失败保留；Isaac 原生窗口关闭使 App clock/runtime 失效，Env 未按合同发布／锁存 typed route fault。Sol 守卫下独立 38 项通过及定向错误传播检查；不自动普通 004、改名清零或进入 5c，等待维护者主导诊断。
 

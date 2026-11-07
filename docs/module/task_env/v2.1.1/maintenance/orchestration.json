@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Attempt003 final independent review found Isaac window close invalidates App but lacks admitted lifecycle limitation and typed Env route fault. Stop ordinary dispatch; await maintainer-led diagnosis; 5c remains planned.",
+  "next_action": "Diagnostic attempt001 independently reviewed PARTIAL: preserve bounded Isaac headless/window-close progress; resolve general reset recovery regression, D1 holdout and scoped camera/stale evidence under maintainer-led diagnosis; no ordinary 004 or automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1442,7 +1442,7 @@
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt002/",
           "package_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
           "input_head": "a34262af95bf9ef65438ece5b2620ff2df553be5",
-          "output_head": "2b8f82b719880f9eb65cb332b30363c64b034deb",
+          "output_head": "0cfb43efdcf22baac411d244819c47a5863fc7cf",
           "expected_duration_minutes": "360-600 active, 720 wall maximum",
           "execution_budget": {
             "wall_minutes": 720,
@@ -1455,7 +1455,7 @@
             "gpu_vram_gib": 6,
             "new_ignored_output_gib": 5
           },
-          "last_observation": "Sol final: 345/345 output hashes, final run diff matches commit, guarded 38 passed; three routes have bounded real-window/RGB evidence, but observed Isaac window close invalidates App without required typed Env route fault/admission disclosure. Stale-frame negative duplicates swapped view. Follow-up static inspection found selected CPU Tk windows lack an observed mouse-drag camera handler; view-switch tests only use set_observer_camera.",
+          "last_observation": "Sol diagnostic001 review: 457/457 files verified; Isaac headless RGB and detached window close bounded positive; D1 fixed holdout 0.072830 < 0.1; generic SelectedReferenceEnv.reset rejects all fault phases, independently reproduced under SDK/source guards and conflicts with existing rebuild recovery; task-camera test used null configuration.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
@@ -1475,24 +1475,29 @@
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/output-manifest.json",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/release-receipt.json",
-            "reviews/20261107_5b_attempt003_final_sol_review.md"
+            "reviews/20261107_5b_attempt003_final_sol_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt001/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt001/output-manifest.json",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt001/release-receipt.json",
+            "reviews/20261107_5b_diagnostic_attempt001_sol_review.md"
           ],
           "commits": [
             "a79273d045191d004bc938fd03c87f76661156ff",
             "1bbcf68a0854a982753e891eafe923e8d1476f5f",
             "b76f718e44e92126d2618692ba915ca5a123f99c",
-            "2b8f82b719880f9eb65cb332b30363c64b034deb"
+            "2b8f82b719880f9eb65cb332b30363c64b034deb",
+            "0cfb43efdcf22baac411d244819c47a5863fc7cf"
           ],
           "review_decision": {
-            "status": "NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED",
+            "status": "DIAGNOSIS_PARTIAL_REWORK_REQUIRED",
             "reviewer": "Sol",
             "date": "2026-11-07",
-            "review_ref": "reviews/20261107_5b_attempt003_final_sol_review.md"
+            "review_ref": "reviews/20261107_5b_diagnostic_attempt001_sol_review.md"
           },
           "blockers": [
-            "Isaac native window close invalidates App/physics runtime yet selected Env does not publish/latch typed route fault and admission does not disclose lifecycle restriction",
-            "Isaac final stale-frame negative duplicates swapped view, not an independent old-state negative; exploratory image selection and uncalibrated primaries/assets remain scoped limitations",
-            "Selected MuJoCo/GeoPhys Tk presentation has no observed observer-camera drag handler; the original drag/task-camera isolation condition is not independently established; CPU routes not separately accepted."
+            "General SelectedReferenceEnv reset/reset_for_solution rejects every execution fault including previously recoverable non-observer failures, contrary to same-Env rebuild recovery.",
+            "Isaac fixed holdout C contrast 0.072830 is below predeclared 0.1 threshold; root cause versus oracle limitation remains unresolved; D1 was run before final commit without an identified run-specific Core diff.",
+            "Task-camera isolation with a configured task camera and an actual stale-state/production rejection require applicable evidence analysis; shared CPU-window behavior needs impact assessment."
           ],
           "pre_attempt003_reassessment": {
             "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
@@ -1506,7 +1511,23 @@
             "count": "same attempt003, no ordinary 004",
             "prior_usage": "source and native each conservatively 679.96 seconds; explicit-step reservations 192/10000, ten zero-step CPU diagnostics missed advance reservations; retain limitations",
             "ref": "reviews/20261107_5b_attempt003_resource_review.md"
-          }
+          },
+          "diagnostic_attempt_count": 1,
+          "diagnostic_attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G05_5b_diagnostic_attempt001",
+              "status": "REVIEWED_REWORK_REQUIRED",
+              "result": "DIAGNOSIS_PARTIAL",
+              "input_head": "427b862665af5ab79f8cae7068f6d575ce9b6223",
+              "output_head": "0cfb43efdcf22baac411d244819c47a5863fc7cf",
+              "package_prompt_sha256": "87cec778884b60bfc3a6aec7e151210f50598915184722f4e08a08edb3edbcab",
+              "output_manifest_sha256": "f15ece1e51a3949fc5f3a7bb4e20cbfce3422e6ddefe0971080c62662261b447",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt001/report.md",
+              "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt001/release-receipt.json",
+              "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt001_sol_review.md"
+            }
+          ]
         },
         {
           "id": "5c",
