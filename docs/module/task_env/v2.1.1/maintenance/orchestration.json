@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Diagnostic attempt002 reviewed PARTIAL: reset bounded repair and real CPU close evidence preserved; use the current headless Isaac + GeoChora window and prior applicable D2/D3 evidence, do not require obsolete viewport closure; resolve configured task-camera isolation and source-bound RGB evidence within 5b without prematurely requiring 5c; no automatic dispatch.",
+  "next_action": "Diagnostic002 rerun reviewed PARTIAL: retain Isaac production world-camera isolation and bounded scene image; under maintainer-led diagnosis resolve route-specific MuJoCo/GeoPhys configured task-camera binding/isolation without automatically requiring 5c observation. No automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1442,7 +1442,7 @@
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt002/",
           "package_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
           "input_head": "a34262af95bf9ef65438ece5b2620ff2df553be5",
-          "output_head": "35be7af495c21925ad7a97595fd4fec9c6db36d7",
+          "output_head": "8130549070c4d2941ea866318bf327177fb678e7",
           "expected_duration_minutes": "360-600 active, 720 wall maximum",
           "execution_budget": {
             "wall_minutes": 720,
@@ -1455,7 +1455,7 @@
             "gpu_vram_gib": 6,
             "new_ignored_output_gib": 5
           },
-          "last_observation": "Diagnostic002 Sol: 858/858 output hashes verified; guarded 24 passed; reset recovery and CPU close bounded evidence; 001 headless Isaac current owned-window close can be reused with diff limits. F06 task-camera config missing; actual task observer contract and independent image evidence need bounded 5b resolution without 5c automatic observation.",
+          "last_observation": "Diagnostic002 rerun reviewed: 298/298 manifest verified; guarded 26 passed. Isaac F06 world-mounted production task camera isolation and bounded scene image accepted. MuJoCo and GeoPhys task camera configurations are null; route-specific isolation remains unproven. Oracle accepts some counterfactual state offsets; do not claim precise state semantics.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
@@ -1483,7 +1483,10 @@
             "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002/output-manifest.json",
             "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002/release-receipt.json",
-            "reviews/20261107_5b_diagnostic_attempt002_sol_review.md"
+            "reviews/20261107_5b_diagnostic_attempt002_sol_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/release-receipt.json",
+            "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
           ],
           "commits": [
             "a79273d045191d004bc938fd03c87f76661156ff",
@@ -1491,17 +1494,17 @@
             "b76f718e44e92126d2618692ba915ca5a123f99c",
             "2b8f82b719880f9eb65cb332b30363c64b034deb",
             "0cfb43efdcf22baac411d244819c47a5863fc7cf",
-            "35be7af495c21925ad7a97595fd4fec9c6db36d7"
+            "35be7af495c21925ad7a97595fd4fec9c6db36d7",
+            "8130549070c4d2941ea866318bf327177fb678e7"
           ],
           "review_decision": {
-            "status": "DIAGNOSIS_PARTIAL_REWORK_REQUIRED",
+            "status": "DIAGNOSIS_PARTIAL_5B_NOT_ACCEPTED",
             "reviewer": "Sol",
             "date": "2026-11-07",
-            "review_ref": "reviews/20261107_5b_diagnostic_attempt002_sol_review.md"
+            "review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
           },
           "blockers": [
-            "Task-camera isolation with a configured task camera is not established for the current selected F06 route; determine a bounded 5b geometry/binding proof without requiring 5c automatic observation, or seek maintainer decision on staged evidence.",
-            "Original holdout C failed 0.1; independent full 5b source-bound image evidence remains to be assessed or complemented with a defensible predeclared oracle; preserve historical selection bias and per-run code identities."
+            "MuJoCo and GeoPhys selected production routes have null task camera configurations; route-specific task/observer isolation is not established."
           ],
           "pre_attempt003_reassessment": {
             "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
@@ -1516,7 +1519,7 @@
             "prior_usage": "source and native each conservatively 679.96 seconds; explicit-step reservations 192/10000, ten zero-step CPU diagnostics missed advance reservations; retain limitations",
             "ref": "reviews/20261107_5b_attempt003_resource_review.md"
           },
-          "diagnostic_attempt_count": 2,
+          "diagnostic_attempt_count": 3,
           "diagnostic_attempts": [
             {
               "attempt": 1,
@@ -1543,6 +1546,19 @@
               "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002/report.md",
               "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002/release-receipt.json",
               "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt002_sol_review.md"
+            },
+            {
+              "attempt": 3,
+              "package_id": "V211_G05_5b_diagnostic_attempt002_rerun001",
+              "status": "REVIEWED_PARTIAL_5B_NOT_ACCEPTED",
+              "result": "PARTIAL",
+              "input_head": "7557d8bbc014388887c77c09af868fb69e249dba",
+              "output_head": "8130549070c4d2941ea866318bf327177fb678e7",
+              "package_prompt_sha256": "1ee46add377d11568e4267c23da4c486e090967b2dacc24be30ba99f0fe74214",
+              "output_manifest_sha256": "5b844550d5c478e982e63ef2a53d2aca486498e6a3ecc22bc0f16543020341f6",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/report.md",
+              "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/release-receipt.json",
+              "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
             }
           ]
         },

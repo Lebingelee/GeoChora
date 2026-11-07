@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b 诊断 attempt002 部分通过，须继续有界诊断
+## 当前：G05 5b 诊断 002 补充重做已主审，5b 尚未接收
+
+[Sol 独立主审](reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md)决定 `DIAGNOSIS_PARTIAL_5B_NOT_ACCEPTED`，普通 count=3、诊断窗口 count=3。Isaac F06 单个 world-mounted 真实任务相机与 observer 隔离及限定场景图像可辨性有界成立。MuJoCo、GeoPhys 的 task camera 均为 null，不能判各自隔离已通过；窗口及 RGB 有界证据按路径复用。新图像规则的状态偏移误报、旧 C 未过和各项限制保留。继续由维护者主导，不自动派包或进入 5c。
+
+## 历史：G05 5b 诊断 attempt002 部分通过，须继续有界诊断
 
 [诊断 002 Sol 独立主审](reviews/20261107_5b_diagnostic_attempt002_sol_review.md)决定 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，普通 count=3、诊断 count=2，5b 未接收。通用 reset 恢复回归取得真实 MuJoCo 有界修复证据，MuJoCo/GeoPhys 关窗及旧 receipt 失效取得限定证据。当前 Isaac 采用 headless + GeoChora 自有窗口，001 的真实关闭／继续采集证据可按差异复用，不将旧原生 viewport 关窗错误地设为当前必测。剩余为 5b task-camera 分离及可辨图像证据的具体闭合；不自动提前实现 5c observation。维护者继续主导，不自动派包。
 
