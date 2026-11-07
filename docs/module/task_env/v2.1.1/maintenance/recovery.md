@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：5c attempt001 已获批准，等待维护者人工转发
+## 当前：5c attempt001 已主审，需通用任务接线返工
+
+[Sol 独立主审](reviews/20261108_5c_attempt001_sol_review.md)决定 `REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION`，普通 attempt count=1。四条指定 PickCube 真实路线结果有界保留；通用 task RGB 入口硬性要求特定 Position 控制 profile，GeoPhys task RGB 又继承固定追踪灯／headlight 假设，尚未满足维护者的通用场景要求。未事前预约物理步及包外 pytest 输出的过程偏差不可追补，记录保留；其本身不使其他有身份的真实结果失效。不自动派发 attempt002 或进入阶段6。
+
+## 历史：5c attempt001 已获批准，等待维护者人工转发
 
 维护者要求按已修订范围准备完整 5c attempt001，并明确批准所列执行范围、必要时的限定 GeoPhys provider/gitlink 改动和预算。包入口位于维护者工作区 `handoffs/V211_G05_5c_attempt001/`，由维护者指定实施者并手动转发；不自动派发或创建执行对话。准备不算 attempt；开工前须核对包的真实快照、前包 release、writer、保护文件及锁。5c 仍 PLANNED／attempt0，5b 已有界接收，具体以[编排索引](orchestration.json)和[调整后的范围](../planning/stage5-5c-fixed-renderer-scope.md)为准。
 

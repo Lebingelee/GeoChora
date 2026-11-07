@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5b accepted within the documented three-route bounded scope. Maintainer approved the complete 5c attempt001 scope and proposed budget, including necessary bounded GeoPhys provider/gitlink changes. Package ready for manual forward; not dispatched, attempt count remains zero. No automatic dispatch, merge, push, tag or publication.",
+  "next_action": "5c attempt001 independently reviewed: REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION; four real PickCube route results bounded and reusable, process deviations preserved. Await maintainer direction on focused attempt002; no automatic dispatch, merge, push, tag or publication.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,25 +1595,36 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
-          "package_preparation_status": "APPROVED_READY_FOR_MANUAL_FORWARD",
+          "package_preparation_status": "DISPATCHED_COMPLETED_REVIEWED",
           "dependencies": [
             "5b"
           ],
-          "status": "PLANNED",
-          "attempt_count": 0,
-          "attempts": [],
-          "assigned_agent": null,
+          "status": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
+          "attempt_count": 1,
+          "attempts": [
+            {
+              "attempt": 1,
+              "package_id": "V211_G05_5c_attempt001",
+              "status": "REVIEWED_REWORK_REQUIRED",
+              "result": "TECHNICAL_RESULTS_BOUNDED_EXECUTION_PROTOCOL_EXCEPTION",
+              "input_head": "c7402e4e7d40ce95ec85b6ddc3f8e3bc4d466311",
+              "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
+              "provider_output": "60300ed315932f67ac01b078c35b51547d727917",
+              "review_ref": "reviews/20261108_5c_attempt001_sol_review.md"
+            }
+          ],
+          "assigned_agent": "maintainer-designated manual implementation session; released",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt001",
-          "package_sha256": null,
-          "input_head": null,
-          "output_head": null,
-          "expected_duration_minutes": null,
-          "execution_budget": null,
-          "last_observation": null,
-          "evidence_refs": [],
-          "commits": [],
-          "review_decision": null,
-          "blockers": []
+          "package_sha256": "e32653c6c19d41a2ff8be1f87685c18a0ab9f1f4fca6f102f93dda3716e81e76",
+          "input_head": "c7402e4e7d40ce95ec85b6ddc3f8e3bc4d466311",
+          "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
+          "expected_duration_minutes": "480-600",
+          "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
+          "last_observation": "2026-11-08: complete report and release received; offline independent review complete",
+          "evidence_refs": ["reviews/20261108_5c_attempt001_sol_review.md", "workspace/maintenance/v211_g05_5c_attempt001/report.md", "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md"],
+          "commits": ["9d7b14a47ea419d9d825bc18dadbc37eead95f74"],
+          "review_decision": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
+          "blockers": ["Generic task RGB currently requires selected Position profile tied to PandaPositionServoProfileV1; actual non-Position public caller rejected", "GeoPhys task capture inherits a single tracking light and headlight assumption; declarative lighting boundary not closed"]
         }
       ]
     },
@@ -1801,11 +1812,11 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G05_5b_diagnostic_attempt003",
-    "status": "ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB",
-    "output_head": "b9f5bc5e7764667d706a9119188ff6780d78a3e3",
-    "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt003_sol_review.md",
-    "note": "5b accepted for the stated three PickCube routes; 5c remains PLANNED and not dispatched."
+    "package_id": "V211_G05_5c_attempt001",
+    "status": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
+    "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
+    "sol_review_ref": "reviews/20261108_5c_attempt001_sol_review.md",
+    "note": "Four real PickCube route results bounded and reusable; pre-reservation and pytest-output deviations preserved; generic public integration requires rework."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,

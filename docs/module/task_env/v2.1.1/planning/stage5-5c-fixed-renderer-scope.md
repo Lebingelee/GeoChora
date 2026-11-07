@@ -1,6 +1,6 @@
 # G05 5c：固定 renderer、通用场景与跨组合
 
-状态：`PLANNED`，attempt 0，未派发／未实施。2026-11-07 维护者明确修订 5c renderer 范围；本文承接 [G05 目标](../goals/05-rendering.md)及 [render 协议](../contracts/render-provider.md)，不改变 5a／5b 的历史接收、已保存证据或执行授权。
+当前状态：5c attempt001 经 [Sol 主审](../maintenance/reviews/20261108_5c_attempt001_sol_review.md)决定 `REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION`，普通 count=1；四条 PickCube 同步 RGB 路线的有限证据及过程偏差保留，通用任务接线尚需返工。2026-11-07 维护者明确修订 5c renderer 范围；本文承接 [G05 目标](../goals/05-rendering.md)及 [render 协议](../contracts/render-provider.md)，不改变 5a／5b 的历史接收或已保存证据。
 
 ## 已确认的范围
 
@@ -28,4 +28,4 @@
 
 ## 后续安排
 
-当前只是规划记录，不是 Goal 包、native／SDK／GPU／GUI 授权或实施派发。以后若准备 5c attempt001，应以一次可完成原修订出口的执行窗口组织：明确实际 HEAD、writer 与释放、provider/API 范围、资源预算、操作权限、锁、同窗口修复与独立证据；由维护者指定实施者并手动转发。不要自动进入阶段 6、merge、push、tag 或发布。
+上述范围是规划合同，不是新的 native／SDK／GPU／GUI 授权或实施派发。attempt001 已结束并由 Sol 主审；后续若准备 attempt002，应聚焦实际未闭合项，明确当前 HEAD、writer 与释放、provider/API 范围、资源预算、操作权限、锁、同窗口修复与独立证据；由维护者指定实施者并手动转发。不要自动进入阶段 6、merge、push、tag 或发布。

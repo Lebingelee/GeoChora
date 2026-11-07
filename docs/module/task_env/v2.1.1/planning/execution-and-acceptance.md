@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-当前状态（2026-11-07）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。G05 的 5a 和 5b 已有界接收，5c 为 PLANNED／attempt0；维护者已将同一 Env 的 renderer 切换延期，详见[调整后范围](stage5-5c-fixed-renderer-scope.md)。依[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)准备后续实际工作包。
+当前状态（2026-11-08）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。G05 的 5a 和 5b 已有界接收，[5c attempt001](../maintenance/reviews/20261108_5c_attempt001_sol_review.md)为通用任务接线返工、普通 count=1；四条 PickCube 路线的限定结果及执行偏差保留。维护者已将同一 Env 的 renderer 切换延期，详见[调整后范围](stage5-5c-fixed-renderer-scope.md)。依[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)安排后续工作。
 
 [装配 Panda](stage4-assembled-panda.md)是版本附加集成用例，不新增为 4a–4c 或 G05 接收前置；完整两任务 Solution 用例由 7a 收口。下文旧状态和准备进度是历史时点；实时状态以[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)为准。
 
