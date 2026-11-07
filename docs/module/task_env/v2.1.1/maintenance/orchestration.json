@@ -1560,7 +1560,13 @@
               "release_ref": "../../../../../workspace/maintenance/v211_g05_5b_diagnostic_attempt002_rerun001/release-receipt.json",
               "sol_review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
             }
-          ]
+          ],
+          "maintainer_isaac_rgb_review": {
+            "status": "ACCEPTED_BOUNDED_SCENE_RECOGNIZABILITY",
+            "scope": "Isaac PickCube seed31 observed human A/B and offscreen D/E raw RGB frames; no acceptance of entire 5b or other routes.",
+            "basis": "Maintainer reviewed the four real frames and confirmed the scene is recognizable; pixel NCC and 6 cm counterfactual are not acceptance blockers for this scope.",
+            "review_ref": "reviews/20261107_5b_diagnostic_attempt002_rerun001_sol_review.md"
+          }
         },
         {
           "id": "5c",
