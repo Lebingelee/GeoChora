@@ -1965,7 +1965,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def publish(_state, _observation):
             nonlocal failure_phase
             task_camera = getattr(self, '_declared_task_camera', None)
-            if task_camera is not None:
+            if task_camera is not None and self.provider != 'mujoco':
                 failure_phase = 'task_camera_binding'
                 self.session.bind_task_camera(task_camera, self.typed_state.view)
             failure_phase = 'arm_schedule_reset'
@@ -2232,6 +2232,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         publication = self._published_position_typed_state
         if publication is None or self._execution_fault is not None or self.session is None:
             raise RuntimeError('task camera readback requires a successfully published state')
+        if self.provider == 'mujoco':
+            if getattr(self, '_declared_task_camera', None) is None:
+                raise RuntimeError('no task camera declared')
+            if getattr(self, '_visual_state_session', None) is None:
+                self.bind_visual_state(self._selected_observer_camera, capture=True)
+            return self._visual_state_session.task_camera_binding(publication.view)
         return self.session.task_camera_binding(publication.view)
 
     def set_observer_camera(self, camera):
@@ -2253,8 +2259,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._ui_render_provider.invalidate_frame()
         session = getattr(self, '_visual_state_session', None)
         if session is not None:
-            session.close()
-            self._visual_state_session = None
+            if task_camera is not None and self.provider == 'mujoco':
+                session.set_observer_camera(camera)
+            else:
+                session.close()
+                self._visual_state_session = None
         self._selected_observer_camera = camera
 
     def render_receipt(self):
@@ -2299,7 +2308,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         execution = ExecutionSpecV1('execution-spec-v1', 'mujoco', 'cpu', V211_PHYSICS_PROFILE,
                                     self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
         session = create_dynamic_camera_session(camera, execution, source=source,
-                                                initial_state=publication.view)
+                                                initial_state=publication.view,
+                                                task_camera=getattr(self, '_declared_task_camera', None))
         self._visual_state_session = session
         self._visual_binding_last_close = None
         self._visual_binding_last_fault = False

@@ -161,10 +161,18 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         execution,
         manifest,
         entity_segmentation: bool = False,
+        task_camera=None,
     ):
         import mujoco
 
         self._initialize(camera)
+        self._task_camera = task_camera
+        if task_camera is not None:
+            task_camera.validate()
+            if (task_camera.parent_frame != 'world' or task_camera.task_artifact_hash != camera.task_artifact_hash
+                    or task_camera.camera_id == camera.camera_id or task_camera.near != camera.near
+                    or task_camera.far != camera.far or (task_camera.width, task_camera.height) != (camera.width, camera.height)):
+                raise ValueError('MuJoCo task camera requires a distinct world camera with shared clip and resolution')
         self._mj = mujoco
         self._source = source
         self._execution = execution
@@ -236,6 +244,16 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
                 world, 'camera', name=self._native_camera_name, pos='0 0 1',
                 quat='1 0 0 0', fovy=str(math.degrees(camera.fov_y)),
             )
+            if task_camera is not None:
+                name = 'geochora_task_camera'
+                if any(node.get('name') == name for node in root.iter('camera')):
+                    raise ValueError('task camera name collides with source')
+                transform = np.asarray(task_camera.T_parent_from_mount) @ np.asarray(task_camera.T_mount_from_camera)
+                rotation = transform[:3, :3] @ np.diag([1., -1., -1.])
+                quaternion = np.zeros(4)
+                mujoco.mju_mat2Quat(quaternion, rotation.reshape(-1))
+                ET.SubElement(world, 'camera', name=name, pos=_numbers(transform[:3, 3]),
+                              quat=_numbers(quaternion), fovy=str(math.degrees(task_camera.fov_y)))
             if not any(node.tag == 'light' for node in world.iter()):
                 ET.SubElement(
                     world, 'light', name='geochora_d03_key', pos='1 -1 2',
@@ -444,6 +462,42 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
     def camera_geometry_identity(self):
         self._require_trustworthy()
         return self._geometry.identity_hash
+
+    def set_observer_camera(self, camera):
+        self._require_trustworthy()
+        if self._task_camera is None:
+            raise RuntimeError('persistent observer camera requires a task camera')
+        if (camera.near, camera.far) != (self._task_camera.near, self._task_camera.far):
+            raise ValueError('MuJoCo task and observer cameras must share clip interval')
+        self._model.cam_fovy[self._camera_index] = math.degrees(camera.fov_y)
+        self._geometry = camera
+
+    def task_camera_binding(self, state):
+        self._require_trustworthy()
+        if self._task_camera is None:
+            raise RuntimeError('no task camera is bound')
+        self.sync_state(state)
+        self._mj.mj_kinematics(self._model, self._data)
+        self._mj.mj_camlight(self._model, self._data)
+        index = self._model.camera('geochora_task_camera').id
+        native = np.eye(4)
+        native[:3, :3] = np.asarray(self._data.cam_xmat[index]).reshape(3, 3) @ np.diag([1., -1., -1.])
+        native[:3, 3] = self._data.cam_xpos[index]
+        expected = np.asarray(self._task_camera.T_parent_from_mount) @ np.asarray(self._task_camera.T_mount_from_camera)
+        fov = float(self._model.cam_fovy[index])
+        clip = [float(self._model.vis.map.znear * self._model.stat.extent),
+                float(self._model.vis.map.zfar * self._model.stat.extent)]
+        resolution = [int(self._renderer.width), int(self._renderer.height)]
+        if (not np.allclose(native, expected, atol=1e-6, rtol=0)
+                or not math.isclose(fov, math.degrees(self._task_camera.fov_y), abs_tol=1e-6)
+                or not np.allclose(clip, (self._task_camera.near, self._task_camera.far), atol=2e-6, rtol=0)
+                or resolution != [self._task_camera.width, self._task_camera.height]):
+            raise RuntimeError('native task camera differs from declaration')
+        return {'camera': self._task_camera.to_mapping(), 'camera_identity': self._task_camera.identity_hash,
+                'owner': self._consumer_id, 'native_camera': 'geochora_task_camera',
+                'native_world_transform': native.tolist(), 'native_fov_y_degrees': fov,
+                'native_clip': clip, 'native_resolution': resolution,
+                'state_boundary': state.boundary.to_mapping(), 'source_closure': self._source.source_closure_digest}
 
     def visual_model_info(self):
         """Describe renderer-owned model resources without exposing native handles."""

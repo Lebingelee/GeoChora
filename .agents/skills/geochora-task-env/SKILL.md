@@ -77,4 +77,6 @@ The same MuJoCo PickCube candidate and exact F06 Isaac 6.2 candidate also have e
 
 For the F06 candidate, `task_camera=CameraGeometry(...)` at construction declares one world-mounted task camera with an ID distinct from the observer. Reset binds a USD camera in the existing scene owner, and `task_camera_binding()` reads and checks that native binding. This is geometry-only, has no automatic task RGB/depth/segmentation consumer, and is not a general moving-mount implementation; its 5b evidence requires independent review.
 
+The selected PickCube MuJoCo CPU and GeoPhys CPU rasterizer observer candidates also admit one world-mounted `task_camera` at construction with a distinct ID. `task_camera_binding()` reads its native renderer-owned geometry and current publication; MuJoCo currently shares observer resolution and clipping. Neither route enables automatic task observations or moving mounts; per-route evidence requires independent review.
+
 A failed visual update faults and releases its own renderer binding; even verified previous Frame poses do not prove all derived renderer state was restored, so rebuild is required. Use `visual_binding_status()` to distinguish a fault and an unknown close result; the physics Env remains separately owned. Historical receipts already returned to callers remain historical, not current state.

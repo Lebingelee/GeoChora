@@ -31,8 +31,18 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
         values = {} if config is None else dict(config)
         observer_camera = kwargs.pop('observer_camera', None)
+        task_camera = kwargs.pop('task_camera', None)
         if kwargs or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy'}:
             raise ValueError('PickCube physical candidate rejects unsupported configuration')
+        if task_camera is not None:
+            from ...observations.canonical_camera import CameraGeometry
+            if type(task_camera) is not CameraGeometry:
+                raise TypeError('task camera must be CameraGeometry')
+            task_camera.validate()
+            if task_camera.parent_frame != 'world' or render_mode is None:
+                raise ValueError('task camera requires observer rendering and a world mount')
+            if task_camera.camera_id == getattr(observer_camera, 'camera_id', None):
+                raise ValueError('task and observer cameras require distinct identities')
         if render_mode is not None:
             from ...render.base.contracts import normalize_render_mode
             from ...observations.canonical_camera import CameraGeometry
@@ -81,6 +91,11 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
                                space_policy=space_policy)
         if render_mode is not None:
             try:
+                if task_camera is not None:
+                    import copy
+                    if task_camera.task_artifact_hash != env.artifact.identity_hash:
+                        raise ValueError('task camera TaskArtifact linkage mismatch')
+                    env._declared_task_camera = copy.deepcopy(task_camera)
                 env._configure_selected_observer(render_mode, observer_camera)
             except BaseException as error:
                 try:

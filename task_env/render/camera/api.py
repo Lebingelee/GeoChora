@@ -210,6 +210,7 @@ def create_dynamic_camera_session(
     source: DynamicCameraRenderSourceV1,
     initial_state,
     manifest=None,
+    task_camera=None,
 ):
     """Create one independent visual consumer after source/state admission."""
 
@@ -221,6 +222,7 @@ def create_dynamic_camera_session(
     return MuJoCoDynamicCameraSession(
         camera, source, initial_projection, execution=execution, manifest=actual_manifest,
         entity_segmentation=(selected.profile == D04_ENTITY_SEGMENTATION_PROFILE),
+        task_camera=task_camera,
     )
 
 

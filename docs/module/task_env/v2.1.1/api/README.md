@@ -88,6 +88,8 @@ MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 
 
 F06 候选可在 `make_env` 构造时另外提供 `task_camera=CameraGeometry(...)`，当前仅支持一个 world 挂载、与 observer 使用不同 camera ID 的相机，且需与同一 TaskArtifact 关联。每次 reset 的现有 Isaac 场景 owner 会创建该 USD camera；`env.task_camera_binding()` 从当前原生场景核验并读取几何、source、相机路径与状态边界。它是几何绑定，不自动采集 task RGB、depth 或 segmentation；reset 替换场景并重新绑定，close 释放场景。它不表示通用挂载或同步 task observation 已实现。真实场景观察相机运动和读回证据待 Sol 独立审查。
 
+PickCube physical candidate 的 MuJoCo CPU observer 与 GeoPhys CPU rasterizer observer 也可在构造时声明一个 world-mounted `task_camera`。任务相机与 observer 的 ID 必须不同；MuJoCo 当前还要求两者的 clip 和分辨率相同。`task_camera_binding()` 读取各自 renderer owner 的实际 camera；它不创建自动 observation。支持范围和本次真实证据待独立主审。
+
 PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前真实 source CPU 离屏试验使用了默认灯光，只是探索证据；窗口和完整 5b 路线仍需独立验收，这不代表同步 task observation 已接通。
 
 5b attempt001 的窗口和图像未被接收，见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；上述候选及本次有界检查均不代表三路线 5b 已接收。GeoPhys 原生窗口／RGB、同步 task observation、renderer 切换和 cross 组合不由这些候选自动建立。

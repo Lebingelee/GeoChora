@@ -131,6 +131,21 @@ def test_usd_task_camera_operations_reject_stale_or_changed_state(monkeypatch):
         session.bind_task_camera('camera', SimpleNamespace(boundary='current'))
 
 
+def test_cpu_candidate_rejects_task_observer_alias_and_moving_mount():
+    from dataclasses import replace
+    from task_env.tasks.pick_cube.physical_candidate import PickCubePhysicalCandidateEnv
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    camera = CameraGeometry('camera-observation-v0', 'a' * 64, 'observer', 'world',
+                            IDENTITY, IDENTITY, 320, 240, 1.0, .01, 10., True, False)
+    with pytest.raises(ValueError, match='distinct identities'):
+        PickCubePhysicalCandidateEnv.from_reference_config({}, render_mode='human',
+            observer_camera=camera, task_camera=camera)
+    with pytest.raises(ValueError, match='world mount'):
+        PickCubePhysicalCandidateEnv.from_reference_config({}, render_mode='human',
+            observer_camera=camera, task_camera=replace(camera, camera_id='task', parent_frame='hand'))
+
+
 def test_failed_present_does_not_publish_capture_receipt():
     frame = SimpleNamespace(rgb=np.ones((2, 3, 3), dtype=np.float32),
                             metadata=_Mapping({'camera': 'observer'}),

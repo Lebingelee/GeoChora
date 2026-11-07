@@ -693,6 +693,87 @@ class _GeoPhysSession(_SessionValues):
         self._require_reset()
         return self._snapshot_with_native_free_joints()[0]
 
+    def _ensure_observer_visualizer(self, camera):
+        if self._observer_visualizer is None:
+            desc = self._observer_render_source.read_render_scene(backend='rasterizer')
+            table = desc.mjcf_light_table
+            records = () if table is None else table.records
+            spots = [item for item in records if item.runtime_payload.get('mjcf_kind') == 'world_trackcom']
+            if (len(spots) != 1 or any(item.light_type == 'mjcf_unsupported' for item in records)
+                    or sum(item.runtime_payload.get('mjcf_kind') == 'headlight' for item in records) != 1):
+                raise RuntimeError('GeoPhys observer requires one supported source tracking light and headlight')
+            self._observer_tracking_light = spots[0]
+            self._observer_visualizer = self._observer_render_source.build_visualizer(
+                backend='rasterizer', use_render_snapshot=False,
+                use_mjcf_lighting=True, enable_shadow=True,
+                width=camera.width, height=camera.height,
+                max_framebuffer_resolution=(camera.width, camera.height),
+                raster_acceleration='compute', shadow_acceleration='compute',
+                raster_material_flags={'enable_texture_sampling': True,
+                                       'enable_normal_map': True,
+                                       'enable_alpha_blending': True},
+                enable_taa=False, enable_fxaa=False, enable_ssao=False)
+        return self._observer_visualizer
+
+    def bind_task_camera(self, camera, state):
+        import math
+        from ...observations.canonical_camera import CameraGeometry, resolve_camera
+        self._require_reset()
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task camera must be CameraGeometry')
+        camera.validate()
+        if camera.parent_frame != 'world' or camera.task_artifact_hash != self._artifact.identity_hash:
+            raise ValueError('GeoPhys task camera requires the declared artifact and world mount')
+        if self._observer_render_request is None or state.boundary != self.state_boundary_identity():
+            raise ValueError('GeoPhys task camera requires an admitted current observer scene')
+        before = self._snapshot_with_native_free_joints()
+        world = np.asarray(resolve_camera(camera, state).T_world_from_camera)
+        visualizer = self._ensure_observer_visualizer(self._observer_render_request.camera)
+        visualizer.bind_task_camera(camera_id=camera.camera_id, position=world[:3, 3],
+            look_at=world[:3, 3] + world[:3, 2], up=-world[:3, 1],
+            fov_degrees=math.degrees(camera.fov_y), near=camera.near, far=camera.far,
+            width=camera.width, height=camera.height)
+        self._declared_task_camera = camera
+        if before != self._snapshot_with_native_free_joints():
+            raise RuntimeError('physics changed during task camera binding')
+        return self.task_camera_binding(state)
+
+    def task_camera_binding(self, state):
+        import math
+        from ...observations.canonical_camera import resolve_camera
+        self._require_reset()
+        camera = getattr(self, '_declared_task_camera', None)
+        if camera is None or self._observer_visualizer is None:
+            raise RuntimeError('no GeoPhys task camera is bound')
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('task camera requires the current publication')
+        before = self._snapshot_with_native_free_joints()
+        native = self._observer_visualizer.read_task_camera()
+        actual = np.eye(4)
+        actual[:3, 0], actual[:3, 1], actual[:3, 2], actual[:3, 3] = native['right'], -np.asarray(native['up']), native['forward'], native['position']
+        expected = np.asarray(resolve_camera(camera, state).T_world_from_camera)
+        if (not np.allclose(actual, expected, atol=2e-6, rtol=0)
+                or not math.isclose(native['fov_degrees'], math.degrees(camera.fov_y), abs_tol=2e-5)
+                or not np.allclose([native['near'], native['far']], [camera.near, camera.far], atol=2e-6, rtol=0)):
+            raise RuntimeError('native GeoPhys task camera differs from its declaration')
+        point = expected[:3, 3] + .3 * expected[:3, 0] + .2 * expected[:3, 1] + 2 * expected[:3, 2]
+        projection = self._observer_visualizer.project_task_camera(point)
+        scene_frame = next((item for item in state.frames if item.frame.entity_id != 'world'), None)
+        if scene_frame is None:
+            raise ValueError('task camera requires a published scene frame')
+        scene_point = list(scene_frame.pose_world.position)
+        scene_projection = self._observer_visualizer.project_task_camera(scene_point)
+        if before != self._snapshot_with_native_free_joints():
+            raise RuntimeError('physics changed during task camera readback')
+        return {'camera': camera.to_mapping(), 'camera_identity': camera.identity_hash,
+                'native': native, 'native_world_transform': actual.tolist(),
+                'projected_world_point': point.tolist(), 'projected_native_pixel_depth': projection,
+                'scene_frame': scene_frame.frame.to_mapping(), 'scene_world_point': scene_point,
+                'scene_native_pixel_depth': scene_projection,
+                'state_boundary': state.boundary.to_mapping(),
+                'source_closure': self._source.source_closure_digest}
+
+
     def capture_observer(self, camera, state):
         """Capture the published boundary using the existing GeoPhys scene owner."""
         import hashlib
@@ -714,25 +795,7 @@ class _GeoPhysSession(_SessionValues):
         before = self._snapshot_with_native_free_joints()
         metadata = resolve_camera(camera, state)
         try:
-            if self._observer_visualizer is None:
-                desc = self._observer_render_source.read_render_scene(backend='rasterizer')
-                table = desc.mjcf_light_table
-                records = () if table is None else table.records
-                spots = [item for item in records if item.runtime_payload.get('mjcf_kind') == 'world_trackcom']
-                if (len(spots) != 1 or any(item.light_type == 'mjcf_unsupported' for item in records)
-                        or sum(item.runtime_payload.get('mjcf_kind') == 'headlight' for item in records) != 1):
-                    raise RuntimeError('GeoPhys observer requires one supported source tracking light and headlight')
-                self._observer_tracking_light = spots[0]
-                self._observer_visualizer = self._observer_render_source.build_visualizer(
-                    backend='rasterizer', use_render_snapshot=False,
-                    use_mjcf_lighting=True, enable_shadow=True,
-                    width=camera.width, height=camera.height,
-                    max_framebuffer_resolution=(camera.width, camera.height),
-                    raster_acceleration='compute', shadow_acceleration='compute',
-                    raster_material_flags={'enable_texture_sampling': True,
-                                           'enable_normal_map': True,
-                                           'enable_alpha_blending': True},
-                    enable_taa=False, enable_fxaa=False, enable_ssao=False)
+            self._ensure_observer_visualizer(camera)
             visualizer = self._observer_visualizer
             resources = visualizer.read_resources()
             material_report = resources.get('material_features')
