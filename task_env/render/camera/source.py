@@ -627,7 +627,9 @@ class CameraCaptureIdentityV1(Contract):
             if not re.fullmatch(r'[0-9a-f]{64}', digest):
                 raise ValueError('camera capture identity requires lowercase SHA-256 references')
         _name(self.camera_id)
-        _choice(self.capture_phase, {'post_control_step'}, 'capture phase')
+        _choice(self.capture_phase, {'reset_initial', 'post_control_step'}, 'capture phase')
+        if self.capture_phase == 'reset_initial' and self.state_boundary.control_step != 0:
+            raise ValueError('reset-initial capture requires control step zero')
         if self.sample_clock.clock_domain != 'evaluation_boundary':
             raise ValueError('camera capture identity requires an evaluation boundary clock')
         if self.sample_clock.sample_index != self.state_boundary.control_step:

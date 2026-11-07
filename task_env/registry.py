@@ -154,10 +154,32 @@ def make_env(
         )
     environment_type = ENV_REGISTRY.get(uid)
     from .environment.configuration import resolve_task_env_config
+    task_rgb_camera = kwargs.pop('task_rgb_camera', None)
+    task_renderer = kwargs.pop('task_renderer', None)
+    if (task_rgb_camera is None) != (task_renderer is None):
+        raise ValueError('task RGB camera and fixed renderer must be declared together')
+    factory_owns_rgb = bool(getattr(environment_type, 'task_rgb_factory_prepares_runtime', False))
+    if task_rgb_camera is not None and factory_owns_rgb:
+        kwargs.update(task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
+
+    def finish(env):
+        if task_rgb_camera is not None and not factory_owns_rgb:
+            from .environment.reference_env import SelectedReferenceEnv
+            try:
+                if not isinstance(env, SelectedReferenceEnv) or not getattr(env, 'position_profile', False):
+                    raise ValueError('task RGB requires an admitted selected Position environment')
+                env._configure_task_rgb(task_rgb_camera, task_renderer)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'task RGB factory cleanup also failed: {cleanup_error!r}')
+                raise
+        return env
 
     if getattr(environment_type, "uses_selected_public_config", False):
         resolved_config = resolve_task_env_config(environment_type, config)
-        return environment_type.from_resolved_config(resolved_config, render_mode=render_mode, **kwargs)
+        return finish(environment_type.from_resolved_config(resolved_config, render_mode=render_mode, **kwargs))
     from .environment.reference_env import SelectedReferenceEnv
 
     reference_config = getattr(environment_type, 'from_reference_config', None)
@@ -170,7 +192,7 @@ def make_env(
             and not getattr(environment_type, 'uses_component_task_config', False)
             and (uses_reference_binding or not inherited_default)):
         # Other selected candidates retain their bounded compatibility route.
-        return environment_type.from_reference_config(config, render_mode=render_mode, **kwargs)
+        return finish(environment_type.from_reference_config(config, render_mode=render_mode, **kwargs))
     resolved_config = resolve_task_env_config(environment_type, config)
     if resolved_config.runtime.batch_physics_layout != "merged_scene":
         from .environment.types import StageUnavailableError
@@ -179,11 +201,11 @@ def make_env(
             "batch_physics_layout is only valid for make_parallel_env(); "
             "single TaskEnv construction requires merged_scene"
         )
-    return environment_type(
+    return finish(environment_type(
         config=resolved_config,
         render_mode=render_mode,
         **kwargs,
-    )
+    ))
 
 
 def make_agent(uid: str, **kwargs) -> AgentComponent:

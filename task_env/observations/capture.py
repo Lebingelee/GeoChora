@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import replace
+from uuid import uuid4
 
 import numpy as np
 
@@ -16,6 +18,101 @@ from .canonical_camera.consumer import (
 )
 from .canonical_camera.geometry import resolve_camera
 from .canonical_camera.images import CanonicalCameraObservation
+
+
+class BorrowedTaskCameraSessionV1:
+    """Use a task camera leased from a RuntimeSession without closing its owner."""
+
+    def __init__(self, owner, camera, state):
+        self._owner, self._camera = owner, camera
+        owner.bind_task_camera(camera, state)
+
+    def capture(self, state):
+        if self._owner is None:
+            raise RuntimeError('task camera lease is closed')
+        result = self._owner.capture_task_camera(self._camera, state)
+        completion = getattr(self._owner, 'task_camera_completion', None)
+        self.completion_evidence = completion(state) if callable(completion) else None
+        return result
+
+    def close(self):
+        self._owner = None
+
+
+class TaskRgbObservationConsumerV1:
+    """One owned RGB consumer of successive typed boundaries in one episode."""
+
+    def __init__(self, camera, renderer, session_factory, *, color_space):
+        from .canonical_camera import CameraGeometry
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task RGB requires CameraGeometry')
+        camera.validate()
+        if not camera.rgb or camera.depth or camera.rgb_layout != 'HWC' or camera.rgb_dtype != 'float32':
+            raise ValueError('task RGB requires HWC float32 RGB without depth')
+        self.camera, self.renderer = camera, renderer
+        self._factory, self._session = session_factory, None
+        self._closed, self._last_boundary = False, None
+        self.generation = uuid4().hex
+        self.color_space = color_space
+
+    def capture(self, state):
+        from ..artifacts.state import CanonicalStateViewV1
+        if self._closed:
+            raise RuntimeError('task RGB consumer is closed')
+        if not isinstance(state, CanonicalStateViewV1):
+            raise TypeError('task RGB requires a canonical state')
+        state.validate()
+        boundary = state.boundary
+        if self._last_boundary is None:
+            if boundary.control_step != 0:
+                raise ValueError('task RGB must start at the reset boundary')
+            phase = 'reset_initial'
+        else:
+            previous = self._last_boundary
+            if (boundary.episode_id != previous.episode_id
+                    or boundary.reset_sample_id != previous.reset_sample_id
+                    or boundary.scene_instance_id != previous.scene_instance_id
+                    or boundary.provider_materialization_id != previous.provider_materialization_id
+                    or boundary.control_step != previous.control_step + 1):
+                raise ValueError('task RGB requires the next boundary of the same episode')
+            phase = 'post_control_step'
+        if self._session is None:
+            self._session = self._factory(state)
+        result = self._session.capture(state)
+        if not isinstance(result, CanonicalCameraObservation) or result.capture_identity is None:
+            raise ValueError('task RGB requires an actual completed camera capture')
+        identity = result.capture_identity
+        identity.validate()
+        if (result.metadata.camera != self.camera or identity.camera_id != self.camera.camera_id
+                or identity.camera_geometry_identity_hash != self.camera.identity_hash
+                or identity.task_artifact_hash != self.camera.task_artifact_hash
+                or identity.state_boundary != boundary or identity.sample_clock != state.sample_clock
+                or identity.renderer_selection != self.renderer or identity.modalities != ('rgb',)
+                or identity.capture_phase != 'post_control_step'):
+            raise ValueError('task RGB capture does not match its requested camera, renderer, or boundary')
+        # The underlying renderer has completed at this boundary.  The phase
+        # is derived from the consumer lifecycle, not from the camera geometry.
+        identity = replace(identity, capture_phase=phase)
+        identity.validate()
+        self._last_boundary = boundary
+        return np.array(result.rgb, copy=True), {
+            'schema_version': 'task-rgb-observation-v1',
+            'capture_identity': identity.to_mapping(),
+            'capture_identity_sha256': identity.identity_hash,
+            'camera': self.camera.to_mapping(),
+            'renderer_generation': self.generation,
+            'completion': 'synchronous capture completed before observation publication',
+            'completion_evidence': getattr(self._session, 'completion_evidence', None),
+            'ownership': 'owned host copy',
+            'color_space': self.color_space,
+        }
+
+    def close(self):
+        if not self._closed:
+            self._closed = True
+            session, self._session = self._session, None
+            if session is not None:
+                session.close()
 
 
 class DynamicCameraObservationConsumerV1:

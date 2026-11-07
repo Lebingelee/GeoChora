@@ -10,6 +10,7 @@ from ...environment.reference_env import SelectedReferenceEnv
 class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
     """F06 USD, native PhysX mimic and a separate typed direct-effort input."""
     uid = 'pickcube-isaac-physical-candidate-v1'
+    task_rgb_factory_prepares_runtime = True
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
@@ -18,6 +19,19 @@ class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
         values = {} if config is None else dict(config)
         observer_camera = kwargs.pop('observer_camera', None)
         task_camera = kwargs.pop('task_camera', None)
+        task_rgb_camera = kwargs.pop('task_rgb_camera', None)
+        task_renderer = kwargs.pop('task_renderer', None)
+        if (task_rgb_camera is None) != (task_renderer is None):
+            raise ValueError('task RGB camera and fixed renderer must be declared together')
+        if task_rgb_camera is not None:
+            from ...observations.canonical_camera import CameraGeometry
+            if type(task_rgb_camera) is not CameraGeometry:
+                raise TypeError('task RGB camera must be CameraGeometry')
+            task_rgb_camera.validate()
+            if task_renderer != 'isaacsim':
+                raise ValueError('Isaac task RGB requires the Isaac RTX renderer')
+        if task_rgb_camera is not None and task_camera is not None:
+            raise ValueError('declare either a task RGB camera or a legacy task camera binding')
         if kwargs or set(values) - {'delivery_manifest', 'seed', 'horizon', 'drive_mode', 'control_kind'}:
             raise ValueError('F06 physical candidate rejects unsupported configuration')
         if task_camera is not None:
@@ -59,7 +73,7 @@ class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
         app_owner = None
         opened_here = False
         try:
-            if render_mode is not None:
+            if render_mode is not None or task_rgb_camera is not None:
                 from ...runtime.sessions.isaac_native_io import (
                     _process_app_owner, V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1,
                 )
@@ -113,6 +127,15 @@ class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
                 recorder_mode='execution', interval_mode='grouped')
             env = cls.from_position_candidate(binding, provider='isaacsim', backend='cuda',
                                               horizon=horizon, execution_spec=execution)
+            if task_rgb_camera is not None:
+                try:
+                    env._configure_task_rgb(task_rgb_camera, task_renderer)
+                except BaseException as error:
+                    try:
+                        env.close()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'F06 task RGB construction cleanup failed: {cleanup_error!r}')
+                    raise
             if render_mode is not None:
                 try:
                     if task_camera is not None:

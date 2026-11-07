@@ -42,6 +42,8 @@ from ..runtime.sessions.source import (
 METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
 _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
+_TASK_RGB_PAIRS = frozenset({('mujoco', 'cpu', 'mujoco'), ('geophys', 'cpu', 'mujoco'),
+                             ('geophys', 'cpu', 'geophys'), ('isaacsim', 'cuda', 'isaacsim')})
 
 
 def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
@@ -1435,6 +1437,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
+        if getattr(self, '_task_rgb_config', None) is not None and isinstance(options, Mapping) and 'renderer' in options:
+            raise ValueError('the task RGB renderer is fixed for the lifetime of this Env')
         prior_fault = self._episode_execution_state().fault
         prior_fault_mapping = None if prior_fault is None else prior_fault.to_mapping()
         from .reference_binding import prepare_selected_reset
@@ -1475,6 +1479,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             requested_seed = None if seed is _RESET_SEED_UNSET else seed
             rng_state = getattr(self, '_switch_rng_state', None)
             switch_candidate = prepare_switch_reset(type(self), resolved, requested_seed, rng_state, target)
+            task_rgb = getattr(self, '_task_rgb_config', None)
+            if task_rgb is not None:
+                target_config = switch_candidate.config
+                pair = (target_config.physics_provider, target_config.environment.runtime.backend, task_rgb[1])
+                if pair not in _TASK_RGB_PAIRS:
+                    raise ValueError('reset physics selection is incompatible with the fixed task RGB renderer')
             seed = switch_candidate.task_seed
             options, mixed_reset_plan, mixed_reset_sample = {}, None, None
             candidate_binding = type(self).selected_binding(switch_candidate.config)
@@ -2015,6 +2025,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 record_cleanup_error('selected reset camera cleanup', cleanup_error)
             failed_session, self.session = self.session, None
             if failed_session is not None:
+                # A failed replacement can retain a process-level native
+                # owner after the session itself has closed.  Keep that
+                # owner reachable so Env.close() can release it even when no
+                # later reset successfully installs another session.
+                if callable(getattr(failed_session, 'close_runtime_owner', None)):
+                    abandoned = getattr(self, '_failed_runtime_sessions', None)
+                    if abandoned is None:
+                        abandoned = self._failed_runtime_sessions = []
+                    abandoned.append(failed_session)
                 reset_effects['replacement_session_close_attempted'] = True
                 try:
                     failed_session.close()
@@ -2179,14 +2198,108 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             observation, info, evaluation = build_selected_observation(self, state)
         else:
             observation, info, evaluation = self.binding.observation_projection(self, state)
+        if getattr(self, '_task_rgb_config', None) is not None:
+            if self._task_rgb_consumer is None:
+                self._task_rgb_consumer = self._new_task_rgb_consumer()
+            image, receipt = self._task_rgb_consumer.capture(self.typed_state.view)
+            observation = dict(observation)
+            observation['task_rgb'] = image
+            info = dict(info)
+            info['task_rgb_v1'] = receipt
         if self._selected_execution_context()[0] is not None:
             info = dict(info)
             info['execution_configuration_v1'] = self.get_execution_receipt()
         return observation, info, evaluation
 
+    def _configure_task_rgb(self, camera, renderer):
+        """Fix one task camera and renderer for this Env before its first reset."""
+        from ..observations.canonical_camera import CameraGeometry
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task RGB camera must be CameraGeometry')
+        if not getattr(self, 'position_profile', False):
+            raise ValueError('task RGB requires a selected Position publication')
+        camera.validate()
+        if camera.task_artifact_hash != self.artifact.identity_hash:
+            raise ValueError('task RGB camera TaskArtifact linkage mismatch')
+        if (not camera.rgb or camera.depth or camera.rgb_layout != 'HWC'
+                or camera.rgb_dtype != 'float32' or camera.parent_frame != 'world'):
+            raise ValueError('task RGB requires a world-mounted HWC float32 RGB camera')
+        observer = getattr(self, '_selected_observer_camera', None)
+        if observer is not None and observer.camera_id == camera.camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        if (observer is not None and renderer == 'geophys'
+                and (observer.width, observer.height) != (camera.width, camera.height)):
+            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
+        import copy
+        camera = copy.deepcopy(camera)
+        if (self.provider, self.backend, renderer) not in _TASK_RGB_PAIRS:
+            raise ValueError('unsupported fixed task RGB renderer and physics pairing')
+        if 'task_rgb' in self.observation_space.spaces:
+            raise ValueError('task observation already declares task_rgb')
+        color_setup = None
+        if renderer == 'isaacsim':
+            from ..runtime.sessions.isaac_native_io import configure_isaac_task_rgb_color_defaults
+            color_setup = configure_isaac_task_rgb_color_defaults()
+        if renderer in {'geophys', 'isaacsim'}:
+            from ..render.base.contracts import ObserverRenderRequestV1
+            request = ObserverRenderRequestV1(camera, 'rgb_array', self.provider,
+                                              'rasterizer' if renderer == 'geophys' else 'rtx')
+            request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
+            if getattr(self, '_observer_render_request', None) is None:
+                self._observer_render_request = request
+        spaces = dict(self.observation_space.spaces)
+        spaces['task_rgb'] = Box(0., 1., shape=(camera.height, camera.width, 3), dtype=np.float32)
+        self.observation_space = Dict(spaces)
+        self._task_rgb_config = (camera, renderer)
+        self._task_rgb_consumer = None
+        self.metadata = dict(self.metadata)
+        color = ('GL_LINEAR framebuffer RGB; primaries uncalibrated' if renderer == 'mujoco'
+                 else 'sRGB transfer after ACES; primaries uncalibrated' if renderer == 'geophys'
+                 else 'sRGB transfer after RTX tone mapping; primaries uncalibrated')
+        self.metadata['task_rgb_v1'] = {'camera': camera.to_mapping(), 'renderer': renderer,
+                                        'color_space': color,
+                                        'ownership': 'owned host copy', 'color_setup': color_setup}
+
+    def _new_task_rgb_consumer(self):
+        from ..artifacts import ExecutionSpecV1, RendererSelectionV1
+        from ..observations.capture import TaskRgbObservationConsumerV1, BorrowedTaskCameraSessionV1
+        from ..render.camera import DynamicCameraRenderSourceV2, create_dynamic_camera_session
+        from ..render.camera.api import (V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE,
+                                         V211_PHYSICS_PROFILE, D03_PHYSICS_PROFILE)
+        camera, renderer = self._task_rgb_config
+        if renderer in {'geophys', 'isaacsim'}:
+            selection = (RendererSelectionV1('renderer-selection-v1', 'geophys', 'rasterizer',
+                                              'v211_geophys_cpu_task_rgb_v1', 'cpu') if renderer == 'geophys'
+                         else RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
+                                                  'v211_isaac_rtx_task_rgb_v1', 'cuda:0'))
+            return TaskRgbObservationConsumerV1(camera, selection,
+                lambda state: BorrowedTaskCameraSessionV1(self.session, camera, state),
+                color_space=self.metadata['task_rgb_v1']['color_space'])
+        is_cross = self.provider == 'geophys'
+        profile = V211_GEOPHYS_MUJOCO_RGB_PROFILE if is_cross else V211_RGB_PROFILE
+        physics_profile = D03_PHYSICS_PROFILE if is_cross else V211_PHYSICS_PROFILE
+        selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl', profile, None)
+
+        def factory(state):
+            source = DynamicCameraRenderSourceV2.from_runtime_source(
+                self.value['source'], artifact=self.artifact, joint_bindings=self.position_joint_bindings,
+                frame_bindings=self.position_frame_bindings)
+            execution = ExecutionSpecV1('execution-spec-v1', self.provider, self.backend, physics_profile,
+                                        self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
+            return create_dynamic_camera_session(camera, execution, source=source, initial_state=state)
+
+        return TaskRgbObservationConsumerV1(camera, selection, factory,
+            color_space='GL_LINEAR framebuffer RGB; primaries uncalibrated')
+
     def _configure_selected_observer(self, render_mode, camera):
         from types import SimpleNamespace
         from ..render import TaskEnvRenderProvider
+        task_rgb = getattr(self, '_task_rgb_config', None)
+        if task_rgb is not None and camera.camera_id == task_rgb[0].camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        if (task_rgb is not None and task_rgb[1] == 'geophys'
+                and (camera.width, camera.height) != (task_rgb[0].width, task_rgb[0].height)):
+            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
         if camera.task_artifact_hash != self.artifact.identity_hash:
             raise ValueError('observer camera TaskArtifact linkage mismatch')
         self.render_mode = render_mode
@@ -2251,6 +2364,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('observer rendering was not configured at construction')
         task_camera = getattr(self, '_declared_task_camera', None)
         if task_camera is not None and camera.camera_id == task_camera.camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
+        task_rgb = getattr(self, '_task_rgb_config', None)
+        if task_rgb is not None and camera.camera_id == task_rgb[0].camera_id:
             raise ValueError('task and observer cameras require distinct identities')
         if (camera.task_artifact_hash != self.artifact.identity_hash or
                 (camera.width, camera.height, camera.rgb, camera.depth, camera.rgb_layout, camera.rgb_dtype) !=
@@ -2351,9 +2467,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _close_camera_consumer(self):
         consumer, self._camera_consumer = self._camera_consumer, None
+        task_consumer = getattr(self, '_task_rgb_consumer', None)
+        self._task_rgb_consumer = None
         visual, self._visual_state_session = getattr(self, '_visual_state_session', None), None
         first = None
-        for resource in (consumer, visual):
+        for resource in (task_consumer, consumer, visual):
             if resource is not None:
                 try:
                     resource.close()
@@ -2677,9 +2795,25 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 except BaseException as cleanup_error:
                     error.add_note('physical batch cleanup also failed: '
                                    f'{type(cleanup_error).__name__}: {cleanup_error}')
-            self._latch_fault(phase, error, before_state=before, after_state=None,
+            task_rgb_requested = getattr(self, '_task_rgb_config', None) is not None
+            after_state = self.state if task_rgb_requested and completed else None
+            readback_error = None
+            if task_rgb_requested and attempted and not completed:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            if task_rgb_requested:
+                try:
+                    self._close_camera_consumer()
+                except BaseException as cleanup_error:
+                    error.add_note('task camera cleanup after physical fault also failed: '
+                                   f'{type(cleanup_error).__name__}: {cleanup_error}')
+            self._latch_fault(phase, error, before_state=before, after_state=after_state,
                 interval_attempted=attempted, interval_completed=completed,
                 native_substeps_expected=self.artifact.timebase.control_substeps,
+                readback_error=readback_error,
                 transition_status=self._fault_transition_status(
                     self.recorder, recording_before, append_attempted=record_append_attempted))
 
@@ -3920,6 +4054,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             session_error_label='RuntimeSession close after Position finalization',
             owner_error_label='Runtime owner close after Position finalization',
         )
+        for abandoned in getattr(self, '_failed_runtime_sessions', ()):
+            first_error, _ = close_session_and_runtime_owner(
+                abandoned, first_error=first_error,
+                session_error_label='failed reset RuntimeSession close',
+                owner_error_label='failed reset Runtime owner close',
+            )
+        self._failed_runtime_sessions = []
         if first_error is not None:
             raise first_error
 

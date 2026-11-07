@@ -776,6 +776,16 @@ class _GeoPhysSession(_SessionValues):
 
     def capture_observer(self, camera, state):
         """Capture the published boundary using the existing GeoPhys scene owner."""
+        return self._capture_raster_camera(camera, state, task=False)
+
+    def capture_task_camera(self, camera, state):
+        """Capture the separately bound task camera at the current boundary."""
+        if camera != getattr(self, '_declared_task_camera', None):
+            raise ValueError('GeoPhys task capture camera differs from its binding')
+        self.task_camera_binding(state)
+        return self._capture_raster_camera(camera, state, task=True)
+
+    def _capture_raster_camera(self, camera, state, *, task):
         import hashlib
         import json
         import math
@@ -824,7 +834,8 @@ class _GeoPhysSession(_SessionValues):
             self._observer_light_report = deepcopy(light_report)
             world = np.asarray(metadata.T_world_from_camera, dtype=np.float64)
             position, forward, up = world[:3, 3], world[:3, 2], -world[:3, 1]
-            visualizer.set_camera_pose(position, position + forward, up)
+            if not task:
+                visualizer.set_camera_pose(position, position + forward, up)
             snapshot = self._boundary.read_snapshot(SnapshotRequest(
                 qacc=False, ctrl=False, body_pose=True, site_pose=False, simulation_time=False))
             current_com = _world_center_of_mass(self._observer_com_bodies, self._observer_com_ids,
@@ -834,9 +845,12 @@ class _GeoPhysSession(_SessionValues):
             visualizer.update_mjcf_light_pose(track.light_id, position=light_position, direction=track.direction)
             visualizer.update_mjcf_light_pose('mjcf:headlight', position=position, direction=-forward)
             self._observer_lighting_resources = deepcopy(visualizer.read_resources().get('lighting'))
-            visualizer.set_fov(math.degrees(camera.fov_y))
-            visualizer.set_clip_interval(camera.near, camera.far)
-            rgb = np.array(visualizer.read_frame(synchronized=True), dtype=np.float32, copy=True)
+            if task:
+                rgb = np.array(visualizer.read_task_camera_frame(synchronized=True), dtype=np.float32, copy=True)
+            else:
+                visualizer.set_fov(math.degrees(camera.fov_y))
+                visualizer.set_clip_interval(camera.near, camera.far)
+                rgb = np.array(visualizer.read_frame(synchronized=True), dtype=np.float32, copy=True)
             after = self._snapshot_with_native_free_joints()
             if before != after or state.boundary != self.state_boundary_identity():
                 raise RuntimeError('physics state or boundary changed during GeoPhys observer capture')
@@ -844,6 +858,7 @@ class _GeoPhysSession(_SessionValues):
             if execution_hash is None:
                 raise RuntimeError('GeoPhys observer requires its declared execution identity')
             selection = RendererSelectionV1('renderer-selection-v1', 'geophys', 'rasterizer',
+                                            'v211_geophys_cpu_task_rgb_v1' if task else
                                             'v211_geophys_cpu_observer_v1', 'cpu')
             capability = {'schema': 'v211-geophys-raster-observer-v1',
                           'capture': 'CPU raster read_frame synchronized; owned host copy',

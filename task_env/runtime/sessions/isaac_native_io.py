@@ -69,6 +69,43 @@ def _read_isaac_observer_color_settings():
     return _validate_isaac_observer_color_settings(values, digest)
 
 
+def configure_isaac_task_rgb_color_defaults():
+    """Fill absent App-local RTX settings with the measured 6.2 contract.
+
+    Existing values are never overwritten.  The SDK's own OCIO file must
+    match the previously measured digest before it can be selected.
+    """
+    import carb
+    import isaacsim
+    settings = carb.settings.get_settings()
+    applied = {}
+    initial = {key: settings.get(key) for key in _ISAAC_62_OBSERVER_COLOR_SETTINGS}
+    for key, expected in _ISAAC_62_OBSERVER_COLOR_SETTINGS.items():
+        actual = initial[key]
+        if actual is not None and (type(actual) is not type(expected) or actual != expected):
+            raise RuntimeError(f'Isaac task RGB rejects incompatible App setting {key}: {actual!r}')
+    key = '/rtx/post/tonemap/ocio/cfgFilePath'
+    configured_path = settings.get(key)
+    if configured_path:
+        if (not isinstance(configured_path, str) or not Path(configured_path).is_file()
+                or hashlib.sha256(Path(configured_path).read_bytes()).hexdigest() != _ISAAC_62_OBSERVER_OCIO_SHA256):
+            raise RuntimeError('Isaac App task RGB OCIO differs from the qualified configuration')
+    else:
+        package_file = getattr(isaacsim, '__file__', None)
+        if not package_file:
+            raise RuntimeError('Isaac SDK root is unavailable for task RGB OCIO')
+        path = Path(package_file).resolve().parent / 'kit/rendering-data/runtime/ov-0.1.0.ocio'
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != _ISAAC_62_OBSERVER_OCIO_SHA256:
+            raise RuntimeError('Isaac SDK task RGB OCIO does not match the qualified configuration')
+        settings.set(key, str(path))
+        applied[key] = str(path)
+    for key, expected in _ISAAC_62_OBSERVER_COLOR_SETTINGS.items():
+        if initial[key] is None and expected is not None:
+            settings.set(key, expected)
+            applied[key] = expected
+    return {'applied_absent_settings': applied, 'qualified': _read_isaac_observer_color_settings()}
+
+
 DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1 = "isaac-headless-default-v1"
 F06_ISAAC_APP_LAUNCH_PROFILE_V1 = "f06-headless-no-render-v1"
 V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 = "v211-headless-camera-v1"
@@ -699,6 +736,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._observer_path = None
         self._task_camera_path = None
         self._task_camera_geometry = None
+        self._task_camera_sensor = None
         self._observer_faulted = False
         self._dg04_native_input = dg04_native_input
         self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
@@ -2286,6 +2324,32 @@ class IsaacSimNativeRuntimeIOV1:
                 error.add_note(f'Isaac observer cleanup also failed: {cleanup_error!r}')
             raise
 
+    def capture_task_camera(self, camera, state):
+        """Capture the separately bound task camera using an owned RTX sensor."""
+        from ...observations.canonical_camera import resolve_camera, CanonicalCameraObservation
+        from ...observations.canonical_camera.images import normalize_rgb
+        if self._closed or self._observer_faulted or self._observer_render_request is None:
+            raise RuntimeError('Isaac task renderer is unavailable or faulted')
+        if camera != self._task_camera_geometry or self._task_camera_path is None:
+            raise ValueError('Isaac task capture camera differs from its binding')
+        self.task_camera_binding(state)
+        try:
+            return self._capture_observer_admitted(camera, state, resolve_camera, normalize_rgb,
+                                                   CanonicalCameraObservation, task=True)
+        except BaseException as error:
+            self._observer_faulted = True
+            try:
+                self._close_task_camera_sensor()
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac task sensor cleanup also failed: {cleanup_error!r}')
+            raise
+
+    def task_camera_completion(self, state):
+        receipt = getattr(self, '_task_camera_completion', None)
+        if receipt is None or receipt['state_boundary'] != state.boundary.to_mapping():
+            raise RuntimeError('Isaac task camera has no completion for this boundary')
+        return copy.deepcopy(receipt)
+
     def _check_observer_clock(self, before, *, playing, operation):
         """A native clock regression means the scene/App was stopped, not a physics step."""
         after = self._counter()
@@ -2298,7 +2362,7 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError(f'Isaac {operation} changed the physics clock or resumed the timeline: '
                                f'before={before!r}, after={after!r}, playing={playing!r}')
 
-    def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb, observation_type):
+    def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb, observation_type, *, task=False):
         import json
         import uuid
         import numpy as np
@@ -2333,17 +2397,27 @@ class IsaacSimNativeRuntimeIOV1:
         self._sync()
         self._check_observer_clock(before, playing=timeline.is_playing(), operation='Fabric update')
         published_bodies = self._publish_observer_body_transforms()
-        if self._observer_sensor is None:
-            path = '/GeoChoraObserver_' + uuid.uuid4().hex
-            self._observer_path = path
-            authoring = RtxCamera(path, tick_rate=0.0)
-            self._observer_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
-                                                 annotators=['rgb'])
-        color_settings = _read_isaac_observer_color_settings()
+        task_sensor_created = False
+        if task:
+            path = self._task_camera_path
+            if self._task_camera_sensor is None:
+                authoring = RtxCamera(path, tick_rate=0.0, reset_xform_op_properties=False)
+                self._task_camera_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
+                                                        annotators=['rgb'])
+                task_sensor_created = True
+            sensor = self._task_camera_sensor
+        else:
+            if self._observer_sensor is None:
+                path = '/GeoChoraObserver_' + uuid.uuid4().hex
+                self._observer_path = path
+                authoring = RtxCamera(path, tick_rate=0.0)
+                self._observer_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
+                                                     annotators=['rgb'])
+            path, sensor = self._observer_path, self._observer_sensor
         stage = omni.usd.get_context().get_stage()
         if stage is None or stage != self._stage:
             raise RuntimeError('Isaac observer lost its leased USD stage')
-        prim = stage.GetPrimAtPath(self._observer_path)
+        prim = stage.GetPrimAtPath(path)
         if not prim or not prim.IsValid():
             raise RuntimeError('Isaac observer camera prim is unavailable')
         usd_camera = UsdGeom.Camera(prim)
@@ -2362,22 +2436,73 @@ class IsaacSimNativeRuntimeIOV1:
         actual = np.asarray(UsdGeom.XformCache().GetLocalToWorldTransform(prim)).T
         if not np.allclose(actual, world, atol=1e-6, rtol=0):
             raise RuntimeError('Isaac realized observer camera transform differs from the request')
+        task_completions = []
+
+        def render_once(operation, *, allow_unready=False):
+            if task:
+                import omni.graph.core as og
+                path = '/Render/PostProcess/SDGPipeline/PostProcessDispatcher'
+                node = og.get_node_by_path(path)
+                prior_count = int(node.get_compute_count()) if node else 0
+            rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0, wait_for_render=True)
+            self._check_observer_clock(before, playing=timeline.is_playing(), operation=operation)
+            if task:
+                node = og.get_node_by_path(path)
+                after_count = int(node.get_compute_count()) if node else 0
+                numerator = node.get_attribute('outputs:referenceTimeNumerator').get() if node else None
+                denominator = node.get_attribute('outputs:referenceTimeDenominator').get() if node else None
+                reference = (float(numerator) / float(denominator)
+                             if numerator is not None and denominator not in (None, 0) else None)
+                count_delta = after_count - prior_count
+                # Replicator 6.2 logs and returns at 1000 wait iterations.
+                # Only a new dispatch with a reference time matching the
+                # native physics clock is eligible as a completed capture.
+                complete = (0 < count_delta < 1000 and reference is not None
+                            and math.isfinite(reference) and abs(reference - float(before[1])) <= 1e-6)
+                task_completions.append({'operation': operation, 'dispatcher_before': prior_count,
+                                         'dispatcher_after': after_count,
+                                         'reference_time': reference, 'physics_time': float(before[1]),
+                                         'timeline_time': float(timeline.get_current_time()),
+                                         'completed': complete})
+                if not complete and not allow_unready:
+                    raise RuntimeError(f'Isaac task render did not complete at the current physics time: {task_completions[-1]!r}')
+                return complete
+
+        if task:
+            # The task sensor is first created inside reset, before the old
+            # post-reset observer ever rendered.  Let RTX initialize its
+            # settings without publishing this warm-up frame or advancing
+            # the already observed physics boundary.
+            if task_sensor_created:
+                for _ in range(4):
+                    self._app_owner.app.update()
+                    self._check_observer_clock(before, playing=timeline.is_playing(), operation='task sensor initialization')
+            for _ in range(4):
+                if render_once('task sensor warmup', allow_unready=True):
+                    break
+            else:
+                raise RuntimeError(f'Isaac task sensor did not complete bounded warmup: {task_completions!r}')
+        color_settings = _read_isaac_observer_color_settings()
         data = None
         for _ in range(8):
-            rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0, wait_for_render=True)
-            self._check_observer_clock(before, playing=timeline.is_playing(), operation='observer rendering')
-            data, _info = self._observer_sensor.get_data('rgb')
+            render_once('task sensor rendering' if task else 'observer rendering')
+            data, _info = sensor.get_data('rgb')
             if data is not None:
                 break
         if data is None:
             raise RuntimeError('Isaac observer RGB did not complete within the bounded render wait')
         if _read_isaac_observer_color_settings() != color_settings:
             raise RuntimeError('Isaac observer color settings changed during capture')
-        self._verify_observer_fabric(state, world, published_bodies)
-        self._observer_camera_contract = (world.copy(), camera.width, camera.height,
-                                          camera.fov_y, camera.near, camera.far)
+        self._verify_observer_fabric(state, world, published_bodies, camera_path=path)
+        if not task:
+            self._observer_camera_contract = (world.copy(), camera.width, camera.height,
+                                              camera.fov_y, camera.near, camera.far)
+        else:
+            self._task_camera_completion = {'state_boundary': state.boundary.to_mapping(),
+                                            'dispatcher_completions': task_completions}
         rgb = np.array(data.numpy(), copy=True)
         selection = RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
+                                        'v211_isaac_rtx_task_rgb_v1' if task else
                                         'v211_isaac_rtx_observer_v1', 'cuda:0')
         capability = {'schema': 'v211-isaac-rtx-observer-v1', 'sdk': '6.2.0.0',
                       'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy',
@@ -2425,7 +2550,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._check_observer_clock(before, playing=False, operation='observer body publication')
         return bodies
 
-    def _verify_observer_fabric(self, state, camera_world, published_bodies=()):
+    def _verify_observer_fabric(self, state, camera_world, published_bodies=(), *, camera_path=None):
         """Reject a frame unless the public renderer-facing poses match publication."""
         import numpy as np
         import isaacsim.core.experimental.utils.backend as backend_utils
@@ -2462,7 +2587,7 @@ class IsaacSimNativeRuntimeIOV1:
                 if p_error > 1e-4 or q_error > 1e-4:
                     raise RuntimeError(f'Isaac renderer-facing frame {semantic!r} differs from published state: '
                                        f'{p_error:g} m, {q_error:g} quaternion L2')
-            position, quaternion = XformPrim(self._observer_path).get_world_poses()
+            position, quaternion = XformPrim(camera_path or self._observer_path).get_world_poses()
             position = np.asarray(position.numpy()).reshape(-1, 3)[0]
             quaternion = np.asarray(quaternion.numpy()).reshape(-1, 4)[0]
         w, x, y, z = quaternion / np.linalg.norm(quaternion)
@@ -2567,6 +2692,11 @@ class IsaacSimNativeRuntimeIOV1:
         if primary is not None:
             raise primary
 
+    def _close_task_camera_sensor(self):
+        sensor, self._task_camera_sensor = getattr(self, '_task_camera_sensor', None), None
+        if sensor is not None:
+            sensor.detach_annotators('rgb')
+
     def close(self) -> None:
         if self._closed:
             return
@@ -2574,6 +2704,10 @@ class IsaacSimNativeRuntimeIOV1:
         import gc
 
         primary = None
+        try:
+            self._close_task_camera_sensor()
+        except BaseException as error:
+            primary = error
         task_camera_path, self._task_camera_path = self._task_camera_path, None
         self._task_camera_geometry = None
         if task_camera_path is not None and self._stage is not None:
@@ -2581,7 +2715,10 @@ class IsaacSimNativeRuntimeIOV1:
                 if self._stage.GetPrimAtPath(task_camera_path):
                     self._stage.RemovePrim(task_camera_path)
             except BaseException as error:
-                primary = error
+                if primary is None:
+                    primary = error
+                else:
+                    primary.add_note(f'Isaac task camera prim cleanup also failed: {error!r}')
         try:
             self._close_observer()
         except BaseException as error:

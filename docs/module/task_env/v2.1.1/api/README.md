@@ -90,6 +90,11 @@ F06 候选可在 `make_env` 构造时另外提供 `task_camera=CameraGeometry(..
 
 PickCube physical candidate 的 MuJoCo CPU observer 与 GeoPhys CPU rasterizer observer 也可在构造时声明一个 world-mounted `task_camera`。任务相机与 observer 的 ID 必须不同；MuJoCo 当前还要求两者的 clip 和分辨率相同。`task_camera_binding()` 读取各自 renderer owner 的实际 camera；它不创建自动 observation。这两条 CPU 路线的真实窗口、相机隔离和 RGB 证据已按各自限定范围独立接收。
 
+5c 实施候选提供单相机同步 RGB：在 `make_env` 同时传入 `task_rgb_camera=CameraGeometry(...)` 和固定的 `task_renderer`（`mujoco`、`geophys` 或 `isaacsim`）。`reset` 和正常 `step` 的 observation 自动包含 `task_rgb`（HWC、float32、0–1 的 owned host copy），`info['task_rgb_v1']` 包含相机、状态边界、采集阶段及 renderer 身份；无需调用 `.render()`。`env.metadata['task_rgb_v1']` 记录色彩语义，三种 renderer 的颜色并非跨设备标定。相机须为所支持的 world-mounted 几何，实际 provider/backend 与 renderer 必须满足准入；renderer 在创建时固定，reset 不接受更换 renderer。旧 `task_camera` 只声明几何，不与新 `task_rgb_camera` 同时使用。
+
+当前实现交集为 MuJoCo CPU × MuJoCo、GeoPhys CPU × rasterizer、Isaac Sim 6.2 PhysX × RTX，以及 GeoPhys CPU × MuJoCo renderer-only；实际交付证据和未闭合项以 5c 报告及独立主审为准。该机制面向符合已支持 source/state/control 契约的 selected Position 环境，其他任务的真实 native 场景尚未经本次代表用例验证。task 相机不提供 depth、分割、动态挂载或多相机承诺。
+
+
 PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前使用默认灯光的 CPU 离屏试验仅为探索证据；后续使用源灯光的所选 rasterizer 真实窗口/RGB 和 5b 相机隔离已按限定范围接收，这不代表同步 task observation 已接通。
 
 5b attempt001 的未接收历史见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；三路线 5b 当前接收范围与限制见[最终主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)。同步 task observation、renderer 切换和 cross 组合仍属 5c，尚未完成。

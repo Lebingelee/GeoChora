@@ -26,12 +26,27 @@ def _physical_pickcube_observation(env, state):
 class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
     """Position compatibility plus typed physical control for PickCube MJCF."""
     uid = 'pickcube-physical-candidate-v1'
+    task_rgb_factory_prepares_runtime = True
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
         values = {} if config is None else dict(config)
         observer_camera = kwargs.pop('observer_camera', None)
         task_camera = kwargs.pop('task_camera', None)
+        task_rgb_camera = kwargs.pop('task_rgb_camera', None)
+        task_renderer = kwargs.pop('task_renderer', None)
+        if (task_rgb_camera is None) != (task_renderer is None):
+            raise ValueError('task RGB camera and fixed renderer must be declared together')
+        if task_rgb_camera is not None:
+            from ...observations.canonical_camera import CameraGeometry
+            if type(task_rgb_camera) is not CameraGeometry:
+                raise TypeError('task RGB camera must be CameraGeometry')
+            task_rgb_camera.validate()
+        if task_rgb_camera is not None and task_camera is not None:
+            raise ValueError('declare either a task RGB camera or a legacy task camera binding')
+        if (task_renderer == 'geophys' and observer_camera is not None
+                and (task_rgb_camera.width, task_rgb_camera.height) != (observer_camera.width, observer_camera.height)):
+            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
         if kwargs or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy'}:
             raise ValueError('PickCube physical candidate rejects unsupported configuration')
         if task_camera is not None:
@@ -55,6 +70,10 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
         elif observer_camera is not None:
             raise ValueError('observer camera requires a configured render mode')
         provider, backend = values.get('provider', 'mujoco'), values.get('backend', 'cpu')
+        if task_rgb_camera is not None and (provider, backend, task_renderer) not in {
+                ('mujoco', 'cpu', 'mujoco'), ('geophys', 'cpu', 'mujoco'),
+                ('geophys', 'cpu', 'geophys')}:
+            raise ValueError('unsupported fixed task RGB renderer and physics pairing')
         horizon, seed = values.get('horizon', 8), values.get('seed', 31)
         drive_mode, control_kind = values.get('drive_mode', 'coexist'), values.get('control_kind', 'direct')
         reset_switch = values.get('reset_switch', False)
@@ -89,6 +108,15 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
         env = _build_candidate(root, provider=provider, horizon=horizon, seed=seed, environment_type=cls,
                                drive_mode=drive_mode, control_kind=control_kind, reset_switch=reset_switch,
                                space_policy=space_policy)
+        if task_rgb_camera is not None:
+            try:
+                env._configure_task_rgb(task_rgb_camera, task_renderer)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'task RGB construction cleanup failed: {cleanup_error!r}')
+                raise
         if render_mode is not None:
             try:
                 if task_camera is not None:

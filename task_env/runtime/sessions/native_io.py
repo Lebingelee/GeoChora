@@ -659,6 +659,12 @@ class UsdCoreRuntimeSession(_SessionValues):
     def task_camera_binding(self, state):
         return self._task_camera_operation('task_camera_binding', state)
 
+    def capture_task_camera(self, camera, state):
+        return self._task_camera_operation('capture_task_camera', state, camera)
+
+    def task_camera_completion(self, state):
+        return self._task_camera_operation('task_camera_completion', state)
+
     def _task_camera_operation(self, operation, state, *args):
         self._require_reset()
         self._assert_native_identity()

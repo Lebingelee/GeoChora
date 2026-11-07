@@ -6,7 +6,7 @@
 
 2026-11-07 维护者修订：renderer 在 public Env 创建时选择并准入，从创建到 close 保持同一选择；reset 可按需重建该 renderer 的 session、worker/App 或 lease，但不更换 renderer。同一 Env 的 renderer 往返切换留待后续未排期任务，不是 5c 出口。若 reset 的其他配置与固定 renderer 不兼容，应在可静态判断的副作用前拒绝。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。目标和验证范围见[5c 范围](../planning/stage5-5c-fixed-renderer-scope.md)。
 
-5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和跨组合仍为 5c 待完成目标。
+5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和跨组合的 5c 实施候选及真实证据以本次工作包和独立主审结论为准；不得把 5b observer 证据当成 5c task RGB。
 
 ## 三项独立完成目标
 

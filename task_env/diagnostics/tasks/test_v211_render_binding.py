@@ -139,3 +139,34 @@ def test_v1_scalar_session_sync_and_stale_rejection_without_sdk():
     assert session.sync_state(moved).publication_updated
     with pytest.raises(ValueError,match='stale'):
         session.sync_state(state)
+
+
+def test_v2_named_mapping_with_extra_nested_link_and_joint():
+    """A second, nested joint is mapped by names, not by the PickCube shape."""
+    source, state = _values()
+    new_joint = replace(_joint('prismatic', joint_id='slide_b'),
+                        parent_frame=FrameReference('robot', 'link'),
+                        child_frame=FrameReference('robot', 'tool_b'))
+    art = source.scene_definition.articulations[0]
+    scene = replace(source.scene_definition,
+                    frames=source.scene_definition.frames +
+                        (FrameDefinition('frame-definition-v1', 'robot', 'tool_b', 'runtime', None, None),),
+                    articulations=(replace(art, link_frame_ids=art.link_frame_ids + ('tool_b',), joints=art.joints + (new_joint,)),))
+    source_id = 'scene-definition-v3:' + scene.identity_hash
+    expanded = replace(source, scene_definition=scene, scene_identity_hash=scene.identity_hash,
+        source_identity=source_id, scene_source=TaskSceneSource('', Path('.'), source_id),
+        joint_bindings=source.joint_bindings + (DynamicRenderJointBindingV1('robot', 'slide_b', 'native_slide_b'),),
+        frame_bindings=source.frame_bindings + (DynamicRenderFrameBindingV1('robot', 'tool_b', 'native_tool_b'),),
+        published_frame_keys=source.published_frame_keys + (('robot', 'tool_b'),))
+    added = TypedJointStateValue('typed-joint-state-v1', 'robot', 'slide_b', 'prismatic',
+                                 'meter', (.08,), 'meter_per_second', (0.,))
+    frame = TypedFrameStateValue('typed-frame-state-v1', FrameReference('robot', 'tool_b'),
+                                 PoseWorld((.2, .3, .4), (1., 0., 0., 0.)))
+    state2 = replace(state, boundary=replace(state.boundary, scene_identity_hash=scene.identity_hash),
+                     joints=state.joints + (added,), frames=state.frames + (frame,))
+    projection = project_render_state_v1(expanded, state2)
+    assert len(projection.joint_positions) == 2 and len(projection.frame_poses) == 3
+    with pytest.raises(ValueError, match='Joint identities'):
+        project_render_state_v1(expanded, replace(state2, joints=state2.joints[:-1]))
+    with pytest.raises(ValueError, match='duplicate'):
+        project_render_state_v1(expanded, replace(state2, frames=state2.frames + (frame,)))

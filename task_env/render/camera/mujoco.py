@@ -263,8 +263,8 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             self._model = mujoco.MjModel.from_xml_string(
                 ET.tostring(root, encoding='unicode'), assets=assets,
             )
-            from .api import V211_RGB_PROFILE
-            if camera.depth or getattr(manifest, 'render_profile', None) == V211_RGB_PROFILE:
+            from .api import V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE
+            if camera.depth or getattr(manifest, 'render_profile', None) in {V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE}:
                 extent = float(self._model.stat.extent)
                 if not math.isfinite(extent) or extent <= 0:
                     raise ValueError('camera clipping requires a finite positive MuJoCo model extent')
@@ -412,12 +412,12 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
 
     def capture(self, state):
         self._require_trustworthy()
-        from .api import V211_DYNAMIC_PROFILE, V211_RGB_PROFILE
+        from .api import V211_DYNAMIC_PROFILE, V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE
         if self._manifest.render_profile == V211_DYNAMIC_PROFILE:
             raise RuntimeError('v211 visual binding does not admit RGB capture')
         try:
             result = super().capture(state)
-            if self._manifest.render_profile == V211_RGB_PROFILE:
+            if self._manifest.render_profile in {V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE}:
                 self._verify_linear_framebuffer()
             return result
         except BaseException as error:
