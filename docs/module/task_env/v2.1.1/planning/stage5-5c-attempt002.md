@@ -17,3 +17,7 @@
 现有 Pendulum 和 TwoWheelBalance 的组件 scene composer 不接受 robot agents，受控关节经 task action adapter 驱动；受控主体不等同于现有 Robot/Agent 类型，可以是有具名控制通道的机械机构，也可以无可复用 Controller。客观实体可以为空，或是 cube、桌面等被动对象；不为满足命名强造机器人、物体或控制器。PickCube 的任务语义和 Panda 控制器仍可专有，其 renderer 与通用接线不得依赖该专有 profile。不得以统一表面类名宣称构建、发布和资源生命周期已统一。
 
 维护者批准此前提议的执行范围和预算，并要求上述两层细化；完整可执行范围以重新冻结的 attempt002 包为准。仍由维护者人工转发；第三次普通 attempt 前须重评。
+
+### Agent／Controller 候选（维护者后续问题）
+
+优先分析将 Pendulum 和双轮车声明为现有 `AgentComponent`，将直接转矩 action adapter 纳入 Controller 边界。现有 `AgentReferences` 已包含非机械臂的关节、执行器等通用字段，`ActionAdapter` 与 `Controller` 协议均提供 `action_space`、`reset`、`convert`，所以有可复用基础；当前两任务尚未注册为 Agent，原 scene composer 拒绝 robot agents，不能称为现成功能。`RobotRuntime` 当前还有 Panda gripper/base/ee 等假设。须核查 inline source 复用避免模型重复、通用运行 handle 和配置、controller 与 provider 适配边界以及原直接转矩动作语义。可按真实能力做所需最小适配和兼容验证；若全量迁移超出本包资源或无法保持语义，保留具体差距并交 Sol 决定，不影响用户要求的 renderer 主线。
