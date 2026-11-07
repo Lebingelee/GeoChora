@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b attempt002 独立主审，需返工
+## 当前：G05 5b attempt003 资源边界续作
+
+[003 中间主审](reviews/20261107_5b_attempt003_resource_review.md)核对原包及 CPU followup，原 5b BLOCKED／PARTIAL，count=3；MuJoCo 和 GeoPhys 有界证据保留，Isaac 未在 003 启动，过程偏差如实保留。维护者要求解除 6 GiB 阻碍并允许 Terra 继续；按明确修订的资源条件准备同 003 续作，原账本和墙钟不重置，需维护者手动转发。不是 5b 接收或普通 004，5c 保持 PLANNED。
+
+## 历史：G05 5b attempt002 独立主审，需返工
 
 [5b attempt002 主审](reviews/20261107_5b_attempt002_sol_review.md)决定 `REWORK_REQUIRED_5B`，普通 count=2。MuJoCo、Isaac 真实窗口／RGB 有界进展保留，图像及颜色证明未完全闭合；GeoPhys 公开裁剪/生产路线阻塞。[第三次前重评](../planning/stage5-5b-attempt003-reassessment.md)及[Sol 前置工作](../planning/stage5-5b-attempt003-prework.md)已完成；维护者已同意所提 provider/gitlink 与预算范围，包须由其手动转发，第三次尚未执行。5c PLANNED，不自动进入阶段6。
 
