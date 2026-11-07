@@ -1964,6 +1964,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def publish(_state, _observation):
             nonlocal failure_phase
+            task_camera = getattr(self, '_declared_task_camera', None)
+            if task_camera is not None:
+                failure_phase = 'task_camera_binding'
+                self.session.bind_task_camera(task_camera, self.typed_state.view)
             failure_phase = 'arm_schedule_reset'
             if self.mixed_control_profile:
                 self.arm_schedule = None
@@ -2223,6 +2227,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('observer requires a successfully published state')
         return self.session.present_observer(publication.view)
 
+    def task_camera_binding(self):
+        """Read the constructed task camera's native binding for this episode."""
+        publication = self._published_position_typed_state
+        if publication is None or self._execution_fault is not None or self.session is None:
+            raise RuntimeError('task camera readback requires a successfully published state')
+        return self.session.task_camera_binding(publication.view)
+
     def set_observer_camera(self, camera):
         """Replace the observer camera without modifying any task camera."""
         from ..observations.canonical_camera import CameraGeometry
@@ -2232,6 +2243,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         previous = getattr(self, '_selected_observer_camera', None)
         if previous is None:
             raise RuntimeError('observer rendering was not configured at construction')
+        task_camera = getattr(self, '_declared_task_camera', None)
+        if task_camera is not None and camera.camera_id == task_camera.camera_id:
+            raise ValueError('task and observer cameras require distinct identities')
         if (camera.task_artifact_hash != self.artifact.identity_hash or
                 (camera.width, camera.height, camera.rgb, camera.depth, camera.rgb_layout, camera.rgb_dtype) !=
                 (previous.width, previous.height, True, False, 'HWC', 'float32')):

@@ -55,6 +55,8 @@ renderer 与 physics 的共享 binding、同一 capture frame 和 batch image bu
 
 Camera 固定字段至少包括稳定命名、mount entity/frame、相对 transform 方向、position 单位与 handedness、quaternion 顺序、intrinsic/FOV/projection、resolution、near/far clip、通道/颜色空间、dtype、range、layout、device、owner/lifetime。构建固定字段与 reset 可变化字段分别声明；缺值不静默套用默认。task camera geometry/count、observation shape/dtype/semantic 固定到 env 构建契约，允许 reset 重采样实际 extrinsics 时要把值绑定到 episode identity。窗口尺寸和 observer-camera 拖动不改 task camera。
 
+F06 Isaac 候选的有界几何路径可在构造时声明一个 world 挂载 task camera；现有 session 在 reset 后的当前场景建立 USD camera 并提供核验原生几何的读回，场景替换时重新绑定、关闭时释放。task camera 和 observer ID 必须不同。此路径不自动采集 task observation，也不支持一般动态挂载；其真实证据仍待独立主审。
+
 建议调用外形（仅设计值）：
 
 ```text

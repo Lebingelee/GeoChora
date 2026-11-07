@@ -697,6 +697,8 @@ class IsaacSimNativeRuntimeIOV1:
         self._observer_render_light_receipt = None
         self._observer_sensor = None
         self._observer_path = None
+        self._task_camera_path = None
+        self._task_camera_geometry = None
         self._observer_faulted = False
         self._dg04_native_input = dg04_native_input
         self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
@@ -2188,6 +2190,77 @@ class IsaacSimNativeRuntimeIOV1:
             native_adaptation_application=native_adaptation_application,
         )
 
+    def bind_task_camera(self, camera, state):
+        """Author an owned USD camera in the existing live scene, without a sensor."""
+        import uuid
+        import numpy as np
+        from pxr import Gf, UsdGeom
+        from ...observations.canonical_camera import CameraGeometry, resolve_camera
+        if self._closed or self._stage is None or self._task_camera_path is not None:
+            raise RuntimeError('task camera binding unavailable or already bound')
+        if type(camera) is not CameraGeometry:
+            raise TypeError('task camera must be CameraGeometry')
+        camera.validate()
+        if camera.task_artifact_hash != self._artifact.identity_hash or camera.parent_frame != 'world':
+            raise ValueError('task camera must be linked to this artifact and world mounted')
+        metadata = resolve_camera(camera, state)
+        path = '/GeoChoraTaskCamera_' + uuid.uuid4().hex
+        try:
+            prim_camera = UsdGeom.Camera.Define(self._stage, path)
+            prim = prim_camera.GetPrim()
+            focal = 24.0
+            vertical = 2.0 * focal * math.tan(camera.fov_y / 2.0)
+            prim_camera.GetFocalLengthAttr().Set(focal)
+            prim_camera.GetVerticalApertureAttr().Set(vertical)
+            prim_camera.GetHorizontalApertureAttr().Set(vertical * camera.width / camera.height)
+            prim_camera.GetClippingRangeAttr().Set(Gf.Vec2f(camera.near, camera.far))
+            world = np.asarray(metadata.T_world_from_camera, dtype=np.float64).copy()
+            world[:3, :3] = world[:3, :3] @ np.diag([1., -1., -1.])
+            UsdGeom.Xformable(prim).AddTransformOp().Set(
+                Gf.Matrix4d(*[float(value) for value in world.T.reshape(-1)]))
+            self._task_camera_path, self._task_camera_geometry = path, camera
+            return self.task_camera_binding(state)
+        except BaseException as error:
+            self._task_camera_path = self._task_camera_geometry = None
+            try:
+                if self._stage.GetPrimAtPath(path):
+                    self._stage.RemovePrim(path)
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac task camera cleanup also failed: {cleanup_error!r}')
+            raise
+
+    def task_camera_binding(self, state):
+        import numpy as np
+        from pxr import UsdGeom
+        from ...observations.canonical_camera import resolve_camera
+        camera, path = self._task_camera_geometry, self._task_camera_path
+        if self._closed or self._stage is None or camera is None or path is None:
+            raise RuntimeError('no task camera is bound to the current scene')
+        prim = self._stage.GetPrimAtPath(path)
+        if not prim or not prim.IsA(UsdGeom.Camera):
+            raise RuntimeError('bound task camera prim is unavailable')
+        native = UsdGeom.Camera(prim)
+        metadata = resolve_camera(camera, state)
+        expected = np.asarray(metadata.T_world_from_camera, dtype=np.float64).copy()
+        expected[:3, :3] = expected[:3, :3] @ np.diag([1., -1., -1.])
+        actual = np.asarray(UsdGeom.XformCache().GetLocalToWorldTransform(prim), dtype=np.float64).T
+        focal = float(native.GetFocalLengthAttr().Get())
+        vertical = float(native.GetVerticalApertureAttr().Get())
+        horizontal = float(native.GetHorizontalApertureAttr().Get())
+        clipping = tuple(float(v) for v in native.GetClippingRangeAttr().Get())
+        if (not np.allclose(actual, expected, atol=1e-6, rtol=0)
+                or not math.isclose(2 * math.atan(vertical / (2 * focal)), camera.fov_y, abs_tol=1e-6)
+                or not math.isclose(horizontal / vertical, camera.width / camera.height, abs_tol=1e-6)
+                or not np.allclose(clipping, (camera.near, camera.far), atol=1e-6, rtol=0)):
+            raise RuntimeError('native task camera geometry no longer matches its declaration')
+        return {'camera': camera.to_mapping(), 'camera_identity': camera.identity_hash,
+                'source_closure': self._source.source_closure_digest,
+                'native_camera_prim': path, 'native_world_transform': actual.tolist(),
+                'native_focal_length': focal, 'native_vertical_aperture': vertical,
+                'native_horizontal_aperture': horizontal, 'native_clipping': clipping,
+                'state_boundary': state.boundary.to_mapping(),
+                'capture': 'none; geometry binding only'}
+
     def capture_observer(self, camera, state):
         """Capture the published F06 boundary through the existing App/scene owner."""
         if self._closed or self._observer_faulted or self._observer_render_request is None:
@@ -2501,10 +2574,21 @@ class IsaacSimNativeRuntimeIOV1:
         import gc
 
         primary = None
+        task_camera_path, self._task_camera_path = self._task_camera_path, None
+        self._task_camera_geometry = None
+        if task_camera_path is not None and self._stage is not None:
+            try:
+                if self._stage.GetPrimAtPath(task_camera_path):
+                    self._stage.RemovePrim(task_camera_path)
+            except BaseException as error:
+                primary = error
         try:
             self._close_observer()
         except BaseException as error:
-            primary = error
+            if primary is None:
+                primary = error
+            else:
+                primary.add_note(f'Isaac observer cleanup also failed: {error!r}')
         try:
             from isaacsim.core.experimental.utils import app as app_utils
             app_utils.stop()

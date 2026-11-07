@@ -653,6 +653,26 @@ class UsdCoreRuntimeSession(_SessionValues):
     def snapshot(self) -> CanonicalStateView:
         return self._snapshot_with_native_free_joints()[0]
 
+    def bind_task_camera(self, camera, state):
+        return self._task_camera_operation('bind_task_camera', state, camera)
+
+    def task_camera_binding(self, state):
+        return self._task_camera_operation('task_camera_binding', state)
+
+    def _task_camera_operation(self, operation, state, *args):
+        self._require_reset()
+        self._assert_native_identity()
+        if state.boundary != self.state_boundary_identity():
+            raise ValueError('task camera request does not match the current state boundary')
+        method = getattr(self._native_io, operation, None)
+        if not callable(method):
+            raise RuntimeError('native Runtime I/O has no task camera binding')
+        before = self._native_io.read_state()
+        result = method(*args, state)
+        if before != self._native_io.read_state() or state.boundary != self.state_boundary_identity():
+            raise RuntimeError('physics state or boundary changed during task camera operation')
+        return result
+
     def capture_observer(self, camera, state):
         """Capture only the currently published boundary through the native owner."""
         self._require_reset()

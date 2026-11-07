@@ -79,6 +79,58 @@ def test_usd_observer_rejects_stale_boundary_before_native_capture(monkeypatch):
     assert observed == []
 
 
+def test_task_camera_declaration_and_readback_guard():
+    from dataclasses import replace
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+
+    camera = CameraGeometry('camera-observation-v0', 'a' * 64, 'task', 'world',
+                            IDENTITY, IDENTITY, 320, 240, 1.0, .01, 10., True, False)
+    env = object.__new__(SelectedReferenceEnv)
+    env.artifact = SimpleNamespace(identity_hash='a' * 64)
+    env.provider = 'isaacsim'
+    env._execution_fault = None
+    env._published_position_typed_state = SimpleNamespace(view='publication')
+    calls = []
+    env.session = SimpleNamespace(task_camera_binding=lambda *args: calls.append(args) or 'read')
+    assert env.task_camera_binding() == 'read'
+    assert calls == [('publication',)]
+    from task_env.tasks.pick_cube.physical_isaac_candidate import PickCubeIsaacPhysicalCandidateEnv
+    with pytest.raises(ValueError, match='world mounts'):
+        PickCubeIsaacPhysicalCandidateEnv.from_reference_config(
+            {}, render_mode='human', task_camera=replace(camera, parent_frame='hand'))
+    with pytest.raises(ValueError, match='observer-enabled'):
+        PickCubeIsaacPhysicalCandidateEnv.from_reference_config({}, task_camera=camera)
+    with pytest.raises(ValueError, match='distinct identities'):
+        PickCubeIsaacPhysicalCandidateEnv.from_reference_config(
+            {}, render_mode='human', observer_camera=camera, task_camera=camera)
+    env._declared_task_camera = camera
+    env._selected_observer_camera = replace(camera, camera_id='observer')
+    with pytest.raises(ValueError, match='distinct identities'):
+        env.set_observer_camera(camera)
+    env._published_position_typed_state = None
+    with pytest.raises(RuntimeError, match='published state'):
+        env.task_camera_binding()
+
+
+def test_usd_task_camera_operations_reject_stale_or_changed_state(monkeypatch):
+    from task_env.runtime.sessions.native_io import UsdCoreRuntimeSession
+    session = object.__new__(UsdCoreRuntimeSession)
+    states = iter(('before', 'after'))
+    calls = []
+    session._native_io = SimpleNamespace(read_state=lambda: next(states),
+        bind_task_camera=lambda *args: calls.append(args) or 'bound')
+    monkeypatch.setattr(session, '_require_reset', lambda: None)
+    monkeypatch.setattr(session, '_assert_native_identity', lambda: None)
+    monkeypatch.setattr(session, 'state_boundary_identity', lambda: 'current')
+    with pytest.raises(ValueError, match='current state boundary'):
+        session.bind_task_camera('camera', SimpleNamespace(boundary='old'))
+    assert calls == []
+    with pytest.raises(RuntimeError, match='physics state'):
+        session.bind_task_camera('camera', SimpleNamespace(boundary='current'))
+
+
 def test_failed_present_does_not_publish_capture_receipt():
     frame = SimpleNamespace(rgb=np.ones((2, 3, 3), dtype=np.float32),
                             metadata=_Mapping({'camera': 'observer'}),
