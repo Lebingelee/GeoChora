@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "V211_G05_5c_attempt002 prepared for maintainer approval and manual forwarding; attempt count remains 1. Focus generic task RGB and declared GeoPhys lighting; try an eligible non-arm component task within approved scope. No automatic dispatch.",
+  "next_action": "V211_G05_5c_attempt002 approved by maintainer with added two-layer SelectedReferenceEnv rendering and controlled-subject/object lifecycle convergence analysis; re-freeze revised package, manual forwarding only. Attempt count remains 1.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1620,7 +1620,7 @@
           "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: maintainer requested focused attempt002 preparation and optional non-arm real verification; package awaits explicit authorization.",
+          "last_observation": "2026-11-08: maintainer approved scope/budget and requested two-layer common rendering and lifecycle analysis; no attempt started.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
@@ -1636,10 +1636,11 @@
           ],
           "next_candidate_package": {
             "id": "V211_G05_5c_attempt002",
-            "status": "PREPARED_AWAITING_MAINTAINER_AUTHORIZATION",
+            "status": "APPROVED_READY_FOR_MANUAL_FORWARD",
             "attempt_count_before_start": 1,
             "plan_ref": "../planning/stage5-5c-attempt002.md",
-            "manual_forward_only": true
+            "manual_forward_only": true,
+            "scope_amendment": "Common renderer integration for selected/component Env plus concrete controlled-subject/object build and lifecycle convergence analysis; implement the necessary shared seam, do not claim a wholesale migration."
           },
           "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window."
         }

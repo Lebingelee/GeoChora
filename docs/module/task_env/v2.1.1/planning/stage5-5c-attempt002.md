@@ -9,3 +9,11 @@
 组件路线使用 runtime assembly、snapshot 和各自 observation builder，现有 task RGB 实现绑定 selected Position 路线；接线需真实覆盖公开构造、reset、step 及 observation，而非仅改变类型检查。保留原 state-only API、现有物理和 Controller 准入；按受影响范围验证，清楚报告实际支持的 renderer 和 source。
 
 维护者允许保留 attempt001 的预算预约和临时目录执行偏差及其未知项，不追加不可恢复的历史调查；见 [Sol 独立主审](../maintenance/reviews/20261108_5c_attempt001_sol_review.md)。执行包、具体预算和必要的 provider 改动均待本次单独批准；用户手工转交，Sol 独立主审。
+
+## 维护者补充：统一 Env 与通用构建模型（2026-11-08）
+
+本包按两层推进：一是在 `SelectedReferenceEnv` 的实际构造、reset、step、close 上接入 renderer，以真实发布状态与相机为输入，覆盖 selected 与组件式调用链；二是分析并在本包所需接缝内推进“受控主体＋场景中的客观实体”的通用声明、编译绑定和生命周期消费，避免 Panda 作为公共渲染或通用生命周期的特殊条件。明确给出两条链的映射、公共 owner、保留差异、可行性和迁移路径；本次所需统一接线须落地，大范围迁移须以实际能力为据，不用纯设计替代 5c 交付。
+
+现有 Pendulum 和 TwoWheelBalance 的组件 scene composer 不接受 robot agents，受控关节经 task action adapter 驱动；受控主体不等同于现有 Robot/Agent 类型，可以是有具名控制通道的机械机构，也可以无可复用 Controller。客观实体可以为空，或是 cube、桌面等被动对象；不为满足命名强造机器人、物体或控制器。PickCube 的任务语义和 Panda 控制器仍可专有，其 renderer 与通用接线不得依赖该专有 profile。不得以统一表面类名宣称构建、发布和资源生命周期已统一。
+
+维护者批准此前提议的执行范围和预算，并要求上述两层细化；完整可执行范围以重新冻结的 attempt002 包为准。仍由维护者人工转发；第三次普通 attempt 前须重评。
