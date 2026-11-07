@@ -84,6 +84,8 @@ MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=Tr
 
 MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；RGB 为拥有的 HWC float32 数组，窗口与任务 observation 分离。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。其 RGB 声明为 RTX tone mapping 后的 sRGB 传递函数；采集前后核验指定 RTX 设置和 OCIO 文件摘要，未通过时拒绝该帧。该声明不校准原色或源素材色域。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
 
+Isaac 6.2 的已测窗口关闭会使共享 App 的物理时钟和运行态失效；旧帧及后续 reset 会被拒绝，需新 worker。当前 Env 尚未把该事件发布并锁存为合同要求的 typed route fault，因此 5b 未获接收，详见[独立主审](../maintenance/reviews/20261107_5b_attempt003_final_sol_review.md)。
+
 PickCube 的 GeoPhys CPU joint-effort 候选也可请求 observer，使用具名的 GeoPhys `rasterizer` compute 路线。它检查材质和灯光资源报告，缺失必需特性或使用默认太阳光时拒绝采集；PickCube 的 authored `top` trackcom 聚光灯和默认头灯使用同一公开状态边界更新；源零位质量中心由编译模型计算，实时质量中心由公开 body pose 和质量计算。投影能力未覆盖或其他 authored 灯光设置未准入时拒绝采集。相机有限 near/far 使用光轴距离，当前只准入无粒子、TAA、overlay 和 native graphics 的 CPU mesh／analytic 组合。若材质和灯光检查通过，RGB 从 renderer 的 ACES 后 gamma 2.2 值转换到 sRGB 传递函数；原色及源素材色域未校准。此前真实 source CPU 离屏试验使用了默认灯光，只是探索证据；窗口和完整 5b 路线仍需独立验收，这不代表同步 task observation 已接通。
 
 5b attempt001 的窗口和图像未被接收，见 [Sol 主审](../maintenance/reviews/20261107_5b_attempt001_sol_review.md)；上述候选及本次有界检查均不代表三路线 5b 已接收。GeoPhys 原生窗口／RGB、同步 task observation、renderer 切换和 cross 组合不由这些候选自动建立。

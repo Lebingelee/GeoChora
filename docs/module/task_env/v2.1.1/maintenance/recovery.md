@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b attempt003 资源边界续作
+## 当前：G05 5b attempt003 未接收，须维护者主导诊断
+
+[003 最终主审](reviews/20261107_5b_attempt003_final_sol_review.md)决定 `NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED`，count=3。三路线真实窗口／RGB 有界证据及原资源偏差、未知启动步和失败保留；Isaac 原生窗口关闭使 App clock/runtime 失效，Env 未按合同发布／锁存 typed route fault。Sol 守卫下独立 38 项通过及定向错误传播检查；不自动普通 004、改名清零或进入 5c，等待维护者主导诊断。
+
+## 历史：G05 5b attempt003 资源边界续作
 
 [003 中间主审](reviews/20261107_5b_attempt003_resource_review.md)核对原包及 CPU followup，原 5b BLOCKED／PARTIAL，count=3；MuJoCo 和 GeoPhys 有界证据保留，Isaac 未在 003 启动，过程偏差如实保留。维护者要求解除 6 GiB 阻碍并允许 Terra 继续；按明确修订的资源条件准备同 003 续作，原账本和墙钟不重置，需维护者手动转发。不是 5b 接收或普通 004，5c 保持 PLANNED。
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-07",
-  "status": "G05_5B_ATTEMPT003_PARTIAL_RESOURCE_CONTINUATION",
+  "status": "G05_5B_NOT_ACCEPTED_HUMAN_DIAGNOSIS_REQUIRED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,8 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": "V211_G05_5b_attempt003_resource_continuation",
-  "next_action": "Maintainer requested continuation with revised VRAM and bootstrap accounting; preserve attempt003 time and usage, forward one continuation manually, then Sol final review; no 5c.",
+  "next_candidate": null,
+  "next_action": "Attempt003 final independent review found Isaac window close invalidates App but lacks admitted lifecycle limitation and typed Env route fault. Stop ordinary dispatch; await maintainer-led diagnosis; 5c remains planned.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1394,7 +1394,7 @@
           "dependencies": [
             "5a"
           ],
-          "status": "BLOCKED_PARTIAL_5B_RESOURCE_CONTINUATION",
+          "status": "NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED",
           "attempt_count": 3,
           "attempts": [
             {
@@ -1426,21 +1426,23 @@
             {
               "attempt": 3,
               "package_id": "V211_G05_5b_attempt003",
-              "status": "PARTIAL_RESOURCE_BOUNDARY_CONTINUATION_AUTHORIZED",
-              "result": "BLOCKED_PARTIAL_MUJOCO_GEOPHYS_BOUNDED_ISAAC_NOT_RUN",
+              "status": "REVIEWED_NOT_ACCEPTED",
+              "result": "PARTIAL_ISAAC_WINDOW_FAULT_CONTRACT_UNCLOSED",
               "input_head": "a34262af95bf9ef65438ece5b2620ff2df553be5",
-              "output_head": "b76f718e44e92126d2618692ba915ca5a123f99c",
+              "output_head": "2b8f82b719880f9eb65cb332b30363c64b034deb",
               "provider_commit": "a6bf45b3422e31dfc632a58948e57fa4b686f1b0",
               "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_attempt003/report.md",
               "continuation_report_ref": "../../../../../workspace/maintenance/v211_g05_5b_attempt003_cpu_followup/report.md",
-              "sol_review_ref": "reviews/20261107_5b_attempt003_resource_review.md"
+              "sol_review_ref": "reviews/20261107_5b_attempt003_final_sol_review.md",
+              "resource_continuation_report_ref": "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/report.md",
+              "review_decision": "NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED"
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session",
           "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt002/",
           "package_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
           "input_head": "a34262af95bf9ef65438ece5b2620ff2df553be5",
-          "output_head": "b76f718e44e92126d2618692ba915ca5a123f99c",
+          "output_head": "2b8f82b719880f9eb65cb332b30363c64b034deb",
           "expected_duration_minutes": "360-600 active, 720 wall maximum",
           "execution_budget": {
             "wall_minutes": 720,
@@ -1453,7 +1455,7 @@
             "gpu_vram_gib": 6,
             "new_ignored_output_gib": 5
           },
-          "last_observation": "Sol reviewed 003 resource return and CPU followup, 2982 manifest entries matched and 37 pure guarded tests passed; 5b blocked/partial; maintainer requests revised GPU resources and continued Isaac work.",
+          "last_observation": "Sol final: 345/345 output hashes, final run diff matches commit, guarded 38 passed; three routes have bounded real-window/RGB evidence, but observed Isaac window close invalidates App without required typed Env route fault/admission disclosure. Stale-frame negative duplicates swapped view.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
@@ -1469,22 +1471,27 @@
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003_cpu_followup/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt003_cpu_followup/release-receipt.json",
-            "reviews/20261107_5b_attempt003_resource_review.md"
+            "reviews/20261107_5b_attempt003_resource_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/output-manifest.json",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt003_resource_continuation/release-receipt.json",
+            "reviews/20261107_5b_attempt003_final_sol_review.md"
           ],
           "commits": [
             "a79273d045191d004bc938fd03c87f76661156ff",
             "1bbcf68a0854a982753e891eafe923e8d1476f5f",
-            "b76f718e44e92126d2618692ba915ca5a123f99c"
+            "b76f718e44e92126d2618692ba915ca5a123f99c",
+            "2b8f82b719880f9eb65cb332b30363c64b034deb"
           ],
           "review_decision": {
-            "status": "BLOCKED_PARTIAL_INTERIM_REVIEW",
+            "status": "NOT_ACCEPTED_5B_HUMAN_DIAGNOSIS_REQUIRED",
             "reviewer": "Sol",
             "date": "2026-11-07",
-            "review_ref": "reviews/20261107_5b_attempt003_resource_review.md"
+            "review_ref": "reviews/20261107_5b_attempt003_final_sol_review.md"
           },
           "blockers": [
-            "Isaac 6.2 003 capture/window not yet run; prior 6 GiB enforced VRAM and pre-bootstrap hard physics bound were not demonstrated; maintainer requests resource revision",
-            "MuJoCo and GeoPhys image oracle bias and complete color semantics remain limited; affected evidence to be checked by Sol on final review"
+            "Isaac native window close invalidates App/physics runtime yet selected Env does not publish/latch typed route fault and admission does not disclose lifecycle restriction",
+            "Isaac final stale-frame negative duplicates swapped view, not an independent old-state negative; exploratory image selection and uncalibrated primaries/assets remain scoped limitations"
           ],
           "pre_attempt003_reassessment": {
             "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
@@ -1493,7 +1500,7 @@
             "authorization": "Maintainer agreed to proposed provider public API, local topic branch and commit, Core gitlink, and proposed attempt003 execution limits; manual forwarding required."
           },
           "resource_continuation": {
-            "status": "PREPARED_FOR_MANUAL_HANDOFF",
+            "status": "REVIEWED_NOT_ACCEPTED",
             "basis": "explicit maintainer request to allow subsequent Terra development after resource-boundary 003",
             "count": "same attempt003, no ordinary 004",
             "prior_usage": "source and native each conservatively 679.96 seconds; explicit-step reservations 192/10000, ten zero-step CPU diagnostics missed advance reservations; retain limitations",
