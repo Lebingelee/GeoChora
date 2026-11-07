@@ -2,7 +2,7 @@
 
 ## 当前：G05 5b attempt002 独立主审，需返工
 
-[5b attempt002 主审](reviews/20261107_5b_attempt002_sol_review.md)决定 `REWORK_REQUIRED_5B`，普通 count=2。MuJoCo、Isaac 真实窗口／RGB 有界进展保留，图像及颜色证明未完全闭合；GeoPhys 公开裁剪/生产路线阻塞。已做[第三次前重评](../planning/stage5-5b-attempt003-reassessment.md)，provider、gitlink 变更和新执行预算均需维护者明确决定，未派发第三次。5c PLANNED，不自动进入阶段6。
+[5b attempt002 主审](reviews/20261107_5b_attempt002_sol_review.md)决定 `REWORK_REQUIRED_5B`，普通 count=2。MuJoCo、Isaac 真实窗口／RGB 有界进展保留，图像及颜色证明未完全闭合；GeoPhys 公开裁剪/生产路线阻塞。[第三次前重评](../planning/stage5-5b-attempt003-reassessment.md)及[Sol 前置工作](../planning/stage5-5b-attempt003-prework.md)已完成；维护者已同意所提 provider/gitlink 与预算范围，包须由其手动转发，第三次尚未执行。5c PLANNED，不自动进入阶段6。
 
 ## 历史：G05 5b attempt001 独立主审，需返工
 

@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-07",
-  "status": "G05_5B_ATTEMPT002_REWORK_REQUIRED_REASSESSMENT_CONDITIONAL",
+  "status": "G05_5B_ATTEMPT003_AUTHORIZED_PREPARATION",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -29,8 +29,8 @@
     "behind_at_creation": 0
   },
   "active_packages": [],
-  "next_candidate": null,
-  "next_action": "5b attempt002 independently reviewed; reassessment conditional on maintainer decision about GeoPhys provider/gitlink and a separately authorized complete attempt003 budget. No third attempt dispatched; 5c remains planned.",
+  "next_candidate": "V211_G05_5b_attempt003",
+  "next_action": "Freeze one complete attempt003 from the reviewed actual HEAD; maintainer has approved proposed GeoPhys provider/gitlink scope and budget, and will manually forward. Preparation is not an attempt; 5c remains planned.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1452,7 +1452,8 @@
             "../../../../../workspace/maintenance/v211_g05_5b_attempt002/output-manifest.json",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt002/release-receipt.json",
             "reviews/20261107_5b_attempt002_sol_review.md",
-            "../planning/stage5-5b-attempt003-reassessment.md"
+            "../planning/stage5-5b-attempt003-reassessment.md",
+            "../planning/stage5-5b-attempt003-prework.md"
           ],
           "commits": [
             "a79273d045191d004bc938fd03c87f76661156ff",
@@ -1465,14 +1466,15 @@
             "review_ref": "reviews/20261107_5b_attempt002_sol_review.md"
           },
           "blockers": [
-            "GeoPhys required public near/far clipping and material/light-preserving production window/RGB route not established; provider/gitlink changes require separate authorization if needed",
+            "GeoPhys required public near/far clipping and material/light-preserving production window/RGB route not established; provider/gitlink changes authorized for manually forwarded attempt003 if needed",
             "MuJoCo and Isaac image oracle exploration bias and sRGB/linear end-to-end semantics remain unresolved",
             "Isaac public pose publication downstream physics side effects remain an unproven risk requiring focused verification"
           ],
           "pre_attempt003_reassessment": {
-            "status": "CONDITIONAL_NOT_READY",
+            "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
             "ref": "../planning/stage5-5b-attempt003-reassessment.md",
-            "reason": "Provider/gitlink permission and separately authorized concrete execution scope/budget are not yet available; credible candidate exists but no dispatch."
+            "prework_ref": "../planning/stage5-5b-attempt003-prework.md",
+            "authorization": "Maintainer agreed to proposed provider public API, local topic branch and commit, Core gitlink, and proposed attempt003 execution limits; manual forwarding required."
           }
         },
         {

@@ -1,6 +1,6 @@
 # G05 5b：第三次普通尝试前重评
 
-状态：`CONDITIONAL_NOT_READY`，普通 count=2。本文是审阅及可行性提议，不是已派发工作包，不授权任何执行。依据 [002 主审](../maintenance/reviews/20261107_5b_attempt002_sol_review.md)、原 [5b 目标](../goals/05-rendering.md#5b) 和 [render 合同](../contracts/render-provider.md)。实际执行前重新核验真实 HEAD、两 pin、保护输入、writer、锁和 002 释放；最终包以届时真实 HEAD 为基线。
+历史重评状态：`CONDITIONAL_NOT_READY`，普通 count=2。维护者随后同意本文所列 provider/gitlink 与执行预算提议；Sol 的[离线前置工作](stage5-5b-attempt003-prework.md)已完成，具体包仍需冻结并由维护者手动转发。本文保留当时判断，不自行开始执行。依据 [002 主审](../maintenance/reviews/20261107_5b_attempt002_sol_review.md)、原 [5b 目标](../goals/05-rendering.md#5b) 和 [render 合同](../contracts/render-provider.md)。实际执行前重新核验真实 HEAD、两 pin、保护输入、writer、锁和 002 释放；最终包以届时真实 HEAD 为基线。
 
 ## 最早失败边界和原出口
 
