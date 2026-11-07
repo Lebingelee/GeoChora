@@ -59,7 +59,14 @@ class TaskEnvRenderProvider:
         # Window resources belong to this existing UI provider.  The camera
         # session owns the native renderer and its completed host frame.
         if self._window_closed_by_user:
-            raise RuntimeError('observer window was closed')
+            self._capture_owned_frame()
+            self._last_frame_receipt['presentation'] = {
+                'status': 'display_closed_capture_only',
+                'event_pump': 'not_run',
+                'completion': 'capture retained; observer window was closed by user',
+                'window_id': None,
+            }
+            return
         if self._window is None:
             import tkinter as tk
             window = tk.Tk()
@@ -81,13 +88,21 @@ class TaskEnvRenderProvider:
         ppm = f'P6\n{frame.shape[1]} {frame.shape[0]}\n255\n'.encode() + pixels.tobytes()
         self._window_image = tk.PhotoImage(data=ppm, format='PPM', master=self._window)
         self._window_label.configure(image=self._window_image)
+        window_id = int(self._window.winfo_id())
         self._window.update_idletasks()
         self._window.update()
         if self._window_closed_by_user:
-            raise RuntimeError('observer window was closed during event processing')
+            self._last_frame_receipt['presentation'] = {
+                'status': 'closed_during_event_pump',
+                'event_pump': 'Tk update',
+                'completion': 'window closed during event processing after image submission',
+                'window_id': window_id,
+            }
+            return
         self._last_frame_receipt['presentation'] = {
+            'status': 'presented',
             'event_pump': 'Tk update', 'completion': 'synchronous Tk image update',
-            'window_id': int(self._window.winfo_id()),
+            'window_id': window_id,
         }
 
     @property

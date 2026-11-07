@@ -94,6 +94,149 @@ def test_failed_present_does_not_publish_capture_receipt():
     provider.close()
 
 
+def test_observer_window_close_keeps_capture_live_without_reopening(monkeypatch):
+    import sys
+
+    class FakeWindow:
+        instances = []
+
+        def __init__(self):
+            self.close_callback = None
+            self.destroyed = False
+            self.close_during_update = False
+            self.instances.append(self)
+
+        def title(self, _value):
+            pass
+
+        def protocol(self, _name, callback):
+            self.close_callback = callback
+
+        def update_idletasks(self):
+            pass
+
+        def update(self):
+            if self.close_during_update:
+                self.close_callback()
+
+        def winfo_id(self):
+            return 731
+
+        def destroy(self):
+            self.destroyed = True
+
+    class FakeLabel:
+        def __init__(self, _window, **_kwargs):
+            pass
+
+        def pack(self):
+            pass
+
+        def configure(self, **_kwargs):
+            pass
+
+    fake_tk = SimpleNamespace(
+        Tk=FakeWindow,
+        Label=FakeLabel,
+        PhotoImage=lambda **_kwargs: object(),
+    )
+    monkeypatch.setitem(sys.modules, 'tkinter', fake_tk)
+    captures = []
+
+    def capture():
+        boundary = len(captures) + 1
+        frame = SimpleNamespace(
+            rgb=np.full((2, 3, 3), boundary / 10, dtype=np.float32),
+            metadata=_Mapping({'observer': 'camera-a'}),
+            capture_identity=_Mapping({'boundary': boundary}),
+        )
+        captures.append(frame)
+        return frame
+
+    provider = TaskEnvRenderProvider(
+        render_source=None, config=SimpleNamespace(width=3, height=2),
+        frame_capture=capture,
+    )
+    assert provider.render(mode=RenderMode.HUMAN, snapshot=None) is None
+    first = provider.last_frame_receipt
+    assert first['capture_identity'] == {'boundary': 1}
+    assert first['presentation']['status'] == 'presented'
+    assert first['presentation']['window_id'] == 731
+
+    FakeWindow.instances[0].close_callback()
+    assert FakeWindow.instances[0].destroyed
+    assert provider.render(mode=RenderMode.HUMAN, snapshot=None) is None
+    second = provider.last_frame_receipt
+    assert second['capture_identity'] == {'boundary': 2}
+    assert second['presentation']['status'] == 'display_closed_capture_only'
+    assert second['presentation']['window_id'] is None
+    assert len(FakeWindow.instances) == 1
+    assert len(captures) == 2
+    provider.close()
+    provider.close()
+
+
+def test_isaac_observer_uses_headless_camera_enabled_app_profile():
+    from task_env.runtime.sessions.isaac_native_io import (
+        IsaacSimAppOwnerV1,
+        V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1,
+    )
+
+    owner = IsaacSimAppOwnerV1(
+        launch_profile_id=V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1,
+    )
+    assert owner.launch_profile_receipt() == {
+        'profile_id': 'v211-headless-camera-v1',
+        'simulation_app_config': {
+            'headless': True,
+            'enable_cameras': True,
+            'limit_cpu_threads': 4,
+            'fast_shutdown': False,
+            'multi_gpu': False,
+            'max_gpu_count': 1,
+        },
+    }
+
+
+def test_selected_observer_render_latches_typed_fault_and_rejects_reuse():
+    from task_env.environment.lifecycle import EpisodeExecutionState
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    env = object.__new__(SelectedReferenceEnv)
+    env._episode_state = EpisodeExecutionState()
+    env._selected_observer_camera = object()
+    env.render_mode = 'rgb_array'
+    env._published_position_state = SimpleNamespace(
+        control_step=7, simulation_time=0.014,
+    )
+    env.artifact = SimpleNamespace(timebase=SimpleNamespace(control_dt=0.002))
+    original = RuntimeError('native observer owner failed')
+    calls = []
+
+    def fail(**_kwargs):
+        calls.append(True)
+        raise original
+
+    env._ui_render_provider = SimpleNamespace(render=fail)
+    with pytest.raises(RuntimeError, match='native observer owner failed') as caught:
+        env.render()
+    assert caught.value is original
+    assert env.execution_fault.phase == 'observer_render'
+    assert env.execution_fault.exception_type == 'RuntimeError'
+    assert env.execution_fault.control_step_before == 7
+    assert env.execution_fault.simulation_time_before_s == pytest.approx(0.014)
+    assert original.execution_fault is env.execution_fault
+    assert env._episode_execution_state().stopped
+
+    with pytest.raises(RuntimeError, match='selected execution is faulted'):
+        env.render()
+    with pytest.raises(RuntimeError, match='selected execution is faulted'):
+        env.reset()
+    with pytest.raises(RuntimeError, match='selected execution is faulted'):
+        env.step(np.zeros(0, dtype=np.float32))
+    assert len(calls) == 1
+
+
 def test_usd_observer_rejects_changed_native_state(monkeypatch):
     from task_env.runtime.sessions.native_io import UsdCoreRuntimeSession
     session = object.__new__(UsdCoreRuntimeSession)
@@ -452,3 +595,122 @@ def test_isaac_observer_color_admission_fails_closed():
         _validate_isaac_observer_color_settings(values, _ISAAC_62_OBSERVER_OCIO_SHA256)
     with pytest.raises(RuntimeError, match='OCIO configuration is not qualified'):
         _validate_isaac_observer_color_settings(_ISAAC_62_OBSERVER_COLOR_SETTINGS, '0' * 64)
+
+
+def test_isaac_session_owner_close_retains_first_error_and_attempts_all_cleanup():
+    from task_env.runtime.sessions.api import close_session_and_runtime_owner
+
+    events = []
+    first_error = LookupError('observer failure')
+
+    class Session:
+        close_receipt = {'session_closed': False}
+
+        def close(self):
+            events.append('session')
+            raise RuntimeError('session close failed')
+
+        def close_runtime_owner(self):
+            events.append('owner')
+            raise ValueError('owner close failed')
+
+    error, receipt = close_session_and_runtime_owner(
+        Session(), first_error=first_error,
+        session_error_label='session cleanup', owner_error_label='owner cleanup',
+        capture_close_receipt=True,
+    )
+    assert error is first_error
+    assert receipt == {'session_closed': False}
+    assert events == ['session', 'owner']
+    assert len(first_error.__notes__) == 2
+    assert 'session cleanup also failed: RuntimeError: session close failed' in first_error.__notes__[0]
+    assert 'owner cleanup also failed: ValueError: owner close failed' in first_error.__notes__[1]
+
+
+def test_runtime_construction_rollback_closes_only_half_built_session(monkeypatch):
+    import task_env.runtime as runtime_module
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions.api import close_session_and_runtime_owner
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1
+
+    class FakeApp:
+        def __init__(self):
+            self.close_calls = 0
+
+        def is_running(self):
+            return self.close_calls == 0
+
+        def close(self):
+            self.close_calls += 1
+
+    owner = IsaacSimAppOwnerV1()
+    owner._app = FakeApp()
+    owner.retain_process_lifetime()  # half-built session
+    owner.retain_process_lifetime()  # live sibling session
+    events = []
+
+    class HalfBuiltSession:
+        def close(self):
+            events.append('half-built-session')
+            raise RuntimeError('partial session cleanup failed')
+
+        def close_runtime_owner(self):
+            events.append('shared-owner-close-request')
+            owner.close()
+
+    class SiblingSession:
+        def __init__(self):
+            self.close_calls = 0
+
+        def close(self):
+            self.close_calls += 1
+
+        def is_live(self):
+            return owner.open().is_running()
+
+    sibling = SiblingSession()
+    primary = RuntimeError('task binding failed after runtime materialization')
+    assembly = SimpleNamespace(boundary=HalfBuiltSession(), compiled_scene=object())
+    monkeypatch.setattr(runtime_module, 'bootstrap_task_runtime', lambda **_kwargs: assembly)
+
+    env = object.__new__(SelectedReferenceEnv)
+    env.config = SimpleNamespace(
+        render=SimpleNamespace(camera_obs=False),
+        agents=SimpleNamespace(agent_uids=()),
+    )
+    env._composition_spec = object()
+    env.scene = object()
+    env.agents = ()
+    env.objects = ()
+    env.render_mode = None
+    env.create_reset_sampler = lambda: object()
+    env.create_scene_composer = lambda: object()
+    env.create_task_definition = lambda _scene: (_ for _ in ()).throw(primary)
+
+    def rollback_close():
+        error, _receipt = close_session_and_runtime_owner(
+            assembly.boundary, session_error_label='half-built session close',
+            owner_error_label='shared App owner close',
+        )
+        if error is not None:
+            raise error
+
+    env.close = rollback_close
+    with pytest.raises(RuntimeError, match='task binding failed after runtime materialization') as caught:
+        env._build_runtime_with_rollback()
+
+    assert caught.value is primary
+    assert primary.execution_fault.phase == 'runtime_construction'
+    assert any('construction rollback also failed' in note for note in primary.__notes__)
+    assert any('partial session cleanup failed' in note for note in primary.__notes__)
+    assert events == ['half-built-session', 'shared-owner-close-request']
+    assert sibling.close_calls == 0 and sibling.is_live()
+    assert owner._close_requested and not owner._close_attempted
+    assert owner.app is owner.open() and owner.app.is_running()
+    assert owner.app.close_calls == 0
+
+    owner.release_process_lifetime()
+    assert owner.app.close_calls == 0
+    owner.release_process_lifetime()
+    assert owner.app.close_calls == 1
+    assert owner.close_receipt()['close_completed']

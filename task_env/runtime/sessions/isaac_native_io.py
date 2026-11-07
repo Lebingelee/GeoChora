@@ -71,7 +71,7 @@ def _read_isaac_observer_color_settings():
 
 DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1 = "isaac-headless-default-v1"
 F06_ISAAC_APP_LAUNCH_PROFILE_V1 = "f06-headless-no-render-v1"
-V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 = "v211-headed-camera-v1"
+V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 = "v211-headless-camera-v1"
 _ISAAC_APP_LAUNCH_PROFILE_OVERRIDES = {
     DEFAULT_ISAAC_APP_LAUNCH_PROFILE_V1: {},
     F06_ISAAC_APP_LAUNCH_PROFILE_V1: {
@@ -80,7 +80,7 @@ _ISAAC_APP_LAUNCH_PROFILE_OVERRIDES = {
         "disable_viewport_updates": True,
     },
     V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1: {
-        "headless": False,
+        "headless": True,
         "enable_cameras": True,
         "multi_gpu": False,
         "max_gpu_count": 1,
@@ -693,6 +693,8 @@ class IsaacSimNativeRuntimeIOV1:
         self._artifact, self._execution, self._source = artifact, execution, source
         self._lease, self._app_owner = lease, app_owner
         self._observer_render_request = observer_render_request
+        self._observer_stage_time_range_receipt = None
+        self._observer_render_light_receipt = None
         self._observer_sensor = None
         self._observer_path = None
         self._observer_faulted = False
@@ -736,7 +738,7 @@ class IsaacSimNativeRuntimeIOV1:
             self._app_owner.open(f06_compatibility=True) if self._f06_pickcube else self._app_owner.open()
             import omni.usd
             import torch
-            from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
+            from pxr import Gf, PhysxSchema, Sdf, UsdGeom, UsdLux, UsdPhysics
             from isaacsim.core.experimental.prims import Articulation, RigidPrim, XformPrim
             from isaacsim.core.simulation_manager import SimulationManager
             from isaacsim.core.experimental.utils import app as app_utils
@@ -769,6 +771,51 @@ class IsaacSimNativeRuntimeIOV1:
             self._stage = self._context.get_stage()
             if self._stage is None:
                 raise RuntimeError("Isaac public USD context did not publish a stage")
+            if self._observer_render_request is not None:
+                start_time_code = float(self._stage.GetStartTimeCode())
+                source_end_time_code = float(self._stage.GetEndTimeCode())
+                end_time_code = source_end_time_code
+                extended = end_time_code <= start_time_code
+                if extended:
+                    # RTX annotators need a non-degenerate USD time range even
+                    # for a static scene. Keep the authored time origin and
+                    # extend only the disposable in-memory stage metadata.
+                    end_time_code = start_time_code + 1.0
+                    self._stage.SetEndTimeCode(end_time_code)
+                self._observer_stage_time_range_receipt = {
+                    "schema_version": "isaac-observer-stage-time-range-v1",
+                    "source_start_time_code": start_time_code,
+                    "source_end_time_code": source_end_time_code,
+                    "effective_start_time_code": start_time_code,
+                    "effective_end_time_code": end_time_code,
+                    "extended_in_memory": extended,
+                    "time_codes_per_second": float(self._stage.GetTimeCodesPerSecond()),
+                    "frames_per_second": float(self._stage.GetFramesPerSecond()),
+                }
+                light_paths = sorted(
+                    str(prim.GetPath()) for prim in self._stage.Traverse()
+                    if prim.HasAPI(UsdLux.LightAPI)
+                )
+                added_light_path = None
+                if not light_paths:
+                    # This frozen F06 stage has no authored lights. A camera
+                    # render product has no viewport headlight, so add a
+                    # renderer-only neutral dome light to the in-memory stage.
+                    added_light_path = "/GeoChoraObserverEnvironmentLight"
+                    dome = UsdLux.DomeLight.Define(self._stage, Sdf.Path(added_light_path))
+                    if not dome or not dome.GetPrim().IsValid():
+                        raise RuntimeError("Isaac observer could not define its renderer-only dome light")
+                    dome.GetIntensityAttr().Set(1000.0)
+                    dome.GetColorAttr().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+                self._observer_render_light_receipt = {
+                    "schema_version": "isaac-observer-render-light-v1",
+                    "source_light_paths": light_paths,
+                    "added_light_path": added_light_path,
+                    "added_light_type": "UsdLux.DomeLight" if added_light_path else None,
+                    "added_light_intensity": 1000.0 if added_light_path else None,
+                    "added_light_color_linear_rgb": [1.0, 1.0, 1.0] if added_light_path else None,
+                    "stage_saved": False,
+                }
             if (float(UsdGeom.GetStageMetersPerUnit(self._stage)) != 1.0
                     or str(UsdGeom.GetStageUpAxis(self._stage)) != "Z"):
                 raise ValueError("F04 admission requires meter units and Z-up source stage")
@@ -998,6 +1045,14 @@ class IsaacSimNativeRuntimeIOV1:
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
                 'provider': 'isaacsim', 'source_id': self._source.source_id,
                 'source_closure': self._source.source_closure_digest, 'objects': checked}
+            if self._observer_stage_time_range_receipt is not None:
+                self._build_layout_facts['observer_stage_time_range'] = dict(
+                    self._observer_stage_time_range_receipt
+                )
+            if self._observer_render_light_receipt is not None:
+                self._build_layout_facts['observer_render_light'] = dict(
+                    self._observer_render_light_receipt
+                )
             if self._f06_pickcube:
                 self._build_layout_facts['sdk_identity'] = dict(self._app_owner.sdk_identity)
                 self._build_layout_facts['sdk_runtime_version_raw'] = list(self._app_owner.sdk_runtime_version_raw)
@@ -2253,7 +2308,9 @@ class IsaacSimNativeRuntimeIOV1:
                                         'v211_isaac_rtx_observer_v1', 'cuda:0')
         capability = {'schema': 'v211-isaac-rtx-observer-v1', 'sdk': '6.2.0.0',
                       'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy',
-                      'color': color_settings}
+                      'color': color_settings,
+                      'stage_time_range': self._observer_stage_time_range_receipt,
+                      'render_light': self._observer_render_light_receipt}
         capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
                                                   separators=(',', ':')).encode()).hexdigest()
         identity = CameraCaptureIdentityV1(

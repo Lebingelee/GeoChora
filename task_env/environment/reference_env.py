@@ -363,11 +363,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..render import RenderUnavailableError, normalize_render_mode
 
         if getattr(self, '_selected_observer_camera', None) is not None:
-            self._episode_execution_state().require_open('environment is closed')
+            execution_state = self._episode_execution_state()
+            execution_state.require_open('environment is closed')
+            if execution_state.fault is not None:
+                raise RuntimeError('selected execution is faulted; a new Env/session is required')
             normalized = normalize_render_mode(mode or self.render_mode)
             if normalized.value != self.render_mode:
                 raise ValueError('TaskEnv render mode is fixed at construction')
-            return self._ui_render_provider.render(mode=normalized, snapshot=None)
+            try:
+                return self._ui_render_provider.render(mode=normalized, snapshot=None)
+            except BaseException as error:
+                self._latch_fault(
+                    'observer_render', error,
+                    before_state=getattr(self, '_published_position_state', None),
+                    transition_status='rejected',
+                )
+                raise
 
         requested_mode = mode
         if requested_mode is None:
@@ -1269,6 +1280,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         return self._execution_fault
 
+    def _require_execution_healthy(self) -> None:
+        """Reject reuse of an Env after an execution fault has been latched."""
+
+        self._episode_execution_state().require_step(
+            closed_message='environment is closed',
+            fault_prefix='selected execution is faulted; a new Env/session is required',
+        )
+
     @property
     def reset_failure_receipt(self):
         """Return an owned record of reset effects; unknown writes are not rollback."""
@@ -1363,7 +1382,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
-        self._episode_execution_state().require_open('environment is closed')
+        self._require_execution_healthy()
         component_lifecycle = None
         if self._has_component_assembly():
             seed = None if seed is _RESET_SEED_UNSET else seed
@@ -1405,7 +1424,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """
         if self.binding.build_external is None or self.binding.validate_external_solution is None:
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
-        self._episode_execution_state().require_open('environment is closed')
+        self._require_execution_healthy()
         self.binding.validate_external_solution(self.value, solution)
         operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
         return self._episode_execution_state().execute_reset(**operations)
@@ -2164,7 +2183,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._ui_render_provider = TaskEnvRenderProvider(
             render_source=None, config=SimpleNamespace(width=camera.width, height=camera.height),
             frame_capture=self._capture_selected_observer,
-            frame_presenter=self._present_selected_observer if self.provider == 'isaacsim' else None,
             frame_color_space=('GL_LINEAR framebuffer RGB; uncalibrated primaries and input assets'
                                if self.provider == 'mujoco' else
                                'sRGB transfer after ACES; primaries uncalibrated' if self.provider == 'geophys' else
@@ -2315,6 +2333,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise first
 
     def step(self, action):
+        self._require_execution_healthy()
         component_lifecycle = None
         if self._has_component_assembly():
             self._episode_execution_state().require_open("environment is closed")
@@ -2331,7 +2350,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(
             closed_message='environment is closed',
-            fault_prefix='selected execution is faulted; reset() is required',
+            fault_prefix='selected execution is faulted; a new Env/session is required',
         )
         from ..planners.contracts import ExpertAction, validate_caller_solution_action
         if self.binding.external_solution_actions and type(action) is ExpertAction:
