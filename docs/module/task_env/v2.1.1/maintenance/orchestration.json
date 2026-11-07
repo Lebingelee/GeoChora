@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-06",
-  "status": "G05_5B_ATTEMPT001_REWORK_REQUIRED",
+  "updated_date": "2026-11-07",
+  "status": "G05_5B_ATTEMPT002_REWORK_REQUIRED_REASSESSMENT_CONDITIONAL",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Prepare one complete 5b attempt002 after independent review, preserve evidence and obtain new execution authorization before manual dispatch; 5c remains planned.",
+  "next_action": "5b attempt002 independently reviewed; reassessment conditional on maintainer decision about GeoPhys provider/gitlink and a separately authorized complete attempt003 budget. No third attempt dispatched; 5c remains planned.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1395,7 +1395,7 @@
             "5a"
           ],
           "status": "REWORK_REQUIRED_5B",
-          "attempt_count": 1,
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -1409,13 +1409,26 @@
               "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
               "sol_review_ref": "reviews/20261107_5b_attempt001_sol_review.md",
               "review_decision": "REWORK_REQUIRED_5B"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G05_5b_attempt002",
+              "package_manifest_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
+              "prompt_sha256": "250459527bf358c5e5251d3f38dff5c28fe781d257246e18c38c501cdf2982dc",
+              "status": "REVIEWED_REWORK_REQUIRED",
+              "result": "PARTIAL_WINDOW_RGB_GEOPHYS_BLOCKED",
+              "input_head": "344f6099a7a70581ea4d21393b5e7d9366d4000a",
+              "output_head": "1bbcf68a0854a982753e891eafe923e8d1476f5f",
+              "report_ref": "../../../../../workspace/maintenance/v211_g05_5b_attempt002/report.md",
+              "sol_review_ref": "reviews/20261107_5b_attempt002_sol_review.md",
+              "review_decision": "REWORK_REQUIRED_5B"
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt001/",
-          "package_sha256": "9495e1658e513324d12f4b8068931cf5407970934d86621df02db40067a3d8b8",
-          "input_head": "a387ff96a033e8bb16d5f31aca545e55eb664ccb",
-          "output_head": "a79273d045191d004bc938fd03c87f76661156ff",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5b_attempt002/",
+          "package_sha256": "4f5a8a8b9dba15fb1e5cf249f91804619692068d41088d837bec2f04943d4350",
+          "input_head": "344f6099a7a70581ea4d21393b5e7d9366d4000a",
+          "output_head": "1bbcf68a0854a982753e891eafe923e8d1476f5f",
           "expected_duration_minutes": "360-600 active, 720 wall maximum",
           "execution_budget": {
             "wall_minutes": 720,
@@ -1428,27 +1441,39 @@
             "gpu_vram_gib": 6,
             "new_ignored_output_gib": 5
           },
-          "last_observation": "Sol reviewed partial 001: MuJoCo oracle/color inconclusive, GeoPhys clipping and production path incomplete, Isaac renderer-facing state mismatch; no 5b gate accepted.",
+          "last_observation": "Sol reviewed 002: MuJoCo and Isaac bounded real window/RGB progress, image/color evidence remains partial; GeoPhys production clipping route blocked. Pre-third reassessment is conditional; no attempt003 dispatched.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/release-receipt.json",
-            "reviews/20261107_5b_attempt001_sol_review.md"
+            "reviews/20261107_5b_attempt001_sol_review.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt002/report.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt002/gate-matrix.md",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt002/output-manifest.json",
+            "../../../../../workspace/maintenance/v211_g05_5b_attempt002/release-receipt.json",
+            "reviews/20261107_5b_attempt002_sol_review.md",
+            "../planning/stage5-5b-attempt003-reassessment.md"
           ],
           "commits": [
-            "a79273d045191d004bc938fd03c87f76661156ff"
+            "a79273d045191d004bc938fd03c87f76661156ff",
+            "1bbcf68a0854a982753e891eafe923e8d1476f5f"
           ],
           "review_decision": {
             "status": "REWORK_REQUIRED_5B",
             "reviewer": "Sol",
             "date": "2026-11-07",
-            "review_ref": "reviews/20261107_5b_attempt001_sol_review.md"
+            "review_ref": "reviews/20261107_5b_attempt002_sol_review.md"
           },
           "blockers": [
-            "MuJoCo RGB color semantics and independent geometry/occlusion oracle incomplete",
-            "GeoPhys renderer production route and camera near/far capability not established",
-            "Isaac renderer-facing published pose mismatch, window/RGB blocked"
-          ]
+            "GeoPhys required public near/far clipping and material/light-preserving production window/RGB route not established; provider/gitlink changes require separate authorization if needed",
+            "MuJoCo and Isaac image oracle exploration bias and sRGB/linear end-to-end semantics remain unresolved",
+            "Isaac public pose publication downstream physics side effects remain an unproven risk requiring focused verification"
+          ],
+          "pre_attempt003_reassessment": {
+            "status": "CONDITIONAL_NOT_READY",
+            "ref": "../planning/stage5-5b-attempt003-reassessment.md",
+            "reason": "Provider/gitlink permission and separately authorized concrete execution scope/budget are not yet available; credible candidate exists but no dispatch."
+          }
         },
         {
           "id": "5c",
