@@ -10,6 +10,10 @@
 - [render 合同](../../contracts/render-provider.md)“用户关闭窗口/display lost”明确要求：若 App/window 生命周期无法分离，以 typed route fault 明确通知；[生命周期合同](../../contracts/lifecycle-and-data.md)要求在 admission 标记该限制并在 fault receipt 通知 Core。当前 `task_env/render/base/contracts.py::ObserverRenderRequestV1` 只校验 camera/mode/provider/backend，没有该生命周期限制；当前 API 文档也没有对该 Isaac 窗口行为作明确声明。`task_env/runtime/sessions/isaac_native_io.py::_check_observer_clock` 将 native/App owner 置失效并抛 `RuntimeError`；`UsdCoreRuntimeSession` 使 observer 失效后重抛；`task_env/environment/reference_env.py::render` 直接返回 provider 调用，未形成或锁存 `ExecutionFaultV1`。现有同次 native close probe 不读取 `env.execution_fault`，因此不能声称其已验证 typed fault。
 - Sol 在禁止 SDK/source import 的 guard 下用真实 `SelectedReferenceEnv.render` 和注入相同错误的纯 provider 定向检查：异常为 `RuntimeError`、无 `execution_fault` 附件，`env.execution_fault` 仍为 `None`。这是对 Env 错误传播分支的离线验证，**不是**重新运行 native window，也不能单凭此推定后续 step 已实际推进或改写物理。代码中 selected step 的故障前置检查依赖 `_execution_fault`，因而不能将底层 App 失效等同于 Env 已显式进入 typed fault。需要维护者主导的诊断确认最小修复：要么让窗口与 App 生命周期实际分离，要么对已确认不可分离的路线在 admission 宣告限制、在实际失败时以项目既有 fault/receipt owner 类型化并使 Env 不再把该 episode 当正常可执行；保留主错和清理次错，并验证真实窗口关闭及故障前后行为。
 
+## 后续静态核对：CPU 路线的窗口交互尚不能视为通过
+
+此前本报告将 Isaac 指为已经确认的直接阻塞，**并未对 MuJoCo 和 GeoPhys 分别作完整 5b 路线接收**。2026-11-07 根据维护者对原计划的追问，进一步核对 `goals/05-rendering.md` 的“观察拖动不改任务相机”：selected MuJoCo 和 GeoPhys 的 `human` 调用经 `TaskEnvRenderProvider._present_owned_frame` 使用 Tk label 展示帧，当前该方法只注册窗口关闭协议，并未看到鼠标拖动事件或从拖动更新 observer camera 的接线。两条 CPU 最终窗口 probe 通过 `set_observer_camera` 程序化更换视角，完成的是视角与窗口帧关联，不是用户拖动及 task camera 隔离的实测。原 5b 该项目前不能判为已通过；是否以不同公开窗口路径实现应由维护者主导诊断核对，不能据此无条件宣称两个 CPU 路线已完整验收。本次为代码和已有记录的静态核对，未新开窗口、无新 native 数据。
+
 ## 其他证据与具体范围
 
 - Final Core `codex/v211-stage5@2b8f82b719880f9eb65cb332b30363c64b034deb` 是 `30a19011885be4e68b179601be2bc4edce02fd2f` 直接子提交；GeoPhys `a6bf45b3422e31dfc632a58948e57fa4b686f1b0`、Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` 和三保护输入保持。002、003 和 CPU followup 的历史决定与 release 均保留；当时已核对 003 原包 8/8、CPU followup 2974/2974 输出摘要。

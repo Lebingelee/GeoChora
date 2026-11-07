@@ -1455,7 +1455,7 @@
             "gpu_vram_gib": 6,
             "new_ignored_output_gib": 5
           },
-          "last_observation": "Sol final: 345/345 output hashes, final run diff matches commit, guarded 38 passed; three routes have bounded real-window/RGB evidence, but observed Isaac window close invalidates App without required typed Env route fault/admission disclosure. Stale-frame negative duplicates swapped view.",
+          "last_observation": "Sol final: 345/345 output hashes, final run diff matches commit, guarded 38 passed; three routes have bounded real-window/RGB evidence, but observed Isaac window close invalidates App without required typed Env route fault/admission disclosure. Stale-frame negative duplicates swapped view. Follow-up static inspection found selected CPU Tk windows lack an observed mouse-drag camera handler; view-switch tests only use set_observer_camera.",
           "evidence_refs": [
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/report.md",
             "../../../../../workspace/maintenance/v211_g05_5b_attempt001/ledger.json",
@@ -1491,7 +1491,8 @@
           },
           "blockers": [
             "Isaac native window close invalidates App/physics runtime yet selected Env does not publish/latch typed route fault and admission does not disclose lifecycle restriction",
-            "Isaac final stale-frame negative duplicates swapped view, not an independent old-state negative; exploratory image selection and uncalibrated primaries/assets remain scoped limitations"
+            "Isaac final stale-frame negative duplicates swapped view, not an independent old-state negative; exploratory image selection and uncalibrated primaries/assets remain scoped limitations",
+            "Selected MuJoCo/GeoPhys Tk presentation has no observed observer-camera drag handler; the original drag/task-camera isolation condition is not independently established; CPU routes not separately accepted."
           ],
           "pre_attempt003_reassessment": {
             "status": "COMPLETED_AUTHORIZED_FOR_PACKAGE_PREPARATION",
