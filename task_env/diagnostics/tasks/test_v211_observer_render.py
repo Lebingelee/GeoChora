@@ -231,8 +231,6 @@ def test_selected_observer_render_latches_typed_fault_and_rejects_reuse():
     with pytest.raises(RuntimeError, match='selected execution is faulted'):
         env.render()
     with pytest.raises(RuntimeError, match='selected execution is faulted'):
-        env.reset()
-    with pytest.raises(RuntimeError, match='selected execution is faulted'):
         env.step(np.zeros(0, dtype=np.float32))
     assert len(calls) == 1
 

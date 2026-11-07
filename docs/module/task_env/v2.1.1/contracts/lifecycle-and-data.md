@@ -14,7 +14,9 @@
 | faulted | 读取 fault/cleanup receipt、明确 rebuild reset、close | 不允许再 step 或提交旧 command；不得继续产生正常 transition |
 | closed | 读取终结 receipt | 所有 state view/lease 无效，重复 close 安全 |
 
-这是目标行为。当前 SelectedReferenceEnv._reset 在 selected path 会先关闭 camera consumer/旧 session，再创建 session；现状不保证每种配置的 pure preflight reject 保留旧 episode。协议要求以后把能静态做的验证移到 destructive close 前；超过该边界后失败记录已发生副作用，不保证恢复旧 session。
+这是 faulted Env 的目标行为。公开 `reset` 与 `reset_for_solution` 是明确的新 episode rebuild 请求；在 Env 未关闭且 reset 前置校验通过后，SelectedReferenceEnv 会关闭旧 camera consumer/session，再创建并 reset 新 session。纯 preflight 拒绝发生在该破坏边界之前，保留既有 fault 和未被触及的 session；越过边界后失败则关闭半构建资源、保留本次错误与清理次错、记录 reset effects 并继续 faulted，不恢复旧 episode。只有 `finish_reset` 在 state/readback/observation 已发布后才清除执行 fault；失败 rebuild 不返回正常 reset observation/info，旧 state/frame/receipt 在 faulted 状态下不得用于新的正常 transition。若 App/worker owner 无法 reopen，保留其原始拒绝及现有 fault，后续 step/render 仍被拒绝，Env 可在 owner 再次可用时显式 retry reset 或 close。
+
+未完成或故障中的 Recorder 仍须按其自己的失败合同处理；reset 不得静默丢弃未完成 transition。`reset_failure_receipt` 在 destructive rebuild 失败时记录阶段、首错、prior execution fault、旧/新 session close 与 reset-write effects，以及清理次错；成功 rebuild 发布后才清除该收据。
 
 ## 构建、reset、step、publish 与 close
 

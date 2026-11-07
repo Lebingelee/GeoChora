@@ -92,6 +92,29 @@ class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
     def __init__(self, artifact, execution, *, source, binding, **_diagnostic_options):
         self._initialize_values(artifact, source, execution.physics_provider)
+        actuator_names = {}
+        for field in ('joint_targets', 'torque_actuators', 'position_actuators'):
+            actuator_names.update(getattr(source, field))
+        checked_objects = {
+            field: {semantic: {'native': native} for semantic, native in getattr(source, field).items()}
+            for field in ('joints', 'free_joints', 'bodies', 'frames')
+        }
+        checked_objects['actuators'] = {
+            semantic: {'native': native} for semantic, native in actuator_names.items()
+        }
+        checked_objects['actuators'].update({
+            'open:' + native: {'native': native} for native in source.open_actuators
+        })
+        self._build_layout_facts = {
+            'helper': ('task_env.runtime.sessions.geophys:check_geophys_named_layout'
+                       if execution.physics_provider == 'geophys' else
+                       'task_env.runtime.sessions.mujoco:check_mujoco_named_layout'),
+            'provider': execution.physics_provider,
+            'source_id': source.scene_source.source_id,
+            'source_closure': source.source_closure_digest,
+            'materialization_id': self.provider_materialization_id,
+            'objects': checked_objects,
+        }
         # This synthetic adapter models the NutAssembly binding's required
         # actuator-force contract so its external lifecycle tests exercise the
         # same native-sample callback gate as the production RuntimeSession.
@@ -1553,14 +1576,144 @@ def test_c05b_faulted_canonical_recording_cannot_be_exported(fake, tmp_path, fai
         env.close()
 
 
-def test_failed_reset_closes_old_runtime_and_requires_new_reset(fake):
-    env=make_env(IDS[1]);env.reset(seed=19);old=env.session
-    with pytest.raises(ValueError):env.reset(seed=31)
-    assert old.closed and env.session is None and env._stopped
-    assert env.execution_fault.phase == 'reset_seed'
-    assert env.execution_fault.physical_progress == 'not_advanced'
-    with pytest.raises(RuntimeError):env.step_expert()
-    env.reset(seed=19);env.step_expert();env.close()
+def test_faulted_public_reset_rebuilds_only_after_successful_publication(fake, monkeypatch):
+    from task_env.environment import reference_env as reference_env_module
+
+    env = make_env(IDS[1], config={'provider': 'mujoco'})
+    try:
+        env.reset(seed=19)
+        old_session = env.session
+
+        def fail_physics_step():
+            raise RuntimeError('injected physics-step failure')
+
+        old_session._step_physics_once = fail_physics_step
+        with pytest.raises(RuntimeError, match='injected physics-step failure'):
+            env.step_expert()
+        assert env.execution_fault.phase == 'physics_step'
+        assert env._stopped
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_expert()
+
+        materialize = reference_env_module.materialize_control
+        materialization_count = 0
+        failed_replacements = []
+
+        def fail_first_replacement_reset(*args, **kwargs):
+            nonlocal materialization_count
+            materialization_count += 1
+            session = materialize(*args, **kwargs)
+            if materialization_count == 1:
+                failed_replacements.append(session)
+                def fail_reset(_sample):
+                    raise RuntimeError('injected replacement reset failure')
+                session.reset = fail_reset
+                close_session = session.close
+
+                def fail_replacement_cleanup():
+                    close_session()
+                    raise RuntimeError('injected replacement cleanup failure')
+
+                session.close = fail_replacement_cleanup
+            return session
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', fail_first_replacement_reset)
+        info_before_failed_reset = env.info
+        with pytest.raises(RuntimeError, match='injected replacement reset failure'):
+            env.reset(seed=19)
+        assert old_session.closed and env.session is None and env._stopped
+        assert env.info is info_before_failed_reset
+        assert env.execution_fault.phase == 'runtime_reset'
+        failed_reset = env.reset_failure_receipt
+        assert failed_reset['previous_session_close_completed']
+        assert failed_reset['replacement_materialization_attempted']
+        assert failed_reset['reset_write_attempted']
+        assert failed_reset['reset_write_status'] == 'unknown'
+        assert failed_reset['replacement_session_close_attempted']
+        assert not failed_reset['replacement_session_close_completed']
+        assert failed_reset['prior_execution_fault']['phase'] == 'physics_step'
+        assert failed_reset['failure']['message'] == 'injected replacement reset failure'
+        assert failed_replacements[0].closed
+        assert failed_reset['cleanup_errors'] == [{
+            'operation': 'selected replacement-session cleanup',
+            'exception_type': 'RuntimeError',
+            'message': 'injected replacement cleanup failure',
+        }]
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_expert()
+        assert env.info is info_before_failed_reset
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', materialize)
+        env.reset(seed=19)
+        assert env.session is not old_session
+        assert env.execution_fault is None
+        assert env.reset_failure_receipt is None
+        assert env.state.control_step == 0
+        assert not env._stopped
+    finally:
+        env.close()
+    with pytest.raises(RuntimeError, match='environment is closed'):
+        env.reset(seed=19)
+
+
+def test_observer_fault_reset_for_solution_and_unavailable_owner(fake, monkeypatch):
+    from task_env.environment import reference_env as reference_env_module
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.observations.canonical_camera.contracts import IDENTITY
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider': 'mujoco', 'horizon': 3})
+    solution = build_readiness_solution()
+    try:
+        env.reset_for_solution(solution, seed=19)
+        old_session = env.session
+        camera = CameraGeometry(
+            'camera-observation-v0', env.artifact.identity_hash, 'r1-observer', 'world',
+            IDENTITY, IDENTITY, 16, 16, 1.0, .01, 10.0, True, False,
+        )
+
+        def fail_capture():
+            raise RuntimeError('injected observer capture failure')
+
+        monkeypatch.setattr(env, '_capture_selected_observer', fail_capture)
+        env._configure_selected_observer('rgb_array', camera)
+        with pytest.raises(RuntimeError, match='injected observer capture failure'):
+            env.render()
+        assert env.execution_fault.phase == 'observer_render'
+        assert env._ui_render_provider.last_frame_receipt is None
+
+        info_before_failed_rebuild = env.info
+        materialize = reference_env_module.materialize_control
+
+        def unavailable_owner(*_args, **_kwargs):
+            raise RuntimeError('Isaac App owner unavailable; new worker required')
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', unavailable_owner)
+        with pytest.raises(RuntimeError, match='new worker required'):
+            env.reset_for_solution(solution, seed=19)
+        assert old_session.closed and env.session is None and env._stopped
+        assert env.info is info_before_failed_rebuild
+        assert env.execution_fault.phase == 'session_materialization'
+        failed_reset = env.reset_failure_receipt
+        assert failed_reset['previous_session_close_completed']
+        assert failed_reset['replacement_materialization_attempted']
+        assert not failed_reset['reset_write_attempted']
+        assert failed_reset['prior_execution_fault']['phase'] == 'observer_render'
+        assert failed_reset['failure']['message'] == 'Isaac App owner unavailable; new worker required'
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+
+        monkeypatch.setattr(reference_env_module, 'materialize_control', materialize)
+        env.reset_for_solution(solution, seed=19)
+        assert env.session is not old_session
+        assert env.execution_fault is None
+        assert env.reset_failure_receipt is None
+        assert env.state.control_step == 0
+        assert not env._stopped
+    finally:
+        env.close()
+    with pytest.raises(RuntimeError, match='environment is closed'):
+        env.reset_for_solution(solution, seed=19)
 
 
 def test_native_partial_interval_fault_is_recorded_without_a_transition(fake, tmp_path):

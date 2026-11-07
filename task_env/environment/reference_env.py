@@ -366,7 +366,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             execution_state = self._episode_execution_state()
             execution_state.require_open('environment is closed')
             if execution_state.fault is not None:
-                raise RuntimeError('selected execution is faulted; a new Env/session is required')
+                raise RuntimeError('selected execution is faulted; reset() is required before rendering')
             normalized = normalize_render_mode(mode or self.render_mode)
             if normalized.value != self.render_mode:
                 raise ValueError('TaskEnv render mode is fixed at construction')
@@ -1281,11 +1281,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._execution_fault
 
     def _require_execution_healthy(self) -> None:
-        """Reject reuse of an Env after an execution fault has been latched."""
+        """Reject normal execution on a faulted Env; reset is its recovery route."""
 
         self._episode_execution_state().require_step(
             closed_message='environment is closed',
-            fault_prefix='selected execution is faulted; a new Env/session is required',
+            fault_prefix='selected execution is faulted; reset() is required',
         )
 
     @property
@@ -1382,7 +1382,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
-        self._require_execution_healthy()
+        self._episode_execution_state().require_open('environment is closed')
         component_lifecycle = None
         if self._has_component_assembly():
             seed = None if seed is _RESET_SEED_UNSET else seed
@@ -1393,6 +1393,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         else:
             operations = self._prepare_reference_reset(seed=seed, options=options)
         result = self._episode_execution_state().execute_reset(**operations)
+        self._reset_failure_receipt = None
         if component_lifecycle is not None:
             return self._format_component_reset(component_lifecycle, result, seed)
         return result
@@ -1420,17 +1421,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         The task binding validates that the supplied mutable Solution matches
         the actual current Artifact/source/readiness configuration before the
-        existing RuntimeSession is reconstructed.
+        RuntimeSession is reconstructed. A faulted Env may request this explicit
+        rebuild; the fault remains latched until reset publication completes.
         """
         if self.binding.build_external is None or self.binding.validate_external_solution is None:
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
-        self._require_execution_healthy()
+        self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
         operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
-        return self._episode_execution_state().execute_reset(**operations)
+        result = self._episode_execution_state().execute_reset(**operations)
+        self._reset_failure_receipt = None
+        return result
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
+        prior_fault = self._episode_execution_state().fault
+        prior_fault_mapping = None if prior_fault is None else prior_fault.to_mapping()
         from .reference_binding import prepare_selected_reset
         physical_selection = getattr(self, '_physical_reset_selection', None)
         physical_candidate = None
@@ -1566,7 +1572,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def prepare():
             nonlocal seed, previous_session_close_attempted, failure_phase
             if switching:
-                self._reset_failure_receipt = None
                 self._switch_rng_state = switch_candidate.rng_state
                 self._switch_task_seed = switch_candidate.task_seed
                 self._switch_provider_seed = switch_candidate.provider_seed
@@ -1698,8 +1703,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def materialize_runtime():
             nonlocal failure_phase
             failure_phase = 'session_materialization'
-            if switching:
-                reset_effects['replacement_materialization_attempted'] = True
+            reset_effects['replacement_materialization_attempted'] = True
 
             def start_worker():
                 from ..runtime.sessions.transport import (
@@ -1810,9 +1814,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 bind_selected_build_checks(deployment_receipt, self.session.build_layout_facts,
                     materialization_id=self.session.provider_materialization_id)
             failure_phase = 'runtime_reset'
-            if switching:
-                reset_effects['reset_write_attempted'] = True
-                reset_effects['reset_write_status'] = 'unknown'
+            reset_effects['reset_write_attempted'] = True
+            reset_effects['reset_write_status'] = 'unknown'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 self.realized = self.session.reset_plan(reset_plan)
@@ -1820,8 +1823,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.realized = self.session.reset_plan(self._mixed_reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
-            if switching:
-                reset_effects['reset_write_status'] = 'completed'
+            reset_effects['reset_write_status'] = 'completed'
             self._compiled_layout_post_reset = None
             if self.binding.post_reset_session_validator is not None:
                 self._compiled_layout_post_reset = self.binding.post_reset_session_validator(
@@ -1990,40 +1992,40 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def on_failure(_phase, error):
             nonlocal previous_session_close_attempted
+            cleanup_errors = []
+
+            def record_cleanup_error(operation, cleanup_error):
+                cleanup_errors.append({
+                    'operation': operation,
+                    'exception_type': type(cleanup_error).__name__,
+                    'message': str(cleanup_error),
+                })
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'{operation} also failed: {cleanup_error!r}')
+
             self._external_solution_owner = None
             try:
                 self._close_camera_consumer()
             except BaseException as cleanup_error:
-                add_note = getattr(error, 'add_note', None)
-                if callable(add_note):
-                    add_note(f'selected reset camera cleanup also failed: {cleanup_error!r}')
+                record_cleanup_error('selected reset camera cleanup', cleanup_error)
             failed_session, self.session = self.session, None
             if failed_session is not None:
-                if switching:
-                    reset_effects['replacement_session_close_attempted'] = True
+                reset_effects['replacement_session_close_attempted'] = True
                 try:
                     failed_session.close()
-                    if switching:
-                        reset_effects['replacement_session_close_completed'] = True
+                    reset_effects['replacement_session_close_completed'] = True
                 except BaseException as cleanup_error:
-                    add_note = getattr(error, 'add_note', None)
-                    if callable(add_note):
-                        add_note(f'selected reset cleanup also failed: {cleanup_error!r}')
+                    record_cleanup_error('selected replacement-session cleanup', cleanup_error)
             if previous_session is not None and not previous_session_close_attempted:
                 previous_session_close_attempted = True
-                if switching:
-                    reset_effects['previous_session_close_attempted'] = True
+                reset_effects['previous_session_close_attempted'] = True
                 try:
                     previous_session.close()
-                    if switching:
-                        reset_effects['previous_session_close_completed'] = True
+                    reset_effects['previous_session_close_completed'] = True
                 except BaseException as cleanup_error:
-                    add_note = getattr(error, 'add_note', None)
-                    if callable(add_note):
-                        add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
+                    record_cleanup_error('selected prior-session cleanup', cleanup_error)
             if switching:
-                self._reset_failure_receipt = {**reset_effects, 'failure_phase': failure_phase}
-                error.reset_failure_receipt = self.reset_failure_receipt
                 # A candidate can own a source lease even if closing the old
                 # session fails before it is installed on this environment.
                 seen = set()
@@ -2035,7 +2037,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     try:
                         receipt.close()
                     except BaseException as cleanup_error:
-                        error.add_note(f'selected reset source cleanup also failed: {cleanup_error!r}')
+                        record_cleanup_error('selected reset source cleanup', cleanup_error)
+            self._reset_failure_receipt = {
+                **reset_effects,
+                'failure_phase': failure_phase,
+                'failure': {
+                    'exception_type': type(error).__name__,
+                    'message': str(error),
+                },
+                'prior_execution_fault': prior_fault_mapping,
+                'cleanup_errors': cleanup_errors,
+            }
+            error.reset_failure_receipt = self.reset_failure_receipt
             self._latch_fault(failure_phase, error)
 
         return dict(
@@ -2350,7 +2363,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(
             closed_message='environment is closed',
-            fault_prefix='selected execution is faulted; a new Env/session is required',
+            fault_prefix='selected execution is faulted; reset() is required',
         )
         from ..planners.contracts import ExpertAction, validate_caller_solution_action
         if self.binding.external_solution_actions and type(action) is ExpertAction:
