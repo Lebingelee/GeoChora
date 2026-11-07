@@ -4,9 +4,9 @@
 
 沿用Env、RuntimeSession、render/camera、observation与batch owner，不新建第二Runtime／Recorder／RenderManager；Depth、segmentation、Flora及非刚体实际运行不在本版必达。
 
-同一 public Env 在 reset 上切换已准入 renderer；内部可重建 render session、worker/App 与资源 lease，窗口／RGB／同步 task RGB 的固定输出契约保持。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。
+2026-11-07 维护者修订：renderer 在 public Env 创建时选择并准入，从创建到 close 保持同一选择；reset 可按需重建该 renderer 的 session、worker/App 或 lease，但不更换 renderer。同一 Env 的 renderer 往返切换留待后续未排期任务，不是 5c 出口。若 reset 的其他配置与固定 renderer 不兼容，应在可静态判断的副作用前拒绝。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。目标和验证范围见[5c 范围](../planning/stage5-5c-fixed-renderer-scope.md)。
 
-5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、renderer reset 切换与跨组合仍为 5c 待完成目标。
+5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和跨组合仍为 5c 待完成目标。
 
 ## 三项独立完成目标
 
@@ -43,7 +43,7 @@ Identity 必须能连接 artifact、source closure、execution/materialization�
 | update | 同一个已发布的 typed state boundary/readback、mapping generation、完成要求 | 更新后确切消费的 state revision/topology generation、转换结果、完成 fence/ticket、拒绝/重建项 | 必须等多 solver 的整场景同步 completion；不读私有 solver storage；renderer 不改变 live physics state；stale state 必须拒绝 | `SelectedReferenceEnv` observation path 与 `DynamicCameraObservationConsumerV1`；扩展公共 typed visual-state binding |
 | capture | camera ID/config revision、env/row、目标 boundary/capture phase、RGB 要求、deadline/ownership | `CapturedFrameV1` 或具名失败；实际 realized camera、identity/clock、HWC layout、RGB/color/range/dtype/device、completion、owned/borrowed 期限 | 不完整异步帧不可消费； required 缺帧不能回旧帧/零图；跨 lease/worker/Recorder 保留时 copy 或 retain | `DynamicCameraObservationConsumerV1.capture`、canonical observation assembly、Recorder 输入；reset 和 step 的 capture phase 需分开表达 |
 | present / event | 当前完成帧、observer camera/window policy、是否允许交互 | `PresentationReceiptV1`、窗口事件、observer camera 更新 | 仅允许改 UI camera/window；不改 task camera、物理状态、episode 或任务时钟，除非构建时显式共享 camera 并记录 | `TaskEnvRenderProvider.render_human`；保持 `.render()` 是 UI owner，task capture 由 observation 调度 |
-| reset / rebind | 完成静态 preflight 后的新 route/config、reset sample、resource generation、固定 obs spec | 新 binding receipt 与 reset 首帧；旧 binding/cache/lease/frame 的显式 invalidation；失败副作用 receipt | episode state 不迁移；A→B→A 走完整 rebuild/reset。first native effect 后失败 faulted；不得发布旧 episode frame | `SelectedReferenceEnv._reset` 先 close 旧 consumer 的现状须保留为已发生副作用事实；未来把静态拒绝前移，5c 验证 |
+| reset / rebind | 完成静态 preflight 后的固定 renderer、reset sample、resource generation、固定 obs spec | 新 binding receipt 与 reset 首帧；旧 binding/cache/lease/frame 的显式 invalidation；失败副作用 receipt | episode state 不迁移；需要时以相同 renderer 重建。first native effect 后失败 faulted；不得发布旧 episode frame | `SelectedReferenceEnv._reset` 先 close 旧 consumer 的现状须保留为已发生副作用事实；未来把静态拒绝前移，5c 验证 |
 | close / failure | owner-scoped close/release 请求、错误上下文与当前 lease generation | 幂等 close receipt、逐项释放情况、旧 view 失效、primary/secondary failures | renderer 不关闭借用的 shared scene/App/model/context；先停止 capture/present，再释放 renderer-owned buffer/model/window/lease，最后由原 owner 决定关共享 App/worker | Env 汇总 cleanup；renderer session 管自有资源；per-worker `IsaacSimAppOwnerV1` 最终关闭 App |
 
 ### 两种 scene 接入路径
@@ -62,13 +62,13 @@ F06 Isaac 候选的有界几何路径可在构造时声明一个 world 挂载 ta
 建议调用外形（仅设计值）：
 
 ```text
-Env(render_mode: "human" | "rgb_array" | null, observer_camera: CameraRequestV1?, task_cameras: tuple[CameraGeometry, ...]?)
+Env(renderer: RendererSelection?, render_mode: "human" | "rgb_array" | null, observer_camera: CameraRequestV1?, task_cameras: tuple[CameraGeometry, ...]?)
 render() -> numpy.ndarray | None
-reset(seed?, options={"renderer": route, "controller": selection, ...}) -> (observation, info)
+reset(seed?, options={"controller": selection, ...}) -> (observation, info)
 close() -> None
 ```
 
-`render_mode` 在构建时固定，沿用 metadata 声明；`human` 的 `.render()` 呈现最新已完成状态并泵 UI 事件，返回 None；`rgb_array` 返回 observer view 的独立 NumPy RGB 数组，dtype/range 按构建契约声明；mode=None 返回 None。PresentationReceipt/CapturedFrame/close receipt 是 adapter↔Core 的内部类型，通过既有诊断/receipt 查询通道提供，不直接替换 Env.render()/close() 的公共返回。显式 device/borrowed frame API 与标准 render 返回分开，不强制 task observation 或全部状态回 CPU。没有 renderer 的 state-only route 若仍接受 `None`，显式查询窗口/RGB 不可用；构建时请求 required output 则拒绝。renderer reset 不能改变已有 observation schema/shape/dtype。reset options 的 route/controller 是项目明确扩展，不能宣称所有 Gymnasium/RL wrapper 兼容。Gymnasium 参考定义了构建时 render mode、metadata 与 close 的惯用边界；项目需要另外定义 reset/rebind 与同步 task sensor。
+`render_mode` 和 renderer 选择在构建时固定，沿用 metadata 声明；`human` 的 `.render()` 呈现最新已完成状态并泵 UI 事件，返回 None；`rgb_array` 返回 observer view 的独立 NumPy RGB 数组，dtype/range 按构建契约声明；mode=None 返回 None。PresentationReceipt/CapturedFrame/close receipt 是 adapter↔Core 的内部类型，通过既有诊断/receipt 查询通道提供，不直接替换 Env.render()/close() 的公共返回。显式 device/borrowed frame API 与标准 render 返回分开，不强制 task observation 或全部状态回 CPU。没有 renderer 的 state-only route 若仍接受 `None`，显式查询窗口/RGB 不可用；构建时请求 required output 则拒绝。reset 不能改变已有 observation schema/shape/dtype 或 renderer 选择；不支持的 renderer 更换请求必须明确拒绝，不能静默忽略。reset options 的 backend/controller 是项目明确扩展，不能宣称所有 Gymnasium/RL wrapper 兼容。Gymnasium 参考定义了构建时 render mode、metadata 与 close 的惯用边界；项目需要另外定义 reset/rebind 与同步 task sensor。
 
 **强制 task-RGB cadence：**每一次成功 reset 的 observation 取该 reset 初始化/readback 后的边界；每个正常 step 的图像对应该 interval 完成后的新状态；所有 required cameras 对齐同一 `StateBoundaryIdentity` 与 capture phase/clock。不得以未声明的一帧延迟、降采样或调用方另行 `.render()` 满足要求。physics/control cadence 与 UI FPS 分离。Recorder 记录图像时使用同一 identity，评价可以并行计算，但在所需 state 与图像都完成前不能发布完整 transition。
 
@@ -76,7 +76,7 @@ close() -> None
 | --- | --- | --- |
 | reset 首帧 | route build/bind → reset write/readback 完成 → publish reset state (control_step=0, reset_sample=n, phase=`reset_initial`) → visual update/fence → 每台 required task camera capture/fence → observation/Recorder → 返回 | 不推进物理；同相机 config 与相同 boundary 可按明示缓存策略复用 |
 | step 图像 | command ack → physics interval 全部完成 → public state boundary/revision → visual update/fence → cameras capture/fence → observation/evaluation/Recorder → 返回 normal transition | 同一 boundary 可复用；不能把 capture 当新的 physics sample |
-| reset A→B→A | preflight B → old task consumer/camera stop+close → bind B 新 generation → 新 episode reset/readback → capture 首帧；再次 A 同样重建 | A 的旧缓存/帧/lease 不可跨新 materialization、episode 或 camera revision |
+| 同 renderer reset | preflight 固定选择与新 episode → 按需释放并重建同一 renderer 的资源 → reset/readback → capture 新首帧 | 旧缓存/帧/lease 不可跨新 materialization、episode 或 camera revision；不能静默更换 renderer |
 | standalone `.render()` | 读取最新完整公开 boundary → observer camera update/capture/present → receipt | 不调用 physics advance；若无有效 state，按明确 none/error 行为答复 |
 
 **当前时钟缺口：**`CameraGeometry.capture_phase` 目前由 `CameraObservationConfigV1.geometries()` 固定为 `post_control_step`，而 reset 初始 observation 也调用同一 consumer，并且 `CameraCaptureIdentityV1.validate` 只接收 `post_control_step`。因此目前 identity 无法区分 reset-initial 与真正的 post-step capture。5c 必须以调用边界传入 capture phase 并扩展 identity/验证；不得据现状声称该语义已验证。
@@ -144,7 +144,7 @@ These results update only the Isaac observer/window lifecycle branch. The pre-ex
 - 同一 RGB case 检查真实非空画面、oracle region/object pose、channel/range、camera extrinsics 与 identity；不得将 shape 或零缓冲当成功。
 - App.update/render/camera warmup 的 physics clock 前后相等，或该 route 被拒绝。
 - required capture 在 physics completed 后故障时保存 partial-progress fault，不返回 normal transition；borrowed buffer expiry 后拒绝 stale access。
-- 两 env/两 camera same-step terminal/reset case 校验四组独立 identity；未选 env lineage 不变；A→B→A 校验 resource generation 和旧帧失效。
+- 两 env/两 camera same-step terminal/reset case 校验四组独立 identity；未选 env lineage 不变；同 renderer reset 校验 resource generation 和旧帧失效。renderer A→B→A 留待后续任务。
 - 共享与独立两路径各校验 owner/close receipt；重复 close 不重复释放共享 App/scene；无第二 physics step。
 
 

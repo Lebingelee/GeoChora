@@ -2,13 +2,13 @@
 
 日期：2026-11-06。G03 的 3a、3b、3c 及 G04 的 4a、4b、4c 均经 Sol 按各自冻结范围独立有界接收；准确当前进度以[编排索引](maintenance/orchestration.json)、[恢复页](maintenance/recovery.md)和各独立主审为准。4c 的范围为 MuJoCo CPU 单 Env reset 切换及迁移后 PickCube seed31 成功；原 N08 FAIL、Isaac 6.1 close 超时、通用装配补偿与未验证交集保留，不外推正式 Qualification。
 
-阶段 5 的 5a 按 PickCube MuJoCo CPU renderer-only 代表绑定有界接收；[5b 独立主审](maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)对所列 MuJoCo、GeoPhys rasterizer 和 Isaac 三路线的真实窗口、RGB 与相机隔离作 `ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB`。普通 5b attempt=3，诊断窗口=4；接收范围及历史限制见主审。5c 仍 PLANNED、attempt0；同步 observation、renderer 切换和跨组合尚未完成，不自动启动。遵循 [G05 原目标](goals/05-rendering.md)及 render／生命周期协议。装配 Panda 为版本附加用例，不替代阶段 5 主线；完整两任务 Solution 用例留 7a。
+阶段 5 的 5a 按 PickCube MuJoCo CPU renderer-only 代表绑定有界接收；[5b 独立主审](maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)对所列 MuJoCo、GeoPhys rasterizer 和 Isaac 三路线的真实窗口、RGB 与相机隔离作 `ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB`。普通 5b attempt=3，诊断窗口=4；接收范围及历史限制见主审。5c 仍 PLANNED、attempt0；同步 observation、创建时固定 renderer 与跨组合尚未完成，不自动启动。2026-11-07 维护者将同一 Env 的 renderer 切换延期，详见[调整后 5c 范围](planning/stage5-5c-fixed-renderer-scope.md)及更新的 [G05 目标](goals/05-rendering.md)。装配 Panda 为版本附加用例，不替代阶段 5 主线；完整两任务 Solution 用例留 7a。
 
 历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 
 ## 版本目标
 
-以统一任务表示为中枢，明确 Core、physics provider adapter、render adapter 之间的协议，实际接通 MuJoCo、GeoPhys、Isaac Sim＋PhysX 的首批路线。支持构建及 reset 时选择后端、renderer 和 Controller；episode 内维持已选执行组合。reset 重新初始化下一轮，不迁移上一轮物理状态。
+以统一任务表示为中枢，明确 Core、physics provider adapter、render adapter 之间的协议，实际接通 MuJoCo、GeoPhys、Isaac Sim＋PhysX 的首批路线。后端和 Controller 的已准入切换可在 reset 时选择；renderer 在构建时选择并保持到 close，同一 Env 的 renderer 切换另行排期。reset 重新初始化下一轮，不迁移上一轮物理状态；不兼容固定 renderer 的 reset 组合须明确拒绝。
 
 控制器统一、PickCube Solution 修复、窗口与同步 RGB、并行执行都服务于上述协议的真实落地。接口注册、静态通过或窗口截图不代表整条路线完成。
 

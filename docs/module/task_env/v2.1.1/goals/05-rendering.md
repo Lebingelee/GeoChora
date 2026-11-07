@@ -23,11 +23,11 @@
 - **交付／出口：**三条首批路线具备声明的窗口＋RGB，图像来自真实 scene；截图不替代原始图像／相机／状态证据。
 
 <a id="5c"></a>
-## 5c：同步 observation、renderer 切换与跨组合
+## 5c：同步 observation、构建时 renderer 选择与跨组合
 
 - **输入／依赖：**5b；相机输出、时间与借用数据契约。
-- **工作：**reset／step 自动协调更新、采样和完成等待，把 RGB 组合进固定 obs；reset 清理旧帧。实现已准入 renderer 选择与重建，并验证一个 physics 与 renderer 跨组合。
-- **检查：**reset 首帧、新状态运动对应、重复 render 的时间不变、相机失败拒绝／清理、旧缓存失效和 renderer A→B→A；有／无渲染的施控及物理边界一致。图像规格与独立记录读回，不能只有 shape 断言。
+- **工作：**构建 Env 时选择并绑定已准入 renderer，在该 Env 的 reset／step 中保持同一 renderer 直到 close。reset／step 自动协调更新、采样和完成等待，把 RGB 组合进固定 obs；reset 清理旧帧。验证至少一个 physics 与 renderer 跨组合。
+- **检查：**reset 首帧、新状态运动对应、重复 render 的时间不变、相机失败拒绝／清理、旧缓存失效、同一 renderer 跨 reset 保持；有／无渲染的施控及物理边界一致。图像规格与独立记录读回，不能只有 shape 断言。
 - **交付／出口：**调用方无需额外 render 即获得同步 RGB；至少一个真实跨组合，不宣称完整自由组合矩阵。
 
 ## 失败与证据
@@ -36,4 +36,4 @@
 
 首跨组合候选为 GeoPhys physics×MuJoCo renderer；若不可行，在派包前按 D01 提出替代并确认，不自行减少该必达项。不同 renderer 无需像素逐点相同，各自须满足公开状态、标定、场景可辨识和同步 oracle。
 
-实施共同约束：同一public Env在reset完成renderer往返切换，内部lease／session／worker重建由Core协调；用户仅配置renderer与相机。窗口／capture不调用Controller或推进physics；同步RGB沿用已确认state boundary与既定obs契约。
+2026-11-07 维护者修订：同一 Env 的 renderer A→B→A 切换延后到未排期的后续任务，不是 5c 出口。renderer 选择在创建 Env 时确定，直到 close 均不更换；reset 可以重建同一 renderer 的内部资源，不得静默换成其他 renderer。已有 backend／Controller reset 目标不因本修订取消，若其新配置无法与固定 renderer 组合，须在作用发生前明确拒绝。不同 Env 可分别选择支持的原生或跨组合。实现须由通用场景、资产、具名状态与相机声明驱动，不得对 PickCube 写特殊渲染分支；PickCube 是本阶段真实验证任务，不代表其他任务已经通过。窗口／capture不调用Controller或推进physics；同步RGB沿用已确认state boundary与既定obs契约。详见[5c 范围与次序](../planning/stage5-5c-fixed-renderer-scope.md)。

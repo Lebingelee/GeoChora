@@ -10,7 +10,7 @@
 4. 以具名关节广义驱动力为统一施控主路线，Robot／嵌套组件声明受控通道和 Controller，公共状态／可替换模型支持 Controller；BodyWrench 独立类型和未来 typed loads 有明确边界；reset 可切 Controller 输入规格。
 5. 窗口、离屏 RGB、RGB 同步进入 observation 全部实现；相机可配置，`.render()` 不额外推进任务物理时间。
 6. 在至少两个确实支持并行的物理后端上验证，至少包含一条原生 batch；记录进程并行与原生批量的区别。
-7. 同一 public Env 构建／reset 可选择执行组合；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
+7. public Env 构建时选择执行组合和 renderer；已准入后端／Controller 可按 reset 能力切换，renderer 固定到 close，同一 Env 的 renderer 切换后移；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
 8. observation 构建后保持结构、shape、dtype、单位、坐标及字段语义；为非刚体表示和设备数据保留扩展边界。
 
 2026-11-06重新编排建议：[装配Panda](stage4-assembled-panda.md)是本版附加集成用例，原G04的typed命令、三后端effort／BodyWrench及Controller reset主线保持。建议4a作接口需求审阅，4b主能力稳定后早做空载／夹爪／补偿检查，4c有效PickCube参考复用，7a完成两任务原Solution在原／新机器人上的完整复用，7b仅按输入变化定向复核。新类仍置于`task_env/robots/`并由任务配置消费；不要求物性等价。排期已由维护者采纳，不增加子阶段或重开G03；当前未实施。
@@ -32,7 +32,7 @@
 | 2 PickCube | 3 | 2a 归因；2b 修复；2c 成功参考 | 现有控制链的有效参考与差异记录 |
 | 3 后端 | 3 | 3a 路由与准入；3b 三后端翻译；3c reset 重建 | 统一协议驱动真实初始化与步进 |
 | 4 控制 | 3 | 4a typed 命令／反馈；4b Controller／外力组合；4c 切换与复核 | 多种输入进入同一施控主路线 |
-| 5 渲染 | 3 | 5a 场景数据；5b 窗口与采集；5c 同步 observation／切换 | 三个渲染完成目标分别成立 |
+| 5 渲染 | 3 | 5a 场景数据；5b 窗口与采集；5c 同步 observation／固定 renderer 与跨组合 | 三个渲染完成目标分别成立 |
 | 6 并行 | 3 | 6a 批量契约；6b 多后端；6c 部分 reset／整批重建 | 状态、动作、图像与 episode 正确对应 |
 | 7 集成 | 3 | 7a 任务复用；7b 最终矩阵；7c 文档收口 | 有证据的版本交付与未决项 |
 

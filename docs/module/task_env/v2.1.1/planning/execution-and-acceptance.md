@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-当前状态（2026-11-06）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收，详见[4a](../maintenance/reviews/20261106_4a_attempt003_sol_review.md)、[4b](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)、[4c](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)主审；原 N08 FAIL、6.1 close 超时及其他已列限制保留。4c 为 MuJoCo CPU 单 Env 切换与 PickCube seed31 成功，非跨后端任务资格。G05 的 5a/5b/5c 尚未执行、attempt0，须以[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)准备实际工作包。
+当前状态（2026-11-07）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。G05 的 5a 和 5b 已有界接收，5c 为 PLANNED／attempt0；维护者已将同一 Env 的 renderer 切换延期，详见[调整后范围](stage5-5c-fixed-renderer-scope.md)。依[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)准备后续实际工作包。
 
 [装配 Panda](stage4-assembled-panda.md)是版本附加集成用例，不新增为 4a–4c 或 G05 接收前置；完整两任务 Solution 用例由 7a 收口。下文旧状态和准备进度是历史时点；实时状态以[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)为准。
 
@@ -41,7 +41,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 4c | 4b | reset 切 Controller，输入契约可识别，observation 固定，Solution 重新复核 |
 | 5a | 1d、3c、4c | [05](../goals/05-rendering.md)：公开 scene data／原生绑定接入既有 renderer |
 | 5b | 5a | 首批路线窗口和离屏 RGB 分别验收，相机可配置，render 不推进物理 |
-| 5c | 5b | reset 首帧、step 同步图像、renderer 切换及一个跨组合成立 |
+| 5c | 5b | reset 首帧、step 同步图像、创建时固定 renderer 及一个真实跨组合成立 |
 | 6a | 3c、4c、5c | [06](../goals/06-parallel.md)：批量布局、reset mask、终止／首帧和 schema 接通 |
 | 6b | 6a | 至少两个物理后端真实并行，至少一条 native batch，覆盖构建／reset／step／render／obs |
 | 6c | 6b | 支持路线部分 reset，切配置整批重建，故障、资源及环境隔离成立 |

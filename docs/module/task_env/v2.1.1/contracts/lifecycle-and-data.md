@@ -35,7 +35,7 @@ Reset 重新执行当前任务初始化，不迁移旧 episode 的 q/qdot、接�
 
 Core 的 seed/sample 准备与提交须有明确消费边界：可用候选 RNG 状态准备样本，纯 preflight 拒绝时不提交候选或推进现有流；一旦提交／发生 effect，记录样本与消耗，即使后续失败也不伪装从未消费。只操作 sampler 自己的 RNG，不要求复制 provider 私有 RNG。
 
-Backend／renderer／Controller 切换由**同一个 public Env 对象**在 reset 上处理；可重建内部 session/worker/App 和隔离运行环境。已准入切换不能要求用户 close 后再次 make_env；内部复杂度由 Core/adapters 管理。用户只提供 backend/renderer/controller/camera 等配置，不需手写 receipt hash、lease ID 或 generation。
+Backend／Controller 的已准入切换由**同一个 public Env 对象**在 reset 上处理；可重建内部 session/worker/App 和隔离运行环境。2026-11-07 维护者修订：renderer 在 Env 创建时确定并保持到 close；同一 Env 的 renderer 切换延后。backend／Controller 的 reset 请求仍须与固定 renderer 一起准入，不兼容时在可静态判断的副作用前拒绝；不因此取消已有 state-only backend／Controller 切换。用户提供 backend/renderer/controller/camera 等配置，不需手写 receipt hash、lease ID 或 generation。
 
 - scalar env 的 route/config reset 若必须重建 session，先做可静态判断的 query，再关闭旧 session、创建新 route、执行 reset 和 readback；新 route 成功前不得发布 success obs。失败后只可明确重建/reset 或 close，不能偷偷返回旧状态。
 - native batch 的 backend/host/engine/solver/coupler/device/action mapping 变化整批重建。只有 capability report 声明 mask-reset 的路线可 same-config partial reset；receipt 精确列受影响 env ids/rows。未选 row 的 episode id、simulation time、state revision、Controller state、terminal obs 和 action spec identity 保持不变。

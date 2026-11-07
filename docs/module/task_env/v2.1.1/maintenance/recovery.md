@@ -1,5 +1,9 @@
 # v2.1.1 恢复与当前状态
 
+## 当前：5c 范围已按维护者要求调整，尚未派发
+
+2026-11-07：renderer 在 Env 创建时选择、维持至 close；同一 Env 的 renderer 切换延后到未排期的后续任务。5c 仍要求同步 RGB、一个真实跨组合和不依赖 PickCube 特判的通用实现，真实验证任务仍是 PickCube。详见[5c 调整后范围](../planning/stage5-5c-fixed-renderer-scope.md)。5c 为 PLANNED／attempt0，未准备或派发执行包；5b 有界接收和历史记录不变。
+
 ## 当前：G05 5b 有界接收，5c 尚未开始
 
 [5b Sol 独立主审](reviews/20261107_5b_diagnostic_attempt003_sol_review.md)决定 `ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB`：指定 PickCube MuJoCo CPU、GeoPhys CPU rasterizer 与 Isaac Sim 6.2 路线有界窗口／RGB／相机隔离证据成立，所列颜色、挂载、设备和历史失败限制保留。普通 count=3、诊断窗口 count=4；5c 保持 PLANNED、attempt0，由维护者决定后续，不自动派包或进入阶段6。

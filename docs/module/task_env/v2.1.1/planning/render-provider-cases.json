@@ -231,6 +231,7 @@
     {
       "id": "P5",
       "title": "reset renderer A→B→A preserves observation contract",
+      "scope_revision": "Maintainer 2026-11-07: preserved historical future case; same-Env renderer switching is deferred to an unscheduled later task and is not a 5c or automatic 6c gate. Current 5c fixes the renderer from Env creation until close.",
       "context": {
         "env": "env-0",
         "worker": "worker-0",

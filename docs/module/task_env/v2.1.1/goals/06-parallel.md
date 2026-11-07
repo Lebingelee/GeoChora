@@ -28,7 +28,7 @@ G06承接Pendulum及其他受影响旧vector caller的适配和真实多环境�
 ## 6c：部分 reset 与配置切换整批重建
 
 - **输入／依赖：**6b、3c、5c。
-- **工作：**不改配置时支持所声明路线的部分 reset；同一public vector Env更换 backend／renderer 时内部关闭并重建整个原生 batch，初始化新 episode，清理旧 Controller／pending force contributions／相机／GPU 绑定。
+- **工作：**不改配置时支持所声明路线的部分 reset；同一 public vector Env 在已准入且与创建时固定 renderer 兼容的 backend 之间切换时内部关闭并重建整个原生 batch，初始化新 episode，清理旧 Controller／pending force contributions／相机／GPU 绑定。2026-11-07 修订：renderer 切换未排期，不作为 6c 默认前置或自动转入 6c；不兼容的 backend／固定 renderer 组合须明确拒绝，6c 的代表切换边在工作包中按实际能力确认。
 - **检查：**相对已完成step后的pre-reset边界，mask reset不改变未选环境的状态、时间、Controller／RNG历史和图像身份；共享borrowed buffer失效另行标记；整批重建后的旧 view／command／frame 失效；失败、重复 close、worker／共享资源回收及锁释放。
 - **交付／出口：**显式声明 reset 粒度，不偷偷重置其他 slot；不能在单个 native batch 中替某个 slot 换后端。整批 A→B→A 的固定 obs 和动作规格正确。
 

@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5b accepted within the documented three-route bounded scope; 5c remains planned and requires maintainer direction and a separate authorized package. No automatic dispatch, merge, push, tag or publication.",
+  "next_action": "5b accepted within the documented three-route bounded scope. Maintainer revised 5c: select renderer at Env creation and retain until close; same-Env renderer switching deferred, real cross-combination and generic task implementation remain required. 5c remains planned, attempt 0; prepare a separate authorized package when requested. No automatic dispatch, merge, push, tag or publication.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1593,6 +1593,8 @@
         {
           "id": "5c",
           "planning_anchor": "../goals/05-rendering.md#5c",
+          "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
+          "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
           "dependencies": [
             "5b"
           ],

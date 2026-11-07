@@ -36,7 +36,7 @@
 - **输入／依赖：**3b；固定 observation 与当前相机需求。
 - **工作：**reset 更换 backend／solver 方案时重建资源与映射；必要时重建 worker，刷新 configuration／materialization／episode 代次并使旧状态失效。保持同一个public Env对象，内部可重建session/worker/App；不能用用户close/make_env替代切换。
 - **检查：**同一public Env的代表性 A→B→A 包含三后端的已声明切换边，不以拒绝所有跨路线切换充数；显式seed重置／seed=None延续Core sampler、provider派生seed、preflight拒绝不消耗现有流／初始化样本、固定 obs、旧 view／command 拒绝、构建／reset 故障、重复 close、worker／GPU／锁回收。不将失败后的部分推进当成回滚成功。
-- **交付／出口：**重建后可开始新 episode；失败不能 step、可明确重新 reset 或 close。renderer 资源实际切换在 5c 联合复核。
+- **交付／出口：**重建后可开始新 episode；失败不能 step、可明确重新 reset 或 close。2026-11-07 维护者修订：同一 Env 的 renderer 切换延后，5c 在固定 renderer 下验证 reset 资源重建；本 3c 的历史实际范围与接收决定不变。
 
 ## 验收与限制
 
