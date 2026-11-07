@@ -2,7 +2,7 @@
 
 日期：2026-11-06。G03 的 3a、3b、3c 及 G04 的 4a、4b、4c 均经 Sol 按各自冻结范围独立有界接收；准确当前进度以[编排索引](maintenance/orchestration.json)、[恢复页](maintenance/recovery.md)和各独立主审为准。4c 的范围为 MuJoCo CPU 单 Env reset 切换及迁移后 PickCube seed31 成功；原 N08 FAIL、Isaac 6.1 close 超时、通用装配补偿与未验证交集保留，不外推正式 Qualification。
 
-阶段 5 的 5a 按 PickCube MuJoCo CPU renderer-only 代表绑定有界接收；5b 普通 count=3 后进入维护者主导诊断。[诊断 attempt001 独立主审](maintenance/reviews/20261107_5b_diagnostic_attempt001_sol_review.md)为 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，诊断 count=1，5b 未接收。Isaac headless RGB、独立窗口和关窗后继续采集的有界成果保留；图像 holdout 和相机隔离仍有限制，通用 reset 故障恢复出现须修复的回归。5c 仍 PLANNED、attempt0；同步 observation 与跨组合尚未完成。遵循 [G05 原目标](goals/05-rendering.md)及已确认的 render／生命周期协议。装配 Panda 仍为版本附加用例，不替代阶段 5 主线；完整两任务 Solution 用例留 7a。
+阶段 5 的 5a 按 PickCube MuJoCo CPU renderer-only 代表绑定有界接收；5b 普通 count=3 后进入维护者主导诊断。[诊断 attempt002 独立主审](maintenance/reviews/20261107_5b_diagnostic_attempt002_sol_review.md)为 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，诊断 count=2，5b 未接收。通用 reset 恢复有界修复；Isaac headless RGB、独立窗口和关闭后继续采集有界成果及 CPU 路线关窗证据保留；相机隔离和可辨图像判据仍待闭合。5c 仍 PLANNED、attempt0；同步 observation 与跨组合尚未完成。遵循 [G05 原目标](goals/05-rendering.md)及已确认的 render／生命周期协议。装配 Panda 仍为版本附加用例，不替代阶段 5 主线；完整两任务 Solution 用例留 7a。
 
 历史状态：日期：2026-11-06。状态：G01/1a–1d、G02阶段2和3a已按各自限定范围接受；3b attempt002已由Sol复审，整体REWORK_REQUIRED_3B、count=2。已测Panda MuJoCo CPU重力补偿与launcher／F06记录修复有界接收，最终补偿记录及required物性等仍待闭合；原N08 FAIL保留，不自动003或3c。详见[002主审](maintenance/reviews/20261106_3b_attempt002_sol_review.md)。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留，见[阶段2主审](maintenance/reviews/20261104_2c_sol_review.md)。
 

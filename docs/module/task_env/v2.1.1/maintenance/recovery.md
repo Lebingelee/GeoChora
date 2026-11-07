@@ -1,6 +1,10 @@
 # v2.1.1 恢复与当前状态
 
-## 当前：G05 5b 诊断 attempt001 部分通过，须返工
+## 当前：G05 5b 诊断 attempt002 部分通过，须继续有界诊断
+
+[诊断 002 Sol 独立主审](reviews/20261107_5b_diagnostic_attempt002_sol_review.md)决定 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，普通 count=3、诊断 count=2，5b 未接收。通用 reset 恢复回归取得真实 MuJoCo 有界修复证据，MuJoCo/GeoPhys 关窗及旧 receipt 失效取得限定证据。当前 Isaac 采用 headless + GeoChora 自有窗口，001 的真实关闭／继续采集证据可按差异复用，不将旧原生 viewport 关窗错误地设为当前必测。剩余为 5b task-camera 分离及可辨图像证据的具体闭合；不自动提前实现 5c observation。维护者继续主导，不自动派包。
+
+## 历史：G05 5b 诊断 attempt001 部分通过，须返工
 
 [诊断 001 Sol 独立主审](reviews/20261107_5b_diagnostic_attempt001_sol_review.md)决定 `DIAGNOSIS_PARTIAL_REWORK_REQUIRED`，普通 count=3、诊断 count=1，5b 未接收。Isaac headless 原生帧、独立真实窗口及关窗后继续采集取得有界证据；固定 holdout 未通过，存在任务相机隔离和 stale 证据限制。此次通用 reset 入口对所有 fault 拒绝 rebuild，是独立复现的跨路线回归，须修复；先按实际输入与代码影响复用 CPU 路线证据。维护者继续主导后续诊断，不自动派包或进入 5c。
 
