@@ -15,12 +15,12 @@ from ...artifacts.logical_assembly import (
 )
 from ...artifacts.state import StateFieldRequirement, StateRequirements
 from ...controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
-from ...controllers.canonical.physical_commands import PhysicalControlBindingV1, PhysicalJointChannelV1, PhysicalBodyBindingV1
+from ...controllers.canonical.physical_commands import PhysicalBodyBindingV1
 from ...controllers.canonical.physical_controller import (
     LinearEffortProfileV1, LinearEffortControllerV1, WrenchControlProfileV1, WrenchControllerV1,
 )
 from ...runtime.sessions.physical_control import (
-    PhysicalControlExecutionV1, compile_physical_control_binding, _rotate,
+    PhysicalControlExecutionV1, compile_declared_subject_binding,
 )
 
 PANDA_DIRECT_EFFORT_PROFILE = 'panda-direct-effort-v1'
@@ -44,7 +44,8 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
                                       **source_asset_bytes(source.scene_source.base_dir, projected)})
     if closure != source.source_closure_digest:
         raise ValueError('physical profile source closure differs from its actual bytes')
-    names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+    from ...robots.panda import PandaAgent
+    names = PandaAgent.physical_joint_names()
     owner, entity = 'panda-direct-effort', entity_id
     definitions = {j.joint_id: j for a in scene.articulations or ()
                    if a.entity_id == entity for j in a.joints}
@@ -88,30 +89,21 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
         # The selected PickCube R3 task uses a 10 N runtime gripper force cap;
         # this changes no authored MJCF bytes and preserves the 1:2 pair map.
         limits[7] = (-10., 10.)
-    instance = next(x for x in scene.entities if x.entity_id == entity)
+    subject, declarations = PandaAgent.physical_subject_declaration(
+        entity_id=entity, source_id=source.source_id,
+        source_closure_sha256=source.source_closure_digest, native_ranges=tuple(limits),
+        native_drive=native_drive, split=split)
+    instance = next(x for x in scene.entities if x.entity_id == subject.entity_id)
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
                                      scene.schema_version, scene.identity_hash)
     refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
-        (name,), 'joint', JointReference(entity, name)) for name in names)
+        item.component_path[1:], 'joint', JointReference(subject.entity_id, item.joint_id))
+        for item in declarations)
     child = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-components', 'v1', pin, refs)
     logical = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-assembly', 'v1', pin, (
         LogicalAssemblyEntityMemberV1('entity_member', ('owner',), entity, instance.asset_id, instance.asset_version),
         LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',), child.assembly_id,
                                       child.revision, child.logical_content_sha256)))
-    channels = []
-    for i, name in enumerate(names):
-        joint = definitions[name]
-        axis = _rotate(joint.pose_parent_from_joint.quaternion_wxyz, joint.axis)
-        arm = i < 7
-        native_limit = limits[i if arm else 7]
-        coefficient = 1.0 if arm else 0.5
-        effort_limit = tuple(coefficient*x for x in native_limit)
-        channel_owner = (('panda-arm-effort' if arm else 'panda-hand-effort') if split else owner)
-        channels.append(PhysicalJointChannelV1('physical-joint-channel-v1', ('robot', name), (channel_owner,),
-            entity, name, 'dof0', joint.kind, axis, joint.parent_frame, 1,
-            'N*m' if arm else 'N', effort_limit, f'actuator{i+1}' if arm else 'actuator8',
-            f'arm-transmission-{i+1}' if arm else 'split-transmission', coefficient,
-            native_limit, native_drive))
     bodies = ()
     if wrench_target is not None:
         targets = {'hand': (entity, 'hand'), 'object': ('square-peg-instance', 'peg1'),
@@ -124,13 +116,12 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
             raise ValueError('wrench profile requires the declared source body')
         bodies = (PhysicalBodyBindingV1('physical-body-binding-v1', body_entity, body_name,
                   FrameReference(body_entity, body_name), body_name, ('candidate-body-wrench',)),)
-    binding = PhysicalControlBindingV1('physical-control-binding-v1', scene.identity_hash,
-        artifact.identity_hash, source.source_id, source.source_closure_digest,
-        logical.logical_content_sha256, tuple(channels), bodies)
-    compiled = compile_physical_control_binding(scene, logical,
-        {(child.assembly_id, child.revision): child}, binding)
-    groups = ((('panda-arm-effort', names[:7]), ('panda-hand-effort', names[7:]))
-              if split else ((owner, names),))
+    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
+        source.source_closure_digest, logical, {(child.assembly_id, child.revision): child},
+        (subject,), declarations, bodies)
+    binding = compiled.binding
+    groups = tuple((writer, tuple(item.joint_id for item in declarations if writer in item.owner_ids))
+                   for writer in subject.controller_writers)
     controllers = ()
     for writer, group_names in groups:
         keys = tuple(f'{entity}/{name}' for name in group_names)
@@ -192,10 +183,6 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
                              if name in artifact.legacy_frame_bindings
                              else FrameReference(*name.split('/', 1)))
                       for name in (*source.bodies, *source.frames)}
-    from ...robots.panda import PandaAgent
-    subject = PandaAgent.controlled_subject(entity_id=entity, source_id=source.source_id,
-        source_closure_sha256=source.source_closure_digest, channels=channels,
-        writers=tuple(writer for writer, _names in groups))
     execution = PhysicalControlExecutionV1(compiled, controllers, scene, joint_bindings,
                                             frame_bindings, requirements, 1, (subject,))
     execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,

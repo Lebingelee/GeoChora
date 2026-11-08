@@ -21,9 +21,13 @@ Core 拥有 binding、能力汇总、action spec、控制 cadence 和组合后�
 
 `ControlledSubjectV1` 在现有 physical control owner 中声明 Scene entity、source closure、来源拥有或引用、root Frame/要求、父主体、具名 logical channel 路径与 Controller writer。`PhysicalControlExecutionV1` 可将它与既有 `resolve_logical_assembly`、physical binding 和 Controller 匹配；在每次批次计算前重新校验，并拒绝主体外的 joint contribution。多个 Controller 仍经现有贡献组合规则形成一次逻辑提交，provider 可按其声明语义在多个物理子步保持或重施。声明的 root/父子关系不单独证明 native 约束或 provider 资产准入；这些仍须由来源、附件和 adapter 的既有检查证明。
 
+诊断返工候选中，主体先声明逻辑通道，来源适配方提供具名传动及范围，`compile_declared_subject_binding` 从这些声明和同一个 logical assembly resolver 构造既有 physical binding；它不替代具体 source 与 native build 的传动核验。Panda 的已验证 source 限制保持在原 source 路径；Pendulum 和双轮声明仍不等于其真实运行路线已迁移。控制器有 Gymnasium `action_space` 时组合该声明，保留其边界、dtype 和动作树；仅有旧 `action_shape` 的既有调用保留无界 float32 Box 兼容语义，并非推断出真实有界能力。
+
 Panda 的现有 PickCube physical 路径消费该声明；Pendulum 与双轮车新增的名称/通道声明尚未替换原 component bootstrap 和 native torque adapter。已存在的 `PhysicalControlExecutionV1` 无主体声明调用保留为兼容路径；这不意味着旧调用自动满足新声明。通用单层/嵌套扩展仍须在具体真实任务、附件、source 和 provider 交集验证，不能因合成声明通过就宣称真实四主体已统一。该候选及其证据等待独立主审，不改变已接收 G04 的范围。
 
 PickCube MuJoCo CPU 的 direct effort 候选可将 physical execution 直接作为 selected 声明经同一 `RuntimeSession` 准入、reset、提交和读取；它不要求先构造 PositionServo profile。观察的 Panda 字段由该任务投影，公共物理状态使用 source-bound typed publication。现有 Position 和 reset-scoped 参考控制器仍是兼容路径；GeoPhys、Isaac、组件任务和其他控制器并未因这条纵切自动迁移或取得新的 native 验证。
+
+PickCube physical 候选的 `ee_pose` 与任务距离、reward 以 source 绑定的 `nutassembly_ee_site` 为准，`hand_pose` 单独表示 hand 原点。旧 default direct 的 Position 投影曾将 hand 代入任务 EE，历史记录按其原实现解释，不回写旧 evidence；这次修正会改变受影响旧路径的任务距离和 reward，shape 及物理控制语义不因此改变。
 
 ## 2. 三类底层物理命令
 

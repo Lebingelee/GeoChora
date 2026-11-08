@@ -16,6 +16,7 @@ from ...artifacts.state import CanonicalStateViewV1, CanonicalStateViewV2
 from ...controllers.canonical.physical_commands import (
     PhysicalControlBindingV1, PhysicalCommandBatchV1, PhysicalControlReceiptV1,
     PhysicalBodyBuildReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1,
+    PhysicalJointChannelV1,
 )
 
 
@@ -89,6 +90,84 @@ class ControlledSubjectV1:
             'channel_paths': self.channel_paths, 'controller_writers': self.controller_writers,
             'attachment_plan_sha256': (None if self.attachment_plan is None
                                        else self.attachment_plan.identity_hash)})
+
+
+@dataclass(frozen=True)
+class SubjectJointDeclarationV1:
+    """Source-adapter transmission facts for one subject-declared logical joint."""
+    component_path: tuple[str, ...]
+    joint_id: str
+    owner_ids: tuple[str, ...]
+    native_actuator: str
+    transmission_id: str
+    transmission_coefficient: float
+    native_range: tuple[float, float]
+    native_drive: str
+
+
+def compile_declared_subject_binding(scene, artifact_sha256, source_id, source_closure_sha256,
+                                     root, children, subjects, joint_declarations, bodies=()):
+    """Build the existing physical binding from subjects, resolved joints and source facts.
+
+    Source adapters must independently validate their transmission declarations
+    against source bytes and native builds; this function does not import them.
+    """
+    if (type(subjects) is not tuple or not subjects
+            or any(type(subject) is not ControlledSubjectV1 for subject in subjects)):
+        raise TypeError('binding construction requires controlled subject declarations')
+    if (type(joint_declarations) is not tuple
+            or any(type(item) is not SubjectJointDeclarationV1 for item in joint_declarations)):
+        raise TypeError('binding construction requires typed subject joint declarations')
+    declared_paths = tuple(path for subject in subjects for path in subject.channel_paths)
+    if (len(set(declared_paths)) != len(declared_paths)
+            or tuple(item.component_path for item in joint_declarations) != declared_paths):
+        raise ValueError('joint declarations must cover subject paths in declared order')
+    resolved = resolve_logical_assembly(root, scene, children)
+    leaves = {leaf.full_path: leaf.member for leaf in resolved.leaves}
+    definitions = {(art.entity_id, joint.joint_id): joint
+                   for art in scene.articulations or () for joint in art.joints}
+    channels = []
+    position = 0
+    for subject in subjects:
+        if (subject.source_id != source_id or subject.source_closure_sha256 != source_closure_sha256):
+            raise ValueError('subject declaration refers to a foreign source')
+        for path in subject.channel_paths:
+            item = joint_declarations[position]
+            position += 1
+            leaf = leaves.get(path)
+            if (type(leaf) is not LogicalAssemblySubcomponentReferenceV1
+                    or leaf.target_kind != 'joint'
+                    or (leaf.target.entity_id, leaf.target.joint_id) != (subject.entity_id, item.joint_id)):
+                raise ValueError('subject joint declaration does not resolve to its named joint')
+            joint = definitions.get((subject.entity_id, item.joint_id))
+            if joint is None or joint.kind not in {'revolute', 'prismatic'} or joint.axis is None:
+                raise ValueError('subject joint is not a supported Scene joint')
+            if not item.owner_ids or not set(item.owner_ids) <= set(subject.controller_writers):
+                raise ValueError('joint writers differ from subject declaration')
+            coefficient = item.transmission_coefficient
+            if (not math.isfinite(coefficient) or coefficient == 0
+                    or len(item.native_range) != 2
+                    or not all(math.isfinite(value) for value in item.native_range)
+                    or item.native_range[0] > item.native_range[1]):
+                raise ValueError('invalid declared source transmission')
+            effort_range = tuple(sorted(coefficient * value for value in item.native_range))
+            channel = PhysicalJointChannelV1('physical-joint-channel-v1', path, item.owner_ids,
+                subject.entity_id, item.joint_id, 'dof0', joint.kind,
+                _rotate(joint.pose_parent_from_joint.quaternion_wxyz, joint.axis),
+                joint.parent_frame, 1, 'N*m' if joint.kind == 'revolute' else 'N',
+                effort_range, item.native_actuator, item.transmission_id, coefficient,
+                item.native_range, item.native_drive)
+            channel.validate()
+            channels.append(channel)
+    binding = PhysicalControlBindingV1('physical-control-binding-v1', scene.identity_hash,
+        artifact_sha256, source_id, source_closure_sha256, root.logical_content_sha256,
+        tuple(channels), bodies)
+    compiled = compile_physical_control_binding(scene, root, children, binding)
+    from types import SimpleNamespace
+    declared_writers = {writer for subject in subjects for writer in subject.controller_writers}
+    validate_controlled_subjects(compiled, subjects,
+        tuple(SimpleNamespace(writer_id=writer) for writer in sorted(declared_writers)))
+    return compiled
 
 
 def validate_controlled_subjects(compiled, subjects, controllers):
@@ -217,7 +296,9 @@ class PhysicalControlExecutionV1:
         from collections.abc import Mapping
         if self.subjects:
             validate_controlled_subjects(self.compiled, self.subjects, self.controllers)
-        if len(self.controllers) == 1 and not isinstance(action, Mapping):
+        if len(self.controllers) == 1 and (
+                not isinstance(action, Mapping)
+                or self._controller_action_space(self.controllers[0]).contains(action)):
             actions = {self.controllers[0].identity: action}
         elif isinstance(action, Mapping):
             actions = dict(action)
@@ -245,18 +326,32 @@ class PhysicalControlExecutionV1:
             tuple(item for part in parts for item in part.extensions))
 
     def action_space(self):
-        """Expose the Controller-declared input shapes on the selected route."""
-        import numpy as np
-        from gymnasium.spaces import Box, Dict
+        """Compose declared Controller input spaces, retaining legacy shape-only callers."""
+        from gymnasium.spaces import Dict
 
-        spaces = {}
-        for controller in self.controllers:
-            shape = getattr(controller, 'action_shape', None)
-            if (type(shape) is not tuple or not shape
-                    or any(type(n) is not int or n < 1 for n in shape)):
-                raise ValueError('physical Controller requires a positive action shape')
-            spaces[controller.identity] = Box(-np.inf, np.inf, shape=shape, dtype=np.float32)
+        spaces = {controller.identity: PhysicalControlExecutionV1._controller_action_space(controller)
+                  for controller in self.controllers}
         return next(iter(spaces.values())) if len(spaces) == 1 else Dict(spaces)
+
+    @staticmethod
+    def _controller_action_space(controller):
+        import numpy as np
+        from gymnasium.spaces import Box, Space
+
+        declared = getattr(controller, 'action_space', None)
+        if declared is not None:
+            if not isinstance(declared, Space):
+                raise TypeError('physical Controller action_space must be a Gymnasium Space')
+            shape = getattr(controller, 'action_shape', None)
+            if shape is not None and declared.shape is not None and tuple(shape) != declared.shape:
+                raise ValueError('physical Controller action shape differs from its action_space')
+            return declared
+        shape = getattr(controller, 'action_shape', None)
+        if (type(shape) is not tuple or not shape
+                or any(type(n) is not int or n < 1 for n in shape)):
+            raise ValueError('physical Controller requires an action_space or legacy positive action shape')
+        # Existing shape-only physical controllers retain their established v1 contract.
+        return Box(-np.inf, np.inf, shape=shape, dtype=np.float32)
 
     def validate_source(self, *, scene, artifact_sha256, source_id, source_closure_sha256, source=None):
         """Recheck an execution selection against the actual task source."""

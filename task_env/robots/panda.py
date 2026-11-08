@@ -44,6 +44,30 @@ class PandaAgent(BaseAgent):
     uid = "panda-v1"
 
     @staticmethod
+    def physical_joint_names():
+        return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+
+    @staticmethod
+    def physical_subject_declaration(*, entity_id, source_id, source_closure_sha256,
+                                     native_ranges, native_drive, split=False):
+        """Describe Panda channels before any physical binding is constructed."""
+        from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
+        names = PandaAgent.physical_joint_names()
+        if len(native_ranges) != 8:
+            raise ValueError('Panda source requires eight checked actuator ranges')
+        writers = ('panda-arm-effort', 'panda-hand-effort') if split else ('panda-direct-effort',)
+        paths = tuple(('robot', name) for name in names)
+        subject = ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None, paths, writers)
+        declarations = tuple(SubjectJointDeclarationV1(
+            path, name, ((writers[0] if i < 7 else writers[-1]),),
+            f'actuator{i+1}' if i < 7 else 'actuator8',
+            f'arm-transmission-{i+1}' if i < 7 else 'split-transmission',
+            1.0 if i < 7 else 0.5, native_ranges[i if i < 7 else 7], native_drive)
+            for i, (name, path) in enumerate(zip(names, paths, strict=True)))
+        return subject, declarations
+
+    @staticmethod
     def controlled_subject(*, entity_id, source_id, source_closure_sha256, channels, writers):
         """Declare this Panda's existing Scene entity for the shared physical owner."""
         from ..runtime.sessions.physical_control import ControlledSubjectV1

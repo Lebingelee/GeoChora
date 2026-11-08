@@ -84,15 +84,17 @@ def _direct_physical_observation(env, state):
         control_step=state.control_step, simulation_time=state.simulation_time,
         joint_position={**state.joint_position, **{f'panda-v1/{n}': float(joints[n].position[0]) for n in names}},
         joint_velocity={**state.joint_velocity, **{f'panda-v1/{n}': float(joints[n].velocity[0]) for n in names}},
-        pose_world={**state.pose_world, 'panda-v1/ee': hand},
+        pose_world=dict(state.pose_world),
     )
     evaluation = env.binding.evaluate(adapted, env.artifact.semantics)
-    pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
+    site = state.pose_world['panda-v1/ee']
+    pose = np.asarray((*site.position, *site.quaternion_wxyz), dtype=np.float32)
+    hand_pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
     cube = state.pose_world['cube-v1']
     boundary = view.boundary
     obs = {'state': {'ee_pose': pose.copy(),
                      'joint_position': np.asarray([joints[n].position[0] for n in names], dtype=np.float32),
-                     'hand_pose': pose.copy(),
+                     'hand_pose': hand_pose,
                      'boundary_identity_sha256': np.frombuffer(bytes.fromhex(
                          boundary.boundary_id.removeprefix('state-boundary-')), dtype=np.uint8).copy()},
            'privileged_state': {'cube_v1_body_pose': np.asarray(
@@ -252,7 +254,7 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
     from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
-    from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
+    from ...observations.selected_reference import selected_reference_observation_spaces
     from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
     from ...runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
     from ..position_candidate.physical_profile import build_panda_direct_effort_execution
@@ -414,7 +416,7 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
         observation_space_factory=(_direct_physical_observation_spaces if direct_physical
                                    else selected_reference_observation_spaces),
         observation_projection=(_direct_physical_observation if direct_physical else
-                                _physical_pickcube_observation if reset_switch else build_selected_observation),
+                                _physical_pickcube_observation),
         build_external=build if reset_switch else None,
         validate_external_solution=_validate_external_readiness_solution if reset_switch else None,
         position_execution_info=physical_execution_info if reset_switch else None,
