@@ -85,7 +85,7 @@ def test_measured_candidate_still_reaches_native_boundary_unchanged(candidate, m
     before = (candidate.scene.identity_hash, candidate.assembly.identity_hash,
               candidate.attachment_plan.identity_hash, candidate.artifact.identity_hash)
     calls = []
-    monkeypatch.setattr(api, "_materialize_admitted", lambda *args: calls.append(args) or "NATIVE_IO_STUB")
+    monkeypatch.setattr(api, "_materialize_admitted", lambda *args, **kwargs: calls.append((args, kwargs)) or "NATIVE_IO_STUB")
     result = api.materialize(candidate.artifact,
         ExecutionSpec("mujoco", "p1_2_scalar_cpu_v0", "none", "cpu", 31, "strict"),
         source=candidate.runtime_source)

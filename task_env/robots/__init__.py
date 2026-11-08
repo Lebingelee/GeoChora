@@ -7,6 +7,7 @@ from .gripper import (
     PandaGripperController,
 )
 from .panda import PANDA_ASSET_ROOT, PandaAgent
+from .assembled_panda import AssembledPandaAgent
 from .pendulum import (
     PENDULUM_ACTION_CONTRACT,
     PendulumEntity,
@@ -25,6 +26,7 @@ __all__ = [
     "GripperTarget",
     "PANDA_ASSET_ROOT",
     "PandaAgent",
+    "AssembledPandaAgent",
     "PandaGripperController",
     "PENDULUM_ACTION_CONTRACT",
     "PendulumEntity",

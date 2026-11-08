@@ -37,3 +37,5 @@ Use this page to locate the current owner; the versioned public API and capabili
 - F06 task success, A123 task success, task1 GeoPhys fluid projection, P renderer evidence, natural Kit destruction, and strict DG03 retain the limits in the current matrix and follow-up pages.
 
 - Direct-effort legacy feedback on opted-in Pendulum and TwoWheel paths is a named, admitted generalized-effort command projection after native acknowledgement, not motor ctrl readback or measured force. Optional clipping flags respect diagnostics configuration; see [direct-effort feedback](../../../../docs/module/task_env/v2.1.1/maintenance/20261108_direct_effort_feedback.md).
+
+- `panda-arm-hand-v1` is a registered declaration of the exact pinned two-source Panda/hand assembly; no selected public TaskEnv configuration or generic Controller kind is admitted for it yet. Its nested source/effort helpers have bounded diagnostic evidence only. See [unit 4 declaration boundary](../../../../docs/module/task_env/v2.1.1/maintenance/20261108_unit4_panda_declarations.md).
