@@ -25,3 +25,7 @@
 ## 最小后续方向
 
 先对非 Position selected 的实际 source/scene/publication 建立独立于 Panda Profile 的真实具名状态和 render binding，覆盖真实生产构造、reset、step 和不支持能力的显式拒绝，不放宽 controller/physics admission；再通过公共相机 binding 实际设置/读回组件相机 FOV、near/far 和 pose，保留 observer 隔离、reset、fault、close，并以受影响的真实代表 route 对照帧、状态及 geometry。保持可复用旧证据、无需全历史矩阵或强制第二任务矩阵。根据两次未接收，第三次普通尝试前进行现有 Skill 强制重评和必要调研，由维护者决定下一工作包与执行授权。
+
+## 后续维护者处置：本次提交中的生成文件
+
+维护者指定仅对阶段 5 本次误提交及后续提交执行历史清理。磁盘证据保留，原／新提交映射和复核结果见[清理收据](../20261108_5c_history_cleanup.md)；本主审中记载的是执行与审阅时的原始提交身份。

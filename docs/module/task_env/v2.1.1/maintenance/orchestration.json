@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5c attempt002 not accepted; mandatory attempt003 reassessment completed, no execution package dispatched or newly authorized. Await maintainer direction.",
+  "next_action": "History cleanup completed in maintainer-approved local stage5 scope; attempt003 prework documented. Ordinary attempt count remains 2; no third attempt package dispatched or newly authorized.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1631,7 +1631,7 @@
           "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: attempt002 independently reviewed; confirmed non-Position typed publication and component camera optics gaps; 3rd ordinary attempt requires reassessment.",
+          "last_observation": "2026-11-08: maintainer-selected scope history cleanup completed with disk evidence intact; targeted 003 prework documented; execution not authorized or dispatched.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
@@ -1662,7 +1662,20 @@
             "reference": "../planning/stage5-5c-attempt003-reassessment.md",
             "ordinary_attempts_completed": 2,
             "feasibility": "credible bounded path; no guaranteed success",
-            "requires_fresh_execution_authorization": true
+            "requires_fresh_execution_authorization": true,
+            "prework_reference": "../planning/stage5-5c-attempt003-sol-prework.md"
+          },
+          "history_cleanup": {
+            "scope": "stage5 attempt002 implementation and its descendants only",
+            "receipt": "20261108_5c_history_cleanup.md",
+            "original_to_rewritten": {
+              "1c6b7e4f49107fe57e31e9be43e2729162ffaca1": "09023b0b7dc2a7874ab5077aa64323650823d54c",
+              "13111ca78f3c678a02da1d7ffb5a7c248447b036": "2b9d2a4c0d8aca58ec38954ddc9798eb854042d7",
+              "f710697a500304979be95a4228b7a51da43c948f": "a402241a031ba46f79ede2361159e7bad41a52cd",
+              "c3034a9c6e35f15c334adfb6087e2cddcf9f0de2": "159eae52deea6625f7fc558fe7300dd92681e449"
+            },
+            "original_evidence_identity_preserved": true,
+            "other_refs_rewritten": false
           }
         }
       ]
@@ -1856,7 +1869,10 @@
     "output_head": "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
     "release_head": "13111ca78f3c678a02da1d7ffb5a7c248447b036",
     "sol_review_ref": "reviews/20261108_5c_attempt002_sol_review.md",
-    "note": "Third ordinary attempt requires mandatory reassessment. No automatic dispatch."
+    "note": "Third ordinary attempt requires mandatory reassessment. No automatic dispatch.",
+    "rewritten_output_head": "09023b0b7dc2a7874ab5077aa64323650823d54c",
+    "rewritten_release_head": "2b9d2a4c0d8aca58ec38954ddc9798eb854042d7",
+    "identity_note": "Original output_head and release_head are retained as execution-time evidence identities; see history_cleanup mapping for current ancestry."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
