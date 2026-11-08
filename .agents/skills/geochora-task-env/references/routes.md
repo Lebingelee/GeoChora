@@ -35,3 +35,5 @@ Use this page to locate the current owner; the versioned public API and capabili
 - GeoPhys/MuJoCo selected CPU routes and the exact PickCube Isaac Sim 6.2/CUDA PhysX source route are bounded; no arbitrary task/provider/backend capability is implied.
 - LIBERO public TaskDefinition migration and lightweight task compatibility checks are deferred to the next API Goal. Its benchmark implementation remains in `bench_deploy/libero`.
 - F06 task success, A123 task success, task1 GeoPhys fluid projection, P renderer evidence, natural Kit destruction, and strict DG03 retain the limits in the current matrix and follow-up pages.
+
+- Direct-effort legacy feedback on opted-in Pendulum and TwoWheel paths is a named, admitted generalized-effort command projection after native acknowledgement, not motor ctrl readback or measured force. Optional clipping flags respect diagnostics configuration; see [direct-effort feedback](../../../../docs/module/task_env/v2.1.1/maintenance/20261108_direct_effort_feedback.md).

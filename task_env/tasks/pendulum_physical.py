@@ -173,17 +173,6 @@ def _observe(env, state):
             'universal_action': env.controller.last_action.copy(),
             'success_definition': PENDULUM_SUCCESS_DEFINITION,
             'observation_schema': env._pendulum_observation_schema}
-    if state.control_step:
-        value = env.controller.last_action.copy()
-        info.update(requested_action=value.copy(), controller_target=value.copy(),
-                    requested_ctrl=value.copy(), applied_ctrl=value.copy(),
-                    control_application='generalized-effort command; source motor isolated; not a force measurement',
-                    action_clipped=False, ctrl_clipped=False,
-                    action={'requested': value.copy(), 'external': value.copy(),
-                            'controller_target': value.copy(), 'requested_ctrl': value.copy(),
-                            'applied_ctrl': value.copy(), 'mode': 'direct_torque',
-                            'clipped': False, 'action_clipped': False, 'ctrl_clipped': False,
-                            'universal_action': value.copy()})
     return observation, info, evaluation
 
 
@@ -223,7 +212,8 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
             'components': ['torque'], 'low': -2., 'high': 2., 'unit': 'N*m'},
         action_space_factory=space, prepare_action=lambda value: value,
         observation_space_factory=_observation_spaces, observation_projection=_observe,
-        physical_control_profile=lambda env: env.value['physical_execution'], physical_terminate_on_success=True,
+        physical_control_profile=lambda env: env.value['physical_execution'], physical_direct_effort_feedback=True,
+        physical_terminate_on_success=True,
         physical_ignore_done=config.episode.ignore_done)
     env = environment_type(provider=provider, backend=backend, horizon=config.episode.horizon, _binding=binding)
     env.config = config

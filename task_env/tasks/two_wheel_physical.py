@@ -201,7 +201,8 @@ def build_two_wheel_environment(environment_type, config, *, provider, backend, 
             'components': ['left_wheel_torque', 'right_wheel_torque'], 'low': -1.5, 'high': 1.5, 'unit': 'N*m'},
         action_space_factory=lambda: Dict({'torque': Box(-1.5, 1.5, (2,), dtype=np.float32)}),
         prepare_action=lambda value: value, observation_space_factory=_observation_spaces, observation_projection=_observe,
-        physical_control_profile=lambda env: env.value['physical_execution'], physical_terminate_on_success=True,
+        physical_control_profile=lambda env: env.value['physical_execution'], physical_direct_effort_feedback=True,
+        physical_terminate_on_success=True,
         physical_ignore_done=config.episode.ignore_done)
     env = environment_type(provider=provider, backend=backend, horizon=config.episode.horizon, _binding=binding)
     env.config = config

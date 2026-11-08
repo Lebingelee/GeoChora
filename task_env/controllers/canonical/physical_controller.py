@@ -209,6 +209,37 @@ class DirectJointEffortControllerV1:
         self._episode_id = None
         self.last_action = None
 
+    def compatibility_feedback(self, resolved, ack, *, mode, include_diagnostics):
+        """Project a validated unit-transmission command, not a force measurement."""
+        if (self.last_action is None or resolved.input_batch.identity_hash != ack.batch_sha256
+                or ack.stage != 'native_write_ack' or ack.context != resolved.input_batch.context
+                or ack.contribution_ids != resolved.accepted_receipt.contribution_ids):
+            raise ValueError('direct effort feedback requires the matching accepted native write')
+        channels = self._channels
+        if (len(resolved.joints) != len(channels) or resolved.body_wrenches or resolved.extensions
+                or any(c.sign != 1 or c.transmission_coefficient != 1.0 or c.native_drive != 'disabled'
+                       or c.unit != 'N*m' for c in channels)):
+            raise ValueError('direct effort compatibility requires isolated unit-gear torque channels')
+        resolved_by_key = {(x.entity_id, x.joint_id, x.dof_id): x for x in resolved.joints}
+        values = []
+        for channel, requested in zip(channels, self.last_action, strict=True):
+            item = resolved_by_key.get(channel.target_key)
+            if (item is None or item.unit != channel.unit or item.clipped_before_sum or item.clipped_after_sum
+                    or len(item.contribution_ids) != 1 or float(item.value) != float(requested)):
+                raise ValueError('admitted effort does not match the declared direct command')
+            values.append(item.value)
+        value = np.asarray(values, dtype=np.float32)
+        action = {name: value.copy() for name in
+                  ('requested', 'external', 'controller_target', 'requested_ctrl', 'applied_ctrl', 'universal_action')}
+        action['mode'] = mode
+        feedback = {'action': action, **{name: value.copy() for name in
+                    ('requested_action', 'external_action', 'controller_target', 'requested_ctrl', 'applied_ctrl', 'universal_action')},
+                    'control_application': 'generalized-effort command; source motor isolated; not a force measurement'}
+        if include_diagnostics:
+            action.update(clipped=False, action_clipped=False, ctrl_clipped=False)
+            feedback.update(action_clipped=False, ctrl_clipped=False)
+        return feedback
+
     def reset_from_realized_state(self, state):
         if state.boundary.scene_identity_hash != self.binding.scene_sha256:
             raise ValueError('direct effort reset state differs from bound Scene')

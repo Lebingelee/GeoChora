@@ -183,6 +183,7 @@ class ReferenceTaskBinding:
     physical_observation_binding: Callable | None = None
     physical_reset_action_schema: Callable | None = None
     physical_action_observer: Callable | None = None
+    physical_direct_effort_feedback: bool = False
     physical_terminate_on_success: bool = False
     physical_ignore_done: bool = False
     classify_position_input: Callable | None = None
@@ -190,6 +191,8 @@ class ReferenceTaskBinding:
     build_receives_binding: bool = False
 
     def __post_init__(self):
+        if type(self.physical_direct_effort_feedback) is not bool:
+            raise TypeError('direct effort feedback selection must be a boolean')
         if type(self.physical_terminate_on_success) is not bool:
             raise TypeError('physical termination policy must be a boolean')
         if type(self.physical_ignore_done) is not bool:

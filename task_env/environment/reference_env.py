@@ -3134,6 +3134,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                             else self.typed_state.view.boundary)
                 self.info['state_boundary_identity'] = boundary.to_mapping()
                 self._publish_task_position_execution_info(self.info)
+            if getattr(self.binding, 'physical_direct_effort_feedback', False):
+                if len(profile.controllers) != 1:
+                    raise ValueError('direct effort compatibility requires one declared Controller')
+                feedback = getattr(profile.controllers[0], 'compatibility_feedback', None)
+                if not callable(feedback):
+                    raise TypeError('declared direct effort feedback is unavailable')
+                self.info.update(feedback(resolved, ack, mode=self.binding.action_schema['mode'],
+                    include_diagnostics=self.config.observation.include_diagnostics))
             self.info['physical_control_v1'] = {
                 'submitted_batch': batch.to_mapping(),
                 'submitted': submitted.to_mapping(),
