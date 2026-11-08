@@ -2,6 +2,8 @@
 
 2026-11-06维护者已采纳重新编排并要求交接阶段4。需求与排期状态为 **MAINTAINER_CONFIRMED_PLANNING**。此项是整个v2.1.1的附加集成用例，不能重新定义[G04](../goals/04-control.md)或替代其原门。当前未实施、未派包，4a–4c仍PLANNED／attempt0；G03接收不重开。文件沿用现有路径作为唯一用例说明，具体检查清单在[用例JSON](assembled-panda-use-case.json)，与原控制协议案例分开。
 
+2026-11-08维护者进一步要求：装配 Panda 作为统一主体/Controller 的实际构建与受影响代表检查提前纳入[5c 诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)；本文件的原排期是既有基线，完整两任务 Solution／任务成功等附加用例仍由7a收口，不改写已接收G04或声称此用例已完成。
+
 ## 先保留原G04主线
 
 | 子阶段 | 原本必须完成的工作 |

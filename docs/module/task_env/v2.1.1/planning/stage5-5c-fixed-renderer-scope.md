@@ -2,6 +2,8 @@
 
 当前状态：5c 三次普通 attempt 均已主审，整体未接收；第三次发现 Isaac USD task RGB reset 回归，现由维护者主导人工诊断，见 [attempt003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)及[诊断现状](stage5-5c-human-diagnosis-baseline.md)。本文保留维护者于 2026-11-07 修订的范围，承接 [G05 目标](../goals/05-rendering.md)及 [render 协议](../contracts/render-provider.md)，不改变 5a／5b 的历史接收或已保存证据；下面的实施次序是原规划，不代表当前进度。
 
+**2026-11-08 后续维护者澄清：**原文关于“第二任务真实运行仅为增强证据”的说明保留为当时决策记录；现要求在 G06 前实际贯通一体 Panda、装配 Panda、Pendulum 和双轮车的统一主体/Controller 构建链，分步验收与实际 provider 交集详见[5c 诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)。这一要求不意味着任意 backend×renderer 已支持，也不把 7a 的完整两任务 Solution 成功提前计作已完成。
+
 ## 已确认的范围
 
 1. renderer 在创建 public Env 时选择并绑定，维持到该 Env 的 `close()`；reset 不切换 renderer。可为 reset 重新构建**同一** renderer 的内部 session／资源，但不允许静默换路线。renderer A→B→A 延后至未排期的后续任务，不是本阶段接收门，也不自动分配到 6c 或其他阶段。

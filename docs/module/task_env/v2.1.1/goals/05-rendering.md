@@ -32,6 +32,8 @@
 
 2026-11-08 维护者进一步明确：Pendulum 与双轮车需以受控主体接入统一构建及 Controller 生产流程；Controller 可为保持既有力矩动作语义的直接映射。Panda 的末端、夹爪和特定维度假设应由对应 Robot/Controller 负责，不应成为公共环境或渲染准入条件。该流程必须兼容既有多层嵌套 Robot，单层任务与嵌套主体应沿同一绑定和命令提交机制；公共 Runtime/state 不依赖任一 renderer，格式和实现适配留在各自边界。该流程目前尚未完整贯通，是 5c 人工诊断中的未完成目标；现状与证据见[统一 Runtime 与嵌套控制审计](../planning/stage5-5c-unified-runtime-control-audit.md)。
 
+2026-11-08 维护者进一步指定：在进入 G06 前以多个必要的人工诊断实施窗口，完成一体／装配 Panda、Pendulum 和双轮车的统一主体构建与 Controller 接入、renderer-independent 公共状态及本轮涉及的诊断耦合归位；各窗口范围和资源另行冻结。装配 Panda 的真实主体/控制接入提前纳入 5c，原两任务完整 Solution 用例仍在 7a。详细工作单元与验收依据见[5c 诊断重构路线](../planning/stage5-5c-diagnostic-refactor-roadmap.md)。
+
 ## 失败与证据
 
 先核实原生 App update 是否会推进物理，是否可控制其采样／显示更新；必须显式处理预热。若 renderer 换成另一种会改变固定 obs 规格或 camera 语义，应拒绝该 env 的组合。

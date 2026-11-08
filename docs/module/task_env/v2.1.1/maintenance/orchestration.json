@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer-led 5c human diagnosis: align nested/single controlled subjects, common runtime and task semantics with renderer-independent state; identify scoped Isaac USD repair and affected regressions. No automatic dispatch or stage 6.",
+  "next_action": "Review staged 5c human-diagnostic refactor roadmap; prepare a bounded implementation package only after choosing the next increment, freezing real inputs and securing scope/resources authorization. Maintainer manually forwards; no automatic G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1698,8 +1698,10 @@
             "new_execution_authorized": false,
             "ordinary_attempts_completed": 3,
             "baseline_ref": "../planning/stage5-5c-human-diagnosis-baseline.md",
-            "scope": "Audit nested Robot compatibility, Panda assumptions outside specific profiles, source versus actual runtime, common task/control/state lifecycle and renderer-only adapters; preserve Isaac regression and prior evidence.",
-            "unified_runtime_nested_control_audit": "../planning/stage5-5c-unified-runtime-control-audit.md"
+            "scope": "Maintainer-directed multi-window 5c refactor: unified single/nested subjects for integrated/assembled Panda, Pendulum, TwoWheel; Controller/canonical action; common Runtime/task semantics; renderer-independent state and Isaac USD; touched diagnostic coupling before G06.",
+            "unified_runtime_nested_control_audit": "../planning/stage5-5c-unified-runtime-control-audit.md",
+            "roadmap": "../planning/stage5-5c-diagnostic-refactor-roadmap.md",
+            "diagnostic_attempts_started": 0
           }
         }
       ]

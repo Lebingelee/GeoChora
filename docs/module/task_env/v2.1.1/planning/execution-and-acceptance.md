@@ -1,6 +1,6 @@
 # v2.1.1 执行顺序与验收
 
-当前状态（2026-11-08）：G03 及 G04 的 4a、4b、4c 已经 Sol 分别按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。G05 的 5a 和 5b 已有界接收，[5c attempt001](../maintenance/reviews/20261108_5c_attempt001_sol_review.md)为通用任务接线返工、普通 count=1；四条 PickCube 路线的限定结果及执行偏差保留。维护者已将同一 Env 的 renderer 切换延期，详见[调整后范围](stage5-5c-fixed-renderer-scope.md)。依[渲染 Goal](../goals/05-rendering.md)和[render 协议](../contracts/render-provider.md)安排后续工作。
+当前状态（2026-11-08）：G03 与 G04 的各子阶段、G05 5a/5b 按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。5c 三次普通 attempt 已结束且未整体接收，现按维护者要求进行人工诊断，目标、具体工作单元与原证据边界见[5c 诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)及[003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)。同一 Env 的 renderer 切换继续延期；统一主体/Controller/Runtime、受影响核心诊断清理及 renderer-independent 状态在进入 G06 前按该路线收口。
 
 [装配 Panda](stage4-assembled-panda.md)是版本附加集成用例，不新增为 4a–4c 或 G05 接收前置；完整两任务 Solution 用例由 7a 收口。下文旧状态和准备进度是历史时点；实时状态以[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)为准。
 
@@ -20,7 +20,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 
 ### 后续开发的诊断与代码边界
 
-阶段3起的执行包引用[诊断开发与核心代码规范](../../../../global/diagnostics-and-code-boundaries.md)，说明新增诊断放在哪里、如何从外部观察或干预；不新增核心实验／测试if-else，不将正式feedback、fault或来源检查误删。既存耦合按[维护规划第2.6节](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记，当前不重开全面解耦；准备进入7a集成时集中合理归位，再在稳定源码上执行后续验证。七阶段编号、依赖和已有有限接收不变，本文更新不启动阶段3。
+阶段3起的执行包引用[诊断开发与核心代码规范](../../../../global/diagnostics-and-code-boundaries.md)，说明新增诊断放在哪里、如何从外部观察或干预；不新增核心实验／测试if-else，不将正式feedback、fault或来源检查误删。既存耦合按[维护规划第2.6节](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记；2026-11-08维护者要求，在5c人工诊断中提前归位本轮触及且阻碍统一公共链的项，未涉及项仍按7a集中分类，见[诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)。七阶段编号、依赖和已有有限接收不变，本文更新不启动阶段3。
 
 默认按表逐项推进；依赖列描述技术前置。必要的协议跨页审阅不另算子阶段。
 
