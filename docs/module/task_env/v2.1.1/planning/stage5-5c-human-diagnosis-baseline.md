@@ -33,7 +33,7 @@
 - 003：补了 typed state 的受控通用链和真实组件相机光学读回，却将只适用于 MJCF/renderer-only 的 `RuntimeSource` 条件强加到借用 Isaac 自有相机的 USD 路线，形成确定回归。第三次未接收，普通尝试停止。
 - Marker 没有 source-bound receipt，先被合法 preflight 阻断；不绕过 provenance、不把该候选不可用扩展成所有非 Position 场景不可能。
 - GeoPhys 的 authored lighting 仅支持已声明子集；visual/default-only 等不支持输入明确拒绝，`extension.light` 诊断保留，不宣称任意灯光源可完整转换。
-- Pendulum/双轮车已有场景内主体和直接 torque adapter，现有 Panda Agent/Controller 源所有权与其不同；简单套用会有重复实体或改变动作语义风险。通用已编译主体 binding 与 controller 的设计/迁移延后，不是 5c 未接收的独立理由。双轮车尚未做本次真实 RGB 路线。
+- Pendulum/双轮车已有场景内主体和直接 torque adapter，现有 Panda Agent/Controller 源所有权与其不同；简单套用会有重复实体或改变动作语义风险。既往工作包将通用已编译主体 binding 与 Controller 迁移延期；维护者现明确要求实际落地统一控制流程，它是当前 5c 未完成事项，详见[后续架构审计](stage5-5c-human-diagnosis-architecture-audit.md)。双轮车尚未做本次真实 RGB 路线。
 - Isaac 001 有启动、采集和关闭中的失败及复验记录；设备利用率和显存采样不能证明瞬时硬峰值，订阅前隐式步 unknown。不要把过去 5b 特定窗口的 VRAM 授权误写成当前通用硬限制。
 - 001 的未事前预约/包外 pytest 输出、002 的 75 步未事前预约、003 的 25 步事后预约均有记录；001 的用户处置不自动消除 002/003 的事实。它们不是本次 Isaac 技术拒收的单独原因。原 ignored 证据保留，阶段 5 误跟踪证据的限定历史清理见 [收据](../maintenance/20261108_5c_history_cleanup.md)。
 

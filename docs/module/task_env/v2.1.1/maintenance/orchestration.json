@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer designated human diagnosis; Sol analyzes the 5c baseline and Isaac USD task RGB regression. No new execution authorization, automatic dispatch or stage 6.",
+  "next_action": "Maintainer-led human diagnosis: audit 5c attempt impacts and resolve Isaac USD RGB regression plus actual generic controlled-subject/Controller flow; no automatic dispatch or stage 6.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1658,7 +1658,8 @@
           ],
           "review_decision": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
           "blockers": [
-            "Task RGB reset unconditionally constructs DynamicCameraRenderSourceV2 from UsdRuntimeSourceV1, which is not RuntimeSource; Isaac historical route cannot pass current code."
+            "Task RGB reset unconditionally constructs DynamicCameraRenderSourceV2 from UsdRuntimeSourceV1, which is not RuntimeSource; Isaac historical route cannot pass current code.",
+            "Maintainer clarified Pendulum and TwoWheelBalance must actually use a shared controlled-subject and Controller production flow, preserving direct torque semantics; implementation is missing."
           ],
           "next_candidate_package": {
             "id": "V211_G05_5c_attempt003",
@@ -1693,9 +1694,11 @@
           "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation.",
           "human_diagnosis": {
             "status": "MAINTAINER_DESIGNATED_BASELINE_ANALYSIS",
-            "reference": "../planning/stage5-5c-human-diagnosis-baseline.md",
+            "reference": "../planning/stage5-5c-human-diagnosis-architecture-audit.md",
             "new_execution_authorized": false,
-            "ordinary_attempts_completed": 3
+            "ordinary_attempts_completed": 3,
+            "baseline_ref": "../planning/stage5-5c-human-diagnosis-baseline.md",
+            "scope": "Audit the entire 5c attempt impact, separate physics topology/control/source/render concerns, and plan actual Pendulum/TwoWheel controller convergence plus Isaac repair."
           }
         }
       ]
