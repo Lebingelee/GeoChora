@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-08",
-  "status": "G05_5C_ATTEMPT003_NOT_ACCEPTED_HUMAN_DIAGNOSIS_REQUIRED",
+  "status": "G05_5C_MAINTAINER_LED_HUMAN_DIAGNOSIS_ACTIVE",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Stop ordinary execution after third 5c attempt; maintainer-led human diagnosis of Isaac USD task RGB reset regression. No automatic dispatch or stage 6.",
+  "next_action": "Maintainer designated human diagnosis; Sol analyzes the 5c baseline and Isaac USD task RGB regression. No new execution authorization, automatic dispatch or stage 6.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1690,7 +1690,13 @@
             "original_evidence_identity_preserved": true,
             "other_refs_rewritten": false
           },
-          "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation."
+          "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation.",
+          "human_diagnosis": {
+            "status": "MAINTAINER_DESIGNATED_BASELINE_ANALYSIS",
+            "reference": "../planning/stage5-5c-human-diagnosis-baseline.md",
+            "new_execution_authorized": false,
+            "ordinary_attempts_completed": 3
+          }
         }
       ]
     },

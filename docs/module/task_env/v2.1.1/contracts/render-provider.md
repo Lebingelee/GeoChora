@@ -81,7 +81,7 @@ close() -> None
 | 同 renderer reset | preflight 固定选择与新 episode → 按需释放并重建同一 renderer 的资源 → reset/readback → capture 新首帧 | 旧缓存/帧/lease 不可跨新 materialization、episode 或 camera revision；不能静默更换 renderer |
 | standalone `.render()` | 读取最新完整公开 boundary → observer camera update/capture/present → receipt | 不调用 physics advance；若无有效 state，按明确 none/error 行为答复 |
 
-**当前时钟缺口：**`CameraGeometry.capture_phase` 目前由 `CameraObservationConfigV1.geometries()` 固定为 `post_control_step`，而 reset 初始 observation 也调用同一 consumer，并且 `CameraCaptureIdentityV1.validate` 只接收 `post_control_step`。因此目前 identity 无法区分 reset-initial 与真正的 post-step capture。5c 必须以调用边界传入 capture phase 并扩展 identity/验证；不得据现状声称该语义已验证。
+**5c 已实现的采集阶段区分：**底层 `CameraGeometry.capture_phase` 仍为 `post_control_step`；`TaskRgbObservationConsumerV1` 核对 renderer 返回的 state boundary 与 sample clock 后，根据 consumer 的 episode 生命周期标记 `reset_initial` 或 `post_control_step`，`CameraCaptureIdentityV1` 接受并验证这两种阶段。001 的四路线证据保存了受测边界；当前代码的适用性仍须结合各路线实际改动和 [003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)判断，不能将阶段标签本身当成真实采集完成的证明。
 
 若 App `update()`、render/present 或 camera warmup 可推进 physics，路线必须证明公开 pause/render-only 路径，或拒绝 task observation 模式。warmup 必须在正式 reset/readback 前显式记账，正式首帧仍从该 reset boundary 生成。当前 Isaac F06 为 headless 且 `enable_cameras=False`，不能作为 camera 支持；不得为本设计启动 App。官方 Isaac 6.2 文档将 SimulationManager stepping 与 RenderingManager/Replicator rendering 分开描述，实际所需 experimental RTX camera API 和 exact installed build 必须在未来包重新核对。
 

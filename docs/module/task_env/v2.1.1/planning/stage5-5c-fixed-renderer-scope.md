@@ -1,6 +1,6 @@
 # G05 5c：固定 renderer、通用场景与跨组合
 
-当前状态：5c attempt001 经 [Sol 主审](../maintenance/reviews/20261108_5c_attempt001_sol_review.md)决定 `REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION`，普通 count=1；四条 PickCube 同步 RGB 路线的有限证据及过程偏差保留，通用任务接线尚需返工。2026-11-07 维护者明确修订 5c renderer 范围；本文承接 [G05 目标](../goals/05-rendering.md)及 [render 协议](../contracts/render-provider.md)，不改变 5a／5b 的历史接收或已保存证据。
+当前状态：5c 三次普通 attempt 均已主审，整体未接收；第三次发现 Isaac USD task RGB reset 回归，现由维护者主导人工诊断，见 [attempt003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)及[诊断现状](stage5-5c-human-diagnosis-baseline.md)。本文保留维护者于 2026-11-07 修订的范围，承接 [G05 目标](../goals/05-rendering.md)及 [render 协议](../contracts/render-provider.md)，不改变 5a／5b 的历史接收或已保存证据；下面的实施次序是原规划，不代表当前进度。
 
 ## 已确认的范围
 
@@ -28,4 +28,4 @@
 
 ## 后续安排
 
-上述范围是规划合同，不是新的 native／SDK／GPU／GUI 授权或实施派发。attempt001 已结束并由 Sol 主审；后续若准备 attempt002，应聚焦实际未闭合项，明确当前 HEAD、writer 与释放、provider/API 范围、资源预算、操作权限、锁、同窗口修复与独立证据；由维护者指定实施者并手动转发。不要自动进入阶段 6、merge、push、tag 或发布。
+上述范围是规划合同，不是新的 native／SDK／GPU／GUI 授权或实施派发。三次普通 attempt 均已完成并独立主审；目前按维护者指示进入人工诊断，详见[诊断现状](stage5-5c-human-diagnosis-baseline.md)。后续具体实施仍须明确当前 HEAD、writer、范围、资源预算与执行授权，由维护者指定并手动转发。不要自动进入阶段 6、merge、push、tag 或发布。
