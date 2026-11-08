@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Maintainer-led human diagnosis: audit 5c attempt impacts and resolve Isaac USD RGB regression plus actual generic controlled-subject/Controller flow; no automatic dispatch or stage 6.",
+  "next_action": "Maintainer-led 5c human diagnosis: align nested/single controlled subjects, common runtime and task semantics with renderer-independent state; identify scoped Isaac USD repair and affected regressions. No automatic dispatch or stage 6.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1698,7 +1698,8 @@
             "new_execution_authorized": false,
             "ordinary_attempts_completed": 3,
             "baseline_ref": "../planning/stage5-5c-human-diagnosis-baseline.md",
-            "scope": "Audit the entire 5c attempt impact, separate physics topology/control/source/render concerns, and plan actual Pendulum/TwoWheel controller convergence plus Isaac repair."
+            "scope": "Audit nested Robot compatibility, Panda assumptions outside specific profiles, source versus actual runtime, common task/control/state lifecycle and renderer-only adapters; preserve Isaac regression and prior evidence.",
+            "unified_runtime_nested_control_audit": "../planning/stage5-5c-unified-runtime-control-audit.md"
           }
         }
       ]

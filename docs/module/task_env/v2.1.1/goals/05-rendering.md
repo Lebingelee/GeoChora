@@ -30,7 +30,7 @@
 - **检查：**reset 首帧、新状态运动对应、重复 render 的时间不变、相机失败拒绝／清理、旧缓存失效、同一 renderer 跨 reset 保持；有／无渲染的施控及物理边界一致。图像规格与独立记录读回，不能只有 shape 断言。
 - **交付／出口：**调用方无需额外 render 即获得同步 RGB；至少一个真实跨组合，不宣称完整自由组合矩阵。
 
-2026-11-08 维护者进一步明确：Pendulum 与双轮车需以受控主体接入统一构建及 Controller 生产流程；Controller 可为保持既有力矩动作语义的直接映射。Panda 的末端、夹爪和特定维度假设应由对应 Robot/Controller 负责，不应成为公共环境或渲染准入条件。该流程目前未实施，是 5c 人工诊断中的未完成目标；范围转译及拟议验证见[控制主体与代码审计](../planning/stage5-5c-human-diagnosis-architecture-audit.md)。
+2026-11-08 维护者进一步明确：Pendulum 与双轮车需以受控主体接入统一构建及 Controller 生产流程；Controller 可为保持既有力矩动作语义的直接映射。Panda 的末端、夹爪和特定维度假设应由对应 Robot/Controller 负责，不应成为公共环境或渲染准入条件。该流程必须兼容既有多层嵌套 Robot，单层任务与嵌套主体应沿同一绑定和命令提交机制；公共 Runtime/state 不依赖任一 renderer，格式和实现适配留在各自边界。该流程目前尚未完整贯通，是 5c 人工诊断中的未完成目标；现状与证据见[统一 Runtime 与嵌套控制审计](../planning/stage5-5c-unified-runtime-control-audit.md)。
 
 ## 失败与证据
 
