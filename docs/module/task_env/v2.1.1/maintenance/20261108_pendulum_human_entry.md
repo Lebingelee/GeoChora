@@ -1,0 +1,3 @@
+# Pendulum human entry boundary
+
+Pendulum's shared physical route admits `render_mode='human'` with GeoPhys CPU or MuJoCo CPU. This selects an environment construction mode; it does **not** provide a visible display. `metadata['human_display_available']` is false, and `env.render()` raises `task_env.render.RenderUnavailableError` without stepping physics or faulting a healthy environment. A real execution fault still requires reset and is reported separately. The render mode stays fixed until close. `rgb_array` continues to use the existing GeoPhys CPU observer; task RGB remains a separate configured observation path. Visible UI and general free-body physical-effort reset are not implemented by this change.

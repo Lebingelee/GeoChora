@@ -377,6 +377,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         from ..render import RenderUnavailableError, normalize_render_mode
 
+        if getattr(self, '_human_display_unavailable', False):
+            self._episode_execution_state().require_open('environment is closed')
+            if self._execution_fault is not None:
+                raise RuntimeError('selected execution is faulted; reset() is required before rendering')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            raise RenderUnavailableError('human display is not available for this environment')
+
         if getattr(self, '_legacy_observer_requested', False):
             self._episode_execution_state().require_open('environment is closed')
             if self._execution_fault is not None or self.session is None:

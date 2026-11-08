@@ -191,9 +191,9 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
                                task_rgb_camera=None, task_renderer=None):
     if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu')}:
         raise ValueError('Pendulum physical route requires a CPU physics provider')
-    if render_mode is not None and (render_mode != 'rgb_array' or provider != 'geophys'):
-        raise ValueError('Pendulum shared observer currently admits GeoPhys CPU rgb_array only')
-    if render_mode is not None and config.render.backend not in {'raytracer', 'rasterizer'}:
+    if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
+        raise ValueError('Pendulum admits human construction or GeoPhys CPU rgb_array')
+    if render_mode == 'rgb_array' and config.render.backend not in {'raytracer', 'rasterizer'}:
         raise ValueError('Pendulum shared observer requires a GeoPhys renderer')
     if config.render.camera_obs and provider != 'geophys':
         raise ValueError('legacy camera observations require GeoPhys CPU')
@@ -238,11 +238,16 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
     env._pendulum_observation_schema = PendulumObservationBuilder(qpos_id=0, qvel_id=0).schema
     env.metadata['reference_profile'] = env.reference_profile()
     env._legacy_camera_observations = bool(config.render.camera_obs)
-    if render_mode is not None:
+    if render_mode == 'human':
+        env.render_mode = render_mode
+        env._human_display_unavailable = True
+        env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
+                            render_mode=render_mode, human_display_available=False)
+    elif render_mode == 'rgb_array':
         env.render_mode = render_mode
         env._legacy_observer_requested = True
-        env.metadata.update(render_modes=['rgb_array'], render_mode=render_mode,
-                            render_backend=config.render.backend,
+        env.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
+                            human_display_available=False, render_backend=config.render.backend,
                             render_resolution=(config.render.width, config.render.height))
     if task_rgb_camera is not None:
         from ..observations.canonical_camera.contracts import CameraGeometry, MOUNT_FROM_CAMERA
