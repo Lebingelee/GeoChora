@@ -1258,13 +1258,20 @@ def test_pickcube_caller_drives_solution_act_public_step_and_observe(fake, tmp_p
         env.start_recording(tmp_path / 'caller-pick.h5')
         assert env.recorder.metadata.expert_identity == solution.identity
         proposal = solution.act(obs, info)
-        from task_env.environment.types import StageUnavailableError
         env.position_profile = True
-        env.position_profiles = ()
+        from types import SimpleNamespace
+        env.position_plan = object()
+        env.position_profiles = (SimpleNamespace(identity='position-controller-arm'),
+                                 SimpleNamespace(identity='position-controller-hand'))
+        from task_env.runtime.sessions.control_lifecycle import has_position_control_capability
+        assert has_position_control_capability(env)
+        from task_env.environment.types import StageUnavailableError
         with pytest.raises(StageUnavailableError, match='unavailable on this Position profile'):
             env.step(proposal)
         assert env.state.control_step == 0
         env.position_profile = False
+        env.position_profiles = ()
+        env.position_plan = None
         from dataclasses import replace
         with pytest.raises(ValueError, match='boundary is stale or mismatched'):
             env.step(replace(proposal, request_boundary={'unexpected': True}))

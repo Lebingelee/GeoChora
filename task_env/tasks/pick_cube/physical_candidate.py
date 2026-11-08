@@ -222,11 +222,13 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
 def _pickcube_mjcf_scene(task_config):
     """Bind the authored MJCF names to the existing PickCube/Panda Scene owner."""
     from ...artifacts import SceneDefinition
-    from ...robots.panda import PandaAgent
+    from ...registry import AGENT_REGISTRY
+    from ...runtime.sessions.mujoco_composition import declare_panda_scene
     from .specialization import build_pickcube_isaac_scene
     scene = build_pickcube_isaac_scene(task_config)
     mapping = scene.to_mapping()
-    panda = PandaAgent()._scene_definition(entity_id='panda-v1', scene_id=scene.scene_id)
+    panda = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
+                                entity_id='panda-v1', scene_id=scene.scene_id)
     mapping['assets'] = [panda.assets[0].to_mapping()
         if asset['asset_id'] == 'f05-dg03-menagerie-panda-source-preserving-isaac-usd' else asset
         for asset in mapping['assets']]

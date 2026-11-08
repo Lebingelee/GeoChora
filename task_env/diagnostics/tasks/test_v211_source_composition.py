@@ -4,7 +4,8 @@ from dataclasses import replace
 import pytest
 
 from task_env.assembly.source_composition import (
-    CompositionMaterializationReceiptV1, CompositionSourceV1, SourceCompositionPlanV1,
+    CompositionAttachmentV2, CompositionMaterializationReceiptV1, CompositionSourceV1,
+    CompositionSourceV2, SourceCompositionPlanV1, SourceCompositionRequestV2,
 )
 
 
@@ -57,6 +58,135 @@ def test_reference_uses_existing_robot_without_duplicate_entity():
         replace(plan, robot_sources=(replace(robot, closure_sha256='b' * 64),))
     with pytest.raises(ValueError, match='retain'):
         replace(plan, robot_sources=(replace(robot, entity_ids=('other',)),))
+
+
+def _request_v2(*, mode='replace', empty_task=False):
+    task_entities = () if empty_task else ('table', 'cube')
+    old_robot = () if mode == 'add' or empty_task else ('panda-v1',)
+    task_source = CompositionSourceV2('task-v2', 'a' * 64, (*task_entities, *old_robot))
+    if mode == 'reference':
+        robot_sources = (CompositionSourceV2('task-v2', 'a' * 64, ('panda-v1',)),)
+        attachments = ()
+    elif mode == 'add':
+        robot_sources = (CompositionSourceV2('standalone-arm', 'b' * 64, ('arm',)),)
+        attachments = ()
+    else:
+        robot_sources = (CompositionSourceV2('arm-source', 'b' * 64, ('arm',)),
+                         CompositionSourceV2('hand-source', 'c' * 64, ('hand',)))
+        attachments = (CompositionAttachmentV2('arm', 'link7', 'hand', 'hand',
+            'fixed-panda-hand-v1', 'arm-source', 'b' * 64, 'hand-source', 'c' * 64),)
+    return SourceCompositionRequestV2('source-composition-request-v2', task_source,
+        task_entities, old_robot, 'panda', robot_sources, mode, 'd' * 64,
+        attachments, (('arm', 'arm-effort', 'arm-writer'),) if mode == 'replace' else ())
+
+
+def test_v2_composition_supports_empty_task_add_reference_and_replace():
+    empty_add = _request_v2(mode='add', empty_task=True)
+    assert empty_add.task_entity_ids == ()
+    assert empty_add.entity_ids == ('arm',)
+    assert len(empty_add.identity_hash) == 64
+
+    added = _request_v2(mode='add')
+    assert added.existing_robot_entity_ids == ()
+    assert added.entity_ids == ('table', 'cube', 'arm')
+
+    referenced = _request_v2(mode='reference')
+    assert referenced.entity_ids == ('table', 'cube', 'panda-v1')
+
+    replaced = _request_v2()
+    assert replaced.entity_ids == ('table', 'cube', 'arm', 'hand')
+    assert replaced.attachments[0].child_entity_id == 'hand'
+
+
+def test_v2_rejects_source_entity_attachment_and_writer_collisions():
+    request = _request_v2()
+    with pytest.raises(ValueError, match='partition'):
+        replace(request, task_entity_ids=('table',))
+    with pytest.raises(ValueError, match='provenance'):
+        replace(request, attachments=(replace(request.attachments[0], child_closure_sha256='f' * 64),))
+    with pytest.raises(ValueError, match='outside the composition'):
+        replace(request, attachments=(replace(request.attachments[0], child_entity_id='missing'),))
+    with pytest.raises(ValueError, match='only one writer'):
+        replace(request, resource_writers=(('arm', 'arm-effort', 'arm-writer'),
+                                           ('arm', 'arm-effort', 'other-writer')))
+    with pytest.raises(ValueError, match='acyclic'):
+        replace(request, attachments=(
+            CompositionAttachmentV2('arm', 'link7', 'hand', 'hand', 'fixed-v1',
+                'arm-source', 'b' * 64, 'hand-source', 'c' * 64),
+            CompositionAttachmentV2('hand', 'hand', 'arm', 'link7', 'fixed-v1',
+                'hand-source', 'c' * 64, 'arm-source', 'b' * 64)))
+    with pytest.raises(ValueError, match='unsupported'):
+        replace(request, schema_version='source-composition-request-v9')
+
+
+def test_panda_robot_recipes_require_no_asset_reads_or_provider_imports(monkeypatch):
+    import builtins
+    from pathlib import Path
+    import task_env.robots  # Register both declarations before applying the provider import guard.
+    from task_env.registry import AGENT_REGISTRY
+
+    original_import = builtins.__import__
+    def guarded_import(name, *args, **kwargs):
+        if any(token in name for token in ('mujoco_composition', 'RuntimeSource', 'mujoco', 'scene')):
+            raise AssertionError(f'Robot declaration imported provider parser: {name}')
+        return original_import(name, *args, **kwargs)
+    def guarded_read(_path, *args, **kwargs):
+        raise AssertionError('Robot declaration read an asset file')
+
+    monkeypatch.setattr(builtins, '__import__', guarded_import)
+    monkeypatch.setattr(Path, 'read_bytes', guarded_read)
+    monkeypatch.setattr(Path, 'open', guarded_read)
+    recipes = {}
+    for uid in ('panda-v1', 'panda-arm-hand-v1'):
+        agent = AGENT_REGISTRY.create(uid)
+        recipe = agent.source_recipe()
+        recipes[uid] = recipe
+        assert recipe.robot_uid == uid
+        assert len(recipe.identity_hash) == 64
+        assert recipe.control_profiles
+        assert not hasattr(agent, 'compose_task_source')
+
+    from types import SimpleNamespace
+    from task_env.assembly.source_composition import build_source_composition_intent_v1
+    task_source = SimpleNamespace(source_id='pickcube-task-source',
+                                  source_closure_digest='a' * 64)
+    integrated = build_source_composition_intent_v1(
+        task_source=task_source, task_entity_ids=('tabletop', 'cube'),
+        existing_robot_entity_ids=('panda-v1',), robot_recipe=recipes['panda-v1'])
+    assembled = build_source_composition_intent_v1(
+        task_source=task_source, task_entity_ids=('tabletop', 'cube'),
+        existing_robot_entity_ids=('panda-v1',), robot_recipe=recipes['panda-arm-hand-v1'],
+        task_site_transfers=(('hand', 'nutassembly_ee_site', 'hand'),))
+    assert integrated.mode == 'reference'
+    assert integrated.task_entity_ids == ('tabletop', 'cube')
+    assert integrated.resource_writers == recipes['panda-v1'].resource_writers
+    assert assembled.mode == 'replace'
+    assert assembled.component_edges == recipes['panda-arm-hand-v1'].component_edges
+    assert assembled.task_site_transfers == (('hand', 'nutassembly_ee_site', 'hand'),)
+    assert tuple(source.source_revision for source in assembled.robot_sources) == (
+        'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
+        'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7')
+    assert len(integrated.identity_hash) == len(assembled.identity_hash) == 64
+
+    import inspect
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+    from task_env.robots.panda import PandaAgent
+    for agent_type in (AssembledPandaAgent, PandaAgent):
+        source = inspect.getsource(agent_type)
+        assert 'RuntimeSource' not in source
+        assert 'mujoco_composition' not in source
+        assert 'derive_task_compatible_attachment' not in source
+        assert 'PandaFixedSourceDeclarationV1' not in source
+
+
+def test_v1_composition_hash_schema_remains_frozen():
+    import hashlib
+    import json
+    plan = _plan()
+    expected = hashlib.sha256(json.dumps(
+        {'schema_version': 'source-composition-plan-v1', **__import__('dataclasses').asdict(plan)},
+        sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+    assert plan.identity_hash == expected
 
 
 def test_selected_robot_configuration_roundtrips_and_rejects_unknown():

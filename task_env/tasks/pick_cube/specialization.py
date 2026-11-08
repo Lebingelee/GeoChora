@@ -530,6 +530,12 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             reference = adapted_source.source_reference_plan
             resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
                                                          else reference.identity_hash)
+            request = adapted_source.source_composition_request
+            if request is not None:
+                resolved['source_composition_request_v2_sha256'] = request.identity_hash
+            intent = adapted_source.source_composition_intent
+            if intent is not None:
+                resolved['source_composition_intent_v1_sha256'] = intent.identity_hash
             value['resolved_configuration'] = resolved
             value['recipe_identity'] = digest(resolved)
             return value
@@ -661,18 +667,34 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         if config.robot_uid is not None:
             from ...registry import AGENT_REGISTRY
             robot = AGENT_REGISTRY.create(config.robot_uid)
-            compose = getattr(robot, 'compose_task_source', None)
-            if compose is not None:
-                profiles = getattr(robot, 'selected_controller_profiles', lambda: ())()
+            recipe_factory = getattr(robot, 'source_recipe', None)
+            if callable(recipe_factory):
+                recipe = recipe_factory()
+                profiles = recipe.control_profiles
                 if profile not in profiles:
                     raise ValueError('selected Robot does not declare this Controller profile')
                 if (config.physics_provider, config.environment.runtime.backend) != ('mujoco', 'cpu'):
                     raise ValueError('selected Robot composition requires an admitted provider capability')
-                adapter = lambda source, **owners: compose(
-                    source, **owners, task_entities=('tabletop-v1', 'cube-v1'),
-                    existing_robot_entity='panda-v1',
-                    task_body_names=(('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube')),
-                    task_site_transfers=(('hand', 'nutassembly_ee_site', 'hand'),))
+                from ...assembly.source_composition import build_source_composition_intent_v1
+                task_entities = ('tabletop-v1', 'cube-v1')
+                existing_robot_entity = 'panda-v1'
+                task_body_names = (('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube'))
+                task_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
+
+                def adapt_robot_source(source, **owners):
+                    # The selected, provider-neutral layer freezes ownership and
+                    # pinned Robot declarations before the provider reads assets.
+                    intent = build_source_composition_intent_v1(
+                        task_source=source, task_entity_ids=task_entities,
+                        existing_robot_entity_ids=(existing_robot_entity,),
+                        robot_recipe=recipe, task_site_transfers=task_site_transfers)
+                    from ...runtime.sessions.mujoco_composition import compose_pickcube_robot_source
+                    return compose_pickcube_robot_source(
+                        source, robot=robot, composition_intent=intent, **owners,
+                        task_entities=task_entities, existing_robot_entity=existing_robot_entity,
+                        task_body_names=task_body_names, task_site_transfers=task_site_transfers)
+
+                adapter = adapt_robot_source
         environment = (_nut_aligned_environment_config(config.environment)
                        if profile in _PICKCUBE_R3_PROFILES else config.environment)
         return make_reference_binding(
@@ -751,10 +773,12 @@ ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
 
 def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
     """Compose the Panda source with task-owned PickCube entities and recipe."""
-    from ...robots.panda import PandaAgent
+    from ...registry import AGENT_REGISTRY
+    from ...runtime.sessions.mujoco_composition import declare_panda_scene
 
     scene_id = str(task_config["recipe"]["scene_uid"])
-    panda_scene = PandaAgent()._scene_definition(entity_id="panda-v1", scene_id=scene_id)
+    panda_scene = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
+                                      entity_id="panda-v1", scene_id=scene_id)
     source_asset = panda_scene.assets[0]
     if not source_asset.source_content_sha256:
         raise ValueError("Panda importer must provide the consumed source closure digest")

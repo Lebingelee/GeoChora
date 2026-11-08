@@ -29,6 +29,10 @@ PickCube MuJoCo CPU 的 direct effort 候选可将 physical execution 直接作�
 
 PickCube physical 候选的 `ee_pose` 与任务距离、reward 以 source 绑定的 `nutassembly_ee_site` 为准，`hand_pose` 单独表示 hand 原点。旧 default direct 的 Position 投影曾将 hand 代入任务 EE，历史记录按其原实现解释，不回写旧 evidence；这次修正会改变受影响旧路径的任务距离和 reward，shape 及物理控制语义不因此改变。
 
+### 2026-11-09 Unit 4 rework002 implementation candidate
+
+选定外部 action 路径为具名的 position 或 physical-effort capability 记录共同的 `ControlLifecycleDispatchV1`，包含 source closure、Artifact、episode、state boundary、clock step、Controller identities 和 generation。两种 position target 表示（`PositionControlTargetV1` 与既有 R1 `CanonicalControlTarget`）以及 effort batch 都进入 `submit_control_command`：它在 provider lowering 前核验活动 identity/boundary、writer/resource 唯一性和一个外部 interval 的一次提交，先消费 boundary，再记录 `ControlSubmissionReceiptV1`。Position target 继续使用关节位置 rad 与夹爪位置 m，并由 position lowering 执行；effort batch 保留声明的 N·m/N 单位并由 physical command lowering 执行。native 子步不产生额外逻辑提交。该实现接入两种 Panda PickCube 配置以及现有 Pendulum/双轮 physical 路径；当前受测交集只由本轮 MuJoCo CPU 短程纵切证据确定。代码和证据仍须等待 Sol 独立主审及维护者人工接收。
+
 ## 2. 三类底层物理命令
 
 名称是语义类别，具体版本值／codec 在现有 canonical/control owner 内由 4a 冻结：

@@ -557,6 +557,7 @@ def test_selected_position_profile_rejects_legacy_action_before_mode_mutation():
     selected._episode_mode = None
     selected.position_profile = True
     selected.position_plan = object()
+    selected.position_profiles = (SimpleNamespace(identity='position-controller'),)
     selected.value = {}
     selected.session = object()
     selected.state = SimpleNamespace(control_step=0)

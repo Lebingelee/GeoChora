@@ -109,6 +109,10 @@
 
 Decoder 只按精确 `schema_version`；unknown core fields/enum 均拒绝。扩展仅能进入该版本显式定义的类型化 extension 槽，至少带 namespace、extension schema version、requiredness、payload/content identity 与 typed references。旧版本若没有 extension 槽，不因新设计而接受未知字段。未来 decoder 仅为保留未知 optional payload 而透传时，执行 admission 仍须确认它不改变语义且不影响本路线；任何 required/physics-affecting extension 未注册、悬空引用、缺少 required representation 或未知相互作用必须在 compile/admission/materialization 的首个可知阶段，以稳定原因拒绝，不丢字段、不降级、不 silent fallback。
 
+### 5.1 Task/Robot source 组合
+
+`SourceCompositionPlanV1` 与其 `source-composition-plan-v1` identity 继续按历史结构解释，不能为加入新组合方式而重签。共享层先从 Task source identity、Task/既有 Robot owner 与 Robot `source_recipe()` 生成 `SourceCompositionIntentV1`；该预解析 identity 固定 pinned source reference/revision、Robot entity、reference/replace/add 模式、组件边、Task site transfer、controlled joints、Controller profile 和 resource writer，不读取 Robot 素材。Provider adapter 消费该 intent 后才校验 source closure、解析 source 并作 native 映射，再生成带 `intent_identity_sha256` 的解析后 `SourceCompositionRequestV2`。V2 可表示空 Task entity 集、Task 已含 Robot 的 reference/replace，以及 Task source 不含 Robot 的 add；它继续携带已验证 source closure、实体 owner、带 closure provenance 的 attachment frame/rule 与 writer/resource 声明。物化回执同时记录 intent/request identity、source closure、native entity 映射及 provider materialization identity。Intent 和 V2 均不含 XML、native handle/index 或 provider type；重复 owner、悬空实体、错误 closure、循环 attachment 和资源双 writer 均应在组合准入时拒绝。旧 V1 identity 和 receipt 仍按其原结构核验。
+
 ## 6. 兼容矩阵
 
 | 现有调用路径 | 1b 处置 | 明确限制 |

@@ -19,6 +19,25 @@ class AssembledPandaAgent(BaseAgent):
             source_reference='mujoco-menagerie://franka_emika_panda/panda_nohand.xml+hand.xml',
             source_revision='b846dd12bc459d776cccb3dee0b1d02acbf7a9c7')
 
+    def source_recipe(self):
+        """Declare pinned arm/hand sources and the canonical nesting edge."""
+        from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
+        manifest = self.asset_manifest()
+        return RobotSourceRecipeV1(self.uid, 'replace-task-subtree', (
+            RobotSourceReferenceV1('panda-arm-source',
+                'mujoco-menagerie://franka_emika_panda/panda_nohand.xml',
+                manifest.source_revision, ('panda-arm',)),
+            RobotSourceReferenceV1('panda-hand-source',
+                'mujoco-menagerie://franka_emika_panda/hand.xml',
+                manifest.source_revision, ('panda-hand',))),
+            (('panda-arm', 'attachment_site', 'panda-hand', 'hand',
+              'fixed-transform-from-task-authored-tcp-v1'),),
+            tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2'),
+            self.selected_controller_profiles(),
+            tuple((entity, f'actuator{index}', 'panda-position-controller')
+                  for entity, indexes in (('panda-arm', range(1, 8)), ('panda-hand', (8,)))
+                  for index in indexes))
+
     def reference_spec(self):
         return ReferenceSpec(body_names=('link0', 'probe_hand_hand', 'probe_hand_left_finger', 'probe_hand_right_finger'),
             joint_names=tuple(f'joint{i}' for i in range(1, 8)) +
@@ -46,84 +65,6 @@ class AssembledPandaAgent(BaseAgent):
             robot_closure_sha256=fixed.source_closure_sha256, task_closure_sha256=task_closure_sha256,
             artifact=artifact, controller=controller, attachment=fixed)
 
-    def compose_task_source(self, source, *, artifact, controller, task_entities, existing_robot_entity,
-                            task_body_names, task_site_transfers):
-        """Bind this exact robot to a task's existing source without parsing native state.
-
-        The caller holds the source execution locks. Legacy task semantic keys
-        remain an explicit compatibility projection; the physical owners are
-        the two declared robot entities in the composition plan.
-        """
-        from dataclasses import replace
-        from ..assembly.source_composition import (
-            CompositionRuntimeInputV1, CompositionSourceV1, SourceCompositionPlanV1,
-            PositionSubjectControlBindingV1,
-        )
-        from ..runtime.sessions.source import RuntimeSource
-        if type(source) is not RuntimeSource or source.execution_source_receipt is None:
-            raise TypeError('assembled Panda requires a verified task RuntimeSource')
-        if type(task_entities) is not tuple or type(task_body_names) is not tuple:
-            raise TypeError('task entity and native body declarations must be tuples')
-        if set(dict(task_body_names)) != set(task_entities):
-            raise ValueError('task body names must cover the declared task entities')
-        declaration = self.declare_source()
-        from ..runtime.sessions.mujoco_composition import derive_task_compatible_attachment
-        if len(task_site_transfers) != 1:
-            raise ValueError('assembled Panda requires one declared task end-effector site')
-        task_hand, _site, source_hand = task_site_transfers[0]
-        declaration = derive_task_compatible_attachment(declaration=declaration,
-            task_receipt=source.execution_source_receipt,
-            task_hand_name=task_hand, source_hand_name=source_hand)
-        fixed = declaration.attachment_plan
-        arm, hand = fixed.parent_entity_id, fixed.child_entity_id
-        control_plan, subject_identity = self.compile_position_binding(declaration, artifact=artifact, controller=controller,
-                                                     task_closure_sha256=source.source_closure_digest)
-        position_binding = PositionSubjectControlBindingV1(control_plan, subject_identity, tuple(
-            (entity, actuator, fixed.native_actuator_names[f'{entity}/{actuator}'])
-            for entity, actuator, _ in control_plan.resource_writers), tuple(
-            (f'{existing_robot_entity}/{name}', entity, name,
-             fixed.native_joint_names[f'{entity}/{name}'], actuator)
-            for entity, names, actuator_names in (
-                (arm, tuple(f'joint{i}' for i in range(1, 8)), tuple(f'actuator{i}' for i in range(1, 8))),
-                (hand, ('finger_joint1', 'finger_joint2'), ('actuator8', 'actuator8')))
-            for name, actuator in zip(names, actuator_names, strict=True)))
-        robot_sources = tuple(CompositionSourceV1(
-            declaration.source_by_entity[entity].source_id, fixed.source_closure_sha256, (entity,))
-            for entity in (arm, hand))
-        plan = SourceCompositionPlanV1(
-            CompositionSourceV1(source.source_id, source.source_closure_digest,
-                                (*task_entities, existing_robot_entity)),
-            task_entities, (existing_robot_entity,), self.uid, robot_sources, 'replace',
-            declaration.assembly.logical_content_sha256, fixed.identity_hash, task_site_transfers,
-            control_plan.identity_hash, subject_identity,
-            task_entity_source_roots=task_body_names,
-            replaced_robot_source_roots=(fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}'],),
-            task_free_joints=tuple(source.free_joints.items()),
-            position_binding_identity_sha256=position_binding.identity_hash)
-        robot_bodies = ((arm, fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}']),
-                        (hand, fixed.native_body_names[f'{hand}/{fixed.child_root.frame_id}']))
-        composition = CompositionRuntimeInputV1(
-            plan, declaration, tuple(name for _, name in task_body_names),
-            (fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}'],),
-            (*task_body_names, *robot_bodies), tuple(source.free_joints.values()), control_plan, subject_identity)
-        joints = dict(source.joints)
-        for index in (1, 2):
-            key, expected = f'{existing_robot_entity}/finger_joint{index}', f'finger_joint{index}'
-            if joints.get(key) != expected:
-                raise ValueError('task finger binding differs from the declared Panda source')
-            joints[key] = fixed.native_joint_names[f'{hand}/{expected}']
-        frames = dict(source.frames)
-        for source_body, site, target_body in task_site_transfers:
-            matching = [key for key, native in frames.items() if native == site]
-            if len(matching) != 1 or not matching[0].startswith(existing_robot_entity + '/'):
-                raise ValueError('task site binding does not uniquely belong to its robot')
-            frames[matching[0]] = fixed.namespace_prefix + site
-        if source.open_actuators != ('actuator8',):
-            raise ValueError('task gripper binding differs from the declared Panda source')
-        return replace(source, joints=joints, frames=frames,
-            open_actuators=(fixed.native_actuator_names[f'{hand}/actuator8'],),
-            composition_runtime_input=composition, position_subject_binding=position_binding)
-
     def supported_controller_kinds(self):
         # The component-runtime controller route is not admitted by this slice.
         return ()
@@ -142,9 +83,9 @@ class AssembledPandaAgent(BaseAgent):
             LogicalAssemblyNestedMemberV1, LogicalAssemblySubcomponentReferenceV1)
         from ..runtime.sessions.physical_control import (ControlledSubjectV1,
             SubjectJointDeclarationV1, compile_declared_subject_binding)
-        from ..assembly.panda_fixed_source import PandaFixedSourceDeclarationV1
-        if type(declaration) is not PandaFixedSourceDeclarationV1:
-            raise TypeError('assembled Panda requires its pinned source declaration')
+        if any(not hasattr(declaration, name) for name in
+               ('scene', 'attachment_plan', 'assembly', 'source_by_entity')):
+            raise TypeError('assembled Panda requires a typed assembly/component declaration')
         if len(native_ranges) != 8 or native_drive not in {'disabled', 'position'}:
             raise ValueError('assembled Panda requires eight source actuator ranges and declared drive')
         scene, plan, pin = declaration.scene, declaration.attachment_plan, declaration.assembly.scene_pin
@@ -232,12 +173,6 @@ class AssembledPandaAgent(BaseAgent):
         execution.validate_source(scene=declaration.scene, artifact_sha256=artifact.identity_hash,
             source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
         return execution
-
-    def declare_source(self):
-        """Read and verify pinned source bytes; caller owns source execution lock."""
-        from ..assembly.panda_fixed_source import declare_panda_fixed_source
-        return declare_panda_fixed_source()
-
 
 from dataclasses import replace
 from ..artifacts import ActuatorReference, FrameReference, JointReference, PoseWorld

@@ -1420,7 +1420,7 @@ def validate_target(session,target):
     if not isinstance(target, CanonicalControlTarget):raise TypeError("CanonicalControlTarget required")
     session._require_reset()
     if not hasattr(session,'_control_binding'):raise ValueError('control session admission required')
-    subject_binding = getattr(session._source, 'position_subject_binding', None)
+    subject_binding = getattr(getattr(session, '_source', None), 'position_subject_binding', None)
     if subject_binding is not None:
         inflight = getattr(session, '_subject_position_inflight', None)
         if (not isinstance(inflight, tuple) or len(inflight) != 3
@@ -1700,15 +1700,33 @@ def apply_position_control_target(
         raise ValueError('position target for this state boundary was already applied')
     # Close the same-boundary replay window before crossing into the Provider.
     consumed.add(consumed_key)
-    session._position_target_in_flight = target.target.identity_hash
-    session._position_target_source_boundary_in_flight = target.source_boundary
-    try:
-        acknowledgement = session.apply_control(target.target)
-    finally:
-        session._position_target_in_flight = None
-        session._position_target_source_boundary_in_flight = None
-    if acknowledgement.target_hash != target.target.identity_hash:
-        raise ValueError('Provider acknowledgement does not match the applied canonical target')
+    from .control_submission import submit_control_command
+
+    def lower_position_target():
+        session._position_target_in_flight = target.target.identity_hash
+        session._position_target_source_boundary_in_flight = target.source_boundary
+        try:
+            acknowledgement = session.apply_control(target.target)
+        finally:
+            session._position_target_in_flight = None
+            session._position_target_source_boundary_in_flight = None
+        if acknowledgement.target_hash != target.target.identity_hash:
+            raise ValueError('Provider acknowledgement does not match the applied canonical target')
+        return acknowledgement
+
+    resource_ids = tuple(f'{entity}/{actuator}'
+                         for entity, actuator, _ in plan.resource_writers)
+    acknowledgement = submit_control_command(
+        session, target, command_kind='position-target', command_sha256=target.identity_hash,
+        source_id=controller_profile.source.source_id,
+        source_closure_sha256=target.source_closure_digest,
+        artifact_sha256=target.target.task_artifact_hash,
+        boundary=boundary, sample_clock=target.sample_clock,
+        controller_generation=int(getattr(controller_profile, 'generation', 0)),
+        controller_identities=(target.controller_identity,), writer_ids=(target.writer_id,),
+        resource_ids=resource_ids, units=('arm-position:rad', 'gripper-position:m'),
+        lowering=f'{type(session).__module__}.{type(session).__qualname__}.apply_control(position)',
+        lower=lower_position_target)
     return acknowledgement
 
 

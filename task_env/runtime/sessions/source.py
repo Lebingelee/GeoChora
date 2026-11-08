@@ -397,6 +397,8 @@ class RuntimeSource:
     composition_runtime_input: object | None = None
     position_subject_binding: object | None = None
     source_reference_plan: object | None = None
+    source_composition_request: object | None = None
+    source_composition_intent: object | None = None
 
     @property
     def source_id(self) -> str:
@@ -404,6 +406,41 @@ class RuntimeSource:
         return self.scene_source.source_id
 
     def __post_init__(self):
+        if self.source_composition_request is not None:
+            from ...assembly.source_composition import (
+                SourceCompositionIntentV1, SourceCompositionRequestV2,
+            )
+            request = self.source_composition_request
+            if (type(request) is not SourceCompositionRequestV2
+                    or request.task_source.source_id != self.scene_source.source_id
+                    or request.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('V2 composition request differs from RuntimeSource provenance')
+            intent = self.source_composition_intent
+            if (type(intent) is not SourceCompositionIntentV1
+                    or intent.identity_hash != request.intent_identity_sha256
+                    or intent.task_source_id != request.task_source.source_id
+                    or intent.task_source_closure_sha256 != request.task_source.closure_sha256
+                    or intent.task_entity_ids != request.task_entity_ids
+                    or intent.existing_robot_entity_ids != request.existing_robot_entity_ids
+                    or intent.robot_uid != request.robot_uid or intent.mode != request.mode):
+                raise ValueError('V2 composition request lacks its matching pre-parse intent')
+            intent_entities = {entity for item in intent.robot_sources for entity in item.entity_ids}
+            request_entities = {entity for item in request.robot_sources for entity in item.entity_ids}
+            if intent_entities != request_entities:
+                raise ValueError('resolved Robot source ownership differs from composition intent')
+            intent_edges = set(intent.component_edges)
+            request_edges = {(item.parent_entity_id, item.parent_frame_id,
+                              item.child_entity_id, item.child_frame_id, item.rule_id)
+                             for item in request.attachments}
+            if intent_edges != request_edges:
+                raise ValueError('resolved attachment edges differ from composition intent')
+            if set(intent.resource_writers) != set(request.resource_writers):
+                raise ValueError('resolved resource writers differ from composition intent')
+            if request.mode == 'reference':
+                if self.source_reference_plan is None or self.source_reference_plan.robot_uid != request.robot_uid:
+                    raise ValueError('V2 reference request lacks its compatible V1 reference projection')
+            elif self.composition_runtime_input is None or self.composition_runtime_input.plan.robot_uid != request.robot_uid:
+                raise ValueError('V2 add/replace request lacks its provider materialization input')
         if self.source_reference_plan is not None:
             from ...assembly.source_composition import SourceCompositionPlanV1
             reference = self.source_reference_plan

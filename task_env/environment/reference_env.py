@@ -2459,7 +2459,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         state_step = getattr(getattr(self, 'state', None), 'control_step', None)
         session = getattr(self, 'session', None)
         boundary_reader = getattr(session, 'state_boundary_identity', None)
-        boundary = boundary_reader() if callable(boundary_reader) else None
+        source = getattr(session, '_source', None)
+        closure = getattr(source, 'source_closure_digest', None)
+        artifact = getattr(session, '_artifact', None)
+        from ..artifacts import TaskArtifactV1
+        has_bound_identity = (isinstance(artifact, TaskArtifactV1)
+                              or (isinstance(closure, str) and len(closure) == 64))
+        boundary = boundary_reader() if callable(boundary_reader) and has_bound_identity else None
         boundary_step = getattr(boundary, 'control_step', None)
         if boundary_step is not None:
             boundary_step = int(boundary_step)
@@ -2899,7 +2905,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise RuntimeError('caller actions require reset without an Env-owned Solution')
             if self._stopped or self.session is None:
                 raise RuntimeError('reset required or episode already stopped')
-            if getattr(self, 'position_profile', False):
+            from ..runtime.sessions.control_lifecycle import has_position_control_capability
+            if has_position_control_capability(self):
                 if self.binding.position_execution_info is None or len(self.position_profiles) != 1:
                     raise StageUnavailableError('caller-driven Solution actions are unavailable on this Position profile')
                 validate_caller_solution_action(
@@ -2926,55 +2933,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
-        if self.binding.physical_control_profile is not None:
-            selection = getattr(self, '_physical_reset_selection', None)
-            if selection is not None:
-                action = selection.validate_action(action)
-                try:
-                    return self._prepare_physical_control(action)
-                except BaseException as error:
-                    self._latch_fault('physical_control_preparation', error, before_state=self.state)
-                    raise
-            return self._prepare_physical_control(action)
-        if getattr(self, 'mixed_control_profile', False):
-            return self._prepare_mixed_control(action)
-        from ..controllers.canonical.contracts import StructuredActionRequestV1
-        if getattr(self, 'position_profile', False):
-            if self._stopped or self.session is None:
-                raise RuntimeError('reset required or episode already stopped')
-            if self.state.control_step >= self.horizon:
-                self._stopped = True
-                raise RuntimeError('selected PositionServoV1 horizon is exhausted')
-            if getattr(self, 'leaf_position_profile', False):
-                if self.fixed_attachment_leaf_position_profile:
-                    from ..controllers.canonical.leaf_actions import AttachedLeafActionSetV1
-                    action_set_type = AttachedLeafActionSetV1
-                else:
-                    from ..controllers.canonical.leaf_actions import LeafPositionActionSetV1
-                    action_set_type = LeafPositionActionSetV1
-                if type(action) is not action_set_type:
-                    raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
-                action.structured_request(self.position_scene, self.leaf_plan)
-                return self._prepare_leaf_position(action)
-            if (not isinstance(action, StructuredActionRequestV1)
-                    and self.value.get('f06_pickcube_isaac_input') is not None
-                    and len(self.position_profiles) == 1):
-                from ..runtime.sessions.control import single_position_action_request
-                action = single_position_action_request(
-                    action, scene=self.position_scene, plan=self.position_plan,
-                    profile=self.position_profiles[0],
-                )
-            if not isinstance(action, StructuredActionRequestV1):
-                raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
-            from ..runtime.sessions.control import prepare_structured_action
-            # Reject bad action and plan identities before changing episode mode,
-            # Controller memory, Recorder state, or the Provider.
-            prepare_structured_action(self.position_plan, action)
-            return self._prepare_position_profile(action)
-        if isinstance(action, StructuredActionRequestV1):
-            raise TypeError('structured ControllerGroup actions require PositionServoV1')
-        self._episode_mode = 'external'
-        return self._prepare_reference_step(action)
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        return prepare_selected_control_action(self, action)
 
     def _prepare_physical_control(self, action, *, proposal=None, observer_solution=None):
         """Prepare one named physical interval through the selected session."""
@@ -3073,10 +3033,33 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def apply_control():
             nonlocal attempted, ack
-            # Mark before the one session write; a partial failure cannot be replayed.
+            # The shared commit owner marks this boundary before calling the
+            # provider so a partial failure cannot be replayed.
             self._last_physical_submission = context.identity_hash
             attempted = True
-            ack = write(resolved)
+            from ..runtime.sessions.control_submission import submit_control_command
+            contributions = (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)
+            writers = tuple(sorted({item.contribution.owner_id for item in contributions}))
+            resources = tuple(sorted({
+                *(f'{item.entity_id}/{item.joint_id}' for item in resolved.joints),
+                *(f'{item.entity_id}/{item.body_id}' for item in resolved.body_wrenches),
+                *(str(getattr(item, 'target_key', type(item).__name__)) for item in resolved.extensions),
+            }))
+            units = tuple(sorted({
+                *(item.unit for item in resolved.joints),
+                *(('N', 'N*m') if resolved.body_wrenches else ()),
+                *(str(getattr(item, 'unit', 'provider-extension')) for item in resolved.extensions),
+            }))
+            ack = submit_control_command(
+                self.session, resolved, command_kind='physical-effort-batch',
+                command_sha256=batch.identity_hash, source_id=plan.source_id,
+                source_closure_sha256=plan.source_closure_sha256,
+                artifact_sha256=plan.artifact_sha256, boundary=view.boundary,
+                sample_clock=view.sample_clock, controller_generation=profile.generation,
+                controller_identities=tuple(controller.identity for controller in profile.controllers),
+                writer_ids=writers, resource_ids=resources, units=units,
+                lowering=f'{type(self.session).__module__}.{type(self.session).__qualname__}.apply_physical_command_batch',
+                lower=lambda: write(resolved))
             if (type(ack) is not PhysicalControlReceiptV1 or ack.stage != 'native_write_ack'
                     or ack.context != context or ack.batch_sha256 != batch.identity_hash
                     or ack.contribution_ids != resolved.accepted_receipt.contribution_ids):
@@ -4109,7 +4092,40 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 else:
                     # Preserve the existing grouped control-interval stepping.
                     failure_phase = 'control_application'
-                    applied = self.session.apply_control(target)
+                    lifecycle = getattr(self.session, '_control_lifecycle_dispatch', None)
+                    if (lifecycle is not None
+                            and getattr(lifecycle, 'command_kind', None) == 'position-target'):
+                        source = self.value['source']
+                        composition = source.source_composition_request
+                        rows = tuple(composition.resource_writers)
+                        writers = tuple(sorted({writer for _entity, _actuator, writer in rows}))
+                        resources = tuple(sorted({f'{entity}/{actuator}'
+                                                  for entity, actuator, _writer in rows}))
+                        from ..artifacts.state import StateSampleClock
+                        boundary = self.session.state_boundary_identity()
+                        native_state = self.session.snapshot()
+                        sample_clock = StateSampleClock(
+                            'state-sample-clock-v1', 'evaluation_boundary',
+                            int(native_state.control_step), float(native_state.simulation_time),
+                        )
+                        from ..runtime.sessions.control_submission import submit_control_command
+                        applied = submit_control_command(
+                            self.session, target, command_kind='position-target',
+                            command_sha256=target.identity_hash,
+                            source_id=source.source_id,
+                            source_closure_sha256=source.source_closure_digest,
+                            artifact_sha256=self.artifact.identity_hash,
+                            boundary=boundary, sample_clock=sample_clock,
+                            controller_generation=lifecycle.controller_generation,
+                            controller_identities=(target.controller_identity,),
+                            writer_ids=writers, resource_ids=resources,
+                            units=('arm-position:rad', 'gripper-position:m'),
+                            lowering=(f'{type(self.session).__module__}.'
+                                      f'{type(self.session).__qualname__}.apply_control(position)'),
+                            lower=lambda: self.session.apply_control(target),
+                        )
+                    else:
+                        applied = self.session.apply_control(target)
             return applied
 
         def advance(_applied):

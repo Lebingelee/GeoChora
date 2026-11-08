@@ -426,3 +426,184 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
         attach_frame_from_child_worldbody=PoseWorld(attach_frame[0],quat(' '.join(map(str,attach_frame[1])))))
     derived.validate()
     return replace(declaration, attachment_plan=derived)
+
+
+def declare_panda_scene(agent, *, entity_id=None, scene_id=None):
+    """Resolve the Panda recipe through the MuJoCo source-import adapter."""
+    from .source_scene_import import import_agent_source_scene
+    from ...robots.panda import _panda_scene_from_import
+    return import_agent_source_scene(
+        agent.asset_manifest(), owner_uid=agent.uid,
+        entity_id=agent.uid if entity_id is None else entity_id,
+        scene_id=agent.uid if scene_id is None else scene_id,
+        scene_factory=_panda_scene_from_import,
+    )
+
+
+def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,
+                                  existing_robot_entity, task_body_names, task_site_transfers):
+    """Provider-owned PickCube adapter for neutral Robot source recipes.
+
+    Robot classes expose only a ``RobotSourceRecipeV1``. This adapter owns
+    RuntimeSource checks, source parsing, native mappings, and MuJoCo-specific
+    materialization input construction. The V2 request is frozen before the
+    MuJoCo model is built and remains alongside the legacy V1 receipt identity.
+    """
+    from dataclasses import replace
+    from ...assembly.source_composition import (
+        CompositionAttachmentV2, CompositionRuntimeInputV1, CompositionSourceV1,
+        CompositionSourceV2, PositionSubjectControlBindingV1,
+        SourceCompositionIntentV1, SourceCompositionPlanV1, SourceCompositionRequestV2,
+    )
+    from ...robots.source_recipe import RobotSourceRecipeV1
+    from .source import RuntimeSource
+
+    recipe_method = getattr(robot, 'source_recipe', None)
+    recipe = recipe_method() if callable(recipe_method) else None
+    if type(recipe) is not RobotSourceRecipeV1:
+        raise TypeError('Robot composition requires a provider-neutral source recipe')
+    if type(composition_intent) is not SourceCompositionIntentV1:
+        raise TypeError('MuJoCo adapter requires a frozen provider-neutral composition intent')
+    if type(source) is not RuntimeSource or source.execution_source_receipt is None:
+        raise TypeError('MuJoCo composition requires a verified RuntimeSource receipt')
+    if (type(task_entities) is not tuple or type(task_body_names) is not tuple
+            or type(task_site_transfers) is not tuple):
+        raise TypeError('Task entity, root, and frame declarations must be immutable tuples')
+    if set(dict(task_body_names)) != set(task_entities):
+        raise ValueError('Task entity roots must cover the declared Task entities')
+    expected_mode = {'reference-task-source': 'reference',
+                     'replace-task-subtree': 'replace', 'add-source': 'add'}[recipe.mode]
+    if (composition_intent.task_source_id != source.source_id
+            or composition_intent.task_source_closure_sha256 != source.source_closure_digest
+            or composition_intent.task_entity_ids != task_entities
+            or composition_intent.existing_robot_entity_ids != (existing_robot_entity,)
+            or composition_intent.robot_uid != robot.uid
+            or composition_intent.robot_recipe_sha256 != recipe.identity_hash
+            or composition_intent.mode != expected_mode
+            or composition_intent.task_site_transfers != task_site_transfers):
+        raise ValueError('provider-neutral composition intent differs from selected Task/Robot declarations')
+    source.execution_source_receipt.validate_snapshot()
+
+    if recipe.mode == 'reference-task-source':
+        if (existing_robot_entity != robot.uid or not recipe.sources
+                or any(item.entity_ids != (existing_robot_entity,) for item in recipe.sources)):
+            raise ValueError('Panda reference recipe does not identify the existing Task Robot')
+        from ...artifacts import FrameReference
+        from ...assembly.source_composition import PositionSubjectControlBindingV1
+        from ...robots.panda_position_binding import compile_panda_position_subjects
+        scene = declare_panda_scene(robot, entity_id=existing_robot_entity,
+                                    scene_id='integrated-panda-position')
+        joints = tuple(recipe.controlled_joints)
+        plan, subject_identity = compile_panda_position_subjects(
+            source_scene=scene, components=((existing_robot_entity, 'link0', joints, None),),
+            site_entity=existing_robot_entity, site_name='nutassembly_ee_site',
+            groups=((existing_robot_entity, 'arm'), (existing_robot_entity, 'gripper')),
+            source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
+            task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
+        if source.open_actuators != ('actuator8',):
+            raise ValueError('integrated Panda source lacks its declared gripper actuator')
+        position = PositionSubjectControlBindingV1(plan, subject_identity,
+            tuple((entity, actuator, actuator) for entity, actuator, _ in plan.resource_writers),
+            tuple((f'{existing_robot_entity}/{name}', existing_robot_entity, name, name,
+                   f'actuator{i + 1}' if i < 7 else 'actuator8')
+                  for i, name in enumerate(joints)))
+        legacy_task = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                          (*task_entities, existing_robot_entity))
+        legacy_robot = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                           (existing_robot_entity,))
+        legacy = SourceCompositionPlanV1(legacy_task, task_entities, (existing_robot_entity,),
+            robot.uid, (legacy_robot,), 'reference', plan.assembly_identity_hash, None, (),
+            plan.identity_hash, subject_identity, position_binding_identity_sha256=position.identity_hash)
+        request = SourceCompositionRequestV2('source-composition-request-v2',
+            CompositionSourceV2(source.source_id, source.source_closure_digest,
+                                 (*task_entities, existing_robot_entity)),
+            task_entities, (existing_robot_entity,), robot.uid,
+            (CompositionSourceV2(source.source_id, source.source_closure_digest,
+                                 (existing_robot_entity,)),), 'reference',
+            plan.assembly_identity_hash,
+            resource_writers=tuple(plan.resource_writers),
+            intent_identity_sha256=composition_intent.identity_hash)
+        if set(recipe.resource_writers) != set(request.resource_writers):
+            raise ValueError('resolved Panda resource writers differ from its pre-parse recipe')
+        return replace(source, position_subject_binding=position,
+                       source_reference_plan=legacy, source_composition_request=request,
+                       source_composition_intent=composition_intent)
+
+    if recipe.mode != 'replace-task-subtree':
+        raise ValueError('MuJoCo PickCube adapter does not admit this Robot recipe mode')
+    if len(task_site_transfers) != 1:
+        raise ValueError('assembled Panda requires one declared Task end-effector site')
+    task_hand, _site, source_hand = task_site_transfers[0]
+    from ...assembly.panda_fixed_source import declare_panda_fixed_source
+    declaration = declare_panda_fixed_source()
+    declaration = derive_task_compatible_attachment(
+        declaration=declaration, task_receipt=source.execution_source_receipt,
+        task_hand_name=task_hand, source_hand_name=source_hand)
+    fixed = declaration.attachment_plan
+    arm, hand = fixed.parent_entity_id, fixed.child_entity_id
+    control_plan, subject_identity = robot.compile_position_binding(
+        declaration, artifact=artifact, controller=controller,
+        task_closure_sha256=source.source_closure_digest)
+    position = PositionSubjectControlBindingV1(control_plan, subject_identity, tuple(
+        (entity, actuator, fixed.native_actuator_names[f'{entity}/{actuator}'])
+        for entity, actuator, _ in control_plan.resource_writers), tuple(
+        (f'{existing_robot_entity}/{name}', entity, name,
+         fixed.native_joint_names[f'{entity}/{name}'], actuator)
+        for entity, names, actuator_names in (
+            (arm, tuple(f'joint{i}' for i in range(1, 8)), tuple(f'actuator{i}' for i in range(1, 8))),
+            (hand, ('finger_joint1', 'finger_joint2'), ('actuator8', 'actuator8')))
+        for name, actuator in zip(names, actuator_names, strict=True)))
+    robot_sources = tuple(CompositionSourceV1(
+        declaration.source_by_entity[entity].source_id, fixed.source_closure_sha256, (entity,))
+        for entity in (arm, hand))
+    legacy = SourceCompositionPlanV1(
+        CompositionSourceV1(source.source_id, source.source_closure_digest,
+                            (*task_entities, existing_robot_entity)),
+        task_entities, (existing_robot_entity,), robot.uid, robot_sources, 'replace',
+        declaration.assembly.logical_content_sha256, fixed.identity_hash, task_site_transfers,
+        control_plan.identity_hash, subject_identity,
+        task_entity_source_roots=task_body_names,
+        replaced_robot_source_roots=(fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}'],),
+        task_free_joints=tuple(source.free_joints.items()),
+        position_binding_identity_sha256=position.identity_hash)
+    robot_bodies = ((arm, fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}']),
+                    (hand, fixed.native_body_names[f'{hand}/{fixed.child_root.frame_id}']))
+    composition = CompositionRuntimeInputV1(
+        legacy, declaration, tuple(name for _, name in task_body_names),
+        (fixed.native_body_names[f'{arm}/{fixed.parent_root.frame_id}'],),
+        (*task_body_names, *robot_bodies), tuple(source.free_joints.values()),
+        control_plan, subject_identity)
+    v2_robot_sources = tuple(CompositionSourceV2(item.source_id, item.closure_sha256, item.entity_ids)
+                             for item in robot_sources)
+    source_by_entity = declaration.source_by_entity
+    edge = CompositionAttachmentV2(arm, fixed.parent_mount_site_name, hand,
+        fixed.child_root.frame_id, 'fixed-transform-from-task-authored-tcp-v1',
+        source_by_entity[arm].source_id, fixed.source_closure_sha256,
+        source_by_entity[hand].source_id, fixed.source_closure_sha256)
+    request = SourceCompositionRequestV2('source-composition-request-v2',
+        CompositionSourceV2(source.source_id, source.source_closure_digest,
+                             (*task_entities, existing_robot_entity)),
+        task_entities, (existing_robot_entity,), robot.uid, v2_robot_sources, 'replace',
+        declaration.assembly.logical_content_sha256, (edge,), tuple(control_plan.resource_writers),
+        composition_intent.identity_hash)
+    if set(recipe.resource_writers) != set(request.resource_writers):
+        raise ValueError('resolved Panda resource writers differ from its pre-parse recipe')
+
+    joints = dict(source.joints)
+    for index in (1, 2):
+        key, expected = f'{existing_robot_entity}/finger_joint{index}', f'finger_joint{index}'
+        if joints.get(key) != expected:
+            raise ValueError('Task finger binding differs from the declared Panda source')
+        joints[key] = fixed.native_joint_names[f'{hand}/{expected}']
+    frames = dict(source.frames)
+    for source_body, site, _target_body in task_site_transfers:
+        matching = [key for key, native in frames.items() if native == site]
+        if len(matching) != 1 or not matching[0].startswith(existing_robot_entity + '/'):
+            raise ValueError('Task site binding does not uniquely belong to its Robot')
+        frames[matching[0]] = fixed.namespace_prefix + site
+    if source.open_actuators != ('actuator8',):
+        raise ValueError('Task gripper binding differs from the declared Panda source')
+    return replace(source, joints=joints, frames=frames,
+        open_actuators=(fixed.native_actuator_names[f'{hand}/actuator8'],),
+        composition_runtime_input=composition, position_subject_binding=position,
+        source_composition_request=request, source_composition_intent=composition_intent)

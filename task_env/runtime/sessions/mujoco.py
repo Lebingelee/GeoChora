@@ -368,11 +368,15 @@ class _MuJoCoSession(_SessionValues):
                 'provider': 'mujoco', 'source_id': source.scene_source.source_id,
                 'source_closure': source.source_closure_digest, 'objects': checked,
                 'materialization_id': self.provider_materialization_id,
+                'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
                 'physical_model': _mujoco_model_facts(self._model, self._mj)}
             if source.source_reference_plan is not None:
                 self._build_layout_facts['source_reference'] = {
                     'schema_version': 'source-composition-materialization-receipt-v1',
                     'plan_sha256': source.source_reference_plan.identity_hash,
+                    'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                    'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
                     'materialization_id': self.provider_materialization_id,
                     'task_source_id': source.source_reference_plan.task_source.source_id,
                     'task_closure_sha256': source.source_reference_plan.task_source.closure_sha256,
@@ -386,6 +390,8 @@ class _MuJoCoSession(_SessionValues):
                 self._build_layout_facts['source_composition'] = {
                     'schema_version': 'source-composition-materialization-receipt-v1',
                     'plan_sha256': self._composition_receipt.plan_sha256,
+                    'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                    'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
                     'source_closures': list(self._composition_receipt.source_closures),
                     'entity_native_names': list(self._composition_receipt.entity_native_names),
                     'materialization_id': self._composition_receipt.materialization_id,

@@ -279,6 +279,10 @@ class _SessionValues:
         self._reset_plan_evidence = None
         if hasattr(self, '_position_applied_boundary_ids'):
             self._position_applied_boundary_ids.clear()
+        if hasattr(self, '_control_submission_consumed'):
+            self._control_submission_consumed.clear()
+        if hasattr(self, '_control_lifecycle_dispatch'):
+            self._control_lifecycle_dispatch = None
         if hasattr(self, '_subject_position_consumed'):
             self._subject_position_consumed.clear()
         self._subject_position_inflight = None

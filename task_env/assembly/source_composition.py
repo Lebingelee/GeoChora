@@ -32,6 +32,15 @@ def _unique(values: tuple[str, ...], label: str) -> None:
         raise ValueError(f"{label} must not contain duplicates")
 
 
+def _unique_allow_empty(values: tuple[str, ...], label: str) -> None:
+    if type(values) is not tuple:
+        raise TypeError(f"{label} must be an immutable tuple")
+    for value in values:
+        _token(value, label)
+    if len(set(values)) != len(values):
+        raise ValueError(f"{label} must not contain duplicates")
+
+
 @dataclass(frozen=True)
 class CompositionSourceV1:
     """Immutable source identity and the canonical entities it contributes."""
@@ -44,6 +53,20 @@ class CompositionSourceV1:
         _token(self.source_id, 'source_id')
         _digest(self.closure_sha256, 'source closure')
         _unique(self.entity_ids, 'source entities')
+
+
+@dataclass(frozen=True)
+class CompositionSourceV2:
+    """Versioned source identity whose Task may legitimately own no entities."""
+
+    source_id: str
+    closure_sha256: str
+    entity_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _token(self.source_id, 'source_id')
+        _digest(self.closure_sha256, 'source closure')
+        _unique_allow_empty(self.entity_ids, 'source entities')
 
 
 @dataclass(frozen=True)
@@ -147,6 +170,311 @@ class SourceCompositionPlanV1:
     @property
     def identity_hash(self) -> str:
         data = {'schema_version': 'source-composition-plan-v1', **asdict(self)}
+        payload = json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+
+@dataclass(frozen=True)
+class CompositionAttachmentV2:
+    """Provider-neutral attachment intent, pinned to both source closures."""
+
+    parent_entity_id: str
+    parent_frame_id: str
+    child_entity_id: str
+    child_frame_id: str
+    rule_id: str
+    parent_source_id: str
+    parent_closure_sha256: str
+    child_source_id: str
+    child_closure_sha256: str
+
+    def __post_init__(self) -> None:
+        for label in ('parent_entity_id', 'parent_frame_id', 'child_entity_id',
+                      'child_frame_id', 'rule_id', 'parent_source_id', 'child_source_id'):
+            _token(getattr(self, label), label)
+        if self.parent_entity_id == self.child_entity_id:
+            raise ValueError('attachment endpoints must be distinct entities')
+        _digest(self.parent_closure_sha256, 'parent source closure')
+        _digest(self.child_closure_sha256, 'child source closure')
+
+
+@dataclass(frozen=True)
+class CompositionSourceReferenceV1:
+    """Pinned Robot source declaration available before provider parsing."""
+
+    source_id: str
+    source_reference: str
+    source_revision: str
+    entity_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for label in ('source_id', 'source_reference', 'source_revision'):
+            _token(getattr(self, label), label)
+        _unique(self.entity_ids, 'Robot source entities')
+
+
+@dataclass(frozen=True)
+class SourceCompositionIntentV1:
+    """Identity-bearing, provider-neutral composition request made pre-parse."""
+
+    schema_version: str
+    task_source_id: str
+    task_source_closure_sha256: str
+    task_entity_ids: tuple[str, ...]
+    existing_robot_entity_ids: tuple[str, ...]
+    robot_uid: str
+    robot_recipe_sha256: str
+    robot_sources: tuple[CompositionSourceReferenceV1, ...]
+    mode: str
+    component_edges: tuple[tuple[str, str, str, str, str], ...]
+    task_site_transfers: tuple[tuple[str, str, str], ...]
+    controlled_joints: tuple[str, ...]
+    control_profiles: tuple[str, ...]
+    resource_writers: tuple[tuple[str, str, str], ...]
+
+    def __post_init__(self) -> None:
+        if self.schema_version != 'source-composition-intent-v1':
+            raise ValueError('unsupported composition intent version')
+        _token(self.task_source_id, 'Task source id')
+        _digest(self.task_source_closure_sha256, 'Task source closure')
+        _unique_allow_empty(self.task_entity_ids, 'Task entities')
+        _unique_allow_empty(self.existing_robot_entity_ids, 'existing Robot entities')
+        _token(self.robot_uid, 'Robot uid')
+        _digest(self.robot_recipe_sha256, 'Robot recipe identity')
+        if type(self.robot_sources) is not tuple or not self.robot_sources or any(
+                type(item) is not CompositionSourceReferenceV1 for item in self.robot_sources):
+            raise TypeError('Robot source intent must contain typed pinned references')
+        if self.mode not in {'reference', 'replace', 'add'}:
+            raise ValueError('composition intent mode must be reference, replace, or add')
+        task, existing = set(self.task_entity_ids), set(self.existing_robot_entity_ids)
+        robot_entities = [entity for source in self.robot_sources for entity in source.entity_ids]
+        if task & existing or task.intersection(robot_entities) or len(set(robot_entities)) != len(robot_entities):
+            raise ValueError('composition intent owners must be unique and disjoint')
+        source_ids = [source.source_id for source in self.robot_sources]
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError('Robot source intent identities must be unique')
+        if self.mode == 'reference':
+            if not existing or set(robot_entities) != existing:
+                raise ValueError('reference intent must retain the existing Robot entities')
+        elif self.mode == 'replace':
+            if not existing or self.task_source_id in source_ids:
+                raise ValueError('replacement intent requires an existing Robot and distinct source')
+        elif existing or self.task_source_id in source_ids:
+            raise ValueError('add intent requires an empty Robot owner and distinct source')
+        if type(self.component_edges) is not tuple:
+            raise TypeError('component edges must be an immutable tuple')
+        edges = []
+        for edge in self.component_edges:
+            if type(edge) is not tuple or len(edge) != 5:
+                raise ValueError('component edges require parent/frame/child/frame/rule')
+            parent, parent_frame, child, child_frame, rule = edge
+            for value in edge:
+                _token(value, 'component edge')
+            if parent == child or parent not in robot_entities or child not in robot_entities:
+                raise ValueError('component edge must connect declared Robot entities')
+            edges.append((parent, child))
+        if len(set(edges)) != len(edges) or len({child for _, child in edges}) != len(edges):
+            raise ValueError('component edges must have unique parent/child ownership')
+        parents = {child: parent for parent, child in edges}
+        for child in parents:
+            seen, current = set(), child
+            while current in parents:
+                if current in seen:
+                    raise ValueError('component edges must be acyclic')
+                seen.add(current)
+                current = parents[current]
+        if type(self.task_site_transfers) is not tuple:
+            raise TypeError('Task site transfers must be an immutable tuple')
+        for transfer in self.task_site_transfers:
+            if type(transfer) is not tuple or len(transfer) != 3:
+                raise ValueError('Task site transfer requires source body, site, and target body')
+            for value in transfer:
+                _token(value, 'Task site transfer')
+        if len(set(self.task_site_transfers)) != len(self.task_site_transfers):
+            raise ValueError('Task site transfers must be unique')
+        _unique(self.controlled_joints, 'Robot controlled joints')
+        _unique(self.control_profiles, 'Robot control profiles')
+        if type(self.resource_writers) is not tuple:
+            raise TypeError('Robot resource writers must be an immutable tuple')
+        resource_keys = []
+        allowed = task | existing | set(robot_entities)
+        for row in self.resource_writers:
+            if type(row) is not tuple or len(row) != 3:
+                raise ValueError('resource writer rows require entity, resource, and writer')
+            entity, resource, writer = row
+            for value in row:
+                _token(value, 'resource writer identity')
+            if entity not in allowed:
+                raise ValueError('resource writer owner is outside the composition intent')
+            resource_keys.append((entity, resource))
+        if len(set(resource_keys)) != len(resource_keys):
+            raise ValueError('composition intent may assign only one writer to a resource')
+
+    @property
+    def identity_hash(self) -> str:
+        data = asdict(self)
+        payload = json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+
+def build_source_composition_intent_v1(*, task_source, task_entity_ids,
+                                      existing_robot_entity_ids, robot_recipe,
+                                      task_site_transfers=()):
+    """Build the shared request from source identities and Robot declarations.
+
+    This function consumes no source bytes and does not import a physics provider.
+    """
+    from ..robots.source_recipe import RobotSourceRecipeV1
+
+    if type(robot_recipe) is not RobotSourceRecipeV1:
+        raise TypeError('composition intent requires a RobotSourceRecipeV1')
+    task_source_id = getattr(task_source, 'source_id', None)
+    task_closure = getattr(task_source, 'source_closure_digest', None)
+    mode = {
+        'reference-task-source': 'reference',
+        'replace-task-subtree': 'replace',
+        'add-source': 'add',
+    }.get(robot_recipe.mode)
+    if mode is None:
+        raise ValueError('Robot source recipe has an unsupported composition mode')
+    sources = tuple(CompositionSourceReferenceV1(
+        item.source_id, item.source_reference, item.source_revision, item.entity_ids)
+        for item in robot_recipe.sources)
+    return SourceCompositionIntentV1(
+        'source-composition-intent-v1', task_source_id, task_closure,
+        task_entity_ids, existing_robot_entity_ids, robot_recipe.robot_uid,
+        robot_recipe.identity_hash, sources, mode, robot_recipe.component_edges,
+        task_site_transfers, robot_recipe.controlled_joints,
+        robot_recipe.control_profiles, robot_recipe.resource_writers)
+
+
+@dataclass(frozen=True)
+class SourceCompositionRequestV2:
+    """Provider-neutral composition intent with explicit ownership and provenance.
+
+    V1 remains frozen for existing receipts. V2 permits a task with no separately
+    owned object entities and a Robot source that is added without a Robot already
+    embedded in the Task source. No provider data or native names are accepted.
+    """
+
+    schema_version: str
+    task_source: CompositionSourceV2
+    task_entity_ids: tuple[str, ...]
+    existing_robot_entity_ids: tuple[str, ...]
+    robot_uid: str
+    robot_sources: tuple[CompositionSourceV2, ...]
+    mode: str
+    assembly_identity_sha256: str
+    attachments: tuple[CompositionAttachmentV2, ...] = ()
+    resource_writers: tuple[tuple[str, str, str], ...] = ()
+    intent_identity_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != 'source-composition-request-v2':
+            raise ValueError('unsupported composition request version')
+        if type(self.task_source) is not CompositionSourceV2:
+            raise TypeError('task_source must be CompositionSourceV2')
+        _unique_allow_empty(self.task_entity_ids, 'task entities')
+        _unique_allow_empty(self.existing_robot_entity_ids, 'existing robot entities')
+        _token(self.robot_uid, 'robot uid')
+        _digest(self.assembly_identity_sha256, 'assembly identity')
+        if self.intent_identity_sha256 is not None:
+            _digest(self.intent_identity_sha256, 'composition intent identity')
+        if type(self.robot_sources) is not tuple or not self.robot_sources or any(
+                type(source) is not CompositionSourceV2 for source in self.robot_sources):
+            raise TypeError('robot_sources must contain typed source declarations')
+        if any(not source.entity_ids for source in self.robot_sources):
+            raise ValueError('Robot sources must own at least one entity')
+        if self.mode not in ('reference', 'replace', 'add'):
+            raise ValueError('composition mode must be reference, replace, or add')
+        task, existing = set(self.task_entity_ids), set(self.existing_robot_entity_ids)
+        if task & existing or task | existing != set(self.task_source.entity_ids):
+            raise ValueError('task source ownership must partition task and existing Robot entities')
+        source_ids = [source.source_id for source in self.robot_sources]
+        robot_entities = [entity for source in self.robot_sources for entity in source.entity_ids]
+        if len(set(robot_entities)) != len(robot_entities) or task.intersection(robot_entities):
+            raise ValueError('Robot and Task entity owners must be unique and disjoint')
+        if self.mode == 'reference':
+            if not existing or len(self.robot_sources) != 1:
+                raise ValueError('reference requires one Robot already owned by the Task source')
+            source = self.robot_sources[0]
+            if (source.source_id != self.task_source.source_id
+                    or source.closure_sha256 != self.task_source.closure_sha256
+                    or set(source.entity_ids) != existing):
+                raise ValueError('reference Robot provenance differs from the Task source')
+        elif self.mode == 'add':
+            if existing:
+                raise ValueError('add requires a Task source with no preexisting Robot')
+            if set(source_ids) & {self.task_source.source_id}:
+                raise ValueError('added Robot source must differ from the Task source')
+        else:
+            if not existing:
+                raise ValueError('replace requires an existing Robot owner')
+            if set(source_ids) & {self.task_source.source_id}:
+                raise ValueError('replacement Robot source must differ from the Task source')
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError('Robot source identities must be unique')
+        if type(self.attachments) is not tuple or any(
+                type(item) is not CompositionAttachmentV2 for item in self.attachments):
+            raise TypeError('attachments must contain typed composition attachments')
+        allowed = task | set(robot_entities)
+        if self.mode == 'reference':
+            allowed = task | existing
+        if any(item.parent_entity_id not in allowed or item.child_entity_id not in allowed
+               for item in self.attachments):
+            raise ValueError('attachment refers to an entity outside the composition')
+        source_by_id = {self.task_source.source_id: self.task_source}
+        source_by_id.update((source.source_id, source) for source in self.robot_sources)
+        entity_sources = {entity: self.task_source for entity in task | existing}
+        for source in self.robot_sources:
+            for entity in source.entity_ids:
+                entity_sources[entity] = source
+        for item in self.attachments:
+            for entity, source_id, closure in (
+                    (item.parent_entity_id, item.parent_source_id, item.parent_closure_sha256),
+                    (item.child_entity_id, item.child_source_id, item.child_closure_sha256)):
+                source = source_by_id.get(source_id)
+                owner = entity_sources.get(entity)
+                if (source is None or source.closure_sha256 != closure or owner is None
+                        or (owner.source_id, owner.closure_sha256) != (source_id, closure)):
+                    raise ValueError('attachment provenance differs from a declared source closure')
+        attachment_pairs = [(item.parent_entity_id, item.child_entity_id) for item in self.attachments]
+        if len(set(attachment_pairs)) != len(attachment_pairs):
+            raise ValueError('attachment parent/child pairs must be unique')
+        parents = {child: parent for parent, child in attachment_pairs}
+        for child in parents:
+            seen, current = set(), child
+            while current in parents:
+                if current in seen:
+                    raise ValueError('attachment relationships must be acyclic')
+                seen.add(current)
+                current = parents[current]
+        if type(self.resource_writers) is not tuple:
+            raise TypeError('resource writers must be an immutable tuple')
+        resource_keys, rows = [], []
+        for row in self.resource_writers:
+            if type(row) is not tuple or len(row) != 3:
+                raise ValueError('resource writer rows require entity, resource, and writer identities')
+            entity, resource, writer = row
+            for value in row:
+                _token(value, 'resource writer identity')
+            if entity not in allowed:
+                raise ValueError('resource writer owner is outside the composition')
+            resource_keys.append((entity, resource))
+            rows.append(row)
+        if len(set(resource_keys)) != len(resource_keys):
+            raise ValueError('a composed resource may have only one writer')
+        if len(set(rows)) != len(rows):
+            raise ValueError('resource writer declarations must be unique')
+
+    @property
+    def entity_ids(self) -> tuple[str, ...]:
+        return self.task_entity_ids + tuple(
+            entity for source in self.robot_sources for entity in source.entity_ids)
+
+    @property
+    def identity_hash(self) -> str:
+        data = asdict(self)
         payload = json.dumps(data, sort_keys=True, separators=(',', ':'), allow_nan=False)
         return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
