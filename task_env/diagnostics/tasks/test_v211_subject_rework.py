@@ -1,9 +1,7 @@
 """Provider-free detectors for the phase-1 independent review findings."""
 from dataclasses import replace
 from types import SimpleNamespace
-import json
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -156,21 +154,20 @@ def test_declared_two_subjects_drive_two_controller_batch():
     assert [(item.entity_id, item.value) for item in batch.joint_efforts] == [('arm',1.), ('hand',2.)]
 
 
-def test_saved_pickcube_state_uses_site_for_observation_and_evaluation():
+def test_synthetic_pickcube_state_uses_site_for_observation_and_evaluation():
+    """A synthetic nonzero site/hand offset catches projection mixups offline."""
     from task_env.tasks.pick_cube.physical_candidate import _direct_physical_observation
-    source = Path('workspace/maintenance/v211_g05_5c_human_diagnostic_attempt001/phase1/runs/mujoco-slice-015/result.json')
-    raw = json.loads(source.read_text())['before']
-    def pose(value): return PoseWorld(tuple(value['position']), tuple(value['quaternion_wxyz']))
-    frames = [SimpleNamespace(frame=SimpleNamespace(**v['frame']), pose_world=pose(v['pose_world']))
-              for v in raw['frames']]
-    joints = [SimpleNamespace(entity_id=v['entity_id'], joint_id=v['joint_id'],
-              position=v['position'], velocity=v['velocity']) for v in raw['joints']]
-    lookup = {(f.frame.entity_id, f.frame.frame_id): f.pose_world for f in frames}
-    site, hand, cube = lookup['panda-v1','nutassembly_ee_site'], lookup['panda-v1','hand'], lookup['cube-v1','PickCube']
+    site = PoseWorld((0.5, -0.1, 0.4), (1., 0., 0., 0.))
+    hand = PoseWorld((0.5, -0.1, 0.4584), (1., 0., 0., 0.))
+    cube = PoseWorld((0.6, -0.05, 0.5), (1., 0., 0., 0.))
+    frames = [SimpleNamespace(frame=FrameReference('panda-v1', 'hand'), pose_world=hand)]
+    names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+    joints = [SimpleNamespace(entity_id='panda-v1', joint_id=name,
+                              position=(0.,), velocity=(0.,)) for name in names]
     boundary = SimpleNamespace(boundary_id='state-boundary-'+'0'*64, to_mapping=lambda: {})
     view = SimpleNamespace(joints=joints, frames=frames, boundary=boundary,
                            sample_clock=SimpleNamespace(to_mapping=lambda: {}))
-    state = SimpleNamespace(convention=raw['convention'], control_step=0, simulation_time=0.,
+    state = SimpleNamespace(convention='SI_right_handed_z_up_wxyz', control_step=0, simulation_time=0.,
         joint_position={}, joint_velocity={}, pose_world={'panda-v1/ee':site,'cube-v1':cube})
     seen = {}
     def evaluate(value, semantics):
