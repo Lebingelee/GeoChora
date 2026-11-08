@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-07",
-  "status": "G05_5B_ACCEPTED_BOUNDED_5C_PLANNED",
+  "status": "G05_5B_ACCEPTED_BOUNDED_5C_REWORK_REQUIRED_AFTER_ATTEMPT002",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "V211_G05_5c_attempt002 approved by maintainer with added two-layer SelectedReferenceEnv rendering and controlled-subject/object lifecycle convergence analysis; re-freeze revised package, manual forwarding only. Attempt count remains 1.",
+  "next_action": "5c attempt002 independently reviewed and not accepted: selected non-Position publication and component camera optical binding defects. Before any third ordinary attempt Sol must reassess. No automatic dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,12 +1595,12 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
-          "package_preparation_status": "DISPATCHED_COMPLETED_REVIEWED",
+          "package_preparation_status": "ATTEMPT002_COMPLETED_REVIEWED",
           "dependencies": [
             "5b"
           ],
-          "status": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
-          "attempt_count": 1,
+          "status": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
+          "attempt_count": 2,
           "attempts": [
             {
               "attempt": 1,
@@ -1611,6 +1611,17 @@
               "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
               "provider_output": "60300ed315932f67ac01b078c35b51547d727917",
               "review_ref": "reviews/20261108_5c_attempt001_sol_review.md"
+            },
+            {
+              "attempt": 2,
+              "package_id": "V211_G05_5c_attempt002",
+              "status": "REVIEWED_REWORK_REQUIRED",
+              "result": "BOUNDED_SELECTED_AND_COMPONENT_PROGRESS_WITH_OPTICAL_AND_GENERIC_PUBLICATION_DEFECTS",
+              "input_head": "c13ae2703230eb633833bfdefdd88acaea4e2d59",
+              "output_head": "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
+              "release_commit": "13111ca78f3c678a02da1d7ffb5a7c248447b036",
+              "provider_output": "40df100c84d900d5ad40a6a23de48ef61c2f6f74",
+              "review_ref": "reviews/20261108_5c_attempt002_sol_review.md"
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session; released",
@@ -1620,23 +1631,26 @@
           "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: maintainer approved scope/budget and requested two-layer common rendering and lifecycle analysis; no attempt started.",
+          "last_observation": "2026-11-08: attempt002 independently reviewed; confirmed non-Position typed publication and component camera optics gaps; 3rd ordinary attempt requires reassessment.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
-            "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md"
+            "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md",
+            "reviews/20261108_5c_attempt002_sol_review.md"
           ],
           "commits": [
-            "9d7b14a47ea419d9d825bc18dadbc37eead95f74"
+            "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
+            "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
+            "13111ca78f3c678a02da1d7ffb5a7c248447b036"
           ],
-          "review_decision": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
+          "review_decision": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
           "blockers": [
-            "Generic task RGB currently requires selected Position profile tied to PandaPositionServoProfileV1; actual non-Position public caller rejected",
-            "GeoPhys task capture inherits a single tracking light and headlight assumption; declarative lighting boundary not closed"
+            "Non-Position selected task RGB reads typed_state without publishing it at reset; MuJoCo source binding is Position-specific",
+            "Component CameraObservationProvider does not apply declared FOV or near/far and produces metadata without native camera verification"
           ],
           "next_candidate_package": {
             "id": "V211_G05_5c_attempt002",
-            "status": "APPROVED_READY_FOR_MANUAL_FORWARD",
+            "status": "COMPLETED_REVIEWED_NOT_ACCEPTED",
             "attempt_count_before_start": 1,
             "plan_ref": "../planning/stage5-5c-attempt002.md",
             "manual_forward_only": true,
@@ -1830,11 +1844,12 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G05_5c_attempt001",
-    "status": "REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION",
-    "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
-    "sol_review_ref": "reviews/20261108_5c_attempt001_sol_review.md",
-    "note": "Four real PickCube route results bounded and reusable; pre-reservation and pytest-output deviations preserved; generic public integration requires rework."
+    "package_id": "V211_G05_5c_attempt002",
+    "status": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
+    "output_head": "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
+    "release_head": "13111ca78f3c678a02da1d7ffb5a7c248447b036",
+    "sol_review_ref": "reviews/20261108_5c_attempt002_sol_review.md",
+    "note": "Third ordinary attempt requires mandatory reassessment. No automatic dispatch."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
