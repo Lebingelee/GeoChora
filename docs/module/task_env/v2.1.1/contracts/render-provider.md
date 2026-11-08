@@ -59,6 +59,8 @@ Camera 固定字段至少包括稳定命名、mount entity/frame、相对 transf
 
 F06 Isaac 候选的有界几何路径可在构造时声明一个 world 挂载 task camera；现有 session 在 reset 后的当前场景建立 USD camera 并提供核验原生几何的读回，场景替换时重新绑定、关闭时释放。task camera 和 observer ID 必须不同。此路径不自动采集 task observation，也不支持一般动态挂载；其限定 F06 真实绑定与观察相机隔离已独立有界接收。
 
+G05 5c attempt003 的待审实现扩展了 selected non-Position 的状态发布：renderer 只消费当前 Artifact/source identity 下解析的具名状态和完整 `StateRequirements`，reset/step observation 发布前均校验 RuntimeSession boundary 与 sample clock；非 canonical source、缺失／歧义 binding 或过期 publication 应拒绝。组件 task RGB 的本次实测交集限于一台 GeoPhys CPU rasterizer task camera、HWC float32 RGB、无 depth、有限 FOV/near/far 和与 framebuffer 相同的分辨率。Core 在同步取帧前绑定并独立读回实际 pose／optics／extent；真实验证为 Pendulum 的 world-mounted camera。受控 camera spy 覆盖了解析后的 body pose 更新，但不构成真实挂载运行证据；多相机、异分辨率、depth 和其它 component renderer 仍未准入。本段记录 attempt003 当前代码／证据边界，最终接收状态以 Sol 独立主审为准。
+
 建议调用外形（仅设计值）：
 
 ```text

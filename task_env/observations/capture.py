@@ -324,6 +324,7 @@ class CameraObservationProvider:
         render_source,
         config: RenderConfig,
         camera_sensors: tuple[CameraSensor, ...],
+        task_rgb_camera_name: str | None = None,
     ) -> None:
         if render_source is None:
             raise ValueError("CameraObservationProvider requires a render_source")
@@ -331,6 +332,20 @@ class CameraObservationProvider:
             raise ValueError("CameraObservationProvider requires at least one camera")
         self.config = config
         self.camera_sensors = tuple(camera_sensors)
+        self.task_rgb_camera_name = task_rgb_camera_name
+        self._task_camera_bound = False
+        if task_rgb_camera_name is not None:
+            if len(self.camera_sensors) != 1 or self.camera_sensors[0].name != task_rgb_camera_name:
+                raise ValueError("component task RGB requires its sole configured camera sensor")
+            spec = self.camera_sensors[0].spec
+            if not spec.rgb or spec.depth or spec.rgb_layout != "HWC" or spec.rgb_dtype != "float32":
+                raise ValueError("component task RGB requires HWC float32 RGB without depth")
+            if (
+                not all(np.isfinite(float(value)) for value in (spec.fov_y, spec.near, spec.far))
+                or not 0.0 < float(spec.fov_y) < np.pi
+                or not 0.0 < float(spec.near) < float(spec.far)
+            ):
+                raise ValueError("component task RGB requires finite 0 < fov_y < pi and 0 < near < far")
         first_camera = self.camera_sensors[0].spec
         self._visualizer = render_source.build_visualizer(
             backend=config.backend,
@@ -347,19 +362,26 @@ class CameraObservationProvider:
         metadata = OrderedDict()
         for sensor in self.camera_sensors:
             camera_metadata = sensor.metadata(snapshot)
+            if sensor.name == self.task_rgb_camera_name:
+                camera_metadata = replace(
+                    camera_metadata,
+                    renderer_readback=self._bind_and_read_task_camera(sensor, camera_metadata),
+                )
+                frame = self._visualizer.read_task_camera_frame(synchronized=True)
+            else:
+                self._visualizer.write_camera_pose(
+                    {
+                        "pos": camera_metadata.pose.position,
+                        "look_at": camera_metadata.pose.look_at,
+                        "up": camera_metadata.pose.up,
+                    }
+                )
+                frame = self._visualizer.read_frame(
+                    width=sensor.spec.width,
+                    height=sensor.spec.height,
+                    synchronized=True,
+                )
             metadata[sensor.name] = camera_metadata
-            self._visualizer.write_camera_pose(
-                {
-                    "pos": camera_metadata.pose.position,
-                    "look_at": camera_metadata.pose.look_at,
-                    "up": camera_metadata.pose.up,
-                }
-            )
-            frame = self._visualizer.read_frame(
-                width=sensor.spec.width,
-                height=sensor.spec.height,
-                synchronized=True,
-            )
             if sensor.spec.rgb:
                 array = np.asarray(frame, dtype=np.float32)
                 expected_shape = (sensor.spec.height, sensor.spec.width, 3)
@@ -379,6 +401,81 @@ class CameraObservationProvider:
                     )
                 depth[sensor.name] = np.ascontiguousarray(depth_array)
         return SensorObservation(rgb=rgb, depth=depth, camera_metadata=metadata)
+
+    def _bind_and_read_task_camera(self, sensor, requested):
+        """Bind requested component optics, then verify the renderer's own readback."""
+        from math import degrees
+        from ..environment import CameraRendererReadbackV1
+
+        visualizer = self._visualizer
+        bind = getattr(visualizer, "bind_task_camera", None)
+        update = getattr(visualizer, "update_task_camera", None)
+        read = getattr(visualizer, "read_task_camera", None)
+        if not callable(bind) or not callable(update) or not callable(read):
+            raise RuntimeError("component task RGB renderer lacks bind/update/read camera capability")
+        spec = sensor.spec
+        pose = requested.pose
+        request = {
+            "camera_id": sensor.name,
+            "position": np.asarray(pose.position, dtype=np.float64),
+            "look_at": np.asarray(pose.look_at, dtype=np.float64),
+            "up": np.asarray(pose.up, dtype=np.float64),
+            "fov_degrees": degrees(float(spec.fov_y)),
+            "near": float(spec.near),
+            "far": float(spec.far),
+            "width": int(spec.width),
+            "height": int(spec.height),
+        }
+        bind_result = (update if self._task_camera_bound else bind)(**request)
+        self._task_camera_bound = True
+        actual = read()
+        if not isinstance(actual, dict):
+            raise TypeError("renderer task camera readback must be a mapping")
+        required = {
+            "camera_id", "binding_id", "position", "forward", "up", "fov_degrees",
+            "near", "far", "width", "height",
+        }
+        if not required <= set(actual):
+            raise ValueError("renderer task camera readback is missing optical fields")
+        if not isinstance(bind_result, dict) or bind_result.get("binding_id") != actual["binding_id"]:
+            raise ValueError("renderer camera bind result differs from its independent readback")
+        expected_forward = request["look_at"] - request["position"]
+        expected_forward /= np.linalg.norm(expected_forward)
+        expected_up = request["up"] / np.linalg.norm(request["up"])
+        position = np.asarray(actual["position"], dtype=np.float64)
+        forward = np.asarray(actual["forward"], dtype=np.float64)
+        up = np.asarray(actual["up"], dtype=np.float64)
+        same = (
+            actual["camera_id"] == request["camera_id"]
+            and type(actual["binding_id"]) is str and bool(actual["binding_id"])
+            and actual["width"] == request["width"]
+            and actual["height"] == request["height"]
+            and np.isfinite(position).all() and np.isfinite(forward).all() and np.isfinite(up).all()
+            and np.linalg.norm(position - request["position"]) <= 3.0e-5
+            and np.linalg.norm(forward - expected_forward) <= 2.0e-4
+            and np.linalg.norm(up - expected_up) <= 2.0e-4
+            and abs(float(actual["fov_degrees"]) - request["fov_degrees"]) <= 2.0e-4
+            and abs(float(actual["near"]) - request["near"]) <= max(2.0e-7, abs(request["near"]) * 2.0e-6)
+            and abs(float(actual["far"]) - request["far"]) <= max(2.0e-6, abs(request["far"]) * 2.0e-6)
+        )
+        if not same:
+            raise ValueError("renderer task camera readback differs from requested identity, pose, optics, or extent")
+        return CameraRendererReadbackV1(
+            camera_id=actual["camera_id"], binding_id=actual["binding_id"],
+            position=tuple(actual["position"]), forward=tuple(actual["forward"]),
+            up=tuple(actual["up"]), fov_degrees=actual["fov_degrees"],
+            near=actual["near"], far=actual["far"], width=actual["width"],
+            height=actual["height"],
+        )
+
+    def project_task_camera(self, point):
+        """Expose the renderer's public task-camera geometry projection for audits."""
+        if self.task_rgb_camera_name is None or not self._task_camera_bound:
+            raise RuntimeError("component task camera has no completed native binding")
+        project = getattr(self._visualizer, "project_task_camera", None)
+        if not callable(project):
+            raise RuntimeError("component task RGB renderer lacks camera projection readback")
+        return project(point)
 
     def close(self) -> None:
         close = getattr(self._visualizer, "close", None)

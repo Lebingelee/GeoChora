@@ -154,6 +154,7 @@ def test_component_task_rgb_config_is_fixed_and_preserves_physics():
 def test_component_task_rgb_uses_owned_frame_from_same_snapshot():
     from types import SimpleNamespace
     from task_env.environment.gym_compat import Box, Dict
+    from task_env.environment import CameraRendererReadbackV1
     from task_env.environment.config import CameraSpec
     from task_env.environment.reference_env import SelectedReferenceEnv
 
@@ -166,8 +167,14 @@ def test_component_task_rgb_uses_owned_frame_from_same_snapshot():
     env._last_camera_metadata = {}
     snapshot = object()
     calls = []
+    realized = CameraRendererReadbackV1(
+        camera_id='task', binding_id='binding-a', position=(0., 0., 0.),
+        forward=(1., 0., 0.), up=(0., 0., 1.), fov_degrees=float(np.degrees(camera.fov_y)),
+        near=camera.near, far=camera.far, width=camera.width, height=camera.height,
+    )
     observation = SimpleNamespace(
-        rgb={'task': source}, camera_metadata={'task': {'synchronized': True}}
+        rgb={'task': source},
+        camera_metadata={'task': SimpleNamespace(synchronized=True, renderer_readback=realized)},
     )
     env._sensor_provider = SimpleNamespace(
         capture=lambda actual: calls.append(actual) or observation

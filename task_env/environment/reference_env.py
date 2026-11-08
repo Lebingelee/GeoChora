@@ -129,6 +129,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     render_source=self._runtime_assembly.render_source,
                     config=self.config.render,
                     camera_sensors=self._camera_sensors,
+                    task_rgb_camera_name=(
+                        None if self._component_task_rgb is None
+                        else self._component_task_rgb[0].name
+                    ),
                 )
             resolved_agents = compiled_scene.references.agents
             if len(resolved_agents) > 1:
@@ -526,6 +530,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._last_sensor_snapshot = snapshot
             self._last_sensor_observation = sensor_observation
         camera, _renderer, _generation = task_rgb
+        camera_metadata = sensor_observation.camera_metadata.get(camera.name)
+        realized = getattr(camera_metadata, 'renderer_readback', None)
+        if realized is None:
+            raise ValueError('component task RGB lacks independently verified renderer camera readback')
         try:
             frame = sensor_observation.rgb[camera.name]
         except KeyError as error:
@@ -582,11 +590,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             or camera.name not in self._last_sensor_observation.rgb
         ):
             raise RuntimeError("task RGB receipt has no capture for the published lifecycle boundary")
+        camera_metadata = self._last_sensor_observation.camera_metadata.get(camera.name)
+        realized = getattr(camera_metadata, 'renderer_readback', None)
+        if realized is None:
+            raise RuntimeError("task RGB receipt has no native camera optical readback")
         return {
             "schema_version": "task-rgb-observation-v1",
-            "source": "SensorObservation.rgb and camera_metadata",
+            "source": "SensorObservation.rgb and native renderer camera readback",
             "camera_name": camera.name,
-            "camera": _json_value(asdict(camera)),
+            "requested_camera": _json_value(asdict(camera)),
+            "realized_camera": _json_value(asdict(realized)),
             "renderer": _renderer,
             "render_backend": self.config.render.backend,
             "renderer_generation": generation,
@@ -597,7 +610,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             },
             "capture": {
                 "status": "completed_before_observation_publication",
-                "api": "CameraObservationProvider.capture/read_frame(synchronized=True)",
+                "api": "CameraObservationProvider.capture/bind_task_camera/update_task_camera/read_task_camera/read_task_camera_frame(synchronized=True)",
                 "synchronized": True,
             },
         }
@@ -1121,6 +1134,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             )
         if existing is None:
             cameras.append(camera)
+        if len(cameras) != 1 or cameras[0] != camera:
+            raise ValueError(
+                "component task RGB currently requires one task camera because GeoPhys owns one task-camera binding"
+            )
         render = replace(
             config.render,
             camera_obs=True,
@@ -1248,6 +1265,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.camera_observation_config = camera_observation_config
         self._camera_consumer = None
         self._camera_session_factory = None
+        self._task_rgb_state_binding = None
+        self.typed_state = None
         self.metadata = {'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
@@ -1569,6 +1588,87 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                   for requirement in profile.requirements.requirements),
         )
 
+    def _prepare_task_rgb_state_binding(self):
+        """Resolve the complete renderer projection from the current source identity."""
+        if getattr(self, '_task_rgb_config', None) is None:
+            self._task_rgb_state_binding = None
+            return None
+        from ..artifacts import StateFieldRequirement, StateRequirements
+        from ..render.camera.source import DynamicCameraRenderSourceV2
+        from ..runtime.sessions.source import (
+            position_frame_bindings_from_artifact,
+            position_joint_bindings_from_artifact,
+        )
+
+        source = self.value.get('source')
+        scene = getattr(source, 'scene_definition', None)
+        if scene is None or getattr(source, 'source_closure_digest', None) is None:
+            raise ValueError('selected task RGB requires a canonical Scene and source closure')
+        joint_bindings = position_joint_bindings_from_artifact(scene, self.artifact, source)
+        frame_bindings = position_frame_bindings_from_artifact(self.artifact, source)
+        render_source = DynamicCameraRenderSourceV2.from_runtime_source(
+            source, artifact=self.artifact,
+            joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        )
+        render_source.validate_binding_provenance()
+        requirements = []
+        for definition in joint_bindings.values():
+            for field_name in ('joint_position', 'joint_velocity'):
+                requirements.append(StateFieldRequirement(
+                    'state-field-requirement-v1', field_name, 'joint',
+                    definition.parent_frame.entity_id, definition.joint_id,
+                    'required', 'evaluation_boundary', 'joint-definition',
+                    'joint_state_query',
+                ))
+        for reference in frame_bindings.values():
+            requirements.append(StateFieldRequirement(
+                'state-field-requirement-v1', 'frame_pose_world', 'frame',
+                reference.entity_id, reference.frame_id, 'required',
+                'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query',
+            ))
+        state_requirements = StateRequirements(
+            'state-requirements-v1', 'renderer', 'selected-task-rgb-v1',
+            tuple(requirements),
+        )
+        state_requirements.validate()
+        result = (source, self.artifact.identity_hash, scene, joint_bindings,
+                  frame_bindings, state_requirements, render_source)
+        self._task_rgb_state_binding = result
+        return result
+
+    def _publish_task_rgb_typed_state(self):
+        """Publish and validate renderer state at the RuntimeSession's current boundary."""
+        self.typed_state = None
+        binding = getattr(self, '_task_rgb_state_binding', None)
+        if binding is None:
+            binding = self._prepare_task_rgb_state_binding()
+        source, artifact_hash, scene, joints, frames, requirements, _render_source = binding
+        if (source is not self.value.get('source') or artifact_hash != self.artifact.identity_hash
+                or scene is not source.scene_definition):
+            raise ValueError('selected task RGB state binding is stale or foreign')
+        current_boundary = self.session.state_boundary_identity()
+        publication = self.session.snapshot_v1(
+            scene=scene, joint_bindings=joints, frame_bindings=frames,
+            requirements=requirements,
+        )
+        from ..artifacts import CanonicalStatePublicationV1
+        if (type(publication) is not CanonicalStatePublicationV1
+                or not publication.lifetime.may_be_retained
+                or publication.view.boundary != current_boundary
+                or abs(publication.view.sample_clock.simulation_time_s
+                       - float(self.state.simulation_time)) > _boundary_interval_clock_tolerance(
+                           float(self.state.simulation_time),
+                           publication.view.sample_clock.simulation_time_s,
+                           self.artifact.timebase.control_dt,
+                           self.artifact.timebase.physics_dt,
+                           self.artifact.timebase.control_substeps,
+                       )):
+            raise ValueError('selected task RGB typed state is stale or differs from Runtime readback')
+        publication.view.validate_against_scene(scene)
+        publication.view.validate_requirements(requirements)
+        self.typed_state = publication
+        return publication
+
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
         self._episode_execution_state().require_open('environment is closed')
         component_lifecycle = None
@@ -1777,6 +1877,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     self._switch_topology_generation = getattr(self, '_switch_topology_generation', 0) + 1
             self._deployment_receipt = deployment_receipt
             self._close_camera_consumer()
+            self._task_rgb_state_binding = None
+            if getattr(self, '_task_rgb_config', None) is not None:
+                self.typed_state = None
             failure_phase = 'reset_close'
             if previous_session is not None:
                 previous_session_close_attempted = True
@@ -1900,6 +2003,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             nonlocal failure_phase
             failure_phase = 'session_materialization'
             reset_effects['replacement_materialization_attempted'] = True
+            self._task_rgb_state_binding = None
+            if getattr(self, '_task_rgb_config', None) is not None:
+                self._prepare_task_rgb_state_binding()
 
             def start_worker():
                 from ..runtime.sessions.transport import (
@@ -2073,6 +2179,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 failure_phase = 'controller_feedback'
                 self.feedback = self.session.control_feedback(self.state)
                 self.controller.reset(self.state, self.feedback)
+            if getattr(self, '_task_rgb_config', None) is not None and not self.position_profile:
+                self._publish_task_rgb_typed_state()
             return self.state
 
         def observe(_state):
@@ -2149,7 +2257,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._publish_task_position_execution_info(self.info)
                 if previous_episode_end is not None:
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
-            if self.state.control_step != 0 or self.state.simulation_time != 0:
+            if self._current_control_step() != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
             reset_solution = external_solution if external_solution is not None else self.solution
             if reset_solution is not None:
@@ -2277,11 +2385,27 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 or getattr(self, 'position_profile', False)):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
         result = ExpertExecutionInfo(
-            'expert-execution-info-v1', self.state.control_step,
+            'expert-execution-info-v1', self._current_control_step(),
             self.state.simulation_time, self.controller.readiness(self.state, self.feedback),
         )
         result.validate()
         return result
+
+    def _current_control_step(self) -> int:
+        """Resolve a selected boundary from RuntimeSession identity, with legacy state fallback."""
+        state_step = getattr(getattr(self, 'state', None), 'control_step', None)
+        session = getattr(self, 'session', None)
+        boundary_reader = getattr(session, 'state_boundary_identity', None)
+        boundary = boundary_reader() if callable(boundary_reader) else None
+        boundary_step = getattr(boundary, 'control_step', None)
+        if boundary_step is not None:
+            boundary_step = int(boundary_step)
+            if state_step is not None and int(state_step) != boundary_step:
+                raise ValueError('selected RuntimeSnapshot control step differs from RuntimeSession boundary')
+            return boundary_step
+        if state_step is None:
+            raise StageUnavailableError('selected RuntimeSession has no current control boundary')
+        return int(state_step)
 
     def _publish_task_position_execution_info(self, info):
         binding = getattr(self, 'binding', None)
@@ -2469,9 +2593,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl', profile, None)
 
         def factory(state):
+            state_binding = getattr(self, '_task_rgb_state_binding', None)
+            if state_binding is None:
+                state_binding = self._prepare_task_rgb_state_binding()
+            if (state_binding[0] is not self.value['source']
+                    or state_binding[1] != self.artifact.identity_hash):
+                raise ValueError('selected task RGB render source is stale or foreign')
+            render_source = state_binding[-1]
             source = DynamicCameraRenderSourceV2.from_runtime_source(
-                self.value['source'], artifact=self.artifact, joint_bindings=self.position_joint_bindings,
-                frame_bindings=self.position_frame_bindings)
+                self.value['source'], artifact=self.artifact,
+                joint_bindings=state_binding[3], frame_bindings=state_binding[4])
+            if source.identity_hash != render_source.identity_hash:
+                raise ValueError('selected task RGB render source changed after reset binding')
             execution = ExecutionSpecV1('execution-spec-v1', self.provider, self.backend, physics_profile,
                                         self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
             return create_dynamic_camera_session(camera, execution, source=source, initial_state=state)
@@ -3843,7 +3976,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 validate_request(proposal.control_request)
             if self.recorder is not None and self.binding.recorder_mode == 'execution':
                 failure_phase = 'recorder_interval_begin'
-                self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
+                self.recorder.begin(self._current_control_step(), self.artifact.timebase.physics_dt,
                                     self.artifact.timebase.control_substeps)
             if proposal is not None and getattr(proposal, 'control_request', None) is not None:
                 failure_phase = 'controller_control_request'
@@ -3895,6 +4028,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'control_feedback'
             self.feedback = self.session.control_feedback(self.state)
             failure_phase = 'observation'
+            if getattr(self, '_task_rgb_config', None) is not None and not self.position_profile:
+                self._publish_task_rgb_typed_state()
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
@@ -3931,7 +4066,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             nonlocal failure_phase, record_append_attempted, diagnostics
             terminated, truncated = self._episode_execution_state().step_outcome(
                 task_terminated=self.evaluation.failure, task_truncated=False,
-                control_step=self.state.control_step, horizon=self.horizon,
+                control_step=self._current_control_step(), horizon=self.horizon,
             )
             if proposal is not None and not caller_driven:
                 failure_phase = 'solution_observation'
