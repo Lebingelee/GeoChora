@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "History cleanup completed in maintainer-approved local stage5 scope; attempt003 prework documented. Ordinary attempt count remains 2; no third attempt package dispatched or newly authorized.",
+  "next_action": "V211_G05_5c_attempt003 prepared, awaiting maintainer authorization and manual forwarding; third ordinary window is final. Count remains 2; no dispatch.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1631,7 +1631,7 @@
           "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: maintainer-selected scope history cleanup completed with disk evidence intact; targeted 003 prework documented; execution not authorized or dispatched.",
+          "last_observation": "2026-11-08: attempt003 complete proposal prepared after mandatory reassessment; no execution authorized or dispatched.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
@@ -1649,12 +1649,12 @@
             "Component CameraObservationProvider does not apply declared FOV or near/far and produces metadata without native camera verification"
           ],
           "next_candidate_package": {
-            "id": "V211_G05_5c_attempt002",
-            "status": "COMPLETED_REVIEWED_NOT_ACCEPTED",
-            "attempt_count_before_start": 1,
-            "plan_ref": "../planning/stage5-5c-attempt002.md",
+            "id": "V211_G05_5c_attempt003",
+            "status": "PREPARED_AWAITING_MAINTAINER_AUTHORIZATION",
+            "attempt_count_before_start": 2,
+            "plan_ref": "../planning/stage5-5c-attempt003-execution.md",
             "manual_forward_only": true,
-            "scope_amendment": "Common renderer integration for selected/component Env plus concrete controlled-subject/object build and lifecycle convergence analysis; implement the necessary shared seam, do not claim a wholesale migration."
+            "last_ordinary_attempt": true
           },
           "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window.",
           "third_attempt_reassessment": {
