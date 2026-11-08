@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "5c attempt002 independently reviewed and not accepted: selected non-Position publication and component camera optical binding defects. Before any third ordinary attempt Sol must reassess. No automatic dispatch.",
+  "next_action": "5c attempt002 not accepted; mandatory attempt003 reassessment completed, no execution package dispatched or newly authorized. Await maintainer direction.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1656,7 +1656,14 @@
             "manual_forward_only": true,
             "scope_amendment": "Common renderer integration for selected/component Env plus concrete controlled-subject/object build and lifecycle convergence analysis; implement the necessary shared seam, do not claim a wholesale migration."
           },
-          "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window."
+          "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window.",
+          "third_attempt_reassessment": {
+            "status": "COMPLETED_NOT_DISPATCHED",
+            "reference": "../planning/stage5-5c-attempt003-reassessment.md",
+            "ordinary_attempts_completed": 2,
+            "feasibility": "credible bounded path; no guaranteed success",
+            "requires_fresh_execution_authorization": true
+          }
         }
       ]
     },
