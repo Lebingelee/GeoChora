@@ -377,7 +377,7 @@ def test_registry_physical_preflight_rejects_foreign_source_before_build(monkeyp
             'versioned_input': candidate, 'physical_execution': execution})
 
 
-def test_physical_reset_preflight_rejects_before_session_materialization():
+def test_physical_reset_preflight_rejects_before_session_materialization(monkeypatch):
     """Exercise preparation only: no reset, provider initialization, or source parsing."""
     from types import SimpleNamespace
     from task_env.environment.reference_env import SelectedReferenceEnv
@@ -392,7 +392,13 @@ def test_physical_reset_preflight_rejects_before_session_materialization():
         env._prepare_reference_reset()
     assert env.session is previous
     env.provider, env.backend, env.position_profile = 'mujoco', 'cpu', False
-    with pytest.raises(StageUnavailableError, match='physical-control RuntimeSession adapter'):
+    env.artifact = object()
+    env.value = {'source': object()}
+    from task_env.runtime.sessions import mujoco_physical
+    def reject_in_preflight(*args):
+        raise ValueError('source capability rejected')
+    monkeypatch.setattr(mujoco_physical, 'preflight_physical_mujoco', reject_in_preflight)
+    with pytest.raises(ValueError, match='source capability rejected'):
         env._prepare_reference_reset()
     assert env.session is previous
 

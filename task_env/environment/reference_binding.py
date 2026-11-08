@@ -17,6 +17,12 @@ def _no_observe_kwargs(env, guard_samples):
     return {}
 
 
+def legacy_position_physical_observation_binding(env):
+    """Compatibility projection for selected callers that still publish V1 state."""
+    return (env.position_scene, env.position_joint_bindings,
+            env.position_frame_bindings, env._position_requirements())
+
+
 def position_input_kind(binding, value):
     """Ask the task binding to classify a versioned Position input, if present."""
     if value is None:
@@ -86,23 +92,26 @@ def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, positio
                 raise ValueError('ResetPlanV1 seed differs from reset seed')
     elif options:
         raise ValueError('selected reference reset options are not supported')
+    physical_plan = (getattr(binding, 'physical_control_profile', None) is not None
+                     and value.get('physical_execution') is not None
+                     and value.get('reset_plan') is not None)
     if seed is seed_unset:
         if mixed and mixed_plan is not None:
             seed = mixed_plan.reset_sample.task_seed
         elif mixed and has_session:
             seed = previous_sample.task_seed
-        elif position:
+        elif position or physical_plan:
             seed = value['reset_plan'].reset_sample.task_seed
         else:
             seed = 19
-    if position:
+    if position or physical_plan:
         seed = binding.reset_seed(seed)
         reset_plan = value.get('reset_plan')
         if reset_plan is None:
-            raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlan')
+            raise ValueError('selected route requires its declared EpisodeResetPlan')
         if binding.build_seeded is None and seed != reset_plan.reset_sample.task_seed:
-            raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
-    if not mixed and not position:
+            raise ValueError('selected reset seed must match its fixed EpisodeResetPlan')
+    if not mixed and not position and not physical_plan:
         # Task seed validation is pure preflight and must not close a live session.
         seed = binding.reset_seed(seed)
     mixed_sample = None
@@ -171,6 +180,9 @@ class ReferenceTaskBinding:
     reset_runtime_input: Callable | None = None
     position_control_binding: Callable | None = None
     physical_control_profile: Callable | None = None
+    physical_observation_binding: Callable | None = None
+    physical_reset_action_schema: Callable | None = None
+    physical_action_observer: Callable | None = None
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
     build_receives_binding: bool = False
@@ -219,6 +231,12 @@ class ReferenceTaskBinding:
             raise ValueError('position control binding selector must be callable when supplied')
         if self.physical_control_profile is not None and not callable(self.physical_control_profile):
             raise ValueError('physical control profile selector must be callable when supplied')
+        if self.physical_observation_binding is not None and not callable(self.physical_observation_binding):
+            raise ValueError('physical observation binding must be callable when supplied')
+        if self.physical_reset_action_schema is not None and not callable(self.physical_reset_action_schema):
+            raise ValueError('physical reset action schema must be callable when supplied')
+        if self.physical_action_observer is not None and not callable(self.physical_action_observer):
+            raise ValueError('physical action observer must be callable when supplied')
         if (self.legacy_position_expert_admission is not None
                 and not callable(self.legacy_position_expert_admission)):
             raise ValueError('legacy Position expert admission must be callable when supplied')

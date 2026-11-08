@@ -190,35 +190,13 @@ def resolve_task_references(
     agent_refs: dict[str, AgentReferences] = {}
     for agent in agents:
         spec = agent.reference_spec()
-        if agent.uid == "panda-v1":
-            # Preserve the Stage 1 Panda controller layout exactly.
-            arm_joint_names = tuple(f"joint{i}" for i in range(1, 8))
-            gripper_joint_names = ("finger_joint1", "finger_joint2")
-            arm_joint_ids = [names.joints[name] for name in arm_joint_names]
-            gripper_joint_ids = [names.joints[name] for name in gripper_joint_names]
-            arm_actuator_ids = [names.actuators[f"actuator{i}"] for i in range(1, 8)]
-            gripper_actuator_ids = [names.actuators["actuator8"]]
-            agent_refs[agent.uid] = AgentReferences(
-                uid=agent.uid,
-                arm_joint_ids=arm_joint_ids,
-                arm_qpos_ids=qpos_adr[arm_joint_ids],
-                arm_dof_ids=dof_adr[arm_joint_ids],
-                arm_actuator_ids=arm_actuator_ids,
-                gripper_joint_ids=gripper_joint_ids,
-                gripper_qpos_ids=qpos_adr[gripper_joint_ids],
-                gripper_actuator_ids=gripper_actuator_ids,
-                eef_site_id=names.sites["nutassembly_ee_site"],
-                hand_body_id=names.bodies["hand"],
-                ctrl_range=ctrl_range,
-                arm_joint_names=arm_joint_names,
-                base_body_id=names.bodies["link0"],
-                base_body_name="link0",
-                eef_site_name="nutassembly_ee_site",
-                joint_names=tuple(spec.joint_names),
-                actuator_names=tuple(spec.actuator_names),
-                body_ids=[names.bodies[name] for name in spec.body_names],
-                site_ids=[names.sites[name] for name in spec.site_names],
-            )
+        project = getattr(agent, 'project_references', None)
+        if callable(project):
+            projected = project(names=names, spec=spec, qpos_adr=qpos_adr,
+                                dof_adr=dof_adr, ctrl_range=ctrl_range)
+            if type(projected) is not AgentReferences or projected.uid != agent.uid:
+                raise ValueError('agent reference projection has a foreign identity or type')
+            agent_refs[agent.uid] = projected
             continue
 
         # Generic articulated-agent projection.  Agent-specific semantics

@@ -9,6 +9,34 @@ from ...registry import register_env
 from ...environment.reference_env import SelectedReferenceEnv
 
 
+def _accept_original_panda_closure(receipt, actual_digest):
+    """Verify the exact historical input, allowing only checkout relocation.
+
+    The legacy receipt hashes the absolute asset directory inside canonical
+    XML. Keep that receipt and its actual hash intact; compare a temporary
+    relocation projection against the old identity, including every asset.
+    """
+    from ...assembly.assets import _source_closure_digest
+    from ...utils._paths import MUJOCO_MENAGERIE_ROOT
+
+    expected = '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d'
+    if receipt is None or actual_digest != receipt.source_closure_digest:
+        return False
+    receipt.validate_snapshot()
+    if actual_digest == expected:
+        return True
+    files = dict(receipt.closure_files)
+    canonical = files.get('canonical-source.xml')
+    if not isinstance(canonical, bytes):
+        return False
+    current = str((MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets').resolve()).encode()
+    old = b'/home/lly/.codex/worktrees/v210-integration/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets'
+    if canonical.count(current) != 1:
+        return False
+    files['canonical-source.xml'] = canonical.replace(current, old, 1)
+    return _source_closure_digest(files) == expected
+
+
 def _physical_pickcube_observation(env, state):
     """Keep the task's source EE site distinct from the Panda hand-origin frame."""
     import numpy as np
@@ -19,6 +47,61 @@ def _physical_pickcube_observation(env, state):
     evaluation = env.binding.evaluate(state, env.artifact.semantics)
     info.update(is_success=bool(evaluation.success), task_failure=bool(evaluation.failure),
                 task_metrics=dict(evaluation.metrics))
+    return obs, info, evaluation
+
+
+def _direct_physical_observation_spaces(env):
+    """PickCube's existing single-Panda state shape, declared by the task."""
+    from collections import OrderedDict
+    import numpy as np
+    from ...environment.gym_compat import Box, Dict
+    return OrderedDict((
+        ('state', Dict({
+            'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+            'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
+            'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
+        })),
+        ('privileged_state', Dict({'cube_v1_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)})),
+    ))
+
+
+def _direct_physical_observation(env, state):
+    """Project the physical publication without requiring a Position controller."""
+    import numpy as np
+    from ...artifacts import CanonicalStateView
+    view = env.typed_state.view
+    joints = {v.joint_id: v for v in view.joints if v.entity_id == 'panda-v1'}
+    names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+    if any(name not in joints for name in names):
+        raise ValueError('PickCube observation requires its named Panda joints')
+    hands = [v for v in view.frames if v.frame.entity_id == 'panda-v1' and v.frame.frame_id == 'hand']
+    if len(hands) != 1:
+        raise ValueError('PickCube observation requires one hand frame')
+    hand = hands[0].pose_world
+    adapted = CanonicalStateView(
+        schema_version='canonical-state-v0', convention=state.convention,
+        control_step=state.control_step, simulation_time=state.simulation_time,
+        joint_position={**state.joint_position, **{f'panda-v1/{n}': float(joints[n].position[0]) for n in names}},
+        joint_velocity={**state.joint_velocity, **{f'panda-v1/{n}': float(joints[n].velocity[0]) for n in names}},
+        pose_world={**state.pose_world, 'panda-v1/ee': hand},
+    )
+    evaluation = env.binding.evaluate(adapted, env.artifact.semantics)
+    pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
+    cube = state.pose_world['cube-v1']
+    boundary = view.boundary
+    obs = {'state': {'ee_pose': pose.copy(),
+                     'joint_position': np.asarray([joints[n].position[0] for n in names], dtype=np.float32),
+                     'hand_pose': pose.copy(),
+                     'boundary_identity_sha256': np.frombuffer(bytes.fromhex(
+                         boundary.boundary_id.removeprefix('state-boundary-')), dtype=np.uint8).copy()},
+           'privileged_state': {'cube_v1_body_pose': np.asarray(
+               [(*cube.position, *cube.quaternion_wxyz)], dtype=np.float32)}}
+    info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
+            'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
+            'simulation_time_s': float(state.simulation_time),
+            'state_boundary_identity': boundary.to_mapping(), 'state_boundary_id': boundary.boundary_id,
+            'state_sample_clock': view.sample_clock.to_mapping()}
     return obs, info, evaluation
 
 
@@ -168,7 +251,7 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
     from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
-    from ...environment.reference_binding import ReferenceTaskBinding
+    from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
     from ...observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
     from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
     from ...runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
@@ -195,10 +278,8 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
                                                    else 'mjcf-physical-effort-no-drive-v1')))
     receipt = original.execution_source_receipt
     try:
-        if (receipt is None or original.source_closure_digest !=
-                '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d'):
+        if not _accept_original_panda_closure(receipt, original.source_closure_digest):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
-        receipt.validate_snapshot()
         scene = _pickcube_mjcf_scene(task_config)
         task_source = adapt_legacy_recipe_task_source({'recipe': task_config['recipe'], 'environment': task_config['environment']})
         artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact, frame_bindings={
@@ -230,8 +311,13 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
         if receipt is not None:
             receipt.close()
     reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
-    position = PandaPositionServoProfileV1.from_source(artifact, source, entity_id='panda-v1')
-    plan = compile_control_binding_plan(scene, (position.controller_binding(),))
+    # GeoPhys and reset-scoped reference controllers retain their existing
+    # bounded compatibility route until separately migrated and verified.
+    direct_physical = provider == 'mujoco' and control_kind == 'direct' and not reset_switch
+    position = (None if direct_physical else
+                PandaPositionServoProfileV1.from_source(artifact, source, entity_id='panda-v1'))
+    plan = (None if direct_physical else
+            compile_control_binding_plan(scene, (position.controller_binding(),)))
     def build_physical(kind, **parameters):
         if (set(parameters) - {'kp', 'kd', 'finger_kp', 'finger_kd'}
                 or any(type(value) not in (int, float) or not 0. < value <= 5000.
@@ -272,10 +358,12 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
     physical = build_physical(control_kind)
     def build(_provider):
         return {'artifact': artifact, 'task_source': task_source, 'source': source,
-            'controller': position, 'solution': None, 'reset_plan': reset_plan,
+            'controller': physical.controllers[0] if direct_physical else position,
+            'solution': None, 'reset_plan': reset_plan,
             **({'solution_factory': base['solution_factory'], 'solution_identity': base['solution_identity'],
                 'readiness': base['readiness']} if reset_switch else {}),
-            'controller_binding_plan': plan, 'construction_id': 'pickcube-mjcf-physical-candidate-v1',
+            **({'physical_execution': physical} if direct_physical else {'controller_binding_plan': plan}),
+            'construction_id': 'pickcube-mjcf-physical-candidate-v1',
             'source_revision': base['source_revision'], 'source_sha256': {
                 'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
                 'projected_closure': closure},
@@ -300,6 +388,20 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
         return PickCubePositionExecutionInfoV1('pickcube-position-execution-info-v1',
             int(state.control_step), float(state.simulation_time), opening, speed, target,
             bool(target <= .045 and opening <= .045 and speed <= .005))
+    def physical_action_schema(kind):
+        if kind == 'r3-pose':
+            from ...controllers.canonical.contracts import REFERENCE_POSE_ACTION_SCHEMA
+            return dict(REFERENCE_POSE_ACTION_SCHEMA)
+        return {'schema_id': 'physical-joint-reference-v1',
+                'controller_kind': 'absolute_joint', 'dimension': 8}
+    def observe_physical_action(env, action, spec):
+        if action is None:
+            env._last_physical_opening_target = None
+        elif spec['kind'] == 'r3-pose':
+            import numpy as np
+            env._last_physical_opening_target = .04 * (float(np.clip(action[-1], -1., 1.)) + 1.)
+        else:
+            env._last_physical_opening_target = float(action[-1])
     from .specialization import _validate_external_readiness_solution
     binding = ReferenceTaskBinding(build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         evaluate=lambda state, semantics: evaluate(state, semantics),
@@ -309,15 +411,30 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
         action_schema={'schema_version': 'physical-control-actions-v1',
                        'controllers': [{'identity': c.identity, 'shape': list(c.action_shape)} for c in physical.controllers]},
         action_space_factory=physical.action_space, prepare_action=reference_pose_action,
-        observation_space_factory=selected_reference_observation_spaces,
-        observation_projection=_physical_pickcube_observation if reset_switch else build_selected_observation,
+        observation_space_factory=(_direct_physical_observation_spaces if direct_physical
+                                   else selected_reference_observation_spaces),
+        observation_projection=(_direct_physical_observation if direct_physical else
+                                _physical_pickcube_observation if reset_switch else build_selected_observation),
         build_external=build if reset_switch else None,
         validate_external_solution=_validate_external_readiness_solution if reset_switch else None,
         position_execution_info=physical_execution_info if reset_switch else None,
         position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
+        physical_reset_action_schema=physical_action_schema if reset_switch else None,
+        physical_action_observer=observe_physical_action if reset_switch else None,
+        physical_observation_binding=None if direct_physical else legacy_position_physical_observation_binding,
         physical_control_profile=(lambda env: env._physical_reset_selection.current.execution)
                                  if reset_switch else (lambda _env: physical))
-    env = environment_type.from_position_candidate(binding, provider=provider, backend='cpu', horizon=horizon)
+    if direct_physical:
+        env = environment_type(provider=provider, backend='cpu', horizon=horizon, _binding=binding)
+        from ...environment.configuration import resolve_candidate_execution_selection
+        try:
+            env._candidate_execution_selection = resolve_candidate_execution_selection(
+                provider=provider, backend='cpu', source=env.value['source'])
+        except BaseException:
+            env.close()
+            raise
+    else:
+        env = environment_type.from_position_candidate(binding, provider=provider, backend='cpu', horizon=horizon)
     if reset_switch:
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         env._physical_reset_selection = PhysicalResetSelection(build_physical, initial_kind=control_kind,

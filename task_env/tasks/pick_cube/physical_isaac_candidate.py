@@ -118,9 +118,11 @@ class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
                 if type(actual) is not int or actual != seed:
                     raise ValueError('F06 physical candidate requires its frozen seed')
                 return actual
+            from ...environment.reference_binding import legacy_position_physical_observation_binding
             binding = replace(base, build=build, build_seeded=build_seeded, reset_seed=reset_seed,
                 reset_sample=lambda _artifact, _seed: value['reset_plan'].reset_sample,
                 physical_control_profile=lambda _env: physical, action_space_factory=physical.action_space,
+                physical_observation_binding=legacy_position_physical_observation_binding,
                 action_schema={'schema_version': 'physical-control-actions-v1',
                                'controllers': [{'identity': c.identity, 'shape': list(c.action_shape)}
                                                for c in physical.controllers]},

@@ -52,7 +52,7 @@ from task_env.runtime.sessions.leaf_control import (
     IsaacNamedPositionDriveReceiptV1,
 )
 from task_env.runtime.sessions.control import ControlBinding, compile_control_binding_plan
-from task_env.environment.reference_binding import ReferenceTaskBinding
+from task_env.environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
 from task_env.environment.reference_env import SelectedReferenceEnv
 
 
@@ -451,6 +451,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         external_actions=True, interval_mode='grouped', recorder_mode='execution',
         reset_seed=fixed_seed,
         physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
+        physical_observation_binding=(None if physical_execution is None else legacy_position_physical_observation_binding),
     )
     env = environment_type.from_position_candidate(
         binding, provider=input_v1.execution.physics_provider,
@@ -636,6 +637,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         recorder_mode='execution',
         reset_seed=fixed_seed,
         physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
+        physical_observation_binding=(None if physical_execution is None else legacy_position_physical_observation_binding),
     )
     env = environment_type.from_position_candidate(
         binding, provider=provider, backend='cpu', horizon=horizon,

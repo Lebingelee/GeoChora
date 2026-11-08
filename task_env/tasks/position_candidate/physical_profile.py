@@ -192,8 +192,12 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
                              if name in artifact.legacy_frame_bindings
                              else FrameReference(*name.split('/', 1)))
                       for name in (*source.bodies, *source.frames)}
+    from ...robots.panda import PandaAgent
+    subject = PandaAgent.controlled_subject(entity_id=entity, source_id=source.source_id,
+        source_closure_sha256=source.source_closure_digest, channels=channels,
+        writers=tuple(writer for writer, _names in groups))
     execution = PhysicalControlExecutionV1(compiled, controllers, scene, joint_bindings,
-                                            frame_bindings, requirements, 1)
+                                            frame_bindings, requirements, 1, (subject,))
     execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
     return execution

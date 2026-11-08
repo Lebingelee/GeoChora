@@ -43,6 +43,38 @@ def panda_reference_control_binding():
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
 
+    @staticmethod
+    def controlled_subject(*, entity_id, source_id, source_closure_sha256, channels, writers):
+        """Declare this Panda's existing Scene entity for the shared physical owner."""
+        from ..runtime.sessions.physical_control import ControlledSubjectV1
+        names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
+        if tuple(channel.joint_id for channel in channels) != names:
+            raise ValueError('Panda subject requires its declared ordered arm and finger joints')
+        if any(channel.entity_id != entity_id for channel in channels):
+            raise ValueError('Panda subject channels must target its own entity')
+        return ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None,
+            tuple(channel.component_path for channel in channels), tuple(writers))
+
+    def project_references(self, *, names, spec, qpos_adr, dof_adr, ctrl_range):
+        """Project the established Panda layout without making the resolver identify robots."""
+        from ..assembly.references import AgentReferences
+        arm_names = tuple(f'joint{i}' for i in range(1, 8))
+        fingers = ('finger_joint1', 'finger_joint2')
+        arm_ids = [names.joints[name] for name in arm_names]
+        finger_ids = [names.joints[name] for name in fingers]
+        return AgentReferences(uid=self.uid, arm_joint_ids=arm_ids,
+            arm_qpos_ids=qpos_adr[arm_ids], arm_dof_ids=dof_adr[arm_ids],
+            arm_actuator_ids=[names.actuators[f'actuator{i}'] for i in range(1, 8)],
+            gripper_joint_ids=finger_ids, gripper_qpos_ids=qpos_adr[finger_ids],
+            gripper_actuator_ids=[names.actuators['actuator8']],
+            eef_site_id=names.sites['nutassembly_ee_site'], hand_body_id=names.bodies['hand'],
+            ctrl_range=ctrl_range, arm_joint_names=arm_names, base_body_id=names.bodies['link0'],
+            base_body_name='link0', eef_site_name='nutassembly_ee_site',
+            joint_names=tuple(spec.joint_names), actuator_names=tuple(spec.actuator_names),
+            body_ids=[names.bodies[name] for name in spec.body_names],
+            site_ids=[names.sites[name] for name in spec.site_names])
+
     def asset_manifest(self) -> AssetManifest:
         return AssetManifest(
             owner_uid=self.uid,

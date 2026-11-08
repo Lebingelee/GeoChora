@@ -1545,6 +1545,20 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             projected_feedback = project_leaf_feedback(
                 source.scene_definition, value.get('logical_assembly'),
                 value.get('child_assemblies', {}), leaf_plan)
+        elif value.get('physical_execution') is not None:
+            from .physical_control import PhysicalControlExecutionV1
+            physical = value['physical_execution']
+            if (binding.physical_control_profile is None
+                    or type(physical) is not PhysicalControlExecutionV1
+                    or not any(selected.controller is item for item in physical.controllers)):
+                raise ValueError('physical Controller is not bound to the selected execution')
+            if selection.deployment == 'isolated_worker':
+                raise ValueError('direct physical execution is not admitted in an isolated worker')
+            physical.validate_source(
+                scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
+                source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
+                source=source,
+            )
         elif selected.position:
             if not declared_bindings:
                 declared_bindings = tuple(profile.controller_binding() for profile in selected.position_profiles)

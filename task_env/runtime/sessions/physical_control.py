@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import math
 from types import MappingProxyType
 
-from ...artifacts import SceneDefinition, resolve_logical_assembly
+from ...artifacts import FixedAttachmentPlanV1, FrameReference, SceneDefinition, resolve_logical_assembly
 from ...artifacts.contracts import CapabilityAssessmentV1
 from ...artifacts.logical_assembly import LogicalAssemblySubcomponentReferenceV1
 from ...artifacts.state import CanonicalStateViewV1, CanonicalStateViewV2
@@ -17,6 +17,149 @@ from ...controllers.canonical.physical_commands import (
     PhysicalControlBindingV1, PhysicalCommandBatchV1, PhysicalControlReceiptV1,
     PhysicalBodyBuildReceiptV1, PhysicalJointBuildReceiptV1, PhysicalBufferPolicyV1,
 )
+
+
+@dataclass(frozen=True)
+class ControlledSubjectV1:
+    """A subject's named channels in one already-declared source/Scene.
+
+    Source ownership describes the declaration, not a second importer. Root
+    attachment is a requirement: provider admission still has to prove it.
+    """
+    subject_id: str
+    entity_id: str
+    source_id: str
+    source_closure_sha256: str
+    source_ownership: str
+    root_mode: str
+    root_frame: FrameReference
+    parent_subject_id: str | None
+    channel_paths: tuple[tuple[str, ...], ...]
+    controller_writers: tuple[str, ...]
+    schema_version: str = 'controlled-subject-v1'
+    attachment_plan: FixedAttachmentPlanV1 | None = None
+
+    def __post_init__(self):
+        from ...artifacts.contracts import FrameReference, _SHA256, _name
+        if self.schema_version != 'controlled-subject-v1':
+            raise ValueError('unsupported controlled subject version')
+        for value in (self.subject_id, self.entity_id, self.source_id):
+            _name(value)
+        if self.source_ownership not in {'owns_source', 'references_existing'}:
+            raise ValueError('subject source ownership is not declared')
+        if type(self.source_closure_sha256) is not str or not _SHA256.fullmatch(self.source_closure_sha256):
+            raise ValueError('subject requires an exact source closure digest')
+        if self.root_mode not in {'fixed', 'free', 'constrained'}:
+            raise ValueError('subject root mode is not declared')
+        if type(self.root_frame) is not FrameReference or self.root_frame.entity_id != self.entity_id:
+            raise ValueError('subject root requires an entity-qualified Frame')
+        if self.parent_subject_id is not None:
+            _name(self.parent_subject_id)
+            if self.parent_subject_id == self.subject_id:
+                raise ValueError('subject cannot parent itself')
+            if self.root_mode != 'constrained':
+                raise ValueError('a subject with a parent requires a constrained root')
+        elif self.root_mode == 'constrained':
+            raise ValueError('a constrained subject requires a parent')
+        if self.attachment_plan is not None and type(self.attachment_plan) is not FixedAttachmentPlanV1:
+            raise TypeError('subject attachment must be a typed FixedAttachmentPlanV1')
+        if self.root_mode != 'constrained' and self.attachment_plan is not None:
+            raise ValueError('only constrained subjects may declare an attachment')
+        if (type(self.channel_paths) is not tuple or not self.channel_paths
+                or any(type(path) is not tuple or not path for path in self.channel_paths)
+                or len(set(self.channel_paths)) != len(self.channel_paths)):
+            raise ValueError('subject requires unique named channel paths')
+        for path in self.channel_paths:
+            for part in path:
+                _name(part)
+        if (type(self.controller_writers) is not tuple or not self.controller_writers
+                or len(set(self.controller_writers)) != len(self.controller_writers)):
+            raise ValueError('subject requires unique Controller writers')
+        for writer in self.controller_writers:
+            _name(writer)
+
+    @property
+    def identity_hash(self):
+        from ...controllers.canonical.contracts import digest
+        return digest({'schema_version': self.schema_version, 'subject_id': self.subject_id,
+            'entity_id': self.entity_id, 'source_id': self.source_id,
+            'source_closure_sha256': self.source_closure_sha256,
+            'source_ownership': self.source_ownership, 'root_mode': self.root_mode,
+            'root_frame': self.root_frame.to_mapping(), 'parent_subject_id': self.parent_subject_id,
+            'channel_paths': self.channel_paths, 'controller_writers': self.controller_writers,
+            'attachment_plan_sha256': (None if self.attachment_plan is None
+                                       else self.attachment_plan.identity_hash)})
+
+
+def validate_controlled_subjects(compiled, subjects, controllers):
+    """Match subjects and Controller writers to the real resolved channels."""
+    if type(subjects) is not tuple or not subjects or any(type(s) is not ControlledSubjectV1 for s in subjects):
+        raise TypeError('physical execution requires typed controlled subjects')
+    resolved = _validate_physical_binding(compiled.scene, compiled.root, compiled.children, compiled.binding)
+    by_id = {s.subject_id: s for s in subjects}
+    if len(by_id) != len(subjects) or len({s.entity_id for s in subjects}) != len(subjects):
+        raise ValueError('duplicate subject or entity ownership')
+    entities = {e.entity_id for e in compiled.scene.entities}
+    frames = {(f.entity_id, f.frame_id) for f in compiled.scene.frames or ()}
+    source_owners = [s.source_id for s in subjects if s.source_ownership == 'owns_source']
+    if len(source_owners) != len(set(source_owners)):
+        raise ValueError('a source cannot have multiple subject owners')
+    channels = {c.component_path: c for c in compiled.binding.channels}
+    leaves = {leaf.full_path: leaf.member for leaf in resolved.leaves}
+    used = set()
+    writers = {getattr(c, 'writer_id', None) for c in controllers}
+    for subject in subjects:
+        if (subject.entity_id not in entities or subject.source_id != compiled.binding.source_id
+                or subject.source_closure_sha256 != compiled.binding.source_closure_sha256):
+            raise ValueError('subject entity or source is missing or foreign')
+        if (subject.root_frame.entity_id, subject.root_frame.frame_id) not in frames:
+            raise ValueError('subject root Frame is missing')
+        roots = {a.root_frame_id for a in compiled.scene.articulations or ()
+                 if a.entity_id == subject.entity_id}
+        if subject.root_frame.frame_id not in roots:
+            raise ValueError('subject root Frame is not an articulation root')
+        if subject.source_ownership == 'owns_source':
+            from ...artifacts.logical_assembly import LogicalAssemblyEntityMemberV1
+            if not any(type(member) is LogicalAssemblyEntityMemberV1
+                       and member.entity_id == subject.entity_id for member in leaves.values()):
+                raise ValueError('source-owning subject needs an Assembly entity owner')
+        chain, cursor = set(), subject
+        while cursor.parent_subject_id is not None:
+            if cursor.subject_id in chain:
+                raise ValueError('controlled subject parent cycle')
+            chain.add(cursor.subject_id)
+            cursor = by_id.get(cursor.parent_subject_id)
+            if cursor is None:
+                raise ValueError('controlled subject parent is missing')
+        if subject.root_mode == 'constrained':
+            parent = by_id[subject.parent_subject_id]
+            attachment = subject.attachment_plan
+            if type(attachment) is not FixedAttachmentPlanV1:
+                raise ValueError('constrained subject requires a source-bound attachment plan')
+            if (attachment.parent_entity_id != parent.entity_id
+                    or attachment.child_entity_id != subject.entity_id
+                    or attachment.parent_root != parent.root_frame
+                    or attachment.child_root != subject.root_frame
+                    or attachment.scene_pin.scene_identity_sha256 != compiled.scene.identity_hash
+                    or attachment.source_closure_sha256 != compiled.binding.source_closure_sha256):
+                raise ValueError('subject attachment differs from its parent, Scene or source')
+        if not set(subject.controller_writers) <= writers:
+            raise ValueError('subject Controller writer is missing')
+        for path in subject.channel_paths:
+            channel = channels.get(path)
+            member = leaves.get(path)
+            if path in used or channel is None or channel.entity_id != subject.entity_id:
+                raise ValueError('subject channel is missing, duplicated or foreign')
+            if type(member) is not LogicalAssemblySubcomponentReferenceV1 or member.target_kind != 'joint':
+                raise ValueError('subject channel does not resolve to a joint')
+            if not set(channel.owner_ids) <= set(subject.controller_writers):
+                raise ValueError('subject channel Controller writers differ')
+            used.add(path)
+        if tuple(channel.component_path for channel in compiled.binding.channels
+                 if channel.component_path in subject.channel_paths) != subject.channel_paths:
+            raise ValueError('subject channel order differs from physical binding')
+    if used != set(channels):
+        raise ValueError('every physical joint channel needs exactly one subject')
 
 
 @dataclass(frozen=True)
@@ -38,6 +181,7 @@ class PhysicalControlExecutionV1:
     frame_bindings: object
     requirements: object
     generation: int
+    subjects: tuple[ControlledSubjectV1, ...] = ()
 
     def __post_init__(self):
         from collections.abc import Mapping
@@ -65,6 +209,40 @@ class PhysicalControlExecutionV1:
             raise ValueError('physical execution generation must be nonnegative')
         object.__setattr__(self, 'joint_bindings', MappingProxyType(dict(self.joint_bindings)))
         object.__setattr__(self, 'frame_bindings', MappingProxyType(dict(self.frame_bindings)))
+        if self.subjects:
+            validate_controlled_subjects(self.compiled, self.subjects, self.controllers)
+
+    def controller_batch(self, action, view, context):
+        """Compute one interval through the declared subject and existing Controller owners."""
+        from collections.abc import Mapping
+        if self.subjects:
+            validate_controlled_subjects(self.compiled, self.subjects, self.controllers)
+        if len(self.controllers) == 1 and not isinstance(action, Mapping):
+            actions = {self.controllers[0].identity: action}
+        elif isinstance(action, Mapping):
+            actions = dict(action)
+        else:
+            raise TypeError('multiple physical Controllers require identity-keyed actions')
+        if set(actions) != {controller.identity for controller in self.controllers}:
+            raise ValueError('physical action must cover every bound Controller exactly once')
+        parts = tuple(controller.compute(actions[controller.identity], view, context)
+                      for controller in self.controllers)
+        if any(type(part) is not PhysicalCommandBatchV1 or part.context != context for part in parts):
+            raise ValueError('physical Controller returned a foreign or untyped batch')
+        for controller, part in zip(self.controllers, parts, strict=True):
+            if any(item.contribution.owner_id != controller.writer_id
+                   for item in (*part.joint_efforts, *part.body_wrenches, *part.extensions)):
+                raise ValueError('physical Controller contribution owner differs from binding')
+            if self.subjects:
+                paths = {path for s in self.subjects if controller.writer_id in s.controller_writers
+                         for path in s.channel_paths}
+                allowed = {c.target_key for c in self.compiled.binding.channels if c.component_path in paths}
+                if any(item.target_key not in allowed for item in part.joint_efforts):
+                    raise ValueError('Controller output is outside its subject channels')
+        return PhysicalCommandBatchV1('physical-command-batch-v1', context,
+            tuple(item for part in parts for item in part.joint_efforts),
+            tuple(item for part in parts for item in part.body_wrenches),
+            tuple(item for part in parts for item in part.extensions))
 
     def action_space(self):
         """Expose the Controller-declared input shapes on the selected route."""
@@ -97,6 +275,19 @@ class PhysicalControlExecutionV1:
                     or set(self.joint_bindings) != joint_names
                     or set(self.frame_bindings) != frame_names):
                 raise ValueError('physical state bindings must exactly cover selected source names')
+            for subject in self.subjects:
+                free = any(name.startswith(subject.entity_id + '/') for name in source.free_joints)
+                if (subject.root_mode == 'free') != free:
+                    raise ValueError('subject root mode differs from source free-joint binding')
+                if subject.root_mode == 'constrained':
+                    attachment = getattr(source, 'fixed_attachment_plan', None)
+                    assembly = getattr(source, 'fixed_attachment_assembly', None)
+                    if (type(attachment) is not FixedAttachmentPlanV1
+                            or attachment.identity_hash != subject.attachment_plan.identity_hash
+                            or assembly is None):
+                        raise ValueError('subject attachment is not bound to the runtime source')
+                    from ...assembly.fixed_attachment import validate_fixed_attachment_scene
+                    validate_fixed_attachment_scene(attachment, assembly, scene)
         self.action_space()
 
 
