@@ -1,3 +1,7 @@
+# 2026-11-08：5c attempt003 获批准
+
+维护者批准已准备的 attempt003 范围与预算；工作包重新冻结后由其手工转发。执行尚未开始，普通 attempt count 仍为 2；第三次为最后一次普通窗口。详见 [执行规划](../planning/stage5-5c-attempt003-execution.md)。
+
 # 2026-11-08：5c attempt002 独立主审
 
 [Sol 主审](reviews/20261108_5c_attempt002_sol_review.md)判定未接收：非 Position 发布状态和组件 task camera 光学绑定仍有缺口。普通 attempt 已执行 2 次，第三次前必须重评；现有有限成果和执行偏差均保留。不自动派发、进入阶段 6 或改写历史。
