@@ -581,8 +581,11 @@ class ResolvedSelectedConfig:
     requested_execution_json: str | None = None
     gravity_compensation: bool = False
     reset_profile: str | None = None
+    robot_uid: str | None = None
 
     def __post_init__(self) -> None:
+        if self.robot_uid is not None and (type(self.robot_uid) is not str or not self.robot_uid.strip() or self.robot_uid != self.robot_uid.strip()):
+            raise ValueError("selected robot_uid must be a nonempty trimmed string")
         if self.reset_profile not in (None, 'pickcube-state-only-switch-v1'):
             raise ValueError('unsupported selected reset profile')
         if type(self.gravity_compensation) is not bool:

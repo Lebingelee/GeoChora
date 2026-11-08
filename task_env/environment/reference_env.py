@@ -4094,17 +4094,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if self.recorder is not None and self.binding.record_native_substeps:
                     self.recorder.applied_substep(index, state, feedback, effective, applied,
                                                    observed_diagnostics)
-            if self.binding.interval_mode == 'native':
-                failure_phase = 'physics_step'
-                interval_attempted = True
-                self.state, target, applied, _ = self.session.step_control_interval(
-                    target, self.controller, interval_observer=observe, arm_schedule=self.arm_schedule)
-                interval_completed = True
-            else:
-                # Preserve historical P1.6 grouped control-interval stepping,
-                # including the provider's boundary clock accumulation.
-                failure_phase = 'control_application'
-                applied = self.session.apply_control(target)
+            from contextlib import nullcontext
+            from ..runtime.sessions.control import position_subject_interval
+            subject_scope = (position_subject_interval(self.session, target, self.state)
+                             if getattr(self.value['source'], 'position_subject_binding', None) is not None
+                             else nullcontext())
+            with subject_scope:
+                if self.binding.interval_mode == 'native':
+                    failure_phase = 'physics_step'
+                    interval_attempted = True
+                    self.state, target, applied, _ = self.session.step_control_interval(
+                        target, self.controller, interval_observer=observe, arm_schedule=self.arm_schedule)
+                    interval_completed = True
+                else:
+                    # Preserve the existing grouped control-interval stepping.
+                    failure_phase = 'control_application'
+                    applied = self.session.apply_control(target)
             return applied
 
         def advance(_applied):

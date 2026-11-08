@@ -170,13 +170,28 @@ def check_mujoco_named_layout(model, mj, source):
             raise ValueError(f'named opening actuator is missing or invalid: {native}')
         fact = {'native': native, 'id': actuator}
         if source.scene_definition is None:
-            actuator_section = ET.fromstring(source.scene_source.xml).find('actuator')
+            composition = getattr(source, 'composition_runtime_input', None)
+            prefix = ''
+            declaration_xml, declaration_name = source.scene_source.xml, native
+            if composition is not None:
+                fixed = composition.fixed_declaration.attachment_plan
+                names = fixed.native_actuator_names
+                owned = [key for key, value in names.items() if value == native]
+                if len(owned) != 1:
+                    raise ValueError(f'opening actuator has no unique composition owner: {native}')
+                entity, declaration_name = owned[0].split('/', 1)
+                declaration_xml = composition.fixed_declaration.source_by_entity[entity].xml
+                if entity == fixed.child_entity_id:
+                    prefix = fixed.namespace_prefix
+            actuator_section = ET.fromstring(declaration_xml).find('actuator')
             candidates = [] if actuator_section is None else [
-                node for node in actuator_section if node.get('name') == native]
+                node for node in actuator_section if node.get('name') == declaration_name]
             if len(candidates) != 1:
                 raise ValueError(f'opening actuator has no unique source declaration: {native}')
             declaration = candidates[0]
             tendon_name, joint_name = declaration.get('tendon'), declaration.get('joint')
+            tendon_name = prefix + tendon_name if tendon_name else None
+            joint_name = prefix + joint_name if joint_name else None
             if tendon_name and not joint_name:
                 expected_type, target = int(mj.mjtTrn.mjTRN_TENDON), int(model.tendon(tendon_name).id)
                 fact.update(target_kind='tendon', target_native=tendon_name, target_id=target)
@@ -216,6 +231,8 @@ class _MuJoCoSession(_SessionValues):
         """Bind one verified physical profile to this materialized session."""
         if getattr(self, '_physical_port', None) is not None or self._reset_done:
             raise ValueError('physical port must be bound once before reset')
+        if getattr(self._source, 'position_subject_binding', None) is not None:
+            raise ValueError('physical effort port cannot share position-subject actuator ownership')
         from .mujoco_physical import MuJoCoPhysicalPort
         self._physical_port = MuJoCoPhysicalPort(self, execution)
         self.physical_control_generation = execution.generation
@@ -284,33 +301,50 @@ class _MuJoCoSession(_SessionValues):
             return
         import mujoco
         self._mj = mujoco
-        assets = None
-        if source.scene_definition is not None:
-            source_xml, assets = lower_mujoco_scene_source(
-                source.scene_source,
-                source.scene_definition,
-                source.source_closure_digest,
+        composition = getattr(source, 'composition_runtime_input', None)
+        if composition is not None:
+            from .mujoco_composition import materialize_fixed_robot_task
+            self._model, self._composition_receipt, self._composition_details = materialize_fixed_robot_task(
+                composition=composition.plan, task_receipt=source.execution_source_receipt,
+                fixed_declaration=composition.fixed_declaration,
+                retained_roots=composition.retained_roots,
+                replaced_robot_roots=composition.replaced_robot_roots,
+                entity_body_names=composition.entity_body_names,
+                allowed_free_joints=composition.allowed_free_joints,
+                task_site_transfers=composition.plan.task_site_transfers,
             )
+            from dataclasses import replace
+            self._composition_receipt = replace(
+                self._composition_receipt, materialization_id=self.provider_materialization_id)
+            self._composition_receipt.validate_against(composition.plan)
         else:
-            receipt = source.execution_source_receipt
-            if receipt is None:
-                source_xml = source.scene_source.xml
+            assets = None
+            if source.scene_definition is not None:
+                source_xml, assets = lower_mujoco_scene_source(
+                    source.scene_source,
+                    source.scene_definition,
+                    source.source_closure_digest,
+                )
             else:
-                receipt.validate_snapshot()
-                source_xml = receipt.importer_xml.decode('utf-8')
-                assets = {name: payload for name, payload in receipt.closure_files.items()
-                          if name not in {'scene.xml', 'canonical-source.xml'}}
-            legacy_root = ET.fromstring(source_xml)
-            for element in legacy_root.iter('freejoint'):
-                element.tag = 'joint'
-                element.set('type', 'free')
-            for element in legacy_root.findall('keyframe'):
-                legacy_root.remove(element)
-            source_xml = ET.tostring(legacy_root, encoding='unicode')
-        root = ET.fromstring(source_xml)
-        self._model = mujoco.MjModel.from_xml_string(
-            ET.tostring(root, encoding='unicode'), assets=assets,
-        )
+                receipt = source.execution_source_receipt
+                if receipt is None:
+                    source_xml = source.scene_source.xml
+                else:
+                    receipt.validate_snapshot()
+                    source_xml = receipt.importer_xml.decode('utf-8')
+                    assets = {name: payload for name, payload in receipt.closure_files.items()
+                              if name not in {'scene.xml', 'canonical-source.xml'}}
+                legacy_root = ET.fromstring(source_xml)
+                for element in legacy_root.iter('freejoint'):
+                    element.tag = 'joint'
+                    element.set('type', 'free')
+                for element in legacy_root.findall('keyframe'):
+                    legacy_root.remove(element)
+                source_xml = ET.tostring(legacy_root, encoding='unicode')
+            root = ET.fromstring(source_xml)
+            self._model = mujoco.MjModel.from_xml_string(
+                ET.tostring(root, encoding='unicode'), assets=assets,
+            )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
         self._fixed_forward_calls = 0
@@ -335,6 +369,32 @@ class _MuJoCoSession(_SessionValues):
                 'source_closure': source.source_closure_digest, 'objects': checked,
                 'materialization_id': self.provider_materialization_id,
                 'physical_model': _mujoco_model_facts(self._model, self._mj)}
+            if source.source_reference_plan is not None:
+                self._build_layout_facts['source_reference'] = {
+                    'schema_version': 'source-composition-materialization-receipt-v1',
+                    'plan_sha256': source.source_reference_plan.identity_hash,
+                    'materialization_id': self.provider_materialization_id,
+                    'task_source_id': source.source_reference_plan.task_source.source_id,
+                    'task_closure_sha256': source.source_reference_plan.task_source.closure_sha256,
+                    'robot_entities': list(source.source_reference_plan.existing_robot_entity_ids),
+                    'objects': checked, 'physical_model': self._build_layout_facts['physical_model'],
+                    'controller_binding_sha256': source.position_subject_binding.plan.identity_hash,
+                    'subject_binding_sha256': source.position_subject_binding.subject_identity_sha256,
+                    'resource_writers': list(source.position_subject_binding.plan.resource_writers),
+                }
+            if composition is not None:
+                self._build_layout_facts['source_composition'] = {
+                    'schema_version': 'source-composition-materialization-receipt-v1',
+                    'plan_sha256': self._composition_receipt.plan_sha256,
+                    'source_closures': list(self._composition_receipt.source_closures),
+                    'entity_native_names': list(self._composition_receipt.entity_native_names),
+                    'materialization_id': self._composition_receipt.materialization_id,
+                    'details': self._composition_details,
+                    'objects': checked, 'physical_model': self._build_layout_facts['physical_model'],
+                    'controller_binding_sha256': source.position_subject_binding.plan.identity_hash,
+                    'subject_binding_sha256': source.position_subject_binding.subject_identity_sha256,
+                    'resource_writers': list(source.position_subject_binding.plan.resource_writers),
+                }
         except BaseException:
             self.close()
             raise

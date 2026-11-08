@@ -1501,7 +1501,13 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             sites = {node.get('name') for node in root.iter('site')}
             actuators = root.find('actuator')
             actuators = set() if actuators is None else {node.get('name') for node in actuators}
-            for label, requested, available in (() if source.fixed_attachment_plan is not None else (
+            if source.composition_runtime_input is not None:
+                if selection.physics_provider != 'mujoco':
+                    raise ValueError('source composition has no admitted adapter for this provider')
+                from .mujoco_composition import validate_composed_source_names
+                validate_composed_source_names(source)
+            for label, requested, available in (() if (source.fixed_attachment_plan is not None
+                    or source.composition_runtime_input is not None) else (
                 ('joint', (*source.joints.values(), *source.free_joints.values()), joints),
                 ('body', source.bodies.values(), bodies),
                 ('frame', source.frames.values(), sites),

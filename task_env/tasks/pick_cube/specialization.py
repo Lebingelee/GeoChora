@@ -509,9 +509,39 @@ def position_execution_info(state, last_position_transition):
 
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
-                           interval_provider=None):
+                           interval_provider=None, robot_source_adapter=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    def adapt(value):
+        if robot_source_adapter is None:
+            return value
+        original_source = value['source']
+        try:
+            adapted_source = robot_source_adapter(original_source, artifact=value['artifact'],
+                                                   controller=value['controller'])
+            # Bind the Robot source and compatibility projection to construction identity.
+            from ...assembly.compiler import reference_task_identity_fields
+            from ...controllers.canonical.contracts import digest
+            value = dict(value)
+            value['source'] = adapted_source
+            resolved = dict(value['resolved_configuration'])
+            resolved.update(reference_task_identity_fields(value['artifact'], adapted_source, value['controller']))
+            composition = adapted_source.composition_runtime_input
+            reference = adapted_source.source_reference_plan
+            resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
+                                                         else reference.identity_hash)
+            value['resolved_configuration'] = resolved
+            value['recipe_identity'] = digest(resolved)
+            return value
+        except BaseException as error:
+            receipt = getattr(original_source, 'execution_source_receipt', None)
+            if receipt is not None:
+                try:
+                    receipt.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'Robot source cleanup also failed: {cleanup_error!r}')
+            raise
+
     def build(provider):
         if provider == "isaacsim":
             if source_delivery_manifest is None:
@@ -522,7 +552,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
+        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -532,8 +562,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
+        return adapt(build_reference(backend="cpu", include_solution=False,
+                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
 
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
@@ -545,7 +575,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
+        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
 
     return ReferenceTaskBinding(
         build=build,
@@ -598,6 +628,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25)}
     selected_supports_isaac = True
+    selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
     selected_execution_defaults = {
         "physics_provider": "geophys",
         "physics_backend": "cpu",
@@ -626,6 +657,22 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config):
         profile = config.controller_profile
+        adapter = None
+        if config.robot_uid is not None:
+            from ...registry import AGENT_REGISTRY
+            robot = AGENT_REGISTRY.create(config.robot_uid)
+            compose = getattr(robot, 'compose_task_source', None)
+            if compose is not None:
+                profiles = getattr(robot, 'selected_controller_profiles', lambda: ())()
+                if profile not in profiles:
+                    raise ValueError('selected Robot does not declare this Controller profile')
+                if (config.physics_provider, config.environment.runtime.backend) != ('mujoco', 'cpu'):
+                    raise ValueError('selected Robot composition requires an admitted provider capability')
+                adapter = lambda source, **owners: compose(
+                    source, **owners, task_entities=('tabletop-v1', 'cube-v1'),
+                    existing_robot_entity='panda-v1',
+                    task_body_names=(('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube')),
+                    task_site_transfers=(('hand', 'nutassembly_ee_site', 'hand'),))
         environment = (_nut_aligned_environment_config(config.environment)
                        if profile in _PICKCUBE_R3_PROFILES else config.environment)
         return make_reference_binding(
@@ -634,6 +681,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             lift_height_m=dict(config.task_parameters).get("lift_height_m"),
             task_config=json.loads(config.task_configuration_json),
             interval_provider=config.physics_provider,
+            robot_source_adapter=adapter,
         )
 
     @classmethod

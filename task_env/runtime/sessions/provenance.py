@@ -577,6 +577,23 @@ def bind_selected_build_checks(receipt, facts, *, materialization_id):
               'frames': 'frames', 'joint_targets': 'actuators',
               'torque_actuators': 'actuators', 'position_actuators': 'actuators'}
     declared = identity['source_bindings']
+    reference_hash = declared.get('source_reference_plan')
+    if reference_hash is not None:
+        reference = facts.get('source_reference')
+        if (not isinstance(reference, dict) or reference.get('schema_version') != 'source-composition-materialization-receipt-v1'
+                or reference.get('plan_sha256') != reference_hash
+                or reference.get('materialization_id') != materialization_id
+                or reference.get('objects') != facts.get('objects')):
+            raise ValueError('adapter reference receipt differs from the requested plan or session')
+    composition_hash = declared.get('source_composition_plan')
+    if composition_hash is not None:
+        composition = facts.get('source_composition')
+        if (not isinstance(composition, dict)
+                or composition.get('schema_version') != 'source-composition-materialization-receipt-v1'
+                or composition.get('plan_sha256') != composition_hash
+                or composition.get('materialization_id') != materialization_id
+                or composition.get('objects') != facts.get('objects')):
+            raise ValueError('adapter composition receipt differs from the requested plan or session')
     for source_field, checked_field in fields.items():
         for semantic, native in declared[source_field].items():
             checked_object = facts['objects'].get(checked_field, {}).get(semantic)

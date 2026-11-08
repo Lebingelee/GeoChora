@@ -279,6 +279,9 @@ class _SessionValues:
         self._reset_plan_evidence = None
         if hasattr(self, '_position_applied_boundary_ids'):
             self._position_applied_boundary_ids.clear()
+        if hasattr(self, '_subject_position_consumed'):
+            self._subject_position_consumed.clear()
+        self._subject_position_inflight = None
 
     def reset_plan(self, plan: EpisodeResetPlanV1 | ResetPlanV1) -> RealizedInitialState:
         """Reset from a public Core plan and open rollout after its readback gate."""

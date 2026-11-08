@@ -349,6 +349,8 @@ def _resolve_selected_config(environment_type, config):
             config["execution"]["reset_profile"] = supplied.reset_profile
         if supplied.controller_profile is not None:
             config["task"]["controller_profile"] = supplied.controller_profile
+        if supplied.robot_uid is not None:
+            config["robot"] = {"uid": supplied.robot_uid}
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if config is None:
@@ -357,10 +359,23 @@ def _resolve_selected_config(environment_type, config):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
     allowed = {"execution", "episode", "task", "controller", "provider", "backend", "horizon",
-               "controller_profile", "source_delivery_manifest"}
+               "controller_profile", "source_delivery_manifest", "robot"}
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
+    robot_selection = values.get('robot')
+    robot_uid = None
+    if robot_selection is not None:
+        if not isinstance(robot_selection, Mapping) or set(robot_selection) != {'uid'}:
+            raise ValueError('selected robot configuration requires exactly uid')
+        robot_uid = robot_selection['uid']
+        if type(robot_uid) is not str or not robot_uid.strip() or robot_uid != robot_uid.strip():
+            raise ValueError('selected robot uid must be a nonempty trimmed string')
+        choices = getattr(environment_type, 'selected_robot_uids', ())
+        if robot_uid not in choices:
+            raise ValueError('selected task does not admit the requested robot')
+        from ..registry import AGENT_REGISTRY
+        AGENT_REGISTRY.get(robot_uid)
     controller = values.get('controller', {})
     if not isinstance(controller, Mapping) or set(controller) - {'gravity_compensation'}:
         raise ValueError('selected controller supports only gravity_compensation')
@@ -511,6 +526,7 @@ def _resolve_selected_config(environment_type, config):
         controller_profile=profile,
         gravity_compensation=gravity_compensation,
         reset_profile=reset_profile,
+        robot_uid=robot_uid,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
@@ -526,6 +542,8 @@ def _resolve_selected_config(environment_type, config):
         original = {"execution": json.loads(requested_json),
                     "episode": {"horizon": result.environment.episode.horizon},
                     "task": dict(result.task_parameters)}
+        if result.robot_uid is not None:
+            original["robot"] = {"uid": result.robot_uid}
         if result.gravity_compensation:
             original['controller'] = {'gravity_compensation': True}
         if result.controller_profile is not None:

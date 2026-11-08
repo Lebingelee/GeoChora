@@ -38,3 +38,4 @@ def test_assembled_robot_declaration_has_two_sources_without_native_import():
     assert len(agent.reference_spec().joint_names) == 9
     assert len(agent.reference_spec().actuator_names) == 8
     assert agent.supported_controller_kinds() == ()
+    assert agent.selected_controller_profiles() == ('r1',)

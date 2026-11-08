@@ -432,6 +432,12 @@ def source_binding_facts(source):
     result['open_actuators'] = list(getattr(source, 'open_actuators', ()))
     plan = getattr(source, 'mixed_actuator_plan', None)
     result['mixed_actuator_plan'] = None if plan is None else plan.identity_hash
+    reference = getattr(source, 'source_reference_plan', None)
+    if reference is not None:
+        result['source_reference_plan'] = reference.identity_hash
+    composition = getattr(source, 'composition_runtime_input', None)
+    if composition is not None:
+        result['source_composition_plan'] = composition.plan.identity_hash
     return result
 
 

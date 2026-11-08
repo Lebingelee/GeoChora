@@ -552,10 +552,12 @@ def test_selected_position_profile_rejects_legacy_action_before_mode_mutation():
     from task_env.tasks.reference_env import SelectedReferenceEnv
 
     selected = object.__new__(SelectedReferenceEnv)
-    selected.binding = SimpleNamespace(external_actions=True, external_solution_actions=False)
+    selected.binding = SimpleNamespace(external_actions=True, external_solution_actions=False,
+                                       physical_control_profile=None)
     selected._episode_mode = None
     selected.position_profile = True
     selected.position_plan = object()
+    selected.value = {}
     selected.session = object()
     selected.state = SimpleNamespace(control_step=0)
     selected.horizon = 10

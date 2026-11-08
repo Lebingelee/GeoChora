@@ -286,6 +286,7 @@ class ControlBindingPlanV1:
     resource_writers: tuple[tuple[str, str, str], ...]
     artifact_identity_hash: str | None = None
     source_closure_digest: str | None = None
+    assembly_identity_hash: str | None = None
     _compiled: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self):
@@ -293,7 +294,7 @@ class ControlBindingPlanV1:
             raise ValueError('unsupported ControlBindingPlan schema')
         if len(self.scene_identity_hash) != 64:
             raise ValueError('ControlBindingPlan requires a Scene identity')
-        for name in ('artifact_identity_hash', 'source_closure_digest'):
+        for name in ('artifact_identity_hash', 'source_closure_digest', 'assembly_identity_hash'):
             value = getattr(self, name)
             if value is not None and (
                 len(value) != 64 or any(char not in '0123456789abcdef' for char in value)
@@ -346,6 +347,8 @@ class ControlBindingPlanV1:
         # Keep historical v1 plan hashes byte-for-byte stable when these
         # source-instance bindings are absent. New bounded R1 plans include
         # them so a writer name cannot stand in for a constructed Controller.
+        if self.assembly_identity_hash is not None:
+            payload['assembly_identity_hash'] = self.assembly_identity_hash
         if self.artifact_identity_hash is not None:
             payload['artifact_identity_hash'] = self.artifact_identity_hash
         if self.source_closure_digest is not None:
@@ -359,12 +362,27 @@ def compile_control_binding_plan(
     *,
     artifact_identity_hash: str | None = None,
     source_closure_digest: str | None = None,
+    logical_assembly=None,
+    assembly_children=(),
 ) -> ControlBindingPlanV1:
     """Resolve each A03 ControlGroup to exactly one existing writer and schema."""
     if not isinstance(scene, SceneDefinition) or scene.schema_version != 'scene-definition-v3':
         raise ValueError('Controller bindings require a canonical scene-definition-v3')
     if not isinstance(controller_bindings, tuple):
         raise TypeError('Controller bindings must be an immutable tuple')
+    assembly_identity = None
+    assembly_entities = set()
+    if logical_assembly is not None:
+        from ...artifacts.logical_assembly import LogicalAssemblyEntityMemberV1
+        from ...artifacts.logical_assembly_resolution import resolve_logical_assembly
+        resolved = resolve_logical_assembly(logical_assembly, scene, assembly_children)
+        assembly_identity = resolved.root_logical_content_sha256
+        assembly_entities = {leaf.member.entity_id for leaf in resolved.leaves
+                             if type(leaf.member) is LogicalAssemblyEntityMemberV1}
+        if not assembly_entities:
+            raise ValueError('Controller Assembly must own at least one Scene entity')
+    elif assembly_children:
+        raise ValueError('Assembly children require a root logical Assembly')
     groups_by_key = {
         (group.entity_id, group.group_id): group
         for group in (scene.control_groups or ())
@@ -383,9 +401,9 @@ def compile_control_binding_plan(
         if binding.action_schema.schema_version != 'task-env-action-v2':
             raise ValueError('Controller binding requires the current ActionModeSpec contract')
         entity_ids = {group.entity_id for group in binding.groups}
-        if len(entity_ids) != 1:
-            raise ValueError('one Controller writer cannot span multiple Robot entities in this slice')
-        controller_entities[binding.writer_id] = next(iter(entity_ids))
+        if len(entity_ids) != 1 and (assembly_identity is None or not entity_ids <= assembly_entities):
+            raise ValueError('multi-entity Controller requires ownership by its resolved logical Assembly')
+        controller_entities[binding.writer_id] = tuple(sorted(entity_ids))
         action_components = []
         for projection in binding.groups:
             key = projection.key
@@ -427,7 +445,7 @@ def compile_control_binding_plan(
         'control-binding-plan-v1', scene.identity_hash, controller_bindings,
         tuple((entity_id, actuator_id, writer_id)
               for (entity_id, actuator_id), writer_id in resource_writers.items()),
-        artifact_identity_hash, source_closure_digest,
+        artifact_identity_hash, source_closure_digest, assembly_identity,
     )
     object.__setattr__(plan, '_compiled', True)
     return plan
@@ -1373,10 +1391,67 @@ def materialize_control(
     return session
 
 
+@__import__('contextlib').contextmanager
+def position_subject_interval(session, target, state):
+    """Authorize one Controller-produced target for the current live boundary."""
+    session._require_reset()
+    binding = getattr(session._source, 'position_subject_binding', None)
+    if binding is None:
+        raise ValueError('position subject interval requires its declared binding')
+    current = session.snapshot()
+    if current.to_mapping() != state.to_mapping():
+        raise ValueError('position subject target was computed from a stale state')
+    boundary = (session.provider_materialization_id, session.episode_id,
+                session.state_revision, current.control_step)
+    consumed = getattr(session, '_subject_position_consumed', None)
+    if consumed is None:
+        consumed = session._subject_position_consumed = set()
+    if boundary in consumed or getattr(session, '_subject_position_inflight', None) is not None:
+        raise ValueError('position subject boundary is already consumed or active')
+    consumed.add(boundary)
+    session._subject_position_inflight = (boundary, target.identity_hash, target.controller_identity)
+    try:
+        yield
+    finally:
+        session._subject_position_inflight = None
+
+
 def validate_target(session,target):
     if not isinstance(target, CanonicalControlTarget):raise TypeError("CanonicalControlTarget required")
     session._require_reset()
     if not hasattr(session,'_control_binding'):raise ValueError('control session admission required')
+    subject_binding = getattr(session._source, 'position_subject_binding', None)
+    if subject_binding is not None:
+        inflight = getattr(session, '_subject_position_inflight', None)
+        if (not isinstance(inflight, tuple) or len(inflight) != 3
+                or inflight[0][0] != session.provider_materialization_id
+                or inflight[0][1] != session.episode_id
+                or inflight[0][3] != session.snapshot().control_step
+                or inflight[2] != target.controller_identity
+                or (not getattr(session, '_inner_interval_active', False)
+                    and inflight[1] != target.identity_hash)):
+            raise ValueError('position target is not authorized for the current subject boundary')
+        from ...assembly.source_composition import PositionSubjectControlBindingV1
+        if type(subject_binding) is not PositionSubjectControlBindingV1:
+            raise TypeError('position target requires its exact subject binding')
+        binding_plan = subject_binding.plan
+        if (not binding_plan._compiled or binding_plan.artifact_identity_hash != target.task_artifact_hash
+                or binding_plan.source_closure_digest != session._source.source_closure_digest):
+            raise ValueError('position target lacks its source-bound Controller binding')
+        bindings = binding_plan.controller_bindings
+        if len(bindings) != 1 or bindings[0].controller_identity != target.controller_identity:
+            raise ValueError('position target Controller identity differs from subject binding')
+        if {writer for _, _, writer in binding_plan.resource_writers} != {bindings[0].writer_id}:
+            raise ValueError('position target does not have one declared Controller writer')
+        native_resources = {native for _, _, native in subject_binding.resource_native_names}
+        requested_resources = set(session._source.joint_targets.values()) | set(session._source.open_actuators)
+        if native_resources != requested_resources:
+            raise ValueError('position target native writers differ from subject binding')
+        composition = getattr(session._source, 'composition_runtime_input', None)
+        if composition is not None and (
+                binding_plan.identity_hash != composition.plan.control_binding_identity_sha256
+                or subject_binding.subject_identity_sha256 != composition.plan.subject_binding_identity_sha256):
+            raise ValueError('position subject binding differs from source composition')
     if hasattr(session, '_position_profile_identities'):
         if getattr(session, '_position_target_in_flight', None) != target.identity_hash:
             raise ValueError('PositionServoV1 target must pass source-bound boundary validation')
@@ -1890,3 +1965,91 @@ def execute_plan_bound_r1_control_interval(
         raise ValueError('R1 interval did not complete exactly one 100 Hz control boundary')
     next_publication.view.validate_requirements(binding.feedback_requirements)
     return canonical, target, acknowledgement, stepped_state, next_publication, feedback
+
+
+def validate_position_control_subjects(*, scene, root, children, subjects, plan, attachment_scene=None):
+    """Bind position Controller resources to declared subjects and logical paths.
+
+    This validates static ownership only. Provider build and per-interval
+    target validation remain separate obligations.
+    """
+    from ...artifacts.logical_assembly import LogicalAssemblySubcomponentReferenceV1
+    from ...artifacts.logical_assembly_resolution import resolve_logical_assembly
+    from ...runtime.sessions.physical_control import ControlledSubjectV1
+    if (type(subjects) is not tuple or not subjects
+            or any(type(subject) is not ControlledSubjectV1 for subject in subjects)):
+        raise TypeError('position binding requires typed controlled subjects')
+    if type(plan) is not ControlBindingPlanV1 or not plan._compiled:
+        raise TypeError('position subjects require a compiled Controller binding plan')
+    resolved = resolve_logical_assembly(root, scene, children)
+    if (resolved.scene_identity_sha256 != plan.scene_identity_hash
+            or resolved.root_logical_content_sha256 != plan.assembly_identity_hash):
+        raise ValueError('position subject Assembly differs from Controller binding')
+    by_id = {subject.subject_id: subject for subject in subjects}
+    if len(by_id) != len(subjects) or len({s.entity_id for s in subjects}) != len(subjects):
+        raise ValueError('position subjects must have unique identities and entities')
+    leaves = {leaf.full_path: leaf.member for leaf in resolved.leaves}
+    from ...artifacts.logical_assembly import LogicalAssemblyEntityMemberV1
+    owners = {member.entity_id for member in leaves.values()
+              if type(member) is LogicalAssemblyEntityMemberV1}
+    owning_sources = [subject.source_id for subject in subjects if subject.source_ownership == 'owns_source']
+    if len(owning_sources) != len(set(owning_sources)):
+        raise ValueError('position subjects cannot duplicate source ownership')
+    used = set()
+    subject_facts = []
+    for subject in subjects:
+        if subject.entity_id not in owners:
+            raise ValueError('position subject lacks an Assembly entity owner')
+        chain, cursor = set(), subject
+        while cursor.parent_subject_id is not None:
+            if cursor.subject_id in chain:
+                raise ValueError('position subject parent cycle')
+            chain.add(cursor.subject_id)
+            cursor = by_id.get(cursor.parent_subject_id)
+            if cursor is None:
+                raise ValueError('position subject parent is missing')
+        roots = {item.root_frame_id for item in scene.articulations or ()
+                 if item.entity_id == subject.entity_id}
+        if subject.root_frame.frame_id not in roots:
+            raise ValueError('position subject root differs from Scene articulation')
+        expected_writers = {writer for entity, _, writer in plan.resource_writers
+                            if entity == subject.entity_id}
+        if expected_writers != set(subject.controller_writers):
+            raise ValueError('position subject writers differ from Controller binding')
+        expected_joints = {joint.joint_id for art in scene.articulations or ()
+                           if art.entity_id == subject.entity_id for joint in art.joints
+                           if joint.kind != 'fixed'}
+        names = set()
+        for path in subject.channel_paths:
+            member = leaves.get(path)
+            if (path in used or type(member) is not LogicalAssemblySubcomponentReferenceV1
+                    or member.target_kind != 'joint' or member.target.entity_id != subject.entity_id):
+                raise ValueError('position subject channel path does not resolve to its own joint')
+            used.add(path); names.add(member.target.joint_id)
+        if len(names) != len(subject.channel_paths) or names != expected_joints:
+            raise ValueError('position subject channels do not cover its joints exactly')
+        if subject.root_mode == 'constrained':
+            parent = by_id.get(subject.parent_subject_id)
+            attachment = subject.attachment_plan
+            if parent is None or attachment is None or attachment_scene is None:
+                raise ValueError('constrained position subject requires declared source attachment')
+            if (attachment.parent_entity_id != parent.entity_id
+                    or attachment.child_entity_id != subject.entity_id
+                    or attachment.parent_root != parent.root_frame
+                    or attachment.child_root != subject.root_frame
+                    or attachment.scene_pin.scene_identity_sha256 != attachment_scene.identity_hash
+                    or attachment.source_closure_sha256 != subject.source_closure_sha256):
+                raise ValueError('position subject attachment differs from source ownership')
+        elif subject.parent_subject_id is not None:
+            raise ValueError('unconstrained subject cannot have a parent')
+        subject_facts.append({'subject_id': subject.subject_id, 'entity_id': subject.entity_id,
+            'source_id': subject.source_id, 'source_closure': subject.source_closure_sha256,
+            'ownership': subject.source_ownership, 'root_mode': subject.root_mode,
+            'root': subject.root_frame.to_mapping(), 'parent': subject.parent_subject_id,
+            'channels': subject.channel_paths, 'writers': subject.controller_writers,
+            'attachment': None if subject.attachment_plan is None else subject.attachment_plan.identity_hash})
+    if {entity for entity, _, _ in plan.resource_writers} != {s.entity_id for s in subjects}:
+        raise ValueError('every position resource must have exactly one subject owner')
+    return _schema_hash({'schema_version': 'position-subject-binding-v1',
+                         'scene': scene.identity_hash, 'assembly': plan.assembly_identity_hash,
+                         'controller': plan.identity_hash, 'subjects': subject_facts})

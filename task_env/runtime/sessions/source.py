@@ -394,6 +394,9 @@ class RuntimeSource:
     contact_geom_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     mixed_actuator_plan: object | None = None
     task_local_joint_limit_tolerance_overrides: Mapping[str, float] = field(default_factory=dict)
+    composition_runtime_input: object | None = None
+    position_subject_binding: object | None = None
+    source_reference_plan: object | None = None
 
     @property
     def source_id(self) -> str:
@@ -401,6 +404,53 @@ class RuntimeSource:
         return self.scene_source.source_id
 
     def __post_init__(self):
+        if self.source_reference_plan is not None:
+            from ...assembly.source_composition import SourceCompositionPlanV1
+            reference = self.source_reference_plan
+            if (type(reference) is not SourceCompositionPlanV1 or reference.mode != 'reference'
+                    or reference.task_source.source_id != self.scene_source.source_id
+                    or reference.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('reference source composition differs from RuntimeSource')
+            if self.composition_runtime_input is not None:
+                raise ValueError('reference and replacement compositions are mutually exclusive')
+            if self.position_subject_binding is None or self.position_subject_binding.identity_hash != reference.position_binding_identity_sha256:
+                raise ValueError('reference source position mapping identity differs from its plan')
+        if self.position_subject_binding is not None:
+            from ...assembly.source_composition import PositionSubjectControlBindingV1
+            binding = self.position_subject_binding
+            if type(binding) is not PositionSubjectControlBindingV1:
+                raise TypeError('position subject binding requires its exact typed value')
+            if (binding.plan.artifact_identity_hash != self.task_artifact_hash
+                    or binding.plan.source_closure_digest != self.source_closure_digest):
+                raise ValueError('position subject binding differs from RuntimeSource identity')
+            declared_joints = {semantic: native for semantic, _entity, _joint, native, _actuator
+                               in binding.joint_native_ownership}
+            if dict(self.joints) != declared_joints:
+                raise ValueError('position semantic joint mapping differs from declared subject ownership')
+            native_resources = {(entity, actuator): native for entity, actuator, native
+                                in binding.resource_native_names}
+            for semantic, entity, _joint, _native, actuator in binding.joint_native_ownership:
+                if semantic in self.joint_targets and self.joint_targets[semantic] != native_resources[(entity, actuator)]:
+                    raise ValueError('position joint target maps to the wrong subject actuator')
+        if self.composition_runtime_input is not None:
+            from ...assembly.source_composition import CompositionRuntimeInputV1
+            value = self.composition_runtime_input
+            if type(value) is not CompositionRuntimeInputV1:
+                raise TypeError('composition input must be CompositionRuntimeInputV1')
+            if self.execution_source_receipt is None:
+                raise ValueError('composition input requires a verified task source receipt')
+            binding = self.position_subject_binding
+            if binding is not None and binding.identity_hash != value.plan.position_binding_identity_sha256:
+                raise ValueError('composition source position mapping identity differs from its plan')
+            if value.control_binding_plan is not None and (
+                    binding is None or binding.plan.identity_hash != value.control_binding_plan.identity_hash
+                    or binding.subject_identity_sha256 != value.subject_binding_identity_sha256):
+                raise ValueError('composition input requires the same declared position subject binding')
+            if (value.plan.task_source.source_id != self.scene_source.source_id
+                    or value.plan.task_source.closure_sha256 != self.source_closure_digest):
+                raise ValueError('composition plan differs from task RuntimeSource identity')
+            if self.fixed_attachment_plan is not None or self.scene_definition is not None:
+                raise ValueError('composition input cannot alias an existing fixed or canonical source')
         for field in (
             'joints', 'bodies', 'frames', 'free_joints', 'joint_targets',
             'torque_actuators', 'position_actuators', 'actuator_units',
@@ -442,6 +492,8 @@ class RuntimeSource:
             if (any(self.actuator_units[name] != 'N*m' for name in self.torque_actuators.values())
                     or any(self.actuator_units[name] != 'm' for name in self.position_actuators.values())):
                 raise ValueError('direct-control unit differs from actuator role')
+        if self.mixed_actuator_plan is not None and self.position_subject_binding is not None:
+            raise ValueError('position subject and mixed actuator writers cannot share a RuntimeSource')
         if self.mixed_actuator_plan is not None:
             from ...controllers.canonical.contracts import MixedActuatorPlanV1
             plan = self.mixed_actuator_plan

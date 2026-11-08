@@ -115,37 +115,12 @@ class PandaAgent(BaseAgent):
     ) -> SceneDefinition:
         """Build the Panda Scene from its declared MJCF through GeoPhys' importer."""
 
-        manifest = self.asset_manifest()
-        if len(manifest.mjcf_sources) != 1 or len(manifest.asset_roots) != 1:
-            raise ValueError("Panda Scene construction requires one declared MJCF root")
-        from scene import SceneSource, import_scene_source
-
-        imported = import_scene_source(
-            SceneSource.mjcf_path(
-                manifest.mjcf_sources[0],
-                label=f"{self.uid}:{manifest.source_revision}",
-            ),
-            cache=False,
-        )
-        root = manifest.asset_roots[0].resolve(strict=True)
-        files = {}
-        for raw_path in imported.dependency_paths:
-            path = Path(raw_path).resolve(strict=True)
-            try:
-                logical_path = path.relative_to(root).as_posix()
-            except ValueError as exc:
-                raise ValueError(
-                    f"Panda importer dependency escaped its declared asset root: {path}"
-                ) from exc
-            files[logical_path] = path.read_bytes()
-        if not files:
-            raise ValueError("Panda importer returned an empty source closure")
-        return _panda_scene_from_import(
-            imported,
-            manifest,
+        from ..runtime.sessions.source_scene_import import import_agent_source_scene
+        return import_agent_source_scene(
+            self.asset_manifest(), owner_uid=self.uid,
             entity_id=self.uid if entity_id is None else entity_id,
             scene_id=self.uid if scene_id is None else scene_id,
-            source_content_sha256=_source_closure_digest(files),
+            scene_factory=_panda_scene_from_import,
         )
 
     def reference_spec(self) -> ReferenceSpec:
@@ -190,6 +165,43 @@ class PandaAgent(BaseAgent):
             ),
             notes=("Stage 1 must resolve these names to qpos addresses.",),
         )
+
+    def selected_controller_profiles(self):
+        return ('r1', 'r3_continuous_v1', 'r3_continuous_v1_pose_path_x20')
+
+    def compose_task_source(self, source, *, artifact, controller, task_entities,
+                            existing_robot_entity, task_body_names, task_site_transfers):
+        """Reference the task's existing Panda once through the shared subject compiler."""
+        from ..assembly.source_composition import (CompositionSourceV1, SourceCompositionPlanV1,
+                                                   PositionSubjectControlBindingV1)
+        from .panda_position_binding import compile_panda_position_subjects
+        if existing_robot_entity != self.uid or source.execution_source_receipt is None:
+            raise ValueError('integrated Panda requires its existing verified task source')
+        if set(dict(task_body_names)) != set(task_entities):
+            raise ValueError('task entities and declared body names differ')
+        source.execution_source_receipt.validate_snapshot()
+        scene = self._scene_definition(entity_id=existing_robot_entity, scene_id='integrated-panda-position')
+        names = self.physical_joint_names()
+        plan, subject_identity = compile_panda_position_subjects(
+            source_scene=scene, components=((existing_robot_entity, 'link0', names, None),),
+            site_entity=existing_robot_entity, site_name='nutassembly_ee_site',
+            groups=((existing_robot_entity, 'arm'), (existing_robot_entity, 'gripper')),
+            source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
+            task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
+        if source.open_actuators != ('actuator8',):
+            raise ValueError('integrated Panda source lacks its declared gripper actuator')
+        references = tuple((e, a, a) for e, a, _ in plan.resource_writers)
+        position = PositionSubjectControlBindingV1(plan, subject_identity, references, tuple(
+            (f'{existing_robot_entity}/{name}', existing_robot_entity, name, name,
+             f'actuator{i + 1}' if i < 7 else 'actuator8') for i, name in enumerate(names)))
+        task = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                   (*task_entities, existing_robot_entity))
+        robot = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                    (existing_robot_entity,))
+        reference = SourceCompositionPlanV1(task, task_entities, (existing_robot_entity,), self.uid,
+            (robot,), 'reference', plan.assembly_identity_hash, None, (), plan.identity_hash, subject_identity,
+            position_binding_identity_sha256=position.identity_hash)
+        return replace(source, position_subject_binding=position, source_reference_plan=reference)
 
     def supported_controller_kinds(self) -> tuple[str, ...]:
         return (
