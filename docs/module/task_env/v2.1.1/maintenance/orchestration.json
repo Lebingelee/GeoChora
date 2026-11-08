@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-07",
-  "status": "G05_5B_ACCEPTED_BOUNDED_5C_REWORK_REQUIRED_AFTER_ATTEMPT002",
+  "updated_date": "2026-11-08",
+  "status": "G05_5C_ATTEMPT003_NOT_ACCEPTED_HUMAN_DIAGNOSIS_REQUIRED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -30,7 +30,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "V211_G05_5c_attempt003 scope and budget approved by maintainer; re-freeze for manual forwarding. Third ordinary window is final. Count remains 2; no dispatch.",
+  "next_action": "Stop ordinary execution after third 5c attempt; maintainer-led human diagnosis of Isaac USD task RGB reset regression. No automatic dispatch or stage 6.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,12 +1595,12 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
-          "package_preparation_status": "ATTEMPT002_COMPLETED_REVIEWED",
+          "package_preparation_status": "ATTEMPT003_COMPLETED_REVIEWED_NOT_ACCEPTED",
           "dependencies": [
             "5b"
           ],
-          "status": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
-          "attempt_count": 2,
+          "status": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
+          "attempt_count": 3,
           "attempts": [
             {
               "attempt": 1,
@@ -1610,7 +1610,8 @@
               "input_head": "c7402e4e7d40ce95ec85b6ddc3f8e3bc4d466311",
               "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
               "provider_output": "60300ed315932f67ac01b078c35b51547d727917",
-              "review_ref": "reviews/20261108_5c_attempt001_sol_review.md"
+              "review_ref": "reviews/20261108_5c_attempt001_sol_review.md",
+              "package_manifest_sha256": "e32653c6c19d41a2ff8be1f87685c18a0ab9f1f4fca6f102f93dda3716e81e76"
             },
             {
               "attempt": 2,
@@ -1622,35 +1623,46 @@
               "release_commit": "13111ca78f3c678a02da1d7ffb5a7c248447b036",
               "provider_output": "40df100c84d900d5ad40a6a23de48ef61c2f6f74",
               "review_ref": "reviews/20261108_5c_attempt002_sol_review.md"
+            },
+            {
+              "attempt": 3,
+              "package_id": "V211_G05_5c_attempt003",
+              "status": "REVIEWED_NOT_ACCEPTED",
+              "result": "BOUNDED_CPU_AND_COMPONENT_PROGRESS_ISAAC_USD_TASK_RGB_REGRESSION",
+              "input_head": "958bbbd786e3dc5ff229cff1cdf4c914bc939faf",
+              "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
+              "provider_output": "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
+              "review_ref": "reviews/20261108_5c_attempt003_sol_review.md"
             }
           ],
           "assigned_agent": "maintainer-designated manual implementation session; released",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt001",
-          "package_sha256": "e32653c6c19d41a2ff8be1f87685c18a0ab9f1f4fca6f102f93dda3716e81e76",
-          "input_head": "c7402e4e7d40ce95ec85b6ddc3f8e3bc4d466311",
-          "output_head": "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
+          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt003",
+          "package_sha256": "83ee53f47c9bbe8bb8cbacb37713aa644e4e8e1c077b7cfc27768465196b6408",
+          "input_head": "958bbbd786e3dc5ff229cff1cdf4c914bc939faf",
+          "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
           "expected_duration_minutes": "480-600",
           "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08: maintainer explicitly approved attempt003 scope and budget; pending manual forwarding; no execution started.",
+          "last_observation": "2026-11-08 Sol review: component native optics and bounded non-Position controlled lifecycle progress; new unconditional DynamicCameraRenderSourceV2 binding rejects Isaac USD source during RGB reset. Third ordinary attempt not accepted; maintainer-led human diagnosis required.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
             "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md",
-            "reviews/20261108_5c_attempt002_sol_review.md"
+            "reviews/20261108_5c_attempt002_sol_review.md",
+            "reviews/20261108_5c_attempt003_sol_review.md"
           ],
           "commits": [
             "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
             "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
-            "13111ca78f3c678a02da1d7ffb5a7c248447b036"
+            "13111ca78f3c678a02da1d7ffb5a7c248447b036",
+            "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425"
           ],
-          "review_decision": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
+          "review_decision": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
           "blockers": [
-            "Non-Position selected task RGB reads typed_state without publishing it at reset; MuJoCo source binding is Position-specific",
-            "Component CameraObservationProvider does not apply declared FOV or near/far and produces metadata without native camera verification"
+            "Task RGB reset unconditionally constructs DynamicCameraRenderSourceV2 from UsdRuntimeSourceV1, which is not RuntimeSource; Isaac historical route cannot pass current code."
           ],
           "next_candidate_package": {
             "id": "V211_G05_5c_attempt003",
-            "status": "APPROVED_READY_FOR_MANUAL_FORWARD",
+            "status": "COMPLETED_REVIEWED_NOT_ACCEPTED",
             "attempt_count_before_start": 2,
             "plan_ref": "../planning/stage5-5c-attempt003-execution.md",
             "manual_forward_only": true,
@@ -1659,7 +1671,7 @@
           },
           "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window.",
           "third_attempt_reassessment": {
-            "status": "COMPLETED_NOT_DISPATCHED",
+            "status": "COMPLETED_PRIOR_TO_ATTEMPT003",
             "reference": "../planning/stage5-5c-attempt003-reassessment.md",
             "ordinary_attempts_completed": 2,
             "feasibility": "credible bounded path; no guaranteed success",
@@ -1677,7 +1689,8 @@
             },
             "original_evidence_identity_preserved": true,
             "other_refs_rewritten": false
-          }
+          },
+          "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation."
         }
       ]
     },
@@ -1865,15 +1878,12 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G05_5c_attempt002",
-    "status": "REWORK_REQUIRED_5C_GENERIC_PUBLICATION_AND_COMPONENT_CAMERA",
-    "output_head": "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
-    "release_head": "13111ca78f3c678a02da1d7ffb5a7c248447b036",
-    "sol_review_ref": "reviews/20261108_5c_attempt002_sol_review.md",
-    "note": "Third ordinary attempt requires mandatory reassessment. No automatic dispatch.",
-    "rewritten_output_head": "09023b0b7dc2a7874ab5077aa64323650823d54c",
-    "rewritten_release_head": "2b9d2a4c0d8aca58ec38954ddc9798eb854042d7",
-    "identity_note": "Original output_head and release_head are retained as execution-time evidence identities; see history_cleanup mapping for current ancestry."
+    "package_id": "V211_G05_5c_attempt003",
+    "status": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
+    "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
+    "provider_output": "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
+    "sol_review_ref": "reviews/20261108_5c_attempt003_sol_review.md",
+    "note": "Third ordinary attempt not accepted; maintainer-led human diagnosis required."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
