@@ -581,9 +581,90 @@ class _TwoWheelBalanceSceneComposer:
 @register_parallel_env()
 @register_env()
 class TwoWheelBalanceEnv(BaseTaskEnv):
-    """GeoPhys-native articulated two-wheel balance environment."""
+    """Source-bound articulated two-wheel balance environment."""
 
     uses_component_task_config = True
+    prefer_reference_factory = True
+
+    @classmethod
+    def from_reference_config(cls, config=None, *, render_mode=None, provider='geophys',
+                              backend='cpu', build_runtime=True, task_rgb_camera=None, task_renderer=None, **kwargs):
+        from ..environment.configuration import resolve_task_env_config
+        from .two_wheel_physical import build_two_wheel_environment
+        if kwargs:
+            raise ValueError(f'unsupported two-wheel options: {sorted(kwargs)}')
+        resolved = resolve_task_env_config(cls, config)
+        if build_runtime is False:
+            if provider != 'geophys' or backend != resolved.runtime.backend:
+                raise ValueError('unbuilt two-wheel uses its component configuration only')
+            return cls(config=resolved, render_mode=render_mode, build_runtime=False,
+                       task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
+        if build_runtime is not True:
+            raise TypeError('build_runtime must be a boolean')
+        return build_two_wheel_environment(cls, resolved, provider=provider, backend=backend,
+                                           render_mode=render_mode, task_rgb_camera=task_rgb_camera,
+                                           task_renderer=task_renderer)
+
+    def observation(self, state):
+        observation, info, evaluation = super().observation(state)
+        if getattr(self, '_legacy_camera_observations', False):
+            from dataclasses import asdict
+            from ..environment.reference_env import _json_value
+            metadata = self.session.capture_legacy_camera_metadata()
+            info = {**info, 'camera_capture': {
+                'source': 'SensorObservation.camera_metadata',
+                'observation_boundary': {'elapsed_steps': state.control_step,
+                                         'simulation_time_s': float(state.simulation_time)},
+                'cameras': {name: _json_value(asdict(value)) for name, value in metadata.items()}}}
+        camera = getattr(self, '_two_wheel_camera_spec', None)
+        if camera is not None:
+            from dataclasses import asdict
+            from ..environment.reference_env import _json_value
+            native = self.session.task_camera_binding(self.typed_state.view)['native']
+            receipt = dict(info['task_rgb_v1'])
+            receipt.update(camera_name=camera.name, requested_camera=_json_value(asdict(camera)),
+                realized_camera=_json_value(native), renderer=self._task_rgb_config[1],
+                render_backend='rasterizer', observation_boundary={
+                    'episode_id': self.typed_state.view.boundary.episode_id,
+                    'control_step': state.control_step, 'simulation_time_s': float(state.simulation_time)})
+            info = {**info, 'task_rgb_v1': receipt}
+        return observation, info, evaluation
+
+    def reset(self, *, seed=None, options=None):
+        if self._has_component_assembly():
+            return super().reset(seed=seed, options=options)
+        from ..environment.reference_env import GymEnvBase
+        from .two_wheel_physical import sample_reset
+        GymEnvBase.reset(self, seed=seed)
+        actual_seed = int(self.np_random_seed)
+        self._two_wheel_pending_reset['sampled'] = sample_reset(self.np_random)
+        try:
+            observation, info = super().reset(seed=actual_seed, options=options)
+            sample = self._two_wheel_pending_reset['sampled']
+            info['reset_parameters'] = dict(zip(('pitch_rad', 'pitch_rate_rad_s',
+                'left_wheel_position_rad', 'right_wheel_position_rad',
+                'left_wheel_rate_rad_s', 'right_wheel_rate_rad_s'), sample, strict=True))
+            info['reset_parameters'].update(profile='two_wheel_balance_uniform_perturbation_v1',
+                pitch_range_rad=[-.08, .08], pitch_rate_range_rad_s=[-.20, .20],
+                wheel_position_range_rad=[-.02, .02], wheel_rate_range_rad_s=[-.30, .30])
+            from ..environment.task_definition import EpisodeTerminationPolicyV1
+            info.update(seed=seed, task_uid=self.config.task.task_uid, stage='stage4_gym_contract',
+                        episode_id=self.session.episode_id, resolved_control_metadata=self.metadata['action_schema'],
+                        termination_policy=EpisodeTerminationPolicyV1().to_mapping())
+            return observation, info
+        finally:
+            self._two_wheel_pending_reset.clear()
+
+    def get_record_metadata(self):
+        if self._has_component_assembly():
+            return super().get_record_metadata()
+        return {'env_metadata': {**self.metadata, 'action_schema': {
+                    'schema_id': 'task-env.two-wheel-balance.wheel-torque.v1',
+                    'schema_version': 'task-env-action-v1', 'mode': 'direct_wheel_torque',
+                    'components': ['left_wheel_torque', 'right_wheel_torque'], 'unit': 'N*m'}},
+                'resolved_config': self.value['resolved_configuration'],
+                'universal_action_schema': {'version': 'task-env-action-v1', 'dimension': 2,
+                    'components': ['left_wheel_torque', 'right_wheel_torque']}}
 
     uid = TWO_WHEEL_BALANCE_ENV_ID
     task_uid = TWO_WHEEL_BALANCE_TASK_UID
@@ -612,7 +693,7 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     def placement_notes(self) -> tuple[str, ...]:
         return (
             "Two-wheel balance is a fixed-anchor articulated chassis with two independent wheel hinges.",
-            "Native action is left/right direct wheel torque; no robot controller is bound.",
+            "Native action is left/right direct wheel torque through the shared Controller.",
         )
 
     def reference_profile(self) -> dict[str, Any]:
