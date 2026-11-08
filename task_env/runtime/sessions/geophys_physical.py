@@ -41,6 +41,20 @@ class GeoPhysPhysicalPort:
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
         drive_mode = ('disabled' if getattr(session._artifact, 'artifact_id', None)
                       == 'pickcube-mjcf-physical-effort-no-drive-v1' else 'position')
+        source = session._source
+        direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
+                        and all(c.native_drive == 'disabled' for c in binding.channels))
+        if direct_motor:
+            if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
+                    != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
+                raise ValueError('physical motor bindings must exactly cover the source actuators')
+            drive_mode = 'disabled'
+            bodies = {row['name']: row for row in model['bodies']}
+            for subject in execution.subjects:
+                if subject.root_mode == 'fixed':
+                    row = bodies.get(subject.root_frame.frame_id)
+                    if row is None or int(row['parent_id']) >= 0 or int(row['joint_count']) != 0:
+                        raise ValueError('physical motor subject root is not a fixed world child')
         groups, dofs = {}, {}
         for channel in binding.channels:
             name = session._source.joints.get(f'{channel.entity_id}/{channel.joint_id}')
@@ -58,7 +72,18 @@ class GeoPhysPhysicalPort:
         for group in groups.values():
             first = group[0][0]
             actuator = actuators.get(first.native_actuator)
-            if (actuator is None or int(actuator['id']) in used or int(actuator['enabled']) != 1
+            if actuator is None or int(actuator['id']) in used:
+                raise ValueError('GeoPhys compiled actuator missing or duplicated')
+            if direct_motor:
+                if (int(actuator['enabled']) != 1 or int(actuator['force_limited']) != 0
+                        or int(actuator['control_limited']) != 1
+                        or not np.allclose(actuator['control_range'], first.native_range, rtol=1e-6, atol=1e-6)
+                        or not math.isclose(float(actuator['gear0']), 1., abs_tol=1e-6)
+                        or int(actuator['bias_type']) != 0 or int(actuator['gain_type']) != 0
+                        or int(actuator['dynamics_type']) != 0
+                        or not math.isclose(float(actuator['gain_parameters'][0]), 1., abs_tol=1e-6)):
+                    raise ValueError('GeoPhys compiled direct motor range, gear or gain differs')
+            elif (int(actuator['enabled']) != 1
                     or int(actuator['force_limited']) != 1 or not np.allclose(actuator['force_range'], first.native_range, rtol=1e-6, atol=1e-6)
                     or not math.isclose(float(actuator['gear0']), 1., abs_tol=1e-6)
                     or int(actuator['bias_type']) != 1 or int(actuator['gain_type']) != 0
@@ -85,6 +110,8 @@ class GeoPhysPhysicalPort:
                     raise ValueError('GeoPhys paired tendon/equality differs')
             else:
                 raise ValueError('GeoPhys unsupported transmission')
+        if direct_motor and used != {int(a['id']) for a in model['actuators']}:
+            raise ValueError('physical motor source contains undeclared actuators')
         if drive_mode == 'disabled':
             session._build_layout_facts['physical_drive_override'] = (
                 session._boundary.isolate_actuator_outputs_for_physical_fixture(tuple(sorted(used))))

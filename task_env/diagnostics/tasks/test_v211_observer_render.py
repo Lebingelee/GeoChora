@@ -449,8 +449,11 @@ def test_gamma22_output_converts_to_srgb_transfer_and_rejects_invalid():
 def _fake_mjcf_render_source(visualizer):
     track = SimpleNamespace(light_id='mjcf:light:top', light_type='spot', direction=(0., 0., 1.),
                             runtime_payload={'mjcf_kind': 'world_trackcom', 'authored_position': (0., 0., 2.)})
-    head = SimpleNamespace(light_type='directional', runtime_payload={'mjcf_kind': 'headlight'})
-    desc = SimpleNamespace(mjcf_light_table=SimpleNamespace(records=(track, head)))
+    head = SimpleNamespace(light_id='mjcf:headlight', light_type='directional',
+                           runtime_payload={'mjcf_kind': 'headlight'})
+    ambient = SimpleNamespace(light_id='mjcf:headlight:ambient', light_type='ambient',
+                              runtime_payload={'mjcf_kind': 'ambient'})
+    desc = SimpleNamespace(mjcf_light_table=SimpleNamespace(records=(track, head, ambient)))
     return SimpleNamespace(read_render_scene=lambda **_kw: desc, build_visualizer=lambda **_kw: visualizer)
 
 
@@ -558,7 +561,7 @@ def test_geophys_observer_rejects_default_light_before_capture(monkeypatch):
     monkeypatch.setattr(session, '_require_reset', lambda: None)
     monkeypatch.setattr(session, 'state_boundary_identity', lambda: state.boundary)
     monkeypatch.setattr(session, '_snapshot_with_native_free_joints', lambda: ('unchanged',))
-    with pytest.raises(RuntimeError, match='cannot preserve authored lighting'):
+    with pytest.raises(RuntimeError, match='substituted a renderer light for authored MJCF lighting'):
         session.capture_observer(camera, state)
     assert closed == [True] and session._observer_fault
 
@@ -570,10 +573,18 @@ def test_geophys_close_releases_all_resources_after_pending_interval_failure():
     def fail_interval():
         events.append('interval')
         raise RuntimeError('interval cleanup failed')
+    def fail_legacy_observer():
+        events.append('legacy_visualizer')
+        raise RuntimeError('legacy observer cleanup failed')
+    def fail_legacy_camera():
+        events.append('legacy_camera')
+        raise RuntimeError('legacy camera cleanup failed')
     session = object.__new__(_GeoPhysSession)
     session._closed = False
     session._physical_port = SimpleNamespace(pending=object(), finish_interval=fail_interval)
     session._observer_visualizer = SimpleNamespace(close=lambda: events.append('visualizer'))
+    session._legacy_observer_visualizer = SimpleNamespace(close=fail_legacy_observer)
+    session._legacy_camera_provider = SimpleNamespace(close=fail_legacy_camera)
     session._boundary = SimpleNamespace(close=lambda: events.append('boundary'))
     session._source = SimpleNamespace(
         execution_source_receipt=SimpleNamespace(close=lambda: events.append('source')),
@@ -584,15 +595,17 @@ def test_geophys_close_releases_all_resources_after_pending_interval_failure():
     session._control_step = session._native_steps = 0
     session._observer_fault = False
     session._observer_material_report = {}
-    with pytest.raises(RuntimeError, match='interval cleanup failed'):
+    with pytest.raises(RuntimeError, match='interval cleanup failed') as error:
         session.close()
-    assert events == ['interval', 'visualizer', 'boundary', 'source']
+    assert any('legacy observer cleanup failed' in note for note in error.value.__notes__)
+    assert any('legacy camera cleanup failed' in note for note in error.value.__notes__)
+    assert events == ['interval', 'legacy_camera', 'legacy_visualizer', 'visualizer', 'boundary', 'source']
     assert session._closed and session._last_close_receipt['boundary_close_completed']
     assert not session._last_close_receipt['cleanup_completed']
     with pytest.raises(RuntimeError, match='no current admitted material report'):
         session.observer_render_facts()
     session.close()
-    assert len(events) == 4
+    assert len(events) == 6
 
 
 def test_geophys_missing_observer_source_keeps_primary_error_on_close_failure(monkeypatch):

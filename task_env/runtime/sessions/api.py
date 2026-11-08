@@ -845,7 +845,16 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
                 _session_admission_input=None, _native_feedback_profile=None,
-                _observer_render_request=None) -> RuntimeSession:
+                _observer_render_request=None, _legacy_observer_requested=False,
+                _legacy_camera_observations=False) -> RuntimeSession:
+    if type(_legacy_observer_requested) is not bool:
+        raise TypeError('legacy observer request must be boolean')
+    if _legacy_observer_requested and execution.physics_provider != 'geophys':
+        raise ValueError('legacy observer is only available with GeoPhys physics')
+    if type(_legacy_camera_observations) is not bool:
+        raise TypeError('legacy camera observation request must be boolean')
+    if _legacy_camera_observations and execution.physics_provider != 'geophys':
+        raise ValueError('legacy camera observations require GeoPhys physics')
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
@@ -1106,7 +1115,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
             or source.config.runtime.control_substeps != artifact.timebase.control_substeps
             or source.config.runtime.backend != execution.backend
-            or source.config.render.camera_obs):
+            or (source.config.render.camera_obs and not _legacy_camera_observations)):
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
@@ -1128,8 +1137,13 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
-    session = _materialize_admitted(artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan,
-                                    observer_render_request=_observer_render_request)
+    materialization_options = {'mixed_actuator_plan': source.mixed_actuator_plan,
+                               'observer_render_request': _observer_render_request}
+    if _legacy_observer_requested:
+        materialization_options['legacy_observer_requested'] = True
+    if _legacy_camera_observations:
+        materialization_options['legacy_camera_observations'] = True
+    session = _materialize_admitted(artifact, execution, source, **materialization_options)
     if _observer_render_request is not None and _observer_render_request.provider == 'geophys':
         import hashlib
         import json
@@ -1347,10 +1361,16 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
 def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None,
-                          observer_render_request=None):
+                          observer_render_request=None, legacy_observer_requested=False,
+                          legacy_camera_observations=False):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
-        return _GeoPhysSession(artifact, source, observer_render_request=observer_render_request)
+        options = {'observer_render_request': observer_render_request}
+        if legacy_observer_requested:
+            options['legacy_observer_requested'] = True
+        if legacy_camera_observations:
+            options['legacy_camera_observations'] = True
+        return _GeoPhysSession(artifact, source, **options)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
         return _MuJoCoSession(artifact, source, mixed_actuator_plan=mixed_actuator_plan)

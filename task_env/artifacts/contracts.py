@@ -1212,20 +1212,23 @@ class ActionIntent(Contract):
     controller_target: str
 
     def validate(self):
-        _choice(self.mode, {'absolute_pose', 'delta_pose', 'absolute_joint'}, 'action mode')
+        _choice(self.mode, {'absolute_pose', 'delta_pose', 'absolute_joint', 'direct_joint_effort'}, 'action mode')
         # Compatibility source: Core ActionModeSpec.__post_init__.
         allowed_references = {
             'absolute_joint': {None},
+            'direct_joint_effort': {None},
             'absolute_pose': {'world', 'base'},
             'delta_pose': {'world', 'base', 'ee'},
         }
         _choice(self.reference, allowed_references[self.mode], 'action reference')
         _choice(self.rotation_representation, {'quaternion_wxyz', 'rotvec', 'none'}, 'rotation')
-        if self.mode == 'absolute_joint' and self.rotation_representation != 'none':
+        if self.mode in {'absolute_joint', 'direct_joint_effort'} and self.rotation_representation != 'none':
             raise ValueError('joint action has no rotation representation')
-        if self.mode != 'absolute_joint' and self.rotation_representation == 'none':
+        if self.mode not in {'absolute_joint', 'direct_joint_effort'} and self.rotation_representation == 'none':
             raise ValueError('pose action requires rotation representation')
-        _choice(self.controller_target, {'arm_joint_position_and_gripper'}, 'controller target')
+        expected_target = ('joint_effort' if self.mode == 'direct_joint_effort'
+                           else 'arm_joint_position_and_gripper')
+        _choice(self.controller_target, {expected_target}, 'controller target')
 
 
 @dataclass(frozen=True)

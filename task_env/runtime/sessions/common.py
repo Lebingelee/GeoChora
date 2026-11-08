@@ -284,6 +284,44 @@ class _SessionValues:
         """Reset from a public Core plan and open rollout after its readback gate."""
         self._require_open()
         if isinstance(plan, ResetPlanV1):
+            if (getattr(self, '_physical_port', None) is not None
+                    and plan.reset_sample.control_policy == 'named_physical_effort_by_source_v1'):
+                plan.validate()
+                sample = plan.reset_sample
+                self._validate_sample(sample)
+                preflight = getattr(self, '_preflight_physical_reset', None)
+                if not callable(preflight):
+                    raise RuntimeError('physical RuntimeSession lacks reset preflight')
+                preflight(sample)
+                self._reset_plan_gate_required = False
+                self._reset_plan_gate_open = False
+                self._reset_plan_evidence = None
+                realized = self.reset(sample)
+                self._reset_plan_gate_required = True
+                try:
+                    plan.validate_realization_identity(realized)
+                    state = realized.measured_state
+                    for name, value in sample.joint_position.items():
+                        actual = float(state.joint_position[name])
+                        if not math.isfinite(actual) or abs(actual - value) > 1e-6:
+                            raise ValueError('physical reset position readback differs')
+                    for name, value in sample.joint_velocity.items():
+                        actual = float(state.joint_velocity[name])
+                        if not math.isfinite(actual) or abs(actual - value) > 1e-6:
+                            raise ValueError('physical reset velocity readback differs')
+                    if state.control_step != 0 or float(state.simulation_time) != 0.0:
+                        raise ValueError('physical reset readback clock is not zero')
+                    self._reset_plan_evidence = {'schema_version': 'physical-reset-evidence-v1',
+                        'reset_plan_identity_sha256': plan.identity_hash,
+                        'reset_sample_id': sample.sample_id, 'source_id': sample.source_id,
+                        'source_closure_digest': sample.source_closure_digest,
+                        'joint_position': dict(state.joint_position),
+                        'joint_velocity': dict(state.joint_velocity), 'simulation_time_s': 0.0}
+                    self._reset_plan_gate_open = True
+                except BaseException:
+                    self._reset_plan_gate_open = False
+                    raise
+                return realized
             if self._provider != 'mujoco':
                 raise ValueError('source-bound ResetPlanV1 is currently admitted for MuJoCo mixed sessions only')
             plan.validate()
@@ -380,7 +418,9 @@ class _SessionValues:
         self._require_open()
         if isinstance(sample, ResetSampleV1) and (
                 self._provider not in {'mujoco', 'geophys'}
-                or getattr(self._source, 'mixed_actuator_plan', None) is None):
+                or (getattr(self._source, 'mixed_actuator_plan', None) is None
+                    and not (getattr(self, '_physical_port', None) is not None
+                             and sample.control_policy == 'named_physical_effort_by_source_v1'))):
             raise TypeError('ResetSampleV1 requires an admitted mixed actuator session before reset')
         if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
             raise TypeError('RuntimeSession reset requires an admitted reset sample schema')

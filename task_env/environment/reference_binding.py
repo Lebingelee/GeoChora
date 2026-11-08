@@ -183,11 +183,17 @@ class ReferenceTaskBinding:
     physical_observation_binding: Callable | None = None
     physical_reset_action_schema: Callable | None = None
     physical_action_observer: Callable | None = None
+    physical_terminate_on_success: bool = False
+    physical_ignore_done: bool = False
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
     build_receives_binding: bool = False
 
     def __post_init__(self):
+        if type(self.physical_terminate_on_success) is not bool:
+            raise TypeError('physical termination policy must be a boolean')
+        if type(self.physical_ignore_done) is not bool:
+            raise TypeError('physical ignore_done policy must be a boolean')
         if type(self.build_receives_binding) is not bool:
             raise TypeError('build_receives_binding must be a boolean')
         if self.build_mixed_control_profile is None and (

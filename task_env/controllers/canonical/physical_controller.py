@@ -176,3 +176,76 @@ class WrenchControllerV1:
             self.profile.moment_reference,self.profile.moment_reference_frame,
             tuple(float(x) for x in values[:3]),tuple(float(x) for x in values[3:]))
         return PhysicalCommandBatchV1('physical-command-batch-v1',context,(),(wrench,),())
+
+class DirectJointEffortControllerV1:
+    """Bounded named torque inputs mapped one-to-one to declared physical channels.
+
+    The action tree and channel order are caller declarations, independent of
+    any task or provider.  All output remains subject to the normal compiled
+    physical-binding and session admission checks.
+    """
+
+    def __init__(self, binding, *, controller_id, channel_keys, action_key='torque'):
+        from gymnasium.spaces import Box, Dict
+        if type(binding) is not PhysicalControlBindingV1:
+            raise TypeError('direct effort requires a typed physical binding')
+        _name(controller_id)
+        _name(action_key)
+        keys = tuple(channel_keys)
+        if not keys or len(set(keys)) != len(keys):
+            raise ValueError('direct effort requires unique ordered channel keys')
+        channels = {f'{c.entity_id}/{c.joint_id}': c for c in binding.channels}
+        if any(key not in channels or controller_id not in channels[key].owner_ids for key in keys):
+            raise ValueError('direct effort channels differ from their declared writer')
+        self.binding, self.writer_id = binding, controller_id
+        self._channels = tuple(channels[key] for key in keys)
+        self._action_key = action_key
+        self.identity = digest({'schema_version': 'direct-joint-effort-controller-v1',
+            'binding': binding.identity_hash, 'controller_id': controller_id,
+            'channels': keys, 'action_key': action_key})
+        low = np.asarray([c.effort_range[0] for c in self._channels], dtype=np.float32)
+        high = np.asarray([c.effort_range[1] for c in self._channels], dtype=np.float32)
+        self.action_space = Dict({action_key: Box(low=low, high=high, dtype=np.float32)})
+        self._episode_id = None
+        self.last_action = None
+
+    def reset_from_realized_state(self, state):
+        if state.boundary.scene_identity_hash != self.binding.scene_sha256:
+            raise ValueError('direct effort reset state differs from bound Scene')
+        self._episode_id = state.boundary.episode_id
+        self.last_action = np.zeros(len(self._channels), dtype=np.float32)
+
+    def compute(self, action, state, context):
+        from collections.abc import Mapping
+        if type(context) is not PhysicalCommandContextV1:
+            raise TypeError('direct effort requires a typed interval context')
+        if isinstance(action, Mapping):
+            if set(action) != {self._action_key}:
+                raise ValueError('direct effort action tree differs from its declaration')
+            action = action[self._action_key]
+        raw = np.asarray(action)
+        if (raw.shape != (len(self._channels),) or raw.dtype.kind not in {'i', 'u', 'f'}
+                or not np.isfinite(raw).all()):
+            raise ValueError('direct effort action shape or finite values are invalid')
+        values = np.asarray(raw, dtype=np.float32)
+        if not self.action_space.spaces[self._action_key].contains(values):
+            raise ValueError('direct effort action exceeds its declared bounds')
+        if (context.source_id, context.source_closure_sha256, context.artifact_sha256) != (
+                self.binding.source_id, self.binding.source_closure_sha256, self.binding.artifact_sha256):
+            raise ValueError('direct effort context source differs from binding')
+        if state.boundary != context.boundary or state.sample_clock != context.clock:
+            raise ValueError('direct effort state is stale or foreign')
+        if self._episode_id is None or context.boundary.episode_id != self._episode_id:
+            raise ValueError('direct effort must be reset for the current episode')
+        efforts = []
+        for index, (channel, value) in enumerate(zip(self._channels, values, strict=True)):
+            policy = ContributionPolicyV1('physical-contribution-policy-v1',
+                f'{self.writer_id}/channel-{index}', f'{self.writer_id}/effect-{index}',
+                self.writer_id, 'exclusive', 'reject_outside', 'one_interval')
+            efforts.append(JointEffortV1('joint-effort-v1', context, policy,
+                channel.entity_id, channel.joint_id, channel.dof_id, channel.kind,
+                channel.axis, channel.axis_frame, channel.sign, channel.unit,
+                float(value), channel.effort_range, 'other_declared'))
+        result = PhysicalCommandBatchV1('physical-command-batch-v1', context, tuple(efforts), (), ())
+        self.last_action = values.copy()
+        return result

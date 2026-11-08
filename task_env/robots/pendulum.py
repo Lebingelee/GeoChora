@@ -1,8 +1,7 @@
-"""Pendulum native torque action adapter.
+"""Pendulum subject declaration and retained legacy component action adapter.
 
-This is deliberately not an ``AgentComponent``: the task has no robot
-controller.  Its native action is already the runtime-facing canonical
-``universal_action``.
+The scalar selected route binds the source-owned subject to a shared physical
+Controller.  The component adapter remains for the existing parallel route.
 """
 
 from __future__ import annotations
@@ -59,11 +58,7 @@ class PendulumEntity:
         return subject, (joint,)
 
     def controlled_subject(self, *, binding, entity_id, root_frame, controller_writer):
-        """Declare the source-owned hinge without constructing a second body.
-
-        This declaration alone does not admit the existing component route to
-        a physical RuntimeSession; source/transmission preflight is still needed.
-        """
+        """Declare the source-owned hinge without constructing a second body."""
         from ..artifacts import FrameReference
         from ..runtime.sessions.physical_control import ControlledSubjectV1
         channels = tuple(c for c in binding.channels if c.entity_id == entity_id)

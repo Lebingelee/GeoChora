@@ -93,3 +93,13 @@ Controller、参数及输入 spec 在 reset 更改；episode 内组合固定。C
 按 realized reset state 初始化 Controller，清 q_ref、积分器、滤波、贡献、force latch、sample history；不迁移旧 Controller 历史。Observation 结构／shape／dtype／单位／Frame／语义保持构建契约。上层输入切换不保证两 Controller 产生相同数值力，只保证输出服从同一物理命令协议。
 
 [结构化案例](../planning/control-command-cases.json)覆盖嵌套主体、8→9、直接 joint effort／BodyWrench、声明叠加及拒绝。4a 落地协议／映射／公开模型边界，4b 真实验证三后端共同 effort 与有界 BodyWrench，4c 验证 reset 切换和 Solution 复核。设计确认不替代运行证据，也不重开 F05 严格传力等价研究。
+
+## Pendulum 有界迁移候选
+
+5c 人工诊断单元 2 的候选将 Pendulum 原 source 中的固定根、单个 hinge 和 unit-gear motor 交给受控主体声明与共享 binding 编译；`DirectJointEffortControllerV1` 将 `torque` 动作树转换为具名 typed effort，Env 的物理控制调度拥有唯一逻辑提交，provider adapter 在 native build 时独立核对关节、轴、传动、范围和 drive 隔离。原并行 component 入口仍是独立待迁移路线。此候选仅覆盖标量 CPU；其他主体、并行及 Isaac 不因此获得支持声明，最终状态以独立主审为准。
+
+原任务的 reset 需要非零角速度。源绑定物理 reset 将采样位置及速度作为同一身份的 reset 输入，先校验来源和具名布局，再由 session 执行并对位置、速度及时钟读回；不以旧零速度 reset 合同隐式替代。共享 `ResetSampleV1` 的该有界策略只接收 time-zero 标量 joint 状态，不声称覆盖 free-body 或任意模型初始化。Pendulum 的 HWC task RGB 使用构造时固定的 CameraSpec／renderer，renderer 消费同一物理边界；渲染能力和闭环验证仍按各自交集审查。
+
+该候选的 GeoPhys CPU `rgb_array` observer 由同一 RuntimeSession 的 render source 提供，使用公开的 visualizer 构造与同步帧读回；observer capture 不提交物理 step。task RGB 与 observer 是不同入口。可见窗口、observer/task RGB 同时使用及其他 renderer 组合不属于本单元验证范围。
+
+原 component 的 `render.camera_obs` 在 GeoPhys CPU 单 world camera 的受测交集由同一 session 的已有 camera provider 继续采集并发布相机元数据；一般多相机、depth 和其他 renderer 仍不由该证据推断。可见 human observer 未在本窗口准入或验证。

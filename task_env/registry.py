@@ -195,7 +195,8 @@ def make_env(
     )
     uses_reference_binding = getattr(environment_type, 'binding', None) is not None
     if (reference_config is not None
-            and not getattr(environment_type, 'uses_component_task_config', False)
+            and (not getattr(environment_type, 'uses_component_task_config', False)
+                 or getattr(environment_type, 'prefer_reference_factory', False))
             and (uses_reference_binding or not inherited_default)):
         # Other selected candidates retain their bounded compatibility route.
         return finish(environment_type.from_reference_config(config, render_mode=render_mode, **kwargs))

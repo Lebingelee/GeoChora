@@ -298,7 +298,8 @@ class PhysicalControlExecutionV1:
             validate_controlled_subjects(self.compiled, self.subjects, self.controllers)
         if len(self.controllers) == 1 and (
                 not isinstance(action, Mapping)
-                or self._controller_action_space(self.controllers[0]).contains(action)):
+                or self._controller_action_space(self.controllers[0]).contains(action)
+                or set(action) != {self.controllers[0].identity}):
             actions = {self.controllers[0].identity: action}
         elif isinstance(action, Mapping):
             actions = dict(action)

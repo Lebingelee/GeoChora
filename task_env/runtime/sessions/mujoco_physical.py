@@ -59,6 +59,18 @@ class MuJoCoPhysicalPort:
         drive_mode = ('disabled' if artifact_id in {'pickcube-mjcf-physical-effort-no-drive-v1',
                                                     'pickcube-mjcf-physical-effort-task-v1'}
                       else 'position')
+        direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
+                        and all(c.native_drive == 'disabled' for c in binding.channels))
+        if direct_motor:
+            if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
+                    != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
+                raise ValueError('physical motor bindings must exactly cover the source actuators')
+            drive_mode = 'disabled'
+            for subject in execution.subjects:
+                if subject.root_mode == 'fixed':
+                    root_id = int(model.body(subject.root_frame.frame_id).id)
+                    if root_id <= 0 or int(model.body_parentid[root_id]) != 0 or int(model.body_jntnum[root_id]) != 0:
+                        raise ValueError('physical motor subject root is not a fixed world child')
         groups, dofs, actuator_ids, equality_ids = {}, {}, set(), []
         for channel in binding.channels:
             semantic = f'{channel.entity_id}/{channel.joint_id}'
@@ -94,7 +106,17 @@ class MuJoCoPhysicalPort:
                 session._build_layout_facts['physical_gripper_force_cap'] = {
                     'schema_version': 'pickcube-runtime-gripper-cap-v1', 'source_range_N': [-5., 5.],
                     'configured_range_N': [-10., 10.], 'source_mjcf_modified': False}
-            if (not bool(model.actuator_forcelimited[actuator])
+            if direct_motor:
+                if (bool(model.actuator_forcelimited[actuator])
+                        or not bool(model.actuator_ctrllimited[actuator])
+                        or not _same(model.actuator_ctrlrange[actuator], first.native_range)
+                        or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
+                        or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_NONE)
+                        or int(model.actuator_gaintype[actuator]) != int(mj.mjtGain.mjGAIN_FIXED)
+                        or int(model.actuator_dyntype[actuator]) != int(mj.mjtDyn.mjDYN_NONE)
+                        or float(model.actuator_gainprm[actuator, 0]) != 1.0):
+                    raise ValueError('compiled direct motor range, gear or gain differs')
+            elif (not bool(model.actuator_forcelimited[actuator])
                     or not _same(model.actuator_forcerange[actuator], first.native_range)
                     or not _same(model.actuator_gear[actuator], (1, 0, 0, 0, 0, 0))
                     or int(model.actuator_biastype[actuator]) != int(mj.mjtBias.mjBIAS_AFFINE)
@@ -132,6 +154,8 @@ class MuJoCoPhysicalPort:
             else:
                 raise ValueError('unsupported compiled physical transmission')
         if drive_mode == 'disabled':
+            if direct_motor and actuator_ids != set(range(int(model.nu))):
+                raise ValueError('global drive isolation requires every actuator to be declared')
             bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
             before = int(model.opt.disableflags)
             model.opt.disableflags = before | bit

@@ -163,6 +163,7 @@ class ResetSampleV1(Contract):
         if self.control_policy not in {
             'named_torque_and_finger_position_by_source_v1',
             'named_mixed_actuator_channels_by_source_v1',
+            'named_physical_effort_by_source_v1',
         }:
             raise ValueError('unsupported ResetSampleV1 control policy')
         order = tuple(self.initialization_order)
@@ -184,9 +185,14 @@ class ResetSampleV1(Contract):
         fixture_pose = dict(self.fixture_pose_world)
         if not joint_position or set(joint_position) != set(joint_velocity):
             raise ValueError('ResetSampleV1 named joint position/velocity sets must match')
-        if (not poses_world or set(poses_world) != set(free_velocity)
+        if ((not poses_world and self.control_policy != 'named_physical_effort_by_source_v1')
+                or set(poses_world) != set(free_velocity)
                 or set(sampled_poses) != set(poses_world)):
             raise ValueError('ResetSampleV1 free-body pose/velocity sets must match')
+        if self.control_policy == 'named_physical_effort_by_source_v1' and (
+                poses_world or fixture_pose or float(self.simulation_time_s) != 0.0
+                or order != generic_order):
+            raise ValueError('physical effort reset requires a time-zero scalar source state')
         if set(poses_world) & set(fixture_pose):
             raise ValueError('ResetSampleV1 free-body and fixture roots must be distinct')
         for name in (*joint_position, *poses_world, *fixture_pose):

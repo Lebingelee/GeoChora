@@ -1876,10 +1876,14 @@ class _MuJoCoSession(_SessionValues):
             if type(sample) is not ResetSampleV1:
                 raise TypeError('source-bound mixed actuator session requires ResetSampleV1 before native reset')
             return self._reset_mixed_actuator(sample)
-        from ...artifacts.execution import ResetSample
-        if type(sample) is not ResetSample:
-            raise TypeError('legacy MuJoCo RuntimeSession requires ResetSample v0 before reset')
+        from ...artifacts.execution import ResetSample, ResetSampleV1
+        physical_sample = (type(sample) is ResetSampleV1 and
+            sample.control_policy == 'named_physical_effort_by_source_v1')
+        if type(sample) is not ResetSample and not physical_sample:
+            raise TypeError('MuJoCo RuntimeSession requires an admitted reset sample')
         self._validate_sample(sample)
+        if physical_sample:
+            self._preflight_physical_reset(sample)
         physical_port = getattr(self, '_physical_port', None)
         if physical_port is not None:
             if (np.any(self._data.xfrc_applied)
@@ -1905,6 +1909,9 @@ class _MuJoCoSession(_SessionValues):
             address = self._free_addresses[name][0]
             self._data.qpos[address:address+7] = (*requested.position, *requested.quaternion_wxyz)
         self._data.qvel[:] = 0
+        if physical_sample:
+            for name, value in sample.joint_velocity.items():
+                self._data.qvel[self._joint_addresses[name][1]] = value
         self._data.act[:] = 0
         for name, actuator in self._target_actuators.items():
             self._data.ctrl[actuator] = sample.joint_position[name]
@@ -1942,6 +1949,17 @@ class _MuJoCoSession(_SessionValues):
         realized = self._realized(sample)
         self._cache_completed_actuator_force()
         return realized
+
+    def _preflight_physical_reset(self, sample):
+        self._validate_sample(sample)
+        if sample.control_policy != 'named_physical_effort_by_source_v1':
+            raise ValueError('physical reset requires the named effort policy')
+        for name, value in sample.joint_position.items():
+            joint = int(self._model.joint(self._source.joints[name]).id)
+            if bool(self._model.jnt_limited[joint]):
+                low, high = self._model.jnt_range[joint]
+                if not float(low) <= float(value) <= float(high):
+                    raise ValueError(f'physical reset joint position exceeds source limits: {name}')
 
     def _preflight_mixed_actuator_reset(self, sample):
         """Validate a source-bound reset completely before changing session state."""

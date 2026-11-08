@@ -279,7 +279,8 @@ def check_geophys_named_layout(names, data, source, boundary):
 
 
 class _GeoPhysSession(_SessionValues):
-    def __init__(self, artifact, source, *, observer_render_request=None):
+    def __init__(self, artifact, source, *, observer_render_request=None, legacy_observer_requested=False,
+                 legacy_camera_observations=False):
         self._initialize_values(artifact, source, 'geophys')
         runtime = bootstrap_task_runtime(
             config=source.config, composition=source.composition, scene=source.scene,
@@ -293,11 +294,15 @@ class _GeoPhysSession(_SessionValues):
                 ),
                 execution_source_receipt=source.execution_source_receipt,
             ),
-            create_render_source=observer_render_request is not None,
+            create_render_source=observer_render_request is not None or legacy_observer_requested,
         )
         self._observer_render_request = observer_render_request
         self._observer_render_source = runtime.render_source
         self._observer_visualizer = None
+        self._legacy_observer_requested = legacy_observer_requested
+        self._legacy_observer_visualizer = None
+        self._legacy_camera_observations = legacy_camera_observations
+        self._legacy_camera_provider = None
         self._observer_fault = False
         self._observer_material_report = None
         self._observer_light_report = None
@@ -306,7 +311,8 @@ class _GeoPhysSession(_SessionValues):
         self._observer_headlight = None
         self._observer_light_source_mode = None
         self._observer_authored_light_count = 0
-        if observer_render_request is not None and self._observer_render_source is None:
+        if (observer_render_request is not None or legacy_observer_requested
+                or legacy_camera_observations) and self._observer_render_source is None:
             error = RuntimeError('GeoPhys observer source could not be materialized')
             try:
                 runtime.boundary.close()
@@ -315,6 +321,7 @@ class _GeoPhysSession(_SessionValues):
             raise error
         self._boundary = runtime.boundary
         compiled = runtime.compiled_scene
+        self._legacy_camera_references = compiled.references
         names, data = compiled.references.names, compiled.scene_model.joint_data
         try:
             self._body_parentid = np.asarray(data['body_parentid'], dtype=np.int32).reshape(-1)
@@ -535,6 +542,8 @@ class _GeoPhysSession(_SessionValues):
 
     def reset(self, sample):
         self._validate_sample(sample)
+        if getattr(sample, 'control_policy', None) == 'named_physical_effort_by_source_v1':
+            self._preflight_physical_reset(sample)
         if getattr(self, '_physical_port', None) is not None and self._physical_port.pending is not None:
             raise RuntimeError('cannot reset with pending physical effort')
         if self._mixed_actuator_plan is not None:
@@ -650,6 +659,21 @@ class _GeoPhysSession(_SessionValues):
             self._reset_count += 1
         return realized
 
+    def _preflight_physical_reset(self, sample):
+        self._validate_sample(sample)
+        if sample.control_policy != 'named_physical_effort_by_source_v1':
+            raise ValueError('physical reset requires the named effort policy')
+        model = self._build_layout_facts['effective_physical_model']
+        joints = {row['name']: row for row in model['joints']}
+        for name, value in sample.joint_position.items():
+            row = joints.get(self._source.joints[name])
+            if row is None:
+                raise ValueError(f'physical reset joint is absent from source: {name}')
+            if bool(row['limited']):
+                low, high = row['range']
+                if not float(low) <= float(value) <= float(high):
+                    raise ValueError(f'physical reset joint position exceeds source limits: {name}')
+
     @staticmethod
     def _pose_mapping(value):
         return {
@@ -748,6 +772,48 @@ class _GeoPhysSession(_SessionValues):
         self._require_reset()
         return self._snapshot_with_native_free_joints()[0]
 
+    def render_legacy_rgb(self, config):
+        """Capture the source's default offscreen camera without advancing physics."""
+        self._require_reset()
+        if not self._legacy_observer_requested or self._observer_render_source is None:
+            raise ValueError('legacy observer was not requested at materialization')
+        if config.backend not in {'raytracer', 'rasterizer'}:
+            raise ValueError('legacy observer backend is not admitted')
+        before = self._snapshot_with_native_free_joints()
+        if self._legacy_observer_visualizer is None:
+            self._legacy_observer_visualizer = self._observer_render_source.build_visualizer(
+                backend=config.backend, use_render_snapshot=False,
+                width=int(config.width), height=int(config.height),
+                render_preset=config.render_preset)
+        frame = np.asarray(self._legacy_observer_visualizer.read_frame(
+            width=int(config.width), height=int(config.height), synchronized=True), dtype=np.float32)
+        if (frame.shape != (int(config.height), int(config.width), 3)
+                or not np.isfinite(frame).all()):
+            raise ValueError('legacy observer returned invalid RGB')
+        if before != self._snapshot_with_native_free_joints():
+            raise RuntimeError('physics changed during legacy observer capture')
+        return np.ascontiguousarray(np.clip(frame, 0., 1.), dtype=np.float32)
+
+    def capture_legacy_camera_metadata(self):
+        """Capture the configured component camera sensors at the current boundary."""
+        self._require_reset()
+        if not self._legacy_camera_observations or self._observer_render_source is None:
+            raise ValueError('legacy camera observations were not admitted')
+        if self._legacy_camera_provider is None:
+            from ...observations import CameraObservationProvider, CameraSensor
+            config = self._source.config.render
+            sensors = tuple(CameraSensor(spec=spec, references=self._legacy_camera_references)
+                            for spec in config.cameras)
+            self._legacy_camera_provider = CameraObservationProvider(
+                render_source=self._observer_render_source, config=config, camera_sensors=sensors)
+        before = self._snapshot_with_native_free_joints()
+        snapshot = self._boundary.read_snapshot(SnapshotRequest(
+            qacc=False, ctrl=False, body_pose=True, site_pose=True, simulation_time=True))
+        sensor_observation = self._legacy_camera_provider.capture(snapshot)
+        if before != self._snapshot_with_native_free_joints():
+            raise RuntimeError('physics changed during legacy camera observation')
+        return sensor_observation.camera_metadata
+
     def _ensure_observer_visualizer(self, camera):
         if self._observer_visualizer is None:
             desc = self._observer_render_source.read_render_scene(backend='rasterizer')
@@ -759,7 +825,7 @@ class _GeoPhysSession(_SessionValues):
             ) = _observer_mjcf_light_declaration(desc.mjcf_light_table)
             self._observer_visualizer = self._observer_render_source.build_visualizer(
                 backend='rasterizer', use_render_snapshot=False,
-                use_mjcf_lighting=True, enable_shadow=True,
+                use_mjcf_lighting=desc.mjcf_light_table is not None, enable_shadow=True,
                 width=camera.width, height=camera.height,
                 max_framebuffer_resolution=(camera.width, camera.height),
                 raster_acceleration='compute', shadow_acceleration='compute',
@@ -1505,6 +1571,24 @@ class _GeoPhysSession(_SessionValues):
             boundary_close_completed = False
             source_receipt_close_completed = None
             visualizer, self._observer_visualizer = getattr(self, '_observer_visualizer', None), None
+            camera_provider, self._legacy_camera_provider = getattr(self, '_legacy_camera_provider', None), None
+            if camera_provider is not None:
+                try:
+                    camera_provider.close()
+                except BaseException as error:
+                    if failure is None:
+                        failure = error
+                    else:
+                        failure.add_note(f'GeoPhys legacy camera cleanup also failed: {error!r}')
+            legacy_visualizer, self._legacy_observer_visualizer = getattr(self, '_legacy_observer_visualizer', None), None
+            if legacy_visualizer is not None:
+                try:
+                    legacy_visualizer.close()
+                except BaseException as error:
+                    if failure is None:
+                        failure = error
+                    else:
+                        failure.add_note(f'GeoPhys legacy observer cleanup also failed: {error!r}')
             if visualizer is not None:
                 try:
                     visualizer.close()

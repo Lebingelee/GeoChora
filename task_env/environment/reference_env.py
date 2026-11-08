@@ -377,6 +377,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         from ..render import RenderUnavailableError, normalize_render_mode
 
+        if getattr(self, '_legacy_observer_requested', False):
+            self._episode_execution_state().require_open('environment is closed')
+            if self._execution_fault is not None or self.session is None:
+                raise RuntimeError('observer requires a healthy reset session')
+            normalized = normalize_render_mode(mode or self.render_mode)
+            if normalized.value != self.render_mode:
+                raise ValueError('TaskEnv render mode is fixed at construction')
+            try:
+                return self.session.render_legacy_rgb(self.config.render)
+            except BaseException as error:
+                self._latch_fault('observer_render', error, before_state=self.state,
+                                  transition_status='rejected')
+                raise
+
         if getattr(self, '_selected_observer_camera', None) is not None:
             execution_state = self._episode_execution_state()
             execution_state.require_open('environment is closed')
@@ -1326,7 +1340,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                  _execution_spec_v1=None, _mixed_control_candidate=False,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
         self._uses_component_assembly = bool(
-            getattr(type(self), 'uses_component_task_config', False)
+            (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
             or config is not None
             or (_binding is None and self.binding is None
                 and getattr(type(self).from_reference_config, '__func__', None)
@@ -1345,8 +1359,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise ValueError("selected task RGB is configured through the public make_env factory")
         if render_mode is not None or build_runtime is not True:
             raise ValueError('selected reference rendering and component runtime options require a component task')
-        if type(horizon) is not int or not 1 <= horizon <= 6000:
-            raise ValueError('selected reference horizon must be an integer in [1, 6000]')
+        if (type(horizon) is not int or horizon < 1
+                or (horizon > 6000 and getattr(_binding, 'physical_control_profile', None) is None)):
+            raise ValueError('selected reference horizon is outside its admitted range')
         if camera_observation_config is not None:
             from ..observations.canonical_camera.consumer import CameraObservationConfigV1
 
@@ -2047,10 +2062,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if selection is not None and selection.deployment == 'isolated_worker':
                     self.session = start_worker()
                 else:
+                    options = {'_observer_render_request': getattr(self, '_observer_render_request', None)}
+                    if getattr(self, '_legacy_observer_requested', False):
+                        options['_legacy_observer_requested'] = True
+                    if getattr(self, '_legacy_camera_observations', False):
+                        options['_legacy_camera_observations'] = True
                     self.session = materialize(
-                        self.artifact, self.execution, source=self.value['source'],
-                        _observer_render_request=getattr(self, '_observer_render_request', None),
-                    )
+                        self.artifact, self.execution, source=self.value['source'], **options)
             elif self.position_profile:
                 from ..runtime.sessions.control import prepare_position_control_materialization
                 self.position_scene = self.value['source'].scene_definition
@@ -2957,7 +2975,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         if self._stopped or self.session is None:
             raise RuntimeError('reset required or episode already stopped')
-        if self.state.control_step >= self.horizon:
+        if (self.state.control_step >= self.horizon
+                and not getattr(self.binding, 'physical_ignore_done', False)):
             raise RuntimeError('selected physical-control horizon is exhausted')
         if (self.recorder is not None and getattr(self.recorder, 'active', False)
                 and getattr(self, '_physical_reset_selection', None) is None):
@@ -3118,8 +3137,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def publish(_control, _state, _evaluation, _observation):
             nonlocal record_append_attempted
             terminated, truncated = self._episode_execution_state().step_outcome(
-                task_terminated=bool(self.evaluation.failure), task_truncated=False,
-                control_step=self.state.control_step, horizon=self.horizon)
+                task_terminated=bool(self.evaluation.failure or
+                    (getattr(self.binding, 'physical_terminate_on_success', False)
+                     and self.evaluation.success)), task_truncated=False,
+                control_step=self.state.control_step, horizon=self.horizon,
+                ignore_done=getattr(self.binding, 'physical_ignore_done', False))
             self._episode_mode = 'external_solution' if proposal is not None else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
             if proposal is not None:
@@ -3144,6 +3166,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._physical_published_state = self.state
                 self._physical_published_typed_state = self.typed_state
                 self._physical_published_evaluation = self.evaluation
+                if ((terminated or truncated)
+                        and getattr(self.binding, 'physical_terminate_on_success', False)):
+                    from ..trajectory.canonical.episode import make_episode_end_v1
+                    boundary = self.typed_state.view.boundary
+                    self._last_episode_end = make_episode_end_v1(
+                        episode_id=boundary.episode_id, final_boundary=int(self.state.control_step),
+                        end_reason='task_terminal' if terminated else 'horizon_reached',
+                        terminated=bool(terminated), truncated=not bool(terminated),
+                        bootstrap_allowed=not bool(terminated),
+                        source='task_env.selected_reference.physical_control_v1',
+                        payload={'control_step': int(self.state.control_step),
+                                 'simulation_time_s': float(self.state.simulation_time)},
+                        event_sequence=0, task_success=bool(self.evaluation.success),
+                        solution_completed=None)
+                    self.info['episode_end_v1'] = self._last_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
 
         def on_failure(phase, error):
