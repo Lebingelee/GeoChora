@@ -112,3 +112,24 @@ def test_same_writer_can_precompute_disjoint_segments_but_not_overlap():
     with pytest.raises(ValueError, match='exceeds'):
         MuJoCoExternalComPort(s, (first, segment(2, 6, 3.)))
     assert not np.any(s._data.qfrc_applied)
+
+
+def test_explicit_com_sum_uses_native_body_identity_and_distinct_effects():
+    from task_env.controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+    s, _, _ = _session()
+    s._source.bodies['alias'] = 'object-native'
+    def summed(writer, effect, body, force):
+        return ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            writer, effect, body, 0, 5, (0., force, 0.), (0., 0., 0.))
+    first, second = summed('a', 'effect-a', 'object', 2.), summed('b', 'effect-b', 'alias', 3.)
+    port = MuJoCoExternalComPort(s, (first, second))
+    assert port.body_resources == {1: 'body:alias'}
+    s._external_com_port = port
+    port.authorized = True
+    port.refresh_substep()
+    assert s._data.qfrc_applied.tolist() == [5., 0.]
+    port.finish()
+    with pytest.raises(ValueError, match='unique'):
+        MuJoCoExternalComPort(s, (first, summed('b', 'effect-a', 'alias', 3.)))
+    with pytest.raises(ValueError, match='unique'):
+        MuJoCoExternalComPort(s, (first, _request(effect='exclusive')))

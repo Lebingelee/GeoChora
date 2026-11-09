@@ -2899,7 +2899,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
 
         Wrenches are an immutable tuple of ``ExternalComWrenchV1`` or
-        ``ExternalComWrenchSegmentV1`` keyed by a source body. They act only
+        ``ExternalComWrenchSegmentV1`` or ``ExternalComWrenchSumSegmentV1``
+        keyed by a source body. They act only
         for the declared half-open range in this interval. The selected grouped
         position path must already have a source-bound scene submission;
         other providers, native-feedback intervals and active Recorders fail

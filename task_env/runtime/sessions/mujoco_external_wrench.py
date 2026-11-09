@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from ...controllers.canonical.physical_commands import ExternalComWrenchSegmentV1, ExternalComWrenchV1
+from ...controllers.canonical.physical_commands import (
+    ExternalComWrenchSegmentV1, ExternalComWrenchSumSegmentV1, ExternalComWrenchV1,
+)
 
 
 def com_wrench_range(request, substeps):
     if type(request) is ExternalComWrenchV1:
         return 0, substeps
-    if type(request) is ExternalComWrenchSegmentV1:
+    if type(request) in (ExternalComWrenchSegmentV1, ExternalComWrenchSumSegmentV1):
         if request.end_substep > substeps:
             raise ValueError('caller COM segment exceeds the control interval')
         return request.start_substep, request.end_substep
@@ -43,7 +45,7 @@ class MuJoCoExternalComPort:
         if type(substeps) is not int or substeps <= 0:
             raise ValueError('caller wrench requires an integral control timebase')
         for request in requests:
-            if type(request) not in (ExternalComWrenchV1, ExternalComWrenchSegmentV1):
+            if type(request) not in (ExternalComWrenchV1, ExternalComWrenchSegmentV1, ExternalComWrenchSumSegmentV1):
                 raise TypeError('caller wrench must be a supported external COM contract')
             request.validate()
             start, end = com_wrench_range(request, substeps)
@@ -58,13 +60,26 @@ class MuJoCoExternalComPort:
                 cursor = int(session._model.body_parentid[cursor])
             if body_id <= 0 or float(session._model.body_mass[body_id]) <= 0 or not movable:
                 raise ValueError('caller wrench requires a source-bound dynamic body')
-            for ranges in (effects.setdefault(request.physical_effect_id, []),
-                           bodies.setdefault(body_id, [])):
-                if any(start < prior_end and prior_start < end for prior_start, prior_end in ranges):
-                    raise ValueError('caller wrench effect or native body ranges overlap; claims must be unique')
-                ranges.append((start, end))
+            effect_ranges = effects.setdefault(request.physical_effect_id, [])
+            if any(start < prior_end and prior_start < end for prior_start, prior_end in effect_ranges):
+                raise ValueError('caller wrench effect ranges overlap; claims must be unique')
+            effect_ranges.append((start, end))
+            body_ranges = bodies.setdefault(body_id, [])
+            if any(start < prior_end and prior_start < end
+                   and (type(request) is not ExternalComWrenchSumSegmentV1
+                        or type(prior) is not ExternalComWrenchSumSegmentV1)
+                   for prior_start, prior_end, prior in body_ranges):
+                raise ValueError('caller wrench native body ranges overlap; exclusive claims must be unique')
+            body_ranges.append((start, end, request))
             rows.append((request, body_id))
         self.session, self.rows = session, tuple(rows)
+        # Different source names may bind the same native body.  Publish one
+        # stable source resource for every such alias, after native admission.
+        self.body_resources = {
+            body_id: 'body:' + min(key for key, native in source.bodies.items()
+                                   if int(session._model.body(native).id) == body_id)
+            for _, body_id in self.rows
+        }
         self.boundary = session.state_boundary_identity()
         self.source_id = source.source_id
         self.source_closure_sha256 = source.source_closure_digest
@@ -88,6 +103,10 @@ class MuJoCoExternalComPort:
             native = s._source.bodies.get(request.source_body_key)
             if native is None or int(s._model.body(native).id) != body_id:
                 raise ValueError('caller wrench source body binding changed before submission')
+            aliases = [key for key, name in s._source.bodies.items()
+                       if int(s._model.body(name).id) == body_id]
+            if not aliases or 'body:' + min(aliases) != self.body_resources[body_id]:
+                raise ValueError('caller wrench source body aliases changed before submission')
 
     def refresh_substep(self):
         s = self.session
