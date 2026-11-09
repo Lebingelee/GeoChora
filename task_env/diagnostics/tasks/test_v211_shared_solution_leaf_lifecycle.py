@@ -159,6 +159,7 @@ def test_caller_solution_enters_declared_common_lifecycle():
 
 
 def test_solution_step_preserves_context_through_shared_dispatch():
+    from contextlib import nullcontext
     from task_env.diagnostics.tasks.test_v211_control_lifecycle_capability import _DeclaredController
     from task_env.diagnostics.tasks.test_v211_control_submission_contract import _Session
 
@@ -177,11 +178,49 @@ def test_solution_step_preserves_context_through_shared_dispatch():
         value={'source': SimpleNamespace(source_id='task', source_closure_digest='a' * 64)},
         artifact=SimpleNamespace(identity_hash='b' * 64), controller=_DeclaredController(),
         _prepare_reference_step=prepare,
+        _selected_com_wrench_scope=lambda _value: nullcontext(),
         _episode_execution_state=lambda: SimpleNamespace(execute_interval=lambda **ops: ops),
     )
     SelectedReferenceEnv._step(env, proposal.action, proposal=proposal, observer_solution=owner)
     assert captured == {'proposal': proposal, 'observer_solution': owner}
     assert session._control_lifecycle_dispatch.stage == 'prepared'
+
+
+def test_solution_pre_dispatch_failure_latches_after_proposal(monkeypatch):
+    from contextlib import nullcontext
+    from task_env.runtime.sessions import control_lifecycle
+
+    failure = ValueError('source boundary unavailable')
+    def reject(*_args, **_kwargs):
+        raise failure
+    monkeypatch.setattr(control_lifecycle, 'prepare_selected_control_action', reject)
+    episode = SimpleNamespace(fault=None)
+    recorded = []
+    env = SimpleNamespace(
+        state=object(), _selected_com_wrench_scope=lambda _value: nullcontext(),
+        _episode_execution_state=lambda: episode,
+        _latch_fault=lambda phase, error, **kwargs: recorded.append((phase, error, kwargs)),
+    )
+    with pytest.raises(ValueError, match='source boundary unavailable'):
+        SelectedReferenceEnv._step(env, [], proposal=ExpertAction([], 'go'))
+    assert recorded == [('solution_preparation', failure, {'before_state': env.state})]
+
+
+def test_external_action_pre_dispatch_failure_does_not_claim_solution_effect(monkeypatch):
+    from contextlib import nullcontext
+    from task_env.runtime.sessions import control_lifecycle
+
+    def reject(*_args, **_kwargs):
+        raise ValueError('source boundary unavailable')
+    monkeypatch.setattr(control_lifecycle, 'prepare_selected_control_action', reject)
+    recorded = []
+    env = SimpleNamespace(
+        _selected_com_wrench_scope=lambda _value: nullcontext(),
+        _latch_fault=lambda *args, **kwargs: recorded.append((args, kwargs)),
+    )
+    with pytest.raises(ValueError, match='source boundary unavailable'):
+        SelectedReferenceEnv._step(env, [])
+    assert not recorded
 
 
 def test_external_solution_converts_action_for_typed_position_profile(monkeypatch):

@@ -4014,9 +4014,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         except BaseException as error:
             # Solution.act() precedes this method and may already have mutated
             # state, even when a Task-load admission fails before its callback.
-            if (proposal is not None and getattr(self.binding, 'task_com_wrench_factory', None) is not None
-                    and self._episode_execution_state().fault is None):
-                self._latch_fault('task_com_solution_preparation', error, before_state=self.state)
+            if proposal is not None and self._episode_execution_state().fault is None:
+                self._latch_fault('solution_preparation', error, before_state=self.state)
             raise
 
     def _prepare_reference_step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
@@ -4104,11 +4103,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 writers = (writer,)
                 resource_owners = ((writer, resources),)
             from ..runtime.sessions.control_submission import submit_control_command
+            from ..runtime.sessions.legacy_native_feedback_binding import source_closure_identity
             return submit_control_command(
                 self.session, target, command_kind='position-target',
                 command_sha256=target.identity_hash,
                 source_id=source.source_id,
-                source_closure_sha256=source.source_closure_digest,
+                source_closure_sha256=source_closure_identity(self.session),
                 artifact_sha256=self.artifact.identity_hash,
                 boundary=boundary, sample_clock=sample_clock,
                 controller_generation=lifecycle.controller_generation,
@@ -4119,7 +4119,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 lowering=lowering, lower=lower,
                 subject_execution_mode=(
                     'native-feedback' if self.binding.interval_mode == 'native' else 'boundary-hold'
-                ) if getattr(source, 'position_subject_binding', None) is not None else None,
+                ) if (getattr(source, 'position_subject_binding', None) is not None
+                      or getattr(self.session, '_legacy_native_feedback_binding', None) is not None) else None,
             )
 
         def apply_control():
@@ -4175,8 +4176,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                                    observed_diagnostics)
             from contextlib import nullcontext
             from ..runtime.sessions.control import position_subject_interval
+            from ..runtime.sessions.legacy_native_feedback_binding import native_feedback_interval
             subject_scope = (position_subject_interval(self.session, target, self.state, controller=self.controller)
                              if getattr(self.value['source'], 'position_subject_binding', None) is not None
+                             else native_feedback_interval(self.session, target, self.state, controller=self.controller)
+                             if getattr(self.session, '_legacy_native_feedback_binding', None) is not None
                              else nullcontext())
             with subject_scope:
                 if self.binding.interval_mode == 'native':

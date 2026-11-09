@@ -249,7 +249,8 @@ class _SessionValues:
             )
             boundary.validate()
         else:
-            closure = self._source.source_closure_digest
+            from .legacy_native_feedback_binding import source_closure_identity
+            closure = source_closure_identity(self)
             if not isinstance(closure, str) or len(closure) != 64:
                 raise ValueError('legacy state boundary requires source closure identity')
             boundary = LegacyStateBoundaryIdentity(
