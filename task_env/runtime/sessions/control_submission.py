@@ -95,6 +95,47 @@ class SceneCommandIntervalV1:
             separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
+def _validate_scene_contributions(interval):
+    """Admit all outer claims together before consuming the one replay key."""
+    if type(interval) is not SceneCommandIntervalV1 or interval.schema_version != 'scene-command-interval-v1':
+        raise TypeError('scene submission requires a versioned SceneCommandIntervalV1')
+    if (type(interval.substeps) is not int or interval.substeps <= 0
+            or not math.isfinite(interval.physics_dt_s) or interval.physics_dt_s <= 0
+            or type(interval.contributions) is not tuple or not interval.contributions):
+        raise ValueError('scene interval requires a finite timebase and typed contributions')
+    claims = {}
+    for item in interval.contributions:
+        if type(item) is not SceneCommandContributionV1:
+            raise TypeError('scene interval contains an untyped contribution')
+        _token(item.producer_kind, 'scene producer')
+        _token(item.command_kind, 'scene command kind')
+        _digest(item.command_sha256, 'scene contribution command')
+        if (item.composition not in {'exclusive', 'sum', 'controller-managed'}
+                or type(item.units) is not tuple or not item.units
+                or type(item.resources) is not tuple or not item.resources
+                or len(item.resources) != len(set(item.resources))
+                or type(item.start_substep) is not int or type(item.end_substep) is not int
+                or not 0 <= item.start_substep < item.end_substep <= interval.substeps):
+            raise ValueError('scene contribution has invalid composition, units, resources or substeps')
+        for unit in item.units:
+            _token(unit, 'scene unit')
+        if item.physical_effect_id is not None:
+            _token(item.physical_effect_id, 'scene physical effect')
+        if item.composition == 'sum' and item.physical_effect_id is None:
+            raise ValueError('summed scene contributions require physical effect identities')
+        for resource in item.resources:
+            _token(resource, 'scene resource')
+            for prior in claims.setdefault(resource, []):
+                if item.start_substep < prior.end_substep and prior.start_substep < item.end_substep:
+                    if item.composition != 'sum' or prior.composition != 'sum':
+                        raise ValueError('scene resource has overlapping exclusive contributions')
+                    if (item.command_kind, item.units) != (prior.command_kind, prior.units):
+                        raise ValueError('summed scene contributions require matching command kinds and units')
+                    if item.physical_effect_id == prior.physical_effect_id:
+                        raise ValueError('scene resource repeats the same physical effect')
+            claims[resource].append(item)
+
+
 def prepare_position_scene_interval(*, session, plan, command, source_id,
                                     source_closure_sha256, artifact_sha256,
                                     boundary, sample_clock, resource_owners):
@@ -914,6 +955,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 'exclusive', request.physical_effect_id, getattr(request, 'writer_id', None), None, None,
                 request.identity_hash, (resource,), start, end))
         scene_interval = replace(scene_interval, contributions=(*scene_interval.contributions, *added))
+    if scene_interval is not None:
+        _validate_scene_contributions(scene_interval)
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']

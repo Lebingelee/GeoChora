@@ -514,3 +514,27 @@ def test_split_subject_commit_rejects_forged_component_before_consuming_boundary
     first, second = good._last_scene_control_submission['interval']['contributions']
     assert (first['writer_id'], first['command_sha256']) == (ARM_WRITER, bundle.arm_hash)
     assert (second['writer_id'], second['command_sha256']) == (HAND_WRITER, bundle.hand_hash)
+
+
+def test_shared_scene_owner_checks_all_fragment_conflicts_and_explicit_sums():
+    from dataclasses import replace
+    from task_env.runtime.sessions.control_submission import (
+        SceneCommandContributionV1, SceneCommandIntervalV1, _validate_scene_contributions,
+    )
+    first = SceneCommandContributionV1('caller', 'body-com-wrench', ('N', 'N*m'), 'exclusive',
+        'effect-a', 'writer-1', None, None, 'a' * 64, ('body:cube',), 0, 2)
+    second = replace(first, command_sha256='b' * 64, start_substep=2, end_substep=5)
+    base = SceneCommandIntervalV1('scene-command-interval-v1', 'task', 'a' * 64, 'b' * 64,
+        _Boundary(), _Clock(), 'c' * 64, None, None, None, .002, 5, (first, second))
+    _validate_scene_contributions(base)
+    with pytest.raises(ValueError, match='overlapping exclusive'):
+        _validate_scene_contributions(replace(base, contributions=(first, replace(second, start_substep=1))))
+    summed = replace(first, composition='sum', start_substep=0, end_substep=5)
+    other = replace(summed, physical_effect_id='effect-b', writer_id='writer-2', command_sha256='b' * 64)
+    _validate_scene_contributions(replace(base, contributions=(summed, other)))
+    with pytest.raises(ValueError, match='same physical effect'):
+        _validate_scene_contributions(replace(base, contributions=(summed, replace(other, physical_effect_id='effect-a'))))
+    with pytest.raises(ValueError, match='kinds and units'):
+        _validate_scene_contributions(replace(base, contributions=(summed, replace(other, units=('N',)))))
+    with pytest.raises(ValueError, match='substeps'):
+        _validate_scene_contributions(replace(base, contributions=(replace(first, end_substep=6),)))
