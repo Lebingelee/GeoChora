@@ -138,3 +138,11 @@ def test_sequence_capability_rejects_unverified_legacy_observer():
         session=SimpleNamespace(), recorder=None)
     with pytest.raises(StageUnavailableError, match='RGB/observer, caller wrench or active Recorder'):
         describe_physical_sequence_capability(env, None)
+    env._legacy_observer_requested = False
+    env.recorder = SimpleNamespace(_frozen=False)
+    with pytest.raises(StageUnavailableError, match='active Recorder'):
+        describe_physical_sequence_capability(env, None)
+    env.recorder = None
+    env.provider = 'geophys'
+    with pytest.raises(StageUnavailableError, match='MuJoCo CPU'):
+        describe_physical_sequence_capability(env, None)
