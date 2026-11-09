@@ -1,4 +1,8 @@
-"""Provider-free regression coverage for one logical multi-writer Position interval."""
+"""Standalone fake-I/O coverage for a logical multi-writer Position interval.
+
+Selected production dispatch requires a real source-bound scene interval;
+these deliberately unbound fixtures exercise the historical standalone API.
+"""
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -9,7 +13,6 @@ from task_env.controllers.canonical.contracts import (
 )
 from task_env.diagnostics.tasks.test_v211_control_submission_contract import _Clock, _Session
 from task_env.runtime.sessions import control
-from task_env.runtime.sessions.control_lifecycle import ControlLifecycleDispatchV1
 
 
 @dataclass(frozen=True)
@@ -92,11 +95,6 @@ def _run_two_writer_interval(monkeypatch, *, resource_writers=None, fail_writer=
     session.snapshot_v1 = lambda **_kwargs: SimpleNamespace(
         view=SimpleNamespace(boundary=next_boundary, sample_clock=SimpleNamespace(sample_index=1)),
     )
-    session._control_lifecycle_dispatch = ControlLifecycleDispatchV1(
-        'control-lifecycle-dispatch-v1', 'position-target', 'task', 'a' * 64,
-        'b' * 64, session.episode_id, boundary.boundary_id, 0, 0,
-        ('controller-a', 'controller-b'), 'prepared',
-    )
     monkeypatch.setattr(control, 'prepare_structured_action',
                         lambda *_args: (('a', object()), ('b', object())))
     monkeypatch.setattr(control, '_validate_position_source_boundary',
@@ -151,5 +149,5 @@ def test_partial_position_write_is_latched_and_interval_cannot_step_or_replay(mo
     assert receipt['status'] == 'failed_partial'
     assert receipt['attempted_writer_ids'] == ('a', 'b')
     assert receipt['completed_writer_ids'] == ('a',)
-    assert session._control_lifecycle_dispatch.stage == 'failed'
+    assert getattr(session, '_control_lifecycle_dispatch', None) is None
     assert ('episode-1', session.boundary.boundary_id) in session._control_submission_consumed

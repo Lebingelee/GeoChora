@@ -728,6 +728,12 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     fresh_controller = LinearEffortControllerV1(profile,plan.binding,model)
     fresh_execution = replace(execution, controllers=(fresh_controller,))
     env.session._physical_controller_versions = fresh_execution.controller_versions()
+    # This remains synthetic I/O: supply the bound execution and timebase so
+    # the real scene preflight is exercised rather than bypassed. The receipt
+    # provenance below was already an explicit fake, not native-build proof.
+    env.session._physical_port = SimpleNamespace(execution=fresh_execution)
+    env.session._artifact = SimpleNamespace(identity_hash='a'*64,
+        timebase=SimpleNamespace(control_dt=.01, physics_dt=.01, control_substeps=1))
     env.binding = replace_binding = SimpleNamespace(**vars(previous.binding))
     replace_binding.physical_control_profile = lambda _env: fresh_execution
     # Explicit mock of the downstream native receipt: this is not build evidence.
