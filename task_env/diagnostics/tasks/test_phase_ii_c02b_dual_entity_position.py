@@ -210,3 +210,35 @@ def test_bad_entity_missing_group_and_wrong_plan_reject_before_compute_apply_or_
         assert counts['step'] == 0
     finally:
         env.close()
+
+
+def test_two_position_writers_keep_independent_materialized_generations(tmp_path):
+    """One real interval retains each admitted generation and rejects drift."""
+    candidate = _candidate(tmp_path)
+    env = candidate.env
+    original = env.binding
+
+    def build_with_generations(provider):
+        value = original.build(provider)
+        for profile, generation in zip(value['controller'], (1, 7), strict=True):
+            profile.generation = generation
+        return value
+
+    env.binding = replace(original, build=build_with_generations)
+    try:
+        env.reset()
+        env.step(_request(env))
+        receipt = env.session._last_scene_control_submission
+        assert receipt['status'] == 'acknowledged'
+        generations = {item['writer_id']: item['controller_generation']
+                       for item in receipt['interval']['contributions']}
+        assert generations == {env.position_profiles[0].writer_id: 1,
+                               env.position_profiles[1].writer_id: 7}
+        assert env.session._last_control_submission['controller_generation'] == 1
+        prior = env.state.control_step
+        env.position_profiles[1].generation = 8
+        with pytest.raises(ValueError, match='RuntimeSession/Controller/plan identity'):
+            env.step(_request(env))
+        assert env.state.control_step == prior
+    finally:
+        env.close()

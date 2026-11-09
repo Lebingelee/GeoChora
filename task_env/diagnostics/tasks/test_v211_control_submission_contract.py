@@ -360,6 +360,7 @@ def test_position_scene_interval_retains_each_admitted_controller_generation(mon
         'writer-1': SimpleNamespace(identity='controller-1', generation=1),
         'writer-2': SimpleNamespace(identity='controller-2', generation=7),
     }
+    session._position_profile_generations = {'writer-1': 1, 'writer-2': 7}
     first, second = _Command(), _Command()
     second.writer_id, second.controller_identity = 'writer-2', 'controller-2'
     interval = prepare_position_scene_interval(session=session, plan=Plan(),
@@ -370,6 +371,13 @@ def test_position_scene_interval_retains_each_admitted_controller_generation(mon
     assert [(item.writer_id, item.controller_generation) for item in interval.contributions] == [
         ('writer-1', 1), ('writer-2', 7)]
     assert not hasattr(session, '_control_submission_consumed')
+    session._position_profiles_by_writer['writer-2'].generation = 8
+    with pytest.raises(ValueError, match='generation differs from materialization'):
+        prepare_position_scene_interval(session=session, plan=Plan(),
+            command=PositionControlBatchV1((first, second)), source_id='task',
+            source_closure_sha256='a' * 64, artifact_sha256='b' * 64,
+            boundary=session.boundary, sample_clock=_Clock(),
+            resource_owners=(('writer-1', ('robot/joint-1',)), ('writer-2', ('robot/joint-2',))))
 
 
 def test_subject_scene_submission_checks_bound_writer_and_live_target(monkeypatch):

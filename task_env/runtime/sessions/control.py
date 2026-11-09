@@ -1103,6 +1103,10 @@ def materialize_control(
             if (not profiles or len(profiles) > 2
                     or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)):
                 raise TypeError('unsupported explicit Controller profile set')
+            for profile in profiles:
+                generation = getattr(profile, 'generation', None)
+                if generation is not None and (type(generation) is not int or generation < 0):
+                    raise ValueError('materialized Position Controller generation must be nonnegative')
             if (not f04_native and not f05_native
                     and not f05_dg04_native and not f06_pickcube_isaac
                     and (execution.physics_provider not in {'geophys', 'mujoco'}
@@ -1370,6 +1374,9 @@ def materialize_control(
     if profiles:
         session._position_profiles_by_writer = {profile.writer_id: profile for profile in profiles}
         session._position_profile_identities = {profile.writer_id: profile.identity for profile in profiles}
+        session._position_profile_generations = {
+            profile.writer_id: getattr(profile, 'generation', None) for profile in profiles
+        }
         session._position_profile_identity = profiles[0].identity
         session._position_profile_id = profiles[0].profile_id
         session._position_writer_id = profiles[0].writer_id
@@ -1539,6 +1546,13 @@ def _validate_position_source_boundary(
             admitted_profile.identity == controller_profile.identity
             and admitted_profile.source.source_closure_digest == controller_profile.source.source_closure_digest
         )
+        generations = getattr(session, '_position_profile_generations', None)
+        if generations is not None:
+            session_profile_valid = session_profile_valid and (
+                controller_profile.writer_id in generations
+                and generations[controller_profile.writer_id] == getattr(controller_profile, 'generation', None)
+                and getattr(admitted_profile, 'generation', None) == generations[controller_profile.writer_id]
+            )
     else:
         session_profile_valid = (
             getattr(session, '_position_profile_identity', None) == controller_profile.identity
@@ -1624,12 +1638,15 @@ def _prepare_position_profile_replacement(
     replacement_profiles[candidate_profile.writer_id] = candidate_profile
     replacement_identities = dict(getattr(session, '_position_profile_identities', {}))
     replacement_identities[candidate_profile.writer_id] = candidate_profile.identity
+    replacement_generations = dict(getattr(session, '_position_profile_generations', {}))
+    replacement_generations[candidate_profile.writer_id] = getattr(candidate_profile, 'generation', None)
     return {
         'current_profile': current_profile,
         'candidate_profile': candidate_profile,
         'activation': activation,
         'profiles_by_writer': replacement_profiles,
         'profile_identities': replacement_identities,
+        'profile_generations': replacement_generations,
         'profile_identity': candidate_profile.identity,
         'profile_id': candidate_profile.profile_id,
         'writer_id': candidate_profile.writer_id,
@@ -1649,12 +1666,14 @@ def _commit_position_profile_replacement(session, prepared):
     (
         session._position_profiles_by_writer,
         session._position_profile_identities,
+        session._position_profile_generations,
         session._position_profile_identity,
         session._position_profile_id,
         session._position_writer_id,
     ) = (
         prepared['profiles_by_writer'],
         prepared['profile_identities'],
+        prepared['profile_generations'],
         prepared['profile_identity'],
         prepared['profile_id'],
         prepared['writer_id'],
@@ -1789,13 +1808,17 @@ def apply_position_control_batch(
         return PositionControlBatchAcknowledgementV1(tuple(acknowledgements), aggregate)
 
     identities = tuple(sorted({target.controller_identity for target in targets}))
+    anchor_writer = getattr(session, '_position_writer_id', prepared[0][1].writer_id)
+    anchor = next((row[0] for row in prepared if row[1].writer_id == anchor_writer), None)
+    if anchor is None:
+        raise ValueError('position batch lacks the legacy lifecycle anchor writer')
     acknowledgement = submit_control_command(
         session, batch, command_kind='position-target', command_sha256=batch.identity_hash,
         source_id=prepared[0][0].source.source_id,
         source_closure_sha256=targets[0].source_closure_digest,
         artifact_sha256=targets[0].target.task_artifact_hash,
         boundary=boundary, sample_clock=targets[0].sample_clock,
-        controller_generation=int(getattr(prepared[0][0], 'generation', 0)),
+        controller_generation=int(getattr(anchor, 'generation', 0)),
         controller_identities=identities, writer_ids=writer_ids,
         resource_ids=resources, resource_owners=resource_owners,
         units=('arm-position:rad', 'gripper-position:m'),
@@ -1846,11 +1869,10 @@ def execute_position_control_interval(
             raise ValueError('complete structured request does not match the admitted Position writers')
         if {binding.writer_id for binding in plan.controller_bindings} != set(by_writer):
             raise ValueError('Position profile set does not exactly match the ControlBindingPlan')
-        generations = {int(getattr(profile, 'generation', 0)) for profile in profiles}
         sources = {(profile.source.source_id, profile.source.source_closure_digest,
                     profile.artifact.identity_hash) for profile in profiles}
-        if len(generations) != 1 or len(sources) != 1:
-            raise ValueError('Position writers must share source, Artifact, and Controller generation')
+        if len(sources) != 1:
+            raise ValueError('Position writers must share source and Artifact')
         actions = dict(prepared)
         # Verify every writer/profile/source/state boundary before any Controller compute.
         for writer_id in sorted(by_writer):

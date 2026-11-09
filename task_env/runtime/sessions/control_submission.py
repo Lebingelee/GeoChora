@@ -138,6 +138,11 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
         generation = getattr(profile, 'generation', None) if profile is not None else None
         if generation is not None and (type(generation) is not int or generation < 0):
             raise ValueError('scene Position Controller generation must be nonnegative')
+        admitted_generations = getattr(session, '_position_profile_generations', None)
+        if admitted_generations is not None and (
+                target.writer_id not in admitted_generations
+                or admitted_generations[target.writer_id] != generation):
+            raise ValueError('scene Position Controller generation differs from materialization')
         resources = owners.get(target.writer_id)
         if not resources:
             raise ValueError('scene Position writer has no bound resources')
