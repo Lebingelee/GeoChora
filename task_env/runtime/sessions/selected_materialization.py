@@ -180,8 +180,8 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
                     or not callable(getattr(candidate, 'create', None))):
                 raise ValueError('runtime construction capability is foreign or invalid')
             candidates.append(candidate)
-        elif provider is env.value.get('physical_execution') and provider is not None:
-            raise TypeError('physical execution lacks its runtime construction capability')
+        elif provider is not None:
+            raise TypeError('declared owner lacks its runtime construction capability')
     if not candidates:
         raise TypeError('selected binding exposes no runtime construction capability')
     priority = max(item.priority for item in candidates)
