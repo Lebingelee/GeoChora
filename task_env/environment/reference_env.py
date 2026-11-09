@@ -1280,7 +1280,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
-        self._mixed_initial_value_pending = bool(mixed_control_candidate)
         self.dual_entity_position = len(self.position_profiles) == 2
         if (not self.position_profile and not mixed_control_candidate
                 and self.binding.physical_control_profile is None):
@@ -1415,33 +1414,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 _native_feedback_request is not None)) > 1:
             raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
         self._diagnostic_profile = diagnostic_profile
-        self._native_feedback_profile = None
-        self._native_feedback_request = None
         self._mixed_control_candidate = bool(_mixed_control_candidate)
-        if _mixed_control_candidate:
-            build_value = lambda: self.binding.build_mixed_control_profile(provider, backend)
-        elif _native_feedback_request is None:
+        if not _mixed_control_candidate and _native_feedback_request is None:
             if (diagnostic_profile is None and _execution_spec_v1 is None
                     and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
-            if self.binding.build_seeded is not None:
-                build_value = lambda: self.binding.build_seeded(provider, backend, 31, horizon)
-            else:
-                build_value = lambda: self.binding.build_for_provider(provider)
-        else:
-            if self.binding.admit_native_feedback_profile is None:
-                raise ValueError(
-                    'normal native-feedback profile requires an opted-in task binding'
-                )
-            self._native_feedback_profile = self.binding.admit_native_feedback_profile(
-                provider, backend, _native_feedback_request,
-            )
-            if type(self._native_feedback_profile) is not str or not self._native_feedback_profile:
-                raise ValueError('native-feedback admission must return a nonempty profile identifier')
-            self._native_feedback_request = _native_feedback_request
-            build_value = lambda: self.binding.build_native_feedback_profile(
-                provider, backend, _native_feedback_request, False,
-            )
+        self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
+            provider, backend, horizon, mixed=bool(_mixed_control_candidate),
+            native_request=_native_feedback_request)
+        self._native_feedback_profile = getattr(self._reset_reconstruction, 'profile', None)
+        self._native_feedback_request = _native_feedback_request
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
         try:
@@ -1451,7 +1433,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('precompiled selected value must match its execution specification')
                 self.value = _initial_value
             else:
-                self.value = build_value()
+                self.value = self._reset_reconstruction.initial()
         except BaseException as error:
             fault = ExecutionFaultV1.from_exception(
                 'selected_construction', error
@@ -1777,6 +1759,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         switch_candidate = None
         candidate_value = None
         candidate_binding = self.binding
+        candidate_reconstruction = self._reset_reconstruction
         prepared_reset_plan_required = getattr(
             getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
         resolved = getattr(self, 'resolved_public_config', None)
@@ -1798,15 +1781,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             seed = switch_candidate.task_seed
             options, mixed_reset_plan, mixed_reset_sample = {}, None, None
             candidate_binding = type(self).selected_binding(switch_candidate.config)
+            candidate_reconstruction = candidate_binding.reset_reconstruction_strategy(
+                switch_candidate.config.physics_provider,
+                switch_candidate.config.environment.runtime.backend, self.horizon)
             selection = switch_candidate.config.execution_spec_v2
             requested_json = switch_candidate.config.requested_execution_json
             if selection.deployment == 'isolated_worker':
                 from ..runtime.sessions.provenance import preflight_interpreter_before_source
                 import json
                 preflight_interpreter_before_source(selection, requested=json.loads(requested_json), task_uid=self.uid)
-            candidate_value = candidate_binding.build_seeded(
-                switch_candidate.config.physics_provider,
-                switch_candidate.config.environment.runtime.backend, seed, self.horizon)
+            candidate_value = candidate_reconstruction.build_switch_candidate(seed)
         else:
             seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
                 self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
@@ -1818,26 +1802,26 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
         if selection is not None:
-            import json
-            from ..runtime.sessions.provenance import (
-                DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
-            )
-            requested = None if requested_json is None else json.loads(requested_json)
-            if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
-                requested = dict(requested or {})
-                requested['controller'] = {'gravity_compensation': True}
-            preflight_value = candidate_value if switching else self.value
-            facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
-                         source=preflight_value['source'],
-                         controller=preflight_value.get('controller', preflight_value.get('leaf_plan')), seed=seed)
-            if selection.deployment == 'isolated_worker':
-                if (self._mixed_control_candidate or self.leaf_position_profile
-                        or self.dual_entity_position or self._diagnostic_profile is not None
-                        or self._native_feedback_profile is not None):
-                    receipt = describe_execution_selection(selection, **facts)
-                    receipt['phase'] = 'static_preflight'
-                    raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
             try:
+                import json
+                from ..runtime.sessions.provenance import (
+                    DeploymentPreflightError, describe_execution_selection, preflight_selected_deployment,
+                )
+                requested = None if requested_json is None else json.loads(requested_json)
+                if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+                    requested = dict(requested or {})
+                    requested['controller'] = {'gravity_compensation': True}
+                preflight_value = candidate_value if switching else self.value
+                facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
+                             source=preflight_value['source'],
+                             controller=preflight_value.get('controller', preflight_value.get('leaf_plan')), seed=seed)
+                if selection.deployment == 'isolated_worker':
+                    if (self._mixed_control_candidate or self.leaf_position_profile
+                            or self.dual_entity_position or self._diagnostic_profile is not None
+                            or self._native_feedback_profile is not None):
+                        receipt = describe_execution_selection(selection, **facts)
+                        receipt['phase'] = 'static_preflight'
+                        raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
                 deployment_receipt = preflight_selected_deployment(
                     selection, **facts, binding=candidate_binding, value=preflight_value)
             except BaseException as error:
@@ -1930,61 +1914,34 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if observe_action is not None:
                     observe_action(self, None, physical_selection.describe())
                 self._last_physical_submission = None
-            previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
             failure_phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
             if switching:
                 self.binding = candidate_binding
+                self._reset_reconstruction = candidate_reconstruction
                 self.resolved_public_config = switch_candidate.config
                 self.provider = switch_candidate.config.physics_provider
                 self.backend = switch_candidate.config.environment.runtime.backend
-                self.value = candidate_value
                 self.artifact = candidate_value['artifact']
                 self._declared_execution_spec_v1 = candidate_value.get('execution_spec_v1')
-            elif self._mixed_control_candidate and self._mixed_initial_value_pending:
-                self._mixed_initial_value_pending = False
-            elif self._mixed_control_candidate:
-                self.value = self.binding.build_mixed_control_profile(self.provider, self.backend)
-            elif self._native_feedback_profile is not None:
-                self.value = self.binding.build_native_feedback_profile(
-                    self.provider, self.backend, self._native_feedback_request, False,
-                )
-            else:
-                if external_solution is not None:
-                    self.value = self.binding.build_external(self.provider)
-                elif self.binding.build_seeded is not None:
-                    self.value = self.binding.build_seeded(
-                        self.provider, self.backend, seed, self.horizon,
-                    )
-                else:
-                    self.value = self.binding.build_for_provider(self.provider)
-            replacement_receipt = getattr(
-                self.value.get('source'), 'execution_source_receipt', None,
-            )
-            if deployment_receipt is not None:
-                from ..runtime.sessions.transport import source_binding_facts
-                if (getattr(self.value.get('source'), 'source_closure_digest', None)
-                        != deployment_receipt['identity_facts']['source_closure']
-                        or source_binding_facts(self.value['source'])
-                        != deployment_receipt['identity_facts']['source_bindings']):
-                    raise ValueError('selected source closure or bindings changed after preflight')
-            if previous_receipt is not None and previous_receipt is not replacement_receipt:
-                previous_receipt.close()
-            if self._mixed_control_candidate or self._native_feedback_profile is not None:
-                if self.value['artifact'] != self.artifact:
-                    raise ValueError('selected Artifact changed between construction and reset')
-            else:
-                select_runtime_input = getattr(self.binding, 'reset_runtime_input', None)
-                runtime_input = select_runtime_input(self.value) if select_runtime_input else None
-                self.artifact = _artifact_for_reset(self.artifact, self.value, runtime_input)
-            if external_solution is not None:
-                self.binding.validate_external_solution(self.value, external_solution)
-            failure_phase = 'reset_seed'
-            if self._mixed_control_candidate:
-                seed = self.binding.reset_seed(seed)
-            self.solution = self.value.get('solution')
-            if self._native_feedback_profile is not None and self.solution is not None:
-                self.binding.validate_external_solution(self.value, self.solution)
+            def verify_rebuilt_source(value):
+                if deployment_receipt is not None:
+                    from ..runtime.sessions.transport import source_binding_facts
+                    if (getattr(value.get('source'), 'source_closure_digest', None)
+                            != deployment_receipt['identity_facts']['source_closure']
+                            or source_binding_facts(value['source'])
+                            != deployment_receipt['identity_facts']['source_bindings']):
+                        raise ValueError('selected source closure or bindings changed after preflight')
+            def set_reconstruction_phase(phase):
+                nonlocal failure_phase
+                failure_phase = phase
+            self._reset_reconstruction.use_binding(self.binding)
+            rebuilt = self._reset_reconstruction.reconstruct(
+                previous_value, self.artifact, seed, external_solution, _artifact_for_reset,
+                verify_source=verify_rebuilt_source, set_phase=set_reconstruction_phase,
+                prepared=candidate_value if switching else None)
+            self.value, self.artifact = rebuilt.value, rebuilt.artifact
+            seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
             if deployment_receipt is not None:

@@ -17,6 +17,136 @@ def _no_observe_kwargs(env, guard_samples):
     return {}
 
 
+@dataclass(frozen=True)
+class ResetReconstructionResult:
+    value: object
+    artifact: object
+    seed: int
+    solution: object
+
+
+class _ResetReconstruction:
+    """Task binding's reconstruction policy for one selected configuration."""
+    def __init__(self, binding, provider, backend, horizon):
+        self.binding, self.provider, self.backend, self.horizon = binding, provider, backend, horizon
+
+    def build_switch_candidate(self, seed):
+        if self.binding.build_seeded is None:
+            raise ValueError('configuration switch requires a seeded task builder')
+        return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
+
+    def use_binding(self, binding):
+        """Use the Env's currently admitted task binding without changing policy."""
+        self.binding = binding
+
+    def _validate_solutions(self, value, external_solution, *, validate_owned=False):
+        if external_solution is not None:
+            self.binding.validate_external_solution(value, external_solution)
+        solution = value.get('solution')
+        if validate_owned and solution is not None:
+            self.binding.validate_external_solution(value, solution)
+        return solution
+
+    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
+        raise NotImplementedError
+
+    def reconstruct(self, current, artifact, seed, external_solution, artifact_for_reset, *,
+                    verify_source, set_phase=lambda _phase: None, prepared=None):
+        value = prepared if prepared is not None else self.build_reset(current, seed, external_solution)
+        old_receipt = getattr(current.get('source'), 'execution_source_receipt', None)
+        receipt = getattr(value.get('source'), 'execution_source_receipt', None)
+        try:
+            verify_source(value)
+            artifact, seed, solution = self._finish(
+                value, artifact, seed, external_solution, artifact_for_reset, set_phase)
+            # Keep the prior source lease until the replacement is validated;
+            # a failed replacement must not strand the reset recovery route.
+            if old_receipt is not None and old_receipt is not receipt:
+                old_receipt.close()
+        except BaseException as error:
+            # A newly built source can own a temporary snapshot even when
+            # validation fails before the Env installs it.
+            if receipt is not None and receipt is not old_receipt:
+                try:
+                    receipt.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'rebuilt source cleanup also failed: {cleanup_error!r}')
+            raise
+        return ResetReconstructionResult(value, artifact, seed, solution)
+
+
+class _StandardResetReconstruction(_ResetReconstruction):
+    def initial(self):
+        if self.binding.build_seeded is not None:
+            return self.binding.build_seeded(self.provider, self.backend, 31, self.horizon)
+        return self.binding.build_for_provider(self.provider)
+
+    def build_reset(self, current, seed, external_solution):
+        if external_solution is not None:
+            return self.binding.build_external(self.provider)
+        if self.binding.build_seeded is not None:
+            return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
+        return self.binding.build_for_provider(self.provider)
+
+    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
+        selector = getattr(self.binding, 'reset_runtime_input', None)
+        runtime_input = selector(value) if selector else None
+        artifact = artifact_for_reset(artifact, value, runtime_input)
+        solution = self._validate_solutions(value, external_solution)
+        set_phase('reset_seed')
+        return artifact, seed, solution
+
+
+class _MixedResetReconstruction(_ResetReconstruction):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._initial_pending = True
+
+    def initial(self):
+        return self.binding.build_mixed_control_profile(self.provider, self.backend)
+
+    def build_reset(self, current, seed, external_solution):
+        if self._initial_pending:
+            self._initial_pending = False
+            return current
+        return self.binding.build_mixed_control_profile(self.provider, self.backend)
+
+    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
+        if value['artifact'] != artifact:
+            raise ValueError('selected Artifact changed between construction and reset')
+        solution = self._validate_solutions(value, external_solution)
+        set_phase('reset_seed')
+        return artifact, self.binding.reset_seed(seed), solution
+
+
+class _NativeFeedbackResetReconstruction(_ResetReconstruction):
+    def __init__(self, binding, provider, backend, horizon, request):
+        super().__init__(binding, provider, backend, horizon)
+        if binding.admit_native_feedback_profile is None:
+            raise ValueError('normal native-feedback profile requires an opted-in task binding')
+        self.profile = binding.admit_native_feedback_profile(provider, backend, request)
+        if type(self.profile) is not str or not self.profile:
+            raise ValueError('native-feedback admission must return a nonempty profile identifier')
+        self.request = request
+
+    def initial(self):
+        return self.binding.build_native_feedback_profile(self.provider, self.backend, self.request, False)
+
+    def build_reset(self, current, seed, external_solution):
+        return self.initial()
+
+    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
+        if value['artifact'] != artifact:
+            raise ValueError('selected Artifact changed between construction and reset')
+        if external_solution is not None:
+            self.binding.validate_external_solution(value, external_solution)
+        set_phase('reset_seed')
+        solution = value.get('solution')
+        if solution is not None:
+            self.binding.validate_external_solution(value, solution)
+        return artifact, seed, solution
+
+
 def legacy_position_physical_observation_binding(env):
     """Compatibility projection for selected callers that still publish V1 state."""
     return (env.position_scene, env.position_joint_bindings,
@@ -356,6 +486,18 @@ class ReferenceTaskBinding:
             )
 
         return cls(build=build, build_receives_binding=True, **binding_fields)
+
+    def reset_reconstruction_strategy(self, provider, backend, horizon, *, mixed=False, native_request=None):
+        """Select task-owned reconstruction once when a configuration is admitted."""
+        if mixed and native_request is not None:
+            raise ValueError('mixed and native-feedback reconstruction are mutually exclusive')
+        if mixed:
+            if not callable(self.build_mixed_control_profile):
+                raise ValueError('mixed-control candidate requires its task reconstruction binding')
+            return _MixedResetReconstruction(self, provider, backend, horizon)
+        if native_request is not None:
+            return _NativeFeedbackResetReconstruction(self, provider, backend, horizon, native_request)
+        return _StandardResetReconstruction(self, provider, backend, horizon)
 
     def build_for_provider(self, provider):
         """Build with this binding when the construction owner opts into it."""
