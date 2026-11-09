@@ -2920,7 +2920,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     action.action, scene=self.position_scene, plan=self.position_plan,
                     profile=self.position_profiles[0],
                 )
-                return self._prepare_position_profile(request, proposal=action, caller_driven=True)
+                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+                return prepare_selected_control_action(self, request, proposal=action, caller_driven=True)
             self._require_published_execution_info()
             validate_caller_solution_action(
                 action, boundary=self.info['expert_execution_boundary_v1'],
@@ -2928,7 +2929,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 control_request_mode=('required' if self.binding.control_request_required
                                       else 'forbidden'),
             )
-            return self._prepare_reference_step(action.action, proposal=action, caller_driven=True)
+            from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+            return prepare_selected_control_action(self, action.action, proposal=action, caller_driven=True)
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
@@ -3218,7 +3220,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     publish=publish, on_failure=on_failure)
 
     def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
-        operations = self._prepare_mixed_control(action, proposal=proposal, observer_solution=observer_solution)
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        operations = prepare_selected_control_action(
+            self, action, proposal=proposal, observer_solution=observer_solution)
         return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
@@ -3422,8 +3426,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     boundary=lambda: self.info.get('state_boundary_identity'),
                     state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
                     solution_identity=self.value.get('solution_identity'), control_request_mode='position')
-                action = self._physical_reset_selection.validate_action(self.bind_physical_action(proposal.action))
-                operations = self._prepare_physical_control(action, proposal=proposal, observer_solution=solution)
+                action = self.bind_physical_action(proposal.action)
+                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+                operations = prepare_selected_control_action(
+                    self, action, proposal=proposal, observer_solution=solution)
             except BaseException as error:
                 self._latch_fault('physical_external_solution_proposal', error, before_state=self.state)
                 raise
@@ -3721,7 +3727,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
-        operations = self._prepare_position_profile(request, proposal=proposal, observer_solution=observer_solution)
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        operations = prepare_selected_control_action(
+            self, request, proposal=proposal, observer_solution=observer_solution)
         return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None, caller_driven=False):
@@ -3975,7 +3983,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
 
     def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
-        operations = self._prepare_reference_step(action, proposal=proposal, observer_solution=observer_solution, caller_driven=caller_driven)
+        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+        operations = prepare_selected_control_action(
+            self, action, proposal=proposal, observer_solution=observer_solution,
+            caller_driven=caller_driven)
         return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_reference_step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):

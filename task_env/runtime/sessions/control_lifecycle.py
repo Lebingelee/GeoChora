@@ -62,7 +62,8 @@ def _dispatch_record(env, command_kind, controller_identities, generation):
     return receipt
 
 
-def prepare_selected_control_action(env, action):
+def prepare_selected_control_action(env, action, *, proposal=None, observer_solution=None,
+                                    caller_driven=False):
     """Run one selected action through its declared capability's common lifecycle.
 
     Capability dispatch is based on bound execution objects. Position and
@@ -72,6 +73,14 @@ def prepare_selected_control_action(env, action):
     """
     if env._stopped or env.session is None:
         raise RuntimeError('reset required or episode already stopped')
+
+    context = {}
+    if proposal is not None:
+        context['proposal'] = proposal
+    if observer_solution is not None:
+        context['observer_solution'] = observer_solution
+    if caller_driven:
+        context['caller_driven'] = True
 
     physical_factory = getattr(env.binding, 'physical_control_profile', None)
     if callable(physical_factory):
@@ -86,12 +95,12 @@ def prepare_selected_control_action(env, action):
             if selection is not None:
                 action = selection.validate_action(action)
                 try:
-                    result = env._prepare_physical_control(action)
+                    result = env._prepare_physical_control(action, **context)
                 except BaseException as error:
                     env._latch_fault('physical_control_preparation', error, before_state=env.state)
                     raise
             else:
-                result = env._prepare_physical_control(action)
+                result = env._prepare_physical_control(action, **context)
             current = env.session._control_lifecycle_dispatch
             if current.stage == 'preparing':
                 from dataclasses import replace
@@ -101,7 +110,30 @@ def prepare_selected_control_action(env, action):
     if getattr(env, 'mixed_control_profile', False):
         _dispatch_record(env, 'mixed-actuator-command', (env.controller.identity,),
                          int(getattr(env.controller, 'generation', 0)))
-        return env._prepare_mixed_control(action)
+        return env._prepare_mixed_control(action, **context)
+
+    if getattr(env, 'leaf_position_profile', False):
+        plan = env.leaf_plan
+        if plan is None or not getattr(plan, '_compiled', False):
+            raise ValueError('leaf Position route requires a compiled control plan')
+        if env.state.control_step >= env.horizon:
+            env._stopped = True
+            raise RuntimeError('selected position-control horizon is exhausted')
+        if getattr(env, 'fixed_attachment_leaf_position_profile', False):
+            from ...controllers.canonical.leaf_actions import AttachedLeafActionSetV1 as ActionType
+        else:
+            from ...controllers.canonical.leaf_actions import LeafPositionActionSetV1 as ActionType
+        if type(action) is not ActionType:
+            raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
+        action.structured_request(env.position_scene, plan)
+        identities = tuple(sorted(entry.binding.identity_hash for entry in plan.leaves))
+        _dispatch_record(env, 'position-target', identities, 0)
+        result = env._prepare_leaf_position(action)
+        current = env.session._control_lifecycle_dispatch
+        if current.stage == 'preparing':
+            from dataclasses import replace
+            env.session._control_lifecycle_dispatch = replace(current, stage='prepared')
+        return result
 
     if has_position_control_capability(env):
         profiles = env.position_profiles
@@ -110,33 +142,20 @@ def prepare_selected_control_action(env, action):
         if env.state.control_step >= env.horizon:
             env._stopped = True
             raise RuntimeError('selected position-control horizon is exhausted')
-        if getattr(env, 'leaf_position_profile', False):
-            if env.fixed_attachment_leaf_position_profile:
-                from ...controllers.canonical.leaf_actions import AttachedLeafActionSetV1
-                action_type = AttachedLeafActionSetV1
-            else:
-                from ...controllers.canonical.leaf_actions import LeafPositionActionSetV1
-                action_type = LeafPositionActionSetV1
-            if type(action) is not action_type:
-                raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
-            action.structured_request(env.position_scene, env.leaf_plan)
-            _dispatch_record(env, 'position-target', identities, generation)
-            result = env._prepare_leaf_position(action)
-        else:
-            from ...controllers.canonical.contracts import StructuredActionRequestV1
-            if (not isinstance(action, StructuredActionRequestV1)
-                    and env.value.get('f06_pickcube_isaac_input') is not None
-                    and len(profiles) == 1):
-                from .control import single_position_action_request
-                action = single_position_action_request(
-                    action, scene=env.position_scene, plan=env.position_plan,
-                    profile=profiles[0])
-            if not isinstance(action, StructuredActionRequestV1):
-                raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
-            from .control import prepare_structured_action
-            prepare_structured_action(env.position_plan, action)
-            _dispatch_record(env, 'position-target', identities, generation)
-            result = env._prepare_position_profile(action)
+        from ...controllers.canonical.contracts import StructuredActionRequestV1
+        if (not isinstance(action, StructuredActionRequestV1)
+                and env.value.get('f06_pickcube_isaac_input') is not None
+                and len(profiles) == 1):
+            from .control import single_position_action_request
+            action = single_position_action_request(
+                action, scene=env.position_scene, plan=env.position_plan,
+                profile=profiles[0])
+        if not isinstance(action, StructuredActionRequestV1):
+            raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
+        from .control import prepare_structured_action
+        prepare_structured_action(env.position_plan, action)
+        _dispatch_record(env, 'position-target', identities, generation)
+        result = env._prepare_position_profile(action, **context)
         current = getattr(env.session, '_control_lifecycle_dispatch', None)
         if current is not None and current.stage == 'preparing':
             from dataclasses import replace
@@ -148,7 +167,7 @@ def prepare_selected_control_action(env, action):
         generation = (session_generation if type(session_generation) is int
                       else int(getattr(env.controller, 'generation', 0)))
         _dispatch_record(env, 'position-target', (env.controller.identity,), generation)
-        result = env._prepare_reference_step(action)
+        result = env._prepare_reference_step(action, **context)
         current = getattr(env.session, '_control_lifecycle_dispatch', None)
         if current is not None and current.stage == 'preparing':
             from dataclasses import replace
@@ -158,5 +177,6 @@ def prepare_selected_control_action(env, action):
     from ...controllers.canonical.contracts import StructuredActionRequestV1
     if isinstance(action, StructuredActionRequestV1):
         raise TypeError('structured ControllerGroup actions require a compiled position capability')
-    env._episode_mode = 'external'
-    return env._prepare_reference_step(action)
+    if proposal is None or caller_driven:
+        env._episode_mode = 'external'
+    return env._prepare_reference_step(action, **context)

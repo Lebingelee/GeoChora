@@ -220,10 +220,12 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
     """
     from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
     from .physical_control import ResolvedPhysicalBatchV1
+    from .leaf_control import LeafPreparedBatchV1
     is_position_batch = type(command) is PositionControlBatchV1
+    is_leaf_batch = type(command) is LeafPreparedBatchV1
 
     if command_kind == 'position-target':
-        if is_position_batch:
+        if is_position_batch or is_leaf_batch:
             command.validate()
         elif type(command) not in {PositionControlTargetV1, CanonicalControlTarget}:
             raise TypeError('position lifecycle requires a typed canonical position target')
@@ -321,12 +323,14 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 or len(flattened_resources) != len(set(flattened_resources))
                 or set(flattened_resources) != set(resource_ids)):
             raise ValueError('resource ownership conflicts or does not cover the complete batch')
-    elif is_position_batch:
+    elif is_position_batch or is_leaf_batch:
         raise ValueError('multi-writer Position batch requires explicit resource ownership')
     if is_position_batch:
         target_writers = tuple(target.writer_id for target in command.targets)
         if target_writers != writer_ids:
             raise ValueError('position batch targets differ from the submitted writer set')
+    if is_leaf_batch and tuple(item.writer_id for item in command.commands) != writer_ids:
+        raise ValueError('leaf batch commands differ from the submitted writer set')
     if submission_progress is not None:
         if (type(submission_progress) is not dict
                 or type(submission_progress.get('attempted_writer_ids')) is not list

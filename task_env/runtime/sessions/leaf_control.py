@@ -1712,6 +1712,34 @@ class LeafPreparedCommandV1:
 
 
 @dataclass(frozen=True)
+class LeafPreparedBatchV1:
+    """Source-bound leaf commands admitted as one logical submission."""
+
+    commands: tuple[LeafPreparedCommandV1, ...]
+
+    def validate(self):
+        if (type(self.commands) is not tuple or not self.commands
+                or any(type(item) is not LeafPreparedCommandV1 for item in self.commands)):
+            raise TypeError('leaf batch requires immutable prepared leaf commands')
+        writers = tuple(item.writer_id for item in self.commands)
+        if len(writers) != len(set(writers)):
+            raise ValueError('leaf batch contains duplicate writers')
+        first = self.commands[0]
+        if any((item.state_boundary, item.effective_plan_identity_sha256,
+                item.materialization_identity_sha256, item.state_configuration_revision)
+               != (first.state_boundary, first.effective_plan_identity_sha256,
+                   first.materialization_identity_sha256, first.state_configuration_revision)
+               for item in self.commands[1:]):
+            raise ValueError('leaf batch commands do not share one source-bound interval')
+
+    @property
+    def identity_hash(self):
+        return _digest({'schema_version': 'leaf-prepared-batch-v1',
+                        'commands': [(item.writer_id, item.command_identity_sha256)
+                                     for item in self.commands]})
+
+
+@dataclass(frozen=True)
 class LeafActuatorPatchV1:
     schema_version: str
     writer_id: str
@@ -2177,103 +2205,143 @@ def dispatch_leaf_control_interval(
         tuple(requirement for entry in plan.leaves
               for requirement in entry.binding.required_state.state_requirements.requirements),
     )
-    # No cursor, replay, apply or physics state has changed before this point.
-    try:
-        runtime.begin_leaf_control_interval(plan.identity_sha256, before.boundary.boundary_id)
-    except BaseException as error:
-        try:
-            after = _read_runtime_clock(runtime)
-            readback_error = None
-        except BaseException as read_error:
-            after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
-        progress = _fault_progress(
-            plan, before.boundary, attempted=(), applied=(), unknown=(),
-            acknowledged=(), ack_hashes=(), command_hashes=(),
-            prepared_commands=prepared, returned_apply_results=(),
-            failed_writer=None, phase="leaf-boundary-consume", error=error,
-            before_clock=before, after_clock=after, interval_attempted=False,
-            readback_error=readback_error,
-        )
-        _latch(runtime, progress, error)
-        raise
     attempted, applied, unknown = [], [], []
     ack_hashes, acknowledged, command_hashes, apply_results = [], [], [], []
-    for command in prepared:
-        writer = command.writer_id
-        attempted.append(writer)
-        command_hashes.append((writer, command.command_identity_sha256))
-        patch = LeafActuatorPatchV1(
-            "leaf-actuator-patch-v1", writer, command.command_identity_sha256,
-            command.target, plan.identity_sha256, request.materialization.identity_sha256,
-            command.state_configuration_revision, command.slot_values,
+    def apply_prepared():
+        # No cursor, replay, apply or physics state has changed before this point.
+        try:
+            runtime.begin_leaf_control_interval(plan.identity_sha256, before.boundary.boundary_id)
+        except BaseException as error:
+            try:
+                after = _read_runtime_clock(runtime)
+                readback_error = None
+            except BaseException as read_error:
+                after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
+            progress = _fault_progress(
+                plan, before.boundary, attempted=(), applied=(), unknown=(),
+                acknowledged=(), ack_hashes=(), command_hashes=(),
+                prepared_commands=prepared, returned_apply_results=(),
+                failed_writer=None, phase="leaf-boundary-consume", error=error,
+                before_clock=before, after_clock=after, interval_attempted=False,
+                readback_error=readback_error,
+            )
+            _latch(runtime, progress, error)
+            raise
+        for command in prepared:
+            writer = command.writer_id
+            attempted.append(writer)
+            command_hashes.append((writer, command.command_identity_sha256))
+            patch = LeafActuatorPatchV1(
+                "leaf-actuator-patch-v1", writer, command.command_identity_sha256,
+                command.target, plan.identity_sha256, request.materialization.identity_sha256,
+                command.state_configuration_revision, command.slot_values,
+            )
+            try:
+                result = runtime.apply_leaf_actuator_patch(patch)
+            except BaseException as error:
+                unknown.append(writer)
+                try:
+                    after = _read_runtime_clock(runtime)
+                    readback_error = None
+                except BaseException as read_error:
+                    after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
+                progress = _fault_progress(
+                    plan, before.boundary, attempted=attempted, applied=applied,
+                    unknown=unknown, acknowledged=acknowledged, ack_hashes=ack_hashes,
+                    command_hashes=command_hashes,
+                    prepared_commands=prepared, returned_apply_results=apply_results,
+                    failed_writer=writer, phase="leaf-apply", error=error,
+                    before_clock=before, after_clock=after, interval_attempted=False,
+                    readback_error=readback_error,
+                )
+                _latch(runtime, progress, error)
+                raise
+            # Returning from the runtime-owned write call means the write may have
+            # happened even if its Ack is malformed. Preserve that fact.
+            applied.append(writer)
+            if type(result) is LeafApplyResultV1:
+                apply_results.append(result)
+                try:
+                    ack_hashes.append((writer, result.ack.identity_hash))
+                except BaseException:
+                    pass
+            try:
+                if type(result) is not LeafApplyResultV1:
+                    raise TypeError("RuntimeSession apply must return LeafApplyResultV1")
+                if (result.writer_id, result.command_identity_sha256,
+                        result.materialization_identity_sha256, result.applied_slots) != (
+                        writer, command.command_identity_sha256,
+                        request.materialization.identity_sha256,
+                        tuple(item.ctrl_slot for item in command.slot_values)):
+                    raise ValueError("RuntimeSession apply result differs from its exact owned patch")
+                current_after_apply = _read_runtime_clock(runtime)
+                _check_runtime_clock(current_after_apply, before, require_state_revision=False)
+                validate_leaf_target_ack(
+                    entries[writer].binding, command.target, result.ack,
+                    expected_source_boundary=command.state_boundary,
+                    expected_source_clock=request.publication.view.sample_clock,
+                    expected_application_boundary=current_after_apply.boundary,
+                    expected_application_clock=current_after_apply.sample_clock,
+                )
+                if result.ack.identity_hash not in {value for name, value in ack_hashes if name == writer}:
+                    ack_hashes.append((writer, result.ack.identity_hash))
+                acknowledged.append(writer)
+            except BaseException as error:
+                try:
+                    after = _read_runtime_clock(runtime)
+                    readback_error = None
+                except BaseException as read_error:
+                    after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
+                progress = _fault_progress(
+                    plan, before.boundary, attempted=attempted, applied=applied,
+                    unknown=unknown, acknowledged=acknowledged, ack_hashes=ack_hashes,
+                    command_hashes=command_hashes,
+                    prepared_commands=prepared, returned_apply_results=apply_results,
+                    failed_writer=writer, phase="leaf-acknowledgement", error=error,
+                    before_clock=before, after_clock=after, interval_attempted=False,
+                    readback_error=readback_error,
+                )
+                _latch(runtime, progress, error)
+                raise
+
+        return tuple(apply_results)
+
+    lifecycle = getattr(runtime, '_control_lifecycle_dispatch', None)
+    if lifecycle is None:
+        # Standalone consumers retain their existing runtime-owned leaf contract.
+        apply_prepared()
+    else:
+        from .control_submission import submit_control_command
+        if lifecycle.source_closure_sha256 != plan.source_closure_sha256:
+            raise ValueError('leaf plan source closure differs from the shared lifecycle')
+        batch = LeafPreparedBatchV1(prepared)
+        owners = tuple(
+            (command.writer_id, tuple(sorted(
+                f'{item.actuator.entity_id}/{item.actuator.actuator_id}'
+                for item in command.slot_values)))
+            for command in prepared
         )
-        try:
-            result = runtime.apply_leaf_actuator_patch(patch)
-        except BaseException as error:
-            unknown.append(writer)
-            try:
-                after = _read_runtime_clock(runtime)
-                readback_error = None
-            except BaseException as read_error:
-                after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
-            progress = _fault_progress(
-                plan, before.boundary, attempted=attempted, applied=applied,
-                unknown=unknown, acknowledged=acknowledged, ack_hashes=ack_hashes,
-                command_hashes=command_hashes,
-                prepared_commands=prepared, returned_apply_results=apply_results,
-                failed_writer=writer, phase="leaf-apply", error=error,
-                before_clock=before, after_clock=after, interval_attempted=False,
-                readback_error=readback_error,
-            )
-            _latch(runtime, progress, error)
-            raise
-        # Returning from the runtime-owned write call means the write may have
-        # happened even if its Ack is malformed. Preserve that fact.
-        applied.append(writer)
-        if type(result) is LeafApplyResultV1:
-            apply_results.append(result)
-            try:
-                ack_hashes.append((writer, result.ack.identity_hash))
-            except BaseException:
-                pass
-        try:
-            if type(result) is not LeafApplyResultV1:
-                raise TypeError("RuntimeSession apply must return LeafApplyResultV1")
-            if (result.writer_id, result.command_identity_sha256,
-                    result.materialization_identity_sha256, result.applied_slots) != (
-                    writer, command.command_identity_sha256,
-                    request.materialization.identity_sha256,
-                    tuple(item.ctrl_slot for item in command.slot_values)):
-                raise ValueError("RuntimeSession apply result differs from its exact owned patch")
-            current_after_apply = _read_runtime_clock(runtime)
-            _check_runtime_clock(current_after_apply, before, require_state_revision=False)
-            validate_leaf_target_ack(
-                entries[writer].binding, command.target, result.ack,
-                expected_source_boundary=command.state_boundary,
-                expected_source_clock=request.publication.view.sample_clock,
-                expected_application_boundary=current_after_apply.boundary,
-                expected_application_clock=current_after_apply.sample_clock,
-            )
-            if result.ack.identity_hash not in {value for name, value in ack_hashes if name == writer}:
-                ack_hashes.append((writer, result.ack.identity_hash))
-            acknowledged.append(writer)
-        except BaseException as error:
-            try:
-                after = _read_runtime_clock(runtime)
-                readback_error = None
-            except BaseException as read_error:
-                after, readback_error = None, f"{type(read_error).__name__}: {read_error}"
-            progress = _fault_progress(
-                plan, before.boundary, attempted=attempted, applied=applied,
-                unknown=unknown, acknowledged=acknowledged, ack_hashes=ack_hashes,
-                command_hashes=command_hashes,
-                prepared_commands=prepared, returned_apply_results=apply_results,
-                failed_writer=writer, phase="leaf-acknowledgement", error=error,
-                before_clock=before, after_clock=after, interval_attempted=False,
-                readback_error=readback_error,
-            )
-            _latch(runtime, progress, error)
-            raise
+        declared = {(entity, actuator, writer)
+                    for entity, actuator, writer in plan.resource_writers}
+        actual = {(item.actuator.entity_id, item.actuator.actuator_id, command.writer_id)
+                  for command in prepared for item in command.slot_values}
+        if declared != actual:
+            raise ValueError('leaf command resources differ from the compiled ownership plan')
+        resources = tuple(sorted(resource for _writer, owned in owners for resource in owned))
+        submit_control_command(
+            runtime, batch, command_kind='position-target', command_sha256=batch.identity_hash,
+            source_id=lifecycle.source_id, source_closure_sha256=lifecycle.source_closure_sha256,
+            artifact_sha256=lifecycle.artifact_sha256, boundary=before.boundary,
+            sample_clock=before.sample_clock, controller_generation=lifecycle.controller_generation,
+            controller_identities=tuple(sorted(entry.binding.identity_hash for entry in plan.leaves)),
+            writer_ids=tuple(item.writer_id for item in prepared),
+            resource_ids=resources, resource_owners=owners,
+            units=('arm-position:rad', 'gripper-position:m'),
+            lowering=f'{type(runtime).__module__}.{type(runtime).__qualname__}.apply_leaf_actuator_patch',
+            lower=apply_prepared,
+            submission_progress={'attempted_writer_ids': attempted,
+                                 'completed_writer_ids': acknowledged},
+        )
 
     try:
         runtime.step_leaf_control_interval(substeps=plan.control_substeps)
