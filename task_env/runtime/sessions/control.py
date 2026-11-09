@@ -2069,10 +2069,16 @@ def _execute_position_action_sequence(session, profile, plan, action, publicatio
     from .control_submission import PositionControlSequenceV1, submit_control_command
     from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
     if (type(session) is not _MuJoCoSession or type(profile) is not PandaPositionServoProfileV1
-            or getattr(session, '_physical_port', None) is not None
             or getattr(session, '_mixed_actuator_plan', None) is not None
             or hasattr(session, '_gravity_model')):
         raise ValueError('Position sequence requires the admitted scalar MuJoCo Position port')
+    physical = getattr(session, '_physical_port', None)
+    if physical is not None:
+        from .mujoco_control_resources import position_native_dofs
+        position_dofs = position_native_dofs(session, profile, plan)
+        if position_dofs.intersection(physical.dofs.values()):
+            raise ValueError('Position and physical bindings overlap native DOFs')
+        raise ValueError('disjoint Position and physical plans require a common mixed submission')
     count = session._artifact.timebase.control_substeps
     action.validate(substeps=count)
     _validate_position_source_boundary(session, profile, plan, publication, scene=scene,
