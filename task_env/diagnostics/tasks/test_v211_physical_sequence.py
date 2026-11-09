@@ -80,6 +80,11 @@ def test_existing_submission_owner_binds_each_nonoverlapping_batch_and_rejects_r
                                **{**kwargs, 'command_sha256': foreign_sequence.identity_hash})
     assert calls == [] and not getattr(session, '_control_submission_consumed', set())
     session._prepared_physical_sequence = sequence
+    unbound = SimpleNamespace(**vars(session))
+    unbound._physical_port = None
+    with pytest.raises(ValueError, match='requires the live source-bound scene interval'):
+        submit_control_command(unbound, sequence, **kwargs)
+    assert calls == [] and not getattr(unbound, '_control_submission_consumed', set())
     submit_control_command(session, sequence, **kwargs)
     outer = session._last_scene_control_submission
     assert calls == ['write']

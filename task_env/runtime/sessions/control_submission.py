@@ -986,6 +986,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 source_id=source_id, source_closure_sha256=source_closure_sha256,
                 artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
                 resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
+    if command_kind == 'physical-effort-sequence' and scene_interval is None:
+        raise ValueError('physical sequence requires the live source-bound scene interval')
     external = getattr(session, '_external_com_port', None)
     if external is not None:
         if scene_interval is None:
