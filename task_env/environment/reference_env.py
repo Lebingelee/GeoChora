@@ -2187,6 +2187,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def read_state():
             nonlocal failure_phase
             failure_phase = 'snapshot_readback'
+            from .reference_binding import validate_initial_state_publication
             self.state = self.session.snapshot()
             if self.position_profile:
                 self.typed_state = self.session.snapshot_v1(
@@ -2195,6 +2196,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     frame_bindings=self.position_frame_bindings,
                     requirements=self._position_requirements(),
                 )
+                validate_initial_state_publication(self.session, self.typed_state, self.state)
                 if self.leaf_position_profile:
                     self.leaf_materialization = self.session.leaf_materialization_receipt
                 else:
@@ -2215,10 +2217,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 publication = self.session.snapshot_v2(
                     scene=execution.scene, joint_bindings=execution.joint_bindings,
                     frame_bindings=execution.frame_bindings, requirements=execution.requirements)
-                if (not publication.lifetime.may_be_retained
-                        or publication.view.boundary != self.session.state_boundary_identity()
-                        or publication.view.boundary.control_step != 0):
-                    raise ValueError('physical Controller reset requires the realized initial boundary')
+                validate_initial_state_publication(self.session, publication, self.state)
                 publication.view.validate_against_scene(execution.scene)
                 publication.view.validate_requirements(execution.requirements)
                 if (getattr(self.binding, 'physical_observation_binding', None) is None

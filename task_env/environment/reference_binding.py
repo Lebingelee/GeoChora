@@ -158,6 +158,26 @@ def execute_selected_reset_effect(session, sample, plan):
     return session.reset(sample) if plan is None else session.reset_plan(plan)
 
 
+def validate_initial_state_publication(session, publication, state):
+    """Check the common initial boundary for every retained typed projection."""
+    import math
+    from ..artifacts.state import CanonicalStatePublicationV1, CanonicalStatePublicationV2
+
+    if type(publication) not in (CanonicalStatePublicationV1, CanonicalStatePublicationV2):
+        raise TypeError('initial state requires a typed publication')
+    publication.validate()
+    boundary = publication.view.boundary
+    clock = publication.view.sample_clock
+    if (not publication.lifetime.may_be_retained
+            or boundary != session.state_boundary_identity()
+            or boundary.control_step != 0
+            or getattr(state, 'control_step', None) != boundary.control_step
+            or not math.isclose(float(state.simulation_time), float(clock.simulation_time_s),
+                                rel_tol=0, abs_tol=1e-9)):
+        raise ValueError('typed initial state differs from the realized session boundary or clock')
+    return publication
+
+
 @dataclass(frozen=True)
 class ReferenceTaskBinding:
     """Internal task-to-reference adapter; not a new public task protocol."""

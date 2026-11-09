@@ -90,6 +90,29 @@ def test_default_effort_checks_original_precision_before_float32_rounding():
         controller.compute([channel.effort_range[1] + 1e-9], object(), context)
 
 
+@pytest.mark.parametrize('version', [1, 2])
+def test_typed_initial_state_uses_session_boundary_and_clock(version):
+    from task_env.artifacts.state import (CanonicalStateViewV1, CanonicalStateViewV2,
+        CanonicalStatePublicationV1, CanonicalStatePublicationV2, StateViewLifetime)
+    from task_env.environment.reference_binding import validate_initial_state_publication
+    _, _, context = _fixture()
+    view_type = CanonicalStateViewV1 if version == 1 else CanonicalStateViewV2
+    publication_type = CanonicalStatePublicationV1 if version == 1 else CanonicalStatePublicationV2
+    view = view_type(f'canonical-state-v{version}', 'SI_right_handed_z_up_wxyz',
+                     context.boundary, context.clock, (), (), ())
+    lifetime = StateViewLifetime('state-view-lifetime-v1', 'material-a', context.boundary, 0,
+                                 'owned_snapshot', 'retained')
+    publication = publication_type(f'canonical-state-publication-v{version}', view, lifetime)
+    session = SimpleNamespace(state_boundary_identity=lambda: context.boundary)
+    state = SimpleNamespace(control_step=0, simulation_time=context.clock.simulation_time_s)
+    assert validate_initial_state_publication(session, publication, state) is publication
+    with pytest.raises(ValueError, match='boundary or clock'):
+        validate_initial_state_publication(session, publication,
+            SimpleNamespace(control_step=0, simulation_time=state.simulation_time + .1))
+    with pytest.raises(ValueError, match='boundary or clock'):
+        validate_initial_state_publication(SimpleNamespace(state_boundary_identity=lambda: None), publication, state)
+
+
 def test_foreign_controller_output_is_rejected_before_submission():
     execution, subject, context = _fixture()
     original = execution.controllers[0]
