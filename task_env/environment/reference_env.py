@@ -2993,6 +2993,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         assessment = assess(plan)
         if getattr(assessment, 'phase', None) not in {'native_build', 'runtime'}:
             raise ValueError('physical session write requires native-build or runtime capability assessment')
+        # Controller computation can mutate owner state even when a subsequent
+        # mapping or capability preflight rejects the batch. There is no
+        # general Controller rollback contract, so the lifecycle must latch a
+        # fault if preparation fails from this point onward.
+        self._physical_controller_preparation_started = True
         batch = profile.controller_batch(action, view, context)
         submitted = PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             batch.identity_hash, 'submitted', tuple(item.contribution.contribution_id
@@ -3224,6 +3229,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
+        self._mixed_controller_preparation_started = False
+        try:
+            return self._prepare_mixed_control_impl(
+                action, proposal=proposal, observer_solution=observer_solution)
+        except BaseException as error:
+            if self._mixed_controller_preparation_started:
+                self._latch_fault('mixed_control_preparation', error, before_state=self.state)
+            raise
+        finally:
+            self._mixed_controller_preparation_started = False
+
+    def _prepare_mixed_control_impl(self, action, *, proposal=None, observer_solution=None):
         """Run one task-prepared named command through the existing RuntimeSession."""
         from ..controllers.canonical.contracts import AppliedMixedActuatorCommandV1
         from ..runtime.sessions.control import (
@@ -3247,6 +3264,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if not np.array_equal(np.asarray(action), proposal.action):
                 raise ValueError('mixed-control Solution proposal action was changed before preparation')
         before = self.state
+        self._mixed_controller_preparation_started = True
         prepared = self.binding.prepare_mixed_control(self, action, before)
         stepwise = self.binding.prepare_mixed_control_substep is not None
         action_values, universal_action, request, target, writer_control = validate_mixed_control_preparation(

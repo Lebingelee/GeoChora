@@ -94,13 +94,15 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             selection = getattr(env, '_physical_reset_selection', None)
             if selection is not None:
                 action = selection.validate_action(action)
-                try:
-                    result = env._prepare_physical_control(action, **context)
-                except BaseException as error:
-                    env._latch_fault('physical_control_preparation', error, before_state=env.state)
-                    raise
-            else:
+            env._physical_controller_preparation_started = False
+            try:
                 result = env._prepare_physical_control(action, **context)
+            except BaseException as error:
+                if selection is not None or env._physical_controller_preparation_started:
+                    env._latch_fault('physical_control_preparation', error, before_state=env.state)
+                raise
+            finally:
+                env._physical_controller_preparation_started = False
             current = env.session._control_lifecycle_dispatch
             if current.stage == 'preparing':
                 from dataclasses import replace

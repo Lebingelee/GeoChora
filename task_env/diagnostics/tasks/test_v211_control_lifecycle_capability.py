@@ -64,6 +64,49 @@ def test_capability_dispatch_does_not_require_source_composition_request_or_pand
     assert env.session._control_lifecycle_dispatch.stage == 'prepared'
 
 
+@pytest.mark.parametrize('controller_started', (False, True))
+def test_physical_preparation_faults_only_after_unrecoverable_controller_work(controller_started):
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    env = _environment(_DeclaredController())
+    profile = object.__new__(PhysicalControlExecutionV1)
+    object.__setattr__(profile, 'controllers', (_DeclaredController(),))
+    object.__setattr__(profile, 'generation', 0)
+    env.binding.physical_control_profile = lambda _env: profile
+    env.state = object()
+    faults = []
+    env._latch_fault = lambda phase, error, **kwargs: faults.append((phase, error, kwargs))
+
+    def prepare(_action):
+        env._physical_controller_preparation_started = controller_started
+        raise ValueError('preflight failed')
+
+    env._prepare_physical_control = prepare
+    with pytest.raises(ValueError, match='preflight failed'):
+        prepare_selected_control_action(env, 'action')
+    assert bool(faults) is controller_started
+    assert env._physical_controller_preparation_started is False
+
+
+@pytest.mark.parametrize('controller_started', (False, True))
+def test_mixed_preparation_latches_if_controller_may_have_changed(controller_started):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    env = SimpleNamespace(state=object())
+    faults = []
+    env._latch_fault = lambda phase, error, **kwargs: faults.append((phase, error, kwargs))
+
+    def prepare(_action, **_kwargs):
+        env._mixed_controller_preparation_started = controller_started
+        raise ValueError('preflight failed')
+
+    env._prepare_mixed_control_impl = prepare
+    with pytest.raises(ValueError, match='preflight failed'):
+        SelectedReferenceEnv._prepare_mixed_control(env, 'action')
+    assert bool(faults) is controller_started
+    assert env._mixed_controller_preparation_started is False
+
+
 def test_source_composition_provider_dispatch_selects_only_registered_real_adapter():
     import inspect
     from task_env.runtime.sessions.source_composition_adapters import (
