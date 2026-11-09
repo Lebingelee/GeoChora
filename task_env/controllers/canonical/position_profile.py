@@ -103,6 +103,11 @@ class PandaPositionServoProfileV1:
     writer_id = POSITION_PROFILE_ID
     tcp_profile = PANDA_HAND_ORIGIN_TCP_V1
 
+    def selected_position_capability(self):
+        """Provide the selected binding's construction and initialization owner."""
+        from ...runtime.sessions.control import SelectedPositionCapabilityV1
+        return SelectedPositionCapabilityV1(self)
+
     def __init__(
         self, *, artifact, source, scene, model, config,
         entity_id='panda-main', joint_ids=None, finger_joint_ids=None,

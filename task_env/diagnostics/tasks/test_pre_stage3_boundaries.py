@@ -69,6 +69,33 @@ def test_selected_controller_binding_checks_route_and_writer_identity():
                                  provider='mujoco', backend='cpu')
 
 
+def test_position_binding_consumes_controller_capability_and_initializes_its_owner():
+    from task_env.runtime.sessions.control import SelectedPositionCapabilityV1, bind_selected_controller
+
+    class DeclaredController:
+        writer_id = 'writer'
+        entity_id = 'entity'
+        def selected_position_capability(self):
+            return SelectedPositionCapabilityV1(self)
+        def controller_binding(self):
+            return 'owner-binding'
+        def _validate_plan(self, plan):
+            assert plan == 'plan'
+        def reset(self, publication, plan):
+            self.initialized = (publication, plan)
+
+    owner = DeclaredController()
+    selected = bind_selected_controller({'controller': owner}, binding=None,
+                                        provider='mujoco', backend='cpu')
+    capability, = selected.position_capabilities
+    assert capability.controller_binding() == 'owner-binding'
+    capability.validate_plan('plan')
+    capability.initialize('publication', 'plan')
+    assert owner.initialized == ('publication', 'plan')
+    # This is capability dispatch only; provider materialization still checks
+    # the actual admitted Controller type and source before a native build.
+
+
 def test_position_recording_does_not_publish_on_existing_path_or_metadata_failure(tmp_path):
     from task_env.environment.reference_env import SelectedReferenceEnv
 

@@ -27,8 +27,8 @@ class PositionInitialState:
         publication = session.snapshot_v1(scene=self.scene, joint_bindings=self.joint_bindings,
             frame_bindings=self.frame_bindings, requirements=self.declaration.position_state_requirements())
         validate_initial_state_publication(session, publication, state)
-        for controller in self.controllers:
-            controller.reset(publication, self.control_plan)
+        for capability in self.controllers:
+            capability.initialize(publication, self.control_plan)
         return InitialStateResult(publication, None,
             self.declaration.initial_materialization_receipt(session), True)
 

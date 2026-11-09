@@ -2047,7 +2047,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if declaration is not None:
                     capabilities.append(PositionInitialState(declaration, self.position_scene,
                         self.position_joint_bindings, self.position_frame_bindings,
-                        self.position_profiles, self.position_plan))
+                        self._selected_controller_binding.position_capabilities, self.position_plan))
                 if mixed_state_controller is not None:
                     capabilities.append(MixedInitialState(mixed_state_controller))
                 if physical_state_execution is not None:
@@ -2114,6 +2114,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     profiles=self.position_profiles, leaf_position=self.leaf_position_profile,
                     plan=self.value.get('controller_binding_plan'),
                     select_binding=select_binding, value=self.value,
+                    capabilities=self._selected_controller_binding.position_capabilities,
                 )
                 self._position_state_declaration = self.leaf_plan if self.position_plan is None else self.position_plan
                 if selection is not None and selection.deployment == 'isolated_worker':

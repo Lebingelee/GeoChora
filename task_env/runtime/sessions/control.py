@@ -60,6 +60,37 @@ def declared_source_capabilities(source):
 
 
 @dataclass(frozen=True)
+class SelectedPositionCapabilityV1:
+    """Controller-provided typed Position construction and reset capability."""
+    owner: object
+
+    @property
+    def writer_id(self):
+        return self.owner.writer_id
+
+    @property
+    def entity_id(self):
+        return self.owner.entity_id
+
+    def controller_binding(self):
+        return self.owner.controller_binding()
+
+    def validate_plan(self, plan):
+        return self.owner._validate_plan(plan)
+
+    def initialize(self, publication, plan):
+        return self.owner.reset(publication, plan)
+
+
+def _selected_position_capability(controller):
+    factory = getattr(controller, 'selected_position_capability', None)
+    capability = factory() if callable(factory) else None
+    if type(capability) is not SelectedPositionCapabilityV1 or capability.owner is not controller:
+        return None
+    return capability
+
+
+@dataclass(frozen=True)
 class SelectedControllerBinding:
     """Admitted controller and profile facts for selected environment assembly."""
     controller: object
@@ -68,21 +99,18 @@ class SelectedControllerBinding:
     mixed: bool
     position: bool
     requires_reset_plan: bool = False
+    position_capabilities: tuple = ()
 
 
 def is_admitted_position_profile_set(profiles):
-    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
-
-    return (bool(profiles) and len(profiles) <= 2
-            and all(isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
-            and len({profile.writer_id for profile in profiles}) == len(profiles)
-            and len({profile.entity_id for profile in profiles}) == len(profiles))
+    capabilities = tuple(_selected_position_capability(profile) for profile in profiles)
+    return (bool(capabilities) and len(capabilities) <= 2 and all(capabilities)
+            and len({item.writer_id for item in capabilities}) == len(capabilities)
+            and len({item.entity_id for item in capabilities}) == len(capabilities))
 
 
 def bind_selected_controller(value, *, binding, provider, backend):
     """Admit a declared controller against its source and execution route."""
-    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
-
     leaf_plan = value.get('leaf_plan')
     if leaf_plan is not None:
         from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
@@ -104,13 +132,15 @@ def bind_selected_controller(value, *, binding, provider, backend):
         return SelectedControllerBinding(raw, (), None, True, False)
 
     profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
-    if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
+    capabilities = tuple(_selected_position_capability(item) for item in profiles)
+    if capabilities and all(capabilities):
         if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
             raise ValueError('selected Position route admits one writer or the bounded two-Entity profile set')
         if len({item.entity_id for item in profiles}) != len(profiles):
             raise ValueError('selected Position writers must bind distinct Entities')
         profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
-        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True)
+        capabilities = tuple(_selected_position_capability(item) for item in profiles)
+        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True, capabilities)
     if isinstance(raw, (tuple, list)):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
     return SelectedControllerBinding(raw, (), None, False, False,
@@ -663,6 +693,7 @@ class ControlBinding:
 
 def prepare_position_control_materialization(
     *, source, artifact, profiles, leaf_position, plan, select_binding, value,
+    capabilities=None,
 ):
     """Prepare the task's Position bindings before a provider is materialized."""
     from .source import position_frame_bindings_from_artifact, position_joint_bindings_from_artifact
@@ -672,14 +703,23 @@ def prepare_position_control_materialization(
         if plan is not None:
             raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')
     else:
+        if capabilities is not None and (len(capabilities) != len(profiles)
+                or any(type(capability) is not SelectedPositionCapabilityV1
+                       or capability.owner is not profile
+                       for capability, profile in zip(capabilities, profiles, strict=True))):
+            raise ValueError('Position construction capabilities differ from their selected Controllers')
+        owners = profiles if capabilities is None else capabilities
         if plan is None:
             plan = compile_control_binding_plan(
-                scene, tuple(profile.controller_binding() for profile in profiles),
+                scene, tuple(owner.controller_binding() for owner in owners),
             )
         if not isinstance(plan, ControlBindingPlanV1):
             raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
-        for profile in profiles:
-            profile._validate_plan(plan)
+        for owner in owners:
+            if capabilities is None:
+                owner._validate_plan(plan)
+            else:
+                owner.validate_plan(plan)
     joint_bindings = position_joint_bindings_from_artifact(scene, artifact, source)
     frame_bindings = position_frame_bindings_from_artifact(artifact, source)
     if not callable(select_binding):
