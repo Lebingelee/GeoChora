@@ -4026,6 +4026,58 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         record_append_attempted = False
         canonical = target = applied = request_boundary = interval_receipt = None
 
+        def submit_position_target(lower, *, lowering):
+            lifecycle = getattr(self.session, '_control_lifecycle_dispatch', None)
+            if (lifecycle is None
+                    or getattr(lifecycle, 'command_kind', None) != 'position-target'):
+                return lower()
+            source = self.value['source']
+            from ..artifacts.state import StateSampleClock
+            boundary = self.session.state_boundary_identity()
+            native_state = self.session.snapshot()
+            sample_clock = StateSampleClock(
+                'state-sample-clock-v1', 'evaluation_boundary',
+                int(native_state.control_step), float(native_state.simulation_time),
+            )
+            composition = getattr(source, 'source_composition_request', None)
+            rows = tuple(getattr(composition, 'resource_writers', ()))
+            if rows:
+                ownership = {}
+                for entity, actuator, writer in rows:
+                    ownership.setdefault(writer, []).append(f'{entity}/{actuator}')
+                resource_owners = tuple(
+                    (writer, tuple(sorted(resources)))
+                    for writer, resources in sorted(ownership.items())
+                )
+                writers = tuple(writer for writer, _resources in resource_owners)
+                resources = tuple(sorted(resource for _writer, owned in resource_owners
+                                         for resource in owned))
+            else:
+                writer = getattr(self.controller, 'control_submission_writer_id', None)
+                if type(writer) is not str or not writer:
+                    raise ValueError('declared Position Controller lacks a stable writer identity')
+                resources = tuple(sorted((*target.arm_servo_position.keys(),
+                                          target.gripper.semantic_id)))
+                if not resources:
+                    raise ValueError('canonical position target declares no controlled resources')
+                writers = (writer,)
+                resource_owners = ((writer, resources),)
+            from ..runtime.sessions.control_submission import submit_control_command
+            return submit_control_command(
+                self.session, target, command_kind='position-target',
+                command_sha256=target.identity_hash,
+                source_id=source.source_id,
+                source_closure_sha256=source.source_closure_digest,
+                artifact_sha256=self.artifact.identity_hash,
+                boundary=boundary, sample_clock=sample_clock,
+                controller_generation=lifecycle.controller_generation,
+                controller_identities=(target.controller_identity,),
+                writer_ids=writers, resource_ids=resources,
+                resource_owners=resource_owners,
+                units=('arm-position:rad', 'gripper-position:m'),
+                lowering=lowering, lower=lower,
+            )
+
         def apply_control():
             nonlocal failure_phase, interval_attempted, interval_completed
             nonlocal canonical, target, applied, request_boundary
@@ -4084,48 +4136,29 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                              else nullcontext())
             with subject_scope:
                 if self.binding.interval_mode == 'native':
-                    failure_phase = 'physics_step'
-                    interval_attempted = True
-                    self.state, target, applied, _ = self.session.step_control_interval(
-                        target, self.controller, interval_observer=observe, arm_schedule=self.arm_schedule)
-                    interval_completed = True
+                    def lower_native_interval():
+                        nonlocal failure_phase, interval_attempted, interval_completed
+                        failure_phase = 'physics_step'
+                        interval_attempted = True
+                        result = self.session.step_control_interval(
+                            target, self.controller, interval_observer=observe,
+                            arm_schedule=self.arm_schedule)
+                        interval_completed = True
+                        return result
+
+                    result = submit_position_target(
+                        lower_native_interval,
+                        lowering=(f'{type(self.session).__module__}.'
+                                  f'{type(self.session).__qualname__}.step_control_interval(position)'),
+                    )
+                    self.state, target, applied, _ = result
                 else:
-                    # Preserve the existing grouped control-interval stepping.
                     failure_phase = 'control_application'
-                    lifecycle = getattr(self.session, '_control_lifecycle_dispatch', None)
-                    if (lifecycle is not None
-                            and getattr(lifecycle, 'command_kind', None) == 'position-target'):
-                        source = self.value['source']
-                        composition = source.source_composition_request
-                        rows = tuple(composition.resource_writers)
-                        writers = tuple(sorted({writer for _entity, _actuator, writer in rows}))
-                        resources = tuple(sorted({f'{entity}/{actuator}'
-                                                  for entity, actuator, _writer in rows}))
-                        from ..artifacts.state import StateSampleClock
-                        boundary = self.session.state_boundary_identity()
-                        native_state = self.session.snapshot()
-                        sample_clock = StateSampleClock(
-                            'state-sample-clock-v1', 'evaluation_boundary',
-                            int(native_state.control_step), float(native_state.simulation_time),
-                        )
-                        from ..runtime.sessions.control_submission import submit_control_command
-                        applied = submit_control_command(
-                            self.session, target, command_kind='position-target',
-                            command_sha256=target.identity_hash,
-                            source_id=source.source_id,
-                            source_closure_sha256=source.source_closure_digest,
-                            artifact_sha256=self.artifact.identity_hash,
-                            boundary=boundary, sample_clock=sample_clock,
-                            controller_generation=lifecycle.controller_generation,
-                            controller_identities=(target.controller_identity,),
-                            writer_ids=writers, resource_ids=resources,
-                            units=('arm-position:rad', 'gripper-position:m'),
-                            lowering=(f'{type(self.session).__module__}.'
-                                      f'{type(self.session).__qualname__}.apply_control(position)'),
-                            lower=lambda: self.session.apply_control(target),
-                        )
-                    else:
-                        applied = self.session.apply_control(target)
+                    applied = submit_position_target(
+                        lambda: self.session.apply_control(target),
+                        lowering=(f'{type(self.session).__module__}.'
+                                  f'{type(self.session).__qualname__}.apply_control(position)'),
+                    )
             return applied
 
         def advance(_applied):

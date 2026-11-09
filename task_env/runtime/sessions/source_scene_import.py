@@ -28,3 +28,14 @@ def import_agent_source_scene(manifest, *, owner_uid, entity_id, scene_id, scene
         raise ValueError('Agent importer returned an empty source closure')
     return scene_factory(imported, manifest, entity_id=entity_id, scene_id=scene_id,
                          source_content_sha256=_source_closure_digest(files))
+
+
+def declare_panda_scene(agent, *, entity_id=None, scene_id=None):
+    """Build the provider-neutral Panda Scene declaration from its pinned source."""
+    from ...robots.panda import _panda_scene_from_import
+    return import_agent_source_scene(
+        agent.asset_manifest(), owner_uid=agent.uid,
+        entity_id=agent.uid if entity_id is None else entity_id,
+        scene_id=agent.uid if scene_id is None else scene_id,
+        scene_factory=_panda_scene_from_import,
+    )

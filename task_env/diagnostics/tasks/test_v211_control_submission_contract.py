@@ -82,6 +82,7 @@ def test_position_and_effort_commands_share_the_commit_owner(monkeypatch):
     receipt = _submit(position_session)
     assert receipt.identity_hash == 'c' * 64
     assert position_session._last_control_submission['command_kind'] == 'position-target'
+    assert position_session._last_control_submission['schema_version'] == 'control-submission-receipt-v2'
     assert position_session._last_control_submission['units'] == (
         'joint-position:rad', 'gripper-position:m')
 
@@ -96,6 +97,21 @@ def test_position_and_effort_commands_share_the_commit_owner(monkeypatch):
         lowering='fake-mujoco-effort-batch-write', lower=lambda: _ack())
     assert effort_session._last_control_submission['command_kind'] == 'physical-effort-batch'
     assert effort_session._last_control_submission['units'] == ('N*m',)
+
+
+def test_legacy_v1_submission_receipt_keeps_its_original_mapping_contract():
+    from task_env.runtime.sessions.control_submission import ControlSubmissionReceiptV1
+
+    receipt = ControlSubmissionReceiptV1(
+        'control-submission-receipt-v1', 'd' * 64, 'position-target', '1' * 64,
+        'mujoco', 'materialization-1', 'task', 'a' * 64, 'b' * 64,
+        'episode-1', 'boundary-1', 0, 0, 0, 0,
+        ('controller-1',), ('writer-1',), ('robot/joint-1',),
+        ('joint-position:rad',), 'fake-lowering', 'acknowledged',
+        'SimpleNamespace', 'c' * 64,
+    )
+    receipt.validate()
+    assert receipt.to_mapping()['schema_version'] == 'control-submission-receipt-v1'
 
 
 def test_legacy_canonical_position_target_uses_same_lifecycle_dispatch():

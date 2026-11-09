@@ -24,23 +24,28 @@ def has_position_control_capability(env) -> bool:
     return bool(getattr(env, 'position_profiles', ())) and getattr(env, 'position_plan', None) is not None
 
 
-def has_canonical_position_control_capability(env) -> bool:
-    """Identify the existing canonical Panda position Controller on a composed source."""
+def has_declared_position_control_capability(env) -> bool:
+    """Identify a Controller's declared canonical-position submission capability."""
+    controller = getattr(env, 'controller', None)
+    capabilities = getattr(controller, 'control_submission_capabilities', ())
+    if not ('canonical-position-target-v1' in capabilities
+            and callable(getattr(controller, 'compute', None))
+            and type(getattr(controller, 'identity', None)) is str
+            and bool(getattr(controller, 'identity', '').strip())):
+        return False
     try:
         source = env.value['source']
     except (TypeError, KeyError, AttributeError):
         return False
-    request = getattr(source, 'source_composition_request', None)
-    if getattr(request, 'schema_version', None) != 'source-composition-request-v2':
-        return False
-    controller = getattr(env, 'controller', None)
-    try:
-        from ...controllers.canonical.production import ProductionCanonicalPandaController
-    except ImportError:
-        return False
-    return (type(controller) is ProductionCanonicalPandaController
-            and callable(getattr(controller, 'compute', None))
-            and bool(getattr(request, 'resource_writers', ())))
+    composition = getattr(source, 'source_composition_request', None)
+    return bool(getattr(composition, 'resource_writers', ())) or (
+        type(getattr(controller, 'control_submission_writer_id', None)) is str
+        and bool(controller.control_submission_writer_id.strip())
+    )
+
+
+# Kept as a source-compatible alias for callers of the pre-v2 capability helper.
+has_canonical_position_control_capability = has_declared_position_control_capability
 
 
 def _dispatch_record(env, command_kind, controller_identities, generation):
@@ -138,7 +143,7 @@ def prepare_selected_control_action(env, action):
             env.session._control_lifecycle_dispatch = replace(current, stage='prepared')
         return result
 
-    if has_canonical_position_control_capability(env):
+    if has_declared_position_control_capability(env):
         session_generation = getattr(env.session, 'physical_control_generation', None)
         generation = (session_generation if type(session_generation) is int
                       else int(getattr(env.controller, 'generation', 0)))

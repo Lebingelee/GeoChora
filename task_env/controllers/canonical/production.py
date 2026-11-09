@@ -13,6 +13,11 @@ from .kinematics import ARM, FINGERS
 
 
 class ProductionCanonicalPandaController:
+    # Runtime lifecycle dispatch consumes this declaration through the public
+    # Controller capability protocol; it does not identify this concrete type.
+    control_submission_capabilities = frozenset({'canonical-position-target-v1'})
+    control_submission_writer_id = 'panda-canonical-position-writer-v1'
+
     def __init__(self, model, *, artifact_hash, config, gripper_config: GripperConfig,
                  gripper_semantic_id='panda-v1/gripper'):
         if not isinstance(gripper_config, GripperConfig):

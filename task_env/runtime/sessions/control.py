@@ -1661,21 +1661,14 @@ def _commit_position_profile_replacement(session, prepared):
     )
 
 
-def apply_position_control_target(
-    session,
-    target,
-    *,
-    controller_profile,
-    plan,
-    publication,
-    scene,
-    joint_bindings,
-    frame_bindings,
+def _position_control_part(
+    session, target, *, controller_profile, plan, publication, scene,
+    joint_bindings, frame_bindings,
 ):
-    """Validate a source-bound position target, then lower it once via the existing session."""
+    """Preflight one writer and return its exact resources and provider lowerer."""
     from ...controllers.canonical.contracts import PositionControlTargetV1
 
-    if not isinstance(target, PositionControlTargetV1):
+    if type(target) is not PositionControlTargetV1:
         raise TypeError('PositionControlTargetV1 required')
     target.validate()
     plan_identity = _validate_position_source_boundary(
@@ -1694,14 +1687,6 @@ def apply_position_control_target(
         raise ValueError('position target writer/Profile/plan/source boundary mismatch')
     if target.target.gripper.semantic_id != controller_profile.gripper_semantic_id:
         raise ValueError('position target gripper semantic binding mismatch')
-    consumed = session._position_applied_boundary_ids
-    consumed_key = (controller_profile.writer_id, boundary.boundary_id)
-    if consumed_key in consumed:
-        raise ValueError('position target for this state boundary was already applied')
-    # Close the same-boundary replay window before crossing into the Provider.
-    consumed.add(consumed_key)
-    from .control_submission import submit_control_command
-
     def lower_position_target():
         session._position_target_in_flight = target.target.identity_hash
         session._position_target_source_boundary_in_flight = target.source_boundary
@@ -1714,8 +1699,32 @@ def apply_position_control_target(
             raise ValueError('Provider acknowledgement does not match the applied canonical target')
         return acknowledgement
 
-    resource_ids = tuple(f'{entity}/{actuator}'
-                         for entity, actuator, _ in plan.resource_writers)
+    resource_ids = tuple(sorted(f'{entity}/{actuator}'
+                                for entity, actuator, writer in plan.resource_writers
+                                if writer == target.writer_id))
+    if not resource_ids:
+        raise ValueError('position writer owns no declared ControlBinding resources')
+    return boundary, resource_ids, lower_position_target
+
+
+def apply_position_control_target(
+    session,
+    target,
+    *,
+    controller_profile,
+    plan,
+    publication,
+    scene,
+    joint_bindings,
+    frame_bindings,
+):
+    """Validate and submit one source-bound position target through the common owner."""
+    boundary, resource_ids, lower = _position_control_part(
+        session, target, controller_profile=controller_profile, plan=plan,
+        publication=publication, scene=scene, joint_bindings=joint_bindings,
+        frame_bindings=frame_bindings,
+    )
+    from .control_submission import submit_control_command
     acknowledgement = submit_control_command(
         session, target, command_kind='position-target', command_sha256=target.identity_hash,
         source_id=controller_profile.source.source_id,
@@ -1724,10 +1733,76 @@ def apply_position_control_target(
         boundary=boundary, sample_clock=target.sample_clock,
         controller_generation=int(getattr(controller_profile, 'generation', 0)),
         controller_identities=(target.controller_identity,), writer_ids=(target.writer_id,),
-        resource_ids=resource_ids, units=('arm-position:rad', 'gripper-position:m'),
+        resource_ids=resource_ids,
+        resource_owners=((target.writer_id, resource_ids),),
+        units=('arm-position:rad', 'gripper-position:m'),
         lowering=f'{type(session).__module__}.{type(session).__qualname__}.apply_control(position)',
-        lower=lower_position_target)
+        lower=lower)
     return acknowledgement
+
+
+def apply_position_control_batch(
+    session, parts, *, plan, publication, scene, joint_bindings, frame_bindings,
+):
+    """Commit all preflighted writer targets as one interval transaction."""
+    parts = tuple(parts)
+    if len(parts) < 2:
+        raise ValueError('position batch requires at least two writer parts')
+    prepared = []
+    for profile, target in parts:
+        boundary, resources, lower = _position_control_part(
+            session, target, controller_profile=profile, plan=plan,
+            publication=publication, scene=scene, joint_bindings=joint_bindings,
+            frame_bindings=frame_bindings,
+        )
+        prepared.append((profile, target, boundary, resources, lower))
+    prepared.sort(key=lambda row: row[1].writer_id)
+    targets = tuple(row[1] for row in prepared)
+    writer_ids = tuple(target.writer_id for target in targets)
+    resource_owners = tuple((target.writer_id, row[3])
+                            for row, target in zip(prepared, targets))
+    resources = tuple(sorted(resource for _writer, owned in resource_owners for resource in owned))
+    if len(resources) != len(set(resources)):
+        raise ValueError('position writers claim a conflicting provider resource')
+    boundary = prepared[0][2]
+    if any(row[2] != boundary for row in prepared[1:]):
+        raise ValueError('position writer targets do not share one state boundary')
+
+    from .control_submission import (
+        PositionControlBatchAcknowledgementV1, PositionControlBatchV1,
+        submit_control_command,
+    )
+    batch = PositionControlBatchV1(targets)
+    progress = {'attempted_writer_ids': [], 'completed_writer_ids': []}
+
+    def lower_batch():
+        acknowledgements = []
+        for profile, target, _target_boundary, _resources, lower in prepared:
+            progress['attempted_writer_ids'].append(target.writer_id)
+            acknowledgement = lower()
+            progress['completed_writer_ids'].append(target.writer_id)
+            acknowledgements.append(acknowledgement)
+        aggregate = hashlib.sha256(json.dumps(
+            tuple((target.writer_id, ack.target_hash)
+                  for target, ack in zip(targets, acknowledgements)),
+            separators=(',', ':')).encode()).hexdigest()
+        return PositionControlBatchAcknowledgementV1(tuple(acknowledgements), aggregate)
+
+    identities = tuple(sorted({target.controller_identity for target in targets}))
+    acknowledgement = submit_control_command(
+        session, batch, command_kind='position-target', command_sha256=batch.identity_hash,
+        source_id=prepared[0][0].source.source_id,
+        source_closure_sha256=targets[0].source_closure_digest,
+        artifact_sha256=targets[0].target.task_artifact_hash,
+        boundary=boundary, sample_clock=targets[0].sample_clock,
+        controller_generation=int(getattr(prepared[0][0], 'generation', 0)),
+        controller_identities=identities, writer_ids=writer_ids,
+        resource_ids=resources, resource_owners=resource_owners,
+        units=('arm-position:rad', 'gripper-position:m'),
+        lowering=f'{type(session).__module__}.{type(session).__qualname__}.apply_control(position-batch)',
+        lower=lower_batch, submission_progress=progress,
+    )
+    return acknowledgement.acknowledgements
 
 
 def execute_position_control_interval(
@@ -1771,6 +1846,11 @@ def execute_position_control_interval(
             raise ValueError('complete structured request does not match the admitted Position writers')
         if {binding.writer_id for binding in plan.controller_bindings} != set(by_writer):
             raise ValueError('Position profile set does not exactly match the ControlBindingPlan')
+        generations = {int(getattr(profile, 'generation', 0)) for profile in profiles}
+        sources = {(profile.source.source_id, profile.source.source_closure_digest,
+                    profile.artifact.identity_hash) for profile in profiles}
+        if len(generations) != 1 or len(sources) != 1:
+            raise ValueError('Position writers must share source, Artifact, and Controller generation')
         actions = dict(prepared)
         # Verify every writer/profile/source/state boundary before any Controller compute.
         for writer_id in sorted(by_writer):
@@ -1783,20 +1863,20 @@ def execute_position_control_interval(
             profile = by_writer[writer_id]
             canonical, target = profile.compute(publication, actions[writer_id], plan)
             computed.append((profile, canonical, target))
-        applied = []
-        for profile, canonical, target in computed:
-            acknowledgement = apply_position_control_target(
-                session, target, controller_profile=profile, plan=plan,
-                publication=publication, scene=scene, joint_bindings=joint_bindings,
-                frame_bindings=frame_bindings,
-            )
-            applied.append((canonical, target, acknowledgement))
+        acknowledgements = apply_position_control_batch(
+            session, tuple((profile, target) for profile, _canonical, target in computed),
+            plan=plan, publication=publication, scene=scene,
+            joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        )
+        applied = tuple((canonical, target, acknowledgement)
+                        for (_profile, canonical, target), acknowledgement
+                        in zip(computed, acknowledgements))
         state = session.step()
         next_publication = session.snapshot_v1(
             scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
             requirements=requirements or profiles[0].requirements,
         )
-        return tuple(applied), state, next_publication
+        return applied, state, next_publication
     if len(prepared) != 1 or prepared[0][0] != controller_profile.writer_id:
         raise ValueError('PositionServoV1 requires exactly one matching structured-action writer')
     _validate_position_source_boundary(

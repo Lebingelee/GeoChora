@@ -8,6 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import xml.etree.ElementTree as ET
+from .source_scene_import import declare_panda_scene
 
 
 def extract_task_world_mjcf(*, task_xml: str, expected_xml_sha256: str,
@@ -426,18 +427,6 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
         attach_frame_from_child_worldbody=PoseWorld(attach_frame[0],quat(' '.join(map(str,attach_frame[1])))))
     derived.validate()
     return replace(declaration, attachment_plan=derived)
-
-
-def declare_panda_scene(agent, *, entity_id=None, scene_id=None):
-    """Resolve the Panda recipe through the MuJoCo source-import adapter."""
-    from .source_scene_import import import_agent_source_scene
-    from ...robots.panda import _panda_scene_from_import
-    return import_agent_source_scene(
-        agent.asset_manifest(), owner_uid=agent.uid,
-        entity_id=agent.uid if entity_id is None else entity_id,
-        scene_id=agent.uid if scene_id is None else scene_id,
-        scene_factory=_panda_scene_from_import,
-    )
 
 
 def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,

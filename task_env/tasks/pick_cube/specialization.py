@@ -673,8 +673,11 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                 profiles = recipe.control_profiles
                 if profile not in profiles:
                     raise ValueError('selected Robot does not declare this Controller profile')
-                if (config.physics_provider, config.environment.runtime.backend) != ('mujoco', 'cpu'):
-                    raise ValueError('selected Robot composition requires an admitted provider capability')
+                from ...runtime.sessions.source_composition_adapters import (
+                    resolve_pickcube_robot_source_adapter,
+                )
+                provider_adapter = resolve_pickcube_robot_source_adapter(
+                    config.physics_provider, config.environment.runtime.backend)
                 from ...assembly.source_composition import build_source_composition_intent_v1
                 task_entities = ('tabletop-v1', 'cube-v1')
                 existing_robot_entity = 'panda-v1'
@@ -688,8 +691,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                         task_source=source, task_entity_ids=task_entities,
                         existing_robot_entity_ids=(existing_robot_entity,),
                         robot_recipe=recipe, task_site_transfers=task_site_transfers)
-                    from ...runtime.sessions.mujoco_composition import compose_pickcube_robot_source
-                    return compose_pickcube_robot_source(
+                    return provider_adapter.compose_pickcube_robot_source(
                         source, robot=robot, composition_intent=intent, **owners,
                         task_entities=task_entities, existing_robot_entity=existing_robot_entity,
                         task_body_names=task_body_names, task_site_transfers=task_site_transfers)
@@ -774,7 +776,7 @@ ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
 def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
     """Compose the Panda source with task-owned PickCube entities and recipe."""
     from ...registry import AGENT_REGISTRY
-    from ...runtime.sessions.mujoco_composition import declare_panda_scene
+    from ...runtime.sessions.source_scene_import import declare_panda_scene
 
     scene_id = str(task_config["recipe"]["scene_uid"])
     panda_scene = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
