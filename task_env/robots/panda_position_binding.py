@@ -20,9 +20,6 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
     from ..runtime.sessions.control import (ControllerBindingV1, ControlGroupActionProjectionV1,
         compile_control_binding_plan, validate_position_control_subjects)
     from ..runtime.sessions.physical_control import ControlledSubjectV1
-    from ..controllers.canonical.split_panda_position import (
-        ARM_WRITER, HAND_WRITER, SplitPandaPositionControllerV1,
-    )
 
     scene = source_scene
     if not any(f.entity_id == site_entity and f.frame_id == site_name for f in scene.frames):
@@ -67,32 +64,55 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
         site_name, 'required', 'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query'),
         StateFieldRequirement('state-field-requirement-v1', 'actuator_force', 'actuator', groups[1][0],
         'actuator8', 'required', 'evaluation_boundary', 'provider-native-actuator-output', 'actuator_force_query'))
-    split = type(controller) is SplitPandaPositionControllerV1
-    if split:
-        if len(components) != 2 or len(groups) != 2 or groups[0][0] == groups[1][0]:
-            raise ValueError('split Position Controllers require distinct arm and hand subjects')
+    declare = getattr(controller, 'position_binding_requirements', None)
+    declarations = tuple(declare()) if callable(declare) else ()
+    if declarations:
         bindings = []
-        for index, (entity, group) in enumerate(groups):
-            owner = controller.arm if index == 0 else controller.hand
-            components_for_owner = names[:7] if index == 0 else names[7:]
+        subject_writers = {}
+        grants = []
+        used_groups = []
+        for index, (owner, group_indices, action_indices, action_mode, needs_site) in enumerate(declarations):
+            if (not group_indices or len(set(group_indices)) != len(group_indices)
+                    or any(type(i) is not int or not 0 <= i < len(groups) for i in group_indices)
+                    or not action_indices or len(set(action_indices)) != len(action_indices)
+                    or any(type(i) is not int or not 0 <= i < len(names) for i in action_indices)
+                    or action_mode not in {'absolute_pose', 'absolute_joint'}
+                    or type(needs_site) is not bool
+                    or not isinstance(getattr(owner, 'writer_id', None), str)
+                    or not isinstance(getattr(owner, 'identity', None), str)):
+                raise ValueError('Controller position binding requirements are invalid')
+            used_groups.extend(group_indices)
+            owned_groups = tuple(groups[i] for i in group_indices)
+            owned_entities = {entity for entity, _ in owned_groups}
+            for entity in owned_entities:
+                if entity in subject_writers and subject_writers[entity] != owner.writer_id:
+                    raise ValueError('one position subject cannot have multiple declared writers')
+                subject_writers[entity] = owner.writer_id
+            components_for_owner = tuple(names[i] for i in action_indices)
             owner_action = ActionModeSpec(
                 f'panda-split-position-{index}-v1', 'task-env-action-v2',
-                'absolute_pose' if index == 0 else 'absolute_joint',
-                'world' if index == 0 else None, 'quaternion_wxyz' if index == 0 else None,
+                action_mode,
+                'world' if action_mode == 'absolute_pose' else None,
+                'quaternion_wxyz' if action_mode == 'absolute_pose' else None,
                 components_for_owner, (float('-inf'),)*len(components_for_owner),
                 (float('inf'),)*len(components_for_owner),
-                quaternion_convention='wxyz' if index == 0 else None)
-            owner_fields = tuple(field for field in fields if field.entity_id == entity
-                                 or (index == 0 and field.field_name == 'frame_pose_world'))
+                quaternion_convention='wxyz' if action_mode == 'absolute_pose' else None)
+            owner_fields = tuple(field for field in fields if field.entity_id in owned_entities
+                                 or (needs_site and field.field_name == 'frame_pose_world'))
             requirements = StateRequirements('state-requirements-v1', 'controller', owner.writer_id, owner_fields)
             bindings.append(ControllerBindingV1('controller-binding-v1', owner.writer_id, owner_action,
                 'canonical-control-feedback', 'v1', requirements,
-                (ControlGroupActionProjectionV1('control-group-action-projection-v1',
-                                                 entity, group, components_for_owner),),
+                tuple(ControlGroupActionProjectionV1('control-group-action-projection-v1',
+                                                      entity, group, components_for_owner)
+                      for entity, group in owned_groups),
                 controller_identity=owner.identity))
+            if needs_site and site_entity not in owned_entities:
+                grants.append((owner.writer_id, site_entity, site_name))
+        if sorted(used_groups) != list(range(len(groups))):
+            raise ValueError('Controller position declarations must cover every group exactly once')
         bindings = tuple(bindings)
-        subject_writers = {groups[0][0]: ARM_WRITER, groups[1][0]: HAND_WRITER}
     else:
+        grants = []
         requirements = StateRequirements('state-requirements-v1', 'controller', writer, fields)
         bindings = (ControllerBindingV1('controller-binding-v1', writer, action, 'canonical-control-feedback',
             'v1', requirements, tuple(ControlGroupActionProjectionV1('control-group-action-projection-v1',
@@ -101,9 +121,9 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
         subject_writers = {entity: writer for entity, _, _, _ in components}
     plan = compile_control_binding_plan(scene, bindings, artifact_identity_hash=artifact.identity_hash,
         source_closure_digest=task_closure_sha256, logical_assembly=root, assembly_children=children,
-        cross_entity_frame_grants=((ARM_WRITER, site_entity, site_name),) if split else (),
-        feedback_attachment=attachment if split else None,
-        feedback_attachment_scene=source_scene if split else None)
+        cross_entity_frame_grants=tuple(grants),
+        feedback_attachment=attachment if grants else None,
+        feedback_attachment_scene=source_scene if grants else None)
     subjects = tuple(ControlledSubjectV1(entity, entity, source_id, robot_closure_sha256,
         'references_existing', 'fixed' if parent is None else 'constrained', FrameReference(entity, root_frame),
         parent, tuple(paths[entity](name) for name in joint_names), (subject_writers[entity],),

@@ -126,6 +126,13 @@ class SplitPandaPositionControllerV1:
     """Coordinate two independent owners while retaining the existing native target."""
     control_submission_capabilities = frozenset({'canonical-position-target-v1'})
 
+    def position_binding_requirements(self):
+        """Declare each owner's group, action and cross-entity feedback needs."""
+        return (
+            (self.arm, (0,), (0, 1, 2, 3, 4, 5, 6), 'absolute_pose', True),
+            (self.hand, (1,), (7,), 'absolute_joint', False),
+        )
+
     def __init__(self, artifact, source):
         if source.task_artifact_hash != artifact.identity_hash:
             raise ValueError('source/Artifact mismatch')
