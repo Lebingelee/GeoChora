@@ -1783,6 +1783,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         switch_candidate = None
         candidate_value = None
         candidate_binding = self.binding
+        prepared_reset_plan_required = getattr(
+            getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
         resolved = getattr(self, 'resolved_public_config', None)
         switching = getattr(resolved, 'reset_profile', None) == 'pickcube-state-only-switch-v1'
         if switching:
@@ -1817,8 +1819,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 mixed=self._mixed_control_candidate,
                 has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
                 artifact=self.artifact, value=self.value,
-                requires_reset_plan=getattr(getattr(self, '_selected_controller_binding', None),
-                                            'requires_reset_plan', False),
+                requires_reset_plan=prepared_reset_plan_required,
             )
             selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
@@ -2018,7 +2019,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.binding, self.value, self.artifact, seed,
                 mixed=self._mixed_control_candidate, mixed_plan=mixed_reset_plan,
                 mixed_sample=mixed_reset_sample)
-            if (getattr(getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
+            if ((not switching and prepared_reset_plan_required
+                    or getattr(getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False))
                     and selected_reset_plan is None):
                 raise ValueError('rebuilt Controller capability requires a declared reset plan')
             if self._mixed_control_candidate or selected_reset_plan is None:

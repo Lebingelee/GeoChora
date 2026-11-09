@@ -1635,6 +1635,9 @@ def _prepare_position_profile_replacement(
         session, current_profile, plan, publication, scene=scene,
         joint_bindings=joint_bindings, frame_bindings=frame_bindings,
     )
+    generation = getattr(candidate_profile, 'generation', None)
+    if generation is not None and (type(generation) is not int or generation < 0):
+        raise ValueError('replacement Position Controller generation must be nonnegative')
     activation = candidate_profile._prepare_switch_activation(publication, plan)
     replacement_profiles = dict(admitted)
     replacement_profiles[candidate_profile.writer_id] = candidate_profile
