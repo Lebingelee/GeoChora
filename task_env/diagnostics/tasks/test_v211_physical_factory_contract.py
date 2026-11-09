@@ -99,9 +99,17 @@ def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, phys
                 return CanonicalStateView('canonical-state-v0','SI_right_handed_z_up_wxyz',self.step_index,
                     self.step_index*.01,{}, {}, {'square-peg-instance/peg1':pose})
         fake=FakeTerminal()
+        # The fake terminal must still declare the live scene inputs required
+        # by the selected lifecycle. This is synthetic admission evidence only.
+        from types import SimpleNamespace
+        fake._physical_port = SimpleNamespace(execution=execution)
+        fake._artifact = env.artifact
+        fake._source = source
         fake._physical_controller_versions = execution.controller_versions()
         fake.initial = fake.publication(1)
         env.session=fake; env._stopped=False
+        env._position_state_declaration = SimpleNamespace(
+            position_state_requirements=lambda: env.value['controller'].requirements)
         env.position_scene=scene; env.position_joint_bindings=execution.joint_bindings
         env.position_frame_bindings=execution.frame_bindings
         env.typed_state=fake.publication(1)

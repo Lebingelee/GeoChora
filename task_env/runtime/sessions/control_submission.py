@@ -996,6 +996,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         if scene_interval is None:
             raise ValueError('caller COM wrench requires a source-bound scene interval')
         external.verify(scene_interval)
+        physical = getattr(session, '_physical_port', None)
+        if physical is not None:
+            external.verify_physical_compatibility(physical, command, command_kind)
         from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
         from .mujoco_external_wrench import com_wrench_range
         added = []

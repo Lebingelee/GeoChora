@@ -150,6 +150,26 @@ def test_task_and_caller_producers_are_recorded_separately():
     port.finish()
 
 
+def test_physical_com_rejects_native_dof_alias_and_foreign_body_wrench():
+    from task_env.runtime.sessions.mujoco_physical import MuJoCoPhysicalPort
+    s, _, _ = _session()
+    s._model.body_dofadr = np.array([-1, 0])
+    physical = object.__new__(MuJoCoPhysicalPort)
+    physical.session = s
+    physical.dofs = {('robot', 'joint', 'dof0'): 1}
+    s._physical_port = physical
+    port = MuJoCoExternalComPort(s, (_request(),))
+    command = SimpleNamespace(input_batch=SimpleNamespace(body_wrenches=(), extensions=()))
+    with pytest.raises(ValueError, match='aliases a physical Controller native DOF'):
+        port.verify_physical_compatibility(physical, command, 'physical-effort-batch')
+    physical.dofs = {('robot', 'joint', 'dof0'): 7}
+    port.verify_physical_compatibility(physical, command, 'physical-effort-batch')
+    assert port.compatible_physical_port is physical
+    command.input_batch.body_wrenches = (object(),)
+    with pytest.raises(ValueError, match='joint-only'):
+        port.verify_physical_compatibility(physical, command, 'physical-effort-batch')
+
+
 def test_task_factory_failure_latches_after_its_possible_side_effect():
     from task_env.environment.reference_env import SelectedReferenceEnv
     env = object.__new__(SelectedReferenceEnv)

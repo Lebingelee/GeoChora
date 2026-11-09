@@ -394,6 +394,13 @@ class MuJoCoPhysicalPort:
             self.pending_joints = matching[0]
             self.pending_substep += 1
         projected = self._project_current(self.pending_joints, self.pending_wrenches)
+        external = getattr(s, '_external_com_port', None)
+        if external is not None:
+            if external.compatible_physical_port is not self:
+                raise RuntimeError('external COM load lacks physical buffer composition admission')
+            projected += external.project_substep()
+            if not np.isfinite(projected).all():
+                raise ValueError('combined physical projection is nonfinite')
         if not np.array_equal(s._data.qfrc_applied, self.pending_values) or np.any(s._data.xfrc_applied):
             raise RuntimeError('physical force buffer changed during projection')
         s._data.qfrc_applied[:] = projected

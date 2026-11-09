@@ -25,10 +25,9 @@ def describe_physical_sequence_capability(env, profile):
     if (getattr(env, '_task_rgb_config', None) is not None
             or getattr(env, '_legacy_camera_observations', False)
             or getattr(env, '_legacy_observer_requested', False)
-            or getattr(env.session, '_external_com_port', None) is not None
             or (env.recorder is not None and not getattr(
                 env.recorder, 'frozen', getattr(env.recorder, '_frozen', False)))):
-        raise StageUnavailableError('physical sequences do not admit RGB/observer, caller wrench or active Recorder')
+        raise StageUnavailableError('physical sequences do not admit RGB/observer or active Recorder')
     port = getattr(env.session, '_physical_port', None)
     if (port is None or getattr(port, 'execution', None) is not profile
             or not callable(getattr(env.session, 'apply_physical_command_sequence', None))):
@@ -71,9 +70,8 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
     """Precompute all admitted slices before a single session write and advance."""
     describe_physical_sequence_capability(env, profile)
     if (proposal is not None or observer_solution is not None
-            or getattr(env, '_task_rgb_config', None) is not None
-            or getattr(env.session, '_external_com_port', None) is not None):
-        raise StageUnavailableError('physical sequences require a bound observation and do not admit Solution, RGB, direct feedback or caller wrench')
+            or getattr(env, '_task_rgb_config', None) is not None):
+        raise StageUnavailableError('physical sequences require a bound observation and do not admit Solution, RGB or direct feedback')
     if env.recorder is not None and not getattr(env.recorder, 'frozen', getattr(env.recorder, '_frozen', False)):
         raise StageUnavailableError('physical sequences are not represented by the active Recorder')
     write = getattr(env.session, 'apply_physical_command_sequence', None)

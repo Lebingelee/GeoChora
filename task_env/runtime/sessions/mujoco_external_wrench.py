@@ -26,9 +26,13 @@ class MuJoCoExternalComPort:
     def __init__(self, session, requests, *, task_requests=()):
         session._require_reset()
         if (getattr(session, '_provider', None) != 'mujoco'
-                or getattr(session, '_physical_port', None) is not None
                 or getattr(session, '_mixed_actuator_plan', None) is not None):
-            raise ValueError('caller COM wrench requires an admitted scalar MuJoCo position session')
+            raise ValueError('caller COM wrench requires an admitted scalar MuJoCo session')
+        physical = getattr(session, '_physical_port', None)
+        if physical is not None:
+            from .mujoco_physical import MuJoCoPhysicalPort
+            if type(physical) is not MuJoCoPhysicalPort or physical.session is not session:
+                raise ValueError('caller COM wrench requires the live admitted physical port')
         if (getattr(session._mj, '__version__', None) != '3.8.1'
                 or int(session._model.opt.integrator)
                 != int(session._mj.mjtIntegrator.mjINT_IMPLICITFAST)):
@@ -89,6 +93,37 @@ class MuJoCoExternalComPort:
         self.pending_values = None
         self.refresh_count = 0
         self.substeps = substeps
+        self.compatible_physical_port = None
+
+    def verify_physical_compatibility(self, physical, command, command_kind):
+        """Reject overlapping native DOFs and physical wrench aliases before commit.
+
+        This first combined capability admits joint-only physical batches and
+        COM loads on a kinematically disjoint dynamic body.  It intentionally
+        does not infer that different semantic strings imply disjoint forces.
+        """
+        self.compatible_physical_port = None
+        if physical is not getattr(self.session, '_physical_port', None):
+            raise ValueError('COM load differs from the live physical execution')
+        if command_kind == 'physical-effort-batch':
+            parts = (command,)
+        elif command_kind == 'physical-effort-sequence':
+            parts = tuple(part for _start, _end, part in command.slices)
+        else:
+            raise ValueError('physical COM composition requires a physical command')
+        if any(part.input_batch.body_wrenches or part.input_batch.extensions for part in parts):
+            raise ValueError('physical COM composition currently admits joint-only batches')
+        bound_dofs = set(physical.dofs.values())
+        model = self.session._model
+        for _request, body_id in self.rows:
+            cursor = body_id
+            while cursor > 0:
+                count = int(model.body_dofnum[cursor])
+                start = int(model.body_dofadr[cursor])
+                if count and (start < 0 or bound_dofs.intersection(range(start, start + count))):
+                    raise ValueError('COM body aliases a physical Controller native DOF')
+                cursor = int(model.body_parentid[cursor])
+        self.compatible_physical_port = physical
 
     def verify(self, interval):
         s = self.session
@@ -109,16 +144,11 @@ class MuJoCoExternalComPort:
             if not aliases or 'body:' + min(aliases) != self.body_resources[body_id]:
                 raise ValueError('caller wrench source body aliases changed before submission')
 
-    def refresh_substep(self):
+    def project_substep(self):
+        """Project this tick into a fresh array without owning a native buffer."""
         s = self.session
         if not self.authorized:
             raise RuntimeError('caller wrench requires the common submission owner')
-        if self.pending_values is None:
-            if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
-                raise RuntimeError('caller wrench force buffer changed before projection')
-        elif (not np.array_equal(s._data.qfrc_applied, self.pending_values)
-              or np.any(s._data.xfrc_applied)):
-            raise RuntimeError('caller wrench force buffer changed during interval')
         # xipos is the current inertial-frame origin, i.e. this body's COM in
         # world coordinates. It must be refreshed after every configuration.
         s._mj.mj_kinematics(s._model, s._data)
@@ -134,6 +164,18 @@ class MuJoCoExternalComPort:
                 np.asarray(request.torque_com_world_Nm), s._data.xipos[body_id].copy(), body_id, projected)
         if not np.isfinite(projected).all():
             raise ValueError('caller COM wrench produced nonfinite generalized force')
+        self.refresh_count += 1
+        return projected
+
+    def refresh_substep(self):
+        s = self.session
+        if self.pending_values is None:
+            if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
+                raise RuntimeError('caller wrench force buffer changed before projection')
+        elif (not np.array_equal(s._data.qfrc_applied, self.pending_values)
+              or np.any(s._data.xfrc_applied)):
+            raise RuntimeError('caller wrench force buffer changed during interval')
+        projected = self.project_substep()
         if self.pending_values is None:
             unchanged = not np.any(s._data.qfrc_applied)
         else:
@@ -142,7 +184,6 @@ class MuJoCoExternalComPort:
             raise RuntimeError('caller wrench force buffer changed during projection')
         s._data.qfrc_applied[:] = projected
         self.pending_values = projected
-        self.refresh_count += 1
 
     def preflight_reset(self):
         data = self.session._data

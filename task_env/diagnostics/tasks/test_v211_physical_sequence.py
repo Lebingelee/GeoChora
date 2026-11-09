@@ -82,7 +82,7 @@ def test_existing_submission_owner_binds_each_nonoverlapping_batch_and_rejects_r
     session._prepared_physical_sequence = sequence
     unbound = SimpleNamespace(**vars(session))
     unbound._physical_port = None
-    with pytest.raises(ValueError, match='requires the live source-bound scene interval'):
+    with pytest.raises(ValueError, match='requires a live source-bound scene interval'):
         submit_control_command(unbound, sequence, **kwargs)
     assert calls == [] and not getattr(unbound, '_control_submission_consumed', set())
     submit_control_command(session, sequence, **kwargs)
@@ -136,7 +136,7 @@ def test_sequence_capability_rejects_unverified_legacy_observer():
         binding=SimpleNamespace(physical_direct_effort_feedback=False,
             physical_observation_binding=lambda _env: None, external_actions=True),
         session=SimpleNamespace(), recorder=None)
-    with pytest.raises(StageUnavailableError, match='RGB/observer, caller wrench or active Recorder'):
+    with pytest.raises(StageUnavailableError, match='RGB/observer or active Recorder'):
         describe_physical_sequence_capability(env, None)
     env._legacy_observer_requested = False
     env.recorder = SimpleNamespace(_frozen=False)

@@ -132,7 +132,7 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
         if (task_renderer == 'geophys' and observer_camera is not None
                 and (task_rgb_camera.width, task_rgb_camera.height) != (observer_camera.width, observer_camera.height)):
             raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
-        if kwargs or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy'}:
+        if kwargs or set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode', 'control_kind', 'reset_switch', 'action_space_policy', 'cube_force_z_N'}:
             raise ValueError('PickCube physical candidate rejects unsupported configuration')
         if task_camera is not None:
             from ...observations.canonical_camera import CameraGeometry
@@ -162,6 +162,14 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
         horizon, seed = values.get('horizon', 8), values.get('seed', 31)
         drive_mode, control_kind = values.get('drive_mode', 'coexist'), values.get('control_kind', 'direct')
         reset_switch = values.get('reset_switch', False)
+        cube_force_z_N = values.get('cube_force_z_N')
+        if cube_force_z_N is not None:
+            import math
+            if (type(cube_force_z_N) not in (int, float)
+                    or not math.isfinite(cube_force_z_N) or not -30. <= cube_force_z_N <= 30.
+                    or (provider, backend, drive_mode, control_kind, reset_switch)
+                    != ('mujoco', 'cpu', 'coexist', 'direct', False)):
+                raise ValueError('PickCube Task COM force requires MuJoCo CPU direct coexist and a finite value in [-30, 30] N')
         space_policy = values.get('action_space_policy', 'dynamic')
         if type(reset_switch) is not bool or space_policy not in {'dynamic', 'fixed_semantic'}:
             raise ValueError('invalid physical reset switch or action-space policy')
@@ -192,7 +200,7 @@ class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
             raise ValueError('PickCube physical source_workspace must be fresh or empty')
         env = _build_candidate(root, provider=provider, horizon=horizon, seed=seed, environment_type=cls,
                                drive_mode=drive_mode, control_kind=control_kind, reset_switch=reset_switch,
-                               space_policy=space_policy)
+                               space_policy=space_policy, cube_force_z_N=cube_force_z_N)
         if task_rgb_camera is not None:
             try:
                 env._configure_task_rgb(task_rgb_camera, task_renderer)
@@ -248,7 +256,7 @@ def _pickcube_mjcf_scene(task_config):
 
 
 def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_mode, control_kind,
-                     reset_switch=False, space_policy='dynamic'):
+                     reset_switch=False, space_policy='dynamic', cube_force_z_N=None):
     from ...artifacts import FrameReference
     from ...assembly.assets import _source_closure_digest
     from ...assembly.source import TaskSceneSource
@@ -374,6 +382,8 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
             'resolved_configuration': {'provider': _provider, 'backend': 'cpu',
                 'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
                 'drive_mode': drive_mode, 'control_kind': control_kind,
+                **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
+                   if cube_force_z_N is not None else {}),
                 'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
                 'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
     def fixed_seed(value):
@@ -406,10 +416,13 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
             env._last_physical_opening_target = .04 * (float(np.clip(action[-1], -1., 1.)) + 1.)
         else:
             env._last_physical_opening_target = float(action[-1])
-    from .specialization import _validate_external_readiness_solution
+    from .specialization import _validate_external_readiness_solution, make_reference_binding
+    task_com_factory = (make_reference_binding(cube_force_z_N=cube_force_z_N).task_com_wrench_factory
+                        if cube_force_z_N is not None else None)
     binding = ReferenceTaskBinding(build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
         evaluate=lambda state, semantics: evaluate(state, semantics),
         object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
+        task_com_wrench_factory=task_com_factory,
         recorder_mode='execution', reset_seed=fixed_seed,
         position_control_binding=lambda _value: ControlBinding('panda-v1/gripper', 0.08),
         action_schema={'schema_version': 'physical-control-actions-v1',
