@@ -258,6 +258,12 @@ class DirectJointEffortControllerV1:
         if (raw.shape != (len(self._channels),) or raw.dtype.kind not in {'i', 'u', 'f'}
                 or not np.isfinite(raw).all()):
             raise ValueError('direct effort action shape or finite values are invalid')
+        # Compare the caller's original precision before converting to the
+        # public float32 action space; rounding must not admit an out-of-range
+        # value such as 2.0 + 1e-9 on a channel limited to 2 N*m.
+        if any(not channel.effort_range[0] <= value <= channel.effort_range[1]
+               for channel, value in zip(self._channels, raw, strict=True)):
+            raise ValueError('direct effort action exceeds its declared bounds')
         values = np.asarray(raw, dtype=np.float32)
         if not self.action_space.spaces[self._action_key].contains(values):
             raise ValueError('direct effort action exceeds its declared bounds')

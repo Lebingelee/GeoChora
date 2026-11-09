@@ -81,6 +81,15 @@ def test_subject_default_effort_controller_is_bound_and_preserves_direct_identit
             binding, writer_id='controller-a', units=(channel.unit,))
 
 
+def test_default_effort_checks_original_precision_before_float32_rounding():
+    execution, subject, context = _fixture()
+    binding = execution.compiled.binding
+    channel = binding.channels[0]
+    controller = subject.default_effort_controller(binding, writer_id='controller-a', units=(channel.unit,))
+    with pytest.raises(ValueError, match='declared bounds'):
+        controller.compute([channel.effort_range[1] + 1e-9], object(), context)
+
+
 def test_foreign_controller_output_is_rejected_before_submission():
     execution, subject, context = _fixture()
     original = execution.controllers[0]
