@@ -2876,20 +2876,43 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if first is not None:
             raise first
 
-    def step(self, action):
+    def step(self, action, *, external_com_wrenches=None):
+        """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
+
+        Wrenches are an immutable tuple of ``ExternalComWrenchV1`` keyed by a
+        source body. They act only for this interval. The selected grouped
+        position path must already have a source-bound scene submission;
+        other providers, native-feedback intervals and active Recorders fail
+        before a force is staged. Ordinary ``step(action)`` is unchanged.
+        """
         self._require_execution_healthy()
-        component_lifecycle = None
-        if self._has_component_assembly():
-            self._episode_execution_state().require_open("environment is closed")
-            component_lifecycle = self._require_task_lifecycle()
-            self._last_camera_metadata = {}
-            operations = component_lifecycle.prepare_step(action)
-        else:
-            operations = self._prepare_selected_step(action)
-        result = self._episode_execution_state().execute_interval(**operations)
-        if component_lifecycle is not None:
-            return self._format_component_step(component_lifecycle, result)
-        return result
+        external = None
+        if external_com_wrenches is not None:
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                raise StageUnavailableError('caller COM wrenches are not represented by the active Recorder')
+            if self._has_component_assembly() or self.binding.interval_mode != 'grouped':
+                raise StageUnavailableError('caller COM wrenches require the selected grouped interval')
+            if self.session is None:
+                raise RuntimeError('reset required before staging caller COM wrenches')
+            from ..runtime.sessions.mujoco_external_wrench import MuJoCoExternalComPort
+            external = MuJoCoExternalComPort(self.session, external_com_wrenches)
+            self.session._external_com_port = external
+        try:
+            component_lifecycle = None
+            if self._has_component_assembly():
+                self._episode_execution_state().require_open("environment is closed")
+                component_lifecycle = self._require_task_lifecycle()
+                self._last_camera_metadata = {}
+                operations = component_lifecycle.prepare_step(action)
+            else:
+                operations = self._prepare_selected_step(action)
+            result = self._episode_execution_state().execute_interval(**operations)
+            if component_lifecycle is not None:
+                return self._format_component_step(component_lifecycle, result)
+            return result
+        finally:
+            if external is not None:
+                external.finish()
 
     def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(

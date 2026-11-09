@@ -1950,6 +1950,10 @@ class _MuJoCoSession(_SessionValues):
         self._validate_sample(sample)
         if physical_sample:
             self._preflight_physical_reset(sample)
+        external = getattr(self, '_external_com_port', None)
+        if external is not None:
+            external.preflight_reset()
+            external.finish()
         physical_port = getattr(self, '_physical_port', None)
         if physical_port is not None:
             if (np.any(self._data.xfrc_applied)
@@ -2863,6 +2867,9 @@ class _MuJoCoSession(_SessionValues):
 
     def step(self):
         self._require_reset()
+        external = getattr(self, '_external_com_port', None)
+        if external is not None and not external.authorized:
+            raise RuntimeError('caller wrench requires an acknowledged interval submission')
         physical_port = getattr(self, '_physical_port', None)
         if physical_port is not None:
             if physical_port.pending is None:
@@ -2904,17 +2911,23 @@ class _MuJoCoSession(_SessionValues):
                     'control_boundary': int(self._control_step),
                 }
                 raise
-        for _ in range(self._artifact.timebase.control_substeps):
-            self._mj.mj_step(self._model, self._data)
-            self._native_steps += 1
-            self._record_gravity_force_sample()
-            self._cache_completed_actuator_force()
-        self._mj.mj_forward(self._model, self._data)
-        if self._source.fixed_attachment_plan is not None:
-            self._fixed_forward_calls += 1
-        self._control_step += 1
-        self._state_revision += 1
-        return self.snapshot()
+        try:
+            for _ in range(self._artifact.timebase.control_substeps):
+                if external is not None:
+                    external.refresh_substep()
+                self._mj.mj_step(self._model, self._data)
+                self._native_steps += 1
+                self._record_gravity_force_sample()
+                self._cache_completed_actuator_force()
+            self._mj.mj_forward(self._model, self._data)
+            if self._source.fixed_attachment_plan is not None:
+                self._fixed_forward_calls += 1
+            self._control_step += 1
+            self._state_revision += 1
+            return self.snapshot()
+        finally:
+            if external is not None:
+                external.finish()
 
     def _step_physics_once(self):
         self._require_reset()
@@ -3050,6 +3063,9 @@ class _MuJoCoSession(_SessionValues):
 
     def close(self):
         if not self._closed:
+            external = getattr(self, '_external_com_port', None)
+            if external is not None:
+                external.finish()
             physical_port = getattr(self, '_physical_port', None)
             if physical_port is not None and physical_port.pending is not None:
                 physical_port.finish_interval()

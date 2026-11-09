@@ -147,6 +147,28 @@ class BodyWrenchV1(Contract):
 
 
 @dataclass(frozen=True)
+class ExternalComWrenchV1(Contract):
+    """Caller-owned world wrench at the current COM for one control interval."""
+
+    schema_version: str
+    physical_effect_id: str
+    source_body_key: str
+    force_world_N: tuple[float, float, float]
+    torque_com_world_Nm: tuple[float, float, float]
+
+    def validate(self):
+        _choice(self.schema_version, {'external-com-wrench-v1'}, 'external COM wrench schema')
+        for value in (self.physical_effect_id, self.source_body_key):
+            _name(value)
+        _vector(self.force_world_N, 'world force')
+        _vector(self.torque_com_world_Nm, 'world COM torque')
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
 class TypedLoadExtensionV1(Contract):
     """Registered extension descriptor; payload is addressed, never an untyped object."""
     schema_version: str

@@ -433,3 +433,37 @@ def test_subject_scene_submission_checks_bound_writer_and_live_target(monkeypatc
             _submit(current, target, command_sha256=target.identity_hash,
                     subject_execution_mode='boundary-hold', lower=lambda: writes.append(1), **kwargs)
         assert not writes and not getattr(current, '_control_submission_consumed', set())
+
+
+def test_caller_com_contribution_is_in_the_single_committed_scene(monkeypatch):
+    from task_env.controllers.canonical.physical_commands import ExternalComWrenchV1
+    import task_env.controllers.canonical.contracts as contracts
+    import task_env.runtime.sessions.control_submission as submission
+
+    monkeypatch.setattr(contracts, 'CanonicalControlTarget', _Command)
+    session = _Session()
+    session._source = SimpleNamespace(source_id='task', source_closure_digest='a' * 64,
+                                      position_subject_binding=object())
+    command = _Command()
+    command.task_artifact_hash = 'b' * 64
+    base = submission.SceneCommandIntervalV1('scene-command-interval-v1', 'task', 'a' * 64,
+        'b' * 64, session.boundary, _Clock(), 'd' * 64, None, None, None, .002, 5,
+        (submission.SceneCommandContributionV1('robot-controller', 'position-target', ('rad',),
+             'exclusive', None, 'writer-1', 'controller-1', None, command.identity_hash,
+             ('robot/joint-1',), 0, 5),))
+    monkeypatch.setattr(submission, 'prepare_subject_position_scene_interval', lambda **_: base)
+    request = ExternalComWrenchV1('external-com-wrench-v1', 'push', 'cube', (0., 0., 1.), (0., 0., 0.))
+    external = SimpleNamespace(rows=((request, 1),), authorized=False, verify=lambda value: None)
+    session._external_com_port = external
+    writes = []
+    _submit(session, command, subject_execution_mode='boundary-hold',
+            lower=lambda: (writes.append(external.authorized), _ack())[1])
+    assert writes == [True]
+    scene = session._last_scene_control_submission
+    assert scene['status'] == 'acknowledged'
+    assert scene['inner_submission_id'] == session._last_control_submission['submission_id']
+    first, second = scene['interval']['contributions']
+    assert first['command_sha256'] == command.identity_hash
+    assert (second['producer_kind'], second['physical_effect_id'], second['resources']) == (
+        'caller', 'push', ('body:cube',))
+    assert second['command_sha256'] == request.identity_hash

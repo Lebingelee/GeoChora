@@ -7,7 +7,7 @@ provider write.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 import math
@@ -63,8 +63,8 @@ class SceneCommandContributionV1:
     units: tuple[str, ...]
     composition: str
     physical_effect_id: str | None
-    writer_id: str
-    controller_identity: str
+    writer_id: str | None
+    controller_identity: str | None
     controller_generation: int | None
     command_sha256: str
     resources: tuple[str, ...]
@@ -872,6 +872,23 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 source_id=source_id, source_closure_sha256=source_closure_sha256,
                 artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
                 resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
+    external = getattr(session, '_external_com_port', None)
+    if external is not None:
+        if scene_interval is None:
+            raise ValueError('caller COM wrench requires a source-bound scene interval')
+        external.verify(scene_interval)
+        existing_resources = {resource for item in scene_interval.contributions for resource in item.resources}
+        existing_effects = {item.physical_effect_id for item in scene_interval.contributions
+                            if item.physical_effect_id is not None}
+        added = []
+        for request, _body_id in external.rows:
+            resource = f'body:{request.source_body_key}'
+            if resource in existing_resources or request.physical_effect_id in existing_effects:
+                raise ValueError('caller COM wrench conflicts with another scene contribution')
+            added.append(SceneCommandContributionV1('caller', 'body-com-wrench', ('N', 'N*m'),
+                'exclusive', request.physical_effect_id, None, None, None,
+                request.identity_hash, (resource,), 0, scene_interval.substeps))
+        scene_interval = replace(scene_interval, contributions=(*scene_interval.contributions, *added))
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']
@@ -884,6 +901,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
     if replay_key in consumed:
         raise ValueError('control interval already has a logical submission')
     consumed.add(replay_key)
+    if external is not None:
+        external.authorized = True
     session._last_control_submission = {**payload, 'submission_id': identity, 'status': 'pending'}
     session._last_scene_control_submission = (None if scene_interval is None else {
         'schema_version': 'scene-control-submission-receipt-v1',
@@ -932,7 +951,6 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 'status': 'acknowledged',
             }
         if lifecycle is not None:
-            from dataclasses import replace
             session._control_lifecycle_dispatch = replace(lifecycle, stage='committed')
         return ack
     except BaseException as error:
@@ -957,6 +975,5 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 'status': status,
             }
         if lifecycle is not None:
-            from dataclasses import replace
             session._control_lifecycle_dispatch = replace(lifecycle, stage='failed')
         raise

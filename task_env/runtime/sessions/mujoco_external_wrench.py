@@ -1,0 +1,121 @@
+"""One-interval caller wrenches owned by a selected MuJoCo session.
+
+This port never advances physics. The session's existing native loop owns
+advancement and asks this port to project at each current configuration.
+"""
+from __future__ import annotations
+
+import numpy as np
+
+from ...controllers.canonical.physical_commands import ExternalComWrenchV1
+
+
+class MuJoCoExternalComPort:
+    def __init__(self, session, requests):
+        session._require_reset()
+        if (getattr(session, '_provider', None) != 'mujoco'
+                or getattr(session, '_physical_port', None) is not None
+                or getattr(session, '_mixed_actuator_plan', None) is not None):
+            raise ValueError('caller COM wrench requires an admitted scalar MuJoCo position session')
+        if (getattr(session._mj, '__version__', None) != '3.8.1'
+                or int(session._model.opt.integrator)
+                != int(session._mj.mjtIntegrator.mjINT_IMPLICITFAST)):
+            raise ValueError('caller COM wrench requires checked MuJoCo 3.8.1 implicitfast')
+        if type(requests) is not tuple or not requests:
+            raise TypeError('caller COM wrenches must be a nonempty immutable tuple')
+        if np.any(session._data.qfrc_applied) or np.any(session._data.xfrc_applied):
+            raise ValueError('caller COM wrench cannot take an occupied force buffer')
+        if getattr(session, '_external_com_port', None) is not None:
+            raise ValueError('a caller wrench is already staged for this interval')
+        source = session._source
+        rows, effects, body_ids = [], set(), set()
+        for request in requests:
+            if type(request) is not ExternalComWrenchV1:
+                raise TypeError('caller wrench must be ExternalComWrenchV1')
+            request.validate()
+            semantic = request.source_body_key
+            native = source.bodies.get(semantic)
+            if native is None:
+                raise ValueError('caller wrench body is not bound by the selected source')
+            body_id = int(session._model.body(native).id)
+            cursor, movable = body_id, False
+            while cursor > 0:
+                movable = movable or int(session._model.body_dofnum[cursor]) > 0
+                cursor = int(session._model.body_parentid[cursor])
+            if body_id <= 0 or float(session._model.body_mass[body_id]) <= 0 or not movable:
+                raise ValueError('caller wrench requires a source-bound dynamic body')
+            if request.physical_effect_id in effects or body_id in body_ids:
+                raise ValueError('caller wrench effect and native body must be unique')
+            effects.add(request.physical_effect_id)
+            body_ids.add(body_id)
+            rows.append((request, body_id))
+        self.session, self.rows = session, tuple(rows)
+        self.boundary = session.state_boundary_identity()
+        self.source_id = source.source_id
+        self.source_closure_sha256 = source.source_closure_digest
+        self.artifact_sha256 = session._artifact.identity_hash
+        self.authorized = False
+        self.pending_values = None
+        self.refresh_count = 0
+
+    def verify(self, interval):
+        s = self.session
+        if (self.authorized or s.state_boundary_identity() != self.boundary
+                or interval.boundary != self.boundary
+                or (interval.source_id, interval.source_closure_sha256, interval.artifact_sha256)
+                != (self.source_id, self.source_closure_sha256, self.artifact_sha256)
+                or interval.substeps != s._artifact.timebase.control_substeps):
+            raise ValueError('caller wrench is stale or differs from the committed interval')
+        if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
+            raise ValueError('caller wrench force buffer changed before submission')
+        for request, body_id in self.rows:
+            native = s._source.bodies.get(request.source_body_key)
+            if native is None or int(s._model.body(native).id) != body_id:
+                raise ValueError('caller wrench source body binding changed before submission')
+
+    def refresh_substep(self):
+        s = self.session
+        if not self.authorized:
+            raise RuntimeError('caller wrench requires the common submission owner')
+        if self.pending_values is None:
+            if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
+                raise RuntimeError('caller wrench force buffer changed before projection')
+        elif (not np.array_equal(s._data.qfrc_applied, self.pending_values)
+              or np.any(s._data.xfrc_applied)):
+            raise RuntimeError('caller wrench force buffer changed during interval')
+        # xipos is the current inertial-frame origin, i.e. this body's COM in
+        # world coordinates. It must be refreshed after every configuration.
+        s._mj.mj_kinematics(s._model, s._data)
+        s._mj.mj_comPos(s._model, s._data)
+        projected = np.zeros(s._model.nv, dtype=float)
+        for request, body_id in self.rows:
+            s._mj.mj_applyFT(s._model, s._data, np.asarray(request.force_world_N),
+                np.asarray(request.torque_com_world_Nm), s._data.xipos[body_id].copy(), body_id, projected)
+        if not np.isfinite(projected).all():
+            raise ValueError('caller COM wrench produced nonfinite generalized force')
+        if self.pending_values is None:
+            unchanged = not np.any(s._data.qfrc_applied)
+        else:
+            unchanged = np.array_equal(s._data.qfrc_applied, self.pending_values)
+        if not unchanged or np.any(s._data.xfrc_applied):
+            raise RuntimeError('caller wrench force buffer changed during projection')
+        s._data.qfrc_applied[:] = projected
+        self.pending_values = projected
+        self.refresh_count += 1
+
+    def preflight_reset(self):
+        data = self.session._data
+        if (np.any(data.xfrc_applied)
+                or (self.pending_values is None and np.any(data.qfrc_applied))
+                or (self.pending_values is not None
+                    and not np.array_equal(data.qfrc_applied, self.pending_values))):
+            raise RuntimeError('caller wrench reset cannot clear a foreign force buffer')
+
+    def finish(self):
+        data = self.session._data
+        if self.pending_values is not None:
+            owned = np.equal(data.qfrc_applied, self.pending_values)
+            data.qfrc_applied[owned] = 0
+        self.pending_values = None
+        if getattr(self.session, '_external_com_port', None) is self:
+            self.session._external_com_port = None
