@@ -1835,7 +1835,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise
         previous_episode_end = self._position_episode_end
         if (self.session is not None
-                and self._published_position_typed_state is not None
+                and getattr(self, '_published_position_typed_state', None) is not None
                 and previous_episode_end is None):
             try:
                 previous_episode_end = self.stop('reset')
