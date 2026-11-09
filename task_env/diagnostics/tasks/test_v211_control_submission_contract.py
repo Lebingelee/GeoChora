@@ -14,6 +14,7 @@ class _Boundary:
     control_step: int = 0
     state_revision: int = 0
     boundary_id: str = 'boundary-1'
+    scene_identity_hash: str = 'e' * 64
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class _Command:
     source_boundary = _Boundary()
     sample_clock = _Clock()
     source_closure_digest = 'a' * 64
+    binding_identity_hash = 'd' * 64
     target = SimpleNamespace(task_artifact_hash='b' * 64)
 
     def validate(self):
@@ -40,6 +42,9 @@ class PhysicalCommandBatchV1:
     identity_hash = '2' * 64
     context = SimpleNamespace(source_id='task', source_closure_sha256='a' * 64,
         artifact_sha256='b' * 64, boundary=_Boundary(), clock=_Clock(), generation=0)
+    joint_efforts = (SimpleNamespace(contribution=SimpleNamespace(owner_id='pendulum-torque')),)
+    body_wrenches = ()
+    extensions = ()
 
     def validate(self):
         pass
@@ -47,6 +52,9 @@ class PhysicalCommandBatchV1:
 
 class _ResolvedPhysicalBatchV1:
     input_batch = PhysicalCommandBatchV1()
+    joints = (SimpleNamespace(entity_id='pendulum', joint_id='hinge'),)
+    body_wrenches = ()
+    extensions = ()
 
 
 class _Session:
@@ -248,3 +256,41 @@ def test_preflight_does_not_consume_boundary_or_call_lowerer(monkeypatch):
     _submit(session)
     with pytest.raises(ValueError, match='already has a logical submission'):
         _submit(session)
+
+
+def test_position_resources_are_checked_against_materialized_plan(monkeypatch):
+    import task_env.controllers.canonical.contracts as contracts
+    import task_env.runtime.sessions.control as control
+    monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
+    class Plan:
+        identity_hash = 'd' * 64
+        _compiled = True
+        scene_identity_hash = 'e' * 64
+        artifact_identity_hash = 'b' * 64
+        source_closure_digest = 'a' * 64
+        resource_writers = (('robot', 'joint-1', 'writer-1'),)
+    monkeypatch.setattr(control, 'ControlBindingPlanV1', Plan)
+    session = _Session()
+    session._control_binding_plan = Plan()
+    writes = []
+    with pytest.raises(ValueError, match='resources differ from the materialized binding'):
+        _submit(session, resource_ids=('robot/forged',),
+                resource_owners=(('writer-1', ('robot/forged',)),),
+                lower=lambda: writes.append('write'))
+    assert not writes and not hasattr(session, '_control_submission_consumed')
+    _submit(session)
+
+
+@pytest.mark.parametrize('writers,resources', (
+    (('foreign-writer',), ('pendulum/hinge',)),
+    (('pendulum-torque',), ('pendulum/forged',)),
+))
+def test_physical_resources_and_writers_match_batch(monkeypatch, writers, resources):
+    import task_env.runtime.sessions.physical_control as physical
+    monkeypatch.setattr(physical, 'ResolvedPhysicalBatchV1', _ResolvedPhysicalBatchV1)
+    session, writes = _Session(), []
+    with pytest.raises(ValueError, match='physical batch writers or resources'):
+        _submit(session, _ResolvedPhysicalBatchV1(), command_kind='physical-effort-batch',
+                command_sha256='2' * 64, writer_ids=writers, resource_ids=resources,
+                lower=lambda: writes.append('write'))
+    assert not writes and not hasattr(session, '_control_submission_consumed')

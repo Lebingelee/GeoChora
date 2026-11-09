@@ -357,6 +357,42 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
             raise ValueError('position batch targets differ from the submitted writer set')
     if is_leaf_batch and tuple(item.writer_id for item in command.commands) != writer_ids:
         raise ValueError('leaf batch commands differ from the submitted writer set')
+    if command_kind == 'physical-effort-batch':
+        batch = command.input_batch
+        contributions = (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)
+        payload_writers = {item.contribution.owner_id for item in contributions}
+        payload_resources = {
+            *(f'{item.entity_id}/{item.joint_id}' for item in command.joints),
+            *(f'{item.entity_id}/{item.body_id}' for item in command.body_wrenches),
+            *(str(getattr(item, 'target_key', type(item).__name__)) for item in command.extensions),
+        }
+        if payload_writers != set(writer_ids) or payload_resources != set(resource_ids):
+            raise ValueError('physical batch writers or resources differ from the submission')
+    # For typed Position profiles the materialized session retains the
+    # compiled source-bound plan. Caller-supplied ownership metadata must be
+    # a projection of that plan, not merely a self-consistent list of names.
+    if command_kind == 'position-target' and not is_leaf_batch:
+        typed_targets = command.targets if is_position_batch else (command,)
+        if all(type(item) is PositionControlTargetV1 for item in typed_targets):
+            plan = getattr(session, '_control_binding_plan', None)
+            if plan is not None:
+                from .control import ControlBindingPlanV1
+                if type(plan) is not ControlBindingPlanV1 or not plan._compiled:
+                    raise TypeError('position submission requires its compiled binding plan')
+                if (plan.scene_identity_hash != boundary.scene_identity_hash
+                        or (plan.artifact_identity_hash is not None
+                            and plan.artifact_identity_hash != artifact_sha256)
+                        or (plan.source_closure_digest is not None
+                            and plan.source_closure_digest != source_closure_sha256)
+                        or any(item.binding_identity_hash != plan.identity_hash for item in typed_targets)):
+                    raise ValueError('position target differs from the materialized binding plan')
+                expected = tuple(sorted(
+                    (writer, tuple(sorted(f'{entity}/{actuator}'
+                                          for entity, actuator, owner in plan.resource_writers
+                                          if owner == writer)))
+                    for writer in writer_ids))
+                if tuple(sorted(resource_owners)) != expected or any(not resources for _, resources in expected):
+                    raise ValueError('position resources differ from the materialized binding plan')
     if submission_progress is not None:
         if (type(submission_progress) is not dict
                 or type(submission_progress.get('attempted_writer_ids')) is not list
