@@ -1590,29 +1590,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self.value['source'].composition
 
     def _position_requirements(self):
-        from ..artifacts import StateRequirements
-
-        if getattr(self, 'leaf_position_profile', False):
-            requirements = tuple(
-                requirement
-                for entry in self.leaf_plan.leaves
-                for requirement in entry.binding.required_state.state_requirements.requirements
-            )
-            return StateRequirements(
-                'state-requirements-v1', 'controller',
-                ('r03c-attached-entity-position-leaves-v1'
-                 if self.fixed_attachment_leaf_position_profile
-                 else 'r02c-independent-position-leaves-v1'),
-                requirements,
-            )
-
-        if len(self.position_profiles) == 1:
-            return self.position_profiles[0].requirements
-        return StateRequirements(
-            'state-requirements-v1', 'controller', 'c02b-dual-position-dispatch-v1',
-            tuple(requirement for profile in self.position_profiles
-                  for requirement in profile.requirements.requirements),
-        )
+        return self._position_state_declaration.position_state_requirements()
 
     def _prepare_task_rgb_state_binding(self):
         """Resolve the complete renderer projection from the current source identity."""
@@ -2094,6 +2072,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     plan=self.value.get('controller_binding_plan'),
                     select_binding=select_binding, value=self.value,
                 )
+                self._position_state_declaration = self.leaf_plan if self.position_plan is None else self.position_plan
                 if selection is not None and selection.deployment == 'isolated_worker':
                     self.session = start_worker()
                 elif self.leaf_position_profile:

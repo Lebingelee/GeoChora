@@ -324,6 +324,16 @@ class ControlBindingPlanV1:
         if any(writer_id not in writer_ids for _entity_id, _actuator_id, writer_id in self.resource_writers):
             raise ValueError('ControlBindingPlan resource writer is not bound')
 
+    def position_state_requirements(self):
+        """Return the typed state declared by the compiled Position writers."""
+        if not self._compiled or not 1 <= len(self.controller_bindings) <= 2:
+            raise ValueError('Position state requires one or two compiled Controller bindings')
+        requirements = tuple(binding.feedback_requirements for binding in self.controller_bindings)
+        if len(requirements) == 1:
+            return requirements[0]
+        return StateRequirements('state-requirements-v1', 'controller', 'c02b-dual-position-dispatch-v1',
+            tuple(item for requirement in requirements for item in requirement.requirements))
+
     @property
     def identity_hash(self):
         payload = {
