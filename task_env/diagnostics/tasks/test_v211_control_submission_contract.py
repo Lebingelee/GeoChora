@@ -534,6 +534,12 @@ def test_shared_scene_owner_checks_all_fragment_conflicts_and_explicit_sums():
     _validate_scene_contributions(replace(base, contributions=(summed, other)))
     with pytest.raises(ValueError, match='same physical effect'):
         _validate_scene_contributions(replace(base, contributions=(summed, replace(other, physical_effect_id='effect-a'))))
+    projected = replace(other, physical_effect_id='effect-a', command_kind='joint-effort',
+                        units=('N*m',), resources=('joint:robot/hinge/dof0',))
+    with pytest.raises(ValueError, match='effect across command kinds'):
+        _validate_scene_contributions(replace(base, contributions=(summed, projected)))
+    _validate_scene_contributions(replace(base, contributions=(
+        replace(summed, end_substep=2), replace(projected, start_substep=2))))
     with pytest.raises(ValueError, match='kinds and units'):
         _validate_scene_contributions(replace(base, contributions=(summed, replace(other, units=('N',)))))
     with pytest.raises(ValueError, match='substeps'):

@@ -104,6 +104,7 @@ def _validate_scene_contributions(interval):
             or type(interval.contributions) is not tuple or not interval.contributions):
         raise ValueError('scene interval requires a finite timebase and typed contributions')
     claims = {}
+    effects = {}
     for item in interval.contributions:
         if type(item) is not SceneCommandContributionV1:
             raise TypeError('scene interval contains an untyped contribution')
@@ -123,6 +124,12 @@ def _validate_scene_contributions(interval):
             _token(item.physical_effect_id, 'scene physical effect')
         if item.composition == 'sum' and item.physical_effect_id is None:
             raise ValueError('summed scene contributions require physical effect identities')
+        if item.physical_effect_id is not None:
+            for prior in effects.setdefault(item.physical_effect_id, []):
+                if (item.start_substep < prior.end_substep and prior.start_substep < item.end_substep
+                        and item.command_kind != prior.command_kind):
+                    raise ValueError('scene interval repeats a physical effect across command kinds')
+            effects[item.physical_effect_id].append(item)
         for resource in item.resources:
             _token(resource, 'scene resource')
             for prior in claims.setdefault(resource, []):
