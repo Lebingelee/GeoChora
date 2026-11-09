@@ -6,6 +6,12 @@
 
 Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 现支持调用方直接传入含来源边界和控制请求的 `ExpertAction`，并在 `observe` 校验五个 native 样本；裸数组仍拒绝。PickCube seed31 与 NutAssembly seed19 已在 MuJoCo CPU 上完成有界物理回归和独立读回，证据及源码身份见[验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
 
+## 5c 单元 4 开发中接口（尚未接收）
+
+公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `task.controller_profile="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。
+
+`task_env.ExternalComWrenchV1` 可描述单 interval 的世界力和关于当前质心的世界力矩；`task_env.ExternalComWrenchSegmentV1` 额外声明 writer 和整数半开子步范围。可通过 `env.step(action, external_com_wrenches=(wrench, ...))` 在选定 grouped Position interval 中提交。当前准入限 MuJoCo 3.8.1 CPU、implicitfast、source 明确绑定的有质量可动 body；同一 native body 或 effect 的范围不得重叠，不重叠片段可复用同一 writer/effect。每个相关子步重新读取当前 COM；该接口不支持与 physical port、mixed control、native-feedback 或活动 Recorder 同时使用。旧 `step(action)` 保持原调用方式。动态 COM 的冻结自由体 oracle 仍有线速度分量超出既定容差，故该实现尚不能作为本单元物理验收通过，也不外推 GeoPhys／Isaac。
+
 ## PickCube state-only reset 切换（有界接收）
 
 显式选择 `execution.reset_profile="pickcube-state-only-switch-v1"` 后，同一个 PickCube Env 支持在 `reset(options={"execution": target})` 中切换 MuJoCo CPU 与 GeoPhys CPU，或 MuJoCo CPU 与 Isaac 6.2 CUDA；目标配置从该 provider 的默认路由重新解析。此 profile 固定 state／cube 观测，`hand_pose` 是 `panda-v1/ee` 的兼容别名；九关节速度在 info 与记录中保留。每 episode 的 Recorder 必须在切换前 finish。显式 seed 重置 Core 随机流，None 继续已初始化的流，首次 None 初始化新流。预检失败保留旧 episode；开始替换后失败会 fault 并报告已知关闭及未知写入结果。
