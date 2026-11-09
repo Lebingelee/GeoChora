@@ -148,3 +148,43 @@ def test_task_and_caller_producers_are_recorded_separately():
     port.refresh_substep()
     assert s._data.qfrc_applied.tolist() == [5., 0.]
     port.finish()
+
+
+def test_task_factory_failure_latches_after_its_possible_side_effect():
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    env = object.__new__(SelectedReferenceEnv)
+    state = SimpleNamespace(fault=None)
+    events = []
+    def factory(_env):
+        events.append('task-mutated')
+        raise ValueError('task preparation failed')
+    env.binding = SimpleNamespace(task_com_wrench_factory=factory, interval_mode='grouped')
+    env.recorder = None
+    env.session = object()
+    env.state = object()
+    env._has_component_assembly = lambda: False
+    env._episode_execution_state = lambda: state
+    def latch(phase, error, **_):
+        events.append((phase, str(error)))
+        state.fault = object()
+    env._latch_fault = latch
+    with pytest.raises(ValueError, match='task preparation failed'):
+        with env._selected_com_wrench_scope(None):
+            pytest.fail('factory failure must not yield an interval')
+    assert events == ['task-mutated', ('task_com_wrench_preparation', 'task preparation failed')]
+    assert state.fault is not None
+
+
+def test_solution_task_admission_failure_latches_after_proposal():
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.environment.types import StageUnavailableError
+    env = object.__new__(SelectedReferenceEnv)
+    state = SimpleNamespace(fault=None)
+    env.binding = SimpleNamespace(task_com_wrench_factory=lambda _: ())
+    env.recorder = SimpleNamespace(_frozen=False)
+    env.state = object()
+    env._episode_execution_state = lambda: state
+    env._latch_fault = lambda phase, error, **_: setattr(state, 'fault', (phase, str(error)))
+    with pytest.raises(StageUnavailableError, match='active Recorder'):
+        env._step(object(), proposal=object())
+    assert state.fault[0] == 'task_com_solution_preparation'
