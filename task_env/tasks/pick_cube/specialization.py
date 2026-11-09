@@ -519,10 +519,18 @@ def position_execution_info(state, last_position_transition):
 
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
-                           interval_provider=None, robot_source_adapter=None):
+                           interval_provider=None, robot_source_adapter=None,
+                           cube_force_z_N=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def adapt(value):
+        if cube_force_z_N is not None:
+            from ...controllers.canonical.contracts import digest
+            value = dict(value)
+            resolved = dict(value['resolved_configuration'])
+            resolved['task_com_force_v1'] = {'cube_force_z_N': cube_force_z_N}
+            value['resolved_configuration'] = resolved
+            value['recipe_identity'] = digest(resolved)
         if robot_source_adapter is None:
             return value
         original_source = value['source']
@@ -593,6 +601,13 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             )
         return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
 
+    def task_com_wrenches(env):
+        from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+        return (ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            'pickcube-task-writer-v1', 'pickcube-task-cube-force-v1', 'cube-v1',
+            0, env.artifact.timebase.control_substeps,
+            (0., 0., cube_force_z_N), (0., 0., 0.)),)
+
     return ReferenceTaskBinding(
         build=build,
         **reference_pose_action_binding(), **selected_observation_binding(),
@@ -618,6 +633,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True,
         external_solution_actions=True,
+        task_com_wrench_factory=task_com_wrenches if cube_force_z_N is not None else None,
         interval_mode=(
             "native"
             if interval_provider in {"mujoco", "geophys"}
@@ -642,7 +658,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
     uses_selected_public_config = True
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
-    selected_parameter_limits = {"lift_height_m": (0.01, 0.25)}
+    selected_parameter_limits = {"lift_height_m": (0.01, 0.25), "cube_force_z_N": (-30., 30.)}
     selected_supports_isaac = True
     selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
     selected_execution_defaults = {
@@ -673,6 +689,10 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config):
         profile = config.controller_profile
+        cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
+        if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
+                or config.environment.runtime.backend != 'cpu' or profile != 'r1'):
+            raise ValueError('PickCube Task COM force requires the MuJoCo CPU R1 grouped interval')
         if profile == 'r1_split' and config.robot_uid is None:
             raise ValueError('split Position Controllers require an explicitly selected Robot source recipe')
         adapter = None
@@ -728,6 +748,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             task_config=json.loads(config.task_configuration_json),
             interval_provider=config.physics_provider,
             robot_source_adapter=adapter,
+            cube_force_z_N=cube_force_z_N,
         )
 
     @classmethod

@@ -23,7 +23,7 @@ def com_wrench_range(request, substeps):
 
 
 class MuJoCoExternalComPort:
-    def __init__(self, session, requests):
+    def __init__(self, session, requests, *, task_requests=()):
         session._require_reset()
         if (getattr(session, '_provider', None) != 'mujoco'
                 or getattr(session, '_physical_port', None) is not None
@@ -33,8 +33,8 @@ class MuJoCoExternalComPort:
                 or int(session._model.opt.integrator)
                 != int(session._mj.mjtIntegrator.mjINT_IMPLICITFAST)):
             raise ValueError('caller COM wrench requires checked MuJoCo 3.8.1 implicitfast')
-        if type(requests) is not tuple or not requests:
-            raise TypeError('caller COM wrenches must be a nonempty immutable tuple')
+        if type(requests) is not tuple or type(task_requests) is not tuple or not (requests or task_requests):
+            raise TypeError('COM wrenches must be immutable tuples with at least one contribution')
         if np.any(session._data.qfrc_applied) or np.any(session._data.xfrc_applied):
             raise ValueError('caller COM wrench cannot take an occupied force buffer')
         if getattr(session, '_external_com_port', None) is not None:
@@ -44,7 +44,7 @@ class MuJoCoExternalComPort:
         substeps = session._artifact.timebase.control_substeps
         if type(substeps) is not int or substeps <= 0:
             raise ValueError('caller wrench requires an integral control timebase')
-        for request in requests:
+        for request in (*requests, *task_requests):
             if type(request) not in (ExternalComWrenchV1, ExternalComWrenchSegmentV1, ExternalComWrenchSumSegmentV1):
                 raise TypeError('caller wrench must be a supported external COM contract')
             request.validate()
@@ -73,6 +73,7 @@ class MuJoCoExternalComPort:
             body_ranges.append((start, end, request))
             rows.append((request, body_id))
         self.session, self.rows = session, tuple(rows)
+        self.producers = ('caller',) * len(requests) + ('task',) * len(task_requests)
         # Different source names may bind the same native body.  Publish one
         # stable source resource for every such alias, after native admission.
         self.body_resources = {

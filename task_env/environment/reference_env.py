@@ -7,6 +7,7 @@ mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass, replace
+from contextlib import contextmanager
 from typing import Any
 from collections.abc import Mapping
 from pathlib import Path
@@ -2895,6 +2896,49 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if first is not None:
             raise first
 
+    @contextmanager
+    def _selected_com_wrench_scope(self, caller_requests):
+        """Stage Task-owned and caller-owned loads for exactly one interval."""
+        factory = getattr(getattr(self, 'binding', None), 'task_com_wrench_factory', None)
+        if caller_requests is None and factory is None:
+            yield
+            return
+        task_started = False
+        external = None
+        try:
+            if self.recorder is not None and not getattr(
+                    self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
+                raise StageUnavailableError('COM wrenches are not represented by the active Recorder')
+            if self._has_component_assembly() or self.binding.interval_mode != 'grouped':
+                raise StageUnavailableError('COM wrenches require the selected grouped interval')
+            if self.session is None:
+                raise RuntimeError('reset required before staging COM wrenches')
+            task_requests = ()
+            if factory is not None:
+                task_started = True
+                task_requests = factory(self)
+                if type(task_requests) is not tuple:
+                    raise TypeError('Task COM wrench factory must return an immutable tuple')
+            caller_requests = () if caller_requests is None else caller_requests
+            if type(caller_requests) is not tuple:
+                raise TypeError('caller COM wrenches must be an immutable tuple')
+            if not caller_requests and not task_requests and factory is not None:
+                yield
+                return
+            from ..runtime.sessions.mujoco_external_wrench import MuJoCoExternalComPort
+            external = MuJoCoExternalComPort(self.session, caller_requests, task_requests=task_requests)
+            self.session._external_com_port = external
+            yield
+        except BaseException as error:
+            # An arbitrary Task callback may have mutated its own state even
+            # if no provider step occurred; no rollback contract exists.
+            if task_started and self._episode_execution_state().fault is None:
+                self._latch_fault('task_com_wrench_preparation', error, before_state=self.state)
+            raise
+        finally:
+            if external is not None:
+                external.finish()
+
     def step(self, action, *, external_com_wrenches=None):
         """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
 
@@ -2907,19 +2951,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         before a force is staged. Ordinary ``step(action)`` is unchanged.
         """
         self._require_execution_healthy()
-        external = None
-        if external_com_wrenches is not None:
-            if self.recorder is not None and not getattr(
-                    self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
-                raise StageUnavailableError('caller COM wrenches are not represented by the active Recorder')
-            if self._has_component_assembly() or self.binding.interval_mode != 'grouped':
-                raise StageUnavailableError('caller COM wrenches require the selected grouped interval')
-            if self.session is None:
-                raise RuntimeError('reset required before staging caller COM wrenches')
-            from ..runtime.sessions.mujoco_external_wrench import MuJoCoExternalComPort
-            external = MuJoCoExternalComPort(self.session, external_com_wrenches)
-            self.session._external_com_port = external
-        try:
+        with self._selected_com_wrench_scope(external_com_wrenches):
             component_lifecycle = None
             if self._has_component_assembly():
                 self._episode_execution_state().require_open("environment is closed")
@@ -2932,9 +2964,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if component_lifecycle is not None:
                 return self._format_component_step(component_lifecycle, result)
             return result
-        finally:
-            if external is not None:
-                external.finish()
 
     def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(
@@ -4061,10 +4090,19 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
-        operations = prepare_selected_control_action(
-            self, action, proposal=proposal, observer_solution=observer_solution,
-            caller_driven=caller_driven)
-        return self._episode_execution_state().execute_interval(**operations)
+        try:
+            with self._selected_com_wrench_scope(None):
+                operations = prepare_selected_control_action(
+                    self, action, proposal=proposal, observer_solution=observer_solution,
+                    caller_driven=caller_driven)
+                return self._episode_execution_state().execute_interval(**operations)
+        except BaseException as error:
+            # Solution.act() precedes this method and may already have mutated
+            # state, even when a Task-load admission fails before its callback.
+            if (proposal is not None and getattr(self.binding, 'task_com_wrench_factory', None) is not None
+                    and self._episode_execution_state().fault is None):
+                self._latch_fault('task_com_solution_preparation', error, before_state=self.state)
+            raise
 
     def _prepare_reference_step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         if self._execution_fault is not None:

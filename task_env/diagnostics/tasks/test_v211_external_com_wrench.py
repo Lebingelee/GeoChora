@@ -133,3 +133,18 @@ def test_explicit_com_sum_uses_native_body_identity_and_distinct_effects():
         MuJoCoExternalComPort(s, (first, summed('b', 'effect-a', 'alias', 3.)))
     with pytest.raises(ValueError, match='unique'):
         MuJoCoExternalComPort(s, (first, _request(effect='exclusive')))
+
+
+def test_task_and_caller_producers_are_recorded_separately():
+    from task_env.controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+    s, _, _ = _session()
+    def request(writer, effect, force):
+        return ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            writer, effect, 'object', 0, 5, (0., force, 0.), (0., 0., 0.))
+    port = MuJoCoExternalComPort(s, (request('caller', 'caller-effect', 2.),),
+                                 task_requests=(request('task', 'task-effect', 3.),))
+    assert port.producers == ('caller', 'task')
+    port.authorized = True
+    port.refresh_substep()
+    assert s._data.qfrc_applied.tolist() == [5., 0.]
+    port.finish()

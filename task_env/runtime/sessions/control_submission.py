@@ -999,11 +999,14 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
         from .mujoco_external_wrench import com_wrench_range
         added = []
-        for request, body_id in external.rows:
+        producers = getattr(external, 'producers', ('caller',) * len(external.rows))
+        if len(producers) != len(external.rows) or any(p not in {'caller', 'task'} for p in producers):
+            raise ValueError('COM wrench producers differ from the staged Task and caller contributions')
+        for (request, body_id), producer in zip(external.rows, producers, strict=True):
             resource = getattr(external, 'body_resources', {}).get(
                 body_id, f'body:{request.source_body_key}')
             start, end = com_wrench_range(request, scene_interval.substeps)
-            added.append(SceneCommandContributionV1('caller', 'body-com-wrench', ('N', 'N*m'),
+            added.append(SceneCommandContributionV1(producer, 'body-com-wrench', ('N', 'N*m'),
                 'sum' if type(request) is ExternalComWrenchSumSegmentV1 else 'exclusive',
                 request.physical_effect_id, getattr(request, 'writer_id', None), None, None,
                 request.identity_hash, (resource,), start, end))

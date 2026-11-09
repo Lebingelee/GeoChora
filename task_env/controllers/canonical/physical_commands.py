@@ -198,7 +198,7 @@ class ExternalComWrenchSegmentV1(Contract):
 
 @dataclass(frozen=True)
 class ExternalComWrenchSumSegmentV1(Contract):
-    """Explicitly summable caller contribution at the current world COM."""
+    """Explicitly summable contribution at the current world COM."""
 
     schema_version: str
     writer_id: str
