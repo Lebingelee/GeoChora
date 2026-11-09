@@ -272,6 +272,8 @@ def test_position_resources_are_checked_against_materialized_plan(monkeypatch):
     monkeypatch.setattr(control, 'ControlBindingPlanV1', Plan)
     session = _Session()
     session._control_binding_plan = Plan()
+    session._artifact = SimpleNamespace(identity_hash='b' * 64,
+        timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01))
     writes = []
     with pytest.raises(ValueError, match='resources differ from the materialized binding'):
         _submit(session, resource_ids=('robot/forged',),
@@ -279,6 +281,14 @@ def test_position_resources_are_checked_against_materialized_plan(monkeypatch):
                 lower=lambda: writes.append('write'))
     assert not writes and not hasattr(session, '_control_submission_consumed')
     _submit(session)
+
+    bad_timebase = _Session()
+    bad_timebase._control_binding_plan = Plan()
+    bad_timebase._artifact = SimpleNamespace(identity_hash='b' * 64,
+        timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.011))
+    with pytest.raises(ValueError, match='not aligned'):
+        _submit(bad_timebase)
+    assert not hasattr(bad_timebase, '_control_submission_consumed')
 
 
 @pytest.mark.parametrize('writers,resources', (
@@ -294,3 +304,21 @@ def test_physical_resources_and_writers_match_batch(monkeypatch, writers, resour
                 command_sha256='2' * 64, writer_ids=writers, resource_ids=resources,
                 lower=lambda: writes.append('write'))
     assert not writes and not hasattr(session, '_control_submission_consumed')
+
+
+def test_scene_resource_admission_allows_disjoint_fragments_for_same_writer():
+    from task_env.runtime.sessions.control_submission import _validate_resource_intervals
+    authority = (('writer-1', ('robot/joint-1',)),)
+    _validate_resource_intervals((('writer-1', 'robot/joint-1', 0, 2),
+                                  ('writer-1', 'robot/joint-1', 2, 5)),
+                                 writer_resources=authority, substeps=5)
+    with pytest.raises(ValueError, match='claims overlap'):
+        _validate_resource_intervals((('writer-1', 'robot/joint-1', 0, 3),
+                                      ('writer-1', 'robot/joint-1', 2, 5)),
+                                     writer_resources=authority, substeps=5)
+    with pytest.raises(ValueError, match='not authorized'):
+        _validate_resource_intervals((('writer-1', 'robot/other', 0, 1),),
+                                     writer_resources=authority, substeps=5)
+    with pytest.raises(ValueError, match='half-open'):
+        _validate_resource_intervals((('writer-1', 'robot/joint-1', 0, 5.0),),
+                                     writer_resources=authority, substeps=5)

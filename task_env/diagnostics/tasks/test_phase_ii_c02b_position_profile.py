@@ -180,6 +180,7 @@ class _PositionSessionProbe:
         self._position_writer_id = profile.writer_id
         self._position_binding_identity_hash = plan.identity_hash
         self._control_binding_plan = plan
+        self._artifact = profile.artifact
         self._position_source_closure_digest = profile.source.source_closure_digest
         self._position_applied_boundary_ids = set()
         self._force_feedback_required = False

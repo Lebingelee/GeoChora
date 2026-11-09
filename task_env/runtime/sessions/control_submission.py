@@ -23,6 +23,38 @@ def _digest(value, label):
         raise ValueError(f'{label} must be a lowercase SHA-256')
 
 
+def _validate_resource_intervals(claims, *, writer_resources, substeps):
+    """Validate exclusive, source-authorized resource claims on half-open ticks.
+
+    Claims are (writer, resource, start, end). A writer may submit several
+    precomputed claims for the same resource when their ranges do not overlap.
+    This is admission only; it neither schedules nor advances physics.
+    """
+    if type(substeps) is not int or substeps <= 0:
+        raise ValueError('scene substep count must be a positive integer')
+    if type(claims) is not tuple or not claims:
+        raise ValueError('scene resource claims must be a nonempty tuple')
+    authorized = {writer: frozenset(resources) for writer, resources in writer_resources}
+    if len(authorized) != len(writer_resources):
+        raise ValueError('scene resource authority contains duplicate writers')
+    by_resource = {}
+    for claim in claims:
+        if type(claim) is not tuple or len(claim) != 4:
+            raise TypeError('scene resource claim must be (writer, resource, start, end)')
+        writer, resource, start, end = claim
+        _token(writer, 'scene writer')
+        _token(resource, 'scene resource')
+        if resource not in authorized.get(writer, ()):
+            raise ValueError('scene resource claim is not authorized by its binding')
+        if type(start) is not int or type(end) is not int or not 0 <= start < end <= substeps:
+            raise ValueError('scene resource claim requires an aligned half-open substep range')
+        by_resource.setdefault(resource, []).append((start, end, writer))
+    for intervals in by_resource.values():
+        intervals.sort()
+        if any(a[1] > b[0] for a, b in zip(intervals, intervals[1:])):
+            raise ValueError('scene resource claims overlap')
+
+
 @dataclass(frozen=True)
 class PositionControlBatchV1:
     """Complete, source-bound set of position writers for one outer interval."""
@@ -393,6 +425,18 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
                     for writer in writer_ids))
                 if tuple(sorted(resource_owners)) != expected or any(not resources for _, resources in expected):
                     raise ValueError('position resources differ from the materialized binding plan')
+                timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+                if timebase is not None:
+                    count = timebase.control_substeps
+                    dt = float(timebase.physics_dt)
+                    control_dt = float(timebase.control_dt)
+                    if (type(count) is not int or count <= 0 or not math.isfinite(dt)
+                            or dt <= 0 or not math.isfinite(control_dt)
+                            or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
+                        raise ValueError('scene control interval is not aligned with the physics timebase')
+                    claims = tuple((writer, resource, 0, count)
+                                   for writer, resources in resource_owners for resource in resources)
+                    _validate_resource_intervals(claims, writer_resources=expected, substeps=count)
     if submission_progress is not None:
         if (type(submission_progress) is not dict
                 or type(submission_progress.get('attempted_writer_ids')) is not list
