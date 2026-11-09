@@ -293,6 +293,10 @@ class PhysicalControlExecutionV1:
     generation: int
     subjects: tuple[ControlledSubjectV1, ...] = ()
 
+    def selected_runtime_builder(self, _selected):
+        from .selected_materialization import PhysicalRuntimeBuilder
+        return PhysicalRuntimeBuilder(self)
+
     def __post_init__(self):
         from collections.abc import Mapping
         from ...artifacts.state import StateRequirements

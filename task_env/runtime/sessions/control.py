@@ -81,6 +81,10 @@ class SelectedPositionCapabilityV1:
     def initialize(self, publication, plan):
         return self.owner.reset(publication, plan)
 
+    def selected_runtime_builder(self, selected):
+        from .selected_materialization import PositionRuntimeBuilder
+        return PositionRuntimeBuilder(selected.position_capabilities)
+
 
 def _selected_position_capability(controller):
     factory = getattr(controller, 'selected_position_capability', None)
@@ -689,6 +693,10 @@ class ControlBinding:
         from ...artifacts.contracts import _name
         _name(self.gripper_semantic_id)
         if self.opening_range_m!=.08:raise ValueError('only audited 0.08m tendon gripper mapping implemented')
+
+    def selected_runtime_builder(self, _selected):
+        from .selected_materialization import ScalarRuntimeBuilder
+        return ScalarRuntimeBuilder(self)
 
 
 def prepare_position_control_materialization(

@@ -2035,31 +2035,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             reset_effects['replacement_materialization_attempted'] = True
             self._task_rgb_state_binding = None
             self._position_state_declaration = None
-            mixed_state_controller = None
-            physical_state_execution = None
-
-            def install_state_capabilities():
-                from ..runtime.sessions.state_initialization import (
-                    LegacyFeedbackInitialState, MixedInitialState, PhysicalInitialState, PositionInitialState,
-                )
-                capabilities = []
-                declaration = self._position_state_declaration
-                if declaration is not None:
-                    capabilities.append(PositionInitialState(declaration, self.position_scene,
-                        self.position_joint_bindings, self.position_frame_bindings,
-                        self._selected_controller_binding.position_capabilities, self.position_plan))
-                if mixed_state_controller is not None:
-                    capabilities.append(MixedInitialState(mixed_state_controller))
-                if physical_state_execution is not None:
-                    capabilities.append(PhysicalInitialState(physical_state_execution,
-                        getattr(self.binding, 'physical_observation_binding', None) is None
-                        and getattr(self, '_task_rgb_config', None) is None,
-                        self.value.get('physical_execution') is physical_state_execution))
-                if not capabilities:
-                    capabilities.append(LegacyFeedbackInitialState(self.controller))
-                self._selected_state_capabilities = tuple(capabilities)
-                self._selected_reset_stop_capability = any(
-                    getattr(capability, 'supports_stop', False) for capability in capabilities)
             if getattr(self, '_task_rgb_config', None) is not None:
                 self._prepare_task_rgb_state_binding()
 
@@ -2092,96 +2067,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     timeout=300.0 if selection.physics_provider == 'isaacsim' else 30.0)
                 deployment_receipt['worker_request_identity'] = request_identity(payload)
                 return session
-            if (self.binding.physical_control_profile is not None
-                    and self.value.get('physical_execution') is not None):
-                if selection is not None and selection.deployment == 'isolated_worker':
-                    self.session = start_worker()
-                else:
-                    options = {'_observer_render_request': getattr(self, '_observer_render_request', None)}
-                    if getattr(self, '_legacy_observer_requested', False):
-                        options['_legacy_observer_requested'] = True
-                    if getattr(self, '_legacy_camera_observations', False):
-                        options['_legacy_camera_observations'] = True
-                    self.session = materialize(
-                        self.artifact, self.execution, source=self.value['source'], **options)
-            elif self.position_profile:
-                from ..runtime.sessions.control import prepare_position_control_materialization
-                self.position_scene = self.value['source'].scene_definition
-                select_binding = self.binding.position_control_binding
-                (self.position_plan, self.position_joint_bindings,
-                 self.position_frame_bindings, position_binding) = prepare_position_control_materialization(
-                    source=self.value['source'], artifact=self.artifact,
-                    profiles=self.position_profiles, leaf_position=self.leaf_position_profile,
-                    plan=self.value.get('controller_binding_plan'),
-                    select_binding=select_binding, value=self.value,
-                    capabilities=self._selected_controller_binding.position_capabilities,
-                )
-                self._position_state_declaration = self.leaf_plan if self.position_plan is None else self.position_plan
-                if selection is not None and selection.deployment == 'isolated_worker':
-                    self.session = start_worker()
-                elif self.leaf_position_profile:
-                    self.session = materialize_control(
-                        self.artifact, self.execution, source=self.value['source'],
-                        binding=position_binding,
-                        leaf_plan=self.leaf_plan,
-                    )
-                else:
-                    self.session = materialize_control(
-                        self.artifact, self.execution, source=self.value['source'],
-                        binding=position_binding,
-                        controller_binding_plan=self.position_plan,
-                        controller_profile=self.position_profiles,
-                        session_admission_input=self.value.get('session_admission_input'),
-                        observer_render_request=getattr(self, '_observer_render_request', None),
-                    )
-                # Preserve what was actually materialized; the task binding can
-                # later be replaced independently of this live session.
-                self._materialized_position_control_binding = position_binding
-                self._materialized_position_control_selector = select_binding
-            elif self._mixed_control_candidate:
-                self.position_profile = False
-                self.session = materialize(
-                    self.artifact, self.execution, source=self.value['source'],
-                )
-                self.session.bind_mixed_controller(self.controller.identity)
-                if self.binding.pre_reset_session_validator is None:
-                    raise ValueError('mixed-control candidate requires compiled-layout validation before reset')
-                self._compiled_layout_pre_reset = self.binding.pre_reset_session_validator(
-                    self.session, self.value,
-                )
-                mixed_state_controller = self.controller
-            else:
-                self.position_profile = False
-                if type(self.binding.scalar_control_binding) is not ControlBinding:
-                    raise TypeError('selected scalar control requires its declared ControlBinding')
-                if selection is not None and selection.deployment == 'isolated_worker':
-                    self.session = start_worker()
-                    if self.binding.physical_control_profile is None:
-                        install_state_capabilities()
-                        return
-                else:
-                    self.session = materialize_control(self.artifact, self.execution,
-                        source=self.value['source'], binding=self.binding.scalar_control_binding,
-                        diagnostic_profile=(self._diagnostic_profile
-                                            if self.backend == 'cuda' else None),
-                        native_feedback_profile=self._native_feedback_profile,
-                        selected_controller=(self.controller
-                                             if self._native_feedback_profile is not None else None),
-                        native_feedback_gripper_control_hz=(
-                            self.value['resolved_configuration'].get('gripper_control_hz')
-                            if self._native_feedback_profile is not None else None
-                        ))
-            if self.binding.physical_control_profile is not None:
-                profile = self.binding.physical_control_profile(self)
-                declared_physical = self.value.get('physical_execution')
-                if declared_physical is not None and profile is not declared_physical:
-                    raise ValueError('physical execution changed after selected preflight')
-                bind_physical = getattr(self.session, 'bind_physical_control', None)
-                if not callable(bind_physical):
-                    raise StageUnavailableError('RuntimeSession does not expose a physical-control build port')
-                bind_physical(profile)
-                physical_state_execution = profile
-            install_state_capabilities()
+            from ..runtime.sessions.selected_materialization import build_selected_runtime
+            build = build_selected_runtime(self, self._selected_controller_binding, selection,
+                                           start_worker, materialize, materialize_control)
+            if build.skip_gravity:
+                return
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
                 if self.uid not in ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'):
                     raise ValueError('gravity compensation is limited to the selected Panda tasks')

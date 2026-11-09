@@ -414,6 +414,12 @@ class MixedActuatorPlanV1(Contract):
     controller_identity: str
     channels: tuple[MixedActuatorChannelV1, ...]
 
+    def selected_runtime_builder(self, selected):
+        from ...runtime.sessions.selected_materialization import MixedRuntimeBuilder
+        if not selected.mixed:
+            raise ValueError('mixed runtime construction requires its admitted Controller binding')
+        return MixedRuntimeBuilder(self)
+
     def validate(self):
         import re
         for name in ('task_artifact_hash', 'source_closure_digest', 'controller_identity'):
