@@ -125,9 +125,15 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
                                   for item in resolved.joints}))
         units = tuple(sorted({item.unit for _, _, resolved in slices for item in resolved.joints}))
         progress = {'attempted_writer_ids': [], 'completed_writer_ids': []}
+        expected_hashes = tuple(item.input_batch.identity_hash for _, _, item in slices)
         def stage_sequence():
             progress['attempted_writer_ids'].extend(writers)
             result = write(sequence)
+            if (type(result) is not PhysicalSequenceAcknowledgementV1
+                    or result.sequence_sha256 != sequence.identity_hash
+                    or result.batch_sha256s != expected_hashes
+                    or result.producer_id != 'mujoco-qfrc-applied'):
+                raise ValueError('physical sequence returned an invalid native acknowledgement')
             progress['completed_writer_ids'].extend(writers)
             return result
         ack = submit_control_command(env.session, sequence, command_kind='physical-effort-sequence',
@@ -137,10 +143,6 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
             controller_identities=identities, writer_ids=writers, resource_ids=resources, units=units,
             lowering=f'{type(env.session).__module__}.{type(env.session).__qualname__}.apply_physical_command_sequence',
             lower=stage_sequence, submission_progress=progress)
-        expected_hashes = tuple(item.input_batch.identity_hash for _, _, item in slices)
-        if (type(ack) is not PhysicalSequenceAcknowledgementV1
-                or ack.sequence_sha256 != sequence.identity_hash or ack.batch_sha256s != expected_hashes):
-            raise ValueError('physical sequence returned an invalid native acknowledgement')
         return ack
 
     def advance(_ack):
