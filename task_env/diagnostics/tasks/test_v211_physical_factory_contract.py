@@ -13,7 +13,7 @@ import pytest
     ('panda-split-direct-effort-v1', None),
 ])
 @pytest.mark.parametrize('stale_after', [False, True])
-def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, physical_profile, expected_body, stale_after):
+def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, monkeypatch, physical_profile, expected_body, stale_after):
     from dataclasses import replace
     import shutil
     from task_env import make_env
@@ -23,6 +23,9 @@ def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, phys
         CanonicalStateViewV1, CanonicalStateViewV2, CanonicalStatePublicationV1,
         CanonicalStatePublicationV2, TypedJointStateValue, TypedFrameStateValue)
     from task_env.controllers.canonical.physical_commands import PhysicalJointBuildReceiptV1, PhysicalBodyBuildReceiptV1, PhysicalControlReceiptV1
+    from task_env.diagnostics.tasks.original_panda_test_source import install_physical_original_source, original_panda_files
+    install_physical_original_source(monkeypatch)
+    original_panda_files()
     env=make_env('panda-position-servo-candidate-v1',config={'provider':'geophys','backend':'cpu',
         'horizon':8,'physical_profile':physical_profile,
         'source_workspace':str(tmp_path / 'candidate-source')})
@@ -151,3 +154,4 @@ def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, phys
         # This test owns this fresh staging copy; source identity and logs are
         # retained separately, while pinned asset bytes remain untouched.
         shutil.rmtree(tmp_path / 'candidate-source')
+        original_panda_files()

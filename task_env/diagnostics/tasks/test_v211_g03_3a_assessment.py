@@ -12,12 +12,18 @@ from task_env.runtime.sessions.provenance import probe_interpreter_environment, 
 
 @pytest.fixture(scope='module')
 def selected():
-    env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
-    facts = probe_interpreter_environment(sys.executable)
-    dependency = assess_declared_dependencies('mujoco', facts)
-    assert dependency['status'] == 'available'
-    yield env, dependency['status']
-    env.close()
+    from task_env.diagnostics.tasks.original_panda_test_source import install_legacy_original_source
+    with pytest.MonkeyPatch.context() as patch:
+        install_legacy_original_source(patch)
+        env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco'})
+        try:
+            facts = probe_interpreter_environment(sys.executable)
+            dependency = assess_declared_dependencies('mujoco', facts)
+            assert dependency['status'] == 'available'
+            yield env, dependency['status']
+            env.value['source'].execution_source_receipt.validate_snapshot()
+        finally:
+            env.close()
 
 
 def _assess(env, dependency, *, artifact=None, source=None, value=None, selection=None, manifest=None):
@@ -51,7 +57,10 @@ def test_user_manifest_cannot_expand_adapter_or_override_required_source(selecte
                         CapabilityClaim('joint_torque_actuation', 'tested', 'synthetic-only')))
     artifact = replace(env.artifact, required_capabilities=RequiredCapabilitySet(
         (*env.artifact.required_capabilities.names, 'joint_torque_actuation')))
-    source = replace(env.value['source'], task_artifact_hash=artifact.identity_hash)
+    # Keep the actual source binding unchanged: a changed Artifact is foreign
+    # to it, and the assessor must reject that mismatch independently of the
+    # caller's expanded manifest.
+    source = env.value['source']
     value = {**env.value, 'artifact': artifact, 'source': source}
     assessment = _assess(env, dependency, artifact=artifact, source=source, value=value, manifest=expanded)
     torque = next(row for row in assessment.rows if row.capability_id == 'joint_torque_actuation')
@@ -70,7 +79,12 @@ def test_manifest_restriction_and_missing_source_names_are_independent(selected)
     row = next(r for r in assessment.rows if r.capability_id == 'frame_pose_query')
     assert row.core_adapter == 'implemented' and row.caller_restriction == 'denied'
     assert assessment.decision == 'rejected'
-    source = replace(env.value['source'], joints={})
+    # RuntimeSource now rejects this malformed mapping at construction.  A
+    # copied and deliberately corrupted object exercises the assessor's own
+    # defensive check without weakening the constructor contract.
+    from copy import copy
+    source = copy(env.value['source'])
+    object.__setattr__(source, 'joints', {})
     value = {**env.value, 'source': source}
     assessment = _assess(env, dependency, source=source, value=value)
     assert next(r for r in assessment.rows if r.capability_id == 'source_closure').requirement_status == 'unsatisfied'

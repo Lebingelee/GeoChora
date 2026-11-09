@@ -608,6 +608,8 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
             'panda_file_count': panda_file_count,
             'solution': None,
             'controller': profile,
+            **({'physical_execution': physical_execution}
+               if physical_profile == 'panda-free-body-wrench-only-v1' else {}),
             'source': source,
             'reset_plan': reset_plan,
             'controller_binding_plan': plan,

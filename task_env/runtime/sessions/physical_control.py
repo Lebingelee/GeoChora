@@ -293,9 +293,11 @@ class PhysicalControlExecutionV1:
     generation: int
     subjects: tuple[ControlledSubjectV1, ...] = ()
 
-    def selected_runtime_builder(self, _selected):
+    def selected_runtime_builder(self, selected):
         from .selected_materialization import PhysicalRuntimeBuilder
-        return PhysicalRuntimeBuilder(self)
+        # A declared Position owner must create its admitted control session;
+        # this execution then binds its physical port and initializes itself.
+        return PhysicalRuntimeBuilder(self, bool(selected.position_capabilities))
 
     def __post_init__(self):
         from collections.abc import Mapping

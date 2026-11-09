@@ -82,24 +82,24 @@ def _candidate(scene, tmp_path):
 
 @pytest.fixture(scope='module')
 def position_candidate(tmp_path_factory):
-    """Share one verified, read-only Panda source closure across this test module."""
+    """Use only the verified original Panda source for this read-only module."""
     import shutil
     from task_env.assembly.assets import _source_closure_digest
     from task_env.tasks.position_candidate.source import EXPECTED_PANDA_CLOSURE
+    from task_env.diagnostics.tasks.original_panda_test_source import (
+        install_position_original_source, original_panda_files,
+    )
 
     root = tmp_path_factory.mktemp('c02b-position-shared')
     try:
-        scene = _a05_scene()
-        candidate = _candidate(scene, root)
-        snapshot = root / 'panda-snapshot'
-        def snapshot_digest():
-            files = {p.relative_to(snapshot).as_posix(): p.read_bytes()
-                     for p in snapshot.rglob('*') if p.is_file()}
-            assert len(files) == 68
-            return _source_closure_digest(files)
-        assert snapshot_digest() == EXPECTED_PANDA_CLOSURE
-        yield scene, candidate
-        assert snapshot_digest() == EXPECTED_PANDA_CLOSURE
+        with pytest.MonkeyPatch.context() as patch:
+            install_position_original_source(patch)
+            scene = _a05_scene()
+            candidate = _candidate(scene, root)
+            assert candidate[3].scene_source.base_dir == original_panda_files()[1]
+            assert _source_closure_digest(original_panda_files()[2]) == EXPECTED_PANDA_CLOSURE
+            yield scene, candidate
+            assert _source_closure_digest(original_panda_files()[2]) == EXPECTED_PANDA_CLOSURE
     finally:
         shutil.rmtree(root)
 

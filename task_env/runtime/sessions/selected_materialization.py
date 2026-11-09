@@ -25,7 +25,11 @@ def _worker(selection):
 @dataclass(frozen=True)
 class PhysicalRuntimeBuilder:
     execution: object
-    priority = 40
+    position_owner_present: bool = False
+
+    @property
+    def priority(self):
+        return 20 if self.position_owner_present else 40
 
     @property
     def declaring_owner(self):

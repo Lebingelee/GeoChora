@@ -1574,9 +1574,14 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         elif value.get('physical_execution') is not None:
             from .physical_control import PhysicalControlExecutionV1
             physical = value['physical_execution']
+            mixed_position = (getattr(binding, 'position_physical_mixed', False) is True and selected.position
+                              and len(selected.position_capabilities) == 1
+                              and selection.physics_provider == 'mujoco'
+                              and selection.physics_backend == 'cpu')
             if (binding.physical_control_profile is None
                     or type(physical) is not PhysicalControlExecutionV1
-                    or not any(selected.controller is item for item in physical.controllers)):
+                    or (not mixed_position
+                        and not any(selected.controller is item for item in physical.controllers))):
                 raise ValueError('physical Controller is not bound to the selected execution')
             if selection.deployment == 'isolated_worker':
                 raise ValueError('direct physical execution is not admitted in an isolated worker')
@@ -1585,6 +1590,17 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
                 source=source,
             )
+            if mixed_position:
+                if any(selected.controller is item or selected.controller.identity == item.identity
+                       for item in physical.controllers):
+                    raise ValueError('mixed Position and physical Controllers must have distinct identities')
+                plan, _, _, _ = prepare_position_control_materialization(
+                    source=source, artifact=artifact, profiles=selected.position_profiles,
+                    leaf_position=False, plan=value.get('controller_binding_plan'),
+                    select_binding=binding.position_control_binding, value=value,
+                    capabilities=selected.position_capabilities,
+                )
+                projected_feedback = project_controller_feedback(plan)
         elif selected.position:
             if not declared_bindings:
                 declared_bindings = tuple(profile.controller_binding() for profile in selected.position_profiles)
