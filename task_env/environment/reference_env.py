@@ -1856,8 +1856,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                             error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
                 raise
         previous_episode_end = self._position_episode_end
-        if ((getattr(self, 'position_profile', False) or self.value.get('physical_execution') is not None)
-                and self.session is not None
+        if (self.session is not None
                 and self._published_position_typed_state is not None
                 and previous_episode_end is None):
             try:
@@ -1871,17 +1870,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         except BaseException as cleanup_error:
                             error.add_note(f'candidate source cleanup also failed: {cleanup_error!r}')
                 raise
-        if (switching or getattr(self, 'position_profile', False)
-                or self.value.get('physical_execution') is not None):
-            self._position_episode_end = None
-            self._position_controller_switch_fault_receipt = None
-            self._pending_position_switch = None
-            self._published_position_state = None
-            self._published_position_typed_state = None
-            self._published_position_obs = None
-            self._published_position_info = None
-            self._published_position_evaluation = None
-            self.last_position_transition = None
+        # Retire any published boundary by its existence, not by the type of
+        # Controller that produced it. Every reset starts with empty publication
+        # and switch slots, including resets that change selected capabilities.
+        self._position_episode_end = None
+        self._position_controller_switch_fault_receipt = None
+        self._pending_position_switch = None
+        self._published_position_state = None
+        self._published_position_typed_state = None
+        self._published_position_obs = None
+        self._published_position_info = None
+        self._published_position_evaluation = None
+        self.last_position_transition = None
         if self._mixed_control_candidate:
             # Publish a candidate reset plan only after the replacement begins.
             self._mixed_reset_plan = mixed_reset_plan

@@ -258,12 +258,14 @@ def test_each_real_source_reaches_its_production_materializer_boundary(monkeypat
         env.close()
 
 
-def test_failed_old_position_stop_releases_candidate_source(monkeypatch):
+@pytest.mark.parametrize('position_profile', [True, False])
+def test_failed_old_position_stop_releases_candidate_source(monkeypatch, position_profile):
     from task_env.runtime.sessions import provenance
     env=make_selected()
     old=SimpleNamespace(close=lambda:pytest.fail('old session must not be closed'))
     env.session=old
-    env.position_profile=True
+    # Published state, not this legacy classification flag, requires stop.
+    env.position_profile=position_profile
     env._published_position_typed_state=object()
     seen=[]
     original=provenance.preflight_selected_deployment
