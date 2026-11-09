@@ -1127,12 +1127,21 @@ def materialize_control(
         from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
         from ...controllers.canonical.gripper_execution import EqualRateGripperServo, NativeRateGripperServo
         from ...controllers.canonical.contracts import digest
-        expected_controller_identity = {
+        from .r05c_v211_candidate import PROFILE_ID as candidate_profile, CONTROLLER_IDENTITY as candidate_identity
+        historical_controller_identity = {
             # Pin the post-refactor source-bound identities. The independent
             # field, source, provider and resource checks remain mandatory.
             100: '94c148b14915a0637bfaf572c101ba2980b93b43c88b0a3a9ccd39785a1d679d',
             500: '7cdf5c3c91ab3ec78dc3fa740fce1cbca7c229a0bf36b1d13c5da3a9c75cc4ec',
         }
+        if native_feedback_profile == candidate_profile:
+            if execution.physics_provider != 'geophys' or execution.backend != 'cpu':
+                raise ValueError('v2.1.1 R05c diagnostic candidate requires GeoPhys CPU')
+            expected_controller_identity = {100: candidate_identity}
+        elif native_feedback_profile == 'nutassembly-native-feedback-v1':
+            expected_controller_identity = historical_controller_identity
+        else:
+            raise ValueError('unknown normal native-feedback admission profile')
         expected_inner_type = {
             100: EqualRateGripperServo,
             500: NativeRateGripperServo,

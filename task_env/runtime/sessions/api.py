@@ -651,8 +651,11 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
     from ...assembly.assets import _source_closure_digest, _source_closure_manifest
     from ...controllers.canonical.contracts import digest
 
-    if profile_id != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE:
+    from .r05c_v211_candidate import PROFILE_ID as candidate_profile, PROVIDER_REVISION as candidate_revision
+    if profile_id not in {_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, candidate_profile}:
         raise ValueError('unknown normal native-feedback admission profile')
+    if profile_id == candidate_profile and execution.backend != 'cpu':
+        raise ValueError('v2.1.1 R05c diagnostic candidate requires GeoPhys CPU')
     if not isinstance(artifact, TaskArtifact):
         raise ValueError('R05b native feedback requires the frozen NutAssembly TaskArtifact v0')
     if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
@@ -738,23 +741,28 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
         raise ValueError('R05b source/receipt/controller actuator mapping differs from the exact allowlist')
     build = provider_build_identity('geophys')
     expected_origin = (Path(__file__).resolve().parents[3] / 'GeoPhys/src/geophys/__init__.py').resolve()
-    if (build['repository_revision'] != _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
+    required_revision = (candidate_revision if profile_id == candidate_profile
+                         else _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION)
+    if (build['repository_revision'] != required_revision
             or build['dirty_build_sha256'] is not None
             or Path(build['import_origin']).resolve() != expected_origin):
         raise ValueError('R05b admission requires the clean committed GeoPhys build from this worktree')
     cpu_manifest = provider_manifest('geophys')
     evidence = (
-        f'{_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE}/artifact={artifact.identity_hash}/'
+        f'{profile_id}/artifact={artifact.identity_hash}/'
         f'canonical_xml={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}/'
         f'provider={build["repository_revision"]}/origin={hashlib.sha256(expected_origin.read_bytes()).hexdigest()}/'
         f'backend={execution.backend}'
     )
     return replace(
         cpu_manifest,
-        adapter_version='task-env-r05b-geophys-native-feedback-v1',
+        adapter_version=('task-env-r05c-v211-cpu100-diagnostic-v1'
+                         if profile_id == candidate_profile
+                         else 'task-env-r05b-geophys-native-feedback-v1'),
         backend=execution.backend,
         capabilities=tuple(cpu_manifest.capabilities) + (
-            CapabilityClaim('actuator_force_query', 'tested', evidence),
+            CapabilityClaim('actuator_force_query',
+                'implemented' if profile_id == candidate_profile else 'tested', evidence),
         ),
         evidence_reference=evidence,
     )
