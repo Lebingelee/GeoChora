@@ -130,7 +130,7 @@ def test_legacy_v1_submission_receipt_keeps_its_original_mapping_contract():
     assert receipt.to_mapping()['schema_version'] == 'control-submission-receipt-v1'
 
 
-def test_legacy_canonical_position_target_uses_same_lifecycle_dispatch():
+def test_selected_canonical_position_without_source_binding_cannot_submit():
     from task_env.controllers.canonical.contracts import (
         CanonicalControlTarget, GripperControlTarget,
     )
@@ -147,13 +147,16 @@ def test_legacy_canonical_position_target_uses_same_lifecycle_dispatch():
     session._control_lifecycle_dispatch = ControlLifecycleDispatchV1(
         'control-lifecycle-dispatch-v1', 'position-target', 'task', 'a' * 64,
         'b' * 64, 'episode-1', 'boundary-1', 0, 0, ('controller-1',), 'preparing')
-    receipt = _submit(
-        session, target, command_sha256=target.identity_hash,
-        controller_identities=('controller-1',), units=('arm-position:rad', 'gripper-position:m'),
-    )
-    assert receipt.identity_hash == 'c' * 64
-    assert session._control_lifecycle_dispatch.stage == 'committed'
-    assert session._last_control_submission['acknowledgement_type'] == 'SimpleNamespace'
+    lowered = []
+    with pytest.raises(ValueError, match='live source-bound scene interval'):
+        _submit(
+            session, target, command_sha256=target.identity_hash,
+            controller_identities=('controller-1',), units=('arm-position:rad', 'gripper-position:m'),
+            lower=lambda: lowered.append(True),
+        )
+    assert not lowered
+    assert not getattr(session, '_control_submission_consumed', set())
+    assert session._control_lifecycle_dispatch.stage == 'preparing'
 
 
 def test_shared_commit_rejects_replay_stale_identity_generation_and_resource_conflict(monkeypatch):
