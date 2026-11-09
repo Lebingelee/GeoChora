@@ -67,6 +67,7 @@ class SelectedControllerBinding:
     leaf_plan: object | None
     mixed: bool
     position: bool
+    requires_reset_plan: bool = False
 
 
 def is_admitted_position_profile_set(profiles):
@@ -89,7 +90,7 @@ def bind_selected_controller(value, *, binding, provider, backend):
             raise TypeError('leaf Position route requires a compiled EffectiveLeafPlanV1')
         if (leaf_plan.provider_name, leaf_plan.backend) != (provider, backend):
             raise ValueError('leaf plan provider/backend differs from the selected environment')
-        return SelectedControllerBinding(None, (), leaf_plan, False, True)
+        return SelectedControllerBinding(None, (), leaf_plan, False, True, True)
 
     raw = value['controller']
     if value.get('selected_controller_kind') == 'mixed_actuator_v1':
@@ -109,10 +110,11 @@ def bind_selected_controller(value, *, binding, provider, backend):
         if len({item.entity_id for item in profiles}) != len(profiles):
             raise ValueError('selected Position writers must bind distinct Entities')
         profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
-        return SelectedControllerBinding(profiles[0], profiles, None, False, True)
+        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True)
     if isinstance(raw, (tuple, list)):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
-    return SelectedControllerBinding(raw, (), None, False, False)
+    return SelectedControllerBinding(raw, (), None, False, False,
+                                     value.get('physical_execution') is not None)
 
 
 def mixed_substep_controller(hook, env, prepared):

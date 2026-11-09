@@ -939,6 +939,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.position_profiles = selected.position_profiles
         self.position_profile = selected.position
         self.controller = selected.controller
+        self._selected_controller_binding = selected
 
     def _episode_execution_state(self):
         state = self.__dict__.get('_episode_state')
@@ -1813,9 +1814,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         else:
             seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
                 self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
-                mixed=self._mixed_control_candidate, position=getattr(self, 'position_profile', False),
+                mixed=self._mixed_control_candidate,
                 has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
                 artifact=self.artifact, value=self.value,
+                requires_reset_plan=getattr(getattr(self, '_selected_controller_binding', None),
+                                            'requires_reset_plan', False),
             )
             selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
@@ -1892,10 +1895,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                          'reset_write_attempted': False, 'reset_write_status': 'not_attempted',
                          'replacement_session_close_attempted': False,
                          'replacement_session_close_completed': False}
+        selected_reset_plan = None
         failure_phase = 'camera_reset_close'
 
         def prepare():
-            nonlocal seed, previous_session_close_attempted, failure_phase
+            nonlocal seed, previous_session_close_attempted, failure_phase, selected_reset_plan
             if switching:
                 self._switch_rng_state = switch_candidate.rng_state
                 self._switch_task_seed = switch_candidate.task_seed
@@ -2009,16 +2013,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('selected declarations or Controller plan changed after preflight')
             self.dual_entity_position = len(self.position_profiles) == 2
             failure_phase = 'reset_sample'
-            if self.position_profile or self.value.get('physical_execution') is not None:
-                reset_plan = self.value.get('reset_plan')
-                if reset_plan is None:
-                    raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlanV1')
-                self.sample = reset_plan.reset_sample
-            elif self._mixed_control_candidate:
-                self.sample = mixed_reset_sample
-                self._selected_episode_id = uuid4().hex
-            else:
-                self.sample = self.binding.reset_sample(self.artifact, seed)
+            from .reference_binding import resolve_selected_reset_effect
+            self.sample, selected_reset_plan = resolve_selected_reset_effect(
+                self.binding, self.value, self.artifact, seed,
+                mixed=self._mixed_control_candidate, mixed_plan=mixed_reset_plan,
+                mixed_sample=mixed_reset_sample)
+            if (getattr(getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
+                    and selected_reset_plan is None):
+                raise ValueError('rebuilt Controller capability requires a declared reset plan')
+            if self._mixed_control_candidate or selected_reset_plan is None:
                 self._selected_episode_id = uuid4().hex
             from .reference_binding import resolve_reset_execution
             self.execution = resolve_reset_execution(
@@ -2165,13 +2168,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'runtime_reset'
             reset_effects['reset_write_attempted'] = True
             reset_effects['reset_write_status'] = 'unknown'
-            if self.position_profile or self.value.get('physical_execution') is not None:
-                reset_plan = self.value.get('reset_plan')
-                self.realized = self.session.reset_plan(reset_plan)
-            elif self._mixed_control_candidate and self._mixed_reset_plan is not None:
-                self.realized = self.session.reset_plan(self._mixed_reset_plan)
-            else:
-                self.realized = self.session.reset(self.sample)
+            from .reference_binding import execute_selected_reset_effect
+            self.realized = execute_selected_reset_effect(
+                self.session, self.sample, selected_reset_plan)
             reset_effects['reset_write_status'] = 'completed'
             self._compiled_layout_post_reset = None
             if self.binding.post_reset_session_validator is not None:

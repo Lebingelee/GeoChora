@@ -66,8 +66,21 @@ def resolve_reset_execution(binding, value, declared, *, seed, provider, backend
     return versioned
 
 
-def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, position,
-                           has_session, previous_sample, artifact, value):
+def selected_episode_reset_plan(value):
+    """Resolve a declared reset capability independently of Controller type."""
+    from ..artifacts.execution import EpisodeResetPlanV1, ResetPlanV1
+
+    plan = value.get('reset_plan')
+    if plan is None:
+        return None
+    if type(plan) not in (EpisodeResetPlanV1, ResetPlanV1):
+        raise TypeError('selected reset plan must be an admitted reset contract')
+    plan.validate()
+    return plan
+
+
+def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed,
+                           has_session, previous_sample, artifact, value, requires_reset_plan=False):
     """Validate reset inputs and resolve a task-bound sample before runtime changes."""
     mixed_plan = None
     if mixed:
@@ -92,26 +105,23 @@ def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, positio
                 raise ValueError('ResetPlanV1 seed differs from reset seed')
     elif options:
         raise ValueError('selected reference reset options are not supported')
-    physical_plan = (getattr(binding, 'physical_control_profile', None) is not None
-                     and value.get('physical_execution') is not None
-                     and value.get('reset_plan') is not None)
+    declared_plan = None if mixed else selected_episode_reset_plan(value)
+    if requires_reset_plan and declared_plan is None:
+        raise ValueError('selected Controller capability requires a declared reset plan')
     if seed is seed_unset:
         if mixed and mixed_plan is not None:
             seed = mixed_plan.reset_sample.task_seed
         elif mixed and has_session:
             seed = previous_sample.task_seed
-        elif position or physical_plan:
-            seed = value['reset_plan'].reset_sample.task_seed
+        elif declared_plan is not None:
+            seed = declared_plan.reset_sample.task_seed
         else:
             seed = 19
-    if position or physical_plan:
+    if declared_plan is not None:
         seed = binding.reset_seed(seed)
-        reset_plan = value.get('reset_plan')
-        if reset_plan is None:
-            raise ValueError('selected route requires its declared EpisodeResetPlan')
-        if binding.build_seeded is None and seed != reset_plan.reset_sample.task_seed:
+        if binding.build_seeded is None and seed != declared_plan.reset_sample.task_seed:
             raise ValueError('selected reset seed must match its fixed EpisodeResetPlan')
-    if not mixed and not position and not physical_plan:
+    if not mixed and declared_plan is None:
         # Task seed validation is pure preflight and must not close a live session.
         seed = binding.reset_seed(seed)
     mixed_sample = None
@@ -127,6 +137,25 @@ def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed, positio
                 or mixed_sample.task_seed != seed):
             raise ValueError('mixed-control reset sample differs from its selected source or seed')
     return seed, options, mixed_plan, mixed_sample
+
+
+def resolve_selected_reset_effect(binding, value, artifact, seed, *, mixed, mixed_plan, mixed_sample):
+    """Resolve the rebuilt task's sample and the one provider reset operation."""
+    if mixed:
+        return mixed_sample, mixed_plan
+    plan = selected_episode_reset_plan(value)
+    if plan is not None:
+        if plan.reset_sample.task_seed != seed:
+            raise ValueError('rebuilt reset plan seed differs from the prepared reset')
+        if plan.reset_sample.task_artifact_hash != artifact.identity_hash:
+            raise ValueError('rebuilt reset plan Artifact differs from the selected Artifact')
+        return plan.reset_sample, plan
+    return binding.reset_sample(artifact, seed), None
+
+
+def execute_selected_reset_effect(session, sample, plan):
+    """Execute exactly the selected source-bound reset through its session owner."""
+    return session.reset(sample) if plan is None else session.reset_plan(plan)
 
 
 @dataclass(frozen=True)
