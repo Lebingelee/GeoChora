@@ -53,6 +53,12 @@ def test_candidate_constructor_uses_distinct_binding_and_metadata(monkeypatch):
 
 
 def test_historical_and_candidate_identity_are_distinct():
-    from task_env.runtime.sessions.api import _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
+    from task_env.runtime.sessions.api import (
+        _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION,
+        _r05b_native_feedback_manifest,
+    )
     assert PROFILE_ID != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE
     assert PROVIDER_REVISION != _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
+    for unknown in ('unknown-profile', []):
+        with pytest.raises(ValueError, match='unknown normal native-feedback'):
+            _r05b_native_feedback_manifest(None, None, None, unknown)

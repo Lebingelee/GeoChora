@@ -652,7 +652,7 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
     from ...controllers.canonical.contracts import digest
 
     from .r05c_v211_candidate import PROFILE_ID as candidate_profile, PROVIDER_REVISION as candidate_revision
-    if profile_id not in {_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, candidate_profile}:
+    if profile_id not in (_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, candidate_profile):
         raise ValueError('unknown normal native-feedback admission profile')
     if profile_id == candidate_profile and execution.backend != 'cpu':
         raise ValueError('v2.1.1 R05c diagnostic candidate requires GeoPhys CPU')
