@@ -58,6 +58,29 @@ def test_subject_controls_actual_named_batch_and_rejects_bad_declarations():
             (replace(subject, root_mode='constrained', parent_subject_id='absent'),), execution.controllers)
 
 
+def test_subject_default_effort_controller_is_bound_and_preserves_direct_identity():
+    from task_env.controllers.canonical.physical_controller import DirectJointEffortControllerV1
+    execution, subject, _ = _fixture()
+    binding = execution.compiled.binding
+    channel = binding.channels[0]
+    controller = subject.default_effort_controller(binding, writer_id='controller-a', units=(channel.unit,))
+    previous = DirectJointEffortControllerV1(binding, controller_id='controller-a',
+                                            channel_keys=(f'{channel.entity_id}/{channel.joint_id}',))
+    assert controller.identity == previous.identity
+    with pytest.raises(ValueError, match='writer'):
+        subject.default_effort_controller(binding, writer_id='foreign', units=(channel.unit,))
+    with pytest.raises(ValueError, match='unit'):
+        subject.default_effort_controller(binding, writer_id='controller-a', units=('wrong-unit',))
+    with pytest.raises(ValueError, match='one explicit unit'):
+        subject.default_effort_controller(binding, writer_id='controller-a', units=())
+    with pytest.raises(ValueError, match='missing or ambiguous'):
+        replace(subject, channel_paths=(('absent',),)).default_effort_controller(
+            binding, writer_id='controller-a', units=(channel.unit,))
+    with pytest.raises(ValueError, match='source'):
+        replace(subject, source_id='foreign').default_effort_controller(
+            binding, writer_id='controller-a', units=(channel.unit,))
+
+
 def test_foreign_controller_output_is_rejected_before_submission():
     execution, subject, context = _fixture()
     original = execution.controllers[0]

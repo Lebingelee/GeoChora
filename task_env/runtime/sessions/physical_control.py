@@ -91,6 +91,37 @@ class ControlledSubjectV1:
             'attachment_plan_sha256': (None if self.attachment_plan is None
                                        else self.attachment_plan.identity_hash)})
 
+    def default_effort_controller(self, binding, *, writer_id, units, action_key='torque'):
+        """Create a direct Controller for this subject's explicitly declared channels.
+
+        Channel order comes from the subject, and units must be specified by
+        the caller. The existing physical binding remains the authority for
+        ranges, transmissions and native admission.
+        """
+        from ...controllers.canonical.physical_controller import DirectJointEffortControllerV1
+
+        if type(binding) is not PhysicalControlBindingV1:
+            raise TypeError('default effort Controller requires a typed physical binding')
+        if (binding.source_id, binding.source_closure_sha256) != (
+                self.source_id, self.source_closure_sha256):
+            raise ValueError('default Controller binding differs from subject source')
+        if writer_id not in self.controller_writers:
+            raise ValueError('default Controller writer is not declared by subject')
+        if type(units) is not tuple or len(units) != len(self.channel_paths):
+            raise ValueError('default Controller requires one explicit unit per subject channel')
+        selected = []
+        for path, unit in zip(self.channel_paths, units, strict=True):
+            matches = tuple(channel for channel in binding.channels
+                            if channel.entity_id == self.entity_id and channel.component_path == path)
+            if len(matches) != 1:
+                raise ValueError('default Controller channel is missing or ambiguous')
+            channel = matches[0]
+            if writer_id not in channel.owner_ids or channel.unit != unit:
+                raise ValueError('default Controller channel writer or unit differs from declaration')
+            selected.append(f'{channel.entity_id}/{channel.joint_id}')
+        return DirectJointEffortControllerV1(binding, controller_id=writer_id,
+                                              channel_keys=tuple(selected), action_key=action_key)
+
 
 @dataclass(frozen=True)
 class SubjectJointDeclarationV1:

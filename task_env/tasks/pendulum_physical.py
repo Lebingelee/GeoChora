@@ -18,7 +18,6 @@ from ..artifacts.execution import ResetSampleV1, ResetPlanV1
 from ..assembly.assets import _source_closure_digest
 from ..assembly.compiler import compile_reference_source
 from ..assembly.source import TaskSceneSource
-from ..controllers.canonical.physical_controller import DirectJointEffortControllerV1
 from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding
@@ -130,8 +129,8 @@ def _build(config, seed, sampled=None):
                                                'joint', JointReference(ENTITY, 'pendulum_hinge'))))
     compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
                                                 closure, assembly, {}, (subject,), declarations)
-    controller = DirectJointEffortControllerV1(compiled.binding, controller_id=WRITER,
-                                               channel_keys=(JOINT,))
+    controller = subject.default_effort_controller(compiled.binding, writer_id=WRITER,
+                                                   units=('N*m',))
     requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
         StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, 'pendulum_hinge',
             'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
