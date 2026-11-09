@@ -4112,6 +4112,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 resource_owners=resource_owners,
                 units=('arm-position:rad', 'gripper-position:m'),
                 lowering=lowering, lower=lower,
+                subject_execution_mode=(
+                    'native-feedback' if self.binding.interval_mode == 'native' else 'boundary-hold'
+                ) if getattr(source, 'position_subject_binding', None) is not None else None,
             )
 
         def apply_control():

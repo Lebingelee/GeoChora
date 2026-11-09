@@ -244,6 +244,76 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
         binding.identity_hash, None, None, context.row, dt, count, tuple(contributions))
 
 
+def prepare_subject_position_scene_interval(*, session, target, source_id,
+        source_closure_sha256, artifact_sha256, boundary, sample_clock,
+        resource_owners, execution_mode):
+    """Bind a legacy target through its admitted, source-owned subject plan."""
+    from ...assembly.source_composition import PositionSubjectControlBindingV1
+    from ...controllers.canonical.contracts import CanonicalControlTarget
+    if type(target) is not CanonicalControlTarget:
+        raise TypeError('scene subject interval requires a canonical Position target')
+    if execution_mode not in {'boundary-hold', 'native-feedback'}:
+        raise ValueError('scene subject interval requires an explicit execution mode')
+    source = getattr(session, '_source', None)
+    binding = getattr(source, 'position_subject_binding', None)
+    if type(binding) is not PositionSubjectControlBindingV1:
+        raise ValueError('scene subject interval requires its source-bound subject binding')
+    plan = binding.plan
+    boundary_scene = getattr(boundary, 'scene_identity_hash', None)
+    if boundary_scene is None:
+        # Legacy state publications have no canonical Scene identity. Bind the
+        # real legacy artifact and closure instead of inventing a Scene field.
+        if (getattr(boundary, 'artifact_identity_hash', None) != artifact_sha256
+                or getattr(boundary, 'source_closure_digest', None) != source_closure_sha256):
+            raise ValueError('legacy boundary differs from the bound artifact or closure')
+    elif plan.scene_identity_hash != boundary_scene:
+        raise ValueError('scene subject plan differs from the boundary Scene')
+    if (not plan._compiled
+            or plan.artifact_identity_hash != artifact_sha256
+            or plan.source_closure_digest != source_closure_sha256
+            or len(plan.controller_bindings) != 1
+            or plan.controller_bindings[0].controller_identity != target.controller_identity
+            or target.task_artifact_hash != artifact_sha256):
+        raise ValueError('scene subject interval differs from its bound Controller or source')
+    expected = tuple(sorted((writer, tuple(sorted(f'{entity}/{actuator}'
+        for entity, actuator, owner in plan.resource_writers if owner == writer)))
+        for writer in {writer for _, _, writer in plan.resource_writers}))
+    if tuple(sorted(resource_owners)) != expected or len(expected) != 1:
+        raise ValueError('scene subject resources differ from the bound writer')
+    expected_boundary = (boundary.provider_materialization_id, boundary.episode_id,
+                         boundary.state_revision, boundary.control_step)
+    if getattr(session, '_subject_position_inflight', None) != (
+            expected_boundary, target.identity_hash, target.controller_identity):
+        raise ValueError('scene subject target is not authorized for this live boundary')
+    composition = getattr(source, 'composition_runtime_input', None)
+    if composition is not None and (
+            plan.identity_hash != composition.plan.control_binding_identity_sha256
+            or binding.subject_identity_sha256 != composition.plan.subject_binding_identity_sha256):
+        raise ValueError('scene subject binding differs from its source composition')
+    timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+    if timebase is None:
+        raise ValueError('scene subject interval requires the bound artifact timebase')
+    count, dt, control_dt = timebase.control_substeps, float(timebase.physics_dt), float(timebase.control_dt)
+    if (type(count) is not int or count <= 0 or not math.isfinite(dt) or dt <= 0
+            or not math.isfinite(control_dt)
+            or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
+        raise ValueError('scene subject interval differs from the artifact timebase')
+    writer, resources = expected[0]
+    _validate_resource_intervals(tuple((writer, resource, 0, count) for resource in resources),
+                                 writer_resources=expected, substeps=count)
+    # The old canonical target does not carry source boundary, row or
+    # generation. Its verified in-flight subject binding supplies the link;
+    # it does not create values for those missing fields. Native feedback mode
+    # represents a Controller-managed interval, not a held actuator setpoint.
+    contribution = SceneCommandContributionV1('robot-controller',
+        'position-reference-native-feedback' if execution_mode == 'native-feedback' else 'position-target',
+        ('rad', 'm'), 'controller-managed' if execution_mode == 'native-feedback' else 'exclusive',
+        None, writer, target.controller_identity, None, target.identity_hash, resources, 0, count)
+    return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
+        source_closure_sha256, artifact_sha256, boundary, sample_clock, binding.identity_hash,
+        None, None, None, dt, count, (contribution,))
+
+
 def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
                                 artifact_sha256, boundary, sample_clock):
     """Bind selected leaf contributions to the already admitted plan and receipt.
@@ -742,7 +812,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                            controller_identities, writer_ids, resource_ids, units,
                            lowering, lower, resource_owners=None,
                            submission_progress=None, scene_interval=None,
-                           scene_plan=None, scene_materialization=None):
+                           scene_plan=None, scene_materialization=None,
+                           subject_execution_mode=None):
     """Commit one previously typed command under the existing replay key."""
     payload, identity, lifecycle = _preflight_control_command(
         session, command, command_kind=command_kind, command_sha256=command_sha256,
@@ -777,7 +848,7 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         # Existing source-bound Position calls enter the same scene envelope
         # after the established preflight. Legacy canonical targets lack this
         # binding and remain on their existing route until explicitly bound.
-        from ...controllers.canonical.contracts import PositionControlTargetV1
+        from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
         typed_position = (type(command) is PositionControlTargetV1
                           or type(command) is PositionControlBatchV1)
         plan = getattr(session, '_control_binding_plan', None)
@@ -790,6 +861,12 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
             scene_interval = prepare_physical_scene_interval(session=session,
                 execution=session._physical_port.execution, resolved=command)
+        elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
+              and getattr(getattr(session, '_source', None), 'position_subject_binding', None) is not None):
+            scene_interval = prepare_subject_position_scene_interval(session=session, target=command,
+                source_id=source_id, source_closure_sha256=source_closure_sha256,
+                artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+                resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']

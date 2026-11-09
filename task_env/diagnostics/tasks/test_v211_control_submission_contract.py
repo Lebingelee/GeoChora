@@ -370,3 +370,58 @@ def test_position_scene_interval_retains_each_admitted_controller_generation(mon
     assert [(item.writer_id, item.controller_generation) for item in interval.contributions] == [
         ('writer-1', 1), ('writer-2', 7)]
     assert not hasattr(session, '_control_submission_consumed')
+
+
+def test_subject_scene_submission_checks_bound_writer_and_live_target(monkeypatch):
+    from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
+    import task_env.assembly.source_composition as composition
+
+    class SubjectBinding:
+        pass
+
+    monkeypatch.setattr(composition, 'PositionSubjectControlBindingV1', SubjectBinding)
+    binding = SubjectBinding()
+    binding.identity_hash = 'f' * 64
+    binding.plan = SimpleNamespace(_compiled=True, scene_identity_hash='e' * 64,
+        artifact_identity_hash='b' * 64, source_closure_digest='a' * 64,
+        controller_bindings=(SimpleNamespace(controller_identity='controller-1'),),
+        resource_writers=(('robot', 'joint-1', 'writer-1'),))
+    joints = tuple(f'robot/joint-{i}' for i in range(1, 8))
+    positions = dict.fromkeys(joints, 0.0)
+    target = CanonicalControlTarget('canonical-control-v0', 'b' * 64, 'controller-1',
+        joints, positions, positions, GripperControlTarget('robot/gripper', .02, 30., .02))
+
+    def session():
+        value = _Session()
+        value._source = SimpleNamespace(source_id='task', source_closure_digest='a' * 64,
+            position_subject_binding=binding, composition_runtime_input=None)
+        value._artifact = SimpleNamespace(identity_hash='b' * 64,
+            timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01))
+        value._subject_position_inflight = (('materialization-1', 'episode-1', 0, 0),
+                                             target.identity_hash, 'controller-1')
+        return value
+
+    for mode, kind, policy in (('boundary-hold', 'position-target', 'exclusive'),
+                                ('native-feedback', 'position-reference-native-feedback', 'controller-managed')):
+        current = session()
+        _submit(current, target, command_sha256=target.identity_hash, subject_execution_mode=mode)
+        outer = current._last_scene_control_submission
+        assert outer['status'] == 'acknowledged'
+        assert outer['inner_command_sha256'] == target.identity_hash
+        contribution, = outer['interval']['contributions']
+        assert (contribution['command_kind'], contribution['composition']) == (kind, policy)
+        assert contribution['controller_generation'] is None
+        assert (contribution['start_substep'], contribution['end_substep']) == (0, 5)
+
+    for field in ('inflight', 'resource'):
+        current = session()
+        writes = []
+        kwargs = {}
+        if field == 'inflight':
+            current._subject_position_inflight = None
+        else:
+            kwargs.update(resource_ids=('robot/other',), resource_owners=(('writer-1', ('robot/other',)),))
+        with pytest.raises(ValueError):
+            _submit(current, target, command_sha256=target.identity_hash,
+                    subject_execution_mode='boundary-hold', lower=lambda: writes.append(1), **kwargs)
+        assert not writes and not getattr(current, '_control_submission_consumed', set())
