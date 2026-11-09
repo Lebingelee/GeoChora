@@ -75,6 +75,53 @@ def test_nested_binding_explicit_sum_and_stale_rejected():
                                        assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan,context))
 
 
+def test_scene_physical_explicit_sum_and_duplicate_effect_admission():
+    from types import SimpleNamespace
+    from task_env.artifacts.state import StateRequirements
+    from task_env.runtime.sessions.control_submission import prepare_physical_scene_interval
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    plan, context, effort, assessment = _case()
+    controller = SimpleNamespace(identity='controller-identity', writer_id='controller-a',
+                                 binding=plan.binding, compute=lambda *_: None)
+    execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {}, {},
+        StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
+    session = SimpleNamespace(_physical_port=SimpleNamespace(execution=execution),
+        physical_control_generation=1, _artifact=SimpleNamespace(
+            timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01)))
+    batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
+        (effort('force-a', 1.25), effort('force-b', 2.0)), (), ())
+    resolved = prepare_physical_command_batch(plan, batch, expected_context=context,
+        assessment=assessment('joint_effort', 'sum'), joint_build_receipt=_joint_receipt(plan, context))
+    # Synthetic fixture explicitly mocks the native-build marker; no native
+    # capability is claimed by this contract test.
+    resolved = replace(resolved, mapping_provenance=('native_build',))
+    interval = prepare_physical_scene_interval(session=session, execution=execution, resolved=resolved)
+    assert [item.composition for item in interval.contributions] == ['sum', 'sum']
+    assert [item.physical_effect_id for item in interval.contributions] == ['force-a', 'force-b']
+    assert all(item.controller_generation == 1 for item in interval.contributions)
+    duplicate = replace(batch.joint_efforts[1], contribution=replace(
+        batch.joint_efforts[1].contribution, physical_effect_id='force-a'))
+    bad_batch = replace(batch, joint_efforts=(batch.joint_efforts[0], duplicate))
+    forged = replace(resolved, input_batch=bad_batch,
+                     accepted_receipt=replace(resolved.accepted_receipt, batch_sha256=bad_batch.identity_hash))
+    with pytest.raises(ValueError, match='duplicate effect'):
+        prepare_physical_scene_interval(session=session, execution=execution, resolved=forged)
+    foreign = replace(batch.joint_efforts[0], contribution=replace(
+        batch.joint_efforts[0].contribution, owner_id='foreign-writer'))
+    bad_batch = replace(batch, joint_efforts=(foreign, batch.joint_efforts[1]))
+    forged = replace(resolved, input_batch=bad_batch,
+                     accepted_receipt=replace(resolved.accepted_receipt, batch_sha256=bad_batch.identity_hash))
+    with pytest.raises(ValueError, match='not an admitted Controller'):
+        prepare_physical_scene_interval(session=session, execution=execution, resolved=forged)
+    wrong_axis = replace(batch.joint_efforts[0], axis=(1., 0., 0.))
+    bad_batch = replace(batch, joint_efforts=(wrong_axis, batch.joint_efforts[1]))
+    forged = replace(resolved, input_batch=bad_batch,
+                     accepted_receipt=replace(resolved.accepted_receipt, batch_sha256=bad_batch.identity_hash))
+    with pytest.raises(ValueError, match='differs from its bound channel'):
+        prepare_physical_scene_interval(session=session, execution=execution, resolved=forged)
+
+
 def test_binding_roundtrip_and_unknown_capability_fail_closed():
     plan, context, effort, assessment = _case()
     assert PhysicalControlBindingV1.from_mapping(plan.binding.to_mapping()) == plan.binding
@@ -845,10 +892,12 @@ def test_selected_env_composes_independent_effort_and_wrench_once():
     env.binding = SimpleNamespace(external_solution_actions=False,external_actions=True,
         physical_control_profile=lambda _env:execution,
         observation_projection=lambda _env,_state: ({}, {}, SimpleNamespace(failure=False,reward=0.)))
-    env.artifact = SimpleNamespace(identity_hash='a'*64,timebase=SimpleNamespace(control_dt=.01,control_substeps=1))
+    env.artifact = SimpleNamespace(identity_hash='a'*64,timebase=SimpleNamespace(control_dt=.01,control_substeps=1,physics_dt=.01))
     env.value = {'source':SimpleNamespace(source_id='source-a',source_closure_digest='b'*64)}
     env.state = SimpleNamespace(control_step=0,simulation_time=0.)
     env.session = FakeSession()
+    env.session._artifact = env.artifact
+    env.session._physical_port = SimpleNamespace(execution=execution)
     env.recorder = None
     env.horizon = 3
     env.mixed_control_profile = False
@@ -856,6 +905,11 @@ def test_selected_env_composes_independent_effort_and_wrench_once():
     assert env.session.writes == 1
     assert len(result[4]['physical_control_v1']['submitted_batch']['joint_efforts']) == 1
     assert len(result[4]['physical_control_v1']['submitted_batch']['body_wrenches']) == 1
+    outer = env.session._last_scene_control_submission
+    assert outer['inner_submission_id'] == env.session._last_control_submission['submission_id']
+    assert {item['command_kind'] for item in outer['interval']['contributions']} == {'joint-effort', 'body-wrench'}
+    assert all(item['controller_generation'] == 1 for item in outer['interval']['contributions'])
+    assert outer['interval']['row'] == 0
 
 
 def test_disjoint_named_controllers_can_form_one_interval():

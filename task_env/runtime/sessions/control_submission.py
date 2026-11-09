@@ -155,6 +155,95 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
         None, None, None, dt, count, tuple(contributions))
 
 
+def prepare_physical_scene_interval(*, session, execution, resolved):
+    """Bind a preflighted physical batch to its live execution and typed effects."""
+    from .physical_control import PhysicalControlExecutionV1, ResolvedPhysicalBatchV1
+    if type(execution) is not PhysicalControlExecutionV1 or type(resolved) is not ResolvedPhysicalBatchV1:
+        raise TypeError('scene physical interval requires its typed execution and resolved batch')
+    port = getattr(session, '_physical_port', None)
+    if port is None or getattr(port, 'execution', None) is not execution:
+        raise ValueError('scene physical execution is not the materialized session binding')
+    binding = execution.compiled.binding
+    batch, context = resolved.input_batch, resolved.input_batch.context
+    batch.validate()
+    context.validate()
+    if (resolved.binding_sha256 != binding.identity_hash
+            or resolved.accepted_receipt.context != context
+            or resolved.accepted_receipt.batch_sha256 != batch.identity_hash
+            or resolved.accepted_receipt.stage != 'accepted'
+            or (context.source_id, context.source_closure_sha256, context.artifact_sha256)
+            != (binding.source_id, binding.source_closure_sha256, binding.artifact_sha256)
+            or context.boundary.scene_identity_hash != binding.scene_sha256
+            or type(context.row) is not int or context.row < 0
+            or context.generation != execution.generation
+            or len(resolved.mapping_provenance) != int(bool(resolved.joints)) + int(bool(resolved.body_wrenches))
+            or any(value != 'native_build' for value in resolved.mapping_provenance)
+            or getattr(session, 'physical_control_generation', None) != execution.generation):
+        raise ValueError('scene physical interval differs from the bound batch or execution')
+    timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+    if timebase is None:
+        raise ValueError('scene physical interval requires the bound artifact timebase')
+    count, dt, control_dt = timebase.control_substeps, float(timebase.physics_dt), float(timebase.control_dt)
+    if (type(count) is not int or count <= 0 or not math.isfinite(dt) or dt <= 0
+            or not math.isfinite(control_dt)
+            or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)
+            or not math.isclose(context.duration_s, control_dt, rel_tol=1e-12, abs_tol=1e-12)
+            or not math.isclose(context.cadence_s, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
+        raise ValueError('scene physical interval differs from the artifact timebase')
+    if batch.extensions:
+        raise ValueError('scene physical interval does not yet admit load extensions')
+    controllers = {item.writer_id: item for item in execution.controllers}
+    channels = {item.target_key: item for item in binding.channels}
+    bodies = {(item.entity_id, item.body_id): item for item in binding.bodies}
+    contributions, groups = [], {}
+    for kind, items in (('joint-effort', batch.joint_efforts), ('body-wrench', batch.body_wrenches)):
+        for item in items:
+            writer = item.contribution.owner_id
+            controller = controllers.get(writer)
+            if controller is None:
+                raise ValueError('scene physical writer is not an admitted Controller')
+            if kind == 'joint-effort':
+                bound = channels.get(item.target_key)
+                resource = f'joint:{item.entity_id}/{item.joint_id}/{item.dof_id}'
+                units = (item.unit,)
+                basis = (item.unit, item.axis, item.axis_frame, item.sign, item.limit,
+                         item.contribution.limit_order)
+            else:
+                bound = bodies.get((item.entity_id, item.body_id))
+                resource = f'body:{item.entity_id}/{item.body_id}'
+                units = ('N', 'N*m')
+                # Existing physical preflight resolves each wrench into the
+                # common world/body-origin basis before explicit summation.
+                basis = ('world', 'body-origin')
+            if bound is None or writer not in bound.owner_ids:
+                raise ValueError('scene physical resource is not owned by its writer')
+            item.validate()
+            item.contribution.validate()
+            if kind == 'joint-effort' and (
+                    (item.joint_kind, item.axis, item.axis_frame, item.sign, item.unit, item.limit)
+                    != (bound.kind, bound.axis, bound.axis_frame, bound.sign, bound.unit, bound.effort_range)
+                    or (item.controller_law == 'explicit_full_pd'
+                        and bound.native_drive not in {'disabled', 'passive'})):
+                raise ValueError('scene physical joint differs from its bound channel')
+            groups.setdefault(resource, []).append((item, basis))
+            contributions.append(SceneCommandContributionV1('robot-controller', kind, units,
+                item.contribution.composition, item.contribution.physical_effect_id,
+                writer, controller.identity, execution.generation, item.identity_hash,
+                (resource,), 0, count))
+    for resource, members in groups.items():
+        if len(members) > 1:
+            if any(item.contribution.composition != 'sum' for item, _ in members):
+                raise ValueError('scene physical resource has overlapping exclusive effects')
+            if len({basis for _, basis in members}) != 1:
+                raise ValueError('scene physical sums require the same basis and units')
+            effects = [item.contribution.physical_effect_id for item, _ in members]
+            if len(effects) != len(set(effects)):
+                raise ValueError('scene physical resource contains a duplicate effect')
+    return SceneCommandIntervalV1('scene-command-interval-v1', context.source_id,
+        context.source_closure_sha256, context.artifact_sha256, context.boundary, context.clock,
+        binding.identity_hash, None, None, context.row, dt, count, tuple(contributions))
+
+
 def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
                                 artifact_sha256, boundary, sample_clock):
     """Bind selected leaf contributions to the already admitted plan and receipt.
@@ -698,6 +787,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 source_id=source_id, source_closure_sha256=source_closure_sha256,
                 artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
                 resource_owners=payload['resource_owners'])
+        elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
+            scene_interval = prepare_physical_scene_interval(session=session,
+                execution=session._physical_port.execution, resolved=command)
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']
