@@ -228,3 +228,23 @@ def test_physical_inner_context_must_match_outer_submission(monkeypatch):
         _submit(session, command, command_kind='physical-effort-batch',
                 command_sha256='2' * 64)
     assert not hasattr(session, '_control_submission_consumed')
+
+
+def test_preflight_does_not_consume_boundary_or_call_lowerer(monkeypatch):
+    import task_env.controllers.canonical.contracts as contracts
+    from task_env.runtime.sessions.control_submission import _preflight_control_command
+    monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
+    session, writes = _Session(), []
+    payload, identity, _ = _preflight_control_command(
+        session, _Command(), command_kind='position-target', command_sha256='1' * 64,
+        source_id='task', source_closure_sha256='a' * 64, artifact_sha256='b' * 64,
+        boundary=session.boundary, sample_clock=_Clock(), controller_generation=0,
+        controller_identities=('controller-1',), writer_ids=('writer-1',),
+        resource_ids=('robot/joint-1',), units=('joint-position:rad',),
+        lowering='fake-lowerer', lower=lambda: writes.append('write'))
+    assert len(identity) == 64 and payload['command_sha256'] == '1' * 64
+    assert not writes and not hasattr(session, '_control_submission_consumed')
+    # The unchanged entry point can still commit the same boundary exactly once.
+    _submit(session)
+    with pytest.raises(ValueError, match='already has a logical submission'):
+        _submit(session)

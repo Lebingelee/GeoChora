@@ -206,17 +206,17 @@ class ControlSubmissionReceiptV2:
         return asdict(self)
 
 
-def submit_control_command(session, command, *, command_kind, command_sha256,
+def _preflight_control_command(session, command, *, command_kind, command_sha256,
                            source_id, source_closure_sha256, artifact_sha256,
                            boundary, sample_clock, controller_generation,
                            controller_identities, writer_ids, resource_ids, units,
                            lowering, lower, resource_owners=None,
                            submission_progress=None):
-    """Validate one common commit envelope and perform one logical provider write.
+    """Validate one typed submission without consuming its boundary or writing.
 
     A multi-Controller Position batch is preflighted as a whole and committed under
-    one replay key. ``submission_progress`` lets the lowerer record attempted and
-    acknowledged writers if a provider fails halfway through that batch.
+    one replay key. ``submission_progress`` must be empty before the lowerer
+    records attempted and acknowledged writers.
     """
     from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
     from .physical_control import ResolvedPhysicalBatchV1
@@ -398,6 +398,27 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         'units': units, 'lowering': lowering,
     }
     identity = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    return payload, identity, lifecycle
+
+
+def submit_control_command(session, command, *, command_kind, command_sha256,
+                           source_id, source_closure_sha256, artifact_sha256,
+                           boundary, sample_clock, controller_generation,
+                           controller_identities, writer_ids, resource_ids, units,
+                           lowering, lower, resource_owners=None,
+                           submission_progress=None):
+    """Commit one previously typed command under the existing replay key."""
+    payload, identity, lifecycle = _preflight_control_command(
+        session, command, command_kind=command_kind, command_sha256=command_sha256,
+        source_id=source_id, source_closure_sha256=source_closure_sha256,
+        artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+        controller_generation=controller_generation, controller_identities=controller_identities,
+        writer_ids=writer_ids, resource_ids=resource_ids, units=units, lowering=lowering,
+        lower=lower, resource_owners=resource_owners, submission_progress=submission_progress)
+    provider = payload['provider']
+    materialization_id = payload['materialization_id']
+    episode_id = payload['episode_id']
+    resource_owners = payload['resource_owners']
     consumed = getattr(session, '_control_submission_consumed', None)
     if consumed is None:
         consumed = set()

@@ -594,6 +594,12 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     profile = LinearEffortProfileV1('linear-effort-profile-v1','controller-a',('action',),
                                      ('arm/drive',),((4.,),),requirement)
     controller = LinearEffortControllerV1(profile,plan.binding,model)
+    original_compute = controller.compute
+    controller.preflight_compute_calls = 0
+    def stateful_compute(action, view, context):
+        controller.preflight_compute_calls += 1
+        return original_compute(action, view, context)
+    controller.compute = stateful_compute
     scene = _scene_v3()
     requirements = StateRequirements('state-requirements-v1','controller','controller-a',())
     execution = PhysicalControlExecutionV1(plan,(controller,),scene,{}, {},requirements,1)
@@ -650,10 +656,12 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     with pytest.raises(ValueError, match='synthetic mapping cannot authorize'):
         env.step((.25,))
     assert (env.session.writes, env.session.advances) == (0, 0)
+    assert controller.preflight_compute_calls == 1
     # Controller calculation has already run. No general rollback exists,
     # even though the physical clock has not advanced.
     with pytest.raises(RuntimeError, match=r'faulted; reset\(\) is required'):
         env.step((.25,))
+    assert controller.preflight_compute_calls == 1
     # The following ACK cases use a separate fixture/episode; this does not
     # claim that clearing a fault alone constitutes a real runtime reset.
     previous = env
@@ -662,6 +670,10 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
                          if key != '_episode_state'})
     env.session = FakeSession()
     env.session.assessment_phase = 'native_build'
+    fresh_controller = LinearEffortControllerV1(profile,plan.binding,model)
+    fresh_execution = replace(execution, controllers=(fresh_controller,))
+    env.binding = replace_binding = SimpleNamespace(**vars(previous.binding))
+    replace_binding.physical_control_profile = lambda _env: fresh_execution
     # Explicit mock of the downstream native receipt: this is not build evidence.
     env.session.provenance = 'native_build'
     if bad_ack:
