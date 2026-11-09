@@ -113,6 +113,26 @@ def test_typed_initial_state_uses_session_boundary_and_clock(version):
         validate_initial_state_publication(SimpleNamespace(state_boundary_identity=lambda: None), publication, state)
 
 
+def test_physical_execution_owns_controller_initialization_and_preflights_model():
+    from task_env.artifacts.state import CanonicalStateViewV2, CanonicalStatePublicationV2, StateViewLifetime
+    from task_env.environment.types import StageUnavailableError
+    execution, _, context = _fixture()
+    calls = []
+    controller = execution.controllers[0]
+    controller.bind_model = lambda model: calls.append(('model', model))
+    controller.reset_from_realized_state = lambda view: calls.append(('reset', view))
+    view = CanonicalStateViewV2('canonical-state-v2', 'SI_right_handed_z_up_wxyz',
+                                context.boundary, context.clock, (), (), (), ())
+    publication = CanonicalStatePublicationV2('canonical-state-publication-v2', view,
+        StateViewLifetime('state-view-lifetime-v1', 'material-a', context.boundary, 0,
+                          'owned_snapshot', 'retained'))
+    with pytest.raises(StageUnavailableError, match='source dynamics model'):
+        execution.initialize_controllers(SimpleNamespace(), publication)
+    assert not calls
+    execution.initialize_controllers(SimpleNamespace(physical_source_dynamics_model=lambda: 'source-model'), publication)
+    assert calls == [('model', 'source-model'), ('reset', view)]
+
+
 def test_foreign_controller_output_is_rejected_before_submission():
     execution, subject, context = _fixture()
     original = execution.controllers[0]

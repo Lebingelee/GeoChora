@@ -2218,21 +2218,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     scene=execution.scene, joint_bindings=execution.joint_bindings,
                     frame_bindings=execution.frame_bindings, requirements=execution.requirements)
                 validate_initial_state_publication(self.session, publication, self.state)
-                publication.view.validate_against_scene(execution.scene)
-                publication.view.validate_requirements(execution.requirements)
+                execution.initialize_controllers(self.session, publication)
                 if (getattr(self.binding, 'physical_observation_binding', None) is None
                         and getattr(self, '_task_rgb_config', None) is None):
                     self.typed_state = publication
-                for controller in execution.controllers:
-                    bind_model = getattr(controller, 'bind_model', None)
-                    if callable(bind_model):
-                        source_model = getattr(self.session, 'physical_source_dynamics_model', None)
-                        if not callable(source_model):
-                            raise StageUnavailableError('selected session has no source dynamics model')
-                        bind_model(source_model())
-                    initialize = getattr(controller, 'reset_from_realized_state', None)
-                    if callable(initialize):
-                        initialize(publication.view)
             if getattr(self, '_task_rgb_config', None) is not None and not self.position_profile:
                 self._publish_task_rgb_typed_state()
             return self.state
