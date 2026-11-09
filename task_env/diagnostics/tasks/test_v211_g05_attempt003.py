@@ -661,3 +661,26 @@ def test_real_pendulum_component_rgb_uses_native_camera_optics_on_reset_step_res
         report["evidence_json_sha256"] = _sha256(report_path)
     finally:
         env.close()
+
+
+def test_public_session_boundary_requires_matching_scene_materialization_and_episode(tmp_path):
+    artifact, source, receipt = _controlled_source(tmp_path)
+    runtime = _ControlledRuntime(artifact, source)
+    runtime.reset_sample_id = 'reset-' + 'a' * 64
+    env = object.__new__(SelectedReferenceEnv)
+    env.session = runtime
+    env.state = runtime.snapshot()
+    try:
+        assert env._current_control_step() == 0
+        original = runtime.state_boundary_identity
+        for field, value in (('scene_identity_hash', 'b' * 64),
+                             ('provider_materialization_id', 'foreign-materialization'),
+                             ('episode_id', 'foreign-episode')):
+            runtime.state_boundary_identity = lambda field=field, value=value: replace(original(), **{field: value})
+            with pytest.raises(ValueError, match='typed source binding'):
+                env._current_control_step()
+        runtime.source = SimpleNamespace(scene_definition=SimpleNamespace(identity_hash='c' * 64))
+        with pytest.raises(ValueError, match='Scene differs from its typed Artifact'):
+            env._current_control_step()
+    finally:
+        receipt.close()

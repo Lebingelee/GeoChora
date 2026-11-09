@@ -2462,9 +2462,35 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         closure = getattr(source, 'source_closure_digest', None)
         artifact = getattr(session, '_artifact', None)
         from ..artifacts import TaskArtifactV1
+        # Some source-bound RuntimeSession implementations expose their
+        # declared artifact/source as public properties. Accept that contract
+        # only when the typed Artifact and Scene agree with the live boundary.
+        public_binding = False
+        uses_public_binding = artifact is None and source is None
+        if uses_public_binding:
+            artifact = getattr(session, 'artifact', None)
+            source = getattr(session, 'source', None)
+            public_binding = isinstance(artifact, TaskArtifactV1) and (
+                getattr(getattr(source, 'scene_definition', None), 'identity_hash', None)
+                == artifact.scene_identity_hash) and (
+                getattr(source, 'task_artifact_hash', None) == artifact.identity_hash) and (
+                isinstance(getattr(source, 'source_closure_digest', None), str)
+                and len(source.source_closure_digest) == 64
+                and all(char in '0123456789abcdef' for char in source.source_closure_digest))
+            if isinstance(artifact, TaskArtifactV1) and not public_binding:
+                raise ValueError('public RuntimeSession Scene differs from its typed Artifact')
+            closure = getattr(source, 'source_closure_digest', None)
         has_bound_identity = (isinstance(artifact, TaskArtifactV1)
                               or (isinstance(closure, str) and len(closure) == 64))
+        if uses_public_binding:
+            has_bound_identity = public_binding
         boundary = boundary_reader() if callable(boundary_reader) and has_bound_identity else None
+        if public_binding and boundary is not None:
+            if (getattr(boundary, 'scene_identity_hash', None) != artifact.scene_identity_hash
+                    or getattr(boundary, 'provider_materialization_id', None)
+                    != getattr(session, 'provider_materialization_id', None)
+                    or getattr(boundary, 'episode_id', None) != getattr(session, 'episode_id', None)):
+                raise ValueError('public RuntimeSession boundary differs from its typed source binding')
         boundary_step = getattr(boundary, 'control_step', None)
         if boundary_step is not None:
             boundary_step = int(boundary_step)
