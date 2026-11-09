@@ -528,6 +528,40 @@ class ResolvedPhysicalBatchV1:
     mapping_provenance: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ResolvedPhysicalSequenceV1:
+    """Previously admitted batches and their aligned, nonoverlapping ranges."""
+    action: object
+    slices: tuple[tuple[int, int, ResolvedPhysicalBatchV1], ...]
+
+    @property
+    def action_sha256(self):
+        return self.action.identity_hash
+
+    @property
+    def identity_hash(self):
+        from ...controllers.canonical.contracts import digest
+        return digest({'schema_version': 'resolved-physical-sequence-v1',
+            'action_sha256': self.action_sha256,
+            'slices': tuple({'start': start, 'end': end, 'batch_sha256': resolved.input_batch.identity_hash}
+                            for start, end, resolved in self.slices)})
+
+
+@dataclass(frozen=True)
+class PhysicalSequenceAcknowledgementV1:
+    """Native staging acknowledgement; it is not a force measurement."""
+    sequence_sha256: str
+    batch_sha256s: tuple[str, ...]
+    producer_id: str
+
+    @property
+    def identity_hash(self):
+        from ...controllers.canonical.contracts import digest
+        return digest({'schema_version': 'physical-sequence-ack-v1',
+            'sequence_sha256': self.sequence_sha256, 'batch_sha256s': self.batch_sha256s,
+            'producer_id': self.producer_id})
+
+
 def _clamp(value, bounds):
     return min(max(value, bounds[0]), bounds[1])
 

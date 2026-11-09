@@ -193,6 +193,8 @@ class MuJoCoPhysicalPort:
         self.pending_values = None
         self.pending_joints = None
         self.pending_wrenches = ()
+        self.pending_schedule = None
+        self.pending_substep = 0
         self.kinematics_refreshes = 0
         self.consumed = set()
 
@@ -229,7 +231,7 @@ class MuJoCoPhysicalPort:
         return PhysicalBufferPolicyV1('physical-buffer-policy-v1', binding.identity_hash,
             self.session.provider_materialization_id, 'replace', 'each_native_step', 'clear_before_new_episode')
 
-    def write(self, resolved):
+    def _prepare_write(self, resolved):
         s = self.session
         s._require_reset()
         if type(resolved) is not ResolvedPhysicalBatchV1 or resolved.binding_sha256 != self.binding.identity_hash:
@@ -280,6 +282,11 @@ class MuJoCoPhysicalPort:
             raise ValueError('physical projection produced nonfinite generalized force')
         if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
             raise RuntimeError('physical force buffer changed before owned write')
+        return context, values, raw_wrenches, projected
+
+    def write(self, resolved):
+        s = self.session
+        context, values, raw_wrenches, projected = self._prepare_write(resolved)
         s._data.qfrc_applied[:] = projected
         self.pending = context.identity_hash
         self.pending_values = projected
@@ -289,6 +296,56 @@ class MuJoCoPhysicalPort:
         return PhysicalControlReceiptV1('physical-control-receipt-v1', context,
             resolved.input_batch.identity_hash, 'native_write_ack', resolved.accepted_receipt.contribution_ids,
             'mujoco-qfrc-applied', 'generalized-force')
+
+    def write_sequence(self, sequence):
+        from .physical_control import PhysicalSequenceAcknowledgementV1, ResolvedPhysicalSequenceV1
+        from ...controllers.canonical.physical_sequence import PhysicalActionSequenceV1
+        if type(sequence) is not ResolvedPhysicalSequenceV1 or not sequence.slices:
+            raise TypeError('physical sequence requires admitted batches')
+        if type(sequence.action) is not PhysicalActionSequenceV1:
+            raise TypeError('physical sequence requires its actual action')
+        if getattr(self.session, '_prepared_physical_sequence', None) is not sequence:
+            raise ValueError('physical sequence is not prepared by this live session')
+        if getattr(self.session, '_physical_controller_versions', None) != self.execution.controller_versions():
+            raise ValueError('physical sequence Controller versions changed after admission')
+        sequence.action.validate(substeps=self.session._artifact.timebase.control_substeps,
+            controller_identities=tuple(item.identity for item in self.execution.controllers))
+        if tuple((item.start_substep, item.end_substep) for item in sequence.action.slices) != tuple(
+                (start, end) for start, end, _ in sequence.slices):
+            raise ValueError('physical sequence action ranges differ from admitted batches')
+        scene_receipt = getattr(self.session, '_last_scene_control_submission', None)
+        if (not isinstance(scene_receipt, dict) or scene_receipt.get('status') != 'pending'
+                or scene_receipt.get('inner_command_sha256') != sequence.identity_hash
+                or scene_receipt.get('inner_batch_sha256') != tuple(
+                    item.input_batch.identity_hash for _, _, item in sequence.slices)):
+            raise ValueError('physical sequence requires the pending common scene submission')
+        prepared = []
+        cursor = 0
+        for start, end, resolved in sequence.slices:
+            if (type(start) is not int or type(end) is not int or start != cursor or end <= start
+                    or resolved.body_wrenches or resolved.extensions):
+                raise ValueError('MuJoCo physical sequence requires contiguous joint-only slices')
+            context, values, wrenches, projected = self._prepare_write(resolved)
+            if wrenches or (prepared and context != prepared[0][2]):
+                raise ValueError('physical sequence slices differ from their common context')
+            prepared.append((start, end, context, values, projected))
+            cursor = end
+        if cursor != self.session._artifact.timebase.control_substeps:
+            raise ValueError('physical sequence does not cover the session timebase')
+        s = self.session
+        if np.any(s._data.qfrc_applied) or np.any(s._data.xfrc_applied):
+            raise RuntimeError('physical force buffer changed before sequence write')
+        first = prepared[0]
+        s._data.qfrc_applied[:] = first[4]
+        self.pending = first[2].identity_hash
+        self.pending_values = first[4]
+        self.pending_joints = first[3]
+        self.pending_wrenches = ()
+        self.pending_schedule = tuple((start, end, values) for start, end, _ctx, values, _p in prepared)
+        self.pending_substep = 0
+        self.consumed.add(self.pending)
+        return PhysicalSequenceAcknowledgementV1(sequence.identity_hash,
+            tuple(item.input_batch.identity_hash for _, _, item in sequence.slices), 'mujoco-qfrc-applied')
 
     def _project_current(self, joints, wrenches):
         """Use fresh public kinematics and each declared frame at this substep."""
@@ -329,6 +386,13 @@ class MuJoCoPhysicalPort:
             raise RuntimeError('physical interval requires exactly one fresh batch')
         if not np.array_equal(s._data.qfrc_applied, self.pending_values) or np.any(s._data.xfrc_applied):
             raise RuntimeError('physical force buffer changed during owned interval')
+        if getattr(self, 'pending_schedule', None) is not None:
+            matching = [values for start, end, values in self.pending_schedule
+                        if start <= self.pending_substep < end]
+            if len(matching) != 1:
+                raise RuntimeError('physical sequence has no unique substep slice')
+            self.pending_joints = matching[0]
+            self.pending_substep += 1
         projected = self._project_current(self.pending_joints, self.pending_wrenches)
         if not np.array_equal(s._data.qfrc_applied, self.pending_values) or np.any(s._data.xfrc_applied):
             raise RuntimeError('physical force buffer changed during projection')
@@ -346,3 +410,5 @@ class MuJoCoPhysicalPort:
         self.pending_values = None
         self.pending_joints = None
         self.pending_wrenches = ()
+        self.pending_schedule = None
+        self.pending_substep = 0

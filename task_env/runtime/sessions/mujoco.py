@@ -254,6 +254,9 @@ class _MuJoCoSession(_SessionValues):
     def apply_physical_command_batch(self, resolved):
         return self._physical_port.write(resolved)
 
+    def apply_physical_command_sequence(self, sequence):
+        return self._physical_port.write_sequence(sequence)
+
     def abort_physical_control(self):
         """Discard this session's pending physical batch after an interval fault."""
         port = getattr(self, '_physical_port', None)

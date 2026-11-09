@@ -1698,6 +1698,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._episode_execution_state().require_open('environment is closed')
         return selection.describe()
 
+    def physical_sequence_spec(self):
+        """Describe an admitted physical sequence at the current live boundary."""
+        self._require_execution_healthy()
+        if self.session is None or self._stopped:
+            raise RuntimeError('reset required before querying physical sequence capability')
+        select = getattr(getattr(self, 'binding', None), 'physical_control_profile', None)
+        if not callable(select):
+            raise StageUnavailableError('this route has no physical control capability')
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
+        profile = select(self)
+        if type(profile) is not PhysicalControlExecutionV1:
+            raise StageUnavailableError('this route has no admitted physical execution')
+        from ..runtime.sessions.physical_sequence import describe_physical_sequence_capability
+        return describe_physical_sequence_capability(self, profile)
+
     def bind_physical_action(self, values):
         """Bind scalar action values to the current physical spec and generation."""
         selection = getattr(self, '_physical_reset_selection', None)
@@ -3014,6 +3029,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         assessment = assess(plan)
         if getattr(assessment, 'phase', None) not in {'native_build', 'runtime'}:
             raise ValueError('physical session write requires native-build or runtime capability assessment')
+        from ..controllers.canonical.physical_sequence import PhysicalActionSequenceV1
+        if type(action) is PhysicalActionSequenceV1:
+            from ..runtime.sessions.physical_sequence import prepare_selected_physical_sequence
+            return prepare_selected_physical_sequence(self, action, profile=profile, view=view,
+                context=context, assessment=assessment, proposal=proposal,
+                observer_solution=observer_solution, clock_tolerance=clock_tolerance)
         # Controller computation can mutate owner state even when a subsequent
         # mapping or capability preflight rejects the batch. There is no
         # general Controller rollback contract, so the lifecycle must latch a

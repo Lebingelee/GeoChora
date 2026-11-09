@@ -656,7 +656,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     records attempted and acknowledged writers.
     """
     from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
-    from .physical_control import ResolvedPhysicalBatchV1
+    from .physical_control import ResolvedPhysicalBatchV1, ResolvedPhysicalSequenceV1
     from .leaf_control import LeafPreparedBatchV1
     is_position_batch = type(command) is PositionControlBatchV1
     is_leaf_batch = type(command) is LeafPreparedBatchV1
@@ -674,6 +674,29 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
         if type(command.input_batch).__name__ != 'PhysicalCommandBatchV1':
             raise TypeError('effort lifecycle requires a typed physical command batch')
         command.input_batch.validate()
+    elif command_kind == 'physical-effort-sequence':
+        from ...controllers.canonical.physical_sequence import PhysicalActionSequenceV1
+        if (type(command) is not ResolvedPhysicalSequenceV1 or type(command.slices) is not tuple
+                or not command.slices or type(command.action) is not PhysicalActionSequenceV1):
+            raise TypeError('effort sequence requires admitted physical batches')
+        if getattr(session, '_prepared_physical_sequence', None) is not command:
+            raise ValueError('physical sequence is not prepared by this live session')
+        _digest(command.action_sha256, 'physical sequence action')
+        cursor = 0
+        for start, end, resolved in command.slices:
+            if (type(start) is not int or type(end) is not int or start != cursor or end <= start
+                    or type(resolved) is not ResolvedPhysicalBatchV1
+                    or resolved.body_wrenches or resolved.extensions):
+                raise ValueError('effort sequence requires contiguous joint-only admitted slices')
+            resolved.input_batch.validate()
+            cursor = end
+        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+        if timebase is None or cursor != timebase.control_substeps:
+            raise ValueError('effort sequence must cover the exact session timebase')
+        command.action.validate(substeps=cursor, controller_identities=controller_identities)
+        if tuple((x.start_substep, x.end_substep) for x in command.action.slices) != tuple(
+                (start, end) for start, end, _ in command.slices):
+            raise ValueError('physical sequence differs from its action slice ranges')
     else:
         raise ValueError('unsupported typed control command kind')
     if not callable(lower):
@@ -681,21 +704,24 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     for value, label in ((command_sha256, 'command'), (source_closure_sha256, 'source closure'),
                          (artifact_sha256, 'artifact')):
         _digest(value, label)
-    if command_sha256 != (command.identity_hash if command_kind == 'position-target'
-                          else command.input_batch.identity_hash):
+    if command_sha256 != (command.input_batch.identity_hash if command_kind == 'physical-effort-batch'
+                          else command.identity_hash):
         raise ValueError('control command identity differs from the typed command')
     # Validate identities carried by the typed payload against the outer
     # submission before consuming the boundary or touching a provider. The
     # legacy canonical target has no boundary/source fields; those remain
     # established by the already admitted source-bound caller.
-    if command_kind == 'physical-effort-batch':
-        context = command.input_batch.context
-        if (context.source_id != source_id
-                or context.source_closure_sha256 != source_closure_sha256
-                or context.artifact_sha256 != artifact_sha256
-                or context.boundary != boundary or context.clock != sample_clock
-                or context.generation != controller_generation):
-            raise ValueError('physical batch context differs from the control submission')
+    if command_kind in {'physical-effort-batch', 'physical-effort-sequence'}:
+        batches = ((command.input_batch,) if command_kind == 'physical-effort-batch'
+                   else tuple(item.input_batch for _, _, item in command.slices))
+        for batch in batches:
+            context = batch.context
+            if (context.source_id != source_id
+                    or context.source_closure_sha256 != source_closure_sha256
+                    or context.artifact_sha256 != artifact_sha256
+                    or context.boundary != boundary or context.clock != sample_clock
+                    or context.generation != controller_generation):
+                raise ValueError('physical batch context differs from the control submission')
     elif not is_leaf_batch:
         targets = command.targets if is_position_batch else (command,)
         for item in targets:
@@ -794,14 +820,16 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
             raise ValueError('position batch targets differ from the submitted writer set')
     if is_leaf_batch and tuple(item.writer_id for item in command.commands) != writer_ids:
         raise ValueError('leaf batch commands differ from the submitted writer set')
-    if command_kind == 'physical-effort-batch':
-        batch = command.input_batch
-        contributions = (*batch.joint_efforts, *batch.body_wrenches, *batch.extensions)
+    if command_kind in {'physical-effort-batch', 'physical-effort-sequence'}:
+        resolved_items = ((command,) if command_kind == 'physical-effort-batch'
+                          else tuple(item for _, _, item in command.slices))
+        contributions = tuple(item for resolved in resolved_items for item in
+            (*resolved.input_batch.joint_efforts, *resolved.input_batch.body_wrenches, *resolved.input_batch.extensions))
         payload_writers = {item.contribution.owner_id for item in contributions}
         payload_resources = {
-            *(f'{item.entity_id}/{item.joint_id}' for item in command.joints),
-            *(f'{item.entity_id}/{item.body_id}' for item in command.body_wrenches),
-            *(str(getattr(item, 'target_key', type(item).__name__)) for item in command.extensions),
+            *(f'{item.entity_id}/{item.joint_id}' for resolved in resolved_items for item in resolved.joints),
+            *(f'{item.entity_id}/{item.body_id}' for resolved in resolved_items for item in resolved.body_wrenches),
+            *(str(getattr(item, 'target_key', type(item).__name__)) for resolved in resolved_items for item in resolved.extensions),
         }
         if payload_writers != set(writer_ids) or payload_resources != set(resource_ids):
             raise ValueError('physical batch writers or resources differ from the submission')
@@ -941,6 +969,17 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
             scene_interval = prepare_physical_scene_interval(session=session,
                 execution=session._physical_port.execution, resolved=command)
+        elif command_kind == 'physical-effort-sequence' and getattr(session, '_physical_port', None) is not None:
+            parts = tuple((start, end, prepare_physical_scene_interval(session=session,
+                execution=session._physical_port.execution, resolved=resolved))
+                for start, end, resolved in command.slices)
+            base = parts[0][2]
+            if any(replace(part, contributions=()) != replace(base, contributions=())
+                   for _, _, part in parts[1:]):
+                raise ValueError('physical sequence slices do not share one scene interval')
+            scene_interval = replace(base, contributions=tuple(
+                replace(item, start_substep=start, end_substep=end)
+                for start, end, part in parts for item in part.contributions))
         elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
               and getattr(getattr(session, '_source', None), 'position_subject_binding', None) is not None):
             scene_interval = prepare_subject_position_scene_interval(session=session, target=command,
@@ -993,6 +1032,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
             for item in scene_interval.contributions),
         'status': 'pending',
     })
+    if scene_interval is not None and command_kind == 'physical-effort-sequence':
+        session._last_scene_control_submission['inner_batch_sha256'] = tuple(
+            item.input_batch.identity_hash for _, _, item in command.slices)
     ack = None
     try:
         ack = lower()
@@ -1027,6 +1069,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 'inner_command_sha256': command_sha256,
                 'contribution_command_sha256': tuple(item.command_sha256
                     for item in scene_interval.contributions),
+                **({'inner_batch_sha256': tuple(item.input_batch.identity_hash for _, _, item in command.slices)}
+                   if command_kind == 'physical-effort-sequence' else {}),
                 'status': 'acknowledged',
             }
         if lifecycle is not None:
@@ -1051,8 +1095,14 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 'inner_command_sha256': command_sha256,
                 'contribution_command_sha256': tuple(item.command_sha256
                     for item in scene_interval.contributions),
+                **({'inner_batch_sha256': tuple(item.input_batch.identity_hash for _, _, item in command.slices)}
+                   if command_kind == 'physical-effort-sequence' else {}),
                 'status': status,
             }
         if lifecycle is not None:
             session._control_lifecycle_dispatch = replace(lifecycle, stage='failed')
         raise
+    finally:
+        if (command_kind == 'physical-effort-sequence'
+                and getattr(session, '_prepared_physical_sequence', None) is command):
+            session._prepared_physical_sequence = None

@@ -89,10 +89,14 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             from .physical_control import PhysicalControlExecutionV1
             if type(profile) is not PhysicalControlExecutionV1:
                 raise TypeError('selected physical route requires PhysicalControlExecutionV1')
-            _dispatch_record(env, 'physical-effort-batch',
+            from ...controllers.canonical.physical_sequence import PhysicalActionSequenceV1
+            _dispatch_record(env, ('physical-effort-sequence' if type(action) is PhysicalActionSequenceV1
+                                   else 'physical-effort-batch'),
                              tuple(item.identity for item in profile.controllers), profile.generation)
             selection = getattr(env, '_physical_reset_selection', None)
             if selection is not None:
+                if type(action) is PhysicalActionSequenceV1:
+                    raise ValueError('physical action sequences do not support reset-scoped Controller switching')
                 action = selection.validate_action(action)
             env._physical_controller_preparation_started = False
             try:
