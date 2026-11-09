@@ -99,6 +99,7 @@ def test_configured_physical_effort_and_wrench_with_fake_terminal(tmp_path, phys
                 return CanonicalStateView('canonical-state-v0','SI_right_handed_z_up_wxyz',self.step_index,
                     self.step_index*.01,{}, {}, {'square-peg-instance/peg1':pose})
         fake=FakeTerminal()
+        fake._physical_controller_versions = execution.controller_versions()
         fake.initial = fake.publication(1)
         env.session=fake; env._stopped=False
         env.position_scene=scene; env.position_joint_bindings=execution.joint_bindings
