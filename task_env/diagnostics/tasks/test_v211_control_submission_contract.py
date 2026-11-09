@@ -272,6 +272,8 @@ def test_position_resources_are_checked_against_materialized_plan(monkeypatch):
     monkeypatch.setattr(control, 'ControlBindingPlanV1', Plan)
     session = _Session()
     session._control_binding_plan = Plan()
+    session._position_writer_id = 'writer-1'
+    session._position_profile_identity = 'controller-1'
     session._artifact = SimpleNamespace(identity_hash='b' * 64,
         timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01))
     writes = []
@@ -280,10 +282,21 @@ def test_position_resources_are_checked_against_materialized_plan(monkeypatch):
                 resource_owners=(('writer-1', ('robot/forged',)),),
                 lower=lambda: writes.append('write'))
     assert not writes and not hasattr(session, '_control_submission_consumed')
+    session._position_profile_identity = 'stale-controller'
+    with pytest.raises(ValueError, match='not the admitted writer'):
+        _submit(session, lower=lambda: writes.append('write'))
+    assert not writes and not hasattr(session, '_control_submission_consumed')
+    session._position_profile_identity = 'controller-1'
     _submit(session)
+    outer = session._last_scene_control_submission
+    assert outer['inner_submission_id'] == session._last_control_submission['submission_id']
+    assert outer['inner_command_sha256'] == '1' * 64
+    assert outer['interval']['contributions'][0]['controller_generation'] is None
 
     bad_timebase = _Session()
     bad_timebase._control_binding_plan = Plan()
+    bad_timebase._position_writer_id = 'writer-1'
+    bad_timebase._position_profile_identity = 'controller-1'
     bad_timebase._artifact = SimpleNamespace(identity_hash='b' * 64,
         timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.011))
     with pytest.raises(ValueError, match='not aligned'):
@@ -322,3 +335,38 @@ def test_scene_resource_admission_allows_disjoint_fragments_for_same_writer():
     with pytest.raises(ValueError, match='half-open'):
         _validate_resource_intervals((('writer-1', 'robot/joint-1', 0, 5.0),),
                                      writer_resources=authority, substeps=5)
+
+
+def test_position_scene_interval_retains_each_admitted_controller_generation(monkeypatch):
+    import task_env.controllers.canonical.contracts as contracts
+    import task_env.runtime.sessions.control as control
+    from task_env.runtime.sessions.control_submission import (
+        PositionControlBatchV1, prepare_position_scene_interval,
+    )
+    monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
+    class Plan:
+        identity_hash = 'd' * 64
+        _compiled = True
+        scene_identity_hash = 'e' * 64
+        artifact_identity_hash = 'b' * 64
+        source_closure_digest = 'a' * 64
+        resource_writers = (('robot', 'joint-1', 'writer-1'),
+                            ('robot', 'joint-2', 'writer-2'))
+    monkeypatch.setattr(control, 'ControlBindingPlanV1', Plan)
+    session = _Session()
+    session._artifact = SimpleNamespace(identity_hash='b' * 64,
+        timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01))
+    session._position_profiles_by_writer = {
+        'writer-1': SimpleNamespace(identity='controller-1', generation=1),
+        'writer-2': SimpleNamespace(identity='controller-2', generation=7),
+    }
+    first, second = _Command(), _Command()
+    second.writer_id, second.controller_identity = 'writer-2', 'controller-2'
+    interval = prepare_position_scene_interval(session=session, plan=Plan(),
+        command=PositionControlBatchV1((first, second)), source_id='task',
+        source_closure_sha256='a' * 64, artifact_sha256='b' * 64,
+        boundary=session.boundary, sample_clock=_Clock(),
+        resource_owners=(('writer-1', ('robot/joint-1',)), ('writer-2', ('robot/joint-2',))))
+    assert [(item.writer_id, item.controller_generation) for item in interval.contributions] == [
+        ('writer-1', 1), ('writer-2', 7)]
+    assert not hasattr(session, '_control_submission_consumed')

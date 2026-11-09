@@ -82,8 +82,8 @@ class SceneCommandIntervalV1:
     boundary: object
     sample_clock: object
     binding_sha256: str
-    binding_revision: str
-    materialization_receipt_sha256: str
+    binding_revision: str | None
+    materialization_receipt_sha256: str | None
     row: int | None
     physics_dt_s: float
     substeps: int
@@ -93,6 +93,66 @@ class SceneCommandIntervalV1:
     def identity_hash(self):
         return hashlib.sha256(json.dumps(asdict(self), sort_keys=True,
             separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+
+
+def prepare_position_scene_interval(*, session, plan, command, source_id,
+                                    source_closure_sha256, artifact_sha256,
+                                    boundary, sample_clock, resource_owners):
+    """Bind existing Position targets to the session's active source-bound plan."""
+    from ...controllers.canonical.contracts import PositionControlTargetV1
+    from .control import ControlBindingPlanV1
+    if type(plan) is not ControlBindingPlanV1 or not plan._compiled:
+        raise TypeError('scene Position interval requires a compiled binding plan')
+    targets = command.targets if type(command) is PositionControlBatchV1 else (command,)
+    if not targets or any(type(item) is not PositionControlTargetV1 for item in targets):
+        raise TypeError('scene Position interval requires typed Position targets')
+    timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+    if timebase is None:
+        raise ValueError('scene Position interval requires the bound artifact timebase')
+    count, dt, control_dt = timebase.control_substeps, float(timebase.physics_dt), float(timebase.control_dt)
+    if (type(count) is not int or count <= 0 or not math.isfinite(dt) or dt <= 0
+            or not math.isfinite(control_dt)
+            or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
+        raise ValueError('scene Position interval differs from the artifact timebase')
+    if (plan.scene_identity_hash != boundary.scene_identity_hash
+            or (plan.artifact_identity_hash is not None and plan.artifact_identity_hash != artifact_sha256)
+            or (plan.source_closure_digest is not None and plan.source_closure_digest != source_closure_sha256)):
+        raise ValueError('scene Position interval differs from the source-bound plan')
+    owners = dict(resource_owners)
+    profiles = getattr(session, '_position_profiles_by_writer', None)
+    contributions = []
+    for target in targets:
+        target.validate()
+        if (target.binding_identity_hash != plan.identity_hash
+                or target.source_boundary != boundary or target.sample_clock != sample_clock
+                or target.source_closure_digest != source_closure_sha256
+                or target.target.task_artifact_hash != artifact_sha256):
+            raise ValueError('scene Position contribution differs from the bound target')
+        profile = profiles.get(target.writer_id) if isinstance(profiles, dict) else None
+        if isinstance(profiles, dict):
+            if profile is None or profile.identity != target.controller_identity:
+                raise ValueError('scene Position Controller is not the admitted writer')
+        elif (getattr(session, '_position_writer_id', None) != target.writer_id
+              or getattr(session, '_position_profile_identity', None) != target.controller_identity):
+            raise ValueError('scene Position Controller is not the admitted writer')
+        generation = getattr(profile, 'generation', None) if profile is not None else None
+        if generation is not None and (type(generation) is not int or generation < 0):
+            raise ValueError('scene Position Controller generation must be nonnegative')
+        resources = owners.get(target.writer_id)
+        if not resources:
+            raise ValueError('scene Position writer has no bound resources')
+        contributions.append(SceneCommandContributionV1('robot-controller', 'position-target',
+            ('rad', 'm'), 'exclusive', None, target.writer_id, target.controller_identity,
+            generation, target.identity_hash, resources, 0, count))
+    authority = tuple((writer, tuple(sorted(f'{entity}/{actuator}'
+        for entity, actuator, owner in plan.resource_writers if owner == writer)))
+        for writer in sorted(owners))
+    claims = tuple((item.writer_id, resource, item.start_substep, item.end_substep)
+                   for item in contributions for resource in item.resources)
+    _validate_resource_intervals(claims, writer_resources=authority, substeps=count)
+    return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
+        source_closure_sha256, artifact_sha256, boundary, sample_clock, plan.identity_hash,
+        None, None, None, dt, count, tuple(contributions))
 
 
 def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
@@ -624,6 +684,20 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
             raise ValueError('scene interval differs from the RuntimeSession timebase')
     elif scene_plan is not None or scene_materialization is not None:
         raise ValueError('scene binding and materialization require an interval')
+    else:
+        # Existing source-bound Position calls enter the same scene envelope
+        # after the established preflight. Legacy canonical targets lack this
+        # binding and remain on their existing route until explicitly bound.
+        from ...controllers.canonical.contracts import PositionControlTargetV1
+        typed_position = (type(command) is PositionControlTargetV1
+                          or type(command) is PositionControlBatchV1)
+        plan = getattr(session, '_control_binding_plan', None)
+        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+        if typed_position and plan is not None and timebase is not None:
+            scene_interval = prepare_position_scene_interval(session=session, plan=plan, command=command,
+                source_id=source_id, source_closure_sha256=source_closure_sha256,
+                artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+                resource_owners=payload['resource_owners'])
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']
@@ -637,6 +711,16 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         raise ValueError('control interval already has a logical submission')
     consumed.add(replay_key)
     session._last_control_submission = {**payload, 'submission_id': identity, 'status': 'pending'}
+    session._last_scene_control_submission = (None if scene_interval is None else {
+        'schema_version': 'scene-control-submission-receipt-v1',
+        'interval_sha256': scene_interval.identity_hash,
+        'interval': asdict(scene_interval),
+        'inner_submission_id': identity,
+        'inner_command_sha256': command_sha256,
+        'contribution_command_sha256': tuple(item.command_sha256
+            for item in scene_interval.contributions),
+        'status': 'pending',
+    })
     ack = None
     try:
         ack = lower()
