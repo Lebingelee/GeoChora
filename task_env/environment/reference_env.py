@@ -3220,9 +3220,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     publish=publish, on_failure=on_failure)
 
     def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
-        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
-        operations = prepare_selected_control_action(
-            self, action, proposal=proposal, observer_solution=observer_solution)
+        operations = self._prepare_mixed_control(action, proposal=proposal, observer_solution=observer_solution)
         return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
@@ -3473,6 +3471,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     if callable(add_note):
                         add_note(f'external Solution abort after proposal failure also failed: {abort_error!r}')
             raise
+        if getattr(self, 'position_profile', False):
+            from ..runtime.sessions.control import single_position_action_request
+            request = single_position_action_request(
+                proposal.action, scene=self.position_scene, plan=self.position_plan,
+                profile=self.position_profiles[0],
+            )
+            return self._step_position_profile(
+                request, proposal=proposal, observer_solution=solution,
+            )
         return self._step(proposal.action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):

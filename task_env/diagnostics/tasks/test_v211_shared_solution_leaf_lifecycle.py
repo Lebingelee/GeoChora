@@ -153,3 +153,30 @@ def test_solution_step_preserves_context_through_shared_dispatch():
     SelectedReferenceEnv._step(env, proposal.action, proposal=proposal, observer_solution=owner)
     assert captured == {'proposal': proposal, 'observer_solution': owner}
     assert session._control_lifecycle_dispatch.stage == 'prepared'
+
+
+def test_external_solution_converts_action_for_typed_position_profile(monkeypatch):
+    from task_env.runtime.sessions import control
+
+    class Episode:
+        def require_step(self, **_kwargs):
+            pass
+
+    proposal = ExpertAction([.1] * 8, 'go')
+    solution = SimpleNamespace(done=False, failed=False, act=lambda *_args: proposal)
+    captured = {}
+    request = object()
+    monkeypatch.setattr(control, 'single_position_action_request',
+                        lambda action, **kwargs: captured.update(action=action, **kwargs) or request)
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: Episode(), _external_solution_owner=solution,
+        _validate_external_solution=lambda _solution: None, _stopped=False,
+        session=object(), _episode_mode=None, _physical_reset_selection=None,
+        mixed_control_profile=False, _require_published_execution_info=lambda: None,
+        obs={}, info={}, position_profile=True, position_scene=object(),
+        position_plan=object(), position_profiles=(object(),),
+        _step_position_profile=lambda value, **kwargs: (value, kwargs),
+    )
+    result, context = SelectedReferenceEnv.step_with_solution(env, solution)
+    assert result is request and context == {'proposal': proposal, 'observer_solution': solution}
+    assert captured['profile'] is env.position_profiles[0]
