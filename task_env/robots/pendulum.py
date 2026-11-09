@@ -13,6 +13,7 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
+from ..environment.protocols import DefaultCanonicalControllerMixin
 
 
 PENDULUM_ACTION_SCHEMA_ID = "task-env.pendulum.torque.v1"
@@ -37,7 +38,7 @@ PENDULUM_ACTION_CONTRACT = ExternalActionContract(
 
 
 @dataclass(frozen=True)
-class PendulumEntity:
+class PendulumEntity(DefaultCanonicalControllerMixin):
     """Stable scene names used by the Pendulum task and adapter."""
 
     uid: str = "pendulum-v1"

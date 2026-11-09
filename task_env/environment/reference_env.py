@@ -3435,13 +3435,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise
         if getattr(self, 'position_profile', False):
             from ..runtime.sessions.control import single_position_action_request
-            request = single_position_action_request(
-                proposal.action, scene=self.position_scene, plan=self.position_plan,
-                profile=self.position_profiles[0],
-            )
-            return self._step_position_profile(
-                request, proposal=proposal, observer_solution=solution,
-            )
+            try:
+                request = single_position_action_request(
+                    proposal.action, scene=self.position_scene, plan=self.position_plan,
+                    profile=self.position_profiles[0],
+                )
+                return self._step_position_profile(
+                    request, proposal=proposal, observer_solution=solution,
+                )
+            except BaseException as error:
+                # act() has already run and may have advanced Solution state;
+                # execution itself may already have recorded a richer fault.
+                if self._episode_execution_state().fault is None:
+                    self._latch_fault('external_solution_action_validation', error, before_state=self.state)
+                raise
         return self._step(proposal.action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):

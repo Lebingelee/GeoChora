@@ -248,3 +248,77 @@ def test_external_solution_converts_action_for_typed_position_profile(monkeypatc
     result, context = SelectedReferenceEnv.step_with_solution(env, solution)
     assert result is request and context == {'proposal': proposal, 'observer_solution': solution}
     assert captured['profile'] is env.position_profiles[0]
+
+
+@pytest.mark.parametrize('action', [[0.1], [float('nan')] * 8])
+def test_external_solution_conversion_failure_latches_before_second_act(action):
+    """An act() side effect is not rolled back by a zero-physics rejection."""
+    class Episode:
+        fault = None
+        def require_step(self, **_kwargs):
+            if self.fault is not None:
+                raise RuntimeError('reset required')
+
+    episode = Episode()
+    class Solution:
+        done = False
+        failed = False
+        calls = 0
+        def act(self, *_args):
+            self.calls += 1
+            return ExpertAction(action, 'go')
+
+    solution = Solution()
+    def latch(phase, error, **_kwargs):
+        episode.fault = (phase, error)
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: episode, _external_solution_owner=solution,
+        _validate_external_solution=lambda _solution: None, _stopped=False,
+        session=object(), _episode_mode=None, _physical_reset_selection=None,
+        mixed_control_profile=False, _require_published_execution_info=lambda: None,
+        obs={}, info={}, position_profile=True, position_scene=object(),
+        position_plan=object(), position_profiles=(object(),), state=object(),
+        _latch_fault=latch,
+    )
+    with pytest.raises(ValueError, match='finite eight-dimensional') as raised:
+        SelectedReferenceEnv.step_with_solution(env, solution)
+    assert episode.fault == ('external_solution_action_validation', raised.value)
+    with pytest.raises(RuntimeError, match='reset required'):
+        SelectedReferenceEnv.step_with_solution(env, solution)
+    assert solution.calls == 1
+
+
+@pytest.mark.parametrize('already_faulted', [False, True])
+def test_external_solution_position_dispatch_failure_preserves_one_fault(monkeypatch, already_faulted):
+    from task_env.runtime.sessions import control
+    class Episode:
+        fault = None
+        def require_step(self, **_kwargs):
+            pass
+    episode = Episode()
+    solution = SimpleNamespace(done=False, failed=False,
+                               act=lambda *_args: ExpertAction([.1] * 8, 'go'))
+    monkeypatch.setattr(control, 'single_position_action_request', lambda *_a, **_k: object())
+    failure = ValueError('structured preflight failed')
+    seen = []
+    def dispatch(*_args, **_kwargs):
+        if already_faulted:
+            episode.fault = 'richer execution fault'
+        raise failure
+    def latch(phase, error, **_kwargs):
+        episode.fault = phase
+        seen.append((phase, error))
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: episode, _external_solution_owner=solution,
+        _validate_external_solution=lambda _solution: None, _stopped=False,
+        session=object(), _episode_mode=None, _physical_reset_selection=None,
+        mixed_control_profile=False, _require_published_execution_info=lambda: None,
+        obs={}, info={}, position_profile=True, position_scene=object(),
+        position_plan=object(), position_profiles=(object(),), state=object(),
+        _latch_fault=latch, _step_position_profile=dispatch,
+    )
+    with pytest.raises(ValueError, match='structured preflight failed'):
+        SelectedReferenceEnv.step_with_solution(env, solution)
+    assert seen == ([] if already_faulted else [('external_solution_action_validation', failure)])
+    assert episode.fault == ('richer execution fault' if already_faulted
+                             else 'external_solution_action_validation')

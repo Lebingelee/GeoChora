@@ -9,6 +9,7 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
+from ..environment.protocols import DefaultCanonicalControllerMixin
 
 
 TWO_WHEEL_ACTION_SCHEMA_ID = "task-env.two-wheel-balance.wheel-torque.v1"
@@ -33,7 +34,7 @@ TWO_WHEEL_ACTION_CONTRACT = ExternalActionContract(
 
 
 @dataclass(frozen=True)
-class TwoWheelBalanceEntity:
+class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
     """Stable body/joint/actuator names for the two-wheel topology."""
 
     uid: str = "two-wheel-balance-v1"

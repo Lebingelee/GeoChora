@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from functools import cached_property
 from typing import Any, ClassVar, Protocol
 
 import numpy as np
@@ -25,7 +26,18 @@ from .types import (
 )
 
 
-class AgentComponent(ABC):
+class DefaultCanonicalControllerMixin:
+    """Give each subject its own stable, initially unbound Controller."""
+
+    @cached_property
+    def default_controller(self):
+        # Lazy import keeps the foundational component contract independent of
+        # Controller package initialization.
+        from ..controllers.canonical.default_identity import DefaultCanonicalController
+        return DefaultCanonicalController()
+
+
+class AgentComponent(DefaultCanonicalControllerMixin, ABC):
     """机器人组件的纯描述基类。"""
 
     uid: ClassVar[str]

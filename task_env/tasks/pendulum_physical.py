@@ -118,7 +118,8 @@ def _build(config, seed, sampled=None):
         free_joints={}, joint_targets={}, open_actuators=(), scene_definition=scene,
         source_closure_digest=closure, torque_actuators={JOINT: 'pendulum_torque'},
         actuator_units={'pendulum_torque': 'N*m'})
-    subject, declarations = PendulumEntity().physical_subject_declaration(source_id=source.source_id,
+    controlled_entity = PendulumEntity()
+    subject, declarations = controlled_entity.physical_subject_declaration(source_id=source.source_id,
         source_closure_sha256=closure, entity_id=ENTITY, root_frame='pendulum_anchor',
         controller_writer=WRITER, component_path=('hinge',))
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
@@ -129,8 +130,8 @@ def _build(config, seed, sampled=None):
                                                'joint', JointReference(ENTITY, 'pendulum_hinge'))))
     compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
                                                 closure, assembly, {}, (subject,), declarations)
-    controller = subject.default_effort_controller(compiled.binding, writer_id=WRITER,
-                                                   units=('N*m',))
+    controller = controlled_entity.default_controller.bind(subject, compiled.binding,
+                                                           writer_id=WRITER, units=('N*m',))
     requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
         StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, 'pendulum_hinge',
             'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')

@@ -118,7 +118,8 @@ def _build(config, seed, sampled=None):
         joint_targets={}, open_actuators=(), scene_definition=scene, source_closure_digest=closure,
         torque_actuators=dict(zip(JOINTS[1:], ACTUATORS, strict=True)),
         actuator_units={a: 'N*m' for a in ACTUATORS})
-    subject, declarations = TwoWheelBalanceEntity().physical_subject_declaration(source_id=source.source_id,
+    controlled_entity = TwoWheelBalanceEntity()
+    subject, declarations = controlled_entity.physical_subject_declaration(source_id=source.source_id,
         source_closure_sha256=closure, entity_id=ENTITY, root_frame=FRAMES[0],
         controller_writer=WRITER, component_paths=(('left',), ('right',)))
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id, scene.schema_version, scene.identity_hash)
@@ -128,8 +129,8 @@ def _build(config, seed, sampled=None):
           for path, name in zip((('left',), ('right',)), NAMES[1:], strict=True))))
     compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id, closure,
                                                 assembly, {}, (subject,), declarations)
-    controller = subject.default_effort_controller(compiled.binding, writer_id=WRITER,
-                                                   units=('N*m', 'N*m'))
+    controller = controlled_entity.default_controller.bind(subject, compiled.binding,
+                                                           writer_id=WRITER, units=('N*m', 'N*m'))
     requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
         StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, name,
             'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
