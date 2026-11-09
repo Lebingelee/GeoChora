@@ -430,7 +430,8 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
 
 
 def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,
-                                  existing_robot_entity, task_body_names, task_site_transfers):
+                                  existing_robot_entity, task_body_names, task_site_transfers,
+                                  robot_recipe=None, controller_profile=None):
     """Provider-owned PickCube adapter for neutral Robot source recipes.
 
     Robot classes expose only a ``RobotSourceRecipeV1``. This adapter owns
@@ -448,7 +449,11 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
     from .source import RuntimeSource
 
     recipe_method = getattr(robot, 'source_recipe', None)
-    recipe = recipe_method() if callable(recipe_method) else None
+    profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
+    recipe = (profile_recipe(controller_profile) if controller_profile is not None and callable(profile_recipe)
+              else recipe_method() if callable(recipe_method) else None)
+    if robot_recipe is not None and robot_recipe != recipe:
+        raise ValueError('provider Robot recipe differs from the selected profile declaration')
     if type(recipe) is not RobotSourceRecipeV1:
         raise TypeError('Robot composition requires a provider-neutral source recipe')
     if type(composition_intent) is not SourceCompositionIntentV1:

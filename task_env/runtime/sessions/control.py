@@ -289,6 +289,8 @@ class ControlBindingPlanV1:
     artifact_identity_hash: str | None = None
     source_closure_digest: str | None = None
     assembly_identity_hash: str | None = None
+    cross_entity_frame_grants: tuple[tuple[str, str, str], ...] = ()
+    feedback_attachment_identity_hash: str | None = None
     _compiled: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self):
@@ -296,7 +298,8 @@ class ControlBindingPlanV1:
             raise ValueError('unsupported ControlBindingPlan schema')
         if len(self.scene_identity_hash) != 64:
             raise ValueError('ControlBindingPlan requires a Scene identity')
-        for name in ('artifact_identity_hash', 'source_closure_digest', 'assembly_identity_hash'):
+        for name in ('artifact_identity_hash', 'source_closure_digest', 'assembly_identity_hash',
+                     'feedback_attachment_identity_hash'):
             value = getattr(self, name)
             if value is not None and (
                 len(value) != 64 or any(char not in '0123456789abcdef' for char in value)
@@ -306,6 +309,12 @@ class ControlBindingPlanV1:
             self.controller_bindings, key=lambda binding: binding.writer_id,
         )))
         object.__setattr__(self, 'resource_writers', tuple(sorted(self.resource_writers)))
+        grants = tuple(sorted(self.cross_entity_frame_grants))
+        if (any(type(row) is not tuple or len(row) != 3 or any(type(x) is not str or not x for x in row)
+                for row in grants) or len(grants) != len(set(grants))
+                or bool(grants) != (self.feedback_attachment_identity_hash is not None)):
+            raise ValueError('cross-entity feedback grants require one exact attachment identity')
+        object.__setattr__(self, 'cross_entity_frame_grants', grants)
         writer_ids = {binding.writer_id for binding in self.controller_bindings}
         if len(writer_ids) != len(self.controller_bindings):
             raise ValueError('ControlBindingPlan contains duplicate Controller writers')
@@ -355,6 +364,9 @@ class ControlBindingPlanV1:
             payload['artifact_identity_hash'] = self.artifact_identity_hash
         if self.source_closure_digest is not None:
             payload['source_closure_digest'] = self.source_closure_digest
+        if self.cross_entity_frame_grants:
+            payload['cross_entity_frame_grants'] = self.cross_entity_frame_grants
+            payload['feedback_attachment_identity_hash'] = self.feedback_attachment_identity_hash
         return _schema_hash(payload)
 
 
@@ -366,6 +378,9 @@ def compile_control_binding_plan(
     source_closure_digest: str | None = None,
     logical_assembly=None,
     assembly_children=(),
+    cross_entity_frame_grants=(),
+    feedback_attachment=None,
+    feedback_attachment_scene=None,
 ) -> ControlBindingPlanV1:
     """Resolve each A03 ControlGroup to exactly one existing writer and schema."""
     if not isinstance(scene, SceneDefinition) or scene.schema_version != 'scene-definition-v3':
@@ -385,6 +400,20 @@ def compile_control_binding_plan(
             raise ValueError('Controller Assembly must own at least one Scene entity')
     elif assembly_children:
         raise ValueError('Assembly children require a root logical Assembly')
+    if type(cross_entity_frame_grants) is not tuple:
+        raise TypeError('cross-entity frame grants require an immutable tuple')
+    if cross_entity_frame_grants:
+        from ...artifacts.fixed_attachment import FixedAttachmentPlanV1
+        if (type(feedback_attachment) is not FixedAttachmentPlanV1
+                or type(feedback_attachment_scene) is not SceneDefinition
+                or assembly_identity is None):
+            raise ValueError('cross-entity frame feedback requires its exact source Attachment and Assembly')
+        feedback_attachment.validate()
+        if (feedback_attachment.scene_pin.scene_identity_sha256 != feedback_attachment_scene.identity_hash
+                or not {feedback_attachment.parent_entity_id, feedback_attachment.child_entity_id} <= assembly_entities):
+            raise ValueError('cross-entity frame feedback Attachment is foreign')
+    elif feedback_attachment is not None or feedback_attachment_scene is not None:
+        raise ValueError('feedback Attachment requires explicit cross-entity frame grants')
     groups_by_key = {
         (group.entity_id, group.group_id): group
         for group in (scene.control_groups or ())
@@ -429,7 +458,19 @@ def compile_control_binding_plan(
             raise ValueError(f'Controller action components have overlapping group writers: {binding.writer_id}')
         if set(action_components) != set(binding.action_schema.components):
             raise ValueError(f'ControlGroups must partition the complete action schema: {binding.writer_id}')
-        _validate_feedback_requirements(scene, binding, entity_ids)
+        grants = tuple(row for row in cross_entity_frame_grants if row[0] == binding.writer_id)
+        if grants and (entity_ids != {feedback_attachment.parent_entity_id}
+                       or any(entity != feedback_attachment.child_entity_id for _, entity, _ in grants)):
+            raise ValueError('cross-entity frame grant is outside the declared parent/child Attachment')
+        declared_grants = {(binding.writer_id, item.entity_id, item.subject_id)
+            for item in binding.feedback_requirements.requirements
+            if item.subject_kind == 'frame' and item.entity_id not in entity_ids}
+        if grants and set(grants) != declared_grants:
+            raise ValueError('cross-entity frame grants must exactly match declared feedback')
+        _validate_feedback_requirements(scene, binding, entity_ids, frame_grants=grants)
+
+    if {row[0] for row in cross_entity_frame_grants} - {binding.writer_id for binding in controller_bindings}:
+        raise ValueError('cross-entity frame grant names an unknown writer')
 
     missing_groups = set(groups_by_key) - set(bound_groups)
     extra_groups = set(bound_groups) - set(groups_by_key)
@@ -448,6 +489,8 @@ def compile_control_binding_plan(
         tuple((entity_id, actuator_id, writer_id)
               for (entity_id, actuator_id), writer_id in resource_writers.items()),
         artifact_identity_hash, source_closure_digest, assembly_identity,
+        cross_entity_frame_grants,
+        None if feedback_attachment is None else feedback_attachment.identity_hash,
     )
     object.__setattr__(plan, '_compiled', True)
     return plan
@@ -480,7 +523,7 @@ def project_leaf_feedback(scene, root, children, plan):
                  for requirement in entry.binding.required_state.state_requirements.requirements)
 
 
-def _validate_feedback_requirements(scene, binding, entity_ids):
+def _validate_feedback_requirements(scene, binding, entity_ids, *, frame_grants=()):
     joints = {
         (articulation.entity_id, joint.joint_id)
         for articulation in (scene.articulations or ())
@@ -495,7 +538,9 @@ def _validate_feedback_requirements(scene, binding, entity_ids):
     entities = {entity.entity_id for entity in scene.entities}
     for requirement in binding.feedback_requirements.requirements:
         key = (requirement.entity_id, requirement.subject_id)
-        if requirement.entity_id not in entity_ids:
+        if requirement.entity_id not in entity_ids and not (
+                requirement.subject_kind == 'frame'
+                and (binding.writer_id, requirement.entity_id, requirement.subject_id) in frame_grants):
             raise ValueError('Controller feedback requirement crosses its bound Entity')
         missing = ((requirement.subject_kind == 'joint' and key not in joints)
                    or (requirement.subject_kind == 'frame' and key not in frames)
@@ -1401,12 +1446,28 @@ def materialize_control(
 
 
 @__import__('contextlib').contextmanager
-def position_subject_interval(session, target, state):
+def position_subject_interval(session, target, state, *, controller=None):
     """Authorize one Controller-produced target for the current live boundary."""
     session._require_reset()
     binding = getattr(session._source, 'position_subject_binding', None)
     if binding is None:
         raise ValueError('position subject interval requires its declared binding')
+    split_bundle = None
+    if len(binding.plan.controller_bindings) != 1:
+        from ...controllers.canonical.split_panda_position import (
+            PandaArmPositionControllerV1, PandaHandPositionControllerV1,
+            SplitPandaPositionControllerV1, SplitPositionBundleV1,
+        )
+        if type(controller) is not SplitPandaPositionControllerV1:
+            raise TypeError('multiple position subjects require their actual split Controller owners')
+        split_bundle = controller.last_split_bundle
+        if (type(split_bundle) is not SplitPositionBundleV1
+                or type(controller.arm) is not PandaArmPositionControllerV1
+                or type(controller.hand) is not PandaHandPositionControllerV1
+                or controller.arm.identity != split_bundle.arm_identity
+                or controller.hand.identity != split_bundle.hand_identity):
+            raise ValueError('split Position outputs do not belong to the live Controller owners')
+        split_bundle.validate_target(target, binding.plan)
     current = session.snapshot()
     if current.to_mapping() != state.to_mapping():
         raise ValueError('position subject target was computed from a stale state')
@@ -1419,10 +1480,12 @@ def position_subject_interval(session, target, state):
         raise ValueError('position subject boundary is already consumed or active')
     consumed.add(boundary)
     session._subject_position_inflight = (boundary, target.identity_hash, target.controller_identity)
+    session._subject_position_split_bundle = split_bundle
     try:
         yield
     finally:
         session._subject_position_inflight = None
+        session._subject_position_split_bundle = None
 
 
 def validate_target(session,target):
@@ -1448,10 +1511,17 @@ def validate_target(session,target):
                 or binding_plan.source_closure_digest != session._source.source_closure_digest):
             raise ValueError('position target lacks its source-bound Controller binding')
         bindings = binding_plan.controller_bindings
-        if len(bindings) != 1 or bindings[0].controller_identity != target.controller_identity:
-            raise ValueError('position target Controller identity differs from subject binding')
-        if {writer for _, _, writer in binding_plan.resource_writers} != {bindings[0].writer_id}:
-            raise ValueError('position target does not have one declared Controller writer')
+        if len(bindings) == 1:
+            if bindings[0].controller_identity != target.controller_identity:
+                raise ValueError('position target Controller identity differs from subject binding')
+        else:
+            from ...controllers.canonical.split_panda_position import SplitPositionBundleV1
+            bundle = getattr(session, '_subject_position_split_bundle', None)
+            if type(bundle) is not SplitPositionBundleV1:
+                raise ValueError('position target lacks its admitted component outputs')
+            bundle.validate_target(target, binding_plan)
+        if {writer for _, _, writer in binding_plan.resource_writers} != {item.writer_id for item in bindings}:
+            raise ValueError('position target writers differ from the declared Controller binding')
         native_resources = {native for _, _, native in subject_binding.resource_native_names}
         requested_resources = set(session._source.joint_targets.values()) | set(session._source.open_actuators)
         if native_resources != requested_resources:
@@ -2175,6 +2245,11 @@ def validate_position_control_subjects(*, scene, root, children, subjects, plan,
             'attachment': None if subject.attachment_plan is None else subject.attachment_plan.identity_hash})
     if {entity for entity, _, _ in plan.resource_writers} != {s.entity_id for s in subjects}:
         raise ValueError('every position resource must have exactly one subject owner')
+    if plan.cross_entity_frame_grants:
+        attachments = {subject.attachment_plan.identity_hash for subject in subjects
+                       if subject.attachment_plan is not None}
+        if plan.feedback_attachment_identity_hash not in attachments:
+            raise ValueError('position feedback grants differ from the actual subject Attachment')
     return _schema_hash({'schema_version': 'position-subject-binding-v1',
                          'scene': scene.identity_hash, 'assembly': plan.assembly_identity_hash,
                          'controller': plan.identity_hash, 'subjects': subject_facts})

@@ -2917,7 +2917,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._require_execution_healthy()
         external = None
         if external_com_wrenches is not None:
-            if self.recorder is not None and getattr(self.recorder, 'active', False):
+            if self.recorder is not None and not getattr(
+                    self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
                 raise StageUnavailableError('caller COM wrenches are not represented by the active Recorder')
             if self._has_component_assembly() or self.binding.interval_mode != 'grouped':
                 raise StageUnavailableError('caller COM wrenches require the selected grouped interval')
@@ -4221,7 +4222,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                                    observed_diagnostics)
             from contextlib import nullcontext
             from ..runtime.sessions.control import position_subject_interval
-            subject_scope = (position_subject_interval(self.session, target, self.state)
+            subject_scope = (position_subject_interval(self.session, target, self.state, controller=self.controller)
                              if getattr(self.value['source'], 'position_subject_binding', None) is not None
                              else nullcontext())
             with subject_scope:
@@ -4328,6 +4329,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 record_append_attempted = True
                 if 'gravity_compensation_v1' in self.info:
                     diagnostics = {**diagnostics, 'gravity_compensation_v1': self.info['gravity_compensation_v1']}
+                if getattr(self.controller, 'last_split_bundle', None) is not None:
+                    scene_receipt = getattr(self.session, '_last_scene_control_submission', None)
+                    if not isinstance(scene_receipt, dict) or scene_receipt.get('status') != 'acknowledged':
+                        raise ValueError('split Position recording requires its scene submission receipt')
+                    diagnostics = {**diagnostics, 'scene_control_submission_v1': scene_receipt}
                 self._record_interval(request, canonical, target, applied, stage, diagnostics,
                                       terminated, truncated, substeps)
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info

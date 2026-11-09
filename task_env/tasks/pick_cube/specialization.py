@@ -62,6 +62,7 @@ FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
 PICKCUBE_CONTROLLER_PROFILES = {
     "r1",
+    "r1_split",
     "r3_continuous_v1",
     "r3_continuous_v1_pose_path_x20",
 }
@@ -271,6 +272,9 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     )
     if controller_profile == "r1":
         controller = ProductionCanonicalPandaController.from_source(artifact, source)
+    elif controller_profile == "r1_split":
+        from ...controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
+        controller = SplitPandaPositionControllerV1(artifact, source)
     else:
         from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
         controller = ProductionCanonicalPandaControllerR3.from_source(
@@ -338,11 +342,17 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         resolved["base_controller_identity"] = base_controller_identity
         resolved.update(execution_profile)
         resolved["controller_identity"] = controller.identity
-    if controller_profile != "r1":
+    if is_r3_profile:
         resolved["controller_profile"] = controller_profile
         resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
         resolved["task_controller_profile"]["posture_path_profile"] = posture_path_profile
         resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
+    elif controller_profile == 'r1_split':
+        resolved['controller_profile'] = controller_profile
+        resolved['controller_owners'] = (
+            {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
+            {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
+        )
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
         "readiness": readiness, "controller": controller,
@@ -663,13 +673,16 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config):
         profile = config.controller_profile
+        if profile == 'r1_split' and config.robot_uid is None:
+            raise ValueError('split Position Controllers require an explicitly selected Robot source recipe')
         adapter = None
         if config.robot_uid is not None:
             from ...registry import AGENT_REGISTRY
             robot = AGENT_REGISTRY.create(config.robot_uid)
             recipe_factory = getattr(robot, 'source_recipe', None)
             if callable(recipe_factory):
-                recipe = recipe_factory()
+                select_recipe = getattr(robot, 'source_recipe_for_profile', None)
+                recipe = select_recipe(profile) if callable(select_recipe) else recipe_factory()
                 profiles = recipe.control_profiles
                 if profile not in profiles:
                     raise ValueError('selected Robot does not declare this Controller profile')
@@ -693,6 +706,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                         robot_recipe=recipe, task_site_transfers=task_site_transfers)
                     return provider_adapter.compose_pickcube_robot_source(
                         source, robot=robot, composition_intent=intent, **owners,
+                        robot_recipe=recipe, controller_profile=profile,
                         task_entities=task_entities, existing_robot_entity=existing_robot_entity,
                         task_body_names=task_body_names, task_site_transfers=task_site_transfers)
 

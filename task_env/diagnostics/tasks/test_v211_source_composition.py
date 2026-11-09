@@ -167,6 +167,11 @@ def test_panda_robot_recipes_require_no_asset_reads_or_provider_imports(monkeypa
         'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
         'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7')
     assert len(integrated.identity_hash) == len(assembled.identity_hash) == 64
+    split_recipe = AGENT_REGISTRY.create('panda-arm-hand-v1').source_recipe_for_profile('r1_split')
+    assert split_recipe.control_profiles == ('r1_split',)
+    assert {writer for _, _, writer in split_recipe.resource_writers} == {
+        'panda-arm-position-writer', 'panda-hand-position-writer'}
+    assert AGENT_REGISTRY.create('panda-arm-hand-v1').source_recipe_for_profile('r1') == recipes['panda-arm-hand-v1']
 
     import inspect
     from task_env.robots.assembled_panda import AssembledPandaAgent

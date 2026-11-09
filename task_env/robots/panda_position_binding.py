@@ -20,6 +20,9 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
     from ..runtime.sessions.control import (ControllerBindingV1, ControlGroupActionProjectionV1,
         compile_control_binding_plan, validate_position_control_subjects)
     from ..runtime.sessions.physical_control import ControlledSubjectV1
+    from ..controllers.canonical.split_panda_position import (
+        ARM_WRITER, HAND_WRITER, SplitPandaPositionControllerV1,
+    )
 
     scene = source_scene
     if not any(f.entity_id == site_entity and f.frame_id == site_name for f in scene.frames):
@@ -64,16 +67,46 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
         site_name, 'required', 'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query'),
         StateFieldRequirement('state-field-requirement-v1', 'actuator_force', 'actuator', groups[1][0],
         'actuator8', 'required', 'evaluation_boundary', 'provider-native-actuator-output', 'actuator_force_query'))
-    requirements = StateRequirements('state-requirements-v1', 'controller', writer, fields)
-    binding = ControllerBindingV1('controller-binding-v1', writer, action, 'canonical-control-feedback',
-        'v1', requirements, tuple(ControlGroupActionProjectionV1('control-group-action-projection-v1',
-            entity, group, names[:7] if index == 0 else names[7:])
-            for index, (entity, group) in enumerate(groups)), controller_identity=controller.identity)
-    plan = compile_control_binding_plan(scene, (binding,), artifact_identity_hash=artifact.identity_hash,
-        source_closure_digest=task_closure_sha256, logical_assembly=root, assembly_children=children)
+    split = type(controller) is SplitPandaPositionControllerV1
+    if split:
+        if len(components) != 2 or len(groups) != 2 or groups[0][0] == groups[1][0]:
+            raise ValueError('split Position Controllers require distinct arm and hand subjects')
+        bindings = []
+        for index, (entity, group) in enumerate(groups):
+            owner = controller.arm if index == 0 else controller.hand
+            components_for_owner = names[:7] if index == 0 else names[7:]
+            owner_action = ActionModeSpec(
+                f'panda-split-position-{index}-v1', 'task-env-action-v2',
+                'absolute_pose' if index == 0 else 'absolute_joint',
+                'world' if index == 0 else None, 'quaternion_wxyz' if index == 0 else None,
+                components_for_owner, (float('-inf'),)*len(components_for_owner),
+                (float('inf'),)*len(components_for_owner),
+                quaternion_convention='wxyz' if index == 0 else None)
+            owner_fields = tuple(field for field in fields if field.entity_id == entity
+                                 or (index == 0 and field.field_name == 'frame_pose_world'))
+            requirements = StateRequirements('state-requirements-v1', 'controller', owner.writer_id, owner_fields)
+            bindings.append(ControllerBindingV1('controller-binding-v1', owner.writer_id, owner_action,
+                'canonical-control-feedback', 'v1', requirements,
+                (ControlGroupActionProjectionV1('control-group-action-projection-v1',
+                                                 entity, group, components_for_owner),),
+                controller_identity=owner.identity))
+        bindings = tuple(bindings)
+        subject_writers = {groups[0][0]: ARM_WRITER, groups[1][0]: HAND_WRITER}
+    else:
+        requirements = StateRequirements('state-requirements-v1', 'controller', writer, fields)
+        bindings = (ControllerBindingV1('controller-binding-v1', writer, action, 'canonical-control-feedback',
+            'v1', requirements, tuple(ControlGroupActionProjectionV1('control-group-action-projection-v1',
+                entity, group, names[:7] if index == 0 else names[7:])
+                for index, (entity, group) in enumerate(groups)), controller_identity=controller.identity),)
+        subject_writers = {entity: writer for entity, _, _, _ in components}
+    plan = compile_control_binding_plan(scene, bindings, artifact_identity_hash=artifact.identity_hash,
+        source_closure_digest=task_closure_sha256, logical_assembly=root, assembly_children=children,
+        cross_entity_frame_grants=((ARM_WRITER, site_entity, site_name),) if split else (),
+        feedback_attachment=attachment if split else None,
+        feedback_attachment_scene=source_scene if split else None)
     subjects = tuple(ControlledSubjectV1(entity, entity, source_id, robot_closure_sha256,
         'references_existing', 'fixed' if parent is None else 'constrained', FrameReference(entity, root_frame),
-        parent, tuple(paths[entity](name) for name in joint_names), (writer,),
+        parent, tuple(paths[entity](name) for name in joint_names), (subject_writers[entity],),
         attachment_plan=None if parent is None else attachment)
         for entity, root_frame, joint_names, parent in components)
     subject_identity = validate_position_control_subjects(scene=scene, root=root, children=children,

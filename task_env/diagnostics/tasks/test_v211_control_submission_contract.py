@@ -467,3 +467,50 @@ def test_caller_com_contribution_is_in_the_single_committed_scene(monkeypatch):
     assert (second['producer_kind'], second['physical_effect_id'], second['resources']) == (
         'caller', 'push', ('body:cube',))
     assert second['command_sha256'] == request.identity_hash
+
+
+def test_split_subject_commit_rejects_forged_component_before_consuming_boundary(monkeypatch):
+    from dataclasses import replace
+    from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
+    from task_env.controllers.canonical.kinematics import ARM
+    from task_env.controllers.canonical.split_panda_position import (
+        ARM_WRITER, HAND_WRITER, SplitPositionBundleV1, split_identity,
+    )
+    import task_env.assembly.source_composition as composition
+    class SubjectBinding:
+        pass
+    monkeypatch.setattr(composition, 'PositionSubjectControlBindingV1', SubjectBinding)
+    arm_id, hand_id = 'a' * 64, 'c' * 64
+    positions = dict.fromkeys(ARM, 0.)
+    hand = GripperControlTarget('panda-v1/gripper', .02, 10., .02)
+    target = CanonicalControlTarget('canonical-control-v0', 'b' * 64, split_identity(arm_id, hand_id),
+                                    ARM, positions, positions, hand)
+    bundle = SplitPositionBundleV1(arm_id, hand_id, (0.,) * 7, (0.,) * 7, hand, target.identity_hash)
+    binding = SubjectBinding(); binding.identity_hash = 'f' * 64
+    binding.plan = SimpleNamespace(_compiled=True, scene_identity_hash='e' * 64,
+        artifact_identity_hash='b' * 64, source_closure_digest='a' * 64,
+        controller_bindings=(SimpleNamespace(writer_id=ARM_WRITER, controller_identity=arm_id),
+                             SimpleNamespace(writer_id=HAND_WRITER, controller_identity=hand_id)),
+        resource_writers=(('arm', 'motor', ARM_WRITER), ('hand', 'motor', HAND_WRITER)))
+    owners = ((ARM_WRITER, ('arm/motor',)), (HAND_WRITER, ('hand/motor',)))
+    def fresh(component):
+        value = _Session()
+        value._source = SimpleNamespace(source_id='task', source_closure_digest='a' * 64,
+            position_subject_binding=binding, composition_runtime_input=None)
+        value._artifact = SimpleNamespace(identity_hash='b' * 64,
+            timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01))
+        value._subject_position_inflight = (('materialization-1', 'episode-1', 0, 0),
+                                             target.identity_hash, target.controller_identity)
+        value._subject_position_split_bundle = component
+        return value
+    kwargs = dict(command_sha256=target.identity_hash, controller_identities=(target.controller_identity,),
+                  writer_ids=(ARM_WRITER, HAND_WRITER), resource_ids=('arm/motor', 'hand/motor'),
+                  resource_owners=owners, subject_execution_mode='boundary-hold')
+    bad = fresh(replace(bundle, hand_identity='d' * 64)); writes=[]
+    with pytest.raises(ValueError, match='source-bound plan'):
+        _submit(bad, target, lower=lambda: writes.append(1), **kwargs)
+    assert not writes and not getattr(bad, '_control_submission_consumed', set())
+    good = fresh(bundle); _submit(good, target, **kwargs)
+    first, second = good._last_scene_control_submission['interval']['contributions']
+    assert (first['writer_id'], first['command_sha256']) == (ARM_WRITER, bundle.arm_hash)
+    assert (second['writer_id'], second['command_sha256']) == (HAND_WRITER, bundle.hand_hash)

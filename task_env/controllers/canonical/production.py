@@ -117,32 +117,10 @@ class ProductionCanonicalPandaController:
             raise RuntimeError('reset then compute exactly once per control boundary')
         # Validate/lower first; invalid public actions never advance gripper state.
         canonical, desired_arm, servo_arm = self._arm._compute_arm(state, requested)
-        cfg = self.gripper_config
-        opening = float(.5 * (canonical.interpreted_values[-1] + 1) * self.config.gripper_opening_range_m)
-        delta = opening - self._commanded
-        if delta > 1e-12:
-            self._force_mode = False
-            self._force_initialized = False
-        closing = delta < -1e-12
-        measured = feedback.gripper.closing_force_N
-        activation = max(.5, .1 * cfg.force_limit_N)
-        if closing and not self._force_mode and measured >= activation:
-            self._force_mode = True
-        if closing and self._force_mode:
-            if not self._force_initialized:
-                self._commanded = float(np.clip(
-                    feedback.gripper.opening_m - cfg.force_limit_N / self.config.gripper_position_stiffness_N_per_m,
-                    0, self.config.gripper_opening_range_m))
-                self._force_initialized = True
-            if cfg.force_limit_N - measured > cfg.force_deadband_N:
-                self._commanded = float(max(0., self._commanded - cfg.force_adjust_step_m))
-        elif not self._force_mode:
-            self._commanded = float(np.clip(self._commanded + np.clip(delta,
-                -cfg.opening_step_m, cfg.opening_step_m), 0, self.config.gripper_opening_range_m))
-        self._desired = opening
+        from .r1_gripper import advance_r1_gripper
+        gripper_target = advance_r1_gripper(self, feedback, canonical)
         target = CanonicalControlTarget('canonical-control-v0', self._arm.artifact_hash,
             self.identity, ARM, dict(zip(ARM, map(float, desired_arm))),
-            dict(zip(ARM, map(float, servo_arm))),
-            GripperControlTarget(self.gripper_semantic_id, opening, cfg.force_limit_N, self._commanded))
+            dict(zip(ARM, map(float, servo_arm))), gripper_target)
         self._expected_step += 1
         return canonical, target

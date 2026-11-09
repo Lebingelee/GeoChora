@@ -33,10 +33,25 @@ class AssembledPandaAgent(BaseAgent):
             (('panda-arm', 'attachment_site', 'panda-hand', 'hand',
               'fixed-transform-from-task-authored-tcp-v1'),),
             tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2'),
-            self.selected_controller_profiles(),
+            ('r1',),
             tuple((entity, f'actuator{index}', 'panda-position-controller')
                   for entity, indexes in (('panda-arm', range(1, 8)), ('panda-hand', (8,)))
                   for index in indexes))
+
+    def source_recipe_for_profile(self, profile):
+        """Keep the historical recipe identity and bind split writers explicitly."""
+        recipe = self.source_recipe()
+        if profile == 'r1':
+            return recipe
+        if profile != 'r1_split':
+            raise ValueError('assembled Panda does not declare this Controller profile')
+        from dataclasses import replace
+        from ..controllers.canonical.split_panda_position import ARM_WRITER, HAND_WRITER
+        return replace(recipe, control_profiles=('r1_split',), resource_writers=tuple(
+            (entity, f'actuator{index}', writer)
+            for entity, indexes, writer in (
+                ('panda-arm', range(1, 8), ARM_WRITER), ('panda-hand', (8,), HAND_WRITER))
+            for index in indexes))
 
     def reference_spec(self):
         return ReferenceSpec(body_names=('link0', 'probe_hand_hand', 'probe_hand_left_finger', 'probe_hand_right_finger'),
@@ -70,7 +85,7 @@ class AssembledPandaAgent(BaseAgent):
         return ()
 
     def selected_controller_profiles(self):
-        return ('r1',)
+        return ('r1', 'r1_split')
 
     def compile_effort_subjects(self, declaration, *, artifact_sha256, source_id,
                                 native_ranges, native_drive='disabled'):

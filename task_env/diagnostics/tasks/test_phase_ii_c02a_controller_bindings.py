@@ -299,3 +299,17 @@ def test_legacy_panda_arm_hand_action_feedback_and_control_outputs_remain_compat
         assert result[2] is False and result[3] is True
     finally:
         env.close()
+
+
+def test_cross_entity_feedback_requires_exact_attachment_and_does_not_change_legacy_plan():
+    scene, binding = _scene(), _binding()
+    legacy = compile_control_binding_plan(scene, (binding,))
+    assert legacy.cross_entity_frame_grants == ()
+    assert legacy.feedback_attachment_identity_hash is None
+    with pytest.raises(ValueError, match='exact source Attachment'):
+        compile_control_binding_plan(scene, (binding,),
+            cross_entity_frame_grants=((binding.writer_id, 'foreign', 'frame'),))
+    with pytest.raises(ValueError, match='explicit cross-entity frame grants'):
+        compile_control_binding_plan(scene, (binding,), feedback_attachment=object())
+    with pytest.raises(ValueError, match='one exact attachment identity'):
+        replace(legacy, cross_entity_frame_grants=((binding.writer_id, 'foreign', 'frame'),))

@@ -84,6 +84,10 @@ def test_active_recorder_rejects_unrecorded_caller_force_before_staging():
     env.recorder = SimpleNamespace(active=True)
     with pytest.raises(StageUnavailableError, match='not represented by the active Recorder'):
         env.step(object(), external_com_wrenches=(_request(),))
+    # The legacy canonical Recorder exposes _frozen instead of active.
+    env.recorder = SimpleNamespace(_frozen=False)
+    with pytest.raises(StageUnavailableError, match='not represented by the active Recorder'):
+        env.step(object(), external_com_wrenches=(_request(),))
 
 
 def test_same_writer_can_precompute_disjoint_segments_but_not_overlap():

@@ -276,14 +276,22 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
     if (not plan._compiled
             or plan.artifact_identity_hash != artifact_sha256
             or plan.source_closure_digest != source_closure_sha256
-            or len(plan.controller_bindings) != 1
-            or plan.controller_bindings[0].controller_identity != target.controller_identity
             or target.task_artifact_hash != artifact_sha256):
         raise ValueError('scene subject interval differs from its bound Controller or source')
+    split_bundle = None
+    if len(plan.controller_bindings) == 1:
+        if plan.controller_bindings[0].controller_identity != target.controller_identity:
+            raise ValueError('scene subject interval differs from its bound Controller')
+    else:
+        from ...controllers.canonical.split_panda_position import SplitPositionBundleV1
+        split_bundle = getattr(session, '_subject_position_split_bundle', None)
+        if type(split_bundle) is not SplitPositionBundleV1:
+            raise ValueError('scene subject interval lacks its component outputs')
+        split_bundle.validate_target(target, plan)
     expected = tuple(sorted((writer, tuple(sorted(f'{entity}/{actuator}'
         for entity, actuator, owner in plan.resource_writers if owner == writer)))
         for writer in {writer for _, _, writer in plan.resource_writers}))
-    if tuple(sorted(resource_owners)) != expected or len(expected) != 1:
+    if tuple(sorted(resource_owners)) != expected:
         raise ValueError('scene subject resources differ from the bound writer')
     expected_boundary = (boundary.provider_materialization_id, boundary.episode_id,
                          boundary.state_revision, boundary.control_step)
@@ -303,20 +311,35 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
             or not math.isfinite(control_dt)
             or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
         raise ValueError('scene subject interval differs from the artifact timebase')
-    writer, resources = expected[0]
-    _validate_resource_intervals(tuple((writer, resource, 0, count) for resource in resources),
+    _validate_resource_intervals(tuple((writer, resource, 0, count)
+                                      for writer, resources in expected for resource in resources),
                                  writer_resources=expected, substeps=count)
     # The old canonical target does not carry source boundary, row or
     # generation. Its verified in-flight subject binding supplies the link;
     # it does not create values for those missing fields. Native feedback mode
     # represents a Controller-managed interval, not a held actuator setpoint.
-    contribution = SceneCommandContributionV1('robot-controller',
-        'position-reference-native-feedback' if execution_mode == 'native-feedback' else 'position-target',
-        ('rad', 'm'), 'controller-managed' if execution_mode == 'native-feedback' else 'exclusive',
-        None, writer, target.controller_identity, None, target.identity_hash, resources, 0, count)
+    if split_bundle is None:
+        writer, resources = expected[0]
+        contributions = (SceneCommandContributionV1('robot-controller',
+            'position-reference-native-feedback' if execution_mode == 'native-feedback' else 'position-target',
+            ('rad', 'm'), 'controller-managed' if execution_mode == 'native-feedback' else 'exclusive',
+            None, writer, target.controller_identity, None, target.identity_hash, resources, 0, count),)
+    else:
+        from ...controllers.canonical.split_panda_position import ARM_WRITER, HAND_WRITER
+        if execution_mode != 'boundary-hold':
+            raise ValueError('split Position owners require boundary-held output')
+        owners = dict(expected)
+        contributions = (
+            SceneCommandContributionV1('robot-controller', 'arm-position-target', ('rad',),
+                'exclusive', None, ARM_WRITER, split_bundle.arm_identity, None, split_bundle.arm_hash,
+                owners[ARM_WRITER], 0, count),
+            SceneCommandContributionV1('robot-controller', 'hand-position-target', ('m',),
+                'exclusive', None, HAND_WRITER, split_bundle.hand_identity, None, split_bundle.hand_hash,
+                owners[HAND_WRITER], 0, count),
+        )
     return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
         source_closure_sha256, artifact_sha256, boundary, sample_clock, binding.identity_hash,
-        None, None, None, dt, count, (contribution,))
+        None, None, None, dt, count, contributions)
 
 
 def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
