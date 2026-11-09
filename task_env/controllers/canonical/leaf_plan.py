@@ -274,6 +274,9 @@ class EffectiveLeafPlanV1:
                     else 'r02c-independent-position-leaves-v1')
         return StateRequirements('state-requirements-v1', 'controller', consumer, requirements)
 
+    def initial_materialization_receipt(self, session):
+        return session.leaf_materialization_receipt
+
     def __post_init__(self):
         if self.schema_version != "effective-leaf-plan-v1":
             raise ValueError("unsupported effective leaf plan schema")

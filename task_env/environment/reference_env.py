@@ -1850,6 +1850,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise
         previous_episode_end = self._position_episode_end
         if (self.session is not None
+                and getattr(self, '_selected_reset_stop_capability', False)
                 and getattr(self, '_published_position_typed_state', None) is not None
                 and previous_episode_end is None):
             try:
@@ -2032,6 +2033,32 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'session_materialization'
             reset_effects['replacement_materialization_attempted'] = True
             self._task_rgb_state_binding = None
+            self._position_state_declaration = None
+            mixed_state_controller = None
+            physical_state_execution = None
+
+            def install_state_capabilities():
+                from ..runtime.sessions.state_initialization import (
+                    LegacyFeedbackInitialState, MixedInitialState, PhysicalInitialState, PositionInitialState,
+                )
+                capabilities = []
+                declaration = self._position_state_declaration
+                if declaration is not None:
+                    capabilities.append(PositionInitialState(declaration, self.position_scene,
+                        self.position_joint_bindings, self.position_frame_bindings,
+                        self.position_profiles, self.position_plan))
+                if mixed_state_controller is not None:
+                    capabilities.append(MixedInitialState(mixed_state_controller))
+                if physical_state_execution is not None:
+                    capabilities.append(PhysicalInitialState(physical_state_execution,
+                        getattr(self.binding, 'physical_observation_binding', None) is None
+                        and getattr(self, '_task_rgb_config', None) is None,
+                        self.value.get('physical_execution') is physical_state_execution))
+                if not capabilities:
+                    capabilities.append(LegacyFeedbackInitialState(self.controller))
+                self._selected_state_capabilities = tuple(capabilities)
+                self._selected_reset_stop_capability = any(
+                    getattr(capability, 'supports_stop', False) for capability in capabilities)
             if getattr(self, '_task_rgb_config', None) is not None:
                 self._prepare_task_rgb_state_binding()
 
@@ -2120,6 +2147,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._compiled_layout_pre_reset = self.binding.pre_reset_session_validator(
                     self.session, self.value,
                 )
+                mixed_state_controller = self.controller
             else:
                 self.position_profile = False
                 if type(self.binding.scalar_control_binding) is not ControlBinding:
@@ -2127,6 +2155,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if selection is not None and selection.deployment == 'isolated_worker':
                     self.session = start_worker()
                     if self.binding.physical_control_profile is None:
+                        install_state_capabilities()
                         return
                 else:
                     self.session = materialize_control(self.artifact, self.execution,
@@ -2149,6 +2178,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if not callable(bind_physical):
                     raise StageUnavailableError('RuntimeSession does not expose a physical-control build port')
                 bind_physical(profile)
+                physical_state_execution = profile
+            install_state_capabilities()
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
                 if self.uid not in ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'):
                     raise ValueError('gravity compensation is limited to the selected Panda tasks')
@@ -2181,42 +2212,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def read_state():
             nonlocal failure_phase
             failure_phase = 'snapshot_readback'
-            from .reference_binding import validate_initial_state_publication
             self.state = self.session.snapshot()
-            if self.position_profile:
-                self.typed_state = self.session.snapshot_v1(
-                    scene=self.position_scene,
-                    joint_bindings=self.position_joint_bindings,
-                    frame_bindings=self.position_frame_bindings,
-                    requirements=self._position_requirements(),
-                )
-                validate_initial_state_publication(self.session, self.typed_state, self.state)
-                if self.leaf_position_profile:
-                    self.leaf_materialization = self.session.leaf_materialization_receipt
-                else:
-                    for profile in self.position_profiles:
-                        profile.reset(self.typed_state, self.position_plan)
-                self.feedback = None
-            elif self.mixed_control_profile:
-                self.feedback = None
-                self.controller.reset(self.state)
-            elif self.binding.physical_control_profile is not None:
-                self.feedback = None
-            else:
-                failure_phase = 'controller_feedback'
-                self.feedback = self.session.control_feedback(self.state)
-                self.controller.reset(self.state, self.feedback)
-            if self.binding.physical_control_profile is not None:
-                execution = self.binding.physical_control_profile(self)
-                publication = self.session.snapshot_v2(
-                    scene=execution.scene, joint_bindings=execution.joint_bindings,
-                    frame_bindings=execution.frame_bindings, requirements=execution.requirements)
-                validate_initial_state_publication(self.session, publication, self.state)
-                execution.initialize_controllers(self.session, publication)
-                if (getattr(self.binding, 'physical_observation_binding', None) is None
-                        and getattr(self, '_task_rgb_config', None) is None):
-                    self.typed_state = publication
-            if getattr(self, '_task_rgb_config', None) is not None and not self.position_profile:
+            self.feedback = None
+            position_published = False
+            for capability in self._selected_state_capabilities:
+                failure_phase = capability.failure_phase
+                result = capability.initialize(self.session, self.state)
+                if result.typed_publication is not None:
+                    self.typed_state = result.typed_publication
+                if result.feedback is not None:
+                    self.feedback = result.feedback
+                if result.materialization_receipt is not None:
+                    self.leaf_materialization = result.materialization_receipt
+                position_published = position_published or result.publishes_position
+            if getattr(self, '_task_rgb_config', None) is not None and not position_published:
                 self._publish_task_rgb_typed_state()
             return self.state
 

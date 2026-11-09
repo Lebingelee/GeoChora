@@ -334,6 +334,9 @@ class ControlBindingPlanV1:
         return StateRequirements('state-requirements-v1', 'controller', 'c02b-dual-position-dispatch-v1',
             tuple(item for requirement in requirements for item in requirement.requirements))
 
+    def initial_materialization_receipt(self, _session):
+        return None
+
     @property
     def identity_hash(self):
         payload = {

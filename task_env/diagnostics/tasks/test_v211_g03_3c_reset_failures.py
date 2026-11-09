@@ -266,6 +266,7 @@ def test_failed_old_position_stop_releases_candidate_source(monkeypatch, positio
     env.session=old
     # Published state, not this legacy classification flag, requires stop.
     env.position_profile=position_profile
+    env._selected_reset_stop_capability=True
     env._published_position_typed_state=object()
     seen=[]
     original=provenance.preflight_selected_deployment
