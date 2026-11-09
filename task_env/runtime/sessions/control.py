@@ -1977,6 +1977,12 @@ def execute_position_control_interval(
     requirements=None,
 ):
     """Preflight both groups, compute/apply once, then advance one outer interval."""
+    from ...controllers.canonical.position_sequence import PositionActionSequenceV1
+    if type(request) is PositionActionSequenceV1:
+        return _execute_position_action_sequence(
+            session, controller_profile, plan, request, publication, scene=scene,
+            joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+            requirements=requirements)
     prepared = prepare_structured_action(plan, request)
     from .transport import RemoteSession
     if isinstance(session, RemoteSession):
@@ -2053,6 +2059,81 @@ def execute_position_control_interval(
         requirements=requirements or controller_profile.requirements,
     )
     return canonical, target, applied, state, next_publication
+
+
+
+def _execute_position_action_sequence(session, profile, plan, action, publication, *,
+                                      scene, joint_bindings, frame_bindings, requirements):
+    """Commit and execute one bounded, source-bound MuJoCo Position sequence."""
+    from .mujoco import _MuJoCoSession
+    from .control_submission import PositionControlSequenceV1, submit_control_command
+    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+    if (type(session) is not _MuJoCoSession or type(profile) is not PandaPositionServoProfileV1
+            or getattr(session, '_physical_port', None) is not None
+            or getattr(session, '_mixed_actuator_plan', None) is not None
+            or hasattr(session, '_gravity_model')):
+        raise ValueError('Position sequence requires the admitted scalar MuJoCo Position port')
+    count = session._artifact.timebase.control_substeps
+    action.validate(substeps=count)
+    _validate_position_source_boundary(session, profile, plan, publication, scene=scene,
+        joint_bindings=joint_bindings, frame_bindings=frame_bindings)
+    if getattr(session, '_prepared_position_sequence', None) is not None:
+        raise RuntimeError('Position sequence is already prepared')
+    previews = profile.preview_absolute_joint_targets(publication,
+        tuple(item.request for item in action.slices), plan)
+    prepared = []
+    for item, (canonical, target) in zip(action.slices, previews, strict=True):
+        boundary, resources, lower = _position_control_part(session, target,
+            controller_profile=profile, plan=plan, publication=publication, scene=scene,
+            joint_bindings=joint_bindings, frame_bindings=frame_bindings)
+        # Provider validation is read-only; the in-flight marker is scoped to
+        # this preflight and is not an acknowledgement or physical write.
+        session._position_target_in_flight = target.target.identity_hash
+        session._position_target_source_boundary_in_flight = target.source_boundary
+        try:
+            validate_target(session, target.target)
+        finally:
+            session._position_target_in_flight = None
+            session._position_target_source_boundary_in_flight = None
+        prepared.append((item, canonical, target, boundary, resources, lower))
+    if any(row[3] != prepared[0][3] or row[4] != prepared[0][4] for row in prepared):
+        raise ValueError('Position sequence slices differ in boundary or resources')
+    sequence = PositionControlSequenceV1(action,
+        tuple((row[0].start_substep, row[0].end_substep, row[2]) for row in prepared))
+    sequence.validate()
+    session._prepared_position_sequence = sequence
+    try:
+        ack = submit_control_command(session, sequence, command_kind='position-target',
+            command_sha256=sequence.identity_hash, source_id=profile.source.source_id,
+            source_closure_sha256=profile.source.source_closure_digest,
+            artifact_sha256=profile.artifact.identity_hash, boundary=publication.view.boundary,
+            sample_clock=publication.view.sample_clock,
+            controller_generation=int(getattr(profile, 'generation', 0)),
+            controller_identities=(profile.identity,), writer_ids=(profile.writer_id,),
+            resource_ids=prepared[0][4], resource_owners=((profile.writer_id, prepared[0][4]),),
+            units=('arm-position:rad', 'gripper-position:m'),
+            lowering=f'{type(session).__module__}.{type(session).__qualname__}.stage_position_sequence',
+            lower=lambda: session.stage_position_sequence(sequence, tuple(row[5] for row in prepared)))
+        # Preview is pure. Consume the Controller cursor only after the common
+        # submission owner has acknowledged staging; any later failure is
+        # fault-latched by the selected Position lifecycle and requires reset.
+        if session.state_boundary_identity() != publication.view.boundary:
+            raise ValueError('Position sequence Controller boundary changed during staging')
+        profile.commit_absolute_joint_preview(publication, plan, sequence,
+                                               session._last_scene_control_submission)
+        state = session.step()
+        applied = getattr(session, '_last_position_sequence_applied', None)
+        if type(applied) is not tuple or len(applied) != len(prepared):
+            raise ValueError('Position sequence did not acknowledge every native target')
+        next_publication = session.snapshot_v1(scene=scene, joint_bindings=joint_bindings,
+            frame_bindings=frame_bindings, requirements=requirements or profile.requirements)
+        # Preserve the established single-target transition shape using the
+        # last real native acknowledgement; the scene receipt carries slices.
+        last = prepared[-1]
+        return last[1], last[2], applied[-1], state, next_publication
+    finally:
+        if getattr(session, '_prepared_position_sequence', None) is sequence:
+            session._prepared_position_sequence = None
 
 
 def _r1_controller_state_from_publication(publication, scene):

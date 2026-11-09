@@ -242,6 +242,8 @@ class PandaPositionServoProfileV1:
         self._constructed_identity = self.identity
         self._constructed_config = config
         self._constructed_algorithm_identity = self._algorithm.identity
+        self._preview_constructed_target_limits = tuple(
+            tuple(float(value) for value in row) for row in self._algorithm.arm_target_limits)
         self._constructed_arm_reference_identity = (
             None if self._arm_reference is None else self._arm_reference.identity
         )
@@ -737,9 +739,12 @@ class PandaPositionServoProfileV1:
                 arm_position=r3_arm,
                 arm_servo_position=r3_arm,
             )
-        # The shared legacy position algorithm consumes panda-v1 semantic
-        # names. The v1 Artifact and RuntimeSource use entity-qualified
-        # identities; lower the same seven values to this Entity's Joint keys.
+        bound_target = self._bind_canonical_target(base_target, publication, plan_identity)
+        self._next_control_step += 1
+        return canonical, bound_target
+
+    def _bind_canonical_target(self, base_target, publication, plan_identity):
+        # Bind the shared Panda algorithm's semantic names to this source entity.
         source_order = tuple(f'{self.entity_id}/{joint_id}' for joint_id in self.joint_ids)
         algorithm_order = tuple(f'panda-v1/joint{index}' for index in range(1, 8))
         target = replace(
@@ -752,10 +757,72 @@ class PandaPositionServoProfileV1:
             controller_identity=self.identity,
             gripper=replace(base_target.gripper, semantic_id=self.gripper_semantic_id),
         )
-        bound_target = PositionControlTargetV1(
+        return PositionControlTargetV1(
             'position-control-target-v1', self.writer_id, self.identity,
             plan_identity, self.source.source_closure_digest,
-            boundary, publication.view.sample_clock, target,
+            publication.view.boundary, publication.view.sample_clock, target,
         )
+
+    def preview_absolute_joint_targets(self, publication, requests, plan):
+        """Compute immutable S0-bound targets without advancing Controller memory.
+
+        This capability deliberately excludes accumulated pose and R3 reference
+        Controllers. It does not authorize provider writes or consume a boundary;
+        the selected interval owner must still perform admission and commit.
+        """
+        from .controller import CanonicalPandaController
+        if (type(self._algorithm) is not CanonicalPandaController
+                or self._arm_reference is not None
+                or self._algorithm.pose_target_method != 'achieved_state_dls_v1'
+                or self.identity != self._constructed_identity
+                or self.config != self._constructed_config
+                or self._algorithm.identity != self._constructed_algorithm_identity
+                or self._algorithm.config != self._constructed_config
+                or self._algorithm.model is not self.model
+                or tuple(tuple(float(value) for value in row)
+                         for row in self._algorithm.arm_target_limits) != self._preview_constructed_target_limits
+                or any(name in vars(self._algorithm) for name in ('compute', '_compute_arm'))):
+            raise ValueError('Position preview requires the pure absolute-joint Controller capability')
+        if type(requests) is not tuple or not requests:
+            raise ValueError('Position preview requires a nonempty immutable request tuple')
+        self._validate_source(self.source)
+        plan_identity = self._validate_plan(plan)
+        if self._next_control_step is None or self._plan_identity_hash != plan_identity:
+            raise RuntimeError('PositionServoV1 reset is required for this binding plan')
+        state = self._adapt_publication(publication)
+        boundary = publication.view.boundary
+        if (boundary.episode_id != self._episode_id
+                or boundary.reset_sample_id != self._reset_sample_id
+                or boundary.control_step != self._next_control_step):
+            raise ValueError('PositionServoV1 target source boundary is stale or out of order')
+        for request in requests:
+            if type(request) is not RequestedAction or request.mode != 'absolute_joint':
+                raise ValueError('Position preview only admits typed absolute-joint requests')
+            request.validate()
+            if (type(request.values) is not tuple
+                    or any(type(value) not in (int, float) or not math.isfinite(value)
+                           for value in request.values)):
+                raise ValueError('Position preview requires immutable finite numeric actions')
+        results = []
+        for request in requests:
+            canonical, base_target = self._algorithm.compute(state, request)
+            results.append((canonical, self._bind_canonical_target(base_target, publication, plan_identity)))
+        return tuple(results)
+
+    def commit_absolute_joint_preview(self, publication, plan, sequence, scene_receipt):
+        """Advance this Controller once after its exact sequence was staged."""
+        from ...runtime.sessions.control_submission import PositionControlSequenceV1
+        if type(sequence) is not PositionControlSequenceV1:
+            raise TypeError('Position preview commit requires its typed control sequence')
+        sequence.validate()
+        recomputed = self.preview_absolute_joint_targets(publication,
+            tuple(item.request for item in sequence.action.slices), plan)
+        target_hashes = tuple(target.identity_hash for _, target in recomputed)
+        if (target_hashes != tuple(target.identity_hash for _, _, target in sequence.slices)
+                or type(scene_receipt) is not dict or scene_receipt.get('status') != 'acknowledged'
+                or scene_receipt.get('inner_command_sha256') != sequence.identity_hash
+                or scene_receipt.get('inner_action_sha256') != sequence.action.identity_hash
+                or tuple(scene_receipt.get('inner_target_sha256', ())) != target_hashes
+                or scene_receipt.get('interval', {}).get('boundary') != publication.view.boundary.to_mapping()):
+            raise ValueError('Position preview commit differs from the acknowledged scene interval')
         self._next_control_step += 1
-        return canonical, bound_target

@@ -522,15 +522,29 @@ def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypa
     from task_env.runtime.sessions import control as control_sessions
 
     scene, candidate = position_candidate
-    _declared_source, artifact, _reset_plan, _source, _ = candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    publication = _typed_publication(scene, reset_plan)
+    profile.reset(publication, plan)
     before = SimpleNamespace(control_step=0, simulation_time=0.0)
     selected = object.__new__(SelectedReferenceEnv)
     selected.horizon = 10
     selected.position_profile = True
-    selected.session = SimpleNamespace(snapshot=lambda: before)
-    selected.controller = object()
-    selected.position_plan = object()
-    selected.typed_state = object()
+    selected.session = SimpleNamespace(
+        snapshot=lambda: before,
+        state_boundary_identity=lambda: publication.view.boundary,
+        episode_id=publication.view.boundary.episode_id,
+    )
+    selected.binding = SimpleNamespace(physical_control_profile=None)
+    selected.value = {'source': source}
+    selected.controller = profile
+    selected.position_profiles = (profile,)
+    selected.position_plan = plan
+    selected._position_state_declaration = SimpleNamespace(
+        position_state_requirements=lambda: profile.requirements,
+    )
+    selected.typed_state = publication
     selected.position_scene = scene
     selected.position_joint_bindings = {}
     selected.position_frame_bindings = {}
@@ -544,7 +558,7 @@ def test_selected_reference_position_interval_uses_existing_fault_latch(monkeypa
 
     monkeypatch.setattr(control_sessions, 'execute_position_control_interval', fail_after_dispatch_start)
     with pytest.raises(RuntimeError, match='injected position interval failure'):
-        selected._step_position_profile(object())
+        selected._step_position_profile(_request(plan))
     assert selected._execution_fault is not None
     assert selected._execution_fault.phase == 'position_control_compute_apply_step'
     assert selected._stopped is True
@@ -595,3 +609,107 @@ def test_old_owned_position_publication_rejected_by_new_materialization(position
                                       publication=old, scene=scene, joint_bindings=joints,
                                       frame_bindings=frames)
     assert not session.apply_calls
+
+
+def test_absolute_joint_preview_uses_one_boundary_without_consuming_controller(position_candidate):
+    from task_env.controllers.canonical.contracts import RequestedAction
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    publication = _typed_publication(scene, reset_plan)
+    profile.reset(publication, plan)
+    first = RequestedAction('absolute_joint', None, 'none', (0., -.2, 0., -1.5, 0., 1.5, -.7, .5))
+    second = replace(first, values=(.1, -.2, 0., -1.5, 0., 1.5, -.7, .5))
+    reference_before = profile._algorithm._nullspace_reference.copy()
+    results = profile.preview_absolute_joint_targets(publication, (first, second), plan)
+    assert len(results) == 2 and profile._next_control_step == 0
+    assert np.array_equal(profile._algorithm._nullspace_reference, reference_before)
+    assert profile._algorithm._arm_target is None
+    assert all(target.source_boundary == publication.view.boundary for _, target in results)
+    assert results[0][1].identity_hash != results[1][1].identity_hash
+    # The ordinary stateful path must produce the same first target and then
+    # consume exactly one outer boundary; previews are not submissions.
+    canonical, bound = profile.compute(publication, first, plan)
+    assert (canonical, bound) == results[0] and profile._next_control_step == 1
+    with pytest.raises(ValueError, match='stale or out of order'):
+        profile.preview_absolute_joint_targets(publication, (second,), plan)
+
+
+def test_absolute_joint_preview_rejects_mutable_or_stateful_compute(position_candidate):
+    from task_env.controllers.canonical.contracts import RequestedAction
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    publication = _typed_publication(scene, reset_plan)
+    profile.reset(publication, plan)
+    request = RequestedAction('absolute_joint', None, 'none', (0., -.2, 0., -1.5, 0., 1.5, -.7, .5))
+    with pytest.raises(ValueError, match='immutable request tuple'):
+        profile.preview_absolute_joint_targets(publication, [request], plan)
+    pose = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', (0., 0., 0., 1., 0., 0., 0., 0.))
+    with pytest.raises(ValueError, match='absolute-joint'):
+        profile.preview_absolute_joint_targets(publication, (request, pose), plan)
+    assert profile._next_control_step == 0
+    profile._algorithm.arm_target_limits[0, 0] += 0.01
+    with pytest.raises(ValueError, match='pure absolute-joint'):
+        profile.preview_absolute_joint_targets(publication, (request,), plan)
+    profile._algorithm.arm_target_limits[0, 0] -= 0.01
+    profile._algorithm.compute = lambda *_: None
+    with pytest.raises(ValueError, match='pure absolute-joint'):
+        profile.preview_absolute_joint_targets(publication, (request,), plan)
+
+
+def test_absolute_joint_preview_commit_requires_exact_ack_and_advances_once(position_candidate):
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.position_sequence import PositionActionSequenceV1, PositionActionSliceV1
+    from task_env.runtime.sessions.control_submission import PositionControlSequenceV1
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    publication = _typed_publication(scene, reset_plan)
+    profile.reset(publication, plan)
+    request = RequestedAction('absolute_joint', None, 'none', (0., -.2, 0., -1.5, 0., 1.5, -.7, .5))
+    action = PositionActionSequenceV1((PositionActionSliceV1(0, 5, request),))
+    target = profile.preview_absolute_joint_targets(publication, (request,), plan)[0][1]
+    sequence = PositionControlSequenceV1(action, ((0, 5, target),))
+    receipt = {'status': 'acknowledged', 'inner_command_sha256': sequence.identity_hash,
+        'inner_action_sha256': action.identity_hash, 'inner_target_sha256': (target.identity_hash,),
+        'interval': {'boundary': publication.view.boundary.to_mapping()}}
+    for changed in ({**receipt, 'status': 'pending'}, {**receipt, 'inner_action_sha256': 'a'*64},
+                    {**receipt, 'inner_target_sha256': ('b'*64,)}):
+        with pytest.raises(ValueError, match='acknowledged scene interval'):
+            profile.commit_absolute_joint_preview(publication, plan, sequence, changed)
+        assert profile._next_control_step == 0
+    profile.commit_absolute_joint_preview(publication, plan, sequence, receipt)
+    assert profile._next_control_step == 1
+    with pytest.raises(ValueError, match='stale or out of order'):
+        profile.commit_absolute_joint_preview(publication, plan, sequence, receipt)
+
+
+def test_position_sequence_requires_live_bound_plan_before_lowering(position_candidate):
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.position_sequence import PositionActionSequenceV1, PositionActionSliceV1
+    from task_env.runtime.sessions.control_submission import PositionControlSequenceV1, submit_control_command
+    scene, candidate = position_candidate
+    _declared_source, artifact, reset_plan, source, _ = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
+    publication = _typed_publication(scene, reset_plan)
+    profile.reset(publication, plan)
+    request = RequestedAction('absolute_joint', None, 'none', (0., -.2, 0., -1.5, 0., 1.5, -.7, .5))
+    action = PositionActionSequenceV1((PositionActionSliceV1(0, 5, request),))
+    target = profile.preview_absolute_joint_targets(publication, (request,), plan)[0][1]
+    sequence = PositionControlSequenceV1(action, ((0, 5, target),))
+    fake = SimpleNamespace(_artifact=artifact, _prepared_position_sequence=sequence)
+    writes = []
+    with pytest.raises(ValueError, match='source-bound compiled plan'):
+        submit_control_command(fake, sequence, command_kind='position-target',
+            command_sha256=sequence.identity_hash, source_id=source.source_id,
+            source_closure_sha256=source.source_closure_digest, artifact_sha256=artifact.identity_hash,
+            boundary=publication.view.boundary, sample_clock=publication.view.sample_clock,
+            controller_generation=0, controller_identities=(profile.identity,), writer_ids=(profile.writer_id,),
+            resource_ids=('panda-main/actuator1',), units=('rad',), lowering='test',
+            lower=lambda: writes.append('write'))
+    assert not writes and not hasattr(fake, '_control_submission_consumed')

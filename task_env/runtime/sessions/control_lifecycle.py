@@ -156,10 +156,16 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             action = single_position_action_request(
                 action, scene=env.position_scene, plan=env.position_plan,
                 profile=profiles[0])
-        if not isinstance(action, StructuredActionRequestV1):
-            raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
-        from .control import prepare_structured_action
-        prepare_structured_action(env.position_plan, action)
+        from ...controllers.canonical.position_sequence import PositionActionSequenceV1
+        if type(action) is PositionActionSequenceV1:
+            if len(profiles) != 1 or proposal is not None or observer_solution is not None:
+                raise ValueError('Position sequences require one external Controller without Solution')
+            action.validate(substeps=env.artifact.timebase.control_substeps)
+        else:
+            if not isinstance(action, StructuredActionRequestV1):
+                raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
+            from .control import prepare_structured_action
+            prepare_structured_action(env.position_plan, action)
         _dispatch_record(env, 'position-target', identities, generation)
         result = env._prepare_position_profile(action, **context)
         current = getattr(env.session, '_control_lifecycle_dispatch', None)

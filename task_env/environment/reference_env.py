@@ -3746,6 +3746,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('reset required or PositionServoV1 horizon is exhausted')
         from ..runtime.sessions.control import execute_position_control_interval
         from ..controllers.canonical.contracts import StructuredActionRequestV1
+        from ..controllers.canonical.position_sequence import PositionActionSequenceV1
+        if type(request) is PositionActionSequenceV1:
+            if (self.recorder is not None or proposal is not None or observer_solution is not None
+                    or getattr(self, '_task_rgb_config', None) is not None):
+                raise ValueError('Position sequence does not admit Recorder, Solution or task RGB')
         if isinstance(request, StructuredActionRequestV1):
             from ..runtime.sessions.control import prepare_structured_action
             prepare_structured_action(self.position_plan, request)
@@ -3793,6 +3798,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         def evaluate(state):
             self.obs, self.info, self.evaluation = self.observation(state)
+            if type(request) is PositionActionSequenceV1:
+                from copy import deepcopy
+                self.info['position_control_sequence_v1'] = deepcopy(
+                    self.session._last_position_sequence_progress)
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
                 self.info['gravity_compensation_v1'] = self.session.gravity_compensation_receipt
             return self.evaluation

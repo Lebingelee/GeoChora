@@ -151,7 +151,7 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
     from .control import ControlBindingPlanV1
     if type(plan) is not ControlBindingPlanV1 or not plan._compiled:
         raise TypeError('scene Position interval requires a compiled binding plan')
-    targets = command.targets if type(command) is PositionControlBatchV1 else (command,)
+    targets = command.targets if type(command) in (PositionControlBatchV1, PositionControlSequenceV1) else (command,)
     if not targets or any(type(item) is not PositionControlTargetV1 for item in targets):
         raise TypeError('scene Position interval requires typed Position targets')
     timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
@@ -169,7 +169,7 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
     owners = dict(resource_owners)
     profiles = getattr(session, '_position_profiles_by_writer', None)
     contributions = []
-    for target in targets:
+    for index, target in enumerate(targets):
         target.validate()
         if (target.binding_identity_hash != plan.identity_hash
                 or target.source_boundary != boundary or target.sample_clock != sample_clock
@@ -196,7 +196,8 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
             raise ValueError('scene Position writer has no bound resources')
         contributions.append(SceneCommandContributionV1('robot-controller', 'position-target',
             ('rad', 'm'), 'exclusive', None, target.writer_id, target.controller_identity,
-            generation, target.identity_hash, resources, 0, count))
+            generation, target.identity_hash, resources,
+            *(command.slices[index][:2] if type(command) is PositionControlSequenceV1 else (0, count))))
     authority = tuple((writer, tuple(sorted(f'{entity}/{actuator}'
         for entity, actuator, owner in plan.resource_writers if owner == writer)))
         for writer in sorted(owners))
@@ -494,6 +495,60 @@ class PositionControlBatchV1:
 
 
 @dataclass(frozen=True)
+class PositionControlSequenceV1:
+    """Precomputed targets bound to one writer and half-open substep ranges."""
+    action: object
+    slices: tuple
+
+    @property
+    def targets(self):
+        return tuple(target for _, _, target in self.slices)
+
+    @property
+    def identity_hash(self):
+        return hashlib.sha256(json.dumps({
+            'schema_version': 'position-control-sequence-v1',
+            'action_sha256': self.action.identity_hash,
+            'slices': tuple((start, end, target.identity_hash) for start, end, target in self.slices),
+        }, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+    def validate(self):
+        from ...controllers.canonical.contracts import PositionControlTargetV1
+        from ...controllers.canonical.position_sequence import PositionActionSequenceV1
+        if type(self.action) is not PositionActionSequenceV1 or type(self.slices) is not tuple or not self.slices:
+            raise TypeError('Position sequence requires typed action and immutable targets')
+        if len(self.action.slices) != len(self.slices):
+            raise ValueError('Position sequence action and targets differ in length')
+        first = None
+        cursor = 0
+        for action, row in zip(self.action.slices, self.slices, strict=True):
+            if type(row) is not tuple or len(row) != 3:
+                raise TypeError('Position sequence target slice must be a tuple')
+            start, end, target = row
+            if (type(start) is not int or type(end) is not int or start != cursor or end <= start
+                    or (start, end) != (action.start_substep, action.end_substep)
+                    or type(target) is not PositionControlTargetV1):
+                raise ValueError('Position sequence slices differ from the action or contain gaps')
+            target.validate()
+            if first is None:
+                first = target
+            elif (target.writer_id, target.controller_identity, target.binding_identity_hash,
+                  target.source_boundary, target.sample_clock, target.source_closure_digest,
+                  target.target.task_artifact_hash) != (
+                  first.writer_id, first.controller_identity, first.binding_identity_hash,
+                  first.source_boundary, first.sample_clock, first.source_closure_digest,
+                  first.target.task_artifact_hash):
+                raise ValueError('Position sequence targets differ in source, writer or boundary')
+            cursor = end
+        self.action.validate(substeps=cursor)
+
+
+@dataclass(frozen=True)
+class PositionSequenceStagedV1:
+    identity_hash: str
+
+
+@dataclass(frozen=True)
 class PositionControlBatchAcknowledgementV1:
     """One receipt value covering all provider acknowledgements in a batch."""
 
@@ -659,10 +714,11 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     from .physical_control import ResolvedPhysicalBatchV1, ResolvedPhysicalSequenceV1
     from .leaf_control import LeafPreparedBatchV1
     is_position_batch = type(command) is PositionControlBatchV1
+    is_position_sequence = type(command) is PositionControlSequenceV1
     is_leaf_batch = type(command) is LeafPreparedBatchV1
 
     if command_kind == 'position-target':
-        if is_position_batch or is_leaf_batch:
+        if is_position_batch or is_position_sequence or is_leaf_batch:
             command.validate()
         elif type(command) not in {PositionControlTargetV1, CanonicalControlTarget}:
             raise TypeError('position lifecycle requires a typed canonical position target')
@@ -699,6 +755,14 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
             raise ValueError('physical sequence differs from its action slice ranges')
     else:
         raise ValueError('unsupported typed control command kind')
+    if is_position_sequence:
+        if getattr(session, '_prepared_position_sequence', None) is not command:
+            raise ValueError('Position sequence is not prepared by this live session')
+        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+        if timebase is None or command.slices[-1][1] != timebase.control_substeps:
+            raise ValueError('Position sequence differs from the session timebase')
+        if getattr(session, '_control_binding_plan', None) is None:
+            raise ValueError('Position sequence requires a source-bound compiled plan')
     if not callable(lower):
         raise TypeError('provider lowering must be callable')
     for value, label in ((command_sha256, 'command'), (source_closure_sha256, 'source closure'),
@@ -723,7 +787,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
                     or context.generation != controller_generation):
                 raise ValueError('physical batch context differs from the control submission')
     elif not is_leaf_batch:
-        targets = command.targets if is_position_batch else (command,)
+        targets = command.targets if is_position_batch or is_position_sequence else (command,)
         for item in targets:
             if type(item) is PositionControlTargetV1:
                 if (item.source_boundary != boundary or item.sample_clock != sample_clock
@@ -837,7 +901,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     # compiled source-bound plan. Caller-supplied ownership metadata must be
     # a projection of that plan, not merely a self-consistent list of names.
     if command_kind == 'position-target' and not is_leaf_batch:
-        typed_targets = command.targets if is_position_batch else (command,)
+        typed_targets = command.targets if is_position_batch or is_position_sequence else (command,)
         if all(type(item) is PositionControlTargetV1 for item in typed_targets):
             plan = getattr(session, '_control_binding_plan', None)
             if plan is not None:
@@ -958,7 +1022,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         # binding and remain on their existing route until explicitly bound.
         from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
         typed_position = (type(command) is PositionControlTargetV1
-                          or type(command) is PositionControlBatchV1)
+                          or type(command) is PositionControlBatchV1
+                          or type(command) is PositionControlSequenceV1)
         plan = getattr(session, '_control_binding_plan', None)
         timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
         if typed_position and plan is not None and timebase is not None:
@@ -1014,6 +1079,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 request.physical_effect_id, getattr(request, 'writer_id', None), None, None,
                 request.identity_hash, (resource,), start, end))
         scene_interval = replace(scene_interval, contributions=(*scene_interval.contributions, *added))
+    if type(command) is PositionControlSequenceV1 and scene_interval is None:
+        raise ValueError('Position sequence requires a live source-bound scene interval')
     if scene_interval is not None:
         _validate_scene_contributions(scene_interval)
     provider = payload['provider']
@@ -1044,6 +1111,10 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
     if scene_interval is not None and command_kind == 'physical-effort-sequence':
         session._last_scene_control_submission['inner_batch_sha256'] = tuple(
             item.input_batch.identity_hash for _, _, item in command.slices)
+    if scene_interval is not None and type(command) is PositionControlSequenceV1:
+        session._last_scene_control_submission['inner_action_sha256'] = command.action.identity_hash
+        session._last_scene_control_submission['inner_target_sha256'] = tuple(
+            target.identity_hash for _, _, target in command.slices)
     ack = None
     try:
         ack = lower()
@@ -1080,6 +1151,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                     for item in scene_interval.contributions),
                 **({'inner_batch_sha256': tuple(item.input_batch.identity_hash for _, _, item in command.slices)}
                    if command_kind == 'physical-effort-sequence' else {}),
+                **({'inner_action_sha256': command.action.identity_hash,
+                    'inner_target_sha256': tuple(target.identity_hash for _, _, target in command.slices)}
+                   if type(command) is PositionControlSequenceV1 else {}),
                 'status': 'acknowledged',
             }
         if lifecycle is not None:
@@ -1106,6 +1180,9 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                     for item in scene_interval.contributions),
                 **({'inner_batch_sha256': tuple(item.input_batch.identity_hash for _, _, item in command.slices)}
                    if command_kind == 'physical-effort-sequence' else {}),
+                **({'inner_action_sha256': command.action.identity_hash,
+                    'inner_target_sha256': tuple(target.identity_hash for _, _, target in command.slices)}
+                   if type(command) is PositionControlSequenceV1 else {}),
                 'status': status,
             }
         if lifecycle is not None:
