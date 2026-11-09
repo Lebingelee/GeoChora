@@ -3029,6 +3029,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 *(('N', 'N*m') if resolved.body_wrenches else ()),
                 *(str(getattr(item, 'unit', 'provider-extension')) for item in resolved.extensions),
             }))
+            mixed = getattr(self.session, '_prepared_mixed_position', None)
+            def lower_physical_and_position():
+                native_ack = write(resolved)
+                if mixed is not None:
+                    mixed.stage()
+                return native_ack
             ack = submit_control_command(
                 self.session, resolved, command_kind='physical-effort-batch',
                 command_sha256=batch.identity_hash, source_id=plan.source_id,
@@ -3038,11 +3044,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 controller_identities=tuple(controller.identity for controller in profile.controllers),
                 writer_ids=writers, resource_ids=resources, units=units,
                 lowering=f'{type(self.session).__module__}.{type(self.session).__qualname__}.apply_physical_command_batch',
-                lower=lambda: write(resolved))
+                lower=lower_physical_and_position)
             if (type(ack) is not PhysicalControlReceiptV1 or ack.stage != 'native_write_ack'
                     or ack.context != context or ack.batch_sha256 != batch.identity_hash
                     or ack.contribution_ids != resolved.accepted_receipt.contribution_ids):
                 raise ValueError('physical RuntimeSession returned an invalid write acknowledgement')
+            if mixed is not None:
+                mixed.commit(self.session._last_scene_control_submission)
+                self.session._prepared_mixed_position = None
+                self.session._prepared_position_sequence = None
             return ack
 
         def advance(_ack):
@@ -3104,6 +3114,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise TypeError('declared direct effort feedback is unavailable')
                 self.info.update(feedback(resolved, ack, mode=self.binding.action_schema['mode'],
                     include_diagnostics=self.config.observation.include_diagnostics))
+            if (getattr(self.session, '_last_scene_control_submission', None) or {}).get('schema_version') == 'scene-control-submission-receipt-v2':
+                from copy import deepcopy
+                self.info['position_physical_sequence_v1'] = deepcopy(self.session._last_position_sequence_progress)
             self.info['physical_control_v1'] = {
                 'submitted_batch': batch.to_mapping(),
                 'submitted': submitted.to_mapping(),
@@ -3163,6 +3176,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
 
         def on_failure(phase, error):
+            self.session._prepared_mixed_position = None
+            self.session._prepared_position_sequence = None
             abort = getattr(self.session, 'abort_physical_control', None)
             if attempted and callable(abort):
                 try:

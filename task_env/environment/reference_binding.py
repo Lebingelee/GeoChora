@@ -231,6 +231,7 @@ class ReferenceTaskBinding:
     physical_control_profile: Callable | None = None
     physical_observation_binding: Callable | None = None
     physical_sequence_v2_observation: bool = False
+    position_physical_mixed: bool = False
     physical_reset_action_schema: Callable | None = None
     physical_action_observer: Callable | None = None
     task_com_wrench_factory: Callable | None = None
@@ -293,6 +294,8 @@ class ReferenceTaskBinding:
             raise ValueError('position control binding selector must be callable when supplied')
         if self.physical_control_profile is not None and not callable(self.physical_control_profile):
             raise ValueError('physical control profile selector must be callable when supplied')
+        if type(self.position_physical_mixed) is not bool:
+            raise TypeError('Position/physical mixed capability must be bool')
         if type(self.physical_sequence_v2_observation) is not bool:
             raise TypeError('physical sequence V2 observation capability must be bool')
         if self.physical_observation_binding is not None and not callable(self.physical_observation_binding):

@@ -2880,7 +2880,8 @@ class _MuJoCoSession(_SessionValues):
         if (type(sequence) is not PositionControlSequenceV1
                 or getattr(self, '_prepared_position_sequence', None) is not sequence
                 or type(receipt) is not dict or receipt.get('status') != 'pending'
-                or receipt.get('inner_command_sha256') != sequence.identity_hash
+                or receipt.get('inner_position_command_sha256',
+                               receipt.get('inner_command_sha256')) != sequence.identity_hash
                 or type(lowers) is not tuple or len(lowers) != len(sequence.slices)
                 or any(not callable(lower) for lower in lowers)
                 or getattr(self, '_pending_position_sequence', None) is not None):
@@ -2897,6 +2898,22 @@ class _MuJoCoSession(_SessionValues):
         }
         return PositionSequenceStagedV1(sequence.identity_hash)
 
+    def _apply_position_sequence_substep(self, pending, index, applied_results):
+        sequence, lowers, admitted_hash = pending
+        if sequence.identity_hash != admitted_hash:
+            raise RuntimeError('Position sequence changed after submission')
+        if not np.array_equal(self._data.ctrl, self._current_ctrl):
+            raise RuntimeError('Position native control changed during sequence')
+        for (start, _end, target), lower in zip(sequence.slices, lowers, strict=True):
+            if index == start:
+                progress = self._last_position_sequence_progress
+                progress['attempted_target_sha256'].append(target.identity_hash)
+                applied = lower()
+                if applied.target_hash != target.target.identity_hash:
+                    raise ValueError('Position sequence native acknowledgement differs')
+                applied_results.append(applied)
+                progress['acknowledged_target_sha256'].append(target.identity_hash)
+
     def step(self):
         self._require_reset()
         external = getattr(self, '_external_com_port', None)
@@ -2906,16 +2923,35 @@ class _MuJoCoSession(_SessionValues):
         if physical_port is not None:
             if physical_port.pending is None:
                 raise RuntimeError('physical interval requires exactly one fresh batch')
+            pending_position = getattr(self, '_pending_position_sequence', None)
+            position_applied = []
             try:
-                for _ in range(self._artifact.timebase.control_substeps):
+                for index in range(self._artifact.timebase.control_substeps):
+                    if pending_position is not None:
+                        self._apply_position_sequence_substep(pending_position, index, position_applied)
                     physical_port.refresh_substep()
+                    if pending_position is not None:
+                        self._last_position_sequence_progress['native_steps_attempted'] += 1
                     self._mj.mj_step(self._model, self._data)
+                    if pending_position is not None:
+                        self._last_position_sequence_progress['native_steps_completed'] += 1
                     self._native_steps += 1
                 self._mj.mj_forward(self._model, self._data)
                 self._control_step += 1
                 self._state_revision += 1
+                if pending_position is not None:
+                    self._last_position_sequence_applied = tuple(position_applied)
+                    self._last_position_sequence_progress['status'] = 'completed'
                 return self.snapshot()
+            except BaseException:
+                if pending_position is not None:
+                    progress = self._last_position_sequence_progress
+                    progress['status'] = 'failed_partial'
+                    progress['native_step_result_unknown'] = (
+                        progress['native_steps_attempted'] > progress['native_steps_completed'])
+                raise
             finally:
+                self._pending_position_sequence = None
                 physical_port.finish_interval()
         if self._mixed_actuator_plan is not None:
             if self._mixed_fault is not None:
@@ -2948,20 +2984,7 @@ class _MuJoCoSession(_SessionValues):
         try:
             for index in range(self._artifact.timebase.control_substeps):
                 if pending_position is not None:
-                    sequence, lowers, admitted_hash = pending_position
-                    if sequence.identity_hash != admitted_hash:
-                        raise RuntimeError('Position sequence changed after submission')
-                    if not np.array_equal(self._data.ctrl, self._current_ctrl):
-                        raise RuntimeError('Position native control changed during sequence')
-                    for (start, _end, target), lower in zip(sequence.slices, lowers, strict=True):
-                        if index == start:
-                            progress = self._last_position_sequence_progress
-                            progress['attempted_target_sha256'].append(target.identity_hash)
-                            applied = lower()
-                            if applied.target_hash != target.target.identity_hash:
-                                raise ValueError('Position sequence native acknowledgement differs')
-                            position_applied.append(applied)
-                            progress['acknowledged_target_sha256'].append(target.identity_hash)
+                    self._apply_position_sequence_substep(pending_position, index, position_applied)
                 if external is not None:
                     external.refresh_substep()
                 if pending_position is not None:

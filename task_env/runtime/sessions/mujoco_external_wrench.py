@@ -94,15 +94,18 @@ class MuJoCoExternalComPort:
         self.refresh_count = 0
         self.substeps = substeps
         self.compatible_physical_port = None
+        self.physical_body_resources = {}
+        self.verified_body_sum_resources = frozenset()
 
     def verify_physical_compatibility(self, physical, command, command_kind):
-        """Reject overlapping native DOFs and physical wrench aliases before commit.
+        """Admit physical and COM loads only with native conflict checks.
 
-        This first combined capability admits joint-only physical batches and
-        COM loads on a kinematically disjoint dynamic body.  It intentionally
-        does not infer that different semantic strings imply disjoint forces.
+        Shared-body contributions require distinct effects and explicit sum;
+        the provider projects each to the same native generalized-force basis.
         """
         self.compatible_physical_port = None
+        self.physical_body_resources = {}
+        self.verified_body_sum_resources = frozenset()
         if physical is not getattr(self.session, '_physical_port', None):
             raise ValueError('COM load differs from the live physical execution')
         if command_kind == 'physical-effort-batch':
@@ -111,8 +114,8 @@ class MuJoCoExternalComPort:
             parts = tuple(part for _start, _end, part in command.slices)
         else:
             raise ValueError('physical COM composition requires a physical command')
-        if any(part.input_batch.body_wrenches or part.input_batch.extensions for part in parts):
-            raise ValueError('physical COM composition currently admits joint-only batches')
+        if any(part.input_batch.extensions for part in parts):
+            raise ValueError('physical COM composition does not admit extensions')
         bound_dofs = set(physical.dofs.values())
         model = self.session._model
         for _request, body_id in self.rows:
@@ -123,6 +126,29 @@ class MuJoCoExternalComPort:
                 if count and (start < 0 or bound_dofs.intersection(range(start, start + count))):
                     raise ValueError('COM body aliases a physical Controller native DOF')
                 cursor = int(model.body_parentid[cursor])
+        physical_resources, verified_sums = {}, set()
+        for part in parts:
+            for item in part.input_batch.body_wrenches:
+                body_id = physical.bodies.get((item.entity_id, item.body_id))
+                if body_id is None:
+                    raise ValueError('physical wrench has no admitted native body')
+                aliases = [key for key, name in self.session._source.bodies.items()
+                           if int(model.body(name).id) == body_id]
+                if not aliases:
+                    raise ValueError('physical wrench body has no source alias')
+                resource = 'body:' + min(aliases)
+                physical_resources[item.identity_hash] = resource
+                for request, request_body in self.rows:
+                    if request_body != body_id:
+                        continue
+                    if (item.contribution.composition != 'sum'
+                            or type(request) is not ExternalComWrenchSumSegmentV1):
+                        raise ValueError('physical and COM wrenches on one body require explicit sum')
+                    if item.contribution.physical_effect_id == request.physical_effect_id:
+                        raise ValueError('physical and COM wrenches repeat a physical effect')
+                    verified_sums.add(resource)
+        self.physical_body_resources = physical_resources
+        self.verified_body_sum_resources = frozenset(verified_sums)
         self.compatible_physical_port = physical
 
     def verify(self, interval):

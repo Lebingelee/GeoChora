@@ -46,3 +46,33 @@ class PositionActionSequenceV1:
         return digest({'schema_version': self.schema_version, 'slices': tuple(
             {'start_substep': item.start_substep, 'end_substep': item.end_substep,
              'request': item.request.to_mapping()} for item in self.slices)})
+
+
+@dataclass(frozen=True)
+class PositionPhysicalActionV1:
+    """One Position schedule plus explicitly keyed physical Controller actions."""
+    position: PositionActionSequenceV1
+    physical_actions: tuple[tuple[str, tuple[float, ...]], ...]
+    schema_version: str = 'position-physical-action-v1'
+
+    def validate(self, *, substeps, controller_identities):
+        if self.schema_version != 'position-physical-action-v1' or type(self.position) is not PositionActionSequenceV1:
+            raise ValueError('mixed action requires the versioned Position sequence')
+        self.position.validate(substeps=substeps)
+        if type(self.physical_actions) is not tuple or not self.physical_actions:
+            raise ValueError('mixed action requires immutable physical Controller actions')
+        identities = []
+        for row in self.physical_actions:
+            if (type(row) is not tuple or len(row) != 2 or type(row[0]) is not str
+                    or len(row[0]) != 64 or any(c not in '0123456789abcdef' for c in row[0])
+                    or type(row[1]) is not tuple or not row[1]
+                    or any(type(v) not in (int, float) or not math.isfinite(v) for v in row[1])):
+                raise ValueError('mixed physical actions require identities and finite immutable values')
+            identities.append(row[0])
+        if len(identities) != len(set(identities)) or set(identities) != set(controller_identities):
+            raise ValueError('mixed physical actions must cover each bound Controller once')
+
+    @property
+    def identity_hash(self):
+        return digest({'schema_version': self.schema_version, 'position_sha256': self.position.identity_hash,
+                       'physical_actions': self.physical_actions})

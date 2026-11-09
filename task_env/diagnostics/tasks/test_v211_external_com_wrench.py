@@ -165,8 +165,8 @@ def test_physical_com_rejects_native_dof_alias_and_foreign_body_wrench():
     physical.dofs = {('robot', 'joint', 'dof0'): 7}
     port.verify_physical_compatibility(physical, command, 'physical-effort-batch')
     assert port.compatible_physical_port is physical
-    command.input_batch.body_wrenches = (object(),)
-    with pytest.raises(ValueError, match='joint-only'):
+    command.input_batch.extensions = (object(),)
+    with pytest.raises(ValueError, match='does not admit extensions'):
         port.verify_physical_compatibility(physical, command, 'physical-effort-batch')
 
 
@@ -208,3 +208,34 @@ def test_solution_task_admission_failure_latches_after_proposal():
     with pytest.raises(StageUnavailableError, match='active Recorder'):
         env._step(object(), proposal=object())
     assert state.fault[0] == 'task_com_solution_preparation'
+
+
+def test_physical_and_com_native_body_sum_needs_explicit_distinct_effects():
+    from task_env.controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+    from task_env.runtime.sessions.mujoco_physical import MuJoCoPhysicalPort
+    s, _, _ = _session()
+    s._model.body_dofadr = np.array([-1, 0])
+    physical = object.__new__(MuJoCoPhysicalPort)
+    physical.session, physical.dofs = s, {('robot','joint','dof0'): 7}
+    physical.bodies = {('object','rigid'): 1}
+    s._physical_port = physical
+    def segment(effect):
+        return ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            'caller', effect, 'object', 0, 5, (0.,2.,0.), (0.,0.,0.))
+    item = SimpleNamespace(entity_id='object', body_id='rigid', identity_hash='f'*64,
+        contribution=SimpleNamespace(composition='sum', physical_effect_id='body-effect'))
+    command = SimpleNamespace(input_batch=SimpleNamespace(body_wrenches=(item,), extensions=()))
+    port = MuJoCoExternalComPort(s, (segment('caller-effect'),))
+    port.verify_physical_compatibility(physical,command,'physical-effort-batch')
+    assert port.physical_body_resources == {'f'*64:'body:object'}
+    assert port.verified_body_sum_resources == frozenset({'body:object'})
+    item.contribution.composition='exclusive'
+    with pytest.raises(ValueError,match='require explicit sum'):
+        port.verify_physical_compatibility(physical,command,'physical-effort-batch')
+    item.contribution.composition='sum'
+    same = MuJoCoExternalComPort(s,(segment('body-effect'),))
+    with pytest.raises(ValueError,match='repeat a physical effect'):
+        same.verify_physical_compatibility(physical,command,'physical-effort-batch')
+    exclusive = MuJoCoExternalComPort(s,(_request(),))
+    with pytest.raises(ValueError,match='require explicit sum'):
+        exclusive.verify_physical_compatibility(physical,command,'physical-effort-batch')

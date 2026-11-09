@@ -95,10 +95,63 @@ class SceneCommandIntervalV1:
             separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
-def _validate_scene_contributions(interval):
+
+@dataclass(frozen=True)
+class SceneCommandIntervalV2:
+    """One source-bound interval retaining each real command binding identity."""
+    schema_version: str
+    source_id: str
+    source_closure_sha256: str
+    artifact_sha256: str
+    boundary: object
+    sample_clock: object
+    binding_authorities: tuple
+    contribution_binding_sha256: tuple
+    row: int | None
+    physics_dt_s: float
+    substeps: int
+    contributions: tuple[SceneCommandContributionV1, ...]
+    task_source_sha256: str | None = None
+
+    @property
+    def identity_hash(self):
+        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True,
+            separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+
+def _validate_scene_contributions(interval, *, verified_body_sums=frozenset()):
     """Admit all outer claims together before consuming the one replay key."""
-    if type(interval) is not SceneCommandIntervalV1 or interval.schema_version != 'scene-command-interval-v1':
-        raise TypeError('scene submission requires a versioned SceneCommandIntervalV1')
+    if not ((type(interval) is SceneCommandIntervalV1 and interval.schema_version == 'scene-command-interval-v1')
+            or (type(interval) is SceneCommandIntervalV2 and interval.schema_version == 'scene-command-interval-v2')):
+        raise TypeError('scene submission requires a supported versioned SceneCommandInterval')
+    if type(interval) is SceneCommandIntervalV2:
+        if (type(interval.binding_authorities) is not tuple
+                or len(interval.binding_authorities) not in (2, 3, 4)
+                or any(type(row) is not tuple or len(row) != 2 for row in interval.binding_authorities)
+                or tuple(row[0] for row in interval.binding_authorities) not in (
+                    ('physical', 'position'), ('physical', 'position', 'scene-load'),
+                    ('physical', 'position', 'task'), ('physical', 'position', 'scene-load', 'task'))
+                or type(interval.contribution_binding_sha256) is not tuple
+                or len(interval.contribution_binding_sha256) != len(interval.contributions)):
+            raise ValueError('mixed scene requires bound authorities for each contribution')
+        for _kind, binding in interval.binding_authorities:
+            _digest(binding, 'mixed scene binding')
+        authorities = dict(interval.binding_authorities)
+        if len(set(authorities.values())) != len(authorities):
+            raise ValueError('mixed scene requires distinct actual binding identities')
+        if 'scene-load' in authorities and authorities['scene-load'] != interval.source_closure_sha256:
+            raise ValueError('mixed scene load authority differs from the live source')
+        if 'task' in authorities:
+            _digest(interval.task_source_sha256, 'mixed Task source')
+        elif interval.task_source_sha256 is not None:
+            raise ValueError('mixed Task source has no Task authority')
+        for contribution, binding in zip(interval.contributions, interval.contribution_binding_sha256, strict=True):
+            if type(contribution) is not SceneCommandContributionV1:
+                raise TypeError('mixed scene contains an untyped contribution')
+            kind = ('scene-load' if contribution.producer_kind == 'caller' else
+                    'task' if contribution.producer_kind == 'task' else
+                    'position' if contribution.command_kind == 'position-target' else 'physical')
+            if binding != authorities.get(kind):
+                raise ValueError('mixed scene contribution has a foreign binding')
     if (type(interval.substeps) is not int or interval.substeps <= 0
             or not math.isfinite(interval.physics_dt_s) or interval.physics_dt_s <= 0
             or type(interval.contributions) is not tuple or not interval.contributions):
@@ -137,7 +190,11 @@ def _validate_scene_contributions(interval):
                     if item.composition != 'sum' or prior.composition != 'sum':
                         raise ValueError('scene resource has overlapping exclusive contributions')
                     if (item.command_kind, item.units) != (prior.command_kind, prior.units):
-                        raise ValueError('summed scene contributions require matching command kinds and units')
+                        native_body_sum = (resource in verified_body_sums
+                            and {item.command_kind, prior.command_kind} == {'body-wrench', 'body-com-wrench'}
+                            and item.units == prior.units == ('N', 'N*m'))
+                        if not native_body_sum:
+                            raise ValueError('summed scene contributions require matching command kinds and units')
                     if item.physical_effect_id == prior.physical_effect_id:
                         raise ValueError('scene resource repeats the same physical effect')
             claims[resource].append(item)
@@ -1064,6 +1121,10 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         physical = getattr(session, '_physical_port', None)
         if physical is not None:
             external.verify_physical_compatibility(physical, command, command_kind)
+            scene_interval = replace(scene_interval, contributions=tuple(
+                replace(item, resources=(external.physical_body_resources[item.command_sha256],))
+                if item.command_kind == 'body-wrench' and item.command_sha256 in external.physical_body_resources
+                else item for item in scene_interval.contributions))
         from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
         from .mujoco_external_wrench import com_wrench_range
         added = []
@@ -1079,10 +1140,53 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 request.physical_effect_id, getattr(request, 'writer_id', None), None, None,
                 request.identity_hash, (resource,), start, end))
         scene_interval = replace(scene_interval, contributions=(*scene_interval.contributions, *added))
+    mixed = getattr(session, '_prepared_mixed_position', None)
+    if mixed is not None:
+        from .position_physical import PreparedMixedPositionV1
+        if (type(mixed) is not PreparedMixedPositionV1 or mixed.session is not session
+                or command_kind != 'physical-effort-batch' or scene_interval is None):
+            raise ValueError('mixed Position/physical interval requires its admitted batch owners')
+        from .mujoco_control_resources import position_native_dofs
+        if position_native_dofs(session, mixed.profile, mixed.plan) != mixed.position_dofs:
+            raise ValueError('mixed Position native DOF footprint changed during Controller preparation')
+        mixed.validate_physical(session._physical_port, command)
+        if external is not None:
+            mixed.validate_external(external)
+        position_sequence = mixed.sequence
+        position_target = position_sequence.targets[0]
+        position_resources = tuple(sorted(f'{entity}/{actuator}'
+            for entity, actuator, writer in mixed.plan.resource_writers
+            if writer == position_target.writer_id))
+        position_interval = prepare_position_scene_interval(session=session, plan=mixed.plan,
+            command=position_sequence, source_id=source_id, source_closure_sha256=source_closure_sha256,
+            artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+            resource_owners=((position_target.writer_id, position_resources),))
+        if ((position_interval.source_id, position_interval.source_closure_sha256,
+             position_interval.artifact_sha256, position_interval.boundary, position_interval.sample_clock,
+             position_interval.physics_dt_s, position_interval.substeps)
+                != (scene_interval.source_id, scene_interval.source_closure_sha256,
+                    scene_interval.artifact_sha256, scene_interval.boundary, scene_interval.sample_clock,
+                    scene_interval.physics_dt_s, scene_interval.substeps)):
+            raise ValueError('mixed Position and physical intervals differ in source, boundary or clock')
+        physical_binding, position_binding = scene_interval.binding_sha256, position_interval.binding_sha256
+        authorities = (('physical', physical_binding), ('position', position_binding))
+        if external is not None and 'caller' in external.producers:
+            authorities += (('scene-load', source_closure_sha256),)
+        if external is not None and 'task' in external.producers:
+            authorities += (('task', mixed.task_construction_sha256),)
+        claims = tuple(source_closure_sha256 if item.producer_kind == 'caller' else
+                       mixed.task_construction_sha256 if item.producer_kind == 'task' else physical_binding
+                       for item in scene_interval.contributions)
+        scene_interval = SceneCommandIntervalV2('scene-command-interval-v2', source_id,
+            source_closure_sha256, artifact_sha256, boundary, sample_clock, authorities,
+            claims + (position_binding,) * len(position_interval.contributions),
+            scene_interval.row, scene_interval.physics_dt_s, scene_interval.substeps,
+            (*scene_interval.contributions, *position_interval.contributions), mixed.task_source_sha256)
     if type(command) is PositionControlSequenceV1 and scene_interval is None:
         raise ValueError('Position sequence requires a live source-bound scene interval')
     if scene_interval is not None:
-        _validate_scene_contributions(scene_interval)
+        _validate_scene_contributions(scene_interval, verified_body_sums=(
+            getattr(external, 'verified_body_sum_resources', frozenset()) if external is not None else frozenset()))
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']
@@ -1099,7 +1203,7 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         external.authorized = True
     session._last_control_submission = {**payload, 'submission_id': identity, 'status': 'pending'}
     session._last_scene_control_submission = (None if scene_interval is None else {
-        'schema_version': 'scene-control-submission-receipt-v1',
+        'schema_version': ('scene-control-submission-receipt-v2' if mixed is not None else 'scene-control-submission-receipt-v1'),
         'interval_sha256': scene_interval.identity_hash,
         'interval': asdict(scene_interval),
         'inner_submission_id': identity,
@@ -1115,6 +1219,12 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         session._last_scene_control_submission['inner_action_sha256'] = command.action.identity_hash
         session._last_scene_control_submission['inner_target_sha256'] = tuple(
             target.identity_hash for _, _, target in command.slices)
+    if mixed is not None:
+        session._last_scene_control_submission.update(
+            mixed_action_sha256=mixed.action_sha256,
+            inner_position_command_sha256=mixed.sequence.identity_hash,
+            inner_action_sha256=mixed.sequence.action.identity_hash,
+            inner_target_sha256=tuple(target.identity_hash for _, _, target in mixed.sequence.slices))
     ack = None
     try:
         ack = lower()
@@ -1142,7 +1252,7 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         session._last_control_submission = receipt.to_mapping()
         if scene_interval is not None:
             session._last_scene_control_submission = {
-                'schema_version': 'scene-control-submission-receipt-v1',
+                'schema_version': ('scene-control-submission-receipt-v2' if mixed is not None else 'scene-control-submission-receipt-v1'),
                 'interval_sha256': scene_interval.identity_hash,
                 'interval': asdict(scene_interval),
                 'inner_submission_id': receipt.submission_id,
@@ -1154,6 +1264,11 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 **({'inner_action_sha256': command.action.identity_hash,
                     'inner_target_sha256': tuple(target.identity_hash for _, _, target in command.slices)}
                    if type(command) is PositionControlSequenceV1 else {}),
+                **({'mixed_action_sha256': mixed.action_sha256,
+                    'inner_position_command_sha256': mixed.sequence.identity_hash,
+                    'inner_action_sha256': mixed.sequence.action.identity_hash,
+                    'inner_target_sha256': tuple(target.identity_hash for _, _, target in mixed.sequence.slices)}
+                   if mixed is not None else {}),
                 'status': 'acknowledged',
             }
         if lifecycle is not None:
@@ -1171,7 +1286,7 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                                             'completed_writer_ids': completed}
         if scene_interval is not None:
             session._last_scene_control_submission = {
-                'schema_version': 'scene-control-submission-receipt-v1',
+                'schema_version': ('scene-control-submission-receipt-v2' if mixed is not None else 'scene-control-submission-receipt-v1'),
                 'interval_sha256': scene_interval.identity_hash,
                 'interval': asdict(scene_interval),
                 'inner_submission_id': identity,
@@ -1183,6 +1298,11 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                 **({'inner_action_sha256': command.action.identity_hash,
                     'inner_target_sha256': tuple(target.identity_hash for _, _, target in command.slices)}
                    if type(command) is PositionControlSequenceV1 else {}),
+                **({'mixed_action_sha256': mixed.action_sha256,
+                    'inner_position_command_sha256': mixed.sequence.identity_hash,
+                    'inner_action_sha256': mixed.sequence.action.identity_hash,
+                    'inner_target_sha256': tuple(target.identity_hash for _, _, target in mixed.sequence.slices)}
+                   if mixed is not None else {}),
                 'status': status,
             }
         if lifecycle is not None:

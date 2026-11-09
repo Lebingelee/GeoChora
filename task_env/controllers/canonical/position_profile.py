@@ -820,7 +820,8 @@ class PandaPositionServoProfileV1:
         target_hashes = tuple(target.identity_hash for _, target in recomputed)
         if (target_hashes != tuple(target.identity_hash for _, _, target in sequence.slices)
                 or type(scene_receipt) is not dict or scene_receipt.get('status') != 'acknowledged'
-                or scene_receipt.get('inner_command_sha256') != sequence.identity_hash
+                or scene_receipt.get('inner_position_command_sha256',
+                                     scene_receipt.get('inner_command_sha256')) != sequence.identity_hash
                 or scene_receipt.get('inner_action_sha256') != sequence.action.identity_hash
                 or tuple(scene_receipt.get('inner_target_sha256', ())) != target_hashes
                 or scene_receipt.get('interval', {}).get('boundary') != publication.view.boundary.to_mapping()):

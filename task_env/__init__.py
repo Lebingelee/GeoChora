@@ -56,6 +56,7 @@ def _get_parallel_registry():
 
 
 _LAZY_EXPORTS = {
+    "PositionPhysicalActionV1": ("task_env.controllers.canonical.position_sequence", "PositionPhysicalActionV1"),
     "PositionActionSliceV1": ("task_env.controllers.canonical.position_sequence", "PositionActionSliceV1"),
     "PositionActionSequenceV1": ("task_env.controllers.canonical.position_sequence", "PositionActionSequenceV1"),
     "PhysicalActionSliceV1": ("task_env.controllers.canonical.physical_sequence", "PhysicalActionSliceV1"),
@@ -124,6 +125,7 @@ __all__ = [
     "ExternalComWrenchV1",
     "ExternalComWrenchSegmentV1",
     "ExternalComWrenchSumSegmentV1",
+    "PositionPhysicalActionV1",
     "PositionActionSliceV1",
     "PositionActionSequenceV1",
     "PhysicalActionSliceV1",

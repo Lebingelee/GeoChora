@@ -45,3 +45,31 @@ def test_native_dof_footprint_rejects_foreign_resource_or_unknown_topology():
     session._model.eq_type[0]=9
     with pytest.raises(ValueError,match='non-joint'):
         position_native_dofs(session,profile,plan)
+
+
+def test_mixed_preflight_rejects_native_joint_and_body_ancestry_aliases():
+    from task_env.runtime.sessions.position_physical import PreparedMixedPositionV1
+    from task_env.runtime.sessions.physical_control import ResolvedPhysicalBatchV1
+    sequence = object()
+    session = SimpleNamespace(_model=SimpleNamespace(body_dofnum=[0, 1, 1],
+        body_dofadr=[-1, 3, 7], body_parentid=[0, 0, 1]), _prepared_position_sequence=sequence)
+    physical = SimpleNamespace(session=session, dofs={}, bodies={('object','body'): 2},
+        execution=SimpleNamespace(controller_versions=lambda: (('writer', 'a'*64, 7),)))
+    session._physical_port = physical
+    session._physical_controller_versions = physical.execution.controller_versions()
+    prepared = PreparedMixedPositionV1(session,None,None,None,sequence,(),frozenset({1}), 'a'*64)
+    item = SimpleNamespace(entity_id='object',body_id='body')
+    resolved = ResolvedPhysicalBatchV1(SimpleNamespace(extensions=(),body_wrenches=(item,)),
+        'b'*64, (), (), (), None, ())
+    prepared.validate_physical(physical,resolved)
+    session._physical_controller_versions = (('writer', 'a'*64, 8),)
+    with pytest.raises(ValueError,match='live admitted owners'):
+        prepared.validate_physical(physical,resolved)
+    session._physical_controller_versions = physical.execution.controller_versions()
+    physical.dofs[('robot','joint','dof0')]=1
+    with pytest.raises(ValueError,match='overlap native DOFs'):
+        prepared.validate_physical(physical,resolved)
+    physical.dofs.clear()
+    prepared = PreparedMixedPositionV1(session,None,None,None,sequence,(),frozenset({3}), 'a'*64)
+    with pytest.raises(ValueError,match='wrench aliases Position'):
+        prepared.validate_physical(physical,resolved)

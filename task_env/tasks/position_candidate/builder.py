@@ -471,13 +471,20 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
 
 def build_position_candidate(workspace: Path | str, *, provider: str, horizon: int = 6000,
                              environment_type=SelectedReferenceEnv,
-                             camera_observation_config=None, physical_profile=None):
+                             camera_observation_config=None, physical_profile=None,
+                             task_probe_force_y_N=None):
     """Build one source-identified candidate through SelectedReferenceEnv's existing binding."""
     import importlib
+    if task_probe_force_y_N is not None:
+        import math
+        if (physical_profile != 'panda-free-body-wrench-only-v1' or provider != 'mujoco'
+                or type(task_probe_force_y_N) not in (int, float)
+                or not math.isfinite(task_probe_force_y_N) or not -30. <= task_probe_force_y_N <= 30.):
+            raise ValueError('probe Task force requires the MuJoCo body-only profile and finite [-30, 30] N')
 
     root = Path(workspace).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    if physical_profile == 'panda-free-body-point-wrench-v1':
+    if physical_profile in ('panda-free-body-point-wrench-v1', 'panda-free-body-wrench-only-v1'):
         from task_env.artifacts import PoseWorld
         from .free_body_fixture import fixture_scene
         scene = fixture_scene()
@@ -492,7 +499,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         timebase=Timebase(0.002, 5, 0.01),
     )
     if physical_profile in ('panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
-                            'panda-direct-effort-home-v1'):
+                            'panda-free-body-wrench-only-v1', 'panda-direct-effort-home-v1'):
         # A distinct Artifact makes the home reset explicit; it does not alter
         # the original A05 candidate or its source constraints and drives.
         home = (0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853)
@@ -505,7 +512,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         if physical_profile == 'panda-direct-effort-home-v1':
             legacy = replace(legacy, artifact_id='panda-direct-effort-home-v1',
                              task_id='panda-direct-effort-home', artifact_version='v1')
-    if physical_profile == 'panda-free-body-point-wrench-v1':
+    if physical_profile in ('panda-free-body-point-wrench-v1', 'panda-free-body-wrench-only-v1'):
         entities = tuple(replace(entity, kind='movable', geometry='source_asset',
                                  parameters_si={'mass_kg': 0.08})
                          if entity.semantic_id == 'probe' else entity for entity in legacy.world.entities)
@@ -532,10 +539,10 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     elif physical_profile in ('panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
                               'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1',
                               'panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
-                              'panda-direct-effort-home-v1'):
+                              'panda-free-body-wrench-only-v1', 'panda-direct-effort-home-v1'):
         from .source import _physical_source_input
         mutator = None
-        if physical_profile == 'panda-free-body-point-wrench-v1':
+        if physical_profile in ('panda-free-body-point-wrench-v1', 'panda-free-body-wrench-only-v1'):
             from .free_body_fixture import compose_fixture_xml
             mutator = compose_fixture_xml
         source, closure_digest, panda_digest, panda_file_count = _physical_source_input(
@@ -568,11 +575,29 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
                   'panda-direct-effort-object-wrench-v1': 'object', 'panda-split-direct-effort-v1': None,
                   'panda-fixed-frame-point-wrench-v1': 'hand',
                   'panda-free-body-point-wrench-v1': 'probe',
+                  'panda-free-body-wrench-only-v1': 'probe',
                   'panda-direct-effort-home-v1': None}[physical_profile]
         physical_execution = build_panda_direct_effort_execution(
             scene, artifact, source, wrench_target=target, split=physical_profile == 'panda-split-direct-effort-v1',
             fixed_frame_point=physical_profile in ('panda-fixed-frame-point-wrench-v1',
-                                                  'panda-free-body-point-wrench-v1'))
+                                                  'panda-free-body-point-wrench-v1',
+                                                  'panda-free-body-wrench-only-v1'))
+        if physical_profile == 'panda-free-body-wrench-only-v1':
+            # This fixture exposes the already source-bound free probe wrench
+            # without claiming Panda actuator channels.  Its distinct control
+            # identity is recorded below with the other physical profiles.
+            from task_env.runtime.sessions.physical_control import (
+                PhysicalControlExecutionV1, compile_physical_control_binding,
+            )
+            from task_env.controllers.canonical.physical_controller import WrenchControllerV1
+            binding = replace(physical_execution.compiled.binding, channels=())
+            compiled = compile_physical_control_binding(scene, physical_execution.compiled.root,
+                physical_execution.compiled.children, binding)
+            controller = WrenchControllerV1(
+                replace(physical_execution.controllers[-1].profile, composition='sum'), binding)
+            physical_execution = PhysicalControlExecutionV1(compiled, (controller,), scene,
+                physical_execution.joint_bindings, physical_execution.frame_bindings,
+                physical_execution.requirements, physical_execution.generation)
 
     def build(_provider):
         profile = PandaPositionServoProfileV1.from_source(artifact, source)
@@ -591,12 +616,16 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
                 'source_closure': source.source_closure_digest,
                 'profile': profile.identity,
                 'plan': plan.identity_hash,
+                **({'position_physical_action': 'position-physical-action-v1'}
+                   if physical_profile == 'panda-free-body-wrench-only-v1' else {}),
+                **({'task_probe_force_y_N': task_probe_force_y_N} if task_probe_force_y_N is not None else {}),
                 **({'physical_binding': physical_execution.compiled.binding.identity_hash,
                     'physical_controllers': [item.identity for item in physical_execution.controllers]}
                    if physical_execution is not None else {}),
             }),
             'resolved_configuration': {
                 'provider': _provider, 'backend': 'cpu', 'profile_id': profile.profile_id,
+                **({'task_probe_force_y_N': task_probe_force_y_N} if task_probe_force_y_N is not None else {}),
                 **({'physical_profile': physical_profile,
                     'physical_binding': physical_execution.compiled.binding.identity_hash,
                     'physical_controllers': [item.identity for item in physical_execution.controllers]}
@@ -621,7 +650,18 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
                          'controllers': [{'identity': item.identity, 'shape': list(item.action_shape)}
                                          for item in physical_execution.controllers]}
         action_space_factory = physical_execution.action_space
+    if physical_profile == 'panda-free-body-wrench-only-v1':
+        action_schema['position_physical_action'] = 'position-physical-action-v1'
+
+    def task_probe_force(env):
+        from task_env.controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+        return (ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            'candidate-task-probe-writer-v1', 'candidate-task-probe-force-v1', 'probe/probe_body',
+            0, env.artifact.timebase.control_substeps, (0., float(task_probe_force_y_N), 0.), (0., 0., 0.)),)
+
     binding = ReferenceTaskBinding(
+        position_physical_mixed=physical_profile == 'panda-free-body-wrench-only-v1',
+        task_com_wrench_factory=task_probe_force if task_probe_force_y_N is not None else None,
         position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
         build=build,
         action_schema=action_schema, action_space_factory=action_space_factory,

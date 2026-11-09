@@ -48,7 +48,7 @@ class PositionCandidateEnv(SelectedReferenceEnv):
                 versioned_input, horizon=horizon, environment_type=cls,
                 controller_config=controller_config, **options,
             ).env
-        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation', 'physical_profile'}:
+        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation', 'physical_profile', 'task_probe_force_y_N'}:
             raise ValueError('Position candidate has unsupported configuration fields')
         provider = values.get('provider', 'geophys')
         backend = values.get('backend', 'cpu')
@@ -60,7 +60,7 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if physical_profile not in (None, 'panda-direct-effort-v1', 'panda-direct-effort-wrench-v1',
                                      'panda-direct-effort-object-wrench-v1', 'panda-split-direct-effort-v1',
                                      'panda-fixed-frame-point-wrench-v1', 'panda-free-body-point-wrench-v1',
-                                     'panda-direct-effort-home-v1'):
+                                     'panda-free-body-wrench-only-v1', 'panda-direct-effort-home-v1'):
             raise ValueError('unsupported physical control profile')
         if backend != 'cpu' or (provider != 'geophys' and not (
                 provider == 'mujoco' and physical_profile is not None)):
@@ -88,6 +88,8 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         from .builder import build_position_candidate
 
         options = {} if physical_profile is None else {'physical_profile': physical_profile}
+        if 'task_probe_force_y_N' in values:
+            options['task_probe_force_y_N'] = values['task_probe_force_y_N']
         return build_position_candidate(
             workspace, provider=provider, horizon=horizon, environment_type=cls,
             camera_observation_config=camera_config, **options,
