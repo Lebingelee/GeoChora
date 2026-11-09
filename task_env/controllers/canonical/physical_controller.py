@@ -254,6 +254,8 @@ class DirectJointEffortControllerV1:
             if set(action) != {self._action_key}:
                 raise ValueError('direct effort action tree differs from its declaration')
             action = action[self._action_key]
+        if isinstance(action, (tuple, list)) and any(isinstance(value, (bool, np.bool_)) for value in action):
+            raise ValueError('direct effort action shape or finite values are invalid')
         raw = np.asarray(action)
         if (raw.shape != (len(self._channels),) or raw.dtype.kind not in {'i', 'u', 'f'}
                 or not np.isfinite(raw).all()):

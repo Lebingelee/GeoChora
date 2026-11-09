@@ -88,6 +88,14 @@ def test_default_effort_checks_original_precision_before_float32_rounding():
     controller = subject.default_effort_controller(binding, writer_id='controller-a', units=(channel.unit,))
     with pytest.raises(ValueError, match='declared bounds'):
         controller.compute([channel.effort_range[1] + 1e-9], object(), context)
+    other = replace(channel, joint_id='other', component_path=('robot', 'other'),
+                    native_actuator='other', transmission_id='other')
+    expanded = replace(binding, channels=(channel, other))
+    expanded_subject = replace(subject, channel_paths=(*subject.channel_paths, ('robot', 'other')))
+    expanded_controller = expanded_subject.default_effort_controller(
+        expanded, writer_id='controller-a', units=(channel.unit, other.unit))
+    with pytest.raises(ValueError, match='shape or finite'):
+        expanded_controller.compute([True, 0.0], object(), context)
 
 
 @pytest.mark.parametrize('version', [1, 2])
