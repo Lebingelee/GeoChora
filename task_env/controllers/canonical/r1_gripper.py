@@ -4,10 +4,10 @@ import numpy as np
 from .contracts import GripperControlTarget
 
 
-def advance_r1_gripper(owner, feedback, canonical):
+def advance_r1_gripper(owner, feedback, gripper_scalar):
     """Advance an already validated R1 gripper owner and return its target."""
     cfg = owner.gripper_config
-    opening = float(.5 * (canonical.interpreted_values[-1] + 1) * owner.config.gripper_opening_range_m)
+    opening = float(.5 * (gripper_scalar + 1) * owner.config.gripper_opening_range_m)
     delta = opening - owner._commanded
     if delta > 1e-12:
         owner._force_mode = False

@@ -75,7 +75,7 @@ def test_split_hand_preserves_existing_r1_gripper_law_across_force_modes():
         state, feedback = boundary(step, opening, force)
         current = SimpleNamespace(interpreted_values=(0.,) * 7 + (scalar,))
         _, old_target = original.compute(state, feedback, None)
-        new_target = hand.compute(state, feedback, current)
+        new_target = hand.compute(state, feedback, scalar)
         assert new_target == old_target.gripper
         assert new_target.servo_opening_m == pytest.approx(expected, abs=1e-12)
         assert hand.readiness(*boundary(step + 1, opening, force)).gripper.close_ready is ready
@@ -89,13 +89,37 @@ def test_split_preflights_both_owner_boundaries_before_computation():
     writes = []
     owner.arm = SimpleNamespace(_expected_step=0, compute=lambda *_: writes.append('arm'))
     owner.hand = SimpleNamespace(_expected_step=1, _feedback=lambda *_: None)
+    request = SimpleNamespace(validate=lambda: None, values=(0.,) * 8)
     with pytest.raises(RuntimeError, match='one current reset boundary'):
-        owner.compute(SimpleNamespace(control_step=0), object(), object())
+        owner.compute(SimpleNamespace(control_step=0), object(), request)
     assert writes == []
     owner.hand._expected_step = 0
     def stale(*_):
         raise ValueError('stale feedback')
     owner.hand._feedback = stale
     with pytest.raises(ValueError, match='stale feedback'):
-        owner.compute(SimpleNamespace(control_step=0), object(), object())
+        owner.compute(SimpleNamespace(control_step=0), object(), request)
     assert writes == []
+
+
+def test_split_projects_arm_and_hand_inputs_to_separate_owners():
+    from task_env.controllers.canonical.contracts import CanonicalAction, RequestedAction
+    from task_env.controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
+    seen = {}
+    arm_id, hand_id = 'a' * 64, 'b' * 64
+    def arm_compute(_state, request):
+        seen['arm_request'] = request.values
+        return CanonicalAction('canonical-action-v0', request, request.values, False, None), (0.,) * 7, (0.,) * 7
+    def hand_compute(_state, _feedback, scalar):
+        seen['hand_scalar'] = scalar
+        return GripperControlTarget('panda-v1/gripper', .08, 10., .08)
+    owner = object.__new__(SplitPandaPositionControllerV1)
+    owner.arm = SimpleNamespace(_expected_step=0, compute=arm_compute, identity=arm_id)
+    owner.hand = SimpleNamespace(_expected_step=0, _feedback=lambda *_: None,
+                                 compute=hand_compute, identity=hand_id)
+    owner.identity = split_identity(arm_id, hand_id)
+    owner.artifact_hash = 'c' * 64
+    request = RequestedAction('absolute_joint', None, 'none', (0.,) * 7 + (1.5,))
+    canonical, _target = owner.compute(SimpleNamespace(control_step=0), object(), request)
+    assert seen == {'arm_request': (0.,) * 8, 'hand_scalar': 1.}
+    assert canonical.requested == request and canonical.interpreted_values[-1] == 1. and canonical.clipped

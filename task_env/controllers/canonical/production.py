@@ -118,7 +118,7 @@ class ProductionCanonicalPandaController:
         # Validate/lower first; invalid public actions never advance gripper state.
         canonical, desired_arm, servo_arm = self._arm._compute_arm(state, requested)
         from .r1_gripper import advance_r1_gripper
-        gripper_target = advance_r1_gripper(self, feedback, canonical)
+        gripper_target = advance_r1_gripper(self, feedback, canonical.interpreted_values[-1])
         target = CanonicalControlTarget('canonical-control-v0', self._arm.artifact_hash,
             self.identity, ARM, dict(zip(ARM, map(float, desired_arm))),
             dict(zip(ARM, map(float, servo_arm))), gripper_target)

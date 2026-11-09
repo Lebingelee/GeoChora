@@ -1,6 +1,6 @@
 """Independent R1 arm and hand writers for one assembled Panda interval."""
 from __future__ import annotations
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import numpy as np
 
 from .contracts import CanonicalControlTarget, GripperControlTarget, digest
@@ -100,12 +100,12 @@ class PandaHandPositionControllerV1:
         self._force_mode = self._force_initialized = False
         self._expected_step = state.control_step
 
-    def compute(self, state, feedback, canonical):
+    def compute(self, state, feedback, gripper_scalar):
         self._feedback(state, feedback)
         if self._expected_step is None or state.control_step != self._expected_step:
             raise RuntimeError('hand Controller requires reset and one compute per boundary')
         from .r1_gripper import advance_r1_gripper
-        target = advance_r1_gripper(self, feedback, canonical)
+        target = advance_r1_gripper(self, feedback, gripper_scalar)
         self._expected_step += 1
         return target
 
@@ -155,6 +155,7 @@ class SplitPandaPositionControllerV1:
         return self.hand.readiness(state, feedback)
 
     def compute(self, state, feedback, requested):
+        requested.validate()
         # Reject stale feedback or either stale owner before the first owner
         # can mutate its boundary cursor or target memory.
         self.hand._feedback(state, feedback)
@@ -162,8 +163,16 @@ class SplitPandaPositionControllerV1:
                 or self.arm._expected_step != state.control_step
                 or self.hand._expected_step != state.control_step):
             raise RuntimeError('split Position owners require one current reset boundary')
-        canonical, desired, servo = self.arm.compute(state, requested)
-        hand = self.hand.compute(state, feedback, canonical)
+        # The legacy arm solver accepts an eight-component request even
+        # though its arm calculation uses only the first seven. Give it a
+        # fixed placeholder and send the real gripper input only to hand.
+        arm_request = replace(requested, values=(*requested.values[:-1], 0.0))
+        arm_action, desired, servo = self.arm.compute(state, arm_request)
+        hand_scalar = float(np.clip(requested.values[-1], -1., 1.))
+        canonical = replace(arm_action, requested=requested,
+            interpreted_values=(*arm_action.interpreted_values[:-1], hand_scalar),
+            clipped=bool(arm_action.clipped or hand_scalar != requested.values[-1]))
+        hand = self.hand.compute(state, feedback, hand_scalar)
         target = CanonicalControlTarget('canonical-control-v0', self.artifact_hash, self.identity,
             ARM, dict(zip(ARM, desired, strict=True)), dict(zip(ARM, servo, strict=True)), hand)
         self.last_split_bundle = SplitPositionBundleV1(self.arm.identity, self.hand.identity,
