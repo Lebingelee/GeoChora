@@ -56,6 +56,112 @@ def _validate_resource_intervals(claims, *, writer_resources, substeps):
 
 
 @dataclass(frozen=True)
+class SceneCommandContributionV1:
+    """One typed command's binding and effective half-open substep range."""
+    producer_kind: str
+    command_kind: str
+    units: tuple[str, ...]
+    composition: str
+    physical_effect_id: str | None
+    writer_id: str
+    controller_identity: str
+    controller_generation: int | None
+    command_sha256: str
+    resources: tuple[str, ...]
+    start_substep: int
+    end_substep: int
+
+
+@dataclass(frozen=True)
+class SceneCommandIntervalV1:
+    """Versioned source-bound outer interval, independent of inner hashes."""
+    schema_version: str
+    source_id: str
+    source_closure_sha256: str
+    artifact_sha256: str
+    boundary: object
+    sample_clock: object
+    binding_sha256: str
+    binding_revision: str
+    materialization_receipt_sha256: str
+    row: int | None
+    physics_dt_s: float
+    substeps: int
+    contributions: tuple[SceneCommandContributionV1, ...]
+
+    @property
+    def identity_hash(self):
+        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True,
+            separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+
+
+def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
+                                artifact_sha256, boundary, sample_clock):
+    """Bind selected leaf contributions to the already admitted plan and receipt.
+
+    Leaf V1 has neither a row number nor Controller generation. Keep those as
+    None and bind the actual plan, leaf binding, and configuration revision;
+    do not invent identities that the old commands do not carry.
+    """
+    from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+    from .leaf_control import LeafMaterializationReceiptV1, LeafPreparedBatchV1
+    if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
+        raise TypeError('scene leaf interval requires its compiled binding plan')
+    if type(materialization) is not LeafMaterializationReceiptV1 or type(batch) is not LeafPreparedBatchV1:
+        raise TypeError('scene leaf interval requires typed materialization and batch')
+    batch.validate()
+    _token(source_id, 'scene source')
+    _digest(artifact_sha256, 'scene artifact')
+    if (boundary.scene_identity_hash != plan.scene_identity_sha256
+            or boundary.provider_materialization_id != materialization.materialization_id
+            or sample_clock.sample_index != boundary.control_step
+            or sample_clock.clock_domain != 'evaluation_boundary'
+            or materialization.scene_identity_sha256 != plan.scene_identity_sha256
+            or materialization.source_closure_sha256 != plan.source_closure_sha256
+            or materialization.effective_plan_identity_sha256 != plan.identity_sha256):
+        raise ValueError('scene leaf interval differs from its source-bound materialization')
+    entries = {item.binding.writer_id: item for item in plan.leaves}
+    authority = tuple((writer, tuple(sorted(f'{entity}/{actuator}'
+        for entity, actuator, owner in plan.resource_writers if owner == writer)))
+        for writer in sorted(entries))
+    contributions = []
+    for item in batch.commands:
+        entry = entries.get(item.writer_id)
+        if (entry is None or item.state_boundary != boundary
+                or item.binding_identity_sha256 != entry.binding.identity_hash
+                or item.effective_configuration_identity_sha256 != entry.effective_configuration_identity_sha256
+                or item.effective_plan_identity_sha256 != plan.identity_sha256
+                or item.materialization_identity_sha256 != materialization.identity_sha256
+                or item.state_configuration_revision != materialization.configuration_revision
+                or item.target.sample_clock != sample_clock
+                or item.target.source_closure_sha256 != plan.source_closure_sha256
+                or item.target.scene_identity_hash != plan.scene_identity_sha256):
+            raise ValueError('scene leaf contribution differs from its bound command')
+        resources = tuple(sorted(f'{slot.actuator.entity_id}/{slot.actuator.actuator_id}'
+                                 for slot in item.slot_values))
+        if resources != dict(authority)[item.writer_id]:
+            raise ValueError('scene leaf contribution does not cover its bound resources')
+        units = ('rad',) if item.profile_kind == 'arm_position' else ('m',)
+        contributions.append(SceneCommandContributionV1('robot-controller', 'position-target', units,
+            'exclusive', None, item.writer_id,
+            item.binding_identity_sha256, None, item.command_identity_sha256,
+            resources, 0, plan.control_substeps))
+    if {item.writer_id for item in contributions} != set(entries):
+        raise ValueError('scene leaf interval does not cover its bound writers')
+    claims = tuple((item.writer_id, resource, item.start_substep, item.end_substep)
+                   for item in contributions for resource in item.resources)
+    _validate_resource_intervals(claims, writer_resources=authority, substeps=plan.control_substeps)
+    if (not math.isfinite(plan.physics_dt_s) or plan.physics_dt_s <= 0
+            or not math.isfinite(sample_clock.simulation_time_s)):
+        raise ValueError('scene leaf interval clock is invalid')
+    return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
+        plan.source_closure_sha256, artifact_sha256, boundary, sample_clock,
+        plan.identity_sha256, materialization.configuration_revision,
+        materialization.identity_sha256, None, plan.physics_dt_s,
+        plan.control_substeps, tuple(contributions))
+
+
+@dataclass(frozen=True)
 class PositionControlBatchV1:
     """Complete, source-bound set of position writers for one outer interval."""
 
@@ -486,7 +592,8 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                            boundary, sample_clock, controller_generation,
                            controller_identities, writer_ids, resource_ids, units,
                            lowering, lower, resource_owners=None,
-                           submission_progress=None):
+                           submission_progress=None, scene_interval=None,
+                           scene_plan=None, scene_materialization=None):
     """Commit one previously typed command under the existing replay key."""
     payload, identity, lifecycle = _preflight_control_command(
         session, command, command_kind=command_kind, command_sha256=command_sha256,
@@ -495,6 +602,28 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         controller_generation=controller_generation, controller_identities=controller_identities,
         writer_ids=writer_ids, resource_ids=resource_ids, units=units, lowering=lowering,
         lower=lower, resource_owners=resource_owners, submission_progress=submission_progress)
+    if scene_interval is not None:
+        if type(scene_interval) is not SceneCommandIntervalV1:
+            raise TypeError('scene submission requires SceneCommandIntervalV1')
+        if getattr(session, 'active_leaf_plan_identity', None) not in (None, getattr(scene_plan, 'identity_sha256', None)):
+            raise ValueError('scene interval plan is not active in the RuntimeSession')
+        check_materialization = getattr(session, 'validate_leaf_materialization', None)
+        if not callable(check_materialization):
+            raise ValueError('scene interval requires RuntimeSession materialization validation')
+        check_materialization(scene_materialization, scene_plan)
+        expected = prepare_leaf_scene_interval(plan=scene_plan, materialization=scene_materialization,
+            batch=command, source_id=source_id, artifact_sha256=artifact_sha256,
+            boundary=boundary, sample_clock=sample_clock)
+        if scene_interval != expected:
+            raise ValueError('scene interval differs from its bound inner commands')
+        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+        if timebase is not None and (timebase.control_substeps != scene_interval.substeps
+                or not math.isclose(timebase.physics_dt, scene_interval.physics_dt_s, rel_tol=0, abs_tol=1e-12)
+                or not math.isclose(timebase.control_dt, scene_interval.physics_dt_s * scene_interval.substeps,
+                                    rel_tol=1e-12, abs_tol=1e-12)):
+            raise ValueError('scene interval differs from the RuntimeSession timebase')
+    elif scene_plan is not None or scene_materialization is not None:
+        raise ValueError('scene binding and materialization require an interval')
     provider = payload['provider']
     materialization_id = payload['materialization_id']
     episode_id = payload['episode_id']
@@ -533,6 +662,17 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
             'acknowledged', type(ack).__name__, ack_identity)
         receipt.validate()
         session._last_control_submission = receipt.to_mapping()
+        if scene_interval is not None:
+            session._last_scene_control_submission = {
+                'schema_version': 'scene-control-submission-receipt-v1',
+                'interval_sha256': scene_interval.identity_hash,
+                'interval': asdict(scene_interval),
+                'inner_submission_id': receipt.submission_id,
+                'inner_command_sha256': command_sha256,
+                'contribution_command_sha256': tuple(item.command_sha256
+                    for item in scene_interval.contributions),
+                'status': 'acknowledged',
+            }
         if lifecycle is not None:
             from dataclasses import replace
             session._control_lifecycle_dispatch = replace(lifecycle, stage='committed')
@@ -547,6 +687,17 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                                             'status': status, 'error_type': type(error).__name__,
                                             'attempted_writer_ids': attempted,
                                             'completed_writer_ids': completed}
+        if scene_interval is not None:
+            session._last_scene_control_submission = {
+                'schema_version': 'scene-control-submission-receipt-v1',
+                'interval_sha256': scene_interval.identity_hash,
+                'interval': asdict(scene_interval),
+                'inner_submission_id': identity,
+                'inner_command_sha256': command_sha256,
+                'contribution_command_sha256': tuple(item.command_sha256
+                    for item in scene_interval.contributions),
+                'status': status,
+            }
         if lifecycle is not None:
             from dataclasses import replace
             session._control_lifecycle_dispatch = replace(lifecycle, stage='failed')

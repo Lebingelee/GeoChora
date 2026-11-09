@@ -2311,7 +2311,7 @@ def dispatch_leaf_control_interval(
         # Standalone consumers retain their existing runtime-owned leaf contract.
         apply_prepared()
     else:
-        from .control_submission import submit_control_command
+        from .control_submission import prepare_leaf_scene_interval, submit_control_command
         if lifecycle.source_closure_sha256 != plan.source_closure_sha256:
             raise ValueError('leaf plan source closure differs from the shared lifecycle')
         batch = LeafPreparedBatchV1(prepared)
@@ -2328,6 +2328,10 @@ def dispatch_leaf_control_interval(
         if declared != actual:
             raise ValueError('leaf command resources differ from the compiled ownership plan')
         resources = tuple(sorted(resource for _writer, owned in owners for resource in owned))
+        scene_interval = prepare_leaf_scene_interval(
+            plan=plan, materialization=request.materialization, batch=batch,
+            source_id=lifecycle.source_id, artifact_sha256=lifecycle.artifact_sha256,
+            boundary=before.boundary, sample_clock=before.sample_clock)
         submit_control_command(
             runtime, batch, command_kind='position-target', command_sha256=batch.identity_hash,
             source_id=lifecycle.source_id, source_closure_sha256=lifecycle.source_closure_sha256,
@@ -2341,6 +2345,8 @@ def dispatch_leaf_control_interval(
             lower=apply_prepared,
             submission_progress={'attempted_writer_ids': attempted,
                                  'completed_writer_ids': acknowledged},
+            scene_interval=scene_interval, scene_plan=plan,
+            scene_materialization=request.materialization,
         )
 
     try:

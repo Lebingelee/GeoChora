@@ -41,6 +41,15 @@ def test_two_leaf_writes_use_one_common_receipt_before_step():
     assert set(common['resource_ids']) == {
         f'{entity}/{actuator}' for entity, actuator, _ in plan.resource_writers}
     assert common['attempted_writer_ids'] == common['completed_writer_ids'] == common['writer_ids']
+    outer = runtime._last_scene_control_submission
+    assert outer['status'] == 'acknowledged'
+    assert outer['inner_submission_id'] == common['submission_id']
+    assert outer['inner_command_sha256'] == common['command_sha256']
+    assert len(outer['contribution_command_sha256']) == 2
+    assert outer['interval']['row'] is None
+    assert all(item['controller_generation'] is None for item in outer['interval']['contributions'])
+    assert {(item['start_substep'], item['end_substep'])
+            for item in outer['interval']['contributions']} == {(0, plan.control_substeps)}
 
 
 def test_selected_leaf_binding_without_position_profiles_installs_lifecycle():
@@ -80,6 +89,9 @@ def test_leaf_failure_is_latched_without_step_or_replay():
     assert runtime.step_calls == 0
     assert runtime._control_lifecycle_dispatch.stage == 'failed'
     assert runtime._last_control_submission['status'] == 'failed_partial'
+    assert runtime._last_scene_control_submission['status'] == 'failed_partial'
+    assert (runtime._last_scene_control_submission['inner_submission_id'] ==
+            runtime._last_control_submission['submission_id'])
     assert runtime.fault is not None
     with pytest.raises(RuntimeError, match='fault-latched'):
         dispatch_leaf_control_interval(plan, _request(plan, receipt, publication), scene=scene, runtime=runtime)
@@ -93,6 +105,23 @@ def test_leaf_rejects_wrong_shared_controller_before_any_write():
     with pytest.raises(ValueError, match='shared lifecycle'):
         dispatch_leaf_control_interval(plan, _request(plan, receipt, publication), scene=scene, runtime=runtime)
     assert runtime.begin_calls == runtime.apply_calls == runtime.step_calls == 0
+
+
+def test_scene_interval_tamper_rejected_before_writer_or_boundary(monkeypatch):
+    from dataclasses import replace
+    from task_env.runtime.sessions import control_submission
+    scene, plan, receipt, publication, runtime = _leaf_runtime()
+    original = control_submission.prepare_leaf_scene_interval
+    calls = []
+    def tamper_first(**kwargs):
+        value = original(**kwargs)
+        calls.append(True)
+        return replace(value, artifact_sha256='f' * 64) if len(calls) == 1 else value
+    monkeypatch.setattr(control_submission, 'prepare_leaf_scene_interval', tamper_first)
+    with pytest.raises(ValueError, match='differs from its bound inner commands'):
+        dispatch_leaf_control_interval(plan, _request(plan, receipt, publication), scene=scene, runtime=runtime)
+    assert runtime.begin_calls == runtime.apply_calls == runtime.step_calls == 0
+    assert not hasattr(runtime, '_control_submission_consumed')
 
 
 def test_caller_solution_enters_declared_common_lifecycle():
