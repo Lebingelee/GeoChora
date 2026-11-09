@@ -548,7 +548,9 @@ class UsdCoreRuntimeSession(_SessionValues):
         if getattr(self, '_physical_port', None) is not None or self._reset_done:
             raise ValueError('physical port must be bound once before reset')
         from .isaac_physical import IsaacF06PhysicalPort
+        versions = execution.controller_versions()
         self._physical_port = IsaacF06PhysicalPort(self, execution)
+        self._physical_controller_versions = versions
         self.physical_control_generation = execution.generation
 
     def assess_physical_control(self, binding):

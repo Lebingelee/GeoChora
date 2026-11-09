@@ -87,6 +87,7 @@ def test_scene_physical_explicit_sum_and_duplicate_effect_admission():
     execution = PhysicalControlExecutionV1(plan, (controller,), plan.scene, {}, {},
         StateRequirements('state-requirements-v1', 'controller', 'controller-a', ()), 1)
     session = SimpleNamespace(_physical_port=SimpleNamespace(execution=execution),
+        _physical_controller_versions=execution.controller_versions(),
         physical_control_generation=1, _artifact=SimpleNamespace(
             timebase=SimpleNamespace(control_substeps=5, physics_dt=.002, control_dt=.01)))
     batch = PhysicalCommandBatchV1('physical-command-batch-v1', context,
@@ -99,7 +100,13 @@ def test_scene_physical_explicit_sum_and_duplicate_effect_admission():
     interval = prepare_physical_scene_interval(session=session, execution=execution, resolved=resolved)
     assert [item.composition for item in interval.contributions] == ['sum', 'sum']
     assert [item.physical_effect_id for item in interval.contributions] == ['force-a', 'force-b']
-    assert all(item.controller_generation == 1 for item in interval.contributions)
+    assert all(item.controller_generation is None for item in interval.contributions)
+    controller.generation = 7
+    with pytest.raises(ValueError, match='versions differ from materialization'):
+        prepare_physical_scene_interval(session=session, execution=execution, resolved=resolved)
+    session._physical_controller_versions = execution.controller_versions()
+    assert all(item.controller_generation == 7 for item in
+               prepare_physical_scene_interval(session=session, execution=execution, resolved=resolved).contributions)
     duplicate = replace(batch.joint_efforts[1], contribution=replace(
         batch.joint_efforts[1].contribution, physical_effect_id='force-a'))
     bad_batch = replace(batch, joint_efforts=(batch.joint_efforts[0], duplicate))
@@ -693,6 +700,7 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     env.value = {'source':SimpleNamespace(source_id='source-a',source_closure_digest='b'*64)}
     env.state = SimpleNamespace(control_step=0,simulation_time=0.)
     env.session = FakeSession()
+    env.session._physical_controller_versions = execution.controller_versions()
     env.recorder = None
     env.horizon = 3
     env.mixed_control_profile = False
@@ -719,6 +727,7 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     env.session.assessment_phase = 'native_build'
     fresh_controller = LinearEffortControllerV1(profile,plan.binding,model)
     fresh_execution = replace(execution, controllers=(fresh_controller,))
+    env.session._physical_controller_versions = fresh_execution.controller_versions()
     env.binding = replace_binding = SimpleNamespace(**vars(previous.binding))
     replace_binding.physical_control_profile = lambda _env: fresh_execution
     # Explicit mock of the downstream native receipt: this is not build evidence.
@@ -856,6 +865,7 @@ def test_selected_env_composes_independent_effort_and_wrench_once():
         FrameReference('arm','base'),(0.,0.,0.),FrameReference('arm','base'),
         (0.,0.,0.),FrameReference('arm','base'),'exclusive')
     wrench = WrenchControllerV1(wp,binding)
+    arm.generation, wrench.generation = 1, 7
     execution = PhysicalControlExecutionV1(plan,(arm,wrench),original.scene,{}, {},
         StateRequirements('state-requirements-v1','controller','controller-a',()),1)
     joint = TypedJointStateValue('typed-joint-state-v1','arm','drive','revolute','radian',(0.,),
@@ -898,9 +908,15 @@ def test_selected_env_composes_independent_effort_and_wrench_once():
     env.session = FakeSession()
     env.session._artifact = env.artifact
     env.session._physical_port = SimpleNamespace(execution=execution)
+    env.session._physical_controller_versions = execution.controller_versions()
     env.recorder = None
     env.horizon = 3
     env.mixed_control_profile = False
+    wrench.generation = 8
+    with pytest.raises(ValueError, match='versions differ from materialization'):
+        env.step({arm.identity:np.array([2.],dtype=np.float32), wrench.identity:np.array([1.,0.,0.,0.,0.,0.])})
+    assert env.session.writes == 0
+    wrench.generation = 7
     result = env.step({arm.identity:np.array([2.],dtype=np.float32), wrench.identity:np.array([1.,0.,0.,0.,0.,0.])})
     assert env.session.writes == 1
     assert len(result[4]['physical_control_v1']['submitted_batch']['joint_efforts']) == 1
@@ -908,7 +924,8 @@ def test_selected_env_composes_independent_effort_and_wrench_once():
     outer = env.session._last_scene_control_submission
     assert outer['inner_submission_id'] == env.session._last_control_submission['submission_id']
     assert {item['command_kind'] for item in outer['interval']['contributions']} == {'joint-effort', 'body-wrench'}
-    assert all(item['controller_generation'] == 1 for item in outer['interval']['contributions'])
+    assert {item['writer_id']: item['controller_generation'] for item in outer['interval']['contributions']} == {
+        'controller-a': 1, 'external-force': 7}
     assert outer['interval']['row'] == 0
 
 

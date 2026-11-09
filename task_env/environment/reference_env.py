@@ -3019,6 +3019,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise StageUnavailableError('RuntimeSession does not expose an admitted physical-control port')
         if getattr(self.session, 'physical_control_generation', None) != profile.generation:
             raise ValueError('physical-control session generation differs from profile')
+        if getattr(self.session, '_physical_controller_versions', None) != profile.controller_versions():
+            raise ValueError('physical Controller versions differ from materialization')
         publication = self.session.snapshot_v2(scene=profile.scene,
             joint_bindings=profile.joint_bindings, frame_bindings=profile.frame_bindings,
             requirements=profile.requirements)

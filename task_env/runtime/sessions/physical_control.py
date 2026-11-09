@@ -357,6 +357,16 @@ class PhysicalControlExecutionV1:
             tuple(item for part in parts for item in part.body_wrenches),
             tuple(item for part in parts for item in part.extensions))
 
+    def controller_versions(self):
+        """Capture actual Controller identities and optional individual generations."""
+        rows = []
+        for controller in self.controllers:
+            generation = getattr(controller, 'generation', None)
+            if generation is not None and (type(generation) is not int or generation < 0):
+                raise ValueError('physical Controller generation must be nonnegative')
+            rows.append((controller.writer_id, controller.identity, generation))
+        return tuple(rows)
+
     def action_space(self):
         """Compose declared Controller input spaces, retaining legacy shape-only callers."""
         from gymnasium.spaces import Dict

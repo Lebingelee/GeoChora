@@ -239,6 +239,10 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
     if batch.extensions:
         raise ValueError('scene physical interval does not yet admit load extensions')
     controllers = {item.writer_id: item for item in execution.controllers}
+    versions = execution.controller_versions()
+    if getattr(session, '_physical_controller_versions', None) != versions:
+        raise ValueError('scene physical Controller versions differ from materialization')
+    generations = {writer: generation for writer, _identity, generation in versions}
     channels = {item.target_key: item for item in binding.channels}
     bodies = {(item.entity_id, item.body_id): item for item in binding.bodies}
     contributions, groups = [], {}
@@ -274,7 +278,7 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
             groups.setdefault(resource, []).append((item, basis))
             contributions.append(SceneCommandContributionV1('robot-controller', kind, units,
                 item.contribution.composition, item.contribution.physical_effect_id,
-                writer, controller.identity, execution.generation, item.identity_hash,
+                writer, controller.identity, generations[writer], item.identity_hash,
                 (resource,), 0, count))
     for resource, members in groups.items():
         if len(members) > 1:

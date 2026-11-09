@@ -234,7 +234,9 @@ class _MuJoCoSession(_SessionValues):
         if getattr(self._source, 'position_subject_binding', None) is not None:
             raise ValueError('physical effort port cannot share position-subject actuator ownership')
         from .mujoco_physical import MuJoCoPhysicalPort
+        versions = execution.controller_versions()
         self._physical_port = MuJoCoPhysicalPort(self, execution)
+        self._physical_controller_versions = versions
         self.physical_control_generation = execution.generation
 
     def assess_physical_control(self, binding):
