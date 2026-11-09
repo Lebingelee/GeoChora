@@ -24,6 +24,12 @@ class _Clock:
 
 class _Command:
     identity_hash = '1' * 64
+    writer_id = 'writer-1'
+    controller_identity = 'controller-1'
+    source_boundary = _Boundary()
+    sample_clock = _Clock()
+    source_closure_digest = 'a' * 64
+    target = SimpleNamespace(task_artifact_hash='b' * 64)
 
     def validate(self):
         if getattr(self, 'invalid', False):
@@ -32,6 +38,8 @@ class _Command:
 
 class PhysicalCommandBatchV1:
     identity_hash = '2' * 64
+    context = SimpleNamespace(source_id='task', source_closure_sha256='a' * 64,
+        artifact_sha256='b' * 64, boundary=_Boundary(), clock=_Clock(), generation=0)
 
     def validate(self):
         pass
@@ -187,3 +195,36 @@ def test_shared_commit_validation_failure_never_writes_and_lowering_failure_cann
     with pytest.raises(ValueError, match='already has a logical submission'):
         _submit(failed)
     assert writes == ['attempt']
+
+
+@pytest.mark.parametrize('field,value', (
+    ('source_boundary', _Boundary(state_revision=1, boundary_id='foreign')),
+    ('sample_clock', _Clock(simulation_time_s=1.0)),
+    ('source_closure_digest', 'f' * 64),
+    ('controller_identity', 'foreign-controller'),
+    ('writer_id', 'foreign-writer'),
+    ('target', SimpleNamespace(task_artifact_hash='f' * 64)),
+))
+def test_position_inner_identity_must_match_outer_submission(monkeypatch, field, value):
+    import task_env.controllers.canonical.contracts as contracts
+    monkeypatch.setattr(contracts, 'PositionControlTargetV1', _Command)
+    session, command, writes = _Session(), _Command(), []
+    setattr(command, field, value)
+    with pytest.raises(ValueError, match='position target identity'):
+        _submit(session, command, lower=lambda: writes.append('write'))
+    assert not writes and not hasattr(session, '_control_submission_consumed')
+
+
+def test_physical_inner_context_must_match_outer_submission(monkeypatch):
+    import task_env.runtime.sessions.physical_control as physical
+    monkeypatch.setattr(physical, 'ResolvedPhysicalBatchV1', _ResolvedPhysicalBatchV1)
+    session = _Session()
+    command = _ResolvedPhysicalBatchV1()
+    command.input_batch = PhysicalCommandBatchV1()
+    command.input_batch.context = SimpleNamespace(source_id='foreign',
+        source_closure_sha256='a' * 64, artifact_sha256='b' * 64,
+        boundary=session.boundary, clock=_Clock(), generation=0)
+    with pytest.raises(ValueError, match='physical batch context'):
+        _submit(session, command, command_kind='physical-effort-batch',
+                command_sha256='2' * 64)
+    assert not hasattr(session, '_control_submission_consumed')

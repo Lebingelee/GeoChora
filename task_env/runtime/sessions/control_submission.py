@@ -247,6 +247,32 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
     if command_sha256 != (command.identity_hash if command_kind == 'position-target'
                           else command.input_batch.identity_hash):
         raise ValueError('control command identity differs from the typed command')
+    # Validate identities carried by the typed payload against the outer
+    # submission before consuming the boundary or touching a provider. The
+    # legacy canonical target has no boundary/source fields; those remain
+    # established by the already admitted source-bound caller.
+    if command_kind == 'physical-effort-batch':
+        context = command.input_batch.context
+        if (context.source_id != source_id
+                or context.source_closure_sha256 != source_closure_sha256
+                or context.artifact_sha256 != artifact_sha256
+                or context.boundary != boundary or context.clock != sample_clock
+                or context.generation != controller_generation):
+            raise ValueError('physical batch context differs from the control submission')
+    elif not is_leaf_batch:
+        targets = command.targets if is_position_batch else (command,)
+        for item in targets:
+            if type(item) is PositionControlTargetV1:
+                if (item.source_boundary != boundary or item.sample_clock != sample_clock
+                        or item.source_closure_digest != source_closure_sha256
+                        or item.target.task_artifact_hash != artifact_sha256
+                        or item.controller_identity not in controller_identities
+                        or item.writer_id not in writer_ids):
+                    raise ValueError('position target identity differs from the control submission')
+            elif type(item) is CanonicalControlTarget:
+                if (item.task_artifact_hash != artifact_sha256
+                        or item.controller_identity not in controller_identities):
+                    raise ValueError('canonical target identity differs from the control submission')
     provider = getattr(session, '_provider', 'test-double')
     materialization_id = getattr(session, 'provider_materialization_id',
                                  getattr(boundary, 'provider_materialization_id', None))

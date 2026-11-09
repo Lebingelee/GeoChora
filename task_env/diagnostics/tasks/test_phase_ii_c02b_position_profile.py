@@ -411,7 +411,7 @@ def test_invalid_groups_wrong_identity_and_duplicate_or_stale_targets_reject_bef
         publication=publication, scene=scene, joint_bindings=joints,
         frame_bindings=frames,
     )
-    with pytest.raises(ValueError, match='already applied'):
+    with pytest.raises(ValueError, match='already has a logical submission'):
         apply_position_control_target(
             session, target, controller_profile=profile, plan=plan,
             publication=publication, scene=scene, joint_bindings=joints,

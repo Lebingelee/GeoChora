@@ -650,6 +650,18 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     with pytest.raises(ValueError, match='synthetic mapping cannot authorize'):
         env.step((.25,))
     assert (env.session.writes, env.session.advances) == (0, 0)
+    # Controller calculation has already run. No general rollback exists,
+    # even though the physical clock has not advanced.
+    with pytest.raises(RuntimeError, match=r'faulted; reset\(\) is required'):
+        env.step((.25,))
+    # The following ACK cases use a separate fixture/episode; this does not
+    # claim that clearing a fault alone constitutes a real runtime reset.
+    previous = env
+    env = object.__new__(SelectedReferenceEnv)
+    env.__dict__.update({key: value for key, value in previous.__dict__.items()
+                         if key != '_episode_state'})
+    env.session = FakeSession()
+    env.session.assessment_phase = 'native_build'
     # Explicit mock of the downstream native receipt: this is not build evidence.
     env.session.provenance = 'native_build'
     if bad_ack:
