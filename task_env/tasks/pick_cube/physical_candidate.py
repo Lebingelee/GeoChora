@@ -439,6 +439,7 @@ def _build_candidate(root, *, provider, horizon, seed, environment_type, drive_m
         physical_reset_action_schema=physical_action_schema if reset_switch else None,
         physical_action_observer=observe_physical_action if reset_switch else None,
         physical_observation_binding=None if direct_physical else legacy_position_physical_observation_binding,
+        physical_sequence_v2_observation=direct_physical,
         physical_control_profile=(lambda env: env._physical_reset_selection.current.execution)
                                  if reset_switch else (lambda _env: physical))
     if direct_physical:

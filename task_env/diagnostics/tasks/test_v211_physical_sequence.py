@@ -146,3 +146,20 @@ def test_sequence_capability_rejects_unverified_legacy_observer():
     env.provider = 'geophys'
     with pytest.raises(StageUnavailableError, match='MuJoCo CPU'):
         describe_physical_sequence_capability(env, None)
+
+
+def test_sequence_v2_observation_requires_explicit_task_capability():
+    from task_env.environment.types import StageUnavailableError
+    from task_env.runtime.sessions.physical_sequence import describe_physical_sequence_capability
+    env = SimpleNamespace(provider='mujoco', backend='cpu',
+        binding=SimpleNamespace(physical_direct_effort_feedback=False,
+            physical_observation_binding=None, external_actions=True),
+        session=SimpleNamespace(), recorder=None)
+    with pytest.raises(StageUnavailableError, match='bound observation'):
+        describe_physical_sequence_capability(env, None)
+    env.binding.physical_sequence_v2_observation = True
+    with pytest.raises(StageUnavailableError, match='bound physical sequence port'):
+        describe_physical_sequence_capability(env, None)
+    env.binding.physical_sequence_v2_observation = 1
+    with pytest.raises(StageUnavailableError, match='bound observation'):
+        describe_physical_sequence_capability(env, None)

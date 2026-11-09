@@ -17,7 +17,8 @@ def describe_physical_sequence_capability(env, profile):
     if (env.provider, env.backend) != ('mujoco', 'cpu'):
         raise StageUnavailableError('physical sequences require the MuJoCo CPU port')
     if (getattr(env.binding, 'physical_direct_effort_feedback', False)
-            or getattr(env.binding, 'physical_observation_binding', None) is None
+            or (getattr(env.binding, 'physical_observation_binding', None) is None
+                and getattr(env.binding, 'physical_sequence_v2_observation', False) is not True)
             or not getattr(env.binding, 'external_actions', False)
             or getattr(env, '_physical_reset_selection', None) is not None
             or getattr(env, '_episode_mode', None) in {'expert', 'external_solution'}):
@@ -192,6 +193,10 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
             ignore_done=getattr(env.binding, 'physical_ignore_done', False))
         env._episode_mode = 'external'
         env._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
+        if env.value.get('physical_execution') is not None:
+            env._physical_published_state = env.state
+            env._physical_published_typed_state = env.typed_state
+            env._physical_published_evaluation = env.evaluation
         if getattr(env.binding, 'physical_observation_binding', None) is not None:
             env._last_position_terminated, env._last_position_truncated = terminated, truncated
             env._published_position_state, env._published_position_typed_state = env.state, env.typed_state
