@@ -7,7 +7,17 @@ from __future__ import annotations
 
 import numpy as np
 
-from ...controllers.canonical.physical_commands import ExternalComWrenchV1
+from ...controllers.canonical.physical_commands import ExternalComWrenchSegmentV1, ExternalComWrenchV1
+
+
+def com_wrench_range(request, substeps):
+    if type(request) is ExternalComWrenchV1:
+        return 0, substeps
+    if type(request) is ExternalComWrenchSegmentV1:
+        if request.end_substep > substeps:
+            raise ValueError('caller COM segment exceeds the control interval')
+        return request.start_substep, request.end_substep
+    raise TypeError('caller wrench must be a supported external COM contract')
 
 
 class MuJoCoExternalComPort:
@@ -28,11 +38,15 @@ class MuJoCoExternalComPort:
         if getattr(session, '_external_com_port', None) is not None:
             raise ValueError('a caller wrench is already staged for this interval')
         source = session._source
-        rows, effects, body_ids = [], set(), set()
+        rows, effects, bodies = [], {}, {}
+        substeps = session._artifact.timebase.control_substeps
+        if type(substeps) is not int or substeps <= 0:
+            raise ValueError('caller wrench requires an integral control timebase')
         for request in requests:
-            if type(request) is not ExternalComWrenchV1:
-                raise TypeError('caller wrench must be ExternalComWrenchV1')
+            if type(request) not in (ExternalComWrenchV1, ExternalComWrenchSegmentV1):
+                raise TypeError('caller wrench must be a supported external COM contract')
             request.validate()
+            start, end = com_wrench_range(request, substeps)
             semantic = request.source_body_key
             native = source.bodies.get(semantic)
             if native is None:
@@ -44,10 +58,11 @@ class MuJoCoExternalComPort:
                 cursor = int(session._model.body_parentid[cursor])
             if body_id <= 0 or float(session._model.body_mass[body_id]) <= 0 or not movable:
                 raise ValueError('caller wrench requires a source-bound dynamic body')
-            if request.physical_effect_id in effects or body_id in body_ids:
-                raise ValueError('caller wrench effect and native body must be unique')
-            effects.add(request.physical_effect_id)
-            body_ids.add(body_id)
+            for ranges in (effects.setdefault(request.physical_effect_id, []),
+                           bodies.setdefault(body_id, [])):
+                if any(start < prior_end and prior_start < end for prior_start, prior_end in ranges):
+                    raise ValueError('caller wrench effect or native body ranges overlap; claims must be unique')
+                ranges.append((start, end))
             rows.append((request, body_id))
         self.session, self.rows = session, tuple(rows)
         self.boundary = session.state_boundary_identity()
@@ -57,6 +72,7 @@ class MuJoCoExternalComPort:
         self.authorized = False
         self.pending_values = None
         self.refresh_count = 0
+        self.substeps = substeps
 
     def verify(self, interval):
         s = self.session
@@ -88,7 +104,12 @@ class MuJoCoExternalComPort:
         s._mj.mj_kinematics(s._model, s._data)
         s._mj.mj_comPos(s._model, s._data)
         projected = np.zeros(s._model.nv, dtype=float)
+        if self.refresh_count >= self.substeps:
+            raise RuntimeError('caller wrench was refreshed beyond its control interval')
         for request, body_id in self.rows:
+            start, end = com_wrench_range(request, self.substeps)
+            if not start <= self.refresh_count < end:
+                continue
             s._mj.mj_applyFT(s._model, s._data, np.asarray(request.force_world_N),
                 np.asarray(request.torque_com_world_Nm), s._data.xipos[body_id].copy(), body_id, projected)
         if not np.isfinite(projected).all():

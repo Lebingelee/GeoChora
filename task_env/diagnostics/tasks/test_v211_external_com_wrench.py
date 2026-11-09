@@ -84,3 +84,27 @@ def test_active_recorder_rejects_unrecorded_caller_force_before_staging():
     env.recorder = SimpleNamespace(active=True)
     with pytest.raises(StageUnavailableError, match='not represented by the active Recorder'):
         env.step(object(), external_com_wrenches=(_request(),))
+
+
+def test_same_writer_can_precompute_disjoint_segments_but_not_overlap():
+    from task_env.controllers.canonical.physical_commands import ExternalComWrenchSegmentV1
+    s, boundary, points = _session()
+    def segment(start, end, force, writer='writer-1'):
+        return ExternalComWrenchSegmentV1('external-com-wrench-segment-v1', writer,
+            'same-effect', 'object', start, end, (0., force, 0.), (0., 0., 0.))
+    first, second = segment(0, 2, 1.), segment(2, 5, 3.)
+    port = MuJoCoExternalComPort(s, (first, second))
+    s._external_com_port = port
+    port.authorized = True
+    observed = []
+    for _ in range(5):
+        port.refresh_substep()
+        observed.append(float(s._data.qfrc_applied[0]))
+    assert observed == [1., 1., 3., 3., 3.]
+    port.finish()
+    assert not np.any(s._data.qfrc_applied)
+    with pytest.raises(ValueError, match='overlap'):
+        MuJoCoExternalComPort(s, (first, segment(1, 5, 3.)))
+    with pytest.raises(ValueError, match='exceeds'):
+        MuJoCoExternalComPort(s, (first, segment(2, 6, 3.)))
+    assert not np.any(s._data.qfrc_applied)

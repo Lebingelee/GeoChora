@@ -169,6 +169,34 @@ class ExternalComWrenchV1(Contract):
 
 
 @dataclass(frozen=True)
+class ExternalComWrenchSegmentV1(Contract):
+    """A precomputed caller-writer COM wrench on half-open native ticks."""
+
+    schema_version: str
+    writer_id: str
+    physical_effect_id: str
+    source_body_key: str
+    start_substep: int
+    end_substep: int
+    force_world_N: tuple[float, float, float]
+    torque_com_world_Nm: tuple[float, float, float]
+
+    def validate(self):
+        _choice(self.schema_version, {'external-com-wrench-segment-v1'}, 'external COM segment schema')
+        for value in (self.writer_id, self.physical_effect_id, self.source_body_key):
+            _name(value)
+        if (type(self.start_substep) is not int or type(self.end_substep) is not int
+                or not 0 <= self.start_substep < self.end_substep):
+            raise ValueError('external COM segment requires a half-open substep range')
+        _vector(self.force_world_N, 'world force')
+        _vector(self.torque_com_world_Nm, 'world COM torque')
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
 class TypedLoadExtensionV1(Contract):
     """Registered extension descriptor; payload is addressed, never an untyped object."""
     schema_version: str

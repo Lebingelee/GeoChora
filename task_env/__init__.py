@@ -57,6 +57,7 @@ def _get_parallel_registry():
 
 _LAZY_EXPORTS = {
     "ExternalComWrenchV1": ("task_env.controllers.canonical.physical_commands", "ExternalComWrenchV1"),
+    "ExternalComWrenchSegmentV1": ("task_env.controllers.canonical.physical_commands", "ExternalComWrenchSegmentV1"),
     "PandaAgent": ("task_env.robots", "PandaAgent"),
     "ActionConfig": ("task_env.environment", "ActionConfig"),
     "CameraSpec": ("task_env.environment", "CameraSpec"),
@@ -116,6 +117,7 @@ __all__ = [
     "ExpertAction",
     "ExternalActionContract",
     "ExternalComWrenchV1",
+    "ExternalComWrenchSegmentV1",
     "NutAssemblyReferenceEnv",
     "PendulumEnv",
     "ObservationConfig",

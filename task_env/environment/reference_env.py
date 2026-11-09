@@ -2879,8 +2879,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def step(self, action, *, external_com_wrenches=None):
         """Advance one interval, optionally with caller COM wrenches on MuJoCo CPU.
 
-        Wrenches are an immutable tuple of ``ExternalComWrenchV1`` keyed by a
-        source body. They act only for this interval. The selected grouped
+        Wrenches are an immutable tuple of ``ExternalComWrenchV1`` or
+        ``ExternalComWrenchSegmentV1`` keyed by a source body. They act only
+        for the declared half-open range in this interval. The selected grouped
         position path must already have a source-bound scene submission;
         other providers, native-feedback intervals and active Recorders fail
         before a force is staged. Ordinary ``step(action)`` is unchanged.

@@ -880,14 +880,16 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         existing_resources = {resource for item in scene_interval.contributions for resource in item.resources}
         existing_effects = {item.physical_effect_id for item in scene_interval.contributions
                             if item.physical_effect_id is not None}
+        from .mujoco_external_wrench import com_wrench_range
         added = []
         for request, _body_id in external.rows:
             resource = f'body:{request.source_body_key}'
             if resource in existing_resources or request.physical_effect_id in existing_effects:
                 raise ValueError('caller COM wrench conflicts with another scene contribution')
+            start, end = com_wrench_range(request, scene_interval.substeps)
             added.append(SceneCommandContributionV1('caller', 'body-com-wrench', ('N', 'N*m'),
-                'exclusive', request.physical_effect_id, None, None, None,
-                request.identity_hash, (resource,), 0, scene_interval.substeps))
+                'exclusive', request.physical_effect_id, getattr(request, 'writer_id', None), None, None,
+                request.identity_hash, (resource,), start, end))
         scene_interval = replace(scene_interval, contributions=(*scene_interval.contributions, *added))
     provider = payload['provider']
     materialization_id = payload['materialization_id']
