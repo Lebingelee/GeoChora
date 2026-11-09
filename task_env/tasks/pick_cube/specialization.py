@@ -676,9 +676,17 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         if profile == 'r1_split' and config.robot_uid is None:
             raise ValueError('split Position Controllers require an explicitly selected Robot source recipe')
         adapter = None
-        if config.robot_uid is not None:
+        # The legacy PickCube source already contains this Robot.  On the
+        # admitted MuJoCo route, resolve its existing reference recipe even
+        # when the caller omitted the optional Robot selector, so ordinary
+        # selected actions have the same source-owned subject binding.
+        robot_uid = config.robot_uid
+        if (robot_uid is None and config.physics_provider == 'mujoco'
+                and config.environment.runtime.backend == 'cpu'):
+            robot_uid = 'panda-v1'
+        if robot_uid is not None:
             from ...registry import AGENT_REGISTRY
-            robot = AGENT_REGISTRY.create(config.robot_uid)
+            robot = AGENT_REGISTRY.create(robot_uid)
             recipe_factory = getattr(robot, 'source_recipe', None)
             if callable(recipe_factory):
                 select_recipe = getattr(robot, 'source_recipe_for_profile', None)
