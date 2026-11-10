@@ -16,7 +16,7 @@ def test_borrowed_camera_uses_runtime_without_mujoco_source(provider, renderer):
     artifact = SimpleNamespace(identity_hash=camera.task_artifact_hash)
     forbidden = lambda: pytest.fail('borrowed camera must not request a MuJoCo source')
     consumer = create_task_rgb_consumer(camera=camera, renderer=renderer, provider=provider,
-        backend='cuda' if provider == 'isaacsim' else 'cpu', provider_seed=1,
+        backend='cuda' if provider == 'isaacsim' else 'cpu', provider_seed_getter=forbidden,
         artifact=artifact, color_space='test', session_getter=lambda: owner,
         source_getter=forbidden, binding_getter=forbidden)
     owner.capture_task_camera = lambda selected, state: _capture(selected, consumer.renderer, state)
@@ -39,7 +39,7 @@ def test_cross_renderer_checks_source_identity_before_session(monkeypatch):
     monkeypatch.setattr(api, 'create_dynamic_camera_session',
         lambda *args, **kwargs: pytest.fail('foreign visual source must not create a session'))
     consumer = create_task_rgb_consumer(camera=_camera(), renderer='mujoco', provider='geophys',
-        backend='cpu', provider_seed=1, artifact=artifact, color_space='test',
+        backend='cpu', provider_seed_getter=lambda: 1, artifact=artifact, color_space='test',
         session_getter=lambda: None, source_getter=lambda: source, binding_getter=lambda: binding)
     with pytest.raises(ValueError, match='source changed'):
         consumer.capture(_state(0))
@@ -62,7 +62,7 @@ def test_cross_renderer_binds_current_public_state(monkeypatch):
         return _Session(camera, consumer.renderer)
     monkeypatch.setattr(api, 'create_dynamic_camera_session', create)
     consumer = create_task_rgb_consumer(camera=_camera(), renderer='mujoco', provider='geophys',
-        backend='cpu', provider_seed=1, artifact=artifact, color_space='test',
+        backend='cpu', provider_seed_getter=lambda: 1, artifact=artifact, color_space='test',
         session_getter=lambda: None, source_getter=lambda: source, binding_getter=lambda: binding)
     state = _state(0)
     _, receipt = consumer.capture(state)

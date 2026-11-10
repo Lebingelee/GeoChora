@@ -1,7 +1,7 @@
 """Construct task RGB consumers at the renderer adapter boundary."""
 
 
-def create_task_rgb_consumer(*, camera, renderer, provider, backend, provider_seed,
+def create_task_rgb_consumer(*, camera, renderer, provider, backend, provider_seed_getter,
                              artifact, color_space, session_getter,
                              source_getter, binding_getter):
     """Bind the selected renderer without owning the physics RuntimeSession."""
@@ -43,7 +43,7 @@ def create_task_rgb_consumer(*, camera, renderer, provider, backend, provider_se
         if current_source.identity_hash != render_source.identity_hash:
             raise ValueError('selected task RGB render source changed after reset binding')
         execution = ExecutionSpecV1('execution-spec-v1', provider, backend, physics_profile,
-                                    provider_seed, 'best_effort', selection, physics_device='cpu')
+                                    provider_seed_getter(), 'best_effort', selection, physics_device='cpu')
         return create_dynamic_camera_session(camera, execution, source=current_source, initial_state=state)
 
     return TaskRgbObservationConsumerV1(camera, selection, factory, color_space=color_space)

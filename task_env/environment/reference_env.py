@@ -2519,7 +2519,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         camera, renderer = self._task_rgb_config
         return create_task_rgb_consumer(
             camera=camera, renderer=renderer, provider=self.provider,
-            backend=self.backend, provider_seed=self.execution.provider_seed,
+            backend=self.backend, provider_seed_getter=lambda: self.execution.provider_seed,
             artifact=self.artifact, color_space=self.metadata['task_rgb_v1']['color_space'],
             session_getter=lambda: self.session,
             source_getter=lambda: self.value['source'], binding_getter=binding,
