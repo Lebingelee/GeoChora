@@ -25,6 +25,7 @@ from task_env.controllers.canonical.contracts import (
     AppliedCanonicalControl,
     ControlGroupActionV1,
     StructuredActionRequestV1,
+    digest,
 )
 from task_env.controllers.canonical.kinematics import PANDA_HAND_ORIGIN_TCP_V1, PandaKinematics
 from task_env.controllers.canonical.position_profile import (
@@ -40,6 +41,7 @@ from task_env.environment import TaskSourceV1, compile_task_artifact_v1, sample_
 from task_env.runtime.sessions.source import project_scene_definition_v3_to_mjcf
 from task_env.runtime.sessions.control import (
     apply_position_control_target,
+    bind_selected_controller,
     compile_control_binding_plan,
     execute_position_control_interval,
 )
@@ -247,6 +249,42 @@ def test_position_profile_binds_hand_origin_tcp_a05_mapping_and_100hz_candidate(
         'joint_state_query', 'frame_pose_query',
     }
     assert not any(item.field_name == 'actuator_force' for item in requirements)
+
+
+def test_selected_position_match_binds_panda_source_artifact_channels_and_resources(position_candidate):
+    _scene, candidate = position_candidate
+    _declared_source, artifact, _reset_plan, source, _file_count = candidate
+    profile = PandaPositionServoProfileV1.from_source(artifact, source)
+    value = {
+        'controller': profile,
+        'source': source,
+        'artifact': artifact,
+        'selected_controller_profile_id': 'r1',
+    }
+
+    selected = bind_selected_controller(
+        value, binding=None, provider='mujoco', backend='cpu',
+    )
+    match, = selected.selection_matches
+    plan = compile_control_binding_plan(profile.scene, (profile.controller_binding(),))
+    assert match.control_kind == 'position'
+    assert match.selection_profile_id == 'r1'
+    assert match.controller_identities == (profile.identity,)
+    assert match.artifact_identity_sha256 == artifact.identity_hash
+    assert match.source_id == source.source_id
+    assert match.source_closure_sha256 == source.source_closure_digest
+    assert match.scene_identity_sha256 == profile.scene.identity_hash
+    assert match.channel_keys == tuple(f'panda-main/joint{i}' for i in range(1, 8))
+    assert match.channel_units == ('rad',) * 7
+    assert set(match.resource_keys) == set(plan.resource_writers)
+    assert match.model_requirement_sha256 == digest((profile.model.source_sha256,))
+
+    foreign_source = replace(source, source_closure_digest='0' * 64)
+    with pytest.raises(ValueError, match='differs from source, Scene, or Artifact'):
+        bind_selected_controller(
+            {**value, 'source': foreign_source}, binding=None,
+            provider='mujoco', backend='cpu',
+        )
 
 
 def test_typed_hand_and_joint_state_adapt_to_canonical_controller_inputs(position_candidate):

@@ -28,6 +28,7 @@ from ...artifacts.contracts import SUPPORTED_STATUSES
 from ...environment.types import ActionModeSpec
 from .api import materialize,provider_manifest
 from .provenance import provider_build_identity
+from ...controllers.canonical.contracts import digest
 
 class ControlledRuntimeSession(RuntimeSession, Protocol):
     def control_feedback(
@@ -83,7 +84,10 @@ class SelectedPositionCapabilityV1:
 
     def selected_runtime_builder(self, selected):
         from .selected_materialization import PositionRuntimeBuilder
-        return PositionRuntimeBuilder(selected.position_capabilities)
+        matches = tuple(getattr(selected, 'selection_matches', ()))
+        return PositionRuntimeBuilder(selected.position_capabilities,
+                                      matches,
+                                      selection_match_required=hasattr(selected, 'selection_matches'))
 
 
 def _selected_position_capability(controller):
@@ -104,6 +108,67 @@ class SelectedControllerBinding:
     position: bool
     requires_reset_plan: bool = False
     position_capabilities: tuple = ()
+    selection_matches: tuple = ()
+    physical_execution: object | None = None
+
+
+@dataclass(frozen=True)
+class ControllerSelectionMatchV1:
+    """Production evidence binding one selected Controller set to its subject."""
+
+    schema_version: str
+    selection_profile_id: str
+    control_kind: str
+    subject_ids: tuple[str, ...]
+    entity_ids: tuple[str, ...]
+    controller_identities: tuple[str, ...]
+    writer_ids: tuple[str, ...]
+    artifact_identity_sha256: str
+    source_id: str
+    source_closure_sha256: str
+    scene_identity_sha256: str
+    channel_keys: tuple[str, ...]
+    channel_units: tuple[str, ...]
+    resource_keys: tuple[tuple[str, str, str], ...]
+    action_contract_sha256: str
+    state_requirements_sha256: str
+    model_requirement_sha256: str | None
+    cadence_s: float
+
+    def __post_init__(self):
+        if self.schema_version != 'controller-selection-match-v1':
+            raise ValueError('unsupported Controller selection match schema')
+        if self.control_kind not in {'joint_effort', 'position'}:
+            raise ValueError('unsupported matched Controller command kind')
+        names = (self.selection_profile_id, self.source_id)
+        if any(type(value) is not str or not value.strip() for value in names):
+            raise ValueError('Controller selection match requires named identities')
+        hashes = (self.artifact_identity_sha256, self.source_closure_sha256, self.scene_identity_sha256,
+                  self.action_contract_sha256, self.state_requirements_sha256)
+        if any(type(value) is not str or len(value) != 64
+               or any(char not in '0123456789abcdef' for char in value) for value in hashes):
+            raise ValueError('Controller selection match requires exact SHA-256 identities')
+        if self.model_requirement_sha256 is not None and (
+                len(self.model_requirement_sha256) != 64
+                or any(char not in '0123456789abcdef' for char in self.model_requirement_sha256)):
+            raise ValueError('Controller model requirement must be SHA-256')
+        if (not self.subject_ids or len(set(self.subject_ids)) != len(self.subject_ids)
+                or not self.entity_ids or len(set(self.entity_ids)) != len(self.entity_ids)
+                or not self.controller_identities or len(set(self.controller_identities)) != len(self.controller_identities)
+                or not self.writer_ids or len(set(self.writer_ids)) != len(self.writer_ids)):
+            raise ValueError('Controller selection match requires unique subject/controller ownership')
+        if (len(self.channel_keys) != len(self.channel_units) or not self.channel_keys
+                or len(set(self.channel_keys)) != len(self.channel_keys)):
+            raise ValueError('Controller selection match channels and units must align')
+        if (len(self.resource_keys) != len(set(self.resource_keys))
+                or any(row[2] not in self.writer_ids for row in self.resource_keys)):
+            raise ValueError('Controller selection match resources must have unique declared writers')
+        if not math.isfinite(self.cadence_s) or self.cadence_s <= 0:
+            raise ValueError('Controller selection match cadence must be positive and finite')
+
+    @property
+    def identity_hash(self):
+        return digest(asdict(self))
 
 
 def is_admitted_position_profile_set(profiles):
@@ -111,6 +176,182 @@ def is_admitted_position_profile_set(profiles):
     return (bool(capabilities) and len(capabilities) <= 2 and all(capabilities)
             and len({item.writer_id for item in capabilities}) == len(capabilities)
             and len({item.entity_id for item in capabilities}) == len(capabilities))
+
+
+def _selected_profile_label(value, fallback):
+    resolved = value.get('resolved_configuration')
+    if isinstance(resolved, Mapping):
+        for key in ('controller_profile', 'selected_controller_profile_id'):
+            candidate = resolved.get(key)
+            if isinstance(candidate, str) and candidate:
+                return candidate
+    candidate = value.get('selected_controller_profile_id')
+    return candidate if isinstance(candidate, str) and candidate else fallback
+
+
+def _match_physical_execution(value):
+    from .physical_control import PhysicalControlExecutionV1
+
+    execution = value.get('physical_execution')
+    profile_id = value.get('selected_controller_profile_id')
+    if execution is None or profile_id is None:
+        return None
+    if type(execution) is not PhysicalControlExecutionV1:
+        raise TypeError('selected physical Controller requires a typed execution')
+    artifact, source = value.get('artifact'), value.get('source')
+    if artifact is None or source is None:
+        raise ValueError('selected physical Controller match requires its Artifact and source')
+    execution.validate_source(scene=execution.scene, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+    if len(execution.controllers) != len(execution.subjects):
+        raise ValueError('selected physical Controller match requires one writer per declared subject')
+
+    required_fields = {
+        (item.field_name, item.entity_id, item.subject_id)
+        for item in execution.requirements.requirements
+        if item.requiredness == 'required' and item.sample_domain == 'evaluation_boundary'
+    }
+    action_rows, model_hashes, channel_keys, channel_units, resources = [], [], [], [], []
+    writers, identities, subjects, entities = [], [], [], []
+    for subject in execution.subjects:
+        if profile_id not in subject.supported_controller_profiles:
+            raise ValueError('selected Controller profile is not declared by the controlled subject')
+        controllers = tuple(item for item in execution.controllers
+                            if item.writer_id in subject.controller_writers)
+        if len(controllers) != 1:
+            raise ValueError('each selected subject requires exactly one matching Controller writer')
+        controller = controllers[0]
+        if getattr(controller, 'profile_id', None) != profile_id:
+            raise ValueError('selected Controller implementation differs from the requested profile')
+        if controller.binding is not execution.compiled.binding:
+            raise ValueError('selected Controller binding is not the execution binding')
+        controller_channels = tuple(getattr(controller, '_channels', ()))
+        if not controller_channels:
+            raise ValueError('selected Controller does not expose its declared output channels')
+        if tuple(item.component_path for item in controller_channels) != subject.channel_paths:
+            raise ValueError('selected Controller channel order differs from subject declaration')
+        if any(item.entity_id != subject.entity_id or controller.writer_id not in item.owner_ids
+               for item in controller_channels):
+            raise ValueError('selected Controller channels or writer differ from subject binding')
+        action_profile = getattr(controller, 'profile', None)
+        model_requirement = getattr(action_profile, 'model_requirement', None)
+        if model_requirement is not None:
+            if (model_requirement.source_id, model_requirement.source_closure_sha256) != (
+                    execution.compiled.binding.source_id,
+                    execution.compiled.binding.source_closure_sha256):
+                raise ValueError('selected Controller model is bound to a foreign source')
+            if model_requirement.cadence_s != artifact.timebase.control_dt:
+                raise ValueError('selected Controller model cadence differs from task timebase')
+            expected_units = tuple('rad' if item.kind == 'revolute' else 'm'
+                                   for item in controller_channels)
+            if (model_requirement.joint_names != tuple(
+                    f'{item.entity_id}/{item.joint_id}' for item in controller_channels)
+                    or model_requirement.joint_units != expected_units
+                    or model_requirement.output_units != tuple(item.unit for item in controller_channels)):
+                raise ValueError('selected Controller model channel names or units differ from binding')
+            for item in controller_channels:
+                for field_name in ('joint_position', 'joint_velocity'):
+                    if (field_name, item.entity_id, item.joint_id) not in required_fields:
+                        raise ValueError(f'selected Controller model lacks required state field {field_name}')
+            model_hashes.append(model_requirement.identity_hash)
+        else:
+            model_hashes.append(None)
+        if action_profile is not None:
+            action_rows.append({
+                'action_names': action_profile.action_names,
+                'action_to_effort': action_profile.action_to_effort,
+                'action_key': getattr(action_profile, 'action_key', None),
+                'action_low': getattr(action_profile, 'action_low', ()),
+                'action_high': getattr(action_profile, 'action_high', ()),
+            })
+        else:
+            action_rows.append({
+                'action_key': getattr(controller, '_action_key', None),
+                'ranges': tuple(item.effort_range for item in controller_channels),
+            })
+        for channel in controller_channels:
+            key = f'{channel.entity_id}/{channel.joint_id}'
+            channel_keys.append(key)
+            channel_units.append(channel.unit)
+            resources.append((channel.entity_id, channel.joint_id, controller.writer_id))
+        writers.append(controller.writer_id)
+        identities.append(controller.identity)
+        subjects.append(subject.subject_id)
+        entities.append(subject.entity_id)
+    if len(resources) != len(set((entity, resource) for entity, resource, _ in resources)):
+        raise ValueError('selected Controllers claim overlapping physical resources')
+    match = ControllerSelectionMatchV1(
+        'controller-selection-match-v1', profile_id, 'joint_effort',
+        tuple(subjects), tuple(entities), tuple(identities), tuple(writers),
+        artifact.identity_hash,
+        execution.compiled.binding.source_id,
+        execution.compiled.binding.source_closure_sha256,
+        execution.scene.identity_hash, tuple(channel_keys), tuple(channel_units),
+        tuple(resources), digest(tuple(action_rows)),
+        digest(execution.requirements.to_mapping()),
+        None if all(item is None for item in model_hashes) else digest(tuple(model_hashes)),
+        artifact.timebase.control_dt)
+    return match
+
+
+def _match_position_profiles(value, profiles):
+    capabilities = tuple(_selected_position_capability(item) for item in profiles)
+    if not capabilities or not all(capabilities):
+        return ()
+    if not value.get('source') or not value.get('artifact'):
+        return ()
+    source, artifact = value['source'], value['artifact']
+    configured_profile = _selected_profile_label(value, capabilities[0].owner.profile_id)
+    source_id, source_closure = source.source_id, source.source_closure_digest
+    scene = source.scene_definition
+    controller_identities, writers, subjects, entities = [], [], [], []
+    channel_keys, channel_units, resources, action_rows, state_hashes, model_hashes = [], [], [], [], [], []
+    for capability in capabilities:
+        owner = capability.owner
+        binding = capability.controller_binding()
+        if (owner.source.source_id, owner.source.source_closure_digest,
+                owner.scene.identity_hash, owner.artifact.identity_hash) != (
+                source_id, source_closure, scene.identity_hash, artifact.identity_hash):
+            raise ValueError('selected Position Controller differs from source, Scene, or Artifact')
+        if binding.writer_id != capability.writer_id or binding.controller_identity not in (None, owner.identity):
+            raise ValueError('selected Position Controller identity differs from its typed binding')
+        target_bindings = getattr(owner, '_target_bindings', {})
+        if not target_bindings:
+            raise ValueError('selected Position Controller has no declared joint resource mapping')
+        owner_keys = tuple(sorted(target_bindings))
+        joints = {(art.entity_id, joint.joint_id): joint
+                  for art in scene.articulations or () for joint in art.joints}
+        for key in owner_keys:
+            entity_id, joint_id = key.split('/', 1)
+            joint = joints.get((entity_id, joint_id))
+            if joint is None:
+                raise ValueError('selected Position Controller resource is absent from its Scene')
+            channel_keys.append(key)
+            channel_units.append('rad' if joint.kind == 'revolute' else 'm')
+            resources.append((entity_id, target_bindings[key], binding.writer_id))
+        open_actuator = getattr(owner, 'open_actuator', None)
+        if open_actuator:
+            resources.append((owner.entity_id, open_actuator, binding.writer_id))
+        controller_identities.append(owner.identity)
+        writers.append(binding.writer_id)
+        subjects.append(owner.profile_id)
+        entities.append(owner.entity_id)
+        action_rows.append(asdict(binding.action_schema))
+        state_hashes.append(digest(binding.feedback_requirements.to_mapping()))
+        model = getattr(owner, 'model', None)
+        model_hashes.append(getattr(model, 'identity', None)
+                            or getattr(model, 'identity_hash', None)
+                            or getattr(model, 'source_sha256', None))
+    if len(resources) != len(set((entity, resource) for entity, resource, _ in resources)):
+        raise ValueError('selected Position Controllers claim overlapping actuator resources')
+    return (ControllerSelectionMatchV1(
+        'controller-selection-match-v1', configured_profile, 'position',
+        tuple(subjects), tuple(entities), tuple(controller_identities), tuple(writers),
+        artifact.identity_hash, source_id, source_closure, scene.identity_hash,
+        tuple(channel_keys), tuple(channel_units),
+        tuple(resources), _schema_hash(tuple(action_rows)), digest(tuple(state_hashes)),
+        None if all(item is None for item in model_hashes) else digest(tuple(model_hashes)),
+        artifact.timebase.control_dt),)
 
 
 def bind_selected_controller(value, *, binding, provider, backend):
@@ -144,11 +385,17 @@ def bind_selected_controller(value, *, binding, provider, backend):
             raise ValueError('selected Position writers must bind distinct Entities')
         profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
         capabilities = tuple(_selected_position_capability(item) for item in profiles)
-        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True, capabilities)
+        matches = _match_position_profiles(value, profiles)
+        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True,
+                                         capabilities, matches)
     if isinstance(raw, (tuple, list)):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
+    physical_match = _match_physical_execution(value)
+    physical_execution = value.get('physical_execution') if physical_match is not None else None
     return SelectedControllerBinding(raw, (), None, False, False,
-                                     value.get('physical_execution') is not None)
+                                     value.get('physical_execution') is not None,
+                                     (), (() if physical_match is None else (physical_match,)),
+                                     physical_execution)
 
 
 def mixed_substep_controller(hook, env, prepared):

@@ -14,6 +14,7 @@ from .config import (
     ActionConfig,
     AgentConfig,
     AssetConfig,
+    ControlConfig,
     EpisodeConfig,
     ExecutionPlan,
     GripperConfig,
@@ -47,7 +48,7 @@ _CORE_SELECTED_EXECUTION_DEFAULTS = {
 
 
 PUBLIC_ENV_CONFIG_SECTIONS = frozenset(
-    {"asset", "runtime", "robot", "action", "observation", "render", "episode"}
+    {"asset", "runtime", "robot", "control", "action", "observation", "render", "episode"}
 )
 
 _LEGACY_GRIPPER_FIELDS = {
@@ -249,6 +250,7 @@ def overlay_public_env_config(
             if "robot" in values
             else base.robot
         ),
+        control=update_config(base.control, values.get("control")),
         action=update_config(base.action, values.get("action")),
         observation=update_config(base.observation, values.get("observation")),
         render=update_config(base.render, values.get("render")),
@@ -572,18 +574,25 @@ def _resolve_task_env_config_impl(
     if getattr(environment_type, "uses_selected_public_config", False):
         return _resolve_selected_config(environment_type, config)
     if isinstance(config, ResolvedEnvConfig):
-        return config
-    base = environment_type.default_config()
-    default_path = environment_type.default_config_path()
-    merged: dict[str, object] = {}
-    if default_path is not None:
-        merged = _deep_merge(merged, load_yaml_mapping(default_path))
-    if config is not None:
-        override = load_yaml_mapping(config) if isinstance(config, (str, Path)) else config
-        if not isinstance(override, Mapping):
-            raise TypeError("TaskEnv config must be ResolvedEnvConfig, mapping, or YAML path")
-        merged = _deep_merge(merged, override)
-    return overlay_public_env_config(base, merged)
+        resolved = config
+    else:
+        base = environment_type.default_config()
+        default_path = environment_type.default_config_path()
+        merged: dict[str, object] = {}
+        if default_path is not None:
+            merged = _deep_merge(merged, load_yaml_mapping(default_path))
+        if config is not None:
+            override = load_yaml_mapping(config) if isinstance(config, (str, Path)) else config
+            if not isinstance(override, Mapping):
+                raise TypeError("TaskEnv config must be ResolvedEnvConfig, mapping, or YAML path")
+            merged = _deep_merge(merged, override)
+        resolved = overlay_public_env_config(base, merged)
+    selected_profile = resolved.control.profile_id
+    if selected_profile is not None:
+        supported = tuple(getattr(environment_type, "selected_physical_controller_profiles", ()))
+        if selected_profile not in supported:
+            raise ValueError(f"unsupported task physical Controller profile: {selected_profile!r}")
+    return resolved
 
 
 
@@ -652,8 +661,11 @@ def _identity_value(value):
 
 
 def _resolved_config_identity(config: ResolvedEnvConfig) -> str:
+    identity_values = asdict(config)
+    if identity_values.get("control", {}).get("profile_id") is None:
+        identity_values.pop("control", None)
     payload = json.dumps(
-        _identity_value(asdict(config)),
+        _identity_value(identity_values),
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
@@ -783,6 +795,7 @@ def resolve_env_config(
     asset: Mapping[str, object] | None = None,
     runtime: Mapping[str, object] | None = None,
     robot: Mapping[str, object] | None = None,
+    control: Mapping[str, object] | None = None,
     action: Mapping[str, object] | None = None,
     observation: Mapping[str, object] | None = None,
     render: Mapping[str, object] | None = None,
@@ -797,6 +810,7 @@ def resolve_env_config(
         objects=ObjectConfig(object_uids=tuple(object_uids)),
         runtime=update_config(RuntimeConfig(), runtime),
         robot=_resolve_robot_config(robot),
+        control=update_config(ControlConfig(), control),
         action=update_config(ActionConfig(), action),
         observation=update_config(ObservationConfig(), observation),
         render=update_config(RenderConfig(), render),

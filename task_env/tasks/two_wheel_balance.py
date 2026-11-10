@@ -585,6 +585,10 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
 
     uses_component_task_config = True
     prefer_reference_factory = True
+    selected_physical_controller_profiles = (
+        'direct_joint_effort_v1',
+        'velocity_damped_joint_effort_v1',
+    )
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, provider='geophys',

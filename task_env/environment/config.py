@@ -352,6 +352,19 @@ class RobotConfig:
 
 
 @dataclass(frozen=True)
+class ControlConfig:
+    """Caller-owned selection for a task-declared physical Controller."""
+
+    profile_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.profile_id is not None:
+            if (type(self.profile_id) is not str or not self.profile_id.strip()
+                    or self.profile_id != self.profile_id.strip()):
+                raise ValueError("control.profile_id must be a nonempty trimmed string")
+
+
+@dataclass(frozen=True)
 class ObservationConfig:
     schema_version: str = "task-env-state-v1"
     include_privileged_state: bool = True
@@ -556,6 +569,7 @@ class ResolvedEnvConfig:
     render: RenderConfig = field(default_factory=RenderConfig)
     task: TaskConfig = field(default_factory=TaskConfig)
     episode: EpisodeConfig = field(default_factory=EpisodeConfig)
+    control: ControlConfig = field(default_factory=ControlConfig)
 
 
 @dataclass(frozen=True)

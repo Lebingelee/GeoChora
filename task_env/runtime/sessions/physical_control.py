@@ -39,6 +39,7 @@ class ControlledSubjectV1:
     controller_writers: tuple[str, ...]
     schema_version: str = 'controlled-subject-v1'
     attachment_plan: FixedAttachmentPlanV1 | None = None
+    supported_controller_profiles: tuple[str, ...] = ()
 
     def __post_init__(self):
         from ...artifacts.contracts import FrameReference, _SHA256, _name
@@ -78,18 +79,26 @@ class ControlledSubjectV1:
             raise ValueError('subject requires unique Controller writers')
         for writer in self.controller_writers:
             _name(writer)
+        if (type(self.supported_controller_profiles) is not tuple
+                or len(set(self.supported_controller_profiles)) != len(self.supported_controller_profiles)):
+            raise ValueError('subject supported Controller profiles must be a unique ordered tuple')
+        for profile_id in self.supported_controller_profiles:
+            _name(profile_id)
 
     @property
     def identity_hash(self):
         from ...controllers.canonical.contracts import digest
-        return digest({'schema_version': self.schema_version, 'subject_id': self.subject_id,
+        payload = {'schema_version': self.schema_version, 'subject_id': self.subject_id,
             'entity_id': self.entity_id, 'source_id': self.source_id,
             'source_closure_sha256': self.source_closure_sha256,
             'source_ownership': self.source_ownership, 'root_mode': self.root_mode,
             'root_frame': self.root_frame.to_mapping(), 'parent_subject_id': self.parent_subject_id,
             'channel_paths': self.channel_paths, 'controller_writers': self.controller_writers,
             'attachment_plan_sha256': (None if self.attachment_plan is None
-                                       else self.attachment_plan.identity_hash)})
+                                       else self.attachment_plan.identity_hash)}
+        if self.supported_controller_profiles:
+            payload['supported_controller_profiles'] = self.supported_controller_profiles
+        return digest(payload)
 
     def default_effort_controller(self, binding, *, writer_id, units, action_key='torque'):
         """Create a direct Controller for this subject's explicitly declared channels.
@@ -121,6 +130,63 @@ class ControlledSubjectV1:
             selected.append(f'{channel.entity_id}/{channel.joint_id}')
         return DirectJointEffortControllerV1(binding, controller_id=writer_id,
                                               channel_keys=tuple(selected), action_key=action_key)
+
+    def select_effort_controller(self, binding, *, profile_id, writer_id, units,
+                                 cadence_s, action_key='torque'):
+        """Select one subject-declared provider-neutral effort profile."""
+        if profile_id not in self.supported_controller_profiles:
+            raise ValueError('selected Controller profile is not declared by the subject')
+        if profile_id == 'direct_joint_effort_v1':
+            controller = self.default_effort_controller(
+                binding, writer_id=writer_id, units=units, action_key=action_key)
+            controller.profile_id = profile_id
+            return controller
+        if profile_id != 'velocity_damped_joint_effort_v1':
+            raise ValueError('subject does not implement the selected Controller profile')
+        if type(binding) is not PhysicalControlBindingV1:
+            raise TypeError('velocity-damped effort requires a typed physical binding')
+        from ...controllers.canonical.model import (
+            AffineJointBiasModelV1, ControllerModelRequirementV1,
+        )
+        from ...controllers.canonical.physical_controller import (
+            LinearEffortControllerV1, LinearEffortProfileV1,
+        )
+        channels = []
+        for path, unit in zip(self.channel_paths, units, strict=True):
+            matches = tuple(channel for channel in binding.channels
+                            if channel.entity_id == self.entity_id and channel.component_path == path)
+            if len(matches) != 1 or matches[0].unit != unit or writer_id not in matches[0].owner_ids:
+                raise ValueError('selected linear Controller channels differ from subject declaration')
+            channels.append(matches[0])
+        keys = tuple(f'{channel.entity_id}/{channel.joint_id}' for channel in channels)
+        if any(channel.kind != 'revolute' or channel.unit != 'N*m' for channel in channels):
+            raise ValueError('velocity-damped effort currently requires revolute torque channels')
+        if not math.isfinite(float(cadence_s)) or float(cadence_s) <= 0:
+            raise ValueError('velocity-damped effort requires a positive finite cadence')
+        damping = 0.25
+        requirement = ControllerModelRequirementV1(
+            'controller-model-requirement-v1',
+            f'{self.subject_id}-velocity-damped-effort-v1',
+            'geochora', 'v1', 'stdlib', binding.source_id,
+            binding.source_closure_sha256, keys, ('rad',) * len(keys),
+            'joint_bias', ('N*m',) * len(keys), 'joint-axis',
+            'evaluation_boundary', float(cadence_s), 0.0,
+            'pure_no_physics_step', writer_id, 'none', 'required')
+        profile = LinearEffortProfileV1(
+            'linear-effort-profile-v1', writer_id,
+            tuple(f'effort-{index}' for index in range(len(keys))), keys,
+            tuple(tuple(1.0 if row == column else 0.0
+                        for column in range(len(keys))) for row in range(len(keys))),
+            requirement, action_key=action_key,
+            action_low=tuple(channel.effort_range[0] for channel in channels),
+            action_high=tuple(channel.effort_range[1] for channel in channels),
+            selection_profile_id=profile_id)
+        model = AffineJointBiasModelV1(
+            'affine-joint-bias-model-v1', requirement,
+            (0.0,) * len(keys), (0.0,) * len(keys), (-damping,) * len(keys))
+        controller = LinearEffortControllerV1(profile, binding, model)
+        controller.profile_id = profile_id
+        return controller
 
 
 @dataclass(frozen=True)
@@ -297,7 +363,8 @@ class PhysicalControlExecutionV1:
         from .selected_materialization import PhysicalRuntimeBuilder
         # A declared Position owner must create its admitted control session;
         # this execution then binds its physical port and initializes itself.
-        return PhysicalRuntimeBuilder(self, bool(selected.position_capabilities))
+        return PhysicalRuntimeBuilder(self, bool(selected.position_capabilities),
+                                      selected.selection_matches)
 
     def __post_init__(self):
         from collections.abc import Mapping

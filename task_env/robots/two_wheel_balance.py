@@ -54,7 +54,9 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
             raise ValueError('two-wheel subject requires two ordered paths')
         subject = ControlledSubjectV1(self.uid, entity_id, source_id, source_closure_sha256,
             'references_existing', 'fixed', FrameReference(entity_id, root_frame), None,
-            component_paths, (controller_writer,))
+            component_paths, (controller_writer,),
+            supported_controller_profiles=('direct_joint_effort_v1',
+                                            'velocity_damped_joint_effort_v1'))
         joints = tuple(SubjectJointDeclarationV1(path, name, (controller_writer,), actuator,
             actuator, 1., (-1.5, 1.5), 'disabled') for path, name, actuator in zip(
                 component_paths, (self.left_wheel_joint_name, self.right_wheel_joint_name),
@@ -73,7 +75,9 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
         return ControlledSubjectV1(self.uid, entity_id, binding.source_id,
             binding.source_closure_sha256, 'references_existing', 'fixed',
             FrameReference(entity_id, root_frame), None,
-            tuple(c.component_path for c in channels), (controller_writer,))
+            tuple(c.component_path for c in channels), (controller_writer,),
+            supported_controller_profiles=('direct_joint_effort_v1',
+                                            'velocity_damped_joint_effort_v1'))
 
 
 class TwoWheelTorqueActionAdapter:

@@ -26,6 +26,7 @@ def _worker(selection):
 class PhysicalRuntimeBuilder:
     execution: object
     position_owner_present: bool = False
+    selection_matches: tuple = ()
 
     @property
     def priority(self):
@@ -41,6 +42,27 @@ class PhysicalRuntimeBuilder:
                 or env.value.get('physical_execution') is not self.execution
                 or not callable(getattr(env.binding, 'physical_control_profile', None))):
             raise TypeError('physical construction requires its admitted execution and Task binding')
+        if env.value.get('selected_controller_profile_id') is not None:
+            if len(self.selection_matches) != 1:
+                raise ValueError('physical construction requires one common Controller match result')
+            match = self.selection_matches[0]
+            from .control import _match_physical_execution
+            if _match_physical_execution(env.value) != match:
+                raise ValueError('physical Controller match changed after selection')
+            expected_resources = tuple((channel.entity_id, channel.joint_id, writer)
+                for controller in self.execution.controllers
+                for channel in controller._channels for writer in (controller.writer_id,))
+            if (match.control_kind != 'joint_effort'
+                    or match.selection_profile_id != env.value['selected_controller_profile_id']
+                    or match.artifact_identity_sha256 != env.artifact.identity_hash
+                    or match.source_id != env.value['source'].source_id
+                    or match.source_closure_sha256 != env.value['source'].source_closure_digest
+                    or match.scene_identity_sha256 != self.execution.scene.identity_hash
+                    or match.controller_identities != tuple(c.identity for c in self.execution.controllers)
+                    or match.writer_ids != tuple(c.writer_id for c in self.execution.controllers)
+                    or set(match.resource_keys) != set(expected_resources)):
+                raise ValueError('physical construction Controller match differs from its selected execution')
+            env._controller_selection_matches = self.selection_matches
         if _worker(selection):
             env.session = start_worker()
         else:
@@ -56,6 +78,8 @@ class PhysicalRuntimeBuilder:
 @dataclass(frozen=True)
 class PositionRuntimeBuilder:
     capabilities: tuple
+    selection_matches: tuple = ()
+    selection_match_required: bool = False
     priority = 30
 
     @property
@@ -72,6 +96,25 @@ class PositionRuntimeBuilder:
             source=source, artifact=env.artifact, profiles=profiles,
             leaf_position=False, plan=env.value.get('controller_binding_plan'),
             select_binding=selector, value=env.value, capabilities=self.capabilities)
+        if self.selection_match_required:
+            if len(self.selection_matches) != 1:
+                raise ValueError('Position materialization requires its common Controller match result')
+            match = self.selection_matches[0]
+            from .control import _match_position_profiles
+            current_match = _match_position_profiles(
+                env.value, tuple(item.owner for item in self.capabilities))
+            if current_match != self.selection_matches:
+                raise ValueError('Position Controller match changed after selection')
+            if (match.control_kind != 'position'
+                    or match.artifact_identity_sha256 != env.artifact.identity_hash
+                    or match.source_id != source.source_id
+                    or match.source_closure_sha256 != source.source_closure_digest
+                    or match.scene_identity_sha256 != source.scene_definition.identity_hash
+                    or match.writer_ids != tuple(item.writer_id for item in self.capabilities)
+                    or match.controller_identities != tuple(item.owner.identity for item in self.capabilities)
+                    or set(match.resource_keys) != set(plan.resource_writers)):
+                raise ValueError('Position materialization differs from its Controller match result')
+            env._controller_selection_matches = self.selection_matches
         env.position_plan, env.position_joint_bindings, env.position_frame_bindings = plan, joints, frames
         env._position_state_declaration = plan
         if _worker(selection):

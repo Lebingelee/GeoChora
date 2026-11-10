@@ -24,6 +24,10 @@ class LinearEffortProfileV1(Contract):
     action_to_effort: tuple[tuple[float, ...], ...]
     model_requirement: ControllerModelRequirementV1
     composition: str = 'exclusive'
+    action_key: str | None = None
+    action_low: tuple[float, ...] = ()
+    action_high: tuple[float, ...] = ()
+    selection_profile_id: str | None = None
 
     def validate(self):
         _choice(self.schema_version, {'linear-effort-profile-v1'}, 'effort profile schema')
@@ -42,10 +46,30 @@ class LinearEffortProfileV1(Contract):
         if self.model_requirement.requiredness != 'required':
             raise ValueError('linear effort Controller requires its model output')
         _choice(self.composition, {'exclusive', 'sum'}, 'composition')
+        if self.action_key is None:
+            if self.action_low or self.action_high:
+                raise ValueError('bounded action values require an explicit action key')
+        else:
+            _name(self.action_key)
+            if (len(self.action_low) != len(self.action_names)
+                    or len(self.action_high) != len(self.action_names)
+                    or any(not math.isfinite(value) for value in (*self.action_low, *self.action_high))
+                    or any(low > high for low, high in zip(self.action_low, self.action_high, strict=True))):
+                raise ValueError('linear effort action bounds must cover its ordered inputs')
+        if self.selection_profile_id is not None:
+            _name(self.selection_profile_id)
 
     @property
     def identity_hash(self):
-        return digest(self.to_mapping())
+        payload = self.to_mapping()
+        # Preserve accepted identities for existing profiles that do not use
+        # the additive public action-tree and selection metadata.
+        for name, value in (('action_key', self.action_key), ('action_low', self.action_low),
+                            ('action_high', self.action_high),
+                            ('selection_profile_id', self.selection_profile_id)):
+            if value is None or value == ():
+                payload.pop(name, None)
+        return digest(payload)
 
 
 class LinearEffortControllerV1:
@@ -71,17 +95,37 @@ class LinearEffortControllerV1:
             raise ValueError('model input units differ from bound joint kinds')
         self.profile, self.binding, self.model = profile, binding, model
         self.writer_id = profile.controller_id
+        self.profile_id = profile.selection_profile_id or profile.model_requirement.profile_id
         self._channels = tuple(channels[key] for key in profile.channel_keys)
         self.identity = digest({'profile': profile.identity_hash, 'binding': binding.identity_hash,
                                 'model': model.identity_hash})
+        self._episode_id = None
+        self.last_action = None
+        self.action_space = None
+        if profile.action_key is not None:
+            from gymnasium.spaces import Box, Dict
+            self.action_space = Dict({profile.action_key: Box(
+                low=np.asarray(profile.action_low, dtype=np.float32),
+                high=np.asarray(profile.action_high, dtype=np.float32), dtype=np.float32)})
 
     @property
     def action_shape(self):
         return (len(self.profile.action_names),)
 
+    def reset_from_realized_state(self, state):
+        if state.boundary.scene_identity_hash != self.binding.scene_sha256:
+            raise ValueError('linear effort reset state differs from bound Scene')
+        self._episode_id = state.boundary.episode_id
+        self.last_action = np.zeros(len(self.profile.action_names), dtype=np.float32)
+
     def compute(self, action, state, context: PhysicalCommandContextV1):
+        from collections.abc import Mapping
         if type(context) is not PhysicalCommandContextV1:
             raise TypeError('Controller requires a typed interval context')
+        if isinstance(action, Mapping):
+            if self.profile.action_key is None or set(action) != {self.profile.action_key}:
+                raise ValueError('linear effort action tree differs from its declaration')
+            action = action[self.profile.action_key]
         if isinstance(action, (tuple, list)) and any(isinstance(x, (bool, np.bool_)) for x in action):
             raise ValueError('Controller action shape or finite values are invalid')
         raw = np.asarray(action)
@@ -89,6 +133,10 @@ class LinearEffortControllerV1:
                 or raw.dtype.kind not in {'i', 'u', 'f'} or not np.isfinite(raw).all()):
             raise ValueError('Controller action shape or finite values are invalid')
         values = tuple(float(x) for x in raw)
+        if self.profile.action_key is not None and any(
+                not low <= value <= high for value, low, high in zip(
+                    values, self.profile.action_low, self.profile.action_high, strict=True)):
+            raise ValueError('linear effort action exceeds its declared bounds')
         if (context.source_id, context.source_closure_sha256, context.artifact_sha256) != (
                 self.binding.source_id, self.binding.source_closure_sha256, self.binding.artifact_sha256):
             raise ValueError('Controller context source differs from binding')
@@ -116,6 +164,7 @@ class LinearEffortControllerV1:
             efforts.append(JointEffortV1('joint-effort-v1', context, policy, channel.entity_id,
                 channel.joint_id, channel.dof_id, channel.kind, channel.axis, channel.axis_frame,
                 channel.sign, channel.unit, value, channel.effort_range, 'other_declared'))
+        self.last_action = np.asarray(values, dtype=np.float32).copy()
         return PhysicalCommandBatchV1('physical-command-batch-v1', context, tuple(efforts), (), ())
 
 

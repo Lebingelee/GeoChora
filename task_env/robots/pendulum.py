@@ -53,7 +53,9 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
         from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
         subject = ControlledSubjectV1(self.uid, entity_id, source_id, source_closure_sha256,
             'references_existing', 'fixed', FrameReference(entity_id, root_frame), None,
-            (component_path,), (controller_writer,))
+            (component_path,), (controller_writer,),
+            supported_controller_profiles=('direct_joint_effort_v1',
+                                            'velocity_damped_joint_effort_v1'))
         joint = SubjectJointDeclarationV1(component_path, self.joint_name, (controller_writer,),
             self.actuator_name, self.actuator_name, 1., (-2., 2.), 'disabled')
         return subject, (joint,)
@@ -70,7 +72,9 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
         return ControlledSubjectV1(self.uid, entity_id, binding.source_id,
             binding.source_closure_sha256, 'references_existing', 'fixed',
             FrameReference(entity_id, root_frame), None,
-            (channels[0].component_path,), (controller_writer,))
+            (channels[0].component_path,), (controller_writer,),
+            supported_controller_profiles=('direct_joint_effort_v1',
+                                            'velocity_damped_joint_effort_v1'))
 
 
 class PendulumTorqueActionAdapter:

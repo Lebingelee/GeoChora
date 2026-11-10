@@ -162,8 +162,10 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
                                                'joint', JointReference(ENTITY, 'pendulum_hinge'))))
     compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
                                                 closure, assembly, {}, (subject,), declarations)
-    controller = controlled_entity.default_controller.bind(subject, compiled.binding,
-                                                           writer_id=WRITER, units=('N*m',))
+    selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
+    controller = subject.select_effort_controller(
+        compiled.binding, profile_id=selected_profile_id, writer_id=WRITER,
+        units=('N*m',), cadence_s=artifact.timebase.control_dt)
     requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
         StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, 'pendulum_hinge',
             'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
@@ -178,7 +180,9 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
         'controller': controller, 'solution': None, 'physical_execution': physical,
         'reset_plan': _reset_plan(artifact, source, seed, sampled), 'construction_id': 'pendulum-shared-physical-v1',
         'source_revision': scene.assets[0].source_revision or 'pendulum-inline-v1',
-        'execution_spec_v1': execution_spec, 'source_sha256': {'original': hashlib.sha256(
+        'execution_spec_v1': execution_spec,
+        'selected_controller_profile_id': selected_profile_id,
+        'source_sha256': {'original': hashlib.sha256(
             PENDULUM_MJCF_XML.encode()).hexdigest(), 'projected_closure': closure},
         'resolved_configuration': {'physics_dt': .002, 'control_substeps': 25}}
 
@@ -214,6 +218,9 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
                                source_delivery_manifest=None):
     if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu'), ('isaacsim', 'cuda')}:
         raise ValueError('Pendulum physical route requires GeoPhys/MuJoCo CPU or the admitted Isaac CUDA route')
+    if (config.control.profile_id == 'velocity_damped_joint_effort_v1'
+            and (provider, backend) != ('mujoco', 'cpu')):
+        raise ValueError('velocity-damped Controller is admitted only by the tested MuJoCo CPU source-state model')
     if provider == 'isaacsim' and render_mode is not None:
         raise ValueError('Pendulum G05 Isaac route is state-only and does not admit rendering')
     if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
@@ -258,7 +265,8 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
             'components': ['torque'], 'low': -2., 'high': 2., 'unit': 'N*m'},
         action_space_factory=space, prepare_action=lambda value: value,
         observation_space_factory=_observation_spaces, observation_projection=_observe,
-        physical_control_profile=lambda env: env.value['physical_execution'], physical_direct_effort_feedback=True,
+        physical_control_profile=lambda env: env.value['physical_execution'],
+        physical_direct_effort_feedback=(config.control.profile_id in (None, 'direct_joint_effort_v1')),
         physical_terminate_on_success=True,
         physical_ignore_done=config.episode.ignore_done)
     execution_spec = (_build(config, 31, provider=provider,
