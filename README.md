@@ -37,7 +37,6 @@ This is a basic scalar API example, not a qualification claim. Optional learning
 - [System architecture](docs/global/architecture.md) and [ownership boundaries](docs/global/ownership.md)
 - [TaskEnv version index](docs/module/task_env/README.md)
 - [Examples](examples/README.md)
-- [场景与资产 MCP 部署](docs/module/task_env/v2.1.0/guides/asset-mcp-deployment.md)
 - [Repository and contribution rules](AGENTS.md)
 
 Importability, a demo, or a registered task does not establish an end-to-end task/provider capability. Use the versioned capability matrix for exact task, source, provider, backend, controller, and evidence boundaries. Generated run data belongs in ignored `workspace/` paths and is not part of the source release.

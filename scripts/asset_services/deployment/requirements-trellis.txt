@@ -1,7 +1,6 @@
 # 作用：安装三个 MCP 入口、共享队列与 TRELLIS 推理的 Python 依赖。
-# PyTorch、CUDA 扩展与 utils3d 按安装记录单独固定。
+# PyTorch、CUDA 扩展与 utils3d 按本部署包 __init__.py 的步骤安装。
 mcp==1.30.0
-supervisor==4.3.0; sys_platform != "win32"
 filelock
 pydantic==2.11.10
 numpy==2.4.6
@@ -32,9 +31,7 @@ tensorboard
 onnxruntime
 rembg
 
-# 编排与本机进程管理；Windows 服务适配层仅在 Windows 安装。
+# 编排服务依赖。
 PyYAML
 jsonschema
-psutil
-pywin32; sys_platform == "win32"
 triton-windows==3.4.0.post21; sys_platform == "win32"

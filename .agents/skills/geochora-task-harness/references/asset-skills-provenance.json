@@ -9,36 +9,23 @@
   "changes": [
     "Add GeoChora routing note to three skill entrypoints.",
     "Mark missing optional drink-ring reference unavailable; no fabricated replacement.",
-    "Route generation tools to repository-owned independent MCP deployment; distinguish deployment OOM from asset acceptance.",
-    "Declare LF checkout for distributed skills; refresh existing input-HEAD checker hashes without modifying checker logic, preserving prior recorded values."
+    "Connect the three creation skills to repository-local MCP services."
   ],
   "files": {
-    "asset-creation/SKILL.md": "308d49595391a84e72e68879ff779be3898575fbe9610b112c7595cd7b43e62a",
+    "asset-creation/SKILL.md": "dfb2d8a5e522e6142367f742f62fc6491c300fe38cd6ce6bd2c31ff117bd55fc",
     "asset-creation/agents/openai.yaml": "3cd727bbe4ce0cc34b1c08b8d8ed1737103944a13403c4006c43b2130f6bcf18",
     "asset-creation/references/asset-routing-cases.md": "673e16eeb0e92858fa333e4b902f57c0585bca23903bdfde49b1f591d70a5b69",
     "asset-creation/references/claims.md": "7749fea94dd2f11b2bd161c5729f1d9432775c0bfa50727a4896fcdf4832fd90",
     "asset-creation/references/lighting.md": "ee36be6d5391d048f4f832e0e8143163620ab3be8135a7da35e70a46f8ab19aa",
-    "asset-creation/scripts/verify_claims.py": "6c3e19b476090ad2ef32b4a2a5a050489f8671ecadd21d22003c73cb96f3f44a",
-    "asset-material-creation/SKILL.md": "27183ff688f09a4ae7ea0909c0601cab07986985250d138ace51ad511e982e6d",
+    "asset-creation/scripts/verify_claims.py": "f05b4a1c35a9906ec3432b8e33beeb541451e18c0e6f1e20e1945bb9ac894e2a",
+    "asset-material-creation/SKILL.md": "eea1476587e598733c61f431ed297c4343353bf81f176d0343ac19fb6d4a2c01",
     "asset-material-creation/agents/openai.yaml": "85ef39eaaac0884b2ff205789407b14df3d97ea77af28fcd07c80708586a723e",
     "asset-material-creation/references/material-preprocessing.md": "8506a962bcaf93cc1bb39ccce7dab478b9233f8984de39cb9cb9501801d049ac",
-    "scene-orchestration/SKILL.md": "91d3b8e94eda66f6340ee9ec8992fa7b018dd02e4f93909b8971bf98d3b7bb95",
+    "scene-orchestration/SKILL.md": "a2b4297b040460dc953217d8f36a5c9c08ec1c3d1dc50d5568faae70ea63aa3a",
     "scene-orchestration/agents/openai.yaml": "1b03bbc2e8a8e0e77bafaa5cac95e444bfb73bf3509e285e3a9369e59db2c9b4",
     "scene-orchestration/references/config.json": "5c0e19163fa017caee758f1c7702d141229be4b9118c4750a1bbf73ffe80fdfd",
     "scene-orchestration/references/embodied-integration.md": "b5ec1beeb65acb459db7c121140921e9a106ad13728546fdffc3f37cbb4fb215",
     "scene-orchestration/references/scene_record.md": "1b8bc406b2f61d057c1ac973e9e7651bb883f5e1dd8bd6b964ce545d6e4bc0ae",
-    "scene-orchestration/scripts/check_usd_static.py": "2e5a5c1907913ce562d01b54e94be667eaa2e3c60ea49e9af3ebfca381ae4f63"
-  },
-  "baseline_checker_hash_drift": {
-    "asset-creation/scripts/verify_claims.py": {
-      "prior_recorded_sha256": "f05b4a1c35a9906ec3432b8e33beeb541451e18c0e6f1e20e1945bb9ac894e2a",
-      "canonical_input_head_sha256": "6c3e19b476090ad2ef32b4a2a5a050489f8671ecadd21d22003c73cb96f3f44a",
-      "checker_logic_changed": false
-    },
-    "scene-orchestration/scripts/check_usd_static.py": {
-      "prior_recorded_sha256": "d67f0d235d8ab1d0f1316c65b1d09325fdac5daac14a9eb6e202792a32f955dc",
-      "canonical_input_head_sha256": "2e5a5c1907913ce562d01b54e94be667eaa2e3c60ea49e9af3ebfca381ae4f63",
-      "checker_logic_changed": false
-    }
+    "scene-orchestration/scripts/check_usd_static.py": "d67f0d235d8ab1d0f1316c65b1d09325fdac5daac14a9eb6e202792a32f955dc"
   }
 }
