@@ -18,6 +18,8 @@
 
 - 单元 1–3 和单元 4 按各自主审/维护者决定有界接收。单元 4 的最终实现方向是现有主体/嵌套 Assembly、Controller binding、scene interval 和一个 RuntimeSession 物理推进 owner；其中默认恒等 Controller 仅覆盖实际声明的 canonical 通道，不自动覆盖所有传动，Task 原选 R1/R3 不被静默替换。单元 4 审查及执行授权文本用于解释本路线，实施结果以真实提交和证据为准。
 - 单元 5 在 Core `8965eec5` 的两简单主体 × 三 provider 短程路线经 Sol 有界审阅；Isaac 的实际交集为固定 delivery-014、6.2 PhysX CUDA、headless。旧失败、source 身份、启动物理 unknown 和预约偏差继续保留；这一结论不证明所有 USD/source、renderer 或 5c 已通过。后续共享代码改动按影响决定定向复验，不以本页状态替代独立证据。
+- 单元 6 在 Core `4c8a0be0` 的四主体受测配置有界接收：简单主体的直接/阻尼 effort 选择和两条 Panda Position 生产路径各有真实短程证据。当前 selected effort 匹配器对显式 profile 限制每主体一个 writer；这一限制不等于已有一体/装配 Panda Position 双 writer 失效，也不证明一般多 writer 匹配已完成。不要为了本轮图像工作重新设计 Controller；后续需求应按实际调用和共同资源合同处理。
+- 维护者指定单元 7 与单元 8 在同一个执行 goal 内完成，最终一起停门由 Sol 主审；本轮只做满足验收的最小真实纵切及受影响回归，不重跑历史矩阵。单元 8 的大规模兼容清理仍在 5c 接收之后。
 - 当初先后次序、技术建议与 2026-11-09 单元 4 侧边方案主审、维护者授权及后续明确决定冲突时，按后者和当前生产代码处理。以下单元 0–5 保留目标与背景，不要求重做已接收纵切；单元 6 以下采用本次修订的边界。
 
 ## 共同目标和调用链
@@ -90,16 +92,16 @@
 ## 工作单元 7：renderer 边界、Isaac 回归与 5c 图像
 
 - **代码范围：**`environment/reference_env.py::_prepare_task_rgb_state_binding`／`_new_task_rgb_consumer`、`observations/capture.py`、`render/camera/source.py`／`api.py`／各 adapter、`runtime/sessions/isaac_native_io.py`／`geophys.py`／MuJoCo renderer-only；必要的 GeoPhys public camera API/gitlink 另明确。
-- **核心目的：**公共 Runtime 发布真实 state、boundary、clock；renderer adapter 按自身能力消费，分离 USD native shared-scene 与 MuJoCo MJCF renderer-only 的 source 前置。先在 1–2 的纯合同中加入能暴露 USD 被误送到 MJCF source 的反例，实际修复位置依统一接口冻结；在相关公共 owner 稳定后做当前代码 Isaac 真正 reset/step/RGB/close 回归，避免先热修后又让大规模迁移失效。
+- **核心目的：**公共 Runtime 发布真实 state、boundary、clock；renderer adapter 按自身能力消费，分离 USD native shared-scene 与 MuJoCo MJCF renderer-only 的 source 前置。Sol 前置已将 MuJoCo 视觉源准备移入 renderer 适配，借用 native 相机无需该源；纯合同已覆盖 USD 不误入 MuJoCo admission 及 artifact 不匹配拒绝，但尚未证明真实 RGB。后续按最终代码在 Isaac 真正 reset/step/RGB/close 上验证，不以此修改控制或场景 interval owner。
 - **主要影响：**保留窗口与任务相机分离、固定 renderer 至 close、旧帧/故障、旧 owned 图像、相机 optics/source/capture identity；任意 renderer 的声明不能改变任务、Controller 或 physics 语义。窗口显示、离屏 RGB 和自动同步 RGB 分别依据受影响记录证明；不重开已人工认可的 5b 可辨性，不设新的通用像素分数门。
-- **退出：**Isaac `UsdRuntimeSourceV1` 不再经过不属于它的 MJCF renderer-only admission，同时身份和同步不被放松；真实 Isaac reset/step 的 frame+state+clock、capture 无额外物理推进及释放；按影响复测 MuJoCo、GeoPhys、GeoPhys CPU×MuJoCo renderer-only 和 Pendulum RGB。PickCube 仍是原真实代表；跨组合至少一条真实，其他非 Panda 图像不假称全路线已验证。
+- **退出：**Isaac `UsdRuntimeSourceV1` 不再经过不属于它的 MJCF renderer-only admission，同时身份和同步不被放松；真实 Isaac reset/step 的 frame+state+clock、capture 无额外物理推进及释放。对同样受本次公共 binding 改动影响的 MuJoCo、GeoPhys、GeoPhys CPU×MuJoCo renderer-only 做各一条最小公开真实 reset/step 纵切，核对实际状态、图像所有权和时钟；旧证据可按具体代码/source/配置及 claim 复用，不要求多视角长轨迹或全矩阵。PickCube 是真实代表；非 Panda 的通用接线至少用不同声明的合同检查，若其最终路径受影响则按能力作最小真实验证并诚实记录覆盖范围。至少一条真实跨组合，不能只用历史 source 名称或 fake 证明。
 
 ## 工作单元 8：诊断、条件分支和兼容债务归位
 
 - **代码范围：**先从实际改动涉及的 `environment/reference_env.py`、`runtime/sessions/api.py`／`control.py`、`assembly/compiler.py`、`observations/selected_reference.py`、renderer 与历史 `task_env/diagnostics/` callers 做精确 inventory；参考 [全局诊断代码规范](../../../../global/diagnostics-and-code-boundaries.md)与[原遗留清单](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)。
 - **核心目的：**5c 接收前先为每项记录位置、真实用途/caller、分类、目标 owner、保留或迁移理由、证据和兼容方案；仅为当下单元目标所必需的局部分支可在实施中迁移。大批量旧调用/历史分支清理在 5c 有界接收后按单独范围执行，不以换名/搬到新大类冒充解耦。
 - **主要影响：**`_diagnostic_profile`、`_diagnostic_manifest`、leaf-record 私有桥、`position_profile` 跨职责判断以及 task UID/fixture 特判逐项调查；不是所有 if 或 `diagnostics` 字段都该删除。正式 source/资产 pin、能力 admission、安全/单位/clock/stale、fault/close、feedback、Recorder/兼容 API 必须保留；旧认证不变更或绕过。先保证正常 caller 后再删除；移除后的受影响测试应验证原生产 owner。
-- **退出：**5c 接收前完成触及项的 disposition、必要局部迁移和回归，其他条目标明后续清理 owner/条件；不得把尚有诊断入口的实验 profile 写成正式通用支持。不可跨包清理 ignored workspace/temp_outputs 或改写受保护输入/历史记录。
+- **退出：**与单元 7 在同一 goal 中完成触及项的 disposition、必要局部迁移和定向回归，其他条目标明后续清理 owner/条件；不得把尚有诊断入口的实验 profile 写成正式通用支持。不可跨包清理 ignored workspace/temp_outputs 或改写受保护输入/历史记录。
 
 ## 工作单元 9：5c 综合主审与 G06 前检查
 

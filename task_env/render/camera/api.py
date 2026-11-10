@@ -26,6 +26,24 @@ class CameraRenderSession(Protocol):
     def close(self) -> None: ...
 
 
+def prepare_task_rgb_render_source(renderer, source, *, artifact, joint_bindings, frame_bindings):
+    """Prepare only the visual model required by the selected task renderer.
+
+    GeoPhys and Isaac lease their cameras from the existing RuntimeSession.
+    A MuJoCo renderer instead needs its own source-bound visual model.
+    """
+    if renderer in {'geophys', 'isaacsim'}:
+        return None
+    if renderer != 'mujoco':
+        raise CapabilityAdmissionError(f'unsupported task RGB renderer: {renderer}')
+    result = DynamicCameraRenderSourceV2.from_runtime_source(
+        source, artifact=artifact, joint_bindings=joint_bindings,
+        frame_bindings=frame_bindings,
+    )
+    result.validate_binding_provenance()
+    return result
+
+
 def render_manifest(provider):
     if provider not in ('geophys','mujoco'):
         raise CapabilityAdmissionError(f'unsupported render provider: {provider}')

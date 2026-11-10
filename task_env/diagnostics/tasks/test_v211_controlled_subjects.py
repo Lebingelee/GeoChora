@@ -376,20 +376,21 @@ def test_task_subject_declarations_preserve_hinge_and_wheel_order():
             entity_id='arm',root_frame='base',controller_writer='controller-a')
 
 
-def test_known_usd_task_rgb_source_boundary_remains_explicit(monkeypatch):
-    """Record current rejection; this is not an Isaac SDK or RGB success."""
+def test_usd_task_rgb_state_binding_does_not_require_mujoco_source(monkeypatch):
+    """Synthetic USD routing is not an Isaac SDK or RGB success."""
     from task_env.environment.reference_env import SelectedReferenceEnv
     from task_env.runtime.sessions import source as source_module
     from task_env.runtime.sessions.source import UsdRuntimeSourceV1
     source=object.__new__(UsdRuntimeSourceV1)
     object.__setattr__(source,'scene_definition',object())
     object.__setattr__(source,'scene_source',SimpleNamespace(source_closure_sha256='0'*64))
+    object.__setattr__(source,'task_artifact',SimpleNamespace(identity_hash='1'*64))
     env=SimpleNamespace(_task_rgb_config=(object(),'isaacsim'),value={'source':source},
                         artifact=SimpleNamespace(identity_hash='1'*64))
     monkeypatch.setattr(source_module,'position_joint_bindings_from_artifact',lambda *_:{})
     monkeypatch.setattr(source_module,'position_frame_bindings_from_artifact',lambda *_:{})
-    with pytest.raises(TypeError,match='dynamic render source requires RuntimeSource'):
-        SelectedReferenceEnv._prepare_task_rgb_state_binding(env)
+    binding = SelectedReferenceEnv._prepare_task_rgb_state_binding(env)
+    assert binding[0] is source and binding[-1] is None
 
 
 def test_component_resolver_delegates_existing_panda_layout_to_subject():

@@ -1581,7 +1581,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._task_rgb_state_binding = None
             return None
         from ..artifacts import StateFieldRequirement, StateRequirements
-        from ..render.camera.source import DynamicCameraRenderSourceV2
+        from ..render.camera.api import prepare_task_rgb_render_source
         from ..runtime.sessions.source import (
             position_frame_bindings_from_artifact,
             position_joint_bindings_from_artifact,
@@ -1591,13 +1591,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         scene = getattr(source, 'scene_definition', None)
         if scene is None or getattr(source, 'source_closure_digest', None) is None:
             raise ValueError('selected task RGB requires a canonical Scene and source closure')
+        if getattr(source, 'task_artifact_hash', None) != self.artifact.identity_hash:
+            raise ValueError('selected task RGB source differs from its Task Artifact')
         joint_bindings = position_joint_bindings_from_artifact(scene, self.artifact, source)
         frame_bindings = position_frame_bindings_from_artifact(self.artifact, source)
-        render_source = DynamicCameraRenderSourceV2.from_runtime_source(
-            source, artifact=self.artifact,
+        render_source = prepare_task_rgb_render_source(
+            self._task_rgb_config[1], source, artifact=self.artifact,
             joint_bindings=joint_bindings, frame_bindings=frame_bindings,
         )
-        render_source.validate_binding_provenance()
         requirements = []
         for definition in joint_bindings.values():
             for field_name in ('joint_position', 'joint_velocity'):

@@ -308,6 +308,7 @@ def test_incompatible_reset_pair_rejected_before_candidate_build(monkeypatch):
     env._task_rgb_config = (_camera(), 'mujoco')
     env.binding = SimpleNamespace(physical_control_profile=None)
     env.recorder = None
+    env._reset_reconstruction = None
     env.resolved_public_config = SimpleNamespace(reset_profile='pickcube-state-only-switch-v1')
     candidate = SimpleNamespace(config=SimpleNamespace(physics_provider='isaacsim',
         environment=SimpleNamespace(runtime=SimpleNamespace(backend='cuda'))))
