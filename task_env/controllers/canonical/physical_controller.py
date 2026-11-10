@@ -65,6 +65,10 @@ class LinearEffortControllerV1:
             raise ValueError('Controller channels differ from its binding')
         if tuple(channels[key].unit for key in profile.channel_keys) != profile.model_requirement.output_units:
             raise ValueError('model output units differ from effort channels')
+        input_units = tuple('rad' if channels[key].kind == 'revolute' else 'm'
+                            for key in profile.channel_keys)
+        if input_units != profile.model_requirement.joint_units:
+            raise ValueError('model input units differ from bound joint kinds')
         self.profile, self.binding, self.model = profile, binding, model
         self.writer_id = profile.controller_id
         self._channels = tuple(channels[key] for key in profile.channel_keys)

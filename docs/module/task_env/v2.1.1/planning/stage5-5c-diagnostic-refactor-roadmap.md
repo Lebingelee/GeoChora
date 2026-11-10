@@ -1,6 +1,6 @@
 # G05 5c 人工诊断与统一中间层重构路线
 
-日期：2026-11-08。状态：`MAINTAINER_DIRECTED_DIAGNOSIS_PLANNED`；这是 Sol 基于维护者最新要求、原 7 阶段计划与当前源码所作的实施次序和范围规划，不是已启动的实施 Goal、native/source/SDK/GPU/GUI 授权或自动派包。
+初版日期：2026-11-08；2026-11-10 按单元 4 已执行的统一主体/场景命令设计、单元 5 有界主审与维护者新指示修订。状态：`MAINTAINER_DIRECTED_DIAGNOSIS_IN_PROGRESS`；本页是路线，不单独构成执行资源授权或自动派包。单元 6 的重心是主体与 Controller 解耦、匹配与实际调用，重力补偿作为现有能力兼容和可选能力检查，不把通用补偿推广作为其主目标。
 
 维护者要求以多个必要的人工诊断窗口解决受控主体、Controller、Runtime、renderer 和公共诊断耦合的实质问题，最终完成 5c，并为 G06 并行提供统一的标量契约。原 5c 三个普通 attempt 的结果与失败保留；本次是维护者明确指定的 post-limit 人工诊断，不新造普通 attempt 004 或清零原计数。诊断 attempt 没有固定次数上限；**下面是依赖顺序中的工作单元，不机械对应 attempt 数量**。一般情况下，一个已授权窗口可以完成多个紧邻单元；但维护者已为工作单元 4 → 5 设定强制停门：单元 4 完成交付后必须结束该窗口，等待 Sol 对精确提交和证据独立主审，再由维护者人工接收并转发单元 5；不得在单元 4 的窗口内预先实施单元 5。其他相邻单元仍按具体包界定是否可合并。每个窗口冻结实际 HEAD、写入/操作范围、资源、完整交付和释放，由维护者指定实施者并手动转发，Sol 独立主审。反复无进展时重新评估，不把 ACK、fake、图或文档当作真实闭环。
 
@@ -8,11 +8,17 @@
 
 - 基准 checkout `/home/lly/.codex/worktrees/v210-integration/Geochora`，branch `codex/v211-stage5`，本计划起草时 HEAD `7f83200f`，GeoPhys `c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7`，Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；准备实际工作包时必须重新绑定真实 HEAD、pins、writer、双锁及保护输入，不以本值覆盖后续结果。
 - 权威为 [统一任务表示](../contracts/unified-task-representation.md)、[控制协议](../contracts/control-and-feedback.md)、[physics](../contracts/physics-provider.md)、[render](../contracts/render-provider.md)、[生命周期和数据](../contracts/lifecycle-and-data.md)、[G03](../goals/03-backends.md)、[G04](../goals/04-control.md)、[修订后 G05](../goals/05-rendering.md)、[G06](../goals/06-parallel.md)、[G07](../goals/07-integration.md)。1–4、5a、5b 按各自记录有界接收，不重写历史；受本轮修改的共享能力需要定向回归。G06 尚未启动。
-- `BaseTaskEnv` 现为 `SelectedReferenceEnv` 别名，但 Pendulum/双轮车走 component bootstrap + `GeoPhysRuntimeBoundary`，并没有自动走 selected 的 `RuntimeSession` 路由；当前不能声称这两任务已支持 MuJoCo 或 Isaac。Isaac F06 exact source/representation/admission 本来就有严格限定，不能靠改注册或删 guard 扩大能力。source 与 SDK 的可用性交集须逐项核实。
+- 起草时 Pendulum/双轮车的 component bootstrap 使用 `GeoPhysRuntimeBoundary`；该表述是历史起点，不代表当前全部生产路由。单元 2/3 和 5 已为两者接通 selected 共同主体/Controller/Runtime 链，受测的 MuJoCo CPU、GeoPhys CPU 和 Isaac 6.2 PhysX CUDA 短程路线已有各自有界证据。原 component/批量调用者及其兼容语义仍需保留，不据别名推断其已迁移。Isaac F06 身份门仍是独立受限交集。
 - 5c attempt001 四条 PickCube 同步 RGB 真机证据、003 的 MuJoCo／GeoPhys／GeoPhys→MuJoCo 与 Pendulum 组件结果按各自 source/代码/时钟身份有界保存；003 的通用 reset 强制调用只接受 `RuntimeSource` 的 MuJoCo renderer-only 绑定，阻断 Isaac `UsdRuntimeSourceV1` task RGB。参见 [003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)。5b 已接收，不重开。
 - Panda 现有重力补偿不是空白：默认关闭，仅已证的 MuJoCo CPU 一体 Panda selected PickCube/Nut 限定交集可启用，依真实 source、固定基座与 position-drive 特性计算并记录贡献；通用装配树/跨实体、其他 provider 未完成。参考 [指南](../guides/panda-gravity-compensation.md)及[装配树提案](gravity-compensation-assembly-tree.md)。保留默认关闭及已支持配置，不能把位置目标偏移重命名成通用 effort 或声称其他 provider 通过。
 - 一体 Panda、Panda 裸臂＋独立夹爪、Pendulum、双轮车的**统一主体构建与 Controller 接入**现由维护者明确提前作为 5c 诊断目标；这不等于将原附加用例的两任务 × 两机器人完整 Solution 成功从 7a 改到 5c。原 [装配 Panda 7a 用例](stage4-assembled-panda.md)的完整成功/跟踪/独立记录门继续保留；若当前不能构建或驱动装配主体，5c 的新主体统一目标不能宣称完成。
-- 原 G07/7a 安排诊断耦合集中收口。维护者现要求在进入并行化前，先处理**本轮所触及且阻碍统一公共链的**实验探针、代码越权和冗余判断；其他未涉及项仍登记供 7a，不扩大成无界全库清理。
+- 原 G07/7a 安排诊断耦合集中收口。维护者随后明确：**大批量兼容代码与历史分支清理放在整个 5c 有界接收之后**；本轮只处理实施目标必需的局部越权或阻塞，维护清理清单，不能批量删除调用者或历史接口。
+
+## 2026-11-10 接收与优先级更新
+
+- 单元 1–3 和单元 4 按各自主审/维护者决定有界接收。单元 4 的最终实现方向是现有主体/嵌套 Assembly、Controller binding、scene interval 和一个 RuntimeSession 物理推进 owner；其中默认恒等 Controller 仅覆盖实际声明的 canonical 通道，不自动覆盖所有传动，Task 原选 R1/R3 不被静默替换。单元 4 审查及执行授权文本用于解释本路线，实施结果以真实提交和证据为准。
+- 单元 5 在 Core `8965eec5` 的两简单主体 × 三 provider 短程路线经 Sol 有界审阅；Isaac 的实际交集为固定 delivery-014、6.2 PhysX CUDA、headless。旧失败、source 身份、启动物理 unknown 和预约偏差继续保留；这一结论不证明所有 USD/source、renderer 或 5c 已通过。后续共享代码改动按影响决定定向复验，不以本页状态替代独立证据。
+- 当初先后次序、技术建议与 2026-11-09 单元 4 侧边方案主审、维护者授权及后续明确决定冲突时，按后者和当前生产代码处理。以下单元 0–5 保留目标与背景，不要求重做已接收纵切；单元 6 以下采用本次修订的边界。
 
 ## 共同目标和调用链
 
@@ -69,15 +75,17 @@
 
 - **代码范围：**`runtime/sessions/api.py`、`source.py`／`representation.py`／`common.py`、`mujoco.py`、`geophys.py`、`native_io.py`／`isaac_native_io.py`、`environment/lifecycle.py`、`task_definition.py`、`observations/*`、`registry.py` 及各真实 task binding；必要 provider 公共 API 变更另在具体包列出。
 - **核心目的：**同一 public Env/Runtime contract 从相同任务主体语义出发执行所支持 provider，不以装载特定任务选择另一套控制/状态语义；Source 是被编译绑定的表示，provider/SDK type 在 adapter 处理，公共 state 与 clock 由同一合同发布。任务的 observation/reward/成功判据留 `TaskDefinition`，机器人本体 state、Controller action space、任务 observation/RGB 在 Env 中按声明组合。
-- **主要影响：**为 Pendulum/双轮车逐项核对 GeoPhys、MuJoCo、Isaac 的受支持 source、joint、actuator、控制模式和可用依赖；现有 MuJoCo/Isaac 并未证明这两任务可运行，尤其 Isaac 的 F06 冻结 USD 不是通用输入。目标是实际走统一入口接通有能力的路线；遇缺 USD/source closure、native API 或资源时形成具体失败证据与可实施修复，不伪造 provenance、不静默 fallback，也不把 provider 实现差异抹成假通过。
+- **主要影响：**为 Pendulum/双轮车逐项核对 GeoPhys、MuJoCo、Isaac 的受支持 source、joint、actuator、控制模式和可用依赖；当前三个 provider 的具体受测交集已有短程证据，Isaac 的 F06 冻结 USD 仍不是通用输入。遇缺 USD/source closure、native API 或资源时保留具体失败证据与可实施修复，不伪造 provenance、不静默 fallback，也不把 provider 实现差异抹成假通过。
 - **退出：**每个任务在已准入路线得到真实 reset/有界动作/状态与 clock，至少覆盖修改后的代表 MuJoCo、GeoPhys 和受影响 Isaac 真实路径；原用户希望两简单主体也能接入 MuJoCo/Isaac，需逐格给出落实状态和剩余阻碍，不能仅测 PickCube 声称已做到。对确因缺少真实资产/provider能力未闭合的交集标 BLOCKED，交维护者决定，不能自动宣称通用支持。保留 G03 的 seed、preflight、切换与 4c Controller reset 能力，受影响时补回归；不执行 G06 batch。
 
-## 工作单元 6：重力补偿与控制贡献兼容
+## 工作单元 6：主体与 Controller 解耦、能力匹配和调用
 
-- **代码范围：**`controllers/canonical/model.py`／`physical_controller.py`、`position_profile.py`／`physical_commands.py`、`runtime/sessions/mujoco.py`／`mujoco_dynamics.py`、configuration/metadata、`assembly/fixed_attachment.py`、现有 gravity guides/树提案及测试。
-- **核心目的：**把“是否启用”和计算所需的本体/Source/model/Controller 能力表达清楚，保留当前默认关闭和限定的一体 Panda MuJoCo 实现；保证统一控制链不会重复补偿、漏算或静默改变 4c 默认成功路径。机器人内部提供模型/配置，通用命令合成管理 source-bound 贡献和一次提交。
-- **主要影响：**当前实现通过经约束审核的 position-drive 目标偏移实现，不能称为一般 direct effort。装配树内哪些实体的自重可选择、手指耦合/限幅、fixed vs mobile base 和 source completeness 必须按现有提案处理；不把外物/接触自动当作本体，也不宣称其他 provider 已有补偿。通用装配重力作为原计划的待实现能力，除非必要且本包明确授权，不以空开关假装完成或强行扩成所有组合。
-- **退出：**关闭态动作/状态/记录兼容和已支持开启态的受影响定向回归；启用不支持交集明确拒绝；装配树选择/贡献计算如本轮实现，需独立数学与真实受测范围证据，未实现标待办并维持 7a 既定完整用例。
+- **代码范围：**`environment/protocols.py`／配置及 `reference_binding.py`、`robots/` 四主体及真实生产 builder、`controllers/contracts.py`／`controllers/canonical/` 已有 Controller 与 model、`runtime/sessions/physical_control.py`／`control.py`／selected materialization 和现有诊断测试。模型来源及 provider native 映射仍由相应 runtime/provider 负责，不把 SDK 对象传进通用 Controller。视实际生产链选用已有 owner，避免另建未消费的平行 registry、batch 或 Runtime。
+- **核心目的：**主体声明可控制通道、类型/单位/边界、嵌套关系、root 及状态/模型能力和可选配置；Controller 独立声明 action 输入、具名 state/model 需求、输出类型、资源、cadence 与能力；在真正构建/绑定前由公共绑定 owner 对照声明进行匹配并明确拒绝不兼容。由主体/任务的公开配置选择并调用匹配的 Controller，再复用已有 scene interval 和 Runtime 提交。一个主体不应在公共 Env 中依靠任务名、Panda profile 或动作维数猜测；Controller 算法不依赖某个 Robot Python 实例或 live provider SDK。Robot 提供配置和描述不等于 Controller 必须放在 Robot 文件中。
+- **生产出口：**明确以既有 `ControlledSubjectV1`、`compile_declared_subject_binding`、`PhysicalControlExecutionV1`、`DefaultCanonicalController` 和 selected Position binding 为基线；区分 `supported_controller_kinds` 的旧 component 含义与 `selected_controller_profiles`，不得因同名返回值为空把既有 selected 能力判为不存在。迁移 Pendulum/双轮声明所需的通用直接力矩选择，验证同一 Controller 实现在不同主体/不同通道下复用；一体/装配 Panda 的 R1/R3、双 Controller、耦合手指仍以各自实际声明和可准入交集匹配，不能按 7+2 个数字或身份猜能力。无有效匹配、冲突、缺失 state/model、单位或 source 不同应在可能的最早无副作用边界拒绝。
+- **兼容与延后：**现有默认恒等输出保持显式 canonical joint effort 通道、单位/范围/传动及 provider admission；它不承诺任意独立手指力矩，零力矩不保证静止；显式选用的 Task Controller 不静默替换。保留旧 Controller identity/receipt、R3 时序、Solution 入口和故障/资源保护，兼容接口需要时提供可追溯桥接。G06 的 batch、通用闭环、多 provider 完整矩阵和全库清理不提前实施。
+- **重力边界：**保留已受测的 MuJoCo CPU 一体 Panda Position 补偿、默认关闭和不支持交集拒绝；是否支持由主体、Controller/model 需求和 provider 能力共同准入，不能由主体或 Controller 直接依赖某个 live SDK。已受测 Position 偏移不重命名为通用 direct effort；装配树/多 provider 重力补偿另依已有提案与后续授权推进，除非为保持既有行为所必需，不将其当单元 6 的新终验。
+- **退出：**生产调用链能够展示实际的主体声明→Controller 选择和能力匹配→状态/动作→scene 提交；至少一条相同通用 Controller 跨 Pendulum 与双轮主体的公开真实短程、一个 Panda 实际选用既有 Controller 的公开短程及装配多 Controller 绑定/资源边界依具体修改影响复用或定向复验；正反合同覆盖形状、单位、通道、source、模型、资源冲突和状态身份。不能仅交 schema、class 名或 fake 检查，也不因此把四主体×三 provider 全矩阵重新变成门。记录可复用的 unit4/5 与 gravity 开闭态证据及未覆盖交集。
 
 ## 工作单元 7：renderer 边界、Isaac 回归与 5c 图像
 
@@ -89,9 +97,9 @@
 ## 工作单元 8：诊断、条件分支和兼容债务归位
 
 - **代码范围：**先从实际改动涉及的 `environment/reference_env.py`、`runtime/sessions/api.py`／`control.py`、`assembly/compiler.py`、`observations/selected_reference.py`、renderer 与历史 `task_env/diagnostics/` callers 做精确 inventory；参考 [全局诊断代码规范](../../../../global/diagnostics-and-code-boundaries.md)与[原遗留清单](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)。
-- **核心目的：**为每项记录位置、真实用途/caller、分类、目标 owner、保留或迁移理由、证据和兼容方案。仅实验/测试探针转诊断驱动/fixture/包装；任务策略移 task/Robot、provider 约束由 adapter/capability owner 管；在相关改造单元内清除重复或越权判断，不以换名/搬到新大类冒充解耦。
+- **核心目的：**5c 接收前先为每项记录位置、真实用途/caller、分类、目标 owner、保留或迁移理由、证据和兼容方案；仅为当下单元目标所必需的局部分支可在实施中迁移。大批量旧调用/历史分支清理在 5c 有界接收后按单独范围执行，不以换名/搬到新大类冒充解耦。
 - **主要影响：**`_diagnostic_profile`、`_diagnostic_manifest`、leaf-record 私有桥、`position_profile` 跨职责判断以及 task UID/fixture 特判逐项调查；不是所有 if 或 `diagnostics` 字段都该删除。正式 source/资产 pin、能力 admission、安全/单位/clock/stale、fault/close、feedback、Recorder/兼容 API 必须保留；旧认证不变更或绕过。先保证正常 caller 后再删除；移除后的受影响测试应验证原生产 owner。
-- **退出：**触及项均有 disposition 和明确回归，未能处理者带原因/owner/7a 计划；不得把尚有诊断入口的实验 profile 写成正式通用支持。不可跨包清理 ignored workspace/temp_outputs 或改写受保护输入/历史记录。
+- **退出：**5c 接收前完成触及项的 disposition、必要局部迁移和回归，其他条目标明后续清理 owner/条件；不得把尚有诊断入口的实验 profile 写成正式通用支持。不可跨包清理 ignored workspace/temp_outputs 或改写受保护输入/历史记录。
 
 ## 工作单元 9：5c 综合主审与 G06 前检查
 
