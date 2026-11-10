@@ -2510,44 +2510,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                         'ownership': 'owned host copy', 'color_setup': color_setup}
 
     def _new_task_rgb_consumer(self):
-        from ..artifacts import ExecutionSpecV1, RendererSelectionV1
-        from ..observations.capture import TaskRgbObservationConsumerV1, BorrowedTaskCameraSessionV1
-        from ..render.camera import DynamicCameraRenderSourceV2, create_dynamic_camera_session
-        from ..render.camera.api import (V211_RGB_PROFILE, V211_GEOPHYS_MUJOCO_RGB_PROFILE,
-                                         V211_PHYSICS_PROFILE, D03_PHYSICS_PROFILE)
+        from ..render.camera.task_rgb import create_task_rgb_consumer
+
+        def binding():
+            return (getattr(self, '_task_rgb_state_binding', None)
+                    or self._prepare_task_rgb_state_binding())
+
         camera, renderer = self._task_rgb_config
-        if renderer in {'geophys', 'isaacsim'}:
-            selection = (RendererSelectionV1('renderer-selection-v1', 'geophys', 'rasterizer',
-                                              'v211_geophys_cpu_task_rgb_v1', 'cpu') if renderer == 'geophys'
-                         else RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
-                                                  'v211_isaac_rtx_task_rgb_v1', 'cuda:0'))
-            return TaskRgbObservationConsumerV1(camera, selection,
-                lambda state: BorrowedTaskCameraSessionV1(self.session, camera, state),
-                color_space=self.metadata['task_rgb_v1']['color_space'])
-        is_cross = self.provider == 'geophys'
-        profile = V211_GEOPHYS_MUJOCO_RGB_PROFILE if is_cross else V211_RGB_PROFILE
-        physics_profile = D03_PHYSICS_PROFILE if is_cross else V211_PHYSICS_PROFILE
-        selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl', profile, None)
-
-        def factory(state):
-            state_binding = getattr(self, '_task_rgb_state_binding', None)
-            if state_binding is None:
-                state_binding = self._prepare_task_rgb_state_binding()
-            if (state_binding[0] is not self.value['source']
-                    or state_binding[1] != self.artifact.identity_hash):
-                raise ValueError('selected task RGB render source is stale or foreign')
-            render_source = state_binding[-1]
-            source = DynamicCameraRenderSourceV2.from_runtime_source(
-                self.value['source'], artifact=self.artifact,
-                joint_bindings=state_binding[3], frame_bindings=state_binding[4])
-            if source.identity_hash != render_source.identity_hash:
-                raise ValueError('selected task RGB render source changed after reset binding')
-            execution = ExecutionSpecV1('execution-spec-v1', self.provider, self.backend, physics_profile,
-                                        self.execution.provider_seed, 'best_effort', selection, physics_device='cpu')
-            return create_dynamic_camera_session(camera, execution, source=source, initial_state=state)
-
-        return TaskRgbObservationConsumerV1(camera, selection, factory,
-            color_space='GL_LINEAR framebuffer RGB; primaries uncalibrated')
+        return create_task_rgb_consumer(
+            camera=camera, renderer=renderer, provider=self.provider,
+            backend=self.backend, provider_seed=self.execution.provider_seed,
+            artifact=self.artifact, color_space=self.metadata['task_rgb_v1']['color_space'],
+            session_getter=lambda: self.session,
+            source_getter=lambda: self.value['source'], binding_getter=binding,
+        )
 
     def _configure_selected_observer(self, render_mode, camera):
         from types import SimpleNamespace
