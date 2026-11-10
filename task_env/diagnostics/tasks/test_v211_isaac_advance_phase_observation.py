@@ -55,3 +55,56 @@ def test_g05_failed_advance_identifies_the_phase(monkeypatch, setter_steps, sync
         assert facts[key][0] == expected
         assert facts[key][1] == pytest.approx(expected * 0.002)
     assert io._native_step_count == 0
+
+
+def test_g05_scene_handoff_captures_only_supported_gravity_and_matching_rate():
+    payload = isaac_native_io._g05_scene_handoff_payload(
+        scene_path="/task_env_pendulum/PhysicsScene",
+        applied_schemas=("PhysxSceneAPI",),
+        authored_values={
+            "physics:gravityDirection": (0.0, 0.0, -2.0),
+            "physics:gravityMagnitude": 9.81,
+            "physx:timeStepsPerSecond": 500,
+        },
+        configured_dt=0.002,
+        meters_per_unit=1.0,
+    )
+    assert payload["gravity_direction_normalized"] == [0.0, 0.0, -1.0]
+    assert payload["gravity_world_m_s2"] == [0.0, 0.0, -9.81]
+    assert payload["steps_per_second"] == 500
+    assert payload["source_bytes_modified"] is False
+
+
+@pytest.mark.parametrize(
+    ("schemas", "values", "match"),
+    [
+        (("NewtonSceneAPI",), {
+            "physics:gravityDirection": (0.0, 0.0, -1.0),
+            "physics:gravityMagnitude": 9.81,
+        }, "unsupported APIs"),
+        ((), {
+            "physics:gravityDirection": (0.0, 0.0, -1.0),
+            "physics:gravityMagnitude": 9.81,
+            "physx:solverType": "TGS",
+        }, "unsupported authored properties"),
+        ((), {
+            "physics:gravityDirection": (0.0, 0.0, -1.0),
+            "physics:gravityMagnitude": 9.81,
+            "physx:timeStepsPerSecond": 400,
+        }, "conflicts with the TaskArtifact timebase"),
+        ((), {"physics:gravityMagnitude": 9.81}, "requires explicit authored gravity"),
+        ((), {
+            "physics:gravityDirection": (0.0, 0.0, 0.0),
+            "physics:gravityMagnitude": 9.81,
+        }, "is invalid"),
+    ],
+)
+def test_g05_scene_handoff_rejects_unpreserved_semantics(schemas, values, match):
+    with pytest.raises(ValueError, match=match):
+        isaac_native_io._g05_scene_handoff_payload(
+            scene_path="/task_env_pendulum/PhysicsScene",
+            applied_schemas=schemas,
+            authored_values=values,
+            configured_dt=0.002,
+            meters_per_unit=1.0,
+        )

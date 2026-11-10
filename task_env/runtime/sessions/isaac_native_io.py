@@ -148,6 +148,75 @@ def _numeric_tuple_matches(actual, expected, *, abs_tol: float) -> bool:
 
 
 
+def _g05_scene_handoff_payload(
+    *, scene_path: str, applied_schemas, authored_values: Mapping[str, object],
+    configured_dt: float, meters_per_unit: float,
+) -> dict[str, object]:
+    """Validate and capture the narrow PhysicsScene semantics G05 can hand off.
+
+    This intentionally accepts only an explicit gravity vector and an
+    optional PhysX rate equal to the TaskArtifact timebase. Unknown authored
+    properties or APIs may carry solver semantics that cannot be reconstructed
+    by the shared SimulationManager owner, so the route fails closed.
+    """
+    schemas = {str(value) for value in applied_schemas}
+    unsupported_schemas = sorted(schemas - {"PhysxSceneAPI"})
+    if unsupported_schemas:
+        raise ValueError(
+            "G05 PhysicsScene cannot be transferred with unsupported APIs: "
+            f"{unsupported_schemas!r}"
+        )
+    allowed_properties = {
+        "physics:gravityDirection",
+        "physics:gravityMagnitude",
+        "physx:timeStepsPerSecond",
+    }
+    unsupported_properties = sorted(set(authored_values) - allowed_properties)
+    if unsupported_properties:
+        raise ValueError(
+            "G05 PhysicsScene cannot be transferred with unsupported authored properties: "
+            f"{unsupported_properties!r}"
+        )
+    if "physics:gravityDirection" not in authored_values or "physics:gravityMagnitude" not in authored_values:
+        raise ValueError("G05 PhysicsScene handoff requires explicit authored gravity direction and magnitude")
+    if not math.isfinite(float(meters_per_unit)) or float(meters_per_unit) <= 0.0:
+        raise ValueError("G05 PhysicsScene handoff requires a finite positive meters-per-unit scale")
+    direction = tuple(float(value) for value in authored_values["physics:gravityDirection"])
+    magnitude = float(authored_values["physics:gravityMagnitude"])
+    if len(direction) != 3 or any(not math.isfinite(value) for value in direction):
+        raise ValueError("G05 PhysicsScene gravity direction must be a finite 3-vector")
+    direction_length = math.sqrt(sum(value * value for value in direction))
+    if direction_length <= 0.0 or not math.isfinite(magnitude) or magnitude < 0.0:
+        raise ValueError("G05 PhysicsScene gravity magnitude/direction is invalid")
+    normalized_direction = tuple(value / direction_length for value in direction)
+    gravity_world = tuple(
+        value * magnitude / float(meters_per_unit) for value in normalized_direction
+    )
+    expected_steps_per_second = int(round(1.0 / float(configured_dt)))
+    authored_steps_per_second = authored_values.get("physx:timeStepsPerSecond")
+    if authored_steps_per_second is not None:
+        if type(authored_steps_per_second) not in (int, float):
+            raise ValueError("G05 PhysicsScene authored PhysX rate must be numeric")
+        if int(authored_steps_per_second) != expected_steps_per_second:
+            raise ValueError(
+                "G05 PhysicsScene authored PhysX rate conflicts with the TaskArtifact timebase: "
+                f"{authored_steps_per_second!r} != {expected_steps_per_second}"
+            )
+    return {
+        "schema_version": "g05-scene-owner-handoff-v1",
+        "source_scene_path": str(scene_path),
+        "source_applied_schemas": sorted(schemas),
+        "source_authored_values": dict(authored_values),
+        "gravity_direction_normalized": list(normalized_direction),
+        "gravity_magnitude_stage_units": magnitude,
+        "meters_per_unit": float(meters_per_unit),
+        "gravity_world_m_s2": list(gravity_world),
+        "physics_dt_s": float(configured_dt),
+        "steps_per_second": expected_steps_per_second,
+        "source_bytes_modified": False,
+    }
+
+
 def _f05_collision_filter_witness(stage, UsdPhysics) -> dict[str, list[dict[str, object]]]:
     """Preserve source-robot filters while detecting filters that touch F05Scene."""
     def in_task_scene(path: str) -> bool:
@@ -838,7 +907,7 @@ class IsaacSimNativeRuntimeIOV1:
             self._app_owner.open(f06_compatibility=True) if self._f06_pickcube else self._app_owner.open()
             import omni.usd
             import torch
-            from pxr import Gf, PhysxSchema, Sdf, UsdGeom, UsdLux, UsdPhysics
+            from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics
             from isaacsim.core.experimental.prims import Articulation, RigidPrim, XformPrim
             from isaacsim.core.simulation_manager import SimulationManager
             from isaacsim.core.experimental.utils import app as app_utils
@@ -989,52 +1058,88 @@ class IsaacSimNativeRuntimeIOV1:
                 )
             if self._g05_effort and len(authored_scenes) == 1:
                 scene_prim = authored_scenes[0]
-                conflicting_scene_apis = [
-                    schema for schema in scene_applied_schemas_before
-                    if schema.startswith(("NewtonSceneAPI", "MjcSceneAPI"))
-                ]
-                if conflicting_scene_apis:
+                get_authored_properties = getattr(scene_prim, "GetAuthoredProperties", None)
+                if not callable(get_authored_properties):
+                    self._update_startup_observation(
+                        status="failed",
+                        failure_boundary="physics_scene_authored_property_inspection_unavailable",
+                    )
+                    raise RuntimeError("USD public API cannot enumerate authored PhysicsScene properties")
+                authored_values = {}
+                for authored_property in get_authored_properties():
+                    property_name = str(authored_property.GetName())
+                    attribute = scene_prim.GetAttribute(property_name)
+                    if not attribute or not attribute.IsValid():
+                        raise ValueError(
+                            "G05 PhysicsScene has an authored non-attribute property that cannot be transferred: "
+                            f"{property_name}"
+                        )
+                    value = attribute.Get()
+                    if property_name == "physics:gravityDirection":
+                        value = [float(component) for component in value]
+                    elif property_name == "physics:gravityMagnitude":
+                        value = float(value)
+                    elif property_name == "physx:timeStepsPerSecond":
+                        value = int(value)
+                    authored_values[property_name] = value
+                try:
+                    handoff = _g05_scene_handoff_payload(
+                        scene_path=str(scene_prim.GetPath()),
+                        applied_schemas=scene_applied_schemas_before,
+                        authored_values=authored_values,
+                        configured_dt=float(self._artifact.timebase.physics_dt),
+                        meters_per_unit=float(UsdGeom.GetStageMetersPerUnit(self._stage)),
+                    )
+                except (TypeError, ValueError) as error:
                     self._update_startup_observation(
                         status="failed",
                         failure_boundary="physics_scene_semantic_conflict",
                         runtime_scene_owner_adaptation={
-                            "schema_version": "g05-runtime-physx-scene-owner-adaptation-v1",
+                            "schema_version": "g05-scene-owner-handoff-v1",
                             "status": "rejected_semantic_conflict",
                             "scene_path": str(scene_prim.GetPath()),
-                            "conflicting_apis": conflicting_scene_apis,
+                            "authored_properties": authored_values,
+                            "applied_schemas": scene_applied_schemas_before,
+                            "error": str(error),
                         },
                     )
-                    raise ValueError(
-                        "G05 PhysX scene has a conflicting Newton/MuJoCo scene API: "
-                        f"{conflicting_scene_apis!r}"
+                    raise
+                session_layer = self._stage.GetSessionLayer()
+                if session_layer is None:
+                    raise RuntimeError("G05 PhysicsScene handoff requires a USD session layer")
+                with Usd.EditContext(self._stage, session_layer):
+                    scene_prim.SetActive(False)
+                if scene_prim.IsActive():
+                    raise RuntimeError("USD session-layer PhysicsScene deactivation did not take effect")
+                remaining_scene_paths = sorted(
+                    str(prim.GetPath()) for prim in self._stage.Traverse()
+                    if prim.IsA(UsdPhysics.Scene)
+                )
+                if remaining_scene_paths:
+                    raise RuntimeError(
+                        "G05 PhysicsScene handoff did not leave a scene-free stage for the existing owner: "
+                        f"{remaining_scene_paths!r}"
                     )
-                had_physx_scene_api = bool(scene_prim.HasAPI(PhysxSchema.PhysxSceneAPI))
-                if not had_physx_scene_api:
-                    scene_prim.ApplyAPI(PhysxSchema.PhysxSceneAPI)
-                physx_scene_api = PhysxSchema.PhysxSceneAPI(scene_prim)
-                configured_steps_per_second = int(round(1.0 / float(self._artifact.timebase.physics_dt)))
-                physx_scene_api.GetTimeStepsPerSecondAttr().Set(configured_steps_per_second)
+                overlay_text = session_layer.ExportToString()
+                session_layer_scene_override = {
+                    "schema_version": "g05-session-layer-physics-scene-override-v1",
+                    "prim_path": handoff["source_scene_path"],
+                    "active": False,
+                    "layer_identifier": str(session_layer.identifier),
+                    "session_layer_sha256": hashlib.sha256(overlay_text.encode("utf-8")).hexdigest(),
+                    "remaining_active_physics_scene_paths": remaining_scene_paths,
+                    "stage_saved": False,
+                }
                 runtime_scene_owner_adaptation = {
-                    "schema_version": "g05-runtime-physx-scene-owner-adaptation-v1",
-                    "status": "applied" if not had_physx_scene_api else "reaffirmed",
-                    "scene_path": str(scene_prim.GetPath()),
-                    "physx_scene_api": "PhysxSceneAPI",
-                    "time_steps_per_second": configured_steps_per_second,
-                    "physics_dt_s": float(self._artifact.timebase.physics_dt),
-                    "source_bytes_modified": False,
-                    "owner": "IsaacSimNativeRuntimeIOV1",
+                    **handoff,
+                    "status": "session_layer_deactivated_pending_manager_scene",
+                    "owner": "isaacsim.core.simulation_manager.SimulationManager",
+                    "session_layer_override": session_layer_scene_override,
                 }
                 self._update_startup_observation(
-                    status="runtime_scene_owner_adapted",
+                    status="runtime_scene_owner_handoff_staged",
                     runtime_scene_owner_adaptation=runtime_scene_owner_adaptation,
-                    scene_applied_schemas_after=sorted(
-                        str(value) for value in scene_prim.GetAppliedSchemas()
-                    ),
-                    scene_time_steps_per_second_after_setup={
-                        "physx:timeStepsPerSecond": int(
-                            physx_scene_api.GetTimeStepsPerSecondAttr().Get()
-                        ),
-                    },
+                    session_layer_scene_override=session_layer_scene_override,
                 )
             elif self._g05_effort:
                 # A local G05 delivery may contain only the task body.  Let
@@ -1065,11 +1170,12 @@ class IsaacSimNativeRuntimeIOV1:
                 device=self._execution.physics_device,
             )
             scenes = SimulationManager.get_physics_scenes()
+            manager_scene_paths = [str(scene.path) for scene in scenes]
             self._update_startup_observation(
                 status="simulation_manager_scene_checked",
                 simulation_manager_scene_count=len(scenes),
                 simulation_manager_device=str(SimulationManager.get_device()),
-                public_physics_scene_paths=authored_scene_paths,
+                public_physics_scene_paths=manager_scene_paths,
             )
             if len(scenes) != 1:
                 self._update_startup_observation(
@@ -1078,23 +1184,50 @@ class IsaacSimNativeRuntimeIOV1:
                 )
                 raise ValueError(f"F04 requires exactly one public PhysX scene, found {len(scenes)}")
             self._physics_scene = scenes[0]
+            if self._g05_effort and len(authored_scenes) == 1:
+                expected_gravity = runtime_scene_owner_adaptation["gravity_world_m_s2"]
+                self._physics_scene.set_gravity(Gf.Vec3f(*expected_gravity))
+                actual_gravity = [float(value) for value in self._physics_scene.get_gravity()]
+                if not _numeric_tuple_matches(actual_gravity, expected_gravity, abs_tol=1e-5):
+                    raise RuntimeError(
+                        "SimulationManager-owned PhysX scene did not retain transferred source gravity: "
+                        f"{actual_gravity!r} != {expected_gravity!r}"
+                    )
             self._physics_scene.set_enabled_gpu_dynamics(True)
             if self._physics_scene.get_enabled_gpu_dynamics() is not True:
                 raise RuntimeError("GPU PhysX dynamics did not remain enabled")
-            scene_time_steps_after_setup = {}
-            if authored_scenes and authored_scenes[0].HasAPI(PhysxSchema.PhysxSceneAPI):
-                scene_time_steps_after_setup = {
-                    "physx:timeStepsPerSecond": int(
-                        PhysxSchema.PhysxSceneAPI(authored_scenes[0])
-                        .GetTimeStepsPerSecondAttr().Get()
-                    ),
+            scene_rate_after_setup = int(self._physics_scene.get_steps_per_second())
+            expected_scene_rate = int(round(1.0 / float(self._artifact.timebase.physics_dt)))
+            if scene_rate_after_setup != expected_scene_rate:
+                raise ValueError(
+                    "public PhysicsScene rate differs from the TaskArtifact timebase: "
+                    f"{scene_rate_after_setup} != {expected_scene_rate}"
+                )
+            manager_scene_prim = self._physics_scene.prim
+            manager_scene_facts = {
+                "path": str(self._physics_scene.path),
+                "gravity_world_m_s2": [float(value) for value in self._physics_scene.get_gravity()],
+                "dt_s": float(self._physics_scene.get_dt()),
+                "steps_per_second": scene_rate_after_setup,
+                "enabled_gpu_dynamics": bool(self._physics_scene.get_enabled_gpu_dynamics()),
+                "applied_schemas": sorted(str(value) for value in manager_scene_prim.GetAppliedSchemas()),
+            }
+            if runtime_scene_owner_adaptation is not None and runtime_scene_owner_adaptation.get(
+                    "status") == "session_layer_deactivated_pending_manager_scene":
+                runtime_scene_owner_adaptation = {
+                    **runtime_scene_owner_adaptation,
+                    "status": "transferred_to_unique_simulation_manager_scene",
+                    "manager_scene_path": manager_scene_facts["path"],
+                    "manager_scene_facts": manager_scene_facts,
                 }
             self._update_startup_observation(
+                runtime_scene_owner_adaptation=runtime_scene_owner_adaptation,
+                manager_scene_facts=manager_scene_facts,
                 physics_scene_dt_s=float(self._physics_scene.get_dt()),
-                scene_applied_schemas_after=(sorted(
-                    str(value) for value in authored_scenes[0].GetAppliedSchemas()
-                ) if authored_scenes else []),
-                scene_time_steps_per_second_after_setup=scene_time_steps_after_setup,
+                scene_applied_schemas_after=manager_scene_facts["applied_schemas"],
+                scene_time_steps_per_second_after_setup={
+                    "physx:timeStepsPerSecond": scene_rate_after_setup,
+                },
             )
             if abs(float(self._physics_scene.get_dt()) - float(self._artifact.timebase.physics_dt)) > 1e-12:
                 raise ValueError("public PhysicsScene dt differs from the TaskArtifact timebase")
