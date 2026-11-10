@@ -34,6 +34,7 @@ F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
+G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 
 
 def close_session_and_runtime_owner(
@@ -91,6 +92,7 @@ def validate_selected_position_route(execution):
         ('geophys', 'cpu', 'cpu', 'best_effort', F05_DG02_GEOPHYS_USD_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F05_DG04_ISAAC_NATIVE_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F06_PICKCUBE_ISAAC_PROFILE),
+        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', G05_ISAAC_EFFORT_PROFILE),
     }:
         raise ValueError('versioned Position construction has an unsupported provider execution route')
 
@@ -1073,10 +1075,53 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
         if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
             raise ValueError('F04 Isaac materialization does not accept caller-supplied admission authorities')
-        _validate_f04_isaac_position_source(artifact, declared_execution, source)
         from .isaac_native_io import create_isaac_native_runtime_io
         from .native_io import UsdCoreRuntimeSession
-
+        if declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE:
+            delivery = source.scene_source.loaded_delivery
+            representation = source.scene_source.representation
+            if (declared_execution.physics_backend, declared_execution.physics_device,
+                    declared_execution.determinism_mode,
+                    declared_execution.render_default.provider,
+                    declared_execution.render_default.backend,
+                    declared_execution.render_default.profile,
+                    declared_execution.render_default.device,
+                    declared_execution.camera_overrides) != (
+                    'cuda', 'cuda:0', 'best_effort',
+                    'none', 'cpu', 'none', None, ()):
+                raise ValueError('G05 Isaac effort profile is state-only and requires cuda:0')
+            if (representation.provider, representation.provider_build_identity,
+                    representation.representation_format, representation.runtime_admitted,
+                    delivery.locally_validated, delivery.source_verified) != (
+                    'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, True, False):
+                raise ValueError('G05 Isaac effort source representation is not the exact local 6.2 USD route')
+            if (source.scene_source.loaded_delivery.delivery.representation_id
+                    != 'isaacsim-6.2.0.0-g05-mjcf-v1'):
+                raise ValueError('G05 Isaac effort source delivery is not the reviewed MJCF conversion')
+            if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+                    artifact.timebase.control_dt) != (0.002, 25, 0.05):
+                raise ValueError('G05 Isaac effort profile requires the task 2 ms / 25 substep timebase')
+            if set(source.joint_targets) != set(source.joints) or not source.joints:
+                raise ValueError('G05 Isaac effort source must expose an exact scalar joint target map')
+            native_io = None
+            try:
+                native_io = create_isaac_native_runtime_io(
+                    artifact, declared_execution, source,
+                    g05_effort=True,
+                )
+                session = UsdCoreRuntimeSession(
+                    artifact, declared_execution, source, native_io, drive_receipt=None,
+                )
+            except BaseException as materialization_error:
+                _close_failed_native_materialization(
+                    materialization_error, native_io, io_label='G05 Isaac effort native-I/O',
+                    runtime_owner_label='G05 Isaac App owner',
+                )
+                raise
+            session._declared_execution_spec_v1 = declared_execution
+            session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+            return session
+        _validate_f04_isaac_position_source(artifact, declared_execution, source)
         native_io = None
         try:
             native_io = create_isaac_native_runtime_io(artifact, declared_execution, source)

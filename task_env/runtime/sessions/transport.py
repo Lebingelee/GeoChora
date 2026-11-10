@@ -474,6 +474,23 @@ paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
 launcher_paths = ([str(pathlib.Path(item).resolve()) for item in os.environ.get('PYTHONPATH', '').split(os.pathsep) if item]
                   if launcher_mode == 'launcher' else [])
 sys.path[:0] = [core, geophys, *launcher_paths, paths['purelib'], paths['platlib']]
+receipt_path = os.environ.get('GEOCHORA_RUNTIME_SCOPE_PRE_IMPORT')
+if receipt_path:
+    cgroup = '/sys/fs/cgroup' + next(
+        (line[3:] for line in pathlib.Path('/proc/self/cgroup').read_text().splitlines()
+         if line.startswith('0::')), '')
+    root = pathlib.Path(cgroup)
+    values = {
+        'stage': 'before_task_env_and_isaac_import',
+        'pid': os.getpid(),
+        'cgroup': cgroup,
+        'memory_max': (root / 'memory.max').read_text().strip() if (root / 'memory.max').exists() else None,
+        'memory_current': (root / 'memory.current').read_text().strip() if (root / 'memory.current').exists() else None,
+        'cpu_max': (root / 'cpu.max').read_text().strip() if (root / 'cpu.max').exists() else None,
+        'cpuset_cpus': (root / 'cpuset.cpus.effective').read_text().strip()
+        if (root / 'cpuset.cpus.effective').exists() else None,
+    }
+    pathlib.Path(receipt_path).write_text(__import__('json').dumps(values, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 sys.argv = ['task_env.runtime.sessions.worker', fd]
 runpy.run_module('task_env.runtime.sessions.worker', run_name='__main__')
 '''

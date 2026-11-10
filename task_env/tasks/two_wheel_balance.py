@@ -588,7 +588,8 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, provider='geophys',
-                              backend='cpu', build_runtime=True, task_rgb_camera=None, task_renderer=None, **kwargs):
+                              backend='cpu', build_runtime=True, task_rgb_camera=None, task_renderer=None,
+                              source_delivery_manifest=None, **kwargs):
         from ..environment.configuration import resolve_task_env_config
         from .two_wheel_physical import build_two_wheel_environment
         if kwargs:
@@ -603,7 +604,8 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
             raise TypeError('build_runtime must be a boolean')
         return build_two_wheel_environment(cls, resolved, provider=provider, backend=backend,
                                            render_mode=render_mode, task_rgb_camera=task_rgb_camera,
-                                           task_renderer=task_renderer)
+                                           task_renderer=task_renderer,
+                                           source_delivery_manifest=source_delivery_manifest)
 
     def observation(self, state):
         observation, info, evaluation = super().observation(state)

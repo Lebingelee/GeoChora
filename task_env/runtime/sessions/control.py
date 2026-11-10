@@ -1050,7 +1050,15 @@ def materialize_control(
             'none', declared_execution.physics_backend,
             declared_execution.provider_seed, declared_execution.determinism_mode,
         )
-        f04_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
+        # The F04 local Panda cell also owns the delivered free cube.  The
+        # source-bound admission below is authoritative for that requirement;
+        # include it in the exact-cell manifest instead of making the manifest
+        # weaker than the RuntimeSource it is about to admit.
+        f04_capabilities = sorted(
+            set(CONTROL_REQUIRED.names)
+            | set(artifact.required_capabilities.names)
+            | set(declared_source_capabilities(source).names)
+        )
         actual_manifest = ProviderCapabilityManifest(
             'provider-capability-v0', 'isaacsim', '6.2.0.0',
             'f04-isaac-panda-native-runtime-io-v1', 'cuda',

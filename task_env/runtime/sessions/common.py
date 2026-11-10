@@ -425,11 +425,13 @@ class _SessionValues:
     def _validate_sample(self, sample):
         self._require_open()
         if isinstance(sample, ResetSampleV1) and (
-                self._provider not in {'mujoco', 'geophys'}
+                self._provider not in {'mujoco', 'geophys', 'isaacsim'}
                 or (getattr(self._source, 'mixed_actuator_plan', None) is None
                     and not (getattr(self, '_physical_port', None) is not None
                              and sample.control_policy == 'named_physical_effort_by_source_v1'))):
-            raise TypeError('ResetSampleV1 requires an admitted mixed actuator session before reset')
+            raise TypeError(
+                'ResetSampleV1 requires an admitted mixed actuator or physical-effort session before reset'
+            )
         if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
             raise TypeError('RuntimeSession reset requires an admitted reset sample schema')
         if sample.task_artifact_hash != self._artifact.identity_hash:
@@ -441,7 +443,7 @@ class _SessionValues:
             if (sample.source_id != self._source.scene_source.source_id
                     or sample.source_closure_digest != self._source.source_closure_digest):
                 raise ValueError('ResetSampleV1 source/closure identity mismatch')
-            if set(sample.fixture_pose_world) != set(self._source.fixture_bodies):
+            if set(sample.fixture_pose_world) != set(getattr(self._source, 'fixture_bodies', ())):
                 raise ValueError('ResetSampleV1 fixture-root bindings mismatch')
             if set(sample.free_joint_velocity) != set(self._source.free_joints):
                 raise ValueError('ResetSampleV1 free-joint velocity bindings mismatch')

@@ -21,6 +21,7 @@ def _io():
     io._closed = False
     io._episode_origin_step = 0
     io._f06_pickcube = True
+    io._g05_effort = False
     io._dof_index = {f'joint{i}': i - 1 for i in range(1, 8)} | {'finger_joint1': 7, 'finger_joint2': 8}
     io._articulation = FakeArticulation()
     io._sync = lambda: None
@@ -132,3 +133,37 @@ def test_f06_contact_reporter_rejects_capacity_and_incomplete_shape():
     io._f06_robot_contact_views['/robot/link'].count = 64
     with pytest.raises(ValueError, match='at capacity'):
         io._read_f06_robot_contact_witness()
+
+
+def test_g05_isaac_physical_session_admits_source_bound_reset_sample():
+    from types import SimpleNamespace
+    from task_env.artifacts.execution import ResetSampleV1
+    from task_env.runtime.sessions.common import _SessionValues
+
+    sample = ResetSampleV1.create(
+        schema_version='reset-sample-v1', task_artifact_hash='a' * 64,
+        source_id='source-a', source_closure_digest='b' * 64,
+        sampler_id='test', sampler_version='v1', task_seed=31, init_row_index=0,
+        init_row_sha256='c' * 64, joint_position={'arm/drive': 0.1},
+        joint_velocity={'arm/drive': 0.0}, sampled_poses_world={}, poses_world={},
+        free_joint_velocity={},
+        free_joint_velocity_frame='mujoco_world_linear_local_angular_v1',
+        fixture_pose_world={}, simulation_time_s=0.0,
+        velocity_policy='named_qvel_and_free_joint_qvel_v1',
+        control_policy='named_physical_effort_by_source_v1',
+        initialization_order=(
+            'sample_source_properties', 'native_preprocess', 'sample_task_placements',
+            'restore_source_bound_state', 'forward_derived_state',
+        ), settle_steps=0,
+    )
+    session = object.__new__(_SessionValues)
+    session._closed = False
+    session._provider = 'isaacsim'
+    session._artifact = SimpleNamespace(identity_hash='a' * 64)
+    session._source = SimpleNamespace(
+        joints={'arm/drive': 'drive'}, free_joints={}, fixture_bodies=(),
+        scene_source=SimpleNamespace(source_id='source-a'),
+        source_closure_digest='b' * 64,
+    )
+    session._physical_port = SimpleNamespace()
+    session._validate_sample(sample)

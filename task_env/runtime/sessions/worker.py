@@ -10,6 +10,30 @@ from .transport import (_receive, _send, _error, request_identity,
                         serve_session, source_execution_facts)
 
 
+def _write_runtime_scope_receipt() -> None:
+    """Write the worker's actual cgroup facts after provider cleanup."""
+    receipt_path = os.environ.get('GEOCHORA_RUNTIME_SCOPE_POST_CLOSE')
+    if not receipt_path:
+        return
+    cgroup = '/sys/fs/cgroup' + next(
+        (line[3:] for line in Path('/proc/self/cgroup').read_text().splitlines()
+         if line.startswith('0::')), '')
+    root = Path(cgroup)
+    values = {
+        'stage': 'after_runtime_session_and_owner_close',
+        'pid': os.getpid(),
+        'cgroup': cgroup,
+        'memory_max': (root / 'memory.max').read_text().strip() if (root / 'memory.max').exists() else None,
+        'memory_peak': (root / 'memory.peak').read_text().strip() if (root / 'memory.peak').exists() else None,
+        'cpu_max': (root / 'cpu.max').read_text().strip() if (root / 'cpu.max').exists() else None,
+        'cpuset_cpus': (root / 'cpuset.cpus.effective').read_text().strip()
+        if (root / 'cpuset.cpus.effective').exists() else None,
+    }
+    Path(receipt_path).write_text(
+        __import__('json').dumps(values, indent=2, sort_keys=True) + '\n', encoding='utf-8',
+    )
+
+
 def _materialize_selected(payload):
     """Rebuild the existing task binding, then call its normal session owner."""
     import importlib
@@ -247,6 +271,7 @@ def main():
             receipt.close()
         if early_app_owner is not None:
             early_app_owner.close()
+        _write_runtime_scope_receipt()
         sock.close()
     if isinstance(payload, dict) and payload.get('selection', {}).get('physics_provider') == 'isaacsim':
         return 0 if completed else 1

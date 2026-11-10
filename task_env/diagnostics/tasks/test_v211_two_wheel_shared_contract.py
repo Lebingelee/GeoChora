@@ -1,9 +1,18 @@
 """Source-independent checks for two-wheel shared-route semantics."""
 import numpy as np
 
-from task_env.tasks.two_wheel_physical import sample_reset
+from task_env.tasks.two_wheel_physical import USD_BODY_PATHS, sample_reset
 from task_env.tasks.two_wheel_balance import TwoWheelBalanceTaskDefinition
 from task_env.environment.types import RuntimeSnapshot
+
+
+def test_isaac_body_bindings_follow_frozen_usd_hierarchy():
+    assert USD_BODY_PATHS == {
+        'balance_anchor': 'Geometry/balance_anchor',
+        'balance_chassis': 'Geometry/balance_anchor/balance_chassis',
+        'left_wheel': 'Geometry/balance_anchor/balance_chassis/left_wheel',
+        'right_wheel': 'Geometry/balance_anchor/balance_chassis/right_wheel',
+    }
 
 
 def test_reset_sampling_preserves_order_and_seed_sequence():

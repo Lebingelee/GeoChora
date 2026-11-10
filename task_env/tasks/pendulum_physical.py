@@ -15,6 +15,7 @@ from ..artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScen
     LogicalAssemblyEntityMemberV1, LogicalAssemblySubcomponentReferenceV1)
 from ..artifacts.state import StateFieldRequirement, StateRequirements
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
+from ..artifacts import ExecutionSpecV1, RendererSelectionV1
 from ..assembly.assets import _source_closure_digest
 from ..assembly.compiler import compile_reference_source
 from ..assembly.source import TaskSceneSource
@@ -25,6 +26,10 @@ from ..environment.gym_compat import Box, Dict
 from ..robots.pendulum import PendulumEntity, PENDULUM_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
 from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+from ..runtime.sessions.isaac_g05 import (
+    G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
+    ensure_g05_isaac_app_open, load_g05_isaac_delivery,
+)
 from .pendulum import (PENDULUM_MJCF_XML, PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
                        PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS)
@@ -34,11 +39,12 @@ JOINT = f'{ENTITY}/pendulum_hinge'
 WRITER = 'pendulum-direct-effort'
 
 
-def _scene():
+def _scene(*, source_revision=None):
     origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
     source_hash = hashlib.sha256(PENDULUM_MJCF_XML.encode()).hexdigest()
     asset = AssetDefinition('asset-definition-v1', 'pendulum-inline', 'v1',
-                            'inline://task-env/pendulum', source_content_sha256=source_hash)
+                            'inline://task-env/pendulum', source_revision=source_revision,
+                            source_content_sha256=source_hash)
     entity = EntityInstance('entity-instance-v1', ENTITY, asset.asset_id, asset.asset_version)
     frames = tuple(FrameDefinition('frame-definition-v1', ENTITY, name, 'runtime', None, None)
                    for name in ('pendulum_anchor', 'pendulum_link'))
@@ -91,9 +97,17 @@ def _reset_plan(artifact, source, seed, sampled=None):
     return ResetPlanV1('reset-plan-v1', sample, 'task_episode')
 
 
-def _build(config, seed, sampled=None):
+def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_manifest=None):
     import xml.etree.ElementTree as ET
-    scene = _scene()
+    isaac_loaded = None
+    if provider == 'isaacsim':
+        if source_delivery_manifest is None:
+            raise ValueError('Pendulum Isaac requires its explicit source_delivery_manifest')
+        isaac_loaded = load_g05_isaac_delivery(source_delivery_manifest)
+        source_revision = isaac_loaded.delivery.asset_definition.source_revision
+    else:
+        source_revision = None
+    scene = _scene(source_revision=source_revision)
     task_source, artifact = _declaration(scene)
     # Validate exact task-owned motor semantics before creating any provider.
     root_xml = ET.fromstring(PENDULUM_MJCF_XML)
@@ -110,14 +124,32 @@ def _build(config, seed, sampled=None):
     closure = _source_closure_digest({'scene.xml': projected.encode(), **source_asset_bytes(base, projected)})
     composition = TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                                       success_definition=PENDULUM_SUCCESS_DEFINITION)
-    source = compile_reference_source(artifact=artifact,
-        scene_source=TaskSceneSource(PENDULUM_MJCF_XML, base, f'scene-definition-v3:{scene.identity_hash}'),
-        composition=composition, config=config, joints={JOINT: 'pendulum_hinge'},
-        bodies={'pendulum-v1/pendulum_anchor': 'pendulum_anchor',
-                'pendulum-v1/pendulum_link': 'pendulum_link'}, frames={},
-        free_joints={}, joint_targets={}, open_actuators=(), scene_definition=scene,
-        source_closure_digest=closure, torque_actuators={JOINT: 'pendulum_torque'},
-        actuator_units={'pendulum_torque': 'N*m'})
+    if provider == 'isaacsim':
+        source = build_g05_isaac_runtime_source(
+            manifest_path=source_delivery_manifest, artifact=artifact, scene=scene,
+            task_source_identity_sha256=task_source.identity_hash,
+            joints={JOINT: 'pendulum_hinge'},
+            bodies={'pendulum-v1/pendulum_anchor': 'Geometry/pendulum_anchor',
+                    'pendulum-v1/pendulum_link': 'Geometry/pendulum_anchor/pendulum_link'},
+            frames={}, free_joints={}, joint_targets={JOINT: 'pendulum_hinge'},
+        )
+        closure = source.source_closure_digest
+        execution_spec = ExecutionSpecV1(
+            'execution-spec-v1', 'isaacsim', 'cuda', G05_ISAAC_EFFORT_PROFILE,
+            seed, 'best_effort',
+            RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
+            physics_device='cuda:0', camera_overrides=(),
+        )
+    else:
+        source = compile_reference_source(artifact=artifact,
+            scene_source=TaskSceneSource(PENDULUM_MJCF_XML, base, f'scene-definition-v3:{scene.identity_hash}'),
+            composition=composition, config=config, joints={JOINT: 'pendulum_hinge'},
+            bodies={'pendulum-v1/pendulum_anchor': 'pendulum_anchor',
+                    'pendulum-v1/pendulum_link': 'pendulum_link'}, frames={},
+            free_joints={}, joint_targets={}, open_actuators=(), scene_definition=scene,
+            source_closure_digest=closure, torque_actuators={JOINT: 'pendulum_torque'},
+            actuator_units={'pendulum_torque': 'N*m'})
+        execution_spec = None
     controlled_entity = PendulumEntity()
     subject, declarations = controlled_entity.physical_subject_declaration(source_id=source.source_id,
         source_closure_sha256=closure, entity_id=ENTITY, root_frame='pendulum_anchor',
@@ -145,7 +177,8 @@ def _build(config, seed, sampled=None):
     return {'artifact': artifact, 'task_source': task_source, 'source': source,
         'controller': controller, 'solution': None, 'physical_execution': physical,
         'reset_plan': _reset_plan(artifact, source, seed, sampled), 'construction_id': 'pendulum-shared-physical-v1',
-        'source_revision': 'pendulum-inline-v1', 'source_sha256': {'original': hashlib.sha256(
+        'source_revision': scene.assets[0].source_revision or 'pendulum-inline-v1',
+        'execution_spec_v1': execution_spec, 'source_sha256': {'original': hashlib.sha256(
             PENDULUM_MJCF_XML.encode()).hexdigest(), 'projected_closure': closure},
         'resolved_configuration': {'physics_dt': .002, 'control_substeps': 25}}
 
@@ -177,9 +210,12 @@ def _observe(env, state):
 
 
 def build_pendulum_environment(environment_type, config, *, provider, backend, render_mode=None,
-                               task_rgb_camera=None, task_renderer=None):
-    if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu')}:
-        raise ValueError('Pendulum physical route requires a CPU physics provider')
+                               task_rgb_camera=None, task_renderer=None,
+                               source_delivery_manifest=None):
+    if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu'), ('isaacsim', 'cuda')}:
+        raise ValueError('Pendulum physical route requires GeoPhys/MuJoCo CPU or the admitted Isaac CUDA route')
+    if provider == 'isaacsim' and render_mode is not None:
+        raise ValueError('Pendulum G05 Isaac route is state-only and does not admit rendering')
     if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
         raise ValueError('Pendulum admits human construction or GeoPhys CPU rgb_array')
     if render_mode == 'rgb_array' and config.render.backend not in {'raytracer', 'rasterizer'}:
@@ -195,16 +231,26 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
         if (not isinstance(task_rgb_camera, CameraSpec) or task_rgb_camera.frame != 'world'
                 or not np.isfinite((task_rgb_camera.fov_y, task_rgb_camera.near, task_rgb_camera.far)).all()):
             raise ValueError('Pendulum task RGB requires a finite world CameraSpec')
+    if provider == 'isaacsim':
+        if source_delivery_manifest is None:
+            raise ValueError('Pendulum Isaac requires its explicit source_delivery_manifest')
+        # Establish Kit's USD owner before the first _build() can enter the
+        # complete Core/USD delivery inspection.  The native adapter later
+        # reuses this process singleton; it must not create another App.
+        ensure_g05_isaac_app_open()
     pending_reset = {}
     def build_seeded(_provider, _backend, seed, _horizon):
-        return _build(config, seed, pending_reset.get('sampled'))
+        return _build(config, seed, pending_reset.get('sampled'), provider=provider,
+                      source_delivery_manifest=source_delivery_manifest)
     def reset_seed(seed):
         if type(seed) is not int or seed < 0:
             raise ValueError('Pendulum seed must be a nonnegative integer')
         return seed
     def space():
         return Dict({'torque': Box(-2., 2., (1,), dtype=np.float32)})
-    binding = ReferenceTaskBinding(build=lambda _provider: _build(config, 31), build_seeded=build_seeded,
+    binding = ReferenceTaskBinding(build=lambda _provider: _build(
+        config, 31, provider=provider, source_delivery_manifest=source_delivery_manifest),
+        build_seeded=build_seeded,
         reset_sample=lambda _artifact, _seed: None, evaluate=lambda _state, _semantics: None,
         object_poses=(), external_actions=True, interval_mode='grouped', recorder_mode='execution',
         reset_seed=reset_seed, action_schema={'schema_id': 'task-env.pendulum.torque.v1',
@@ -215,13 +261,18 @@ def build_pendulum_environment(environment_type, config, *, provider, backend, r
         physical_control_profile=lambda env: env.value['physical_execution'], physical_direct_effort_feedback=True,
         physical_terminate_on_success=True,
         physical_ignore_done=config.episode.ignore_done)
-    env = environment_type(provider=provider, backend=backend, horizon=config.episode.horizon, _binding=binding)
+    execution_spec = (_build(config, 31, provider=provider,
+                             source_delivery_manifest=source_delivery_manifest).get('execution_spec_v1')
+                      if provider == 'isaacsim' else None)
+    env = environment_type(provider=provider, backend=backend, horizon=config.episode.horizon,
+                           _binding=binding, _execution_spec_v1=execution_spec)
     env.config = config
     from ..environment.reference_env import build_stage0_metadata
     from dataclasses import replace
     env._env_metadata = replace(build_stage0_metadata(env.uid, config),
         external_action=PENDULUM_ACTION_CONTRACT,
-        physics_engine='GeoPhys' if provider == 'geophys' else 'MuJoCo',
+        physics_engine=('GeoPhys' if provider == 'geophys'
+                        else 'Isaac Sim PhysX' if provider == 'isaacsim' else 'MuJoCo'),
         camera_specs=((task_rgb_camera,) if task_rgb_camera is not None else config.render.cameras))
     env._pendulum_pending_reset = pending_reset
     env._pendulum_task_definition = PendulumTaskDefinition(qpos_id=0, qvel_id=0)

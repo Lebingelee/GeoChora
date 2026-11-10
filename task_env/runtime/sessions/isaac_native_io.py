@@ -254,7 +254,17 @@ class IsaacSimAppOwnerV1:
             elif installed != "6.2.0.0":
                 raise RuntimeError(f"F04 requires the installed isaacsim 6.2.0.0 distribution, found {installed}")
             self.start_attempts += 1
-            from isaacsim.simulation_app import SimulationApp
+            # Isaac Sim 6.2 exposes the supported standalone entry point from
+            # the package root.  Keep the extension-module fallback only for
+            # the older compatible shim used by existing boundary fixtures;
+            # the production package takes the package-root branch.
+            try:
+                from isaacsim import SimulationApp
+            except ImportError as package_root_error:
+                try:
+                    from isaacsim.simulation_app import SimulationApp
+                except ImportError:
+                    raise package_root_error
 
             # Kit's default fast shutdown can terminate Python before the
             # worker writes its producer-owned completion receipt.
@@ -720,9 +730,9 @@ class IsaacSimNativeRuntimeIOV1:
 
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
-                 app_owner: IsaacSimAppOwnerV1, *,
+        app_owner: IsaacSimAppOwnerV1, *,
                  dg04_native_input=None, f06_pickcube_input=None,
-                 observer_render_request=None):
+                 g05_effort=False, observer_render_request=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
         if type(source) is not UsdRuntimeSourceV1 or type(lease) is not UsdSnapshotLeaseV1:
@@ -742,11 +752,14 @@ class IsaacSimNativeRuntimeIOV1:
         self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
         self._f06_pickcube_input = f06_pickcube_input
         self._f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+        self._g05_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
+        if type(g05_effort) is not bool or g05_effort != self._g05_effort:
+            raise ValueError('G05 Isaac I/O requires its exact effort profile flag')
         if self._dg04_native != (dg04_native_input is not None):
             raise ValueError('DG04 Isaac I/O requires its exact native candidate/profile alone')
         if self._f06_pickcube != (f06_pickcube_input is not None) or sum((
-                self._dg04_native, self._f06_pickcube)) > 1:
-            raise ValueError('F06 Isaac I/O requires its exact PickCube input/profile alone')
+                self._dg04_native, self._f06_pickcube, self._g05_effort)) > 1:
+            raise ValueError('Isaac I/O requires one exact native route/profile alone')
         self._closed = False
         self._runtime_owner_closed = False
         self._context = None
@@ -767,11 +780,58 @@ class IsaacSimNativeRuntimeIOV1:
         self._episode_origin_time: float | None = None
         self._native_step_count = 0
         self._metadata: NativeRuntimeIOMetadataV1 | None = None
+        self._bootstrap_receipt = None
+        self._startup_observation = {
+            "schema_version": "isaac-public-physics-bootstrap-observation-v2",
+            "status": "construction_started",
+            "source_id": self._source.source_id,
+            "source_closure": self._source.source_closure_digest,
+            "scene_identity": self._source.scene_definition.identity_hash,
+            "configured_physics_dt_s": float(self._artifact.timebase.physics_dt),
+            "stage_physics_scene_paths": [],
+            "stage_physics_scene_count": None,
+            "stage_start_time_code": None,
+            "stage_end_time_code": None,
+            "stage_time_codes_per_second": None,
+            "scene_gravity_direction": None,
+            "scene_gravity_magnitude": None,
+            "scene_time_steps_per_second": {},
+            "scene_time_steps_per_second_after_setup": {},
+            "scene_applied_schemas_before": [],
+            "scene_applied_schemas_after": [],
+            "runtime_scene_owner_adaptation": None,
+            "physics_scene_dt_s": None,
+            "simulation_manager_scene_count": None,
+            "simulation_manager_device": None,
+            "simulation_manager_owner": "isaacsim.core.simulation_manager.SimulationManager",
+            "clock_owner": "SimulationManager.get_simulation_time",
+            "step_index_before": None,
+            "step_index_after_play": None,
+            "step_index_after": None,
+            "simulation_time_before_s": None,
+            "simulation_time_after_play_s": None,
+            "simulation_time_after_s": None,
+            "physics_step_delta": None,
+            "physics_time_delta_s": None,
+            "timeline_playing_before_pause": None,
+            "timeline_playing_after_pause": None,
+            "application_updates": 2,
+            "bootstrap_update_samples": [],
+            "failure_boundary": None,
+        }
+        self._build_layout_facts = {
+            "native_startup_observation": self._startup_observation,
+        }
         self.drive_receipt = None
         self._dg04_native_mimic_receipt = None
         self._f06_native_mimic_receipt = None
         self._last_native_mimic_target = None
         self._open_public_runtime()
+
+    def _update_startup_observation(self, **values) -> None:
+        """Keep failure-visible App/scene/clock facts in the adapter receipt."""
+        self._startup_observation.update(values)
+        self._build_layout_facts["native_startup_observation"] = dict(self._startup_observation)
 
     def _open_public_runtime(self) -> None:
         try:
@@ -788,6 +848,7 @@ class IsaacSimNativeRuntimeIOV1:
             expected_profile = (
                 'isaac-gpu-physx-pickcube-f06-v1' if self._f06_pickcube
                 else 'isaac-gpu-physx-f05-dg04-native-mimic-v1' if self._dg04_native
+                else 'isaac-gpu-physx-g05-5c-effort-v1' if self._g05_effort
                 else 'isaac-gpu-physx-f04-position-v1'
             )
             if (self._execution.physics_provider, self._execution.physics_backend,
@@ -811,6 +872,9 @@ class IsaacSimNativeRuntimeIOV1:
             self._stage = self._context.get_stage()
             if self._stage is None:
                 raise RuntimeError("Isaac public USD context did not publish a stage")
+            load_stage = getattr(self._stage, 'Load', None)
+            if callable(load_stage):
+                load_stage()
             if self._observer_render_request is not None:
                 start_time_code = float(self._stage.GetStartTimeCode())
                 source_end_time_code = float(self._stage.GetEndTimeCode())
@@ -881,9 +945,114 @@ class IsaacSimNativeRuntimeIOV1:
                 )
 
             authored_scenes = [p for p in self._stage.Traverse() if p.IsA(UsdPhysics.Scene)]
-            if len(authored_scenes) != 1:
+            authored_scene_paths = sorted(str(prim.GetPath()) for prim in authored_scenes)
+            scene_gravity_direction = None
+            scene_gravity_magnitude = None
+            scene_time_steps_per_second = {}
+            scene_applied_schemas_before = []
+            runtime_scene_owner_adaptation = None
+            if len(authored_scenes) == 1:
+                scene_prim = authored_scenes[0]
+                scene_applied_schemas_before = sorted(str(value) for value in scene_prim.GetAppliedSchemas())
+                gravity_direction_attr = scene_prim.GetAttribute("physics:gravityDirection")
+                gravity_magnitude_attr = scene_prim.GetAttribute("physics:gravityMagnitude")
+                if gravity_direction_attr and gravity_direction_attr.IsValid() and gravity_direction_attr.HasAuthoredValue():
+                    scene_gravity_direction = [float(value) for value in gravity_direction_attr.Get()]
+                if gravity_magnitude_attr and gravity_magnitude_attr.IsValid() and gravity_magnitude_attr.HasAuthoredValue():
+                    scene_gravity_magnitude = float(gravity_magnitude_attr.Get())
+                for attribute_name in (
+                        "physx:timeStepsPerSecond",
+                        "physics:timeStepsPerSecond",
+                        "newton:timeStepsPerSecond"):
+                    time_steps_attr = scene_prim.GetAttribute(attribute_name)
+                    if time_steps_attr and time_steps_attr.IsValid() and time_steps_attr.HasAuthoredValue():
+                        scene_time_steps_per_second[attribute_name] = int(time_steps_attr.Get())
+            self._update_startup_observation(
+                status="stage_scene_checked",
+                stage_physics_scene_paths=authored_scene_paths,
+                stage_physics_scene_count=len(authored_scene_paths),
+                stage_start_time_code=float(self._stage.GetStartTimeCode()),
+                stage_end_time_code=float(self._stage.GetEndTimeCode()),
+                stage_time_codes_per_second=float(self._stage.GetTimeCodesPerSecond()),
+                scene_gravity_direction=scene_gravity_direction,
+                scene_gravity_magnitude=scene_gravity_magnitude,
+                scene_time_steps_per_second=scene_time_steps_per_second,
+                scene_applied_schemas_before=scene_applied_schemas_before,
+            )
+            if len(authored_scenes) not in (0, 1) or (not self._g05_effort and len(authored_scenes) != 1):
+                self._update_startup_observation(
+                    status="failed",
+                    failure_boundary="authored_physics_scene_count",
+                )
                 raise ValueError(
-                    "verified USD source must author exactly one PhysicsScene before SimulationManager setup"
+                    "verified USD source must author at most one PhysicsScene; non-G05 routes require exactly one"
+                )
+            if self._g05_effort and len(authored_scenes) == 1:
+                scene_prim = authored_scenes[0]
+                conflicting_scene_apis = [
+                    schema for schema in scene_applied_schemas_before
+                    if schema.startswith(("NewtonSceneAPI", "MjcSceneAPI"))
+                ]
+                if conflicting_scene_apis:
+                    self._update_startup_observation(
+                        status="failed",
+                        failure_boundary="physics_scene_semantic_conflict",
+                        runtime_scene_owner_adaptation={
+                            "schema_version": "g05-runtime-physx-scene-owner-adaptation-v1",
+                            "status": "rejected_semantic_conflict",
+                            "scene_path": str(scene_prim.GetPath()),
+                            "conflicting_apis": conflicting_scene_apis,
+                        },
+                    )
+                    raise ValueError(
+                        "G05 PhysX scene has a conflicting Newton/MuJoCo scene API: "
+                        f"{conflicting_scene_apis!r}"
+                    )
+                had_physx_scene_api = bool(scene_prim.HasAPI(PhysxSchema.PhysxSceneAPI))
+                if not had_physx_scene_api:
+                    scene_prim.ApplyAPI(PhysxSchema.PhysxSceneAPI)
+                physx_scene_api = PhysxSchema.PhysxSceneAPI(scene_prim)
+                configured_steps_per_second = int(round(1.0 / float(self._artifact.timebase.physics_dt)))
+                physx_scene_api.GetTimeStepsPerSecondAttr().Set(configured_steps_per_second)
+                runtime_scene_owner_adaptation = {
+                    "schema_version": "g05-runtime-physx-scene-owner-adaptation-v1",
+                    "status": "applied" if not had_physx_scene_api else "reaffirmed",
+                    "scene_path": str(scene_prim.GetPath()),
+                    "physx_scene_api": "PhysxSceneAPI",
+                    "time_steps_per_second": configured_steps_per_second,
+                    "physics_dt_s": float(self._artifact.timebase.physics_dt),
+                    "source_bytes_modified": False,
+                    "owner": "IsaacSimNativeRuntimeIOV1",
+                }
+                self._update_startup_observation(
+                    status="runtime_scene_owner_adapted",
+                    runtime_scene_owner_adaptation=runtime_scene_owner_adaptation,
+                    scene_applied_schemas_after=sorted(
+                        str(value) for value in scene_prim.GetAppliedSchemas()
+                    ),
+                    scene_time_steps_per_second_after_setup={
+                        "physx:timeStepsPerSecond": int(
+                            physx_scene_api.GetTimeStepsPerSecondAttr().Get()
+                        ),
+                    },
+                )
+            elif self._g05_effort:
+                # A local G05 delivery may contain only the task body.  Let
+                # the existing SimulationManager owner construct its single
+                # PhysX scene after source inspection; do not author a second
+                # scene or mutate the frozen delivery bytes.
+                self._update_startup_observation(
+                    status="runtime_scene_owner_deferred_to_manager",
+                    runtime_scene_owner_adaptation={
+                        "schema_version": "g05-runtime-physx-scene-owner-adaptation-v1",
+                        "status": "deferred_to_simulation_manager",
+                        "scene_path": None,
+                        "physx_scene_api": None,
+                        "time_steps_per_second": int(round(1.0 / float(self._artifact.timebase.physics_dt))),
+                        "physics_dt_s": float(self._artifact.timebase.physics_dt),
+                        "source_bytes_modified": False,
+                        "owner": "isaacsim.core.simulation_manager.SimulationManager",
+                    },
                 )
             articulation_roots = [
                 p for p in self._stage.Traverse()
@@ -896,12 +1065,37 @@ class IsaacSimNativeRuntimeIOV1:
                 device=self._execution.physics_device,
             )
             scenes = SimulationManager.get_physics_scenes()
+            self._update_startup_observation(
+                status="simulation_manager_scene_checked",
+                simulation_manager_scene_count=len(scenes),
+                simulation_manager_device=str(SimulationManager.get_device()),
+                public_physics_scene_paths=authored_scene_paths,
+            )
             if len(scenes) != 1:
+                self._update_startup_observation(
+                    status="failed",
+                    failure_boundary="simulation_manager_scene_count",
+                )
                 raise ValueError(f"F04 requires exactly one public PhysX scene, found {len(scenes)}")
             self._physics_scene = scenes[0]
             self._physics_scene.set_enabled_gpu_dynamics(True)
             if self._physics_scene.get_enabled_gpu_dynamics() is not True:
                 raise RuntimeError("GPU PhysX dynamics did not remain enabled")
+            scene_time_steps_after_setup = {}
+            if authored_scenes and authored_scenes[0].HasAPI(PhysxSchema.PhysxSceneAPI):
+                scene_time_steps_after_setup = {
+                    "physx:timeStepsPerSecond": int(
+                        PhysxSchema.PhysxSceneAPI(authored_scenes[0])
+                        .GetTimeStepsPerSecondAttr().Get()
+                    ),
+                }
+            self._update_startup_observation(
+                physics_scene_dt_s=float(self._physics_scene.get_dt()),
+                scene_applied_schemas_after=(sorted(
+                    str(value) for value in authored_scenes[0].GetAppliedSchemas()
+                ) if authored_scenes else []),
+                scene_time_steps_per_second_after_setup=scene_time_steps_after_setup,
+            )
             if abs(float(self._physics_scene.get_dt()) - float(self._artifact.timebase.physics_dt)) > 1e-12:
                 raise ValueError("public PhysicsScene dt differs from the TaskArtifact timebase")
             if str(SimulationManager.get_device()) != "cuda:0":
@@ -992,7 +1186,7 @@ class IsaacSimNativeRuntimeIOV1:
             for semantic in self._source.free_joints:
                 body_path = _native_prim_path(self._source.bodies[semantic], entry_prim)
                 self._free_views[semantic] = self._body_views[body_path]
-            if len(self._free_views) != 1:
+            if not self._g05_effort and len(self._free_views) != 1:
                 raise ValueError("F04 requires exactly one mapped floating rigid body")
             # Isaac's tensor views become live only after the public timeline
             # starts and Kit processes its stage callbacks. Count this bootstrap
@@ -1001,21 +1195,69 @@ class IsaacSimNativeRuntimeIOV1:
                 int(SimulationManager.get_num_physics_steps()),
                 float(SimulationManager.get_simulation_time()),
             )
+            self._update_startup_observation(
+                status="bootstrap_before_recorded",
+                step_index_before=self._bootstrap_before[0],
+                simulation_time_before_s=self._bootstrap_before[1],
+            )
             app_utils.play()
-            app_utils.update_app(steps=2)
+            after_play = (
+                int(SimulationManager.get_num_physics_steps()),
+                float(SimulationManager.get_simulation_time()),
+            )
+            update_samples = []
+
+            def _record_update(update_index, update_count):
+                update_samples.append({
+                    "update_index": int(update_index),
+                    "update_count": int(update_count),
+                    "step_index": int(SimulationManager.get_num_physics_steps()),
+                    "simulation_time_s": float(SimulationManager.get_simulation_time()),
+                })
+                return True
+
+            app_utils.update_app(steps=2, callback=_record_update)
             self._bootstrap_after = (
                 int(SimulationManager.get_num_physics_steps()),
                 float(SimulationManager.get_simulation_time()),
             )
+            self._update_startup_observation(
+                status="bootstrap_after_recorded",
+                step_index_after_play=after_play[0],
+                simulation_time_after_play_s=after_play[1],
+                bootstrap_update_samples=update_samples,
+                step_index_after=self._bootstrap_after[0],
+                simulation_time_after_s=self._bootstrap_after[1],
+                physics_step_delta=self._bootstrap_after[0] - self._bootstrap_before[0],
+                physics_time_delta_s=self._bootstrap_after[1] - self._bootstrap_before[1],
+            )
+            # App updates used for tensor-view bootstrap leave the public
+            # timeline playing. Pause the existing timeline owner before
+            # reset/interval ownership; no second App or clock is made.
+            # This pause alone has not resolved the observed mismatch between
+            # one explicit step and the manager's counter/time deltas.
+            timeline_playing_before_pause = bool(app_utils.is_playing())
+            app_utils.pause()
+            timeline_playing_after_pause = bool(app_utils.is_playing())
+            self._update_startup_observation(
+                status="bootstrap_timeline_paused",
+                timeline_playing_before_pause=timeline_playing_before_pause,
+                timeline_playing_after_pause=timeline_playing_after_pause,
+            )
+            if timeline_playing_after_pause:
+                raise RuntimeError("Isaac public timeline remained playing after bootstrap pause")
             for view in (self._articulation, *self._body_views.values(),
                          *(v for v in self._frame_views.values() if isinstance(v, RigidPrim))):
                 if hasattr(view, "is_physics_tensor_entity_valid") and not view.is_physics_tensor_entity_valid():
                     raise RuntimeError("public physics tensor view did not initialize after Kit bootstrap")
             self._dof_names = tuple(str(name) for name in self._articulation.dof_names)
             expected_dofs = set(self._source.joint_targets.values())
-            if len(self._dof_names) != 9 or len(set(self._dof_names)) != 9 or set(self._dof_names) != expected_dofs:
+            if ((not self._g05_effort and len(self._dof_names) != 9)
+                    or not self._dof_names
+                    or len(set(self._dof_names)) != len(self._dof_names)
+                    or set(self._dof_names) != expected_dofs):
                 raise ValueError(
-                    "public articulation DOF names differ from the exact source-bound nine-joint mapping: "
+                    "public articulation DOF names differ from the exact source-bound joint mapping: "
                     f"actual={self._dof_names!r}, expected={sorted(expected_dofs)!r}"
                 )
             self._dof_index = {name: index for index, name in enumerate(self._dof_names)}
@@ -1026,6 +1268,47 @@ class IsaacSimNativeRuntimeIOV1:
                 name: (float(lows[index]), float(highs[index]))
                 for index, name in enumerate(self._dof_names)
             }
+            self._simple_effort_drive_receipt = None
+            self._torch = torch
+            if self._g05_effort:
+                before_stiffness, before_damping = self._articulation.get_dof_gains()
+                before_stiffness = _tensor_rows(
+                    before_stiffness, width=len(self._dof_names),
+                    label='G05 pre-isolation stiffness',
+                )[0]
+                before_damping = _tensor_rows(
+                    before_damping, width=len(self._dof_names),
+                    label='G05 pre-isolation damping',
+                )[0]
+                indices = list(range(len(self._dof_names)))
+                self._articulation.set_dof_gains(
+                    [0.0] * len(indices), [0.0] * len(indices),
+                    dof_indices=indices, update_default_gains=False,
+                )
+                self._sync()
+                stiffness, damping = self._articulation.get_dof_gains()
+                after_stiffness = _tensor_rows(
+                    stiffness, width=len(self._dof_names),
+                    label='G05 isolated stiffness',
+                )[0]
+                after_damping = _tensor_rows(
+                    damping, width=len(self._dof_names),
+                    label='G05 isolated damping',
+                )[0]
+                if any(abs(after_stiffness[index]) > 1e-8 or abs(after_damping[index]) > 1e-8
+                       for index in indices):
+                    raise RuntimeError('G05 public gain readback did not confirm explicit effort mode')
+                self._simple_effort_drive_receipt = {
+                    'schema_version': 'g05-public-effort-drive-isolation-v1',
+                    'native_dof_names': list(self._dof_names),
+                    'before_stiffness': list(before_stiffness),
+                    'before_damping': list(before_damping),
+                    'after_stiffness': list(after_stiffness),
+                    'after_damping': list(after_damping),
+                    'source_usd_modified': False,
+                    'api': 'Articulation.set_dof_gains tensor',
+                }
+            static_collision_paths = ()
             for semantic, view in self._free_views.items():
                 masses = _tensor_rows(view.get_masses(), width=1, label=f"{semantic} mass")
                 if masses[0][0] <= 0.0:
@@ -1056,11 +1339,32 @@ class IsaacSimNativeRuntimeIOV1:
             bootstrap_steps = self._bootstrap_after[0] - self._bootstrap_before[0]
             bootstrap_time = self._bootstrap_after[1] - self._bootstrap_before[1]
             if bootstrap_steps < 0 or bootstrap_time < 0:
+                self._update_startup_observation(
+                    status="failed",
+                    failure_boundary="bootstrap_counter_backwards",
+                )
                 raise RuntimeError("public physics counters moved backwards during bootstrap")
             if abs(bootstrap_time - bootstrap_steps * float(self._artifact.timebase.physics_dt)) > 1e-8:
-                raise RuntimeError("public physics bootstrap counter/time deltas disagree with the configured dt")
+                self._update_startup_observation(
+                    status=("bootstrap_clock_offset_recorded" if self._g05_effort else "failed"),
+                    failure_boundary=(
+                        "bootstrap_clock_offset_recorded" if self._g05_effort
+                        else "bootstrap_counter_time_consistency"
+                    ),
+                    clock_alignment=(
+                        "startup_counter_time_mismatch_recorded; explicit_steps_remain_strict"
+                        if self._g05_effort else None
+                    ),
+                    bootstrap_dt_error_s=(
+                        bootstrap_time - bootstrap_steps * float(self._artifact.timebase.physics_dt)
+                    ),
+                )
+                if not self._g05_effort:
+                    raise RuntimeError("public physics bootstrap counter/time deltas disagree with the configured dt")
             self._bootstrap_receipt = {
+                **self._startup_observation,
                 "schema_version": "isaac-public-physics-bootstrap-v1",
+                "status": "complete",
                 "step_index_before": self._bootstrap_before[0],
                 "step_index_after": self._bootstrap_after[0],
                 "simulation_time_before_s": self._bootstrap_before[1],
@@ -1079,12 +1383,15 @@ class IsaacSimNativeRuntimeIOV1:
                 ),
                 "static_collision_paths": list(static_collision_paths),
             }
-            self._torch = torch
             checked = check_isaac_named_layout(self._source, self._dof_names,
                 self._frame_views, self._free_views, self._read_views)
             self._build_layout_facts = {'helper': 'task_env.runtime.sessions.isaac_native_io:check_isaac_named_layout',
                 'provider': 'isaacsim', 'source_id': self._source.source_id,
                 'source_closure': self._source.source_closure_digest, 'objects': checked}
+            if self._g05_effort:
+                self._build_layout_facts['native_effort_mode'] = copy.deepcopy(
+                    self._simple_effort_drive_receipt
+                )
             if self._observer_stage_time_range_receipt is not None:
                 self._build_layout_facts['observer_stage_time_range'] = dict(
                     self._observer_stage_time_range_receipt
@@ -1199,11 +1506,17 @@ class IsaacSimNativeRuntimeIOV1:
                 self._bootstrap_receipt['native_adaptation_receipt'] = self.drive_receipt.to_mapping()
                 self._build_layout_facts['native_public_bootstrap_receipt'] = copy.deepcopy(self._bootstrap_receipt)
                 self._build_layout_facts['native_runtime_metadata'] = self._metadata.to_mapping()
+            self._build_layout_facts['native_public_bootstrap_receipt'] = copy.deepcopy(self._bootstrap_receipt)
+            self._build_layout_facts['native_runtime_metadata'] = self._metadata.to_mapping()
             self._manager = SimulationManager
         except BaseException as primary:
             import gc
             import traceback
 
+            # Constructor failures happen before RuntimeSession can attach the
+            # adapter to Env. Preserve the scalar startup receipt on the
+            # exception so the production runner can write it after cleanup.
+            primary._g05_startup_observation = dict(self._startup_observation)
             original_traceback = "".join(traceback.format_exception(
                 type(primary), primary, primary.__traceback__,
             ))
@@ -1770,7 +2083,8 @@ class IsaacSimNativeRuntimeIOV1:
 
     def bootstrap_receipt(self) -> Mapping[str, object]:
         """Return measured public Kit/view bootstrap facts for the worker ledger."""
-        if self._closed or not hasattr(self, "_bootstrap_receipt"):
+        if (self._closed or self._bootstrap_receipt is None
+                or self._bootstrap_receipt.get("status") != "complete"):
             raise RuntimeError("Isaac bootstrap receipt is unavailable before native materialization")
         return dict(self._bootstrap_receipt)
 
@@ -1796,7 +2110,10 @@ class IsaacSimNativeRuntimeIOV1:
         # ``__new__`` to exercise reset behavior without opening Isaac.
         dg04_native = getattr(self, "_dg04_native", False)
         f06_pickcube = getattr(self, "_f06_pickcube", False)
-        if dg04_native or f06_pickcube:
+        g05_effort = getattr(self, "_g05_effort", False)
+        if g05_effort:
+            valid_targets = not expected_targets
+        elif dg04_native or f06_pickcube:
             expected_active_names = {f'joint{index}' for index in range(1, 8)} | {'finger_joint1'}
             valid_targets = (
                 len(expected_targets) == 8
@@ -1826,7 +2143,11 @@ class IsaacSimNativeRuntimeIOV1:
             attempted = len(self._dof_names)
             self._articulation.set_dof_positions(positions)
             written_joints.extend(self._source.joints)
-            self._articulation.set_dof_velocities([0.0] * len(self._dof_names))
+            velocities = [0.0] * len(self._dof_names)
+            if g05_effort:
+                for semantic, native in self._source.joints.items():
+                    velocities[self._dof_index[native]] = float(sample.joint_velocity[semantic])
+            self._articulation.set_dof_velocities(velocities)
             if dg04_native or f06_pickcube:
                 self._articulation.set_dof_position_targets(
                     [item[2] for item in expected_targets],
@@ -1855,8 +2176,10 @@ class IsaacSimNativeRuntimeIOV1:
                         sample.joint_position[f'{finger_entity}/finger_joint1']
                     ),
                 }
-            else:
+            elif not g05_effort:
                 self._articulation.set_dof_position_targets([item[2] for item in expected_targets])
+            else:
+                self._articulation.set_dof_efforts([0.0] * len(self._dof_names))
             for semantic, pose in sample.poses_world.items():
                 view = self._free_views.get(semantic)
                 if view is None:
@@ -1894,7 +2217,7 @@ class IsaacSimNativeRuntimeIOV1:
             return NativeResetWriteReceiptV1(
                 "native-reset-write-receipt-v1", sample.sample_id,
                 tuple(sorted(written_joints)), tuple(sorted(written_free)),
-                tuple(item[1] for item in expected_targets), True, False,
+                tuple(item[1] for item in expected_targets), not g05_effort, False,
             )
         except BaseException as error:
             error.add_note(
@@ -1960,6 +2283,8 @@ class IsaacSimNativeRuntimeIOV1:
                                targets: tuple[tuple[int, str, float], ...]) -> NativePositionWriteAckV1:
         if self._closed:
             raise RuntimeError("Isaac native I/O is closed")
+        if getattr(self, '_g05_effort', False):
+            raise RuntimeError('G05 simple-effort route does not admit position target writes')
         ordered = tuple(sorted(targets))
         f06_pickcube = getattr(self, "_f06_pickcube", False)
         dg04_native = getattr(self, "_dg04_native", False)
@@ -2063,6 +2388,41 @@ class IsaacSimNativeRuntimeIOV1:
     def write_physical_effort(self, values):
         """Apply one F06 source-bound effort interval through the public API."""
         import math
+        if getattr(self, '_g05_effort', False):
+            expected = set(self._dof_names)
+            if (self._closed or self._episode_origin_step is None
+                    or getattr(self, '_physical_effort_fault', False)
+                    or getattr(self, '_physical_effort_pending', None) is not None):
+                raise RuntimeError('G05 physical effort requires an available reset interval')
+            if (not isinstance(values, dict) or set(values) != expected
+                    or any(isinstance(v, bool) or not math.isfinite(float(v))
+                           for v in values.values())):
+                raise ValueError('G05 physical effort requires every finite named source DOF')
+            names = tuple(self._dof_names)
+            indices = [self._dof_index[name] for name in names]
+            efforts = [float(values[name]) for name in names]
+            self._physical_effort_pending = (indices, efforts)
+            try:
+                self._articulation.set_dof_efforts(efforts, dof_indices=indices)
+                self._sync()
+                readback = _tensor_rows(
+                    self._articulation.get_dof_efforts(dof_indices=indices),
+                    width=len(names), label='G05 public effort readback',
+                )[0]
+                if any(not math.isclose(actual, requested, rel_tol=0.0, abs_tol=1e-5)
+                       for actual, requested in zip(readback, efforts, strict=True)):
+                    raise RuntimeError('G05 public effort setter readback differs from requested values')
+                self._last_effort_write_receipt = {
+                    'schema_version': 'g05-public-effort-write-v1',
+                    'native_dof_names': list(names),
+                    'requested_efforts': list(efforts),
+                    'readback_efforts': list(readback),
+                    'public_effort_api': 'Articulation.get_dof_efforts',
+                }
+            except BaseException:
+                self._physical_effort_fault = True
+                raise
+            return
         expected = {f'joint{i}' for i in range(1, 8)} | {'finger_joint1'}
         if (self._closed or self._episode_origin_step is None or not self._f06_pickcube
                 or getattr(self, '_physical_effort_fault', False)
@@ -2108,15 +2468,44 @@ class IsaacSimNativeRuntimeIOV1:
         before = self._counter()
         attempted_index = self._native_step_count + 1
         native_adaptation_application = None
+        after_effort_setter = None
+        after_effort_sync = None
+        after_manager_step = None
         try:
             pending = getattr(self, '_physical_effort_pending', None)
             if pending is not None:
                 indices, efforts = pending
                 self._articulation.set_dof_efforts(efforts, dof_indices=indices)
+                if self._g05_effort:
+                    after_effort_setter = self._counter()
                 self._sync()
+                if self._g05_effort:
+                    after_effort_sync = self._counter()
             self._manager.step(steps=1, update_fabric=False)
+            after_manager_step = self._counter()
             self._sync()
-            if self._dg04_native or self._f06_pickcube:
+            if self._g05_effort:
+                if pending is None:
+                    raise RuntimeError('G05 native substep has no current effort interval')
+                indices, efforts = pending
+                readback = _tensor_rows(
+                    self._articulation.get_dof_efforts(dof_indices=indices),
+                    width=len(indices), label='G05 post-step effort readback',
+                )[0]
+                if any(not math.isclose(actual, requested, rel_tol=0.0, abs_tol=1e-5)
+                       for actual, requested in zip(readback, efforts, strict=True)):
+                    raise RuntimeError('G05 effort hold/reapply readback differs from requested values')
+                native_adaptation_application = {
+                    'schema_version': 'native-physx-effort-substep-application-v1',
+                    'profile_id': 'isaacsim-6.2-physx-direct-effort-v1',
+                    'provenance_kind': 'native_runtime',
+                    'native_step_index': attempted_index,
+                    'native_dof_names': list(self._dof_names),
+                    'requested_efforts': list(efforts),
+                    'readback_efforts': list(readback),
+                    'public_effort_api': 'Articulation.get_dof_efforts',
+                }
+            elif self._dg04_native or self._f06_pickcube:
                 target = self._last_native_mimic_target
                 if (not isinstance(target, dict)
                         or target.get('drive_receipt_identity_sha256') != self.drive_receipt.identity_sha256
@@ -2215,11 +2604,72 @@ class IsaacSimNativeRuntimeIOV1:
         after = self._counter()
         delta_steps = after[0] - before[0]
         delta_time = after[1] - before[1]
+        advance_observation = None
+        if self._g05_effort:
+            try:
+                from isaacsim.core.experimental.utils import app as app_utils
+                timeline_state = {
+                    "playing": bool(app_utils.is_playing()),
+                    "paused": bool(app_utils.is_paused()),
+                    "stopped": bool(app_utils.is_stopped()),
+                }
+            except BaseException as observation_error:
+                timeline_state = {
+                    "observation_error": f"{type(observation_error).__name__}: {observation_error}",
+                }
+            advance_observation = {
+                "schema_version": "g05-native-advance-counter-observation-v1",
+                "attempted_index": attempted_index,
+                "before": list(before),
+                "after_effort_setter": (
+                    None if after_effort_setter is None else list(after_effort_setter)
+                ),
+                "after_effort_sync": (
+                    None if after_effort_sync is None else list(after_effort_sync)
+                ),
+                "after_manager_step": None if after_manager_step is None else list(after_manager_step),
+                "after_cuda_sync": list(after),
+                "effort_setter_counter_delta": (
+                    None if after_effort_setter is None
+                    else [after_effort_setter[0] - before[0], after_effort_setter[1] - before[1]]
+                ),
+                "effort_sync_counter_delta": (
+                    None if after_effort_sync is None or after_effort_setter is None
+                    else [after_effort_sync[0] - after_effort_setter[0],
+                          after_effort_sync[1] - after_effort_setter[1]]
+                ),
+                "manager_step_counter_delta": (
+                    None if after_manager_step is None or after_effort_sync is None
+                    else [after_manager_step[0] - after_effort_sync[0],
+                          after_manager_step[1] - after_effort_sync[1]]
+                ),
+                # The final counter follows synchronization and effort
+                # readback, so it cannot attribute movement to sync alone.
+                "post_manager_counter_delta": (
+                    None if after_manager_step is None
+                    else [after[0] - after_manager_step[0], after[1] - after_manager_step[1]]
+                ),
+                "manager_physics_dt_s": float(self._manager.get_physics_dt()),
+                "physics_scene_dt_s": None if self._physics_scene is None else float(self._physics_scene.get_dt()),
+                "physics_scene_steps_per_second": (
+                    None if self._physics_scene is None
+                    else int(self._physics_scene.get_steps_per_second())
+                ),
+                "simulation_manager_is_simulating": bool(self._manager.is_simulating()),
+                "simulation_manager_is_paused": bool(self._manager.is_paused()),
+                "timeline": timeline_state,
+                "counter_delta": delta_steps,
+                "time_delta_s": delta_time,
+            }
+            self._build_layout_facts["native_last_advance_observation"] = advance_observation
         if delta_steps != 1 or abs(delta_time - float(self._artifact.timebase.physics_dt)) > 1e-9:
-            raise RuntimeError(
+            error = RuntimeError(
                 "Isaac public step did not accept exactly one configured physics substep: "
                 f"counter_delta={delta_steps}, time_delta={delta_time}"
             )
+            if advance_observation is not None:
+                setattr(error, '_g05_native_last_advance_observation', advance_observation)
+            raise error
         self._native_step_count = attempted_index
         assert self._episode_origin_time is not None
         episode_time = after[1] - self._episode_origin_time
@@ -2784,14 +3234,16 @@ class IsaacSimNativeRuntimeIOV1:
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *,
                                   dg04_native_input=None, f06_pickcube_input=None,
-                                  observer_render_request=None):
+                                  g05_effort=False, observer_render_request=None):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
     dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
     f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+    g05_simple_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
     if (dg04_native != (dg04_native_input is not None)
             or f06_pickcube != (f06_pickcube_input is not None)
-            or sum((dg04_native, f06_pickcube)) > 1):
+            or g05_simple_effort != bool(g05_effort)
+            or sum((dg04_native, f06_pickcube, g05_simple_effort)) > 1):
         raise ValueError('Isaac native adapter requires exactly one versioned input/profile pair')
     if not (source.scene_source.source_verified or source.scene_source.locally_validated):
         raise ValueError("Isaac Core adapter requires an upstream-validated or exact locally validated USD delivery")
@@ -2829,6 +3281,7 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
             artifact, execution, source, lease, owner,
             dg04_native_input=dg04_native_input,
             f06_pickcube_input=f06_pickcube_input,
+            g05_effort=g05_effort,
             observer_render_request=observer_render_request,
         )
     except BaseException as primary:

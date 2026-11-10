@@ -683,7 +683,7 @@ class PendulumEnv(BaseTaskEnv):
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, provider='geophys',
                               backend='cpu', task_rgb_camera=None, task_renderer=None,
-                              build_runtime=True, **kwargs):
+                              build_runtime=True, source_delivery_manifest=None, **kwargs):
         from ..environment.configuration import resolve_task_env_config
         from .pendulum_physical import build_pendulum_environment
         if kwargs:
@@ -698,7 +698,8 @@ class PendulumEnv(BaseTaskEnv):
             raise TypeError('build_runtime must be a boolean')
         return build_pendulum_environment(cls, resolved, provider=provider,
             backend=backend, render_mode=render_mode,
-            task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
+            task_rgb_camera=task_rgb_camera, task_renderer=task_renderer,
+            source_delivery_manifest=source_delivery_manifest)
 
     def observation(self, state):
         observation, info, evaluation = super().observation(state)
