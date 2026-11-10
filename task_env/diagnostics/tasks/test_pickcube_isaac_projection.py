@@ -286,7 +286,21 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding
     assert rebuilt_artifact == initial_artifact
     assert rebuilt_artifact is not initial_artifact
 
-    reset_plan = SimpleNamespace(reset_sample=SimpleNamespace(task_seed=31))
+    from task_env.artifacts.execution import ResetPlanV1, ResetSampleV1
+    reset_sample = ResetSampleV1.create(
+        schema_version='reset-sample-v1', task_artifact_hash='a' * 64,
+        source_id='source-a', source_closure_digest='b' * 64,
+        sampler_id='test', sampler_version='v1', task_seed=31,
+        init_row_index=0, init_row_sha256='c' * 64,
+        joint_position={'arm/drive': 1.0}, joint_velocity={'arm/drive': 0.0},
+        sampled_poses_world={}, poses_world={}, free_joint_velocity={},
+        free_joint_velocity_frame='mujoco_world_linear_local_angular_v1',
+        fixture_pose_world={}, simulation_time_s=0.0,
+        velocity_policy='named_qvel_and_free_joint_qvel_v1',
+        control_policy='named_physical_effort_by_source_v1', initialization_order=(
+            'sample_source_properties', 'native_preprocess', 'sample_task_placements',
+            'restore_source_bound_state', 'forward_derived_state'), settle_steps=0)
+    reset_plan = ResetPlanV1('reset-plan-v1', reset_sample, 'task_episode')
     execution = ExecutionSpecV1(
         schema_version='execution-spec-v1',
         physics_provider='isaacsim',
@@ -326,11 +340,18 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding
     # The Position preparation seam validates the profile/plan before it
     # reaches the materializer; the old plain object lacked that protocol.
     env.position_profiles = (SimpleNamespace(_validate_plan=lambda _plan: None),)
+    from task_env.runtime.sessions.control import SelectedPositionCapabilityV1
+    env._selected_controller_binding = SimpleNamespace(
+        leaf_plan=None,
+        position_capabilities=(SelectedPositionCapabilityV1(env.position_profiles[0]),),
+        requires_reset_plan=True,
+    )
     env.position_plan = plan
     env.provider, env.backend, env.horizon = 'isaacsim', 'cuda', 1000
     env.artifact = initial_artifact
     env.value = {'artifact': initial_artifact, 'reset_plan': reset_plan}
     env.binding = SimpleNamespace(
+        physical_control_profile=None,
         reset_seed=lambda seed: seed,
         build_seeded=lambda *_args: rebuilt_value,
         reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
@@ -340,6 +361,9 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact(binding
                            if binding_kind == 'valid' else 'panda-v1/gripper')
         ),
     )
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+    env._reset_reconstruction = ReferenceTaskBinding.reset_reconstruction_strategy(
+        env.binding, env.provider, env.backend, env.horizon)
     env._diagnostic_profile = None
     env._native_feedback_profile = None
     env._mixed_control_candidate = False

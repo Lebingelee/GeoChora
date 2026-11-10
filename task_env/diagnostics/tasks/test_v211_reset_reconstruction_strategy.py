@@ -128,11 +128,18 @@ def test_selected_strategy_uses_current_task_binding_without_reselecting_policy(
 
 @pytest.mark.parametrize('failure_point', ('preflight', 'old_stop'))
 def test_switch_preflight_failure_closes_candidate_lease_before_old_session(monkeypatch, failure_point):
+    import hashlib
+    from pathlib import Path
     from task_env.diagnostics.tasks.test_v211_g03_3c_reset_failures import make_selected
     from task_env.runtime.sessions import provenance
     from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
 
     env = make_selected()
+    old_receipt = env.value['source'].execution_source_receipt
+    original_asset = (Path(__file__).resolve().parents[3] / 'asset/external/mujoco_menagerie'
+                      / 'franka_emika_panda/panda.xml')
+    original_hash = hashlib.sha256(original_asset.read_bytes()).hexdigest()
+    assert old_receipt.snapshot_root.exists()
     previous = SimpleNamespace(close=lambda: pytest.fail('old session must remain open'))
     env.session = previous
     candidate_receipts, closed = [], []
@@ -157,8 +164,11 @@ def test_switch_preflight_failure_closes_candidate_lease_before_old_session(monk
             env.reset(seed=31)
         assert env.session is previous and len(candidate_receipts) == 1
         assert any(receipt is candidate_receipts[0] for receipt in closed)
-        # The adapter's original asset directory must remain intact.
-        assert candidate_receipts[0].snapshot_root.exists()
+        # Candidate snapshots are owned temporaries, not the original asset.
+        assert candidate_receipts[0] is not old_receipt
+        assert not candidate_receipts[0].snapshot_root.exists()
+        assert old_receipt.snapshot_root.exists()
+        assert hashlib.sha256(original_asset.read_bytes()).hexdigest() == original_hash
     finally:
         env.session = None
         env._published_position_typed_state = None
