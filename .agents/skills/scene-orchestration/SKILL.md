@@ -8,6 +8,8 @@ description: 根据场景生成需求与具身任务要求，统筹完整场景�
 在 GeoChora 仓库中使用时，先读 [GeoChora 单 Panda 资产场景交接](../geochora-task-harness/references/asset-scene-integration.md)。以该文档声明的任务、机器人与运行合同适配本技能；原项目的双臂、标准支架、head 相机和实例 `task.py` 约定仅适用于原项目配置。资产和材质制作方法仍按下文执行，GeoChora 的 reset、成功条件、控制、录制和运行准入由 TaskEnv 负责。
 
 
+部署生成工具时使用仓库的[场景与资产 MCP 独立部署](../../../docs/module/task_env/v2.1.0/guides/asset-mcp-deployment.md)。本机资产服务为 `trellis2`、`ultrashape`、`trellis-texturing`；`experiment-batch` 仅管理独立会话。服务部署接受的真实 CUDA OOM 不代表该资产生成或验收通过。
+
 # 场景生成与统筹
 
 ## 目标与职责

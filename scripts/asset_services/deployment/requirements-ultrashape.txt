@@ -1,0 +1,25 @@
+# 作用：安装 UltraShape 固定推理适配层所需的依赖；不安装训练组件。
+# PyTorch 与 CuMesh 使用同一 CUDA 构建，独立于 TRELLIS 的 Transformers 与 Diffusers。
+numpy==1.26.4
+accelerate==1.1.1
+diffusers==0.30.0
+transformers==4.37.2
+huggingface-hub==0.36.2
+safetensors==0.8.0
+einops==0.8.1
+omegaconf==2.3.0
+opencv-python-headless==4.11.0.86
+trimesh==4.4.7
+pillow
+scipy
+timm==1.0.22
+pytorch-lightning==1.9.5
+torchmetrics==0.11.4
+scikit-image==0.24.0
+jaxtyping==0.3.4
+typeguard==4.3.0
+torchdiffeq==0.2.5
+tqdm
+setuptools==80.9.0
+wheel
+ninja

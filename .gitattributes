@@ -1,0 +1,6 @@
+# 迁移收据绑定这些文件的字节，跨平台检出保持 LF。
+/scripts/asset_services/** text eol=lf
+/scripts/orchestrator/** text eol=lf
+/.agents/skills/asset-creation/** text eol=lf
+/.agents/skills/asset-material-creation/** text eol=lf
+/.agents/skills/scene-orchestration/** text eol=lf

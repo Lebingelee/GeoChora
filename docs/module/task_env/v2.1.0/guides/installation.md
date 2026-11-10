@@ -1,5 +1,7 @@
 # Installation and environment setup
 
+For optional scene/asset generation services, follow [场景与资产 MCP 独立部署](asset-mcp-deployment.md). It covers separate model environments, public source/weight preparation, hardware, MCP registration and local validation; these services are not installed by TaskEnv requirements.
+
 ## Python environment
 
 The repository has no root `pyproject.toml`, `setup.py`, or `setup.cfg`. Create/use a Python environment compatible with the selected route and install the checked-in TaskEnv requirements from the repository root:

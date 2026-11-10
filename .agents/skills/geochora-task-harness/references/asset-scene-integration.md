@@ -2,6 +2,8 @@
 
 Read this reference when the upstream task needs a real USD asset or scene before candidate construction. Use sibling `scene-orchestration`, `asset-creation`, and `asset-material-creation` for their production methods. The host agent orchestrates them; GeoChora TaskEnv remains the owner of task semantics, reset, control, runtime admission, recording, and review evidence.
 
+Initialize the generation tools through [场景与资产 MCP 独立部署](../../../../docs/module/task_env/v2.1.0/guides/asset-mcp-deployment.md). Use the local `trellis2`, `ultrashape`, `trellis-texturing` tools and optional `experiment-batch`; their code ships with this checkout. Deployment acceptance of a real CUDA OOM does not make its failed asset generation a passing preparation check.
+
 ## First supported target and scope
 
 The first integration target is one fixed-base Panda, one real rigid graspable object, and a fixed support surface. The object's actual visual geometry and collision representation must be consumed by Isaac. Preserve the source object identity, dimensions, mass/physical assumptions, materials, and any conversion losses. A texture over the built-in cube or a proxy box is not evidence for the real asset.

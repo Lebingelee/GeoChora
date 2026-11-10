@@ -8,6 +8,8 @@ description: 为资产与环境创建、接入和修正表面材质，结合已�
 在 GeoChora 仓库中使用时，先读 [GeoChora 单 Panda 资产场景交接](../geochora-task-harness/references/asset-scene-integration.md)。以该文档声明的任务、机器人与运行合同适配本技能；原项目的双臂、标准支架、head 相机和实例 `task.py` 约定仅适用于原项目配置。资产和材质制作方法仍按下文执行，GeoChora 的 reset、成功条件、控制、录制和运行准入由 TaskEnv 负责。
 
 
+部署生成工具时使用仓库的[场景与资产 MCP 独立部署](../../../docs/module/task_env/v2.1.0/guides/asset-mcp-deployment.md)。本机资产服务为 `trellis2`、`ultrashape`、`trellis-texturing`；`experiment-batch` 仅管理独立会话。服务部署接受的真实 CUDA OOM 不代表该资产生成或验收通过。
+
 # 资产材质创建与贴图后处理
 
 本 skill 与 `asset-creation`、`scene-orchestration` 同级安装。材质制作需要 Blender，最终检查需要 Isaac Sim；生图工具及可复用 PBR 由接收方提供。历史案例是方法摘要，不依赖原项目的实验目录。
