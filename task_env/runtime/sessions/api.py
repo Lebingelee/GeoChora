@@ -1634,7 +1634,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             position_owner = (selected.position and len(selected.position_capabilities) == 1
                               and callable(binding.physical_observation_binding)
                               and (selection.physics_provider, selection.physics_backend)
-                                  in {('mujoco', 'cpu'), ('geophys', 'cpu')})
+                                  in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')})
             if (binding.physical_control_profile is None
                     or type(physical) is not PhysicalControlExecutionV1
                     or (not position_owner
@@ -1657,6 +1657,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                     select_binding=binding.position_control_binding, value=value,
                     capabilities=selected.position_capabilities,
                 )
+                declared_bindings = plan.controller_bindings
                 projected_feedback = project_controller_feedback(plan)
         elif selected.position:
             if not declared_bindings:

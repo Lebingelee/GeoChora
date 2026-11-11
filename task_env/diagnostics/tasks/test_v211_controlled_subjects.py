@@ -13,6 +13,60 @@ from task_env.runtime.sessions.physical_control import (
 )
 
 
+def test_isaac_binding_compiles_once_in_shared_construction_and_rebuilds_on_reset(monkeypatch):
+    from task_env.tasks.pick_cube import physical_isaac_candidate as candidate
+    from task_env.tasks.pick_cube import physical_usd_profile, specialization
+    builds = []
+    def build_reference(**kwargs):
+        value = {'source': SimpleNamespace(scene_definition=object()),
+                 'artifact': object(), 'controller': object(),
+                 'reset_plan': SimpleNamespace(reset_sample=object())}
+        builds.append((kwargs, value))
+        return value
+    controller = SimpleNamespace(identity='physical-controller', action_shape=(8,))
+    physical = SimpleNamespace(controllers=(controller,), action_space=lambda: 'space')
+    monkeypatch.setattr(specialization, 'build_isaac_reference', build_reference)
+    monkeypatch.setattr(physical_usd_profile, 'build_f06_direct_effort_execution',
+                        lambda *_args: physical)
+    binding = candidate.make_isaac_physical_binding(delivery_manifest='/source.json',
+        seed=47, horizon=8, drive_mode='coexist', control_kind='direct')
+    assert builds == [] and binding.action_schema is None
+    policy = binding.reset_reconstruction_strategy('isaacsim', 'cuda', 8)
+    initial = policy.initial(seed=47)
+    assert len(builds) == 1 and initial['source'] is builds[0][1]['source']
+    assert initial['physical_execution'] is physical
+    rebuilt = policy.build_reset(initial, 47, None)
+    assert len(builds) == 2 and rebuilt['source'] is builds[1][1]['source']
+    assert rebuilt['source'] is not initial['source']
+    with pytest.raises(ValueError, match='frozen execution'):
+        policy.initial(seed=48)
+    assert len(builds) == 2
+
+
+def test_compiled_physical_contract_reuses_actual_controller_and_preserves_extensions():
+    from task_env import make_env
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'provider': 'mujoco', 'controller': {'profile_id': 'panda-direct-effort-v1'}})
+    try:
+        execution = env.value['physical_execution']
+        assert env.binding.action_space_factory.__self__ is execution
+        assert env.binding.action_schema == execution.action_schema()
+        deferred = replace(env.binding, action_schema=None, action_space_factory=None)
+        resolved = deferred.bind_compiled_control(env.value)
+        assert resolved.action_schema == env.binding.action_schema
+        assert resolved.action_space_factory.__self__ is execution
+        with pytest.raises(ValueError, match='requires its execution'):
+            deferred.bind_compiled_control({})
+        extended = replace(env.binding, action_schema={**env.binding.action_schema,
+            'position_physical_action': 'position-physical-action-v1'})
+        bound = extended.bind_compiled_control(env.value)
+        assert bound.action_schema['position_physical_action'] == 'position-physical-action-v1'
+        assert bound.action_space_factory.__self__ is execution
+        assert env.metadata['action_schema'] == execution.action_schema()
+    finally:
+        env.close()
+
+
 def test_solution_info_payload_preserves_typed_gym_schema_and_nonfinite_rejection():
     from types import MappingProxyType
     from task_env.environment import ObservationSchema, ObservationFieldSpec

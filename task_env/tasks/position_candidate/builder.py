@@ -430,10 +430,7 @@ def declare_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 |
     action_schema = REFERENCE_POSE_ACTION_SCHEMA
     action_space_factory = reference_pose_action_space
     if physical_execution is not None:
-        action_schema = {'schema_version': 'physical-control-actions-v1',
-                         'controllers': [{'identity': item.identity,
-                                          'shape': list(item.action_shape)}
-                                         for item in physical_execution.controllers]}
+        action_schema = physical_execution.action_schema()
         action_space_factory = physical_execution.action_space
     binding = ReferenceTaskBinding(
         position_control_binding=lambda _value: ControlBinding("panda-main/gripper", 0.08),
@@ -641,9 +638,7 @@ def declare_position_candidate(workspace: Path | str, *, provider: str, horizon:
     action_schema = REFERENCE_POSE_ACTION_SCHEMA
     action_space_factory = reference_pose_action_space
     if physical_execution is not None:
-        action_schema = {'schema_version': 'physical-control-actions-v1',
-                         'controllers': [{'identity': item.identity, 'shape': list(item.action_shape)}
-                                         for item in physical_execution.controllers]}
+        action_schema = physical_execution.action_schema()
         action_space_factory = physical_execution.action_space
     if physical_profile == 'panda-free-body-wrench-only-v1':
         action_schema['position_physical_action'] = 'position-physical-action-v1'

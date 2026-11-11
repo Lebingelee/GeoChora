@@ -249,3 +249,28 @@ G05 功能接收保持；代码优化和项目优化尚未接收，E00～E04 未
 | E04 | 普通已准入 native 的真实 source／Controller interval 已接通 | 其余 action／model／clock／部署与 worker adapter 对账，含受影响 GeoPhys／Isaac 范围 |
 
 G05 功能接收保持；优化和 E00～E04 整体仍未接收，不启动 G06，不 merge／push／发布。
+
+### 6.5 第六批：编译后的 Controller 合同与 Isaac 正式入口复验
+
+输入 `f45ac387`。正式 Isaac 物理配置过去在创建 binding 时先编译一次 source，而共同构造又按 seed 编译一次；现在 binding 只声明能力，实际 source 由共同构造／reset 的现有编译入口生成。动作 schema 和空间取自该次实际 `PhysicalControlExecutionV1`，不再由 Task 提前复制 Controller 列表；已有物理 schema 的扩展字段保留，显式非物理及 mixed action 合同仍归原 owner。三个原先重复的 schema 生成点调用同一物理执行 owner；reset 后也从新执行对象重绑，seed／horizon、身份、source、Controller 和故障检查未放宽。
+
+Isaac 正式入口首次真实复验在 reset 前被部署预检拒绝；原始结果和失败保留。对照实际组合后，预检补认已有资格内的 Isaac CUDA 位置观测 owner 与独立 physical port，继续执行原有 exact F06 USD 来源检查、不同 Controller 身份和 compiled binding／feedback 检查。后续真实复验通过；不据此扩大 Isaac 资产或 provider 资格。构造后 source 编译计数从原先代码路径的两次降到实测一次；第一次／第二次 reset 后累计分别为 2／3 次，表示每次重建各编译一次，未省略 reset 的重建。
+
+量化：本批 7 个生产文件 +50／−22，净**增加 28 行**；1 个测试文件 +54／−0。累计生产 37 个文件 +1,522／−1,340，净**增加 182 行**；累计测试 +677／−8，非测试诊断 +2／−1；tracked 路径 1,365→1,365，新增／删除／迁移均 0。三个重复 schema 表达式收归一个已有执行对象方法；没有跨文件原样搬迁，也不把代码净增加描述成减少。文档与维护脚本单列，最终度量随退出重新计算。
+
+验证与边界：
+
+- 124 个定向纯合同节点通过；最终修改后另有 94 项合同复核通过（两组有重叠，不相加）。覆盖共同编译、实际执行对象、schema 扩展、seed 拒绝和旧输入；纯合同不代表 native 物理表现。
+- 真实 MuJoCo CPU direct 与 reset 选择各完成 reset→非零 step→第二次 reset→close；后一条还检查重建代次、旧 action 拒绝及恢复。本批两个成功运行 15 个 native 子步，原 CPU 窗口累计受监督 38 次／305 个可观测子步，加历史未锁运行的 150 保守计费为 455／2,000。
+- 独立 Isaac CUDA／RTX headless 窗口使用正式 UID、原 F06 USD delivery、固定 seed 31／horizon 8，完成 reset、一个非零控制 interval、第二次 reset 和三次同步 RGB；独立 reader 检查 source／state boundary／clock、capture 期间无物理回调、图像所有权和关闭。实际首次构造／两次 reset 的编译次数为 1／2／3。应用 close receipt 为 completed；SDK 回调退订接口不可用的诊断仍保留，进程随后退出。启动观察器安装前的隐式物理推进未知，不声称像素逐位一致或任务成功。
+- Isaac 两次运行包括首次拒绝及复验成功；未观测到首次运行物理回调，按预留保守计费 59，成功运行观测 41，累计计费 100／120，native wall 约 240.22 秒；资源违规 0，锁已释放。原始计划／失败／成功／资源和 reader 分别保存在 ignored `isaac-006/plan.json`、`plan-v2.json`、`runs/isaac-001/`、`runs/isaac-002/` 与 `budget-ledger.jsonl`。本批仅在 Isaac 路线变化前后冻结各自 source diff，Position schema 去重发生在 native 复验后，属于等价合同输出，未虚称这些最终字节在同次 GPU 中运行。
+
+| 事件 | 本批具体成效 | 仍需完成 |
+| --- | --- | --- |
+| E00 | 失败与成功、各自输入、资源和实际计数分别记录 | 最终逐项审计与累计度量 |
+| E01 | Isaac 正式配置去除首次重复编译，实际 source／Controller 构造及 reset 可见 | execution／codec、Position 旧输入与 source 管理及其余入口继续对账 |
+| E02 | 三处动作 schema 使用实际 Controller execution owner | 剩余主体／Controller／registry 构建合同审计 |
+| E03 | 编译后的 binding 在构造及 reset 重建后重绑；首次失败仍保留 | 其余 reset／profile／fault／close 审计 |
+| E04 | 已接收范围内 Isaac 真实提交、状态边界、clock 和 RGB 复验 | GeoPhys 受影响路线及 action／model／worker adapter 对账 |
+
+G05 保持原有界接收；本批不是 E00～E04 总接收，不进入 G06。

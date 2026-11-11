@@ -48,8 +48,6 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('Isaac physical source horizon must be in [1, 1000]')
     manifest = delivery_manifest
-    value = build_isaac_reference(delivery_manifest=manifest, task_seed=seed, horizon=horizon,
-                                  include_solution=False, physical_fixture=drive_mode)
     def with_physical(value):
         physical = build_f06_direct_effort_execution(value['source'].scene_definition,
                                                       value['artifact'], value['source'])
@@ -73,12 +71,11 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
                 physical = build_reference_effort_execution(physical, reference_kind=control_kind,
                                                              r3_reference=reference, end_frame_id='ee')
         return {**value, 'physical_execution': physical}
-    value = with_physical(value)
     base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
     def build(provider):
         if provider != 'isaacsim':
             raise ValueError('F06 physical candidate requires Isaac')
-        return value
+        return build_seeded(provider, 'cuda', seed, horizon)
     def build_seeded(provider, backend, actual_seed, actual_horizon):
         if (provider, backend, actual_seed, actual_horizon) != ('isaacsim', 'cuda', seed, horizon):
             raise ValueError('F06 physical candidate requires its frozen execution')
@@ -90,11 +87,8 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         return actual
     from ...environment.reference_binding import legacy_position_physical_observation_binding
     return replace(base, build=build, build_seeded=build_seeded, reset_seed=reset_seed,
-        reset_sample=lambda _artifact, _seed: value['reset_plan'].reset_sample,
         physical_control_profile=lambda env: env.value['physical_execution'],
-        action_space_factory=value['physical_execution'].action_space,
+        action_space_factory=None,
         physical_observation_binding=legacy_position_physical_observation_binding,
-        action_schema={'schema_version': 'physical-control-actions-v1',
-                       'controllers': [{'identity': c.identity, 'shape': list(c.action_shape)}
-                                       for c in value['physical_execution'].controllers]},
+        action_schema=None,
         recorder_mode='execution', interval_mode='grouped')

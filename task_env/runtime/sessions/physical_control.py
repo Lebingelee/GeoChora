@@ -461,6 +461,12 @@ class PhysicalControlExecutionV1:
             if callable(initialize):
                 initialize(publication.view)
 
+    def action_schema(self):
+        """Describe the action inputs of the Controllers actually compiled here."""
+        return {'schema_version': 'physical-control-actions-v1',
+                'controllers': [{'identity': controller.identity, 'shape': list(controller.action_shape)}
+                                for controller in self.controllers]}
+
     def action_space(self):
         """Compose declared Controller input spaces, retaining legacy shape-only callers."""
         from gymnasium.spaces import Dict

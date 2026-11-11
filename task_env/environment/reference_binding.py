@@ -1,6 +1,6 @@
 """Internal binding between selected task semantics and the environment."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections.abc import Mapping
 from typing import Callable
 
@@ -429,9 +429,12 @@ class ReferenceTaskBinding:
             raise TypeError('physical ignore_done policy must be a boolean')
         if type(self.build_receives_binding) is not bool:
             raise TypeError('build_receives_binding must be a boolean')
+        compiled_physical_action = (self.action_schema is None and self.action_space_factory is None
+                                    and callable(self.physical_control_profile))
         if self.build_mixed_control_profile is None and (
-                not callable(self.action_space_factory) or not callable(self.prepare_action)
-                or not isinstance(self.action_schema, dict) or not self.action_schema):
+                not callable(self.prepare_action) or (not compiled_physical_action and (
+                    not callable(self.action_space_factory)
+                    or not isinstance(self.action_schema, dict) or not self.action_schema))):
             raise TypeError('selected action schema, space and preparation must be explicitly declared')
         if self.build_mixed_control_profile is not None and (
                 self.action_space_factory is not None or self.prepare_action is not None
@@ -552,3 +555,27 @@ class ReferenceTaskBinding:
         if self.build_receives_binding:
             return self.build(provider, self)
         return self.build(provider)
+
+    def bind_compiled_control(self, value):
+        """Bind the physical action contract to the Controllers actually compiled.
+
+        Explicit task action contracts and mixed-control construction keep their
+        existing owners. Physical contracts can be resolved after source compile.
+        """
+        if self.build_mixed_control_profile is not None:
+            return self
+        physical = value.get('physical_execution')
+        declared = self.action_schema
+        if declared is not None and declared.get('schema_version') != 'physical-control-actions-v1':
+            return self
+        if physical is None:
+            if declared is None:
+                raise ValueError('compiled physical action contract requires its execution')
+            return self
+        from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
+        if type(physical) is not PhysicalControlExecutionV1:
+            raise TypeError('compiled physical action contract requires PhysicalControlExecutionV1')
+        schema = {**(declared or {}), **physical.action_schema()}
+        if schema == declared and getattr(self.action_space_factory, '__self__', None) is physical:
+            return self
+        return replace(self, action_schema=schema, action_space_factory=physical.action_space)

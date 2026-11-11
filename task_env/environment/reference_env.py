@@ -940,6 +940,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             declared = initial.get('execution_spec_v1')
             if execution_spec is not None and declared != execution_spec:
                 raise ValueError('compiled task differs from its declared execution specification')
+            binding = binding.bind_compiled_control(initial)
         except BaseException as error:
             cls._release_failed_task_construction(initial, binding, error)
             raise
@@ -2164,6 +2165,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.value, self.artifact = rebuilt.value, rebuilt.artifact
             seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
+            previous_action_schema = self.binding.action_schema
+            self.binding = self.binding.bind_compiled_control(self.value)
+            if self.binding.action_schema != previous_action_schema:
+                self.metadata['action_schema'] = dict(self.binding.action_schema)
+                self.action_space = self.binding.action_space_factory()
             self._bind_selected_controller(self.value)
             self._bind_selected_task_definition()
             if deployment_receipt is not None:

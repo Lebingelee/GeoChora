@@ -415,8 +415,7 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
             task_com_wrench_factory=task_com_factory,
             recorder_mode='execution', reset_seed=fixed_seed, close_task_resources=owned_resources.close,
             position_control_binding=lambda _value: ControlBinding('panda-v1/gripper', 0.08),
-            action_schema={'schema_version': 'physical-control-actions-v1',
-                           'controllers': [{'identity': c.identity, 'shape': list(c.action_shape)} for c in physical.controllers]},
+            action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,
             observation_space_factory=(_direct_physical_observation_spaces if direct_physical
                                        else selected_reference_observation_spaces),
