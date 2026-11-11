@@ -2245,11 +2245,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'core_root': str(GEOCHORA_ROOT), 'geophys_src': str(GEOPHYS_PROVIDER_ROOT / 'src'),
                     'environment': deployment_receipt['environment'],
                 }
-                # SDK App startup includes loading Kit and PhysX.  Keep the
-                # worker deadline finite while allowing that selected route's
-                # cold start to finish inside the enclosing run budget.
+                # Native startup and the first control interval can compile
+                # provider kernels; keep a finite operation deadline for both.
                 session = start_selected_worker(selection.interpreter, payload,
-                    timeout=300.0 if selection.physics_provider == 'isaacsim' else 30.0)
+                    timeout=300.0 if selection.physics_provider == 'isaacsim' else 120.0)
                 deployment_receipt['worker_request_identity'] = request_identity(payload)
                 return session
             from ..runtime.sessions.selected_materialization import build_selected_runtime

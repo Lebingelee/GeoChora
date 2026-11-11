@@ -137,7 +137,30 @@ def _materialize_selected(payload):
                 scene=scene, joint_bindings=joints, frame_bindings=frames)
         else:
             session = materialize_control(artifact, execution, source=source,
-                                          binding=binding.scalar_control_binding)
+                                          binding=binding.scalar_control_binding,
+                                          selected_controller=(selected.controller
+                                              if binding.interval_mode == 'native' else None))
+            from contextlib import nullcontext
+            from .control import position_subject_interval
+            from .legacy_native_feedback_binding import native_feedback_interval
+
+            def subject_scoped(operation):
+                def invoke(target, *args, **kwargs):
+                    state = session.snapshot()
+                    if getattr(source, 'position_subject_binding', None) is not None:
+                        scope = position_subject_interval(session, target, state, controller=selected.controller)
+                    elif getattr(session, '_legacy_native_feedback_binding', None) is not None:
+                        scope = native_feedback_interval(session, target, state, controller=selected.controller)
+                    else:
+                        scope = nullcontext()
+                    with scope:
+                        return operation(target, *args, **kwargs)
+                return invoke
+
+            for name in ('apply_control', 'step_control_interval'):
+                operation = getattr(session, name, None)
+                if callable(operation):
+                    handlers[name] = subject_scoped(operation)
         return session, handlers, source
     except BaseException:
         receipt = getattr(source, 'execution_source_receipt', None)

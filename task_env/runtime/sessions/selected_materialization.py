@@ -200,6 +200,12 @@ class ScalarRuntimeBuilder:
             raise TypeError('selected scalar control requires its declared ControlBinding')
         if _worker(selection):
             env.session = start_worker()
+            env.session._source, env.session._artifact = env.value['source'], env.artifact
+            if (env.binding.interval_mode == 'native'
+                    and getattr(env.value['source'], 'position_subject_binding', None) is None):
+                from .legacy_native_feedback_binding import install_admitted_binding
+                install_admitted_binding(env.session, source=env.value['source'],
+                                         artifact=env.artifact, controller=env.controller)
             return RuntimeBuildResult(skip_gravity=env.binding.physical_control_profile is None)
         env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
             binding=self.binding,

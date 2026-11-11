@@ -22,7 +22,7 @@ class TransportProtocolError(ValueError):
     """The worker or connection violated the session transport protocol."""
 
 _METHODS = frozenset({
-    'reset', 'reset_plan', 'snapshot', 'snapshot_v1', 'snapshot_v2',
+    'reset', 'reset_plan', 'snapshot', 'snapshot_v1', 'snapshot_v2', 'state_boundary_identity',
     'control_feedback', 'native_control_feedback_sample', 'apply_control',
     'step', 'step_control_interval', 'apply_mixed_actuator_command',
     'bind_mixed_controller', 'step_mixed_actuator_interval',
@@ -38,7 +38,8 @@ _PROPERTIES = frozenset({
 def _types():
     from ...artifacts import (CanonicalStateView, CanonicalStateViewV1,
         CanonicalStateViewV2, CanonicalStatePublicationV1, CanonicalStatePublicationV2,
-        SceneDefinition, JointDefinition, FrameReference, StateRequirements)
+        SceneDefinition, JointDefinition, FrameReference, StateRequirements, StateBoundaryIdentity)
+    from .common import LegacyStateBoundaryIdentity
     from ...artifacts.execution import (ResetSample, ResetSampleV1, ResetPlanV1,
         EpisodeResetPlanV1, RealizedInitialState)
     from ...controllers.canonical.contracts import (CanonicalControlTarget,
@@ -48,7 +49,8 @@ def _types():
         NativeControlFeedbackSampleV1)
     values = (CanonicalStateView, CanonicalStateViewV1, CanonicalStateViewV2,
         CanonicalStatePublicationV1, CanonicalStatePublicationV2, SceneDefinition,
-        JointDefinition, FrameReference, StateRequirements, ResetSample, ResetSampleV1,
+        JointDefinition, FrameReference, StateRequirements, StateBoundaryIdentity,
+        LegacyStateBoundaryIdentity, ResetSample, ResetSampleV1,
         ResetPlanV1, EpisodeResetPlanV1, RealizedInitialState, CanonicalControlTarget,
         AppliedCanonicalControl, GripperControlTarget, MixedActuatorCommandV1,
         AppliedMixedActuatorCommandV1, PositionControlTargetV1, CanonicalControlFeedback,
@@ -63,6 +65,13 @@ def _encode(value):
         if not math.isfinite(value):
             raise ValueError('transport refuses nonfinite numbers')
         return value
+    # Provider layout facts may contain NumPy scalar values. Convert the
+    # scalar to its ordinary JSON value without accepting arrays or handles.
+    import numpy as np
+    if isinstance(value, np.generic):
+        converted = value.item()
+        if type(converted) in (bool, int, float, str):
+            return _encode(converted)
     known = _types()
     if type(value).__name__ in known and type(value) is known[type(value).__name__]:
         return {'$type': type(value).__name__, 'value': value.to_mapping()}
@@ -185,7 +194,7 @@ def serve_session(sock, session, request_identity, *, handlers=None):
     """Forward one session until close; check operation and episode identity."""
     materialization = session.provider_materialization_id
     handlers = {} if handlers is None else dict(handlers)
-    if set(handlers) - {'position_preflight', 'position_apply'}:
+    if set(handlers) - {'position_preflight', 'position_apply', 'apply_control', 'step_control_interval'}:
         raise ValueError('unknown worker control handler')
     methods = sorted(name for name in _METHODS if name in handlers or callable(getattr(session, name, None)))
     properties = sorted(name for name in _PROPERTIES
@@ -292,12 +301,17 @@ class RemoteSession:
             pass
         try:
             self._process.wait(timeout=3)
+
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(self._process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             self._process.wait(timeout=3)
+
+    def _require_reset(self):
+        if self._closed or self._episode_id is None:
+            raise RuntimeError('reset required before snapshot/step')
 
     def _call(self, method, *args, callbacks=None, **kwargs):
         if self._closed:

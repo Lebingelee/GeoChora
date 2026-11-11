@@ -274,3 +274,26 @@ Isaac 正式入口首次真实复验在 reset 前被部署预检拒绝；原始�
 | E04 | 已接收范围内 Isaac 真实提交、状态边界、clock 和 RGB 复验 | GeoPhys 受影响路线及 action／model／worker adapter 对账 |
 
 G05 保持原有界接收；本批不是 E00～E04 总接收，不进入 G06。
+
+### 6.6 第七批：隔离 worker 的状态边界与控制归属
+
+输入 `cdb1ded1`。正式 PickCube 隔离 worker 原可 reset，但实际 step 在共同控制 lifecycle 请求 `state_boundary_identity()` 时失败：transport 没有暴露这项已有 Runtime 合同。现在 transport 只传递已登记的 canonical／legacy boundary 值；parent 的 RemoteSession 保留实际 source／Artifact，父进程和 worker 各用现有 position subject／legacy native-feedback scope 校验当前 boundary、Controller 与资源，然后才进入原 Runtime 提交。worker 独立重建、source／Artifact／Controller 对账、episode／sequence 身份和原生 layout admission 都保留。GeoPhys 布局事实中的 NumPy 数值在 transport 变为普通有限 JSON 标量，数组、句柄和非有限值继续拒绝。非 Isaac worker 的有限操作超时从 30 秒调整为 120 秒，覆盖本机首次 GeoPhys interval 的实际耗时；外层单次运行仍限 180 秒。
+
+量化：本批 5 个生产文件 +55／−9，净**增加 46 行**；1 个测试文件 +15／−0。累计生产 40 个文件 +1,577／−1,349，净**增加 228 行**；测试 +692／−8；非测试诊断 +2／−1。tracked 文件 1,365→1,365；新增、删除和迁移均 0；没有把 source scope 或 transport 编码移动计算成行数减少。文档和 ignored 验证脚本不计生产代码。
+
+验证与保留失败：
+
+- 正式 UID 的真实 MuJoCo CPU 隔离 worker 完成 reset→非零 action→第二次 reset→重复 close，状态边界 control step 为 0→1，时间 0→0.01 秒，第二次 reset 产生新 episode。结果为 `cpu-020-worker/result.json`；后续 GeoPhys 专用数值表达和有限 timeout 的修改未改变此 MuJoCo 输入／控制逻辑，本条按 diff 复用，不声称是最终字节的第二次实测。
+- 正式 UID 的真实 GeoPhys CPU 隔离 worker 在最终代码下完成同一短程序列，边界为 0→1、时间 0→0.01 秒，并产生新 episode；`cpu-023-geophys-worker/result.json` 耗时约 55.65 秒。这证明受测配置的真实 source、worker state／clock 和控制提交接线，不是完整 Solution、成功任务或新 provider 资格。
+- `cpu-017-worker` 是检查器误调用未暴露方法；`cpu-018-worker` 显示生产 step 缺 boundary；`cpu-019-worker` 显示后续 subject scope 缺 reset 合同；`cpu-021-geophys-worker` 是布局中 NumPy 标量被 transport 拒绝；`cpu-022-geophys-worker` reset 成功后首 interval 超过原 30 秒期限。原始失败、各自冻结 diff／计划和修复后结果均保留；不将失败写成通过。
+- 9 个逐项核对的无 native transport 合同节点通过，覆盖 boundary 值跨进程、有限标量／非值／NaN 拒绝、callback、episode／sequence 和关闭。误运行整个旧 transport 测试文件时，3 个 fixture 节点失败：两个被 native import guard 阻止或 launcher 路径不匹配，一个同样在 guard 处停止；日志 `worker-020-pure.log` 保留。这次无锁运行触发资产解析，未将其作为纯证据；物理子步无法观测，另保守计费 150。
+- 本批 7 次双锁监督运行各为未观测子进程物理计数预留并计费 50；累计监督 45 次，其中旧已观测 305 子步、此次 worker 内部子步未知。加两次无锁旧 pytest 的各 150 保守计费，累计预算计费 **955／2,000**。锁已释放；RLIMIT_AS 为子进程继承的每进程上限，并非本批全部进程的 aggregate cgroup 读数。
+
+| 事件 | 本批具体成效 | 仍需完成 |
+| --- | --- | --- |
+| E00 | 真实通过、5 次失败、误运行及保守计费分列 | 最终累计度量和逐项退出对账 |
+| E01／E02 | worker 复用现有 source／Artifact／Controller，不创建平行 Runtime | 配置 codec、Position 输入及主体／registry 构造对账 |
+| E03 | 两个受测 provider 的隔离 worker reset／close 已复验 | 其余 fault／profile 和未受测模式 |
+| E04 | source-bound boundary、clock 和提交跨 parent／worker 对齐，GeoPhys 标量编码问题修复 | 其余 action／model／renderer 及 worker 组合按影响核对 |
+
+G05 继续有界接收，E00～E04 和项目优化尚未整体接收；不进入 G06。

@@ -49,6 +49,10 @@ class LegacyStateBoundaryIdentity:
     def to_mapping(self):
         return asdict(self)
 
+    @classmethod
+    def from_mapping(cls, value):
+        return cls(**value)
+
     @property
     def boundary_id(self):
         return 'state-boundary-' + digest(self.to_mapping())
