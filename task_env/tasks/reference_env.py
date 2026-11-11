@@ -2513,6 +2513,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 # Preserve historical P1.6 grouped control-interval stepping,
                 # including the provider's boundary clock accumulation.
+                phase = 'gripper_inner_update'
+                target = self._grouped_gripper_update(target)
                 phase = 'control_application'
                 applied = self.session.apply_control(target)
                 phase = 'physics_step'
@@ -2612,6 +2614,27 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         add_note(f'expert abort after execution fault also failed: {abort_error!r}')
             # An incomplete interval cannot be finalized as a valid trajectory.
             raise
+
+    def _grouped_gripper_update(self, target):
+        """Advance the controller gripper servo once per grouped control interval.
+
+        Grouped stepping holds one applied target for the whole outer interval,
+        so the gripper servo state (``servo_opening_m``) is advanced here at the
+        outer control period. Without it the servo never leaves its reset value
+        and the gripper cannot close.
+        """
+        inner_step = getattr(self.controller, 'inner_gripper_step', None)
+        if (target is None or not callable(inner_step)
+                or not hasattr(self.controller, 'inner_physics_dt_s')):
+            return target
+        from dataclasses import replace
+        inner_dt = self.controller.inner_physics_dt_s
+        try:
+            self.controller.inner_physics_dt_s = float(self.artifact.timebase.control_dt)
+            gripper_target, _ = inner_step(self.state, self.feedback)
+        finally:
+            self.controller.inner_physics_dt_s = inner_dt
+        return replace(target, gripper=gripper_target)
 
     @staticmethod
     def _recording_counts(recorder):
