@@ -107,20 +107,22 @@ def test_panda_effort_controller_rejects_foreign_writer():
 
 
 @pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
-def test_direct_effort_does_not_construct_position_controller(provider, monkeypatch):
+@pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
+    'panda-r3-effort-reference-v1', 'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
+def test_fixed_effort_does_not_construct_position_controller(provider, profile, monkeypatch):
     import sys
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     def reject_position(*args, **kwargs):
-        raise AssertionError('direct effort must not construct a Position Controller')
+        raise AssertionError('fixed effort must not construct a Position Controller')
 
     monkeypatch.setattr(PandaPositionServoProfileV1, 'from_source', reject_position)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': provider, 'deployment': 'in_process',
                       'interpreter': sys.executable},
-        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'controller': {'profile_id': profile},
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:

@@ -15,7 +15,7 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         from .physical_reference_profile import build_pickcube_effort_profile
         position = value['controller']
         physical = build_pickcube_effort_profile(physical, value['artifact'], value['source'],
-            kind=control_kind, position=position, model=position.model, end_frame_id='ee')
+            kind=control_kind, config=position.config, model=position.model, end_frame_id='ee')
         return {**value, 'physical_execution': physical}
     base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
     def build(provider):

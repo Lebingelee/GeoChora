@@ -790,3 +790,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +2／−3，净减 1 行；版本诊断修改 1 文件 +26／−0，检查 MuJoCo 和 GeoPhys 的 direct effort 构造不再调用 Position Controller；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。GeoPhys 现在通过 physical Runtime 的 source、V2 状态、同一个控制提交和 clock；renderer 未改。
 
 80 项版本检查通过。GeoPhys direct effort 实际完成 reset、step、二次 reset 和重复关闭，观测到一次控制 interval 对应 0.01 秒；native 内部子步未观测、按 50 保守预留。补充的 GeoPhys 录像尝试在开始写入前因 direct effort 构造未提供 Solution identity 被记录器拒绝，未完成 H5 读回；该 identity 在本批输入版本也只由 reset 切换路线提供，记录器整理仍待处理。MuJoCo direct 的生产分支未变，其先前运行证据按原范围保留；Isaac 和完整 Solution 本批未重跑。冻结生产 diff、最终 diff、计划与两次运行收据位于 ignored `workspace/maintenance/v211_direct_effort_state_20261112_xkZyFZ/`。E01～E04 仍未接收。
+
+### 6.68 固定 Panda effort 不再依赖 Position 观测
+
+输入 `3106e834`。MJCF 上非切换的 joint、R3 和质量模型 effort 原先仍构造 Position Controller，以取得 action 配置和 V1 观测；现直接从已绑定 source 取得 action 配置，使用 effort Controller 与 V2 状态。MuJoCo 与 GeoPhys 共用此构建决定。reset 切换路线仍需要其 Position 观测和 Solution 接线；USD 仅将同一 action 配置显式传给 effort 组合器，仍使用原 Position 观测。
+
+生产修改 3 文件 +7／−6，净增 1 行；版本诊断修改 2 文件 +9／−5，扩展五种固定 profile 的双 CPU provider 构造检查与 R3 短程探针；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。固定 effort 不再为状态发布构造 Position Controller；Runtime source、control interval、clock 和 renderer 所有权未改。
+
+88 项版本检查通过，五种固定 profile 均验证 MuJoCo／GeoPhys 构造不调用 Position Controller。五种 MJCF／USD profile 的十组 source／Controller 合同与输入基线对照一致。MuJoCo 和 GeoPhys 的 joint／R3 effort 均完成 reset、step、二次 reset 和关闭；MuJoCo 两次各观测 5 个 native 子步，GeoPhys 内部子步未观测、两次各保守预留 50。质量模型 profile 此批只有构造检查，USD 只有 source 合同对照，Isaac 原生和完整 Solution 未重跑。冻结 production diff、最终 diff、计划与运行收据位于 ignored `workspace/maintenance/v211_fixed_effort_state_20261112_nrUXR7/`；R3 探针更新的身份另记于 `r3-plan.json`。E01～E04 仍未接收。

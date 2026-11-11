@@ -28,7 +28,7 @@ def load_pickcube_mass_effort_model(artifact, source, *, kind):
                 max_abs_deviation=model['max_abs_deviation'], model_sha256=_MODEL_SHA256)
 
 
-def build_pickcube_effort_profile(direct_execution, artifact, source, *, kind, position,
+def build_pickcube_effort_profile(direct_execution, artifact, source, *, kind, config,
                                  model, end_frame_id, dynamic_parameters=None):
     """Supply the task's admitted reference inputs to the common Controller owner."""
     from ...controllers.canonical.r3_effort import build_panda_effort_profile
@@ -44,6 +44,6 @@ def build_pickcube_effort_profile(direct_execution, artifact, source, *, kind, p
         mass_model = load_pickcube_mass_effort_model(artifact, source, kind=kind)
     return build_panda_effort_profile(direct_execution, kind=kind,
         cadence_s=artifact.timebase.control_dt, end_frame_id=end_frame_id,
-        model=model, config=position.config, artifact_hash=artifact.identity_hash,
+        model=model, config=config, artifact_hash=artifact.identity_hash,
         r3_profile=r3_profile, joint_velocity_limit_rad_s=velocity_limit,
         mass_model=mass_model, dynamic_parameters=dynamic_parameters)

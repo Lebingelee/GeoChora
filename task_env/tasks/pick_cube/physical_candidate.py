@@ -221,8 +221,9 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
             scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
         reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
-        # Direct effort does not require a Position Controller for state publication.
-        direct_physical = control_kind == 'direct' and not reset_switch
+        # Fixed effort Controllers publish their own physical state. Only the
+        # reset-scoped reference route still uses Position task observations.
+        direct_physical = not reset_switch
         position = (None if direct_physical else
                     PandaPositionServoProfileV1.from_source(artifact, source, entity_id='panda-v1'))
         plan = (None if direct_physical else
@@ -251,7 +252,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 model = PandaKinematics(projected, tcp_profile=PANDA_PICKCUBE_EE_TCP_V1)
             from .physical_reference_profile import build_pickcube_effort_profile
             return build_pickcube_effort_profile(physical, artifact, source, kind=kind,
-                position=position, model=model, end_frame_id='nutassembly_ee_site',
+                config=source.config.action, model=model, end_frame_id='nutassembly_ee_site',
                 dynamic_parameters=parameters if reset_switch else None)
 
         physical = build_physical(control_kind)

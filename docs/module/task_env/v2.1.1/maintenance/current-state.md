@@ -149,3 +149,5 @@ PickCube USD Scene 声明与 effort 构造现使用同一 Panda Robot 实例；�
 Pendulum 与双轮车现将 source 校验过的同一份传动声明用于 Assembly／Controller；MuJoCo 与 GeoPhys 短程通过，Isaac 本批只有无 SDK 合同检查。详见[实施记录 6.66](../planning/post-5c-optimization-execution.md#666-简单主体复用-source-校验过的传动声明)。
 
 PickCube GeoPhys direct effort 已与 MuJoCo 使用相同的物理 Controller／V2 状态路径；真实短程通过，录像因缺少 Solution identity 在写入前被拒绝。详见[实施记录 6.67](../planning/post-5c-optimization-execution.md#667-pickcube-direct-effort-统一物理状态路径)。
+
+PickCube 固定 MJCF effort profile 已直接消费 source action 配置并使用 V2 状态，joint／R3 的 MuJoCo／GeoPhys 短程通过；reset 切换和 USD 的 Position 观测依赖仍待处理。详见[实施记录 6.68](../planning/post-5c-optimization-execution.md#668-固定-panda-effort-不再依赖-position-观测)。

@@ -36,7 +36,7 @@ try:
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
         if args.case=='panda-effort':config['controller']={'profile_id':'panda-direct-effort-v1'}
         if args.case=='panda-joint':
-            config['controller']={'profile_id':'panda-joint-effort-reference-v1'}
+            config['controller']={'profile_id':args.profile or 'panda-joint-effort-reference-v1'}
             if args.record:config['controller']['parameters']={'reset_selection':True}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
@@ -46,7 +46,9 @@ try:
                           [.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
         if args.case=='panda-joint':
             q=env.artifact.initialization.joint_position
-            action=np.asarray([q[f'panda-v1/joint{i}'] + (.002 if i==1 else 0.) for i in range(1,8)]+[.04],dtype=np.float32)
+            action=(np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
+                    if args.profile in {'panda-r3-effort-reference-v1','panda-r3-mass-effort-v1'} else
+                    np.asarray([q[f'panda-v1/joint{i}'] + (.002 if i==1 else 0.) for i in range(1,8)]+[.04],dtype=np.float32))
     else:
         uid='pendulum-v1' if args.case=='pendulum' else 'two-wheel-balance-v1'
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu',
