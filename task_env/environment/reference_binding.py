@@ -370,6 +370,7 @@ class ReferenceTaskBinding:
     build_sampled: Callable | None = None
     task_reset_sampler: Callable | None = None
     task_reset_metadata: Callable | None = None
+    prepare_reset_switch: Callable | None = None
     task_definition_factory: Callable | None = None
     task_state_projection: Callable | None = None
     task_observation_schema: object | None = None

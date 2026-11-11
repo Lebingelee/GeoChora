@@ -26,6 +26,34 @@ class SwitchResetCandidate:
     seed_algorithm: str = 'pickcube-reset-seed-v1'
 
 
+def reset_switch_receipt(candidate, *, provider, provider_seed, configuration_generation,
+                         topology_generation):
+    """Describe this selected reset strategy after its new boundary commits."""
+    return {
+        'schema_version': 'pickcube-reset-switch-receipt-v1',
+        'task_seed': candidate.task_seed,
+        'provider_seed': provider_seed,
+        'task_seed_algorithm': candidate.seed_algorithm,
+        'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
+        'provider': provider,
+        'configuration_generation': configuration_generation,
+        'topology_generation': topology_generation,
+    }
+
+
+def reset_switch_execution_receipt(*, configuration_generation, topology_generation,
+                                   task_seed, provider_seed):
+    """Describe the current switch generation in an execution receipt."""
+    return {
+        'configuration_generation': configuration_generation,
+        'topology_generation': topology_generation,
+        'task_seed': task_seed,
+        'provider_seed': provider_seed,
+        'task_seed_algorithm': 'pickcube-reset-seed-v1',
+        'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
+    }
+
+
 def prepare_switch_reset(environment_type, current, seed, rng_state, execution):
     """Resolve a target from its own defaults and a detached RNG candidate."""
     from .configuration import resolve_task_env_config

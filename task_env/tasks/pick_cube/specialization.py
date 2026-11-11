@@ -776,7 +776,9 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
         if config.reset_profile is not None:
             from ...observations.selected_reference import switch_observation_space
+            from ...environment.reset_switch import prepare_switch_reset
             binding = replace(binding,
+                prepare_reset_switch=prepare_switch_reset,
                 observation_space_factory=lambda _env: dict(switch_observation_space().spaces),
                 observation_metadata={
                     'schema_version': config.reset_profile,

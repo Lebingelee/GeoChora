@@ -358,3 +358,9 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 输入 `76a05cbe`。`resolve_execution_plan` 不再按 `panda-v1` 名称决定是否检查 Controller；它读取 Robot 声明的 `component_controller_kinds`，再将已有 `robot.controller` 的 kind／reference 记入计划。Panda 的公开 `supported_controller_kinds()` 与静态声明共用同一组值；没有此组件能力的 Robot 保持原空选择。只有 UID 时可从已登记的 Robot 类型读取静态声明，无需实例化 Robot 或启动 provider；未知 UID 仍留给正常 registry 构造边界。实际 agent iterable 只消费一次。此机制让其他 Robot 可以声明相同的组件合同，但不扩大其 native、source 或多主体资格。
 
 本批生产 3 个文件 +27／−10，测试 1 个文件 +24；不新增／删除／迁移文件。4 项纯静态合同通过，覆盖另一名称的能力声明、不同 kind 拒绝、Panda 缺配置拒绝和多 agent 边界。另用真实 `PandaAgent` 声明与修改前执行计划作完整 mapping／identity 比较，结果相等；没有运行物理。证据为 `component-capability-012-pure.log` 和 `component-capability-012-comparison.json`。其余主体的实际 Runtime 构建和 native 能力仍按已有范围对账；E02／E04 未据此整体接收。
+
+### 6.14 reset 重建能力归属
+
+输入 `7143c476`。PickCube 在已有 reset profile 的任务 binding 中声明 `prepare_reset_switch`；共同 Env 依据此能力调用原 `prepare_switch_reset`，不再用 PickCube profile 字符串选择 reset 路径。该策略仍自行验证精确 profile、受限 provider 边和 seed；预检、固定 renderer 检查、候选 source 失败清理及 commit／fault 顺序保持。两类包含 PickCube 特定 schema／seed algorithm 的 receipt 构造归到现有 `reset_switch` owner，字段与值保持；不把不同 Task 的 reset 算法强行统一。
+
+本批生产 4 个文件 +45／−22，净增 23 行；测试 1 个文件 +3；无文件新增、删除或整文件迁移。receipt 字段经过缩进／接口重写归位，不作为生产净删除。17 个双锁下的 profile、RNG、source 清理和失败阶段合同通过；真实 MuJoCo CPU 正式 reset-switch 配置完成 reset→非零 step→第二次 reset→close，观测 5 个子步，公开 reset／execution receipt 的 seed 31、代次 1→2 和 topology generation 保留。目标 provider 边的纯准备检查通过，但本批没有跨 provider native 重跑。累计监督 49 次，325 个可观测子步、7 个 worker 的内部子步未知；含原保守计费为 975／2,000。证据为 `reset-capability-013-pure.log`、`cpu-run-plan-026.json`、`cpu-source-026.diff` 与 `cpu-026-reset-switch/result.json`；E03 仍须完成其他 profile／故障组合的影响对账。

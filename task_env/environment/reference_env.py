@@ -1990,15 +1990,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         prepared_reset_plan_required = getattr(
             getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False)
         resolved = getattr(self, 'resolved_public_config', None)
-        switching = getattr(resolved, 'reset_profile', None) == 'pickcube-state-only-switch-v1'
+        prepare_switch = getattr(self.binding, 'prepare_reset_switch', None)
+        switching = prepare_switch is not None
         if switching:
-            from .reset_switch import prepare_switch_reset
             if options is not None and (not isinstance(options, Mapping) or set(options) - {'execution'}):
                 raise ValueError('reset options support only execution')
             target = None if options is None else options.get('execution')
             requested_seed = None if seed is _RESET_SEED_UNSET else seed
             rng_state = getattr(self, '_switch_rng_state', None)
-            switch_candidate = prepare_switch_reset(type(self), resolved, requested_seed, rng_state, target)
+            switch_candidate = prepare_switch(type(self), resolved, requested_seed, rng_state, target)
             task_rgb = getattr(self, '_task_rgb_config', None)
             if task_rgb is not None:
                 target_config = switch_candidate.config
@@ -2381,16 +2381,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     and previous_episode_end is not None):
                 self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if switching:
-                self.info['reset_switch_v1'] = {
-                    'schema_version': 'pickcube-reset-switch-receipt-v1',
-                    'task_seed': switch_candidate.task_seed,
-                    'provider_seed': self.execution.provider_seed,
-                    'task_seed_algorithm': switch_candidate.seed_algorithm,
-                    'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
-                    'provider': self.provider,
-                    'configuration_generation': self._switch_generation,
-                    'topology_generation': self._switch_topology_generation,
-                }
+                from .reset_switch import reset_switch_receipt
+                self.info['reset_switch_v1'] = reset_switch_receipt(
+                    switch_candidate, provider=self.provider, provider_seed=self.execution.provider_seed,
+                    configuration_generation=self._switch_generation,
+                    topology_generation=self._switch_topology_generation)
             if self.mixed_control_profile:
                 realization = self.value['reset_realizations'].get(self.sample.sample_id)
                 if not isinstance(realization, dict):
@@ -5035,15 +5030,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     controller=self.value.get('controller', self.value.get('leaf_plan')), seed=None,
                 )
         result = json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
-        if getattr(getattr(self, 'resolved_public_config', None), 'reset_profile', None) == 'pickcube-state-only-switch-v1' and hasattr(self, '_switch_generation'):
-            result['reset_switch_v1'] = {
-                'configuration_generation': self._switch_generation,
-                'topology_generation': self._switch_topology_generation,
-                'task_seed': self._switch_task_seed,
-                'provider_seed': self._switch_provider_seed,
-                'task_seed_algorithm': 'pickcube-reset-seed-v1',
-                'provider_seed_algorithm': 'pickcube-provider-seed-task-identity-v1',
-            }
+        if getattr(self.binding, 'prepare_reset_switch', None) is not None and hasattr(self, '_switch_generation'):
+            from .reset_switch import reset_switch_execution_receipt
+            result['reset_switch_v1'] = reset_switch_execution_receipt(
+                configuration_generation=self._switch_generation,
+                topology_generation=self._switch_topology_generation,
+                task_seed=self._switch_task_seed, provider_seed=self._switch_provider_seed)
         return result
 
     def _recorded_execution_configuration(self):
