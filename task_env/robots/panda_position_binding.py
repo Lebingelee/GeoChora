@@ -37,9 +37,9 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
     Components are (entity, root_frame, joint_names, parent_entity) declarations.
     The source attachment is checked against the original robot source scene.
     """
-    from ..artifacts import (FrameDefinition, FrameReference, JointReference, LogicalAssemblyV1,
-        LogicalAssemblyScenePinV1, LogicalAssemblyEntityMemberV1, LogicalAssemblyNestedMemberV1,
-        LogicalAssemblySubcomponentReferenceV1)
+    from ..artifacts import (FrameDefinition, FrameReference, LogicalAssemblyV1,
+        LogicalAssemblyScenePinV1, LogicalAssemblyNestedMemberV1)
+    from ..artifacts.logical_assembly_resolution import existing_entity_joint_members
     from ..artifacts.state import StateFieldRequirement, StateRequirements
     from ..environment.types import ActionModeSpec
     from ..runtime.sessions.control import (ControllerBindingV1, ControlGroupActionProjectionV1,
@@ -53,14 +53,10 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
     scene.validate()
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
                                     scene.schema_version, scene.identity_hash)
-    entities = {item.entity_id: item for item in scene.entities}
     leaves = []
     for entity_id, _root_name, names, _parent in components:
-        entity = entities[entity_id]
-        members = (LogicalAssemblyEntityMemberV1('entity_member', ('owner',), entity_id,
-                   entity.asset_id, entity.asset_version),) + tuple(
-            LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref', (name,),
-                                                    'joint', JointReference(entity_id, name)) for name in names)
+        members = existing_entity_joint_members(scene, entity_id,
+                                                tuple(((name,), name) for name in names))
         leaves.append(LogicalAssemblyV1('logical-assembly-v1', entity_id + '-position-owner',
                                          'v1', pin, members))
     def edge(path, child):

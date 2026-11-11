@@ -468,3 +468,11 @@ MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step
 生产修改 4 文件 +45／−79，净减 34 行；其中 Assembly 重写归并到 Runtime，删除的是重复构建及旧反向方法，不能把迁移行直接当作删除效果。版本诊断修改 1 文件 +4／−2，增加正式 PickCube Panda effort 短程选项；本记录及当前状态 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。renderer、时钟、Position 提交及 source adapter 未改。
 
 MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 reset／非零 action／第二次 reset／close，分别观测 5、25、25 子步；两个简单主体 GeoPhys CPU 同样通过，内部物理子步未观测，按各 50 预留。MuJoCo 新旧运行的两个简单主体 Scene、reset sample、Robot／Controller identity 相同；Panda effort 的 Scene 和 Controller identity 与此前直接路线相同。27 项版本纯合同通过；不声称本批验证了每个绑定 hash、完整 Solution、Isaac、renderer 或 Position 路线。冻结 diff、计划和结果在 ignored `workspace/maintenance/v211_subject_assembly_20261112_001/`；E01～E04 仍未完成。
+
+### 6.28 Position 与 effort 共用已有主体成员声明
+
+输入 `c1ce191e`。Position Panda 和 Panda／简单主体 effort 不再各自从 Scene 实体手工拼接 owner 与关节引用；共同 Assembly resolution owner 从实体及 joint path 声明生成相同成员。单层、嵌套结构仍由各自逻辑 Assembly 组合，Position 的 group／姿态控制合同和 effort 的传动／单位合同保留；这是共同主体构建的一步，不代表两种控制已被错误合并成一个语义，也不代表 E02 已完成。
+
+生产修改 3 文件 +26／−26，净变化 0；成员构建代码经过重写归并，无新增、删除或迁移文件；诊断代码未改，文档修改 2 文件，tracked 文件数不变。provider source、renderer、时钟、动作提交未改。27 项版本纯合同通过；MuJoCo CPU 的 PickCube Panda effort／Position、装配 Panda、NutAssembly、Pendulum、双轮车分别完成 reset、非零 action 或单个 Nut Solution interval、再次 reset 和 close，共 70 个可观测子步。
+
+与先前对应同 seed 路线对照，六种运行的 Robot／Controller identity、reset sample 及各自可用的 Scene 或 Artifact／source identity 一致；三条 Position 路线中记录的 binding identity 和 resource writers 亦包含在 Robot 对照中。首次自动对账错误地假设 Position boundary 包含 `scene_identity_hash`，未启动物理；改为比较其实际提供的 Artifact 和 source 字段后通过。计划、冻结 diff、原始结果和对账在 ignored `workspace/maintenance/v211_common_members_20261112_001/`。GeoPhys、Isaac、renderer 本批未重跑，不外推完整 Solution 或后续事件接收。

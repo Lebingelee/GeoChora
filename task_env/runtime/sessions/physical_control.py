@@ -206,31 +206,23 @@ def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
                                       source_closure_sha256, subject, declarations,
                                       assembly_id, nested_component_id=None):
     """Compile one existing Robot's declared joints, including optional nested parts."""
-    from ...artifacts import JointReference
     from ...artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
-        LogicalAssemblyEntityMemberV1, LogicalAssemblyNestedMemberV1,
-        LogicalAssemblySubcomponentReferenceV1)
+        LogicalAssemblyNestedMemberV1)
+    from ...artifacts.logical_assembly_resolution import existing_entity_joint_members
 
-    entities = tuple(entity for entity in scene.entities if entity.entity_id == subject.entity_id)
-    if len(entities) != 1:
-        raise ValueError('Robot subject must refer to exactly one Scene entity')
-    entity = entities[0]
     pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
                                     scene.schema_version, scene.identity_hash)
-    owner = LogicalAssemblyEntityMemberV1('entity_member', ('owner',), subject.entity_id,
-                                          entity.asset_id, entity.asset_version)
     if nested_component_id is None:
-        refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
-            item.component_path, 'joint', JointReference(subject.entity_id, item.joint_id))
-            for item in declarations)
-        members, children = (owner, *refs), {}
+        joint_paths = tuple((item.component_path, item.joint_id) for item in declarations)
     else:
         if any(len(item.component_path) < 2 or item.component_path[0] != 'robot' for item in declarations):
             raise ValueError('nested Robot component paths must start with robot')
-        refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
-            item.component_path[1:], 'joint', JointReference(subject.entity_id, item.joint_id))
-            for item in declarations)
-        child = LogicalAssemblyV1('logical-assembly-v1', nested_component_id, 'v1', pin, refs)
+        joint_paths = tuple((item.component_path[1:], item.joint_id) for item in declarations)
+    owner, *refs = existing_entity_joint_members(scene, subject.entity_id, joint_paths)
+    if nested_component_id is None:
+        members, children = (owner, *refs), {}
+    else:
+        child = LogicalAssemblyV1('logical-assembly-v1', nested_component_id, 'v1', pin, tuple(refs))
         members = (owner, LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',),
             child.assembly_id, child.revision, child.logical_content_sha256))
         children = {(child.assembly_id, child.revision): child}
