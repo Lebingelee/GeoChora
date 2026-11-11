@@ -330,7 +330,7 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 
 ### 6.10 E04 动作入口及未调用旁路
 
-静态追踪当前实际 caller，删除 `SelectedReferenceEnv._step_leaf_position`：全仓 Python 搜索只有其定义，没有调用者；该私有包装直接调用 `_prepare_leaf_position`，缺少共同 `prepare_selected_control_action` 所建立的 dispatch。保留 `_prepare_leaf_position` 作为现有 lifecycle 的 leaf 实现，`dispatch_leaf_control_interval` 仍调用共同 `submit_control_command`；没有删改 typed Action、资源、边界或 clock 校验。本批删除 4 行生产代码，不新增／删除文件，不把未调用代码当作真实运行性能提升。
+静态追踪当前实际 caller，删除 `SelectedReferenceEnv._step_leaf_position`：移除前 Core 中非 ignored Python 搜索只有其定义，没有调用者；未将历史 ignored 探针当作当前调用链；该私有包装直接调用 `_prepare_leaf_position`，缺少共同 `prepare_selected_control_action` 所建立的 dispatch。保留 `_prepare_leaf_position` 作为现有 lifecycle 的 leaf 实现，`dispatch_leaf_control_interval` 仍调用共同 `submit_control_command`；没有删改 typed Action、资源、边界或 clock 校验。本批删除 4 行生产代码，不新增／删除文件，不把未调用代码当作真实运行性能提升。
 
 | 动作入口 | 实际动作准备与提交 | 证据边界 |
 | --- | --- | --- |
