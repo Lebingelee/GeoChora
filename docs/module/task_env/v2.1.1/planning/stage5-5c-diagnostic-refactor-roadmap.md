@@ -33,6 +33,10 @@
 
 Core `a53bf19d` 的单元 7／8 已按[Sol 主审](../maintenance/reviews/20261111_unit007_008_sol_review_a53bf19d.md)有界接收：独立 renderer 状态投影、真实 Isaac reset／非零 step／二次 reset 的同步 RGB 与关闭，以及 GeoPhys CPU → MuJoCo renderer-only 均有适用证据。本轮局部职责迁移接收不等于所有入口、registry 和兼容路径已整理完成。下一步为单元 9 综合对账；5c 接收后按[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)完成代码与项目优化及人工接收，再进入 G06。台账不是倒灌到本轮的额外验收门；不重加复杂像素阈值、跨 provider 数值一致、启动 unknown 归零或整张历史矩阵。
 
+## 2026-11-11：单元 9 综合交付，待独立主审
+
+单元 9 已完成离线 G1～G6 综合对账，执行者建议 `READY_FOR_SOL_5C_BOUNDED_REVIEW`；**单元 9 已交付、待独立主审、待维护者接收**，不等于本页已签署整个 5c。生产实现仍为 `a53bf19d`，没有新 native 或矩阵复验；旧证据按受测身份及共同 reset／RGB 的实际变更逐项解释。见[执行者综合交付索引](../maintenance/reviews/20261111_unit009_executor_5c_closeout.md)。5c 接收后仍须完成维护者指定的代码／入口／项目优化并人工接收，之后才决定 G06；本轮未进入优化施工。
+
 ## 共同目标和调用链
 
 ```text
