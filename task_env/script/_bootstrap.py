@@ -219,17 +219,3 @@ def check_observation(observation: Any, observation_space: Any, *, batch: int | 
             raise ValueError(f"observation leaf {path!r} contains non-finite values")
         if batch is not None and (value.ndim < 1 or value.shape[0] != batch):
             raise ValueError(f"observation leaf {path!r} must have leading batch {batch}")
-
-
-def pick_cube_config(*, backend: str, horizon: int):
-    """Return the documented public configuration used by all examples."""
-    return {
-        "runtime": {
-            "backend": backend,
-            "broadphase": "n2",
-            "prewarm": False,
-            "control_substeps": 25,
-        },
-        "robot": {"controller": {"kind": "absolute_pose", "reference": "world"}},
-        "episode": {"horizon": horizon},
-    }

@@ -366,8 +366,7 @@ def _resolve_selected_config(environment_type, config):
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "controller", "provider", "backend", "horizon",
-               "source_delivery_manifest", "robot"}
+    allowed = {"execution", "episode", "task", "controller", "robot"}
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
@@ -417,18 +416,6 @@ def _resolve_selected_config(environment_type, config):
         unknown = set(section) - allowed_sections[name]
         if unknown:
             raise KeyError(f"unsupported selected {name} fields: {sorted(unknown)}")
-    aliases = {"provider": ("execution", "physics_provider"),
-               "backend": ("execution", "physics_backend"),
-               "horizon": ("episode", "horizon"),
-               "source_delivery_manifest": ("execution", "source_delivery_manifest")}
-    for old, (section, key) in aliases.items():
-        if old not in values:
-            continue
-        if key not in allowed_sections[section]:
-            raise KeyError(f"{old} is not available for this task")
-        if key in sections[section]:
-            raise ValueError(f"{old} conflicts with {section}.{key}")
-        sections[section][key] = values[old]
     requested_json = (supplied.requested_execution_json if supplied is not None else
                       json.dumps(_identity_value(sections["execution"]), sort_keys=True,
                                  separators=(",", ":"), allow_nan=False))

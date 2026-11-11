@@ -14,7 +14,6 @@ from .._bootstrap import (
     get_logger,
     json_compatible,
     load_yaml_mapping,
-    pick_cube_config,
     resolved_config_summary,
     stage14_output,
     with_backend_fallback,
@@ -45,9 +44,14 @@ def _observation_leaf_shapes(value: Any, path: str = "") -> dict[str, dict[str, 
     }
 
 
+_FORMAL_TASKS = frozenset(('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+                           'pendulum-v1', 'two-wheel-balance-v1'))
+
+
 def inline_config(env_id: str, backend: str, horizon: int) -> dict[str, Any]:
-    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
-        return {'provider': 'geophys', 'backend': backend, 'horizon': horizon}
+    if env_id in _FORMAL_TASKS:
+        return {'execution': {'physics_provider': 'geophys', 'physics_backend': backend},
+                'episode': {'horizon': horizon}}
     return {
         "runtime": {"backend": backend, "broadphase": "n2", "prewarm": False},
         "episode": {"horizon": horizon},
@@ -63,8 +67,8 @@ def public_config(
     """Resolve inline example defaults followed by the user YAML mapping."""
 
     values = deep_merge(inline_config(env_id, backend, horizon), load_yaml_mapping(config_path))
-    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
-        values['backend'] = backend
+    if env_id in _FORMAL_TASKS:
+        values['execution'] = dict(values.get('execution', {}), physics_backend=backend)
         return values
     runtime = dict(values.get("runtime", {}))
     runtime["backend"] = backend
@@ -86,8 +90,8 @@ def run_single(
     logger = get_logger(f"task-env-stage14-{summary_name}")
 
     def create(backend: str):
-        selected = env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}
-        values = dict(config, backend=backend) if selected else deep_merge(config, {'runtime': {'backend': backend}})
+        values = deep_merge(config, {'execution': {'physics_backend': backend}} if env_id in _FORMAL_TASKS
+                            else {'runtime': {'backend': backend}})
         return make_env(env_id, config=values)
 
     backend, env = with_backend_fallback(

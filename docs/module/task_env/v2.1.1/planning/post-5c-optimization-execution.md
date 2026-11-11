@@ -452,3 +452,11 @@ MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step
 生产配置与 reset 修改 2 文件 +12／−22，净减 10 行；示例 1 文件 +1／−1；版本诊断 2 文件 +45／−1；本记录及当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件净变化为 0。provider、renderer、时钟、提交与 source 不因本批改变；历史 controller 输入及其诊断不再作为兼容目标。
 
 四正式任务以及 PickCube 装配 Panda 在 MuJoCo CPU 完成构建、reset、非零动作／Nut 单个 Solution interval、再次 reset 和 close，依次观测 5、5、5、25、25 子步（合计 65）；其中装配 Panda 以 `controller.profile_id=r1_split` 指定选择。18 项版本纯合同通过，覆盖四任务 mapping／YAML／Resolved 配置一致、显式 profile、旧位置拒绝和 reset 切换候选；并非完整 Solution 验证。计划、冻结 diff 和结果在 ignored `workspace/maintenance/v211_controller_config_20261112_001/`。其他 provider、renderer 本批未重跑。E01 的其他旧别名与 component 结构仍须对账，E00～E04 均不以本批声明完成。
+
+### 6.26 正式执行配置和直接 caller 迁移
+
+输入 `fb8f4eec`。正式配置不再接受顶层 `provider`、`backend`、`horizon`、`source_delivery_manifest`，分别使用 `execution` 和 `episode` 下的规范字段；移除对应别名转换。迁移轨迹录制／规划、录制示例、通用环境脚本和简单主体单步示例；移除无调用者且已经失效的旧 PickCube 配置 helper。修复上一批漏查的 Harness：其生成的 `task.controller_profile` 已改为 `controller.profile_id`。通用环境脚本对四个正式 UID 使用同一种配置结构，其他历史 component 环境仍有独立入口。
+
+生产配置及脚本修改 6 文件 +15／−38，净减 23 行；示例 2 文件 +4／−2；版本诊断 1 文件 +41；本记录和当前状态文档 2 文件修改。无文件新增、删除、迁移，tracked 文件数不变。27 项版本纯合同通过，覆盖旧字段拒绝、四任务示例配置以及 Harness 输出交给真实配置解析器；Harness 此处未实际执行完整运行。四任务 MuJoCo CPU 各完成 reset／单 interval／第二次 reset／close，共 60 个观测子步，Nut 为单个 Solution interval；结果、计划和冻结 diff 位于 ignored `workspace/maintenance/v211_formal_callers_20261112_001/`。运行后只对 `_bootstrap.py` 移除一个文件末尾空行，纯合同在最终内容上重跑通过；冻结 diff 保留运行时精确状态。
+
+本批未更改 provider／renderer、时钟或提交，其他 provider 和 renderer 未重跑。Pendulum 的旧 RGB 示例仍传入 component 的 `runtime`／`render` 配置，不能在当前正式配置入口使用；其渲染参数迁移留待渲染配置整理，不将它描述为已迁移。仍需审计其他正式 caller、component 结构和四主体共同构造，E01～E04 未完成。

@@ -105,7 +105,7 @@ def run_solution(
         raise ValueError('selected reference planning requires CPU')
     if env_id not in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
         raise ValueError('planning commands admit only the selected public reference UIDs')
-    env = make_env(env_id, config={'provider': provider, 'backend': 'cpu', 'horizon': horizon})
+    env = make_env(env_id, config={'execution': {'physics_provider': provider, 'physics_backend': 'cpu'}, 'episode': {'horizon': horizon}})
     try:
         is_pickcube = env_id == 'pick-cube-p16-reference-v1'
         if is_pickcube:

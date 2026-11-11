@@ -82,3 +82,44 @@ def test_reset_switch_preserves_canonical_controller_profile():
     assert candidate.config.controller_profile == current.controller_profile
     assert candidate.config.physics_provider == 'geophys'
     assert candidate.task_seed == candidate.provider_seed == 17
+
+
+@pytest.mark.parametrize('key', ['provider', 'backend', 'horizon', 'source_delivery_manifest'])
+def test_retired_top_level_execution_inputs_are_rejected(key):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='unsupported'):
+        resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), {key: 'obsolete'})
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_environment_example_generates_formal_configuration(uid):
+    from task_env.script.env._common import inline_config
+    importlib.import_module('task_env.tasks')
+    config = inline_config(uid, 'cpu', 8)
+    resolved = resolve_task_env_config(ENV_REGISTRY.get(uid), config)
+    assert resolved.physics_provider == 'geophys'
+    assert resolved.environment.episode.horizon == 8
+
+
+def test_builtin_harness_outputs_formal_controller_configuration(monkeypatch, tmp_path):
+    from task_env.script.agent import catalog_query, harness_compiler
+    from task_env.script.agent.builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    spec = BuiltinPickCubeExampleV1(
+        'harness-builtin-pickcube-example-v1', 'pickcube-harness-example-v1',
+        'pick-cube-p16-reference-v1', 'mujoco', 'cpu', 'cpu', 'r3_continuous_v1',
+        (31, 32, 33), 8, .002, 5, None)
+    scope = ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ())
+    repo = str(tmp_path.resolve())
+    monkeypatch.setattr(catalog_query, 'core_context', lambda _: {'core_repo': repo, 'core_commit': 'test'})
+    monkeypatch.setattr(harness_compiler, '_example_working_tree_context', lambda *_: {})
+    monkeypatch.setattr('subprocess.check_output', lambda *args, **kwargs: '')
+    catalog = {'schema_version': 'harness-catalog-v0', 'core_repo': repo, 'core_commit': 'test',
+               'core_dirty': False, 'builtin_examples': {'pickcube-harness-example-v1': {'task_uid': spec.task_uid}},
+               'env_uids': [spec.task_uid], 'providers': {'mujoco': {'available': True}}}
+    config, _, _ = harness_compiler.resolve_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+    assert config['controller'] == {'profile_id': spec.controller_profile}
+    importlib.import_module('task_env.tasks')
+    assert resolve_task_env_config(ENV_REGISTRY.get(spec.task_uid), config).controller_profile == spec.controller_profile

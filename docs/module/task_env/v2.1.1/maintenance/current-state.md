@@ -65,3 +65,5 @@ Pendulum 和双轮车现由各自 Robot 声明受控关节、writer 和 source �
 Pendulum／双轮车的传动校验与 provider source 映射现由共同 source 编译器从 Robot 和 Scene 声明生成，Task 不再各自接线；MuJoCo CPU 和 GeoPhys CPU 的两任务短程均通过。Isaac 映射仅做不启动 SDK 的合同检查，完整四任务构建统一仍待完成。详见[实施记录 6.24](../planning/post-5c-optimization-execution.md#624-简单主体按声明共同编译-source)。
 
 四个正式任务的 Controller 选择现直接使用 `controller.profile_id`；旧顶层、`task.controller_profile` 和 `control.profile_id` 选择位置已明确拒绝。四任务及装配 Panda 的 MuJoCo CPU 短程已复验，详细范围见[实施记录 6.25](../planning/post-5c-optimization-execution.md#625-controller-规范字段直达配置解析)。
+
+正式执行选择已收敛到 `execution`／`episode`，旧顶层选择字段被拒绝；Harness 和本批识别到的录制、轨迹及环境脚本已迁移。Pendulum 旧 RGB 示例的渲染配置仍待迁移；E01～E04 保持未完成。详见[实施记录 6.26](../planning/post-5c-optimization-execution.md#626-正式执行配置和直接-caller-迁移)。

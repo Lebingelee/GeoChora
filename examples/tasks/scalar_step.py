@@ -30,7 +30,9 @@ def main(argv=None):
     env = None
     result = None
     try:
-        env = make_env(args.uid, config={'runtime': {'backend': 'cpu', 'prewarm': False}})
+        config = ({'runtime': {'backend': 'cpu', 'prewarm': False}} if args.uid == 'empty-v1'
+                  else {'execution': {'physics_provider': 'geophys', 'physics_backend': 'cpu'}})
+        env = make_env(args.uid, config=config)
         observation, info = env.reset(seed=args.seed)
         if not env.observation_space.contains(observation):
             raise ValueError('reset observation is outside observation_space')

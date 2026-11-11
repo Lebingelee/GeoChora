@@ -62,7 +62,7 @@ def main(argv=None) -> int:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
 
-            env = make_env(args.env_id, config={"provider": args.provider, "backend": "cpu", "horizon": args.horizon})
+            env = make_env(args.env_id, config={"execution": {"physics_provider": args.provider, "physics_backend": "cpu"}, "episode": {"horizon": args.horizon}})
             obs, reset_info = env.reset(seed=seed)
             if args.env_id == ENV_IDS[1]:
                 from task_env.tasks.nut_assembly.task import build_outcome_solution

@@ -147,7 +147,7 @@ def resolve_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
                       **({'source_delivery_manifest': spec.source_delivery_manifest}
                          if spec.source_delivery_manifest is not None else {})},
         'episode': {'horizon': spec.horizon_control_ticks},
-        'task': {'controller_profile': spec.controller_profile},
+        'controller': {'profile_id': spec.controller_profile},
     }
     if spec.provider != 'isaacsim':
         provider_row = catalog.get('providers', {}).get(spec.provider)

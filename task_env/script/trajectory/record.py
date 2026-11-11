@@ -54,7 +54,7 @@ def main(argv=None):
     parser.add_argument('--seed', type=int, default=19)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
-    env = make_env(args.env_id, config={'provider': args.provider, 'backend': 'cpu', 'horizon': args.horizon})
+    env = make_env(args.env_id, config={'execution': {'physics_provider': args.provider, 'physics_backend': 'cpu'}, 'episode': {'horizon': args.horizon}})
     try:
         observation, info = env.reset(seed=args.seed)
         solution = None
