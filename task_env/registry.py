@@ -160,8 +160,7 @@ def make_env(
         raise ValueError('task RGB camera and fixed renderer must be declared together')
     if (getattr(environment_type, "uses_selected_public_config", False)
             or getattr(environment_type, "uses_component_task_config", False)):
-        resolved_config = resolve_task_env_config(environment_type, config)
-        return environment_type.from_resolved_config(resolved_config, render_mode=render_mode,
+        return environment_type.from_resolved_config(config, render_mode=render_mode,
             task_rgb_camera=task_rgb_camera, task_renderer=task_renderer, **kwargs)
     factory_owns_rgb = bool(getattr(environment_type, 'task_rgb_factory_prepares_runtime', False))
     if task_rgb_camera is not None and factory_owns_rgb:

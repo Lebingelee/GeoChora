@@ -811,9 +811,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
         if (getattr(cls, 'uses_selected_public_config', False)
                 or getattr(cls, 'uses_component_task_config', False)):
-            from .configuration import resolve_task_env_config
-            return cls.from_resolved_config(resolve_task_env_config(cls, config),
-                                            render_mode=render_mode, **kwargs)
+            return cls.from_resolved_config(config, render_mode=render_mode, **kwargs)
         if getattr(cls, 'binding', None) is None:
             from .configuration import resolve_task_env_config
             resolved = resolve_task_env_config(cls, config)
@@ -850,16 +848,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def from_resolved_config(cls, config, *, render_mode=None,
                              task_rgb_camera=None, task_renderer=None,
                              observer_camera=None, task_camera=None, **kwargs):
-        """Compile declarations once, then construct the common Env owner.
-
-        ResolvedSelectedConfig and ResolvedEnvConfig retain their existing input
-        codecs; they do not select different selected-Env lifecycles.
-        """
+        """Resolve one public configuration, then construct its Env owner."""
         from .config import ResolvedSelectedConfig
         from .configuration import resolve_task_env_config
-        selected = type(config) is ResolvedSelectedConfig
-        if selected and config.task_uid != cls.uid:
+        if type(config) is ResolvedSelectedConfig and config.task_uid != cls.uid:
             raise TypeError('selected construction requires its own resolved configuration')
+        config = resolve_task_env_config(cls, config)
+        selected = type(config) is ResolvedSelectedConfig
         if not selected and type(config) is not ResolvedEnvConfig:
             raise TypeError('environment construction requires resolved configuration')
         from ..render.base.contracts import validate_camera_declarations, normalize_render_mode
@@ -868,7 +863,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if selected or observer_camera is not None or task_camera is not None:
             validate_camera_declarations(render_mode=render_mode, observer_camera=observer_camera,
                 task_camera=task_camera, task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
-        config = resolve_task_env_config(cls, config)
         camera, renderer = task_rgb_camera, task_renderer
         if (camera is None) != (renderer is None):
             raise ValueError('task RGB camera and fixed renderer must be declared together')

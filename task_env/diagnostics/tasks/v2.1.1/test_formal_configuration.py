@@ -210,3 +210,40 @@ def test_formal_construction_rejects_old_component_resolved_config(uid):
     old = resolve_env_config(task_uid=uid, scene_uid='tabletop-v1')
     with pytest.raises(TypeError, match='mapping or YAML'):
         task.from_resolved_config(old)
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_make_env_resolves_public_config_once(uid, monkeypatch):
+    import sys
+    import task_env.environment.configuration as configuration
+    from task_env import make_env
+
+    calls = []
+    resolve = configuration.resolve_task_env_config
+    def counted(task, value):
+        calls.append((task.uid, value))
+        return resolve(task, value)
+    monkeypatch.setattr(configuration, 'resolve_task_env_config', counted)
+    config = {'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                            'physics_device': 'cpu', 'deployment': 'in_process',
+                            'interpreter': sys.executable}, 'episode': {'horizon': 8}}
+    env = make_env(uid, config=config)
+    try:
+        assert calls == [(uid, config)]
+        assert env.resolved_public_config.task_uid == uid
+    finally:
+        env.close()
+
+
+def test_formal_constructor_revalidates_supplied_resolved_config():
+    from dataclasses import replace
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get('pendulum-v1')
+    resolved = resolve_task_env_config(task, {'execution': {'physics_provider': 'mujoco'}})
+    forged_runtime = replace(resolved.environment.runtime, physics_dt=0.123)
+    forged = replace(resolved, environment=replace(resolved.environment, runtime=forged_runtime))
+    with pytest.raises(ValueError, match='unsupported overrides'):
+        task.from_resolved_config(forged)

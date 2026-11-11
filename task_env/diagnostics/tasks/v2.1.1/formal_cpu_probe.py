@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');args=parser.parse_args()
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -24,6 +24,13 @@ try:
             return original_step(*params,**kwargs)
         mujoco.mj_step=counted_step
     from task_env import make_env
+    def construct(uid, config):
+        if args.yaml:
+            import yaml
+            path = Path('formal-task.yaml')
+            path.write_text(yaml.safe_dump(config), encoding='utf-8')
+            return make_env(uid, config=path)
+        return make_env(uid, config=config)
     if args.case in {'panda-r3','panda-gravity','panda-effort','panda-joint','assembled-unreset','assembled-live','nut'}:
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
@@ -34,7 +41,7 @@ try:
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
         if args.robot_uid is not None:config['robot']={'uid':args.robot_uid}
-        env=make_env(uid,config=config)
+        env=construct(uid,config)
         action=np.asarray([.2,0.,0.,0.,0.,0.,0.,0.] if args.case=='panda-effort' else
                           [.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
         if args.case=='panda-joint':
@@ -46,7 +53,7 @@ try:
                              'deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.profile is not None:config['controller']={'profile_id':args.profile}
         if args.robot_uid is not None:config['robot']={'uid':args.robot_uid}
-        env=make_env(uid,config=config)
+        env=construct(uid,config)
         action={'torque':np.asarray([.25]if args.case=='pendulum'else[.25,-.2],dtype=np.float32)}
     result['uid']=env.uid
     result['constructed']=True

@@ -646,3 +646,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +1／−70，净减 69 行；版本诊断修改 1 文件 +8／−0，为真实双 Controller interval 增加收据核对；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1365。旧诊断专用数据生成逻辑退出 Robot 模块，provider／renderer、clock 与实际提交逻辑未改。
 
 58 项版本检查通过。MuJoCo CPU 的正式 PickCube 装配 Panda `r1_split` 与一体 Panda R3 短程通过，共观测 10 子步；装配路线实际确认一次 `position-target` 提交，arm 与 hand 两个 writer 的资源分别为七个 arm actuator 与一个 hand actuator，收据为 acknowledged，两个运行 Controller 身份与各自产出一致。与上次同 seed 对照的主体、Controller、Artifact、source、reset 和单步奖励一致。GeoPhys、Isaac、renderer 和完整 Solution 未在本批重跑；计划、冻结 diff、对照和提交收据位于 ignored `workspace/maintenance/v211_retire_assembly_leaf_probe_20261112_001/`。E01～E04 仍未接收。
+
+### 6.50 正式公共配置只解析一次
+
+输入 `8925a27a`。`make_env` 与继承的配置入口现在把原始 mapping／YAML／已解析对象直接交给共同 Env 构造边界，由该边界调用一次正式解析器；不再先解析后把结果交给 Env 再重解码一次。外部传入的 `ResolvedSelectedConfig` 仍经过原有字段、任务身份及重建一致性检查，篡改的时间步不会成为构建请求。component-only 环境仍由其既有 codec 解析，不将其当成四任务正式路径。
+
+生产修改 2 文件 +6／−13，净减 7 行；版本诊断修改 2 文件 +47／−3；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1365。普通正式调用去掉一次配置重解码，四任务继续使用同一字段语义与构建边界；实际 source、provider／renderer、clock 与提交实现未改。不同内部任务和能力的构建仍未完全合流，E01～E04 不在此批接收。
+
+63 项版本检查通过，直接计数四任务 `make_env` 各调用一次解析器，检查伪造已解析时间步被拒绝；既有四任务 YAML／mapping 解析等价检查通过。MuJoCo CPU 下，PickCube／Pendulum 使用 YAML，NutAssembly／双轮车、装配 Panda 和 PickCube reset-scoped 物理切换使用 mapping，均完成短程，共观测 75 子步；切换包含 H5 读回。两个 tabletop MuJoCo 隔离 worker 也完成 reset／单 interval／二次 reset／close，内部子步未观测，各保守预留 50。GeoPhys CPU 的 YAML PickCube 与 mapping 双轮车通过短程，内部子步未观测，各保守预留 50；单独以不启动物理的方式检查 component-only 环境构造与关闭。同 seed 对照的主体、reset、可用 Artifact／Scene／source 与单步奖励一致；Nut Controller 与最近一次 Task binding 变更后的身份一致。Isaac、renderer 和完整 Solution 本批未重跑。计划、冻结 diff、对照与结果位于 ignored `workspace/maintenance/v211_single_public_resolution_20261112_001/`。
