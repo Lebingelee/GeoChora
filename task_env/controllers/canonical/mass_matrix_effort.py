@@ -88,3 +88,33 @@ class MassMatrixEffortControllerV1:
                 channel.dof_id,channel.kind,channel.axis,channel.axis_frame,channel.sign,channel.unit,
                 float(values[i]),channel.effort_range,'explicit_full_pd'))
         return PhysicalCommandBatchV1('physical-command-batch-v1',context,tuple(efforts),(),())
+
+
+def build_mass_effort_execution(direct_execution, *, matrix, nominal_position, max_abs_deviation,
+                                model_sha256, use_pose_reference=False, r3_reference=None,
+                                end_frame_id='ee'):
+    """Compose a source-admitted mass servo into an existing physical execution."""
+    from dataclasses import replace
+    from ...artifacts.state import StateFieldRequirement, StateRequirements
+    from .r3_effort import R3ReferenceEffortControllerV1
+
+    binding = direct_execution.compiled.binding
+    cadence = direct_execution.controllers[0].model.requirement.cadence_s
+    servo = MassMatrixEffortControllerV1(binding, matrix=matrix,
+        nominal_position=nominal_position, max_abs_deviation=max_abs_deviation,
+        model_sha256=model_sha256, cadence_s=cadence)
+    requirements = direct_execution.requirements
+    if use_pose_reference:
+        from .production_r3 import _ProductionR3ArmReference
+        if not isinstance(r3_reference, _ProductionR3ArmReference):
+            raise TypeError('mass pose control requires the existing production R3 reference')
+        entity = binding.channels[0].entity_id
+        field = StateFieldRequirement('state-field-requirement-v1', 'frame_pose_world', 'frame', entity,
+            end_frame_id, 'required', 'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query')
+        requirements = StateRequirements('state-requirements-v1', 'controller', servo.writer_id,
+                                          (*requirements.requirements, field))
+        controller = R3ReferenceEffortControllerV1(r3_reference, servo, entity_id=entity,
+                                                   end_frame_id=end_frame_id, opening_range_m=.08)
+    else:
+        controller = servo
+    return replace(direct_execution, controllers=(controller,), requirements=requirements)

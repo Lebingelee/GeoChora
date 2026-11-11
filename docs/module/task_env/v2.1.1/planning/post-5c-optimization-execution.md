@@ -346,3 +346,9 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 输入 `6d556a4d`。Panda MJCF 的 fixed tendon／equality、actuator 映射、gain／bias 及有限有符号 force range 检查，现在由既有 MuJoCo source adapter `panda_effort_source_limits` 完成；Position candidate 的 Controller 声明读取 adapter 返回的限值。原 source closure、九个具名 joint、任务特有的 gripper cap、wrench 目标及后续 native admission 均保留。该改动按格式责任归位，**不是**新增 Panda 通用资格；Task 仍有其他待迁的 Robot／Controller 编译职责。
 
 生产 2 个文件 +37／−30，净增 7 行；其中 29 行检查逻辑原样跨文件迁移、另移动 1 条 import，单列而不冒充删除；无文件新增／删除。8 个双锁下的真实 source 编译／fake terminal 合同通过，包含 tendon 篡改、source closure 和实际 Controller 输出；fake terminal 不证明 native。最终改动下正式 PickCube direct effort 走真实 MuJoCo CPU reset→非零 step→第二次 reset→重复 close，通过且观测到 5 个 native 子步。累计监督 46 次，已有可观测 310 子步；7 次 worker 的实际子步未知；加既有保守预留及无锁检查器偏差，累计计费 960／2,000。计划、冻结 diff、结果、纯合同日志位于 ignored `cpu-run-plan-024.json`、`cpu-source-024.diff`、`cpu-024-direct/`、`panda-source-010-pure.log`；不宣称完整 Solution 或其他 source 的资格。
+
+### 6.12 质量模型 Controller 归位
+
+输入 `296f1fe8`。PickCube 任务仍验证允许的 fixture ID、质量模型文件 SHA、schema 和 source closure，并选择其已受限的模型参数；实际 `MassMatrixEffortControllerV1`、已有 R3 reference wrapper、状态需求和新 physical execution 的组合移入现有 Controller 模块。源资产资格、R3 类型、帧、时间和模型适用范围均保留；没有声称模型适用于其他 Robot 或 source。
+
+本批生产 2 个文件 +35／−23，净增 12 行。跨文件匹配到 14 行连续原样 Controller 组装代码，其余包括参数接口重写；迁移单列、不计作删除整个功能或性能提升。没有新增／删除文件或新测试文件。双锁下 10 个 Controller／正式配置合同通过；MuJoCo CPU 正式 joint-mass、R3-mass 各完成 reset→非零 step→二次 reset→close，各观测 5 个 native 子步。累计监督 48 次，320 个已观测子步，另 7 次 worker 的内部子步未知；含历史保守计费共 970／2,000。`mass-owner-011-pure.log`、`cpu-run-plan-025.json`、`cpu-source-025.diff` 和 `cpu-025-mass-*` 记录输入与结果；不是完整 Solution 或跨 provider 资格；受影响的 Isaac 质量模型配置未在本批重新实跑。
