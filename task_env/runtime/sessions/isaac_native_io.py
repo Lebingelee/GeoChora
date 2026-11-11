@@ -247,43 +247,6 @@ def _g05_scene_handoff_payload(
     }
 
 
-def _f05_collision_filter_witness(stage, UsdPhysics) -> dict[str, list[dict[str, object]]]:
-    """Preserve source-robot filters while detecting filters that touch F05Scene."""
-    def in_task_scene(path: str) -> bool:
-        return path == '/F05Scene' or path.startswith('/F05Scene/')
-
-    filter_relationships = []
-    task_scene_filter_relationships = []
-    collision_groups = []
-    task_scene_collision_groups = []
-    for prim in stage.Traverse():
-        prim_path = str(prim.GetPath())
-        is_group = prim.IsA(UsdPhysics.CollisionGroup)
-        if is_group:
-            collision_groups.append(prim_path)
-            if in_task_scene(prim_path):
-                task_scene_collision_groups.append(prim_path)
-        for relationship in prim.GetRelationships():
-            relationship_name = str(relationship.GetName())
-            targets = [str(value) for value in relationship.GetTargets()]
-            if relationship_name.startswith('physics:filteredPairs') and targets:
-                row = {
-                    'prim_path': prim_path,
-                    'relationship': relationship_name,
-                    'targets': targets,
-                }
-                filter_relationships.append(row)
-                if in_task_scene(prim_path) or any(in_task_scene(path) for path in targets):
-                    task_scene_filter_relationships.append(row)
-            if is_group and any(token in relationship_name for token in ('includes', 'excludes')):
-                if any(in_task_scene(path) for path in targets):
-                    task_scene_collision_groups.append(prim_path)
-    return {
-        'collision_groups': sorted(set(collision_groups)),
-        'filtered_pairs': filter_relationships,
-        'task_scene_collision_groups': sorted(set(task_scene_collision_groups)),
-        'task_scene_filtered_pairs': task_scene_filter_relationships,
-    }
 
 
 class IsaacSimAppOwnerV1:
@@ -853,7 +816,7 @@ class IsaacSimNativeRuntimeIOV1:
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
         app_owner: IsaacSimAppOwnerV1, *,
-                 dg04_native_input=None, f06_pickcube_input=None,
+                 f06_pickcube_input=None,
                  g05_effort=False, observer_render_request=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
@@ -871,17 +834,13 @@ class IsaacSimNativeRuntimeIOV1:
         self._task_camera_geometry = None
         self._task_camera_sensor = None
         self._observer_faulted = False
-        self._dg04_native_input = dg04_native_input
-        self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
         self._f06_pickcube_input = f06_pickcube_input
         self._f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
         self._g05_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
         if type(g05_effort) is not bool or g05_effort != self._g05_effort:
             raise ValueError('G05 Isaac I/O requires its exact effort profile flag')
-        if self._dg04_native != (dg04_native_input is not None):
-            raise ValueError('DG04 Isaac I/O requires its exact native candidate/profile alone')
-        if self._f06_pickcube != (f06_pickcube_input is not None) or sum((
-                self._dg04_native, self._f06_pickcube, self._g05_effort)) > 1:
+        if self._f06_pickcube != (f06_pickcube_input is not None) or (
+                self._f06_pickcube and self._g05_effort):
             raise ValueError('Isaac I/O requires one exact native route/profile alone')
         self._closed = False
         self._runtime_owner_closed = False
@@ -946,7 +905,6 @@ class IsaacSimNativeRuntimeIOV1:
             "native_startup_observation": self._startup_observation,
         }
         self.drive_receipt = None
-        self._dg04_native_mimic_receipt = None
         self._f06_native_mimic_receipt = None
         self._last_native_mimic_target = None
         self._open_public_runtime()
@@ -970,7 +928,6 @@ class IsaacSimNativeRuntimeIOV1:
                 raise RuntimeError("F04 requires CUDA device 0; CPU fallback is not admitted")
             expected_profile = (
                 'isaac-gpu-physx-pickcube-f06-v1' if self._f06_pickcube
-                else 'isaac-gpu-physx-f05-dg04-native-mimic-v1' if self._dg04_native
                 else 'isaac-gpu-physx-g05-5c-effort-v1' if self._g05_effort
                 else 'isaac-gpu-physx-f04-position-v1'
             )
@@ -978,7 +935,7 @@ class IsaacSimNativeRuntimeIOV1:
                     self._execution.physics_device, self._execution.determinism_mode,
                     self._execution.physics_profile) != (
                     "isaacsim", "cuda", "cuda:0", "best_effort", expected_profile):
-                raise ValueError("unsupported exact F04/F05 Isaac execution identity")
+                raise ValueError("unsupported exact Isaac execution identity")
             if SimulationManager.get_active_physics_engine() != "physx":
                 raise RuntimeError("F04 requires the public PhysX simulation engine")
 
@@ -1056,12 +1013,7 @@ class IsaacSimNativeRuntimeIOV1:
                         or not variant_set.SetVariantSelection(selection)):
                     raise ValueError(f"delivery variant is not available: {key}={selection}")
 
-            if self._dg04_native:
-                self._dg04_native_input.validate()
-                self._verify_native_mimic_profile(
-                    PhysxSchema, UsdPhysics, route='dg04',
-                )
-            elif self._f06_pickcube:
+            if self._f06_pickcube:
                 self._f06_pickcube_input.validate()
                 self._verify_native_mimic_profile(
                     PhysxSchema, UsdPhysics, route='f06',
@@ -1298,10 +1250,7 @@ class IsaacSimNativeRuntimeIOV1:
                         raise ValueError(f"USD RuntimeSource frame binding is not a composed prim: {path}")
                     if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
                         raise ValueError(f"USD RuntimeSource body lacks authored RigidBodyAPI: {path}")
-                    if self._dg04_native and semantic == 'free-cube/free_cube':
-                        self._body_views[path] = RigidPrim(path, max_contact_count=32)
-                        self._body_views[path].set_enabled_contact_tracking(True, threshold=0.0)
-                    elif (self._f06_pickcube and semantic == 'cube-v1' and self._artifact.artifact_id in {
+                    if (self._f06_pickcube and semantic == 'cube-v1' and self._artifact.artifact_id in {
                             'pickcube-f06-physical-effort-fixture-v1',
                             'pickcube-f06-physical-effort-no-drive-v1'}):
                         self._body_views[path] = RigidPrim(path, max_contact_count=64)
@@ -1662,23 +1611,7 @@ class IsaacSimNativeRuntimeIOV1:
                 int(self._artifact.timebase.control_substeps), self._dof_names,
                 self._position_limits,
             )
-            if self._dg04_native:
-                from .leaf_control import compile_isaac_native_mimic_position_receipt_v1
-
-                witness = self._verify_public_drives(route='dg04')
-                self.drive_receipt = compile_isaac_native_mimic_position_receipt_v1(
-                    execution=self._execution, source=self._source,
-                    native_metadata=self._metadata,
-                    writer_id='panda-main/position-servo-v1',
-                    native_drive_witness=witness,
-                    provenance_kind='native_runtime',
-                )
-                self._bootstrap_receipt['native_mimic_drive_witness'] = witness
-                self._bootstrap_receipt['native_adaptation_receipt'] = self.drive_receipt.to_mapping()
-                self._bootstrap_receipt['source_scene_witness'] = (
-                    self._verify_f05_public_scene(UsdGeom, UsdPhysics)
-                )
-            elif self._f06_pickcube:
+            if self._f06_pickcube:
                 from .leaf_control import compile_isaac_native_mimic_position_receipt_v1
 
                 witness = self._verify_public_drives(route='f06')
@@ -1737,139 +1670,6 @@ class IsaacSimNativeRuntimeIOV1:
             raise primary.with_traceback(None)
 
 
-    def _verify_f05_public_scene(self, UsdGeom, UsdPhysics) -> dict[str, object]:
-        """Bind the F05 task geometry and effective public body properties."""
-        support_path = '/F05Scene/support'
-        cube_path = '/F05Scene/free_cube'
-        support = self._stage.GetPrimAtPath(support_path)
-        cube = self._stage.GetPrimAtPath(cube_path)
-        support_collision_path = f'{support_path}/collision'
-        cube_collision_path = f'{cube_path}/collision'
-        support_collision = self._stage.GetPrimAtPath(support_collision_path)
-        cube_collision = self._stage.GetPrimAtPath(cube_collision_path)
-        if any(not prim or not prim.IsValid() for prim in (
-                support, cube, support_collision, cube_collision)):
-            raise ValueError('F05 F05 support/cube task scene prims are incomplete')
-        if (not support_collision.HasAPI(UsdPhysics.CollisionAPI)
-                or not cube_collision.HasAPI(UsdPhysics.CollisionAPI)
-                or not cube.HasAPI(UsdPhysics.RigidBodyAPI)
-                or not cube.HasAPI(UsdPhysics.MassAPI)):
-            raise ValueError('F05 F05 task scene physics schemas differ from its exact recipe')
-        scene_prims = [prim for prim in self._stage.Traverse() if prim.IsA(UsdPhysics.Scene)]
-        if len(scene_prims) != 1:
-            raise ValueError('F05 F05 task scene must bind exactly one PhysicsScene')
-        gravity_direction = tuple(float(x) for x in scene_prims[0].GetAttribute(
-            'physics:gravityDirection').Get())
-        gravity_magnitude = float(scene_prims[0].GetAttribute('physics:gravityMagnitude').Get())
-        if (not _numeric_tuple_matches(
-                gravity_direction, (0.0, 0.0, -1.0), abs_tol=1e-7)
-                or not _numeric_value_matches(gravity_magnitude, 9.81, abs_tol=1e-6)):
-            raise ValueError('F05 F05 gravity differs from the frozen task-scene recipe')
-
-        def box_geometry(prim, path, expected_center, expected_size):
-            geom = UsdGeom.Cube(prim)
-            size = float(geom.GetSizeAttr().Get())
-            scale = tuple(float(x) for x in prim.GetAttribute('xformOp:scale').Get())
-            root = self._stage.GetPrimAtPath(path)
-            center = tuple(float(x) for x in root.GetAttribute('xformOp:translate').Get())
-            dimensions = tuple(size * value for value in scale)
-            if (not _numeric_tuple_matches(center, expected_center, abs_tol=1e-6)
-                    or not _numeric_tuple_matches(dimensions, expected_size, abs_tol=1e-6)):
-                raise ValueError(f'F05 task-scene box differs from the frozen recipe: {path}')
-            return {'center_m': list(center), 'dimensions_m': list(dimensions),
-                    'usd_cube_size': size, 'usd_scale': list(scale)}
-
-        cube_geometry_receipt = box_geometry(
-            cube_collision, cube_path, (1.0, 0.5, 0.9), (0.06, 0.06, 0.06),
-        )
-        support_geometry_receipt = box_geometry(
-            support_collision, support_path, (1.0, 0.5, 0.45), (0.35, 0.35, 0.05),
-        )
-        mass_attr = cube.GetAttribute('physics:mass')
-        if (not mass_attr or not mass_attr.IsValid()
-                or not _numeric_value_matches(float(mass_attr.Get()), 0.1, abs_tol=1e-7)):
-            raise ValueError('F05 task cube authored mass differs from the frozen 0.1 kg recipe')
-        collision_enabled = {
-            path: bool(self._stage.GetPrimAtPath(path).GetAttribute(
-                'physics:collisionEnabled').Get())
-            for path in (support_collision_path, cube_collision_path)
-        }
-        if collision_enabled != {support_collision_path: True, cube_collision_path: True}:
-            raise ValueError('F05 task collision geometry is not enabled on both recipe shapes')
-
-        material_bindings = {}
-        for path in (support_collision_path, cube_collision_path):
-            prim = self._stage.GetPrimAtPath(path)
-            rows = []
-            while prim and prim.IsValid():
-                relationship = prim.GetRelationship('material:binding')
-                if relationship and relationship.IsValid():
-                    targets = tuple(str(target) for target in relationship.GetTargets())
-                    if targets:
-                        rows.append({'prim_path': str(prim.GetPath()), 'targets': list(targets)})
-                prim = prim.GetParent()
-            material_bindings[path] = rows
-        if any(material_bindings.values()):
-            raise ValueError('F05 cube/support source profile must remain without authored material bindings')
-
-        filter_witness = _f05_collision_filter_witness(self._stage, UsdPhysics)
-        filter_relationships = filter_witness['filtered_pairs']
-        collision_groups = filter_witness['collision_groups']
-        task_scene_filter_relationships = filter_witness['task_scene_filtered_pairs']
-        task_scene_collision_groups = filter_witness['task_scene_collision_groups']
-        if task_scene_collision_groups or task_scene_filter_relationships:
-            raise ValueError('F05 task scene unexpectedly adds collision filtering')
-
-        if len(self._free_views) != 1:
-            raise ValueError('F05 source scene requires exactly one floating free-cube body')
-        view = next(iter(self._free_views.values()))
-        masses = _tensor_rows(view.get_masses(), width=1, label='F05 public cube mass')[0]
-        com_positions, com_orientations = view.get_coms()
-        com_position = _tensor_rows(com_positions, width=3,
-                                    label='F05 public cube COM position')[0]
-        com_orientation = _tensor_rows(com_orientations, width=4,
-                                       label='F05 public cube COM orientation')[0]
-        inertias = _tensor_rows(view.get_inertias(), width=9,
-                                label='F05 public cube inertia tensor')[0]
-        expected_inertia = 0.1 * 0.06 * 0.06 / 6.0
-        diagonal = (inertias[0], inertias[4], inertias[8])
-        if (not math.isclose(masses[0], 0.1, rel_tol=0.0, abs_tol=1e-6)
-                or any(not math.isclose(value, 0.0, rel_tol=0.0, abs_tol=1e-6)
-                       for value in com_position)
-                or any(not math.isclose(actual, expected_inertia, rel_tol=0.05, abs_tol=1e-7)
-                       for actual in diagonal)
-                or any(not math.isclose(inertias[index], 0.0, rel_tol=0.0, abs_tol=1e-7)
-                       for index in (1, 2, 3, 5, 6, 7))):
-            raise ValueError('F05 public cube mass/COM/inertia differ from the 0.1 kg uniform cube profile')
-        return {
-            'schema_version': 'f05-isaac-public-source-scene-witness-v1',
-            'gravity_direction': list(gravity_direction),
-            'gravity_magnitude_m_s2': gravity_magnitude,
-            'support_geometry': support_geometry_receipt,
-            'free_cube_geometry': cube_geometry_receipt,
-            'authored_mass_kg': float(mass_attr.Get()),
-            'public_mass_kg': masses[0],
-            'public_com_position_body_m': list(com_position),
-            'public_com_orientation_body_wxyz': list(com_orientation),
-            'public_inertia_tensor_kg_m2_row_major': list(inertias),
-            'uniform_cube_inertia_reference_kg_m2': expected_inertia,
-            'collision_enabled': collision_enabled,
-            'material_binding_targets': material_bindings,
-            'collision_groups': collision_groups,
-            'filtered_pairs': filter_relationships,
-            'task_scene_collision_groups': task_scene_collision_groups,
-            'task_scene_filtered_pairs': task_scene_filter_relationships,
-            'contact_query': {
-                'public_api': 'RigidPrim.get_raw_contact_data',
-                'sensor_path': cube_path,
-                'matched_actor_path': support_collision_path,
-                'contact_report_api_enabled_via': 'RigidPrim.set_enabled_contact_tracking',
-                'physics_collision_filter_authored': bool(
-                    task_scene_collision_groups or task_scene_filter_relationships
-                ),
-            },
-            'cross_engine_material_equivalence_claimed': False,
-        }
 
     def _read_f06_robot_contact_witness(self):
         """Read bounded public contacts for every source robot body after a step."""
@@ -1909,119 +1709,13 @@ class IsaacSimNativeRuntimeIOV1:
                 'total_contacts': sum(row['count'] for row in rows),
                 'cube_contact_count': cube_count, 'cube_contact_actor_paths': list(cube_actor_paths)}
 
-    def _read_dg04_contact_witness(self) -> dict[str, object]:
-        """Read public raw contacts and select only the frozen support collider."""
-        if not self._dg04_native or not self._free_views:
-            raise RuntimeError('F05 Isaac contact readback requires the exact free-cube view')
-        view = next(iter(self._free_views.values()))
-        result = view.get_raw_contact_data(dt=float(self._artifact.timebase.physics_dt))
-        if type(result) is not tuple or len(result) != 7:
-            raise ValueError('DG04 public raw contact API returned an unexpected seven-array result')
-        normal_forces, _points, normals, distances, counts, starts, actor_ids = result
-        count_rows = counts.numpy().tolist()
-        start_rows = starts.numpy().tolist()
-        if len(count_rows) != 1 or len(start_rows) != 1:
-            raise ValueError('DG04 public raw contact view must return one free-cube sensor row')
-        raw_contact_count = int(count_rows[0])
-        contact_start = int(start_rows[0])
-        if raw_contact_count < 0 or raw_contact_count > 32 or contact_start < 0:
-            raise ValueError('DG04 public contact count/start index is outside the bounded view')
-        force_rows = normal_forces.numpy().tolist()
-        actor_paths = (
-            view.get_actor_paths_from_ids(
-                actor_ids.to('cpu')[contact_start:contact_start + raw_contact_count],
-            )
-            if raw_contact_count else []
-        )
-        selected = force_rows[contact_start:contact_start + raw_contact_count]
-        if len(selected) != raw_contact_count or len(actor_paths) != raw_contact_count:
-            raise ValueError('DG04 public contact force slice exceeds the returned contact buffer')
-        force_values = tuple(float(row[0]) for row in selected)
-        normal_rows = normals.numpy().tolist()
-        distance_rows = distances.numpy().tolist()
-        selected_normals = tuple(
-            tuple(float(value) for value in normal_rows[contact_start + index])
-            for index in range(raw_contact_count)
-        )
-        selected_separations = tuple(
-            float(distance_rows[contact_start + index][0])
-            for index in range(raw_contact_count)
-        )
-        if (len(selected_normals) != raw_contact_count
-                or len(selected_separations) != raw_contact_count):
-            raise ValueError('DG04 public contact normal/separation slices exceed the returned buffer')
-        invalid_force_indices = tuple(
-            index for index, value in enumerate(force_values)
-            if (not math.isfinite(value)
-                or not all(math.isfinite(component) for component in selected_normals[index])
-                or not math.isfinite(selected_separations[index]))
-        )
-        if invalid_force_indices:
-            invalid_samples = tuple({
-                'contact_index': contact_start + index,
-                'actor_path': actor_paths[index],
-                'force_scalar_N': force_values[index],
-                'normal_world': selected_normals[index],
-                'separation_m': selected_separations[index],
-            } for index in (invalid_force_indices or tuple(
-                index for index, value in enumerate(force_values) if value < 0.0
-            )))
-            raise ValueError(
-                'F05 public raw contact data contains invalid force/normal/separation values; '
-                f'count={raw_contact_count}, start={contact_start}, invalid={invalid_samples!r}'
-            )
-        force_magnitudes = tuple(abs(value) for value in force_values)
-        support_path = '/F05Scene/support/collision'
-        support_indices = tuple(
-            index for index, path in enumerate(actor_paths)
-            if path == '/F05Scene/support' or path == support_path
-            or path.startswith(support_path + '/')
-        )
-        support_forces = tuple(force_magnitudes[index] for index in support_indices)
-        witness = {
-            'schema_version': (
-                'f05-dg04-native-contact-witness-v1'
-            ),
-            'provenance_kind': 'native_runtime',
-            'api': 'RigidPrim.get_raw_contact_data',
-            'sensor_path': '/F05Scene/free_cube',
-            'support_path': support_path,
-            'physics_dt_s': float(self._artifact.timebase.physics_dt),
-            'raw_contact_count': raw_contact_count,
-            'raw_contact_actor_paths': list(actor_paths),
-            'raw_contact_normal_forces_N': list(force_magnitudes),
-            'contact_count': len(support_indices),
-            'support_contact_normal_forces_N': list(support_forces),
-            'normal_force_sum_N': math.fsum(support_forces),
-            'contact_present': bool(support_indices),
-        }
-        if self._dg04_native:
-            witness.update({
-                'raw_contact_signed_normal_force_scalars_N': list(force_values),
-                'raw_contact_normals_world': [list(row) for row in selected_normals],
-                'raw_contact_separations_m': list(selected_separations),
-                'force_magnitude_mapping': 'abs(raw_signed_normal_force_scalar_N)',
-            })
-        return witness
 
     def _verify_native_mimic_profile(self, PhysxSchema, UsdPhysics, *, route: str) -> None:
         """Verify the shared Panda mimic relation with route-owned drive settings."""
-        if route == 'dg04':
-            if not self._dg04_native or self._stage is None:
-                raise RuntimeError('DG04 native mimic requires its exact composed USD stage')
-            label, entity_id = 'DG04', 'panda-main'
-            expected_source_sha256 = '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'
-            leader_drive = ('force', 2000.0, 100.0, 100.0)
-            authors_drive = True
-        elif route == 'f06':
-            if not self._f06_pickcube or self._stage is None:
-                raise RuntimeError('F06 native mimic requires its exact composed USD stage')
-            label, entity_id = 'F06', 'panda-v1'
-            expected_source_sha256 = None
-            leader_drive = ('force', 5000.0, 120.0, 5.0)
-            authors_drive = False
-        else:
-            raise ValueError(f'unsupported Isaac mimic profile route: {route!r}')
+        if route != 'f06' or not self._f06_pickcube or self._stage is None:
+            raise RuntimeError('F06 native mimic requires its exact composed USD stage')
+        label, entity_id = 'F06', 'panda-v1'
+        leader_drive = ('force', 5000.0, 120.0, 5.0)
 
         import xml.etree.ElementTree as ET
 
@@ -2032,8 +1726,6 @@ class IsaacSimNativeRuntimeIOV1:
         if type(source_xml) is not bytes:
             raise ValueError(f'{label} source delivery omits the original Panda XML bytes')
         source_xml_sha256 = hashlib.sha256(source_xml).hexdigest()
-        if expected_source_sha256 is not None and source_xml_sha256 != expected_source_sha256:
-            raise ValueError('DG04 source adaptation requires the exact frozen Menagerie Panda XML bytes')
         equalities = ET.fromstring(source_xml).findall('./equality/joint')
         if len(equalities) != 1:
             raise ValueError(f'{label} source must contain exactly one finger equality')
@@ -2071,23 +1763,9 @@ class IsaacSimNativeRuntimeIOV1:
             raise ValueError(f'{label} native PhysX mimic profile could not be authored/read back')
 
         drive_exists = reference.HasAPI(UsdPhysics.DriveAPI, 'linear')
-        if authors_drive:
-            if drive_exists:
-                raise ValueError('DG04 source leader unexpectedly already has a second linear DriveAPI')
-            drive = UsdPhysics.DriveAPI.Apply(reference, 'linear')
-            if not drive:
-                raise RuntimeError('DG04 could not apply the public linear DriveAPI to the mimic leader')
-            for attr_name, value in zip(('Type', 'Stiffness', 'Damping', 'MaxForce'), leader_drive):
-                creator = getattr(drive, f'Create{attr_name}Attr', None)
-                if not callable(creator):
-                    raise RuntimeError(f'DG04 installed UsdPhysics DriveAPI lacks Create{attr_name}Attr')
-                attribute = creator()
-                if not attribute or not attribute.IsValid() or attribute.Set(value) is False:
-                    raise RuntimeError(f'DG04 public DriveAPI rejected the fixed leader {attr_name} value')
-        else:
-            if not drive_exists:
-                raise ValueError('F06 source-bound leader DriveAPI is absent from the desktop USD')
-            drive = UsdPhysics.DriveAPI(reference, 'linear')
+        if not drive_exists:
+            raise ValueError('F06 source-bound leader DriveAPI is absent from the desktop USD')
+        drive = UsdPhysics.DriveAPI(reference, 'linear')
         actual_drive = (
             str(drive.GetTypeAttr().Get()), float(drive.GetStiffnessAttr().Get()),
             float(drive.GetDampingAttr().Get()), float(drive.GetMaxForceAttr().Get()),
@@ -2097,43 +1775,19 @@ class IsaacSimNativeRuntimeIOV1:
                        for index in range(1, 4))):
             raise ValueError(f'{label} source-bound leader drive differs from its exact profile: {actual_drive!r}')
 
-        if route == 'dg04':
-            self._dg04_native_mimic_receipt = {
-                'schema_version': 'isaac-dg04-native-mimic-stage-receipt-v1',
-                'source_entry_sha256': source_xml_sha256,
-                'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
-                'reference_joint': 'finger_joint1', 'reference_path': str(reference.GetPath()),
-                'source_polycoef': polycoef,
-                'native_mimic_api': 'PhysxMimicJointAPI:transX',
-                'native_mimic_properties': {
-                    'gearing': float(follower.GetAttribute('physxMimicJoint:transX:gearing').Get()),
-                    'offset': float(follower.GetAttribute('physxMimicJoint:transX:offset').Get()),
-                    'naturalFrequency': float(frequency_attr.Get()),
-                    'dampingRatio': float(damping_attr.Get()),
-                },
-                'native_drive_api': 'PhysicsDriveAPI:linear',
-                'leader_drive_joint': 'finger_joint1', 'leader_drive_path': str(reference.GetPath()),
-                'leader_drive_properties': {
-                    'type': actual_drive[0], 'stiffness_N_m': actual_drive[1],
-                    'damping_N_s_m': actual_drive[2], 'max_force_N': actual_drive[3],
-                },
-                'profile_id': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
-                'runtime_stage_mutated': True,
-            }
-        else:
-            self._f06_native_mimic_receipt = {
-                'schema_version': 'isaac-f06-pickcube-native-mimic-stage-receipt-v1',
-                'source_xml_sha256': source_xml_sha256,
-                'source_polycoef': polycoef,
-                'follower_path': str(follower.GetPath()), 'reference_path': str(reference.GetPath()),
-                'native_mimic_api': 'PhysxMimicJointAPI:transX',
-                'mimic_frequency_hz': float(frequency_attr.Get()),
-                'mimic_damping_ratio': float(damping_attr.Get()),
-                'leader_drive_api': 'PhysicsDriveAPI:linear',
-                'leader_stiffness_N_m': actual_drive[1], 'leader_damping_N_s_m': actual_drive[2],
-                'leader_max_force_N': actual_drive[3],
-                'runtime_stage_mutated_for_native_mimic_profile': True,
-            }
+        self._f06_native_mimic_receipt = {
+            'schema_version': 'isaac-f06-pickcube-native-mimic-stage-receipt-v1',
+            'source_xml_sha256': source_xml_sha256,
+            'source_polycoef': polycoef,
+            'follower_path': str(follower.GetPath()), 'reference_path': str(reference.GetPath()),
+            'native_mimic_api': 'PhysxMimicJointAPI:transX',
+            'mimic_frequency_hz': float(frequency_attr.Get()),
+            'mimic_damping_ratio': float(damping_attr.Get()),
+            'leader_drive_api': 'PhysicsDriveAPI:linear',
+            'leader_stiffness_N_m': actual_drive[1], 'leader_damping_N_s_m': actual_drive[2],
+            'leader_max_force_N': actual_drive[3],
+            'runtime_stage_mutated_for_native_mimic_profile': True,
+        }
 
     def _verify_public_drives(self, *, route: str) -> dict[str, object]:
         """Check the shared seven-arm/one-leader surface against its exact profile."""
@@ -2153,24 +1807,6 @@ class IsaacSimNativeRuntimeIOV1:
                 'joint7': (2000.0, 200.0, 250.0),
             }
             leader_expected = (5000.0, 120.0, 5.0)
-        elif route == 'dg04':
-            if (not self._dg04_native or self._stage is None
-                    or self._dg04_native_mimic_receipt is None):
-                raise RuntimeError('DG04 stage mimic/drive profile was not initialized before public view checks')
-            label = 'DG04'
-            schema_version = 'isaac-dg04-native-mimic-drive-witness-v1'
-            # Keep the source-derived Menagerie actuator force limits distinct
-            # from F06's task-specific 250 N arm limits.
-            arm_expected = {
-                'joint1': (4500.0, 450.0, 87.0),
-                'joint2': (4500.0, 450.0, 87.0),
-                'joint3': (3500.0, 350.0, 87.0),
-                'joint4': (3500.0, 350.0, 87.0),
-                'joint5': (2000.0, 200.0, 12.0),
-                'joint6': (2000.0, 200.0, 12.0),
-                'joint7': (2000.0, 200.0, 12.0),
-            }
-            leader_expected = (2000.0, 100.0, 100.0)
         else:
             raise ValueError(f'unsupported Isaac public-drive route: {route!r}')
 
@@ -2403,12 +2039,11 @@ class IsaacSimNativeRuntimeIOV1:
         expected_targets = tuple(sorted(position_targets))
         # Provider-free F04 boundary tests construct this adapter with
         # ``__new__`` to exercise reset behavior without opening Isaac.
-        dg04_native = getattr(self, "_dg04_native", False)
         f06_pickcube = getattr(self, "_f06_pickcube", False)
         g05_effort = getattr(self, "_g05_effort", False)
         if g05_effort:
             valid_targets = not expected_targets
-        elif dg04_native or f06_pickcube:
+        elif f06_pickcube:
             expected_active_names = {f'joint{index}' for index in range(1, 8)} | {'finger_joint1'}
             valid_targets = (
                 len(expected_targets) == 8
@@ -2443,7 +2078,7 @@ class IsaacSimNativeRuntimeIOV1:
                 for semantic, native in self._source.joints.items():
                     velocities[self._dof_index[native]] = float(sample.joint_velocity[semantic])
             self._articulation.set_dof_velocities(velocities)
-            if dg04_native or f06_pickcube:
+            if f06_pickcube:
                 self._articulation.set_dof_position_targets(
                     [item[2] for item in expected_targets],
                     dof_indices=[int(item[0]) for item in expected_targets],
@@ -2452,7 +2087,7 @@ class IsaacSimNativeRuntimeIOV1:
                     self._articulation.get_dof_position_targets(
                         dof_indices=[int(item[0]) for item in expected_targets],
                     ),
-                    width=8, label=('F06' if f06_pickcube else 'DG04')
+                    width=8, label='F06'
                     + ' reset active position-target readback',
                 )[0]
                 if any(not math.isclose(actual, item[2], rel_tol=0.0, abs_tol=1e-6)
@@ -2582,8 +2217,7 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError('G05 simple-effort route does not admit position target writes')
         ordered = tuple(sorted(targets))
         f06_pickcube = getattr(self, "_f06_pickcube", False)
-        dg04_native = getattr(self, "_dg04_native", False)
-        if dg04_native or f06_pickcube:
+        if f06_pickcube:
             expected_active_names = {f'joint{index}' for index in range(1, 8)} | {'finger_joint1'}
             valid_targets = (
                 len(ordered) == 8
@@ -2607,8 +2241,8 @@ class IsaacSimNativeRuntimeIOV1:
             )
             self._sync()
             applied_values = tuple(float(item[2]) for item in ordered)
-            if dg04_native or f06_pickcube:
-                label = 'F06' if f06_pickcube else 'DG04'
+            if f06_pickcube:
+                label = 'F06'
                 target_readback = _tensor_rows(
                     self._articulation.get_dof_position_targets(
                         dof_indices=[int(item[0]) for item in ordered],
@@ -2619,7 +2253,7 @@ class IsaacSimNativeRuntimeIOV1:
                        for actual, item in zip(target_readback, ordered, strict=True)):
                     raise ValueError(f'{label} public Articulation position-target readback differs from its admitted target')
                 applied_values = tuple(float(value) for value in target_readback)
-            if dg04_native or f06_pickcube:
+            if f06_pickcube:
                 leader_index = next(index for index, item in enumerate(ordered)
                                     if item[1] == 'finger_joint1')
                 self._last_native_mimic_target = {
@@ -2800,44 +2434,35 @@ class IsaacSimNativeRuntimeIOV1:
                     'readback_efforts': list(readback),
                     'public_effort_api': 'Articulation.get_dof_efforts',
                 }
-            elif self._dg04_native or self._f06_pickcube:
+            elif self._f06_pickcube:
                 target = self._last_native_mimic_target
                 if (not isinstance(target, dict)
                         or target.get('drive_receipt_identity_sha256') != self.drive_receipt.identity_sha256
                         or not _is_sha256_identity(target.get('target_identity_sha256'))):
-                    raise RuntimeError('DG04 physics substep has no current acknowledged leader position target')
+                    raise RuntimeError('F06 physics substep has no current acknowledged leader position target')
                 self._sync()
                 q = _tensor_rows(self._articulation.get_dof_positions(), width=len(self._dof_names),
-                                 label='DG04 post-step DOF position')[0]
+                                 label='F06 post-step DOF position')[0]
                 qd = _tensor_rows(self._articulation.get_dof_velocities(), width=len(self._dof_names),
-                                  label='DG04 post-step DOF velocity')[0]
+                                  label='F06 post-step DOF velocity')[0]
                 reference_index = self._dof_index['finger_joint1']
                 follower_index = self._dof_index['finger_joint2']
-                if self._f06_pickcube:
-                    # F06's 5 N contract bounds the leader drive's actuator
-                    # output. Projected joint force also includes forces
-                    # arriving through the joint and is retained separately
-                    # as a physical observation.
-                    applied_effort = _tensor_rows(
-                        self._articulation.get_dof_efforts(
-                            dof_indices=[reference_index],
-                        ),
-                        width=1, label='F06 public leader actuation-effort readback',
-                    )[0][0]
-                    projected_joint_force = _tensor_rows(
-                        self._articulation.get_dof_projected_joint_forces(
-                            dof_indices=[reference_index],
-                        ),
-                        width=1, label='F06 public projected active leader-force readback',
-                    )[0][0]
-                else:
-                    applied_effort = _tensor_rows(
-                        self._articulation.get_dof_projected_joint_forces(
-                            dof_indices=[reference_index],
-                        ),
-                        width=1, label='DG04 public projected active leader effort readback',
-                    )[0][0]
-                    projected_joint_force = None
+                # F06's 5 N contract bounds the leader drive's actuator
+                # output. Projected joint force also includes forces
+                # arriving through the joint and is retained separately
+                # as a physical observation.
+                applied_effort = _tensor_rows(
+                    self._articulation.get_dof_efforts(
+                        dof_indices=[reference_index],
+                    ),
+                    width=1, label='F06 public leader actuation-effort readback',
+                )[0][0]
+                projected_joint_force = _tensor_rows(
+                    self._articulation.get_dof_projected_joint_forces(
+                        dof_indices=[reference_index],
+                    ),
+                    width=1, label='F06 public projected active leader-force readback',
+                )[0][0]
                 reference_position = float(q[reference_index])
                 follower_position = float(q[follower_index])
                 reference_velocity = float(qd[reference_index])
@@ -2845,9 +2470,8 @@ class IsaacSimNativeRuntimeIOV1:
                 native_adaptation_application = {
                     'schema_version': 'native-physx-mimic-substep-application-v1',
                     'profile_id': (
-                        ('isaacsim-' + self._app_owner.sdk_identity['normalized_version'].rsplit('.', 2)[0]
-                         + '-pickcube-physx-mimic-5n-v1') if self._f06_pickcube
-                        else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
+                        'isaacsim-' + self._app_owner.sdk_identity['normalized_version'].rsplit('.', 2)[0]
+                        + '-pickcube-physx-mimic-5n-v1'
                     ),
                     'provenance_kind': 'native_runtime',
                     'drive_receipt_identity_sha256': self.drive_receipt.identity_sha256,
@@ -2862,14 +2486,12 @@ class IsaacSimNativeRuntimeIOV1:
                     'relation_error_m': follower_position - reference_position,
                     'reference_target_m': float(target['reference_target_m']),
                     'reference_effort_N': float(applied_effort),
-                    'maximum_effort_N': 5.0 if self._f06_pickcube else 100.0,
+                    'maximum_effort_N': 5.0,
                     'public_effort_api': (
-                        'Articulation.get_dof_efforts' if self._f06_pickcube
-                        else 'Articulation.get_dof_projected_joint_forces'
+                        'Articulation.get_dof_efforts'
                     ),
                     'effort_measurement_semantics': (
-                        'actuation_force' if self._f06_pickcube
-                        else 'projected_active_joint_force'
+                        'actuation_force'
                     ),
                     'native_mimic_api': 'PhysxMimicJointAPI:transX',
                     'native_drive_api': 'PhysicsDriveAPI:linear',
@@ -2884,16 +2506,12 @@ class IsaacSimNativeRuntimeIOV1:
                         ),
                         'projected_force_measurement_semantics': 'projected_active_joint_force',
                     })
-                if self._dg04_native:
-                    native_adaptation_application['public_contact_witness'] = (
-                        self._read_dg04_contact_witness()
-                    )
         except BaseException as error:
             if getattr(self, '_physical_effort_pending', None) is not None:
                 self._physical_effort_fault = True
             error.add_note(
                 f"one native physics step was attempted; pre-step counter={before!r}; "
-                f"DG04 native adaptation receipt={native_adaptation_application!r}"
+                f"native adaptation receipt={native_adaptation_application!r}"
             )
             raise
         after = self._counter()
@@ -3792,35 +3410,21 @@ class IsaacSimNativeRuntimeIOV1:
 
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *,
-                                  dg04_native_input=None, f06_pickcube_input=None,
+                                  f06_pickcube_input=None,
                                   g05_effort=False, observer_render_request=None,
                                   task_render_requested=False):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
-    dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
     f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
     g05_simple_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
-    if (dg04_native != (dg04_native_input is not None)
-            or f06_pickcube != (f06_pickcube_input is not None)
+    if (f06_pickcube != (f06_pickcube_input is not None)
             or g05_simple_effort != bool(g05_effort)
-            or sum((dg04_native, f06_pickcube, g05_simple_effort)) > 1):
+            or (f06_pickcube and g05_simple_effort)):
         raise ValueError('Isaac native adapter requires exactly one versioned input/profile pair')
     if not (source.scene_source.source_verified or source.scene_source.locally_validated):
         raise ValueError("Isaac Core adapter requires an upstream-validated or exact locally validated USD delivery")
     if source.scene_source.representation.provider != "isaacsim":
         raise ValueError("Isaac Core adapter requires an Isaac Sim representation selection")
-    if dg04_native:
-        from .api import _require_session_admission_input_route
-
-        _require_session_admission_input_route(
-            dg04_native_input, 'f05_dg04',
-            'DG04 Isaac adapter requires exact F05Dg04IsaacNativeCandidateInputV1',
-        )
-        dg04_native_input.validate()
-        if (dg04_native_input.artifact is not artifact
-                or dg04_native_input.execution.identity_hash != execution.identity_hash
-                or dg04_native_input.runtime_source is not source):
-            raise ValueError('DG04 Isaac adapter candidate differs from the exact artifact/execution/source')
     if f06_pickcube:
         from .source import UsdRuntimeInputV1
         from .api import _validate_f06_pickcube_isaac_input
@@ -3842,7 +3446,6 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
     try:
         return IsaacSimNativeRuntimeIOV1(
             artifact, execution, source, lease, owner,
-            dg04_native_input=dg04_native_input,
             f06_pickcube_input=f06_pickcube_input,
             g05_effort=g05_effort,
             observer_render_request=observer_render_request,

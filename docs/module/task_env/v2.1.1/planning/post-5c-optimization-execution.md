@@ -734,3 +734,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 删除 6 个历史资产文件、24022 字节、869 个文本行；无生产 Python 代码、测试或诊断代码变化，无新增或迁移。本文和当前状态文档修改 2 文件；tracked 文件数由 1364 减至 1358。正式构建、provider／renderer、clock 和提交路径未改变。
 
 73 项版本检查通过；MuJoCo 正式 PickCube reference 与 physical joint→R3 reset 切换、H5 读回和 close 短程通过，共观测 15 个 native 子步。Isaac 与 GeoPhys 本批未重跑，6.58／6.59 的正式路线证据可在本批删除文件不属于其 source 输入或生产调用链的范围内复用；完整 Solution 未重跑。文件身份、冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_position_legacy_assets_20261112_001/`。E01～E04 仍未接收。
+
+### 6.61 退休 Isaac adapter 的 DG04 专用分支
+
+输入 `5f3c714b`。DG04 的正式输入与 Session 准入已退休，但 Isaac native adapter 仍保留其特定 scene、contact witness、DriveAPI 改写、receipt 和 route 选择。本批移除这些专属实现，保留仍由正式 F06 使用的 Panda mimic 关系、source 检查、5 N leader drive、原生状态和 actuation／projected force 的分离读回，以及 G05 effort 路线。此项只收敛已不可达的 DG04 分支，并不代表 renderer 或全部 provider adapter 整理已完成。
+
+生产修改 1 文件 +63／−460，净减 397 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1358。Runtime 对正式 source、clock、提交和 native feedback 的合同保持；旧 DG04 输入不再是 native adapter 的构造选项。
+
+73 项版本检查通过。Isaac PickCube Position 与 joint effort 的 CUDA／同步 RGB 路线均完成两次 reset、非零 step、三帧独立读回、重复 Env close 和 App close，各观测 41 次 physics callback；订阅前启动推进未知。Position H5 独立检查确认 native Ack、5 个推进收据、两个 typed-state 样本以及各收据的 F06 mimic／5 N actuation 语义。两次关闭日志均有 Isaac 菜单扩展访问已关闭 USD context 的异常，但应用与进程关闭收据均成功；该日志不当作物理故障或被忽略。简单主体 Isaac、MuJoCo、GeoPhys 和完整 Solution 本批未重跑；其他 provider 代码未变，先前证据按原范围保留。冻结 diff、计划、两次 native 收据与 H5 检查位于 ignored `workspace/maintenance/v211_retire_dg04_isaac_20261112_001/`。E01～E04 仍未接收。
