@@ -158,8 +158,8 @@ def check_v3_oracle(directory, details, summary, spec_hash, artifact_hash, core_
     require(compiled.get('source_closure_sha256')==profile.get('source_closure_digest')
         and compiled.get('source_sha256',{}).get('f06_delivery_manifest_sha256')
             ==profile.get('delivery_manifest_sha256'),'Oracle source closure/delivery mismatch')
-    from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1
-    require(profile.get('delivery_manifest_sha256')==ISAAC_DELIVERY_MANIFEST_SHA256_V1,
+    from task_env.tasks.pick_cube.isaac import ISAAC_ADMITTED_DELIVERIES_V1
+    require(profile.get('delivery_manifest_sha256') in ISAAC_ADMITTED_DELIVERIES_V1,
         'Oracle recorded delivery differs from Core pin')
     checks=details.get('storage_identity_checks') or {}
     expected_checks={'inspector_pass','t_plus_one','artifact_identity','controller_identity','expert_identity',
@@ -226,7 +226,7 @@ def check_asset_binding(spec, upstream, provider):
     require(len(matches)==1,'candidate object missing or ambiguous in upstream asset binding')
     asset=matches[0]
     if bundle.get('schema_version')=='harness-builtin-source-bundle-v1':
-        from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1
+        from task_env.tasks.pick_cube.isaac import ISAAC_ADMITTED_DELIVERIES_V1
         from task_env.assembly.usd_delivery import load_usd_asset_delivery
         require(provider=='isaacsim' and asset.get('uid')=='cube-v1'
             and asset.get('source_kind')=='core-builtin-pinned-usd'
@@ -234,7 +234,7 @@ def check_asset_binding(spec, upstream, provider):
             'unsupported built-in source binding')
         path=(upstream/asset['delivery_manifest']).resolve()
         require(path.is_relative_to(upstream) and digest(path)==asset.get('sha256')
-            ==ISAAC_DELIVERY_MANIFEST_SHA256_V1,'built-in USD delivery pin mismatch')
+            and asset.get('sha256') in ISAAC_ADMITTED_DELIVERIES_V1,'built-in USD delivery pin mismatch')
         loaded=load_usd_asset_delivery(path)
         require(loaded.locally_validated and not loaded.source_verified,'built-in delivery provenance mismatch')
         return {'kind':'core-builtin-pinned-usd','asset_uid':asset['uid'],'asset_sha256':asset['sha256'],

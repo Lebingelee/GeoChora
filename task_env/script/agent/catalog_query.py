@@ -108,13 +108,15 @@ def isaac_route_record(delivery_manifest=None):
     1000-tick horizon. The Harness records that pin and whether the local
     manifest bytes match; it never relaxes the pin or claims runtime admission.
     """
-    from task_env.tasks.pick_cube.isaac import ISAAC_DELIVERY_MANIFEST_SHA256_V1, ISAAC_PROFILE_V1
+    from task_env.tasks.pick_cube.isaac import (ISAAC_ADMITTED_DELIVERIES_V1,
+        ISAAC_DELIVERY_MANIFEST_SHA256_V1, ISAAC_PROFILE_V1)
     from task_env.tasks.pick_cube.specialization import REFERENCE_ENV_ID
     record={'schema_version':'harness-isaac-route-v1','provider':'isaacsim','backend':'cuda','device':'cuda:0',
         'physics_profile':ISAAC_PROFILE_V1,'controller_profile':'r3_continuous_v1','horizon_max_control_ticks':1000,
         'core_task_uid':REFERENCE_ENV_ID,'builtin_object_uid':'cube-v1','external_assets_admitted':False,
         'execution':'supervised_isaac_python_worker','runtime_tested':False,
         'pinned_delivery_manifest_sha256':ISAAC_DELIVERY_MANIFEST_SHA256_V1,
+        'admitted_delivery_manifest_sha256s':sorted(ISAAC_ADMITTED_DELIVERIES_V1),
         'delivery_manifest':None,'delivery_manifest_sha256':None,'available':False,'unavailable_reason':None}
     if delivery_manifest is None:
         record['unavailable_reason']='no --isaac-delivery-manifest was supplied'
@@ -126,8 +128,8 @@ def isaac_route_record(delivery_manifest=None):
         return record
     digest=hashlib.sha256(path.read_bytes()).hexdigest()
     record['delivery_manifest_sha256']=digest
-    if digest!=ISAAC_DELIVERY_MANIFEST_SHA256_V1:
-        record['unavailable_reason']='delivery manifest bytes differ from the Core-pinned F06 PickCube desktop delivery'
+    if digest not in ISAAC_ADMITTED_DELIVERIES_V1:
+        record['unavailable_reason']='delivery manifest bytes differ from every Core-admitted PickCube Isaac delivery'
         return record
     record['available']=True
     return record

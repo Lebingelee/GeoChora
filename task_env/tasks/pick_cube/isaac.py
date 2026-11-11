@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 import hashlib
 import json
 from pathlib import Path
+from types import MappingProxyType
 
 from ...artifacts import ExecutionSpecV1, RendererSelectionV1
 from ...runtime.sessions.source import UsdRuntimeSourceV1
@@ -41,6 +42,23 @@ ISAAC_REPRESENTATION_V1 = "isaacsim-6.2.0.0-pickcube-desktop-v1"
 ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
     "6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2"
 )
+# Separately versioned asset-object scene: the F06 composition with the task
+# object's geometry/material replaced by a generated asset (asset-creation skill,
+# TRELLIS.2).  Derived by task_env/diagnostics/tasks/pickcube_isaac_asset_object_delivery.py.
+ISAAC_REPRESENTATION_ASSET_OBJECT_V1 = "isaacsim-6.2.0.0-pickcube-asset-object-v1"
+ISAAC_DELIVERY_MANIFEST_SHA256_ASSET_OBJECT_V1 = (
+    "40b0dd2226d49e22d8d4ad03de5440ea454bbb7d4b4e2eabea3abbe732565d3e"
+)
+# Exact admitted delivery manifest bytes -> required representation id.
+ISAAC_ADMITTED_DELIVERIES_V1 = MappingProxyType({
+    ISAAC_DELIVERY_MANIFEST_SHA256_V1: ISAAC_REPRESENTATION_V1,
+    ISAAC_DELIVERY_MANIFEST_SHA256_ASSET_OBJECT_V1: ISAAC_REPRESENTATION_ASSET_OBJECT_V1,
+})
+
+
+def isaac_delivery_admitted(manifest_sha256: str, representation_id: str) -> bool:
+    """Return whether these exact manifest bytes are a Core-admitted PickCube Isaac delivery."""
+    return ISAAC_ADMITTED_DELIVERIES_V1.get(manifest_sha256) == representation_id
 
 
 def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
@@ -189,8 +207,8 @@ class PickCubeIsaacRuntimeInputV1:
             raise ValueError("F06 USD RuntimeSource must bind the exact TaskSource and Scene")
         delivery = self.runtime_source.scene_source.loaded_delivery
         if (delivery.manifest_bytes_sha256 != self.delivery_manifest_sha256
-                or self.delivery_manifest_sha256 != ISAAC_DELIVERY_MANIFEST_SHA256_V1
-                or delivery.delivery.representation_id != ISAAC_REPRESENTATION_V1
+                or not isaac_delivery_admitted(
+                    self.delivery_manifest_sha256, delivery.delivery.representation_id)
                 or not delivery.locally_validated or delivery.source_verified):
             raise ValueError("F06 requires its exact locally validated, non-upstream Isaac desktop USD")
         expected_joints = {
@@ -269,10 +287,9 @@ def build_pickcube_isaac_runtime_input_v1(
     path = Path(delivery_manifest).resolve(strict=True)
     loaded = load_usd_asset_delivery(path)
     manifest_sha = loaded.manifest_bytes_sha256
-    if (manifest_sha != ISAAC_DELIVERY_MANIFEST_SHA256_V1
-            or not loaded.locally_validated or loaded.source_verified
-            or loaded.delivery.representation_id != ISAAC_REPRESENTATION_V1):
-        raise ValueError("F06 builder requires the exact generated PickCube desktop delivery v1")
+    if (not isaac_delivery_admitted(manifest_sha, loaded.delivery.representation_id)
+            or not loaded.locally_validated or loaded.source_verified):
+        raise ValueError("F06 builder requires an exact Core-admitted PickCube Isaac delivery")
 
     task_config = _configuration() if task_config is None else task_config
     legacy_artifact = build_artifact(task_config=task_config)
@@ -319,7 +336,9 @@ def build_pickcube_isaac_runtime_input_v1(
 
 __all__ = [
     "SCHEMA_VERSION", "SCENE_RECIPE_ID", "ISAAC_PROFILE_V1",
-    "ISAAC_DELIVERY_MANIFEST_SHA256_V1", "PickCubeIsaacRuntimeInputV1",
+    "ISAAC_DELIVERY_MANIFEST_SHA256_V1", "ISAAC_REPRESENTATION_ASSET_OBJECT_V1",
+    "ISAAC_DELIVERY_MANIFEST_SHA256_ASSET_OBJECT_V1", "ISAAC_ADMITTED_DELIVERIES_V1",
+    "isaac_delivery_admitted", "PickCubeIsaacRuntimeInputV1",
     "build_pickcube_isaac_scene", "compile_pickcube_isaac_task_artifact",
     "build_pickcube_isaac_runtime_input_v1",
 ]
