@@ -72,6 +72,7 @@ def test_custom_base_task_subclass_uses_component_configuration_without_marker(m
         assert isinstance(env, BaseTaskEnv)
         assert env.config.episode.horizon == 7
         assert env._runtime is None
+        assert env.get_execution_receipt()['status'] == 'selection_only'
     finally:
         env.close()
 
