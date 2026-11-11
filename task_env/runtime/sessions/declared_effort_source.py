@@ -1,6 +1,7 @@
 """Compile a declared fixed Robot subject into an effort Runtime source."""
 from __future__ import annotations
 
+from dataclasses import replace
 import xml.etree.ElementTree as ET
 
 from ...artifacts import ExecutionSpecV1, RendererSelectionV1
@@ -90,4 +91,8 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
             torque_actuators=torque_actuators,
             actuator_units={item.native_actuator: 'N*m' for item in declarations})
         execution_spec = None
-    return source, execution_spec, closure
+    # The source adapter may replace the provisional MJCF identity with a USD
+    # identity. Preserve the exact transmission declaration checked above.
+    subject = replace(subject, source_id=source.source_id,
+                      source_closure_sha256=source.source_closure_digest)
+    return source, execution_spec, closure, subject, declarations

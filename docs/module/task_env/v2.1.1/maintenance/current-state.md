@@ -145,3 +145,5 @@ Panda effort profile 语义已从 PickCube candidate 归控制与 Robot owner，
 MJCF／USD 的 Panda effort 参考参数与质量模型准入已收敛为一份 Task 声明，受影响 MuJoCo reset 切换和 Isaac effort／RGB 已复验；Task 的 source 专属构建仍待收敛。详见[实施记录 6.64](../planning/post-5c-optimization-execution.md#664-收敛-panda-effort-参考参数的重复准备)。
 
 PickCube USD Scene 声明与 effort 构造现使用同一 Panda Robot 实例；真实 source 对照和 Isaac 短程已复验。详见[实施记录 6.65](../planning/post-5c-optimization-execution.md#665-usd-panda-声明与-effort-构造共享-robot)。
+
+Pendulum 与双轮车现将 source 校验过的同一份传动声明用于 Assembly／Controller；MuJoCo 与 GeoPhys 短程通过，Isaac 本批只有无 SDK 合同检查。详见[实施记录 6.66](../planning/post-5c-optimization-execution.md#666-简单主体复用-source-校验过的传动声明)。

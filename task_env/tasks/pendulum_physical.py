@@ -12,10 +12,6 @@ from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
 from ..robots.pendulum import PENDULUM_ACTION_CONTRACT
 
-from ..runtime.sessions.declared_effort_source import (
-    declared_effort_scene, compile_declared_effort_source,
-)
-
 from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
                        PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS)

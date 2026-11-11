@@ -27,12 +27,15 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
     seen = {}
     def build_source(**kwargs):
         seen.update(kwargs)
-        return SimpleNamespace(source_closure_digest='a' * 64)
+        return SimpleNamespace(source_id='usd-source', source_closure_digest='a' * 64)
     monkeypatch.setattr(isaac_g05, 'build_g05_isaac_runtime_source', build_source)
     args = dict(scene=scene, artifact=artifact, task_source=task_source,
                 composition=None, config=None, provider='isaacsim',
                 source_delivery_manifest='fixture', seed=31, base_dir=Path(task.__file__).parent)
-    source, spec, closure = compile_declared_effort_source(robot=robot, **args)
+    source, spec, closure, subject, declarations = compile_declared_effort_source(robot=robot, **args)
+    assert subject.source_id == source.source_id
+    assert subject.source_closure_sha256 == source.source_closure_digest
+    assert len(declarations) == len(subject.channel_paths)
     assert seen['bodies'] == expected_bodies
     assert seen['joints'] == {f'{robot.uid}/{name}': name for name in robot.state_joint_names}
     assert seen['joint_targets'] == seen['joints']
@@ -126,3 +129,30 @@ def test_effort_controller_rejects_foreign_subject_source(profile):
     with pytest.raises(ValueError, match='differs from subject source'):
         select_subject_effort_controller(foreign, compiled.binding, profile_id=profile,
             writer_id=subject.controller_writers[0], units=('N*m',), cadence_s=.05)
+
+
+@pytest.mark.parametrize(('uid', 'robot_type'), [
+    ('pendulum-v1', PendulumEntity), ('two-wheel-balance-v1', TwoWheelBalanceEntity),
+])
+def test_source_checked_declaration_is_used_by_the_controller(uid, robot_type, monkeypatch):
+    import sys
+    from task_env import make_env
+
+    original = robot_type.physical_subject_declaration
+    declared = []
+    def capture(robot, **kwargs):
+        value = original(robot, **kwargs)
+        declared.append(value)
+        return value
+    monkeypatch.setattr(robot_type, 'physical_subject_declaration', capture)
+    config = {'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
+                            'interpreter': sys.executable}, 'episode': {'horizon': 8}}
+    env = make_env(uid, config=config)
+    try:
+        assert len(declared) == 1
+        execution = env.value['physical_execution']
+        assert execution.subjects[0] == declared[0][0]
+        assert tuple(channel.native_actuator for channel in execution.compiled.binding.channels) == tuple(
+            item.native_actuator for item in declared[0][1])
+    finally:
+        env.close()

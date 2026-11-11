@@ -774,3 +774,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +13／−12，净增 1 行；版本诊断修改 1 文件 +18／−0，覆盖 Scene 使用传入 Robot；本文及当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer 的 source、状态、clock、提交和资源合同未改变。
 
 76 项版本检查通过。真实 MJCF／USD source 的五种 profile 共十组合同与输入版本一致，USD 的场景声明与 effort 构造实测收到同一 Robot 实例。Isaac joint effort／CUDA／同步 RGB 实际完成两次 reset、一次 step、三帧独立读回、重复 Env close 与 App close，观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知。渲染 warmup 日志出现推进错误后取得图像；只读环境的 stage template 权限日志与 SDK 关闭时菜单扩展异常保留，进程和读回均成功。MuJoCo、GeoPhys 及完整 Solution 本批未重跑，静态 source 对照不等于原生执行。证据位于 ignored `workspace/maintenance/v211_usd_robot_owner_20261112_001/`，本次 native 运行是 `isaac/runs/isaac-003`，目录中更早的 `001`／`002` 属于历史运行，不能混用。E01～E04 仍未接收。
+
+### 6.66 简单主体复用 source 校验过的传动声明
+
+输入 `4726e235`。Pendulum 和双轮车的共同 source compiler 与 Controller 构造此前分别调用 Robot 的主体声明，存在两份独立生成的传动数据。现在 source compiler 检查电机数、关节、名称、传动比、限幅之后，把同一份关节声明交给共同 Assembly／Controller 路径；若 source adapter 改变 source 身份，则将主体绑定到最终 source，后续编译仍核对 source identity 与 closure。删除两份 Task 文件中不再使用的 source compiler 导入。
+
+生产修改 5 文件 +11／−15，净减 4 行；版本诊断修改 1 文件 +32／−2，覆盖 USD source 身份绑定及两个正式任务实际只生成一次声明；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer 的推进、clock、状态及资源合同未改；这项收敛只覆盖简单主体，Panda 和完整 adapter 整理仍需继续。
+
+78 项版本检查通过；MuJoCo Pendulum 和双轮车各完成 reset、step 和关闭，分别观测 25 个 native 子步。GeoPhys 两任务短程均通过，内部物理子步未观测、按每次 50 保守预留。Isaac 的最终 source 身份绑定通过无 SDK 合同检查，本批未进行 Isaac 原生运行；完整 Solution 未重跑。冻结 diff、计划和 CPU 收据位于 ignored `workspace/maintenance/v211_checked_subject_20261112_6l8UzF/`。E01～E04 仍未接收。

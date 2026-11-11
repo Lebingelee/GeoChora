@@ -11,10 +11,6 @@ from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
 from ..robots.two_wheel_balance import TWO_WHEEL_ACTION_CONTRACT
 
-from ..runtime.sessions.declared_effort_source import (
-    declared_effort_scene, compile_declared_effort_source,
-)
-
 from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
     TWO_WHEEL_BALANCE_SCENE_UID, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
     TwoWheelBalanceTaskDefinition, TwoWheelBalanceObservationBuilder)

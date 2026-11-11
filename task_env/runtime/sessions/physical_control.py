@@ -169,10 +169,9 @@ def build_declared_effort_execution(*, scene, artifact, source, subject, declara
     return execution
 
 
-def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
-    """Compile an existing Robot's declaration into one source-bound effort execution."""
-    subject, declarations = robot.physical_subject_declaration(
-        source_id=source.source_id, source_closure_sha256=source.source_closure_digest)
+def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id,
+                                  subject, declarations):
+    """Compile the source-checked Robot declaration into an effort execution."""
     names = tuple(robot.state_joint_names)
     definitions = {joint.joint_id: joint for articulation in scene.articulations or ()
                    if articulation.entity_id == subject.entity_id for joint in articulation.joints}

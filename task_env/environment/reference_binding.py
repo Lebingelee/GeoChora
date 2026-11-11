@@ -627,14 +627,14 @@ class ExistingSubjectEffortTask:
             scene = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
             task_source, artifact = self.compile_declaration(scene, robot)
-            source, execution_spec, closure = compile_declared_effort_source(
+            source, execution_spec, closure, subject, declarations = compile_declared_effort_source(
                 robot=robot, scene=scene, artifact=artifact, task_source=task_source,
                 composition=self.composition, config=config, provider=provider,
                 source_delivery_manifest=source_delivery_manifest, seed=seed,
                 base_dir=self.source_base_dir)
             profile_id = config.control.profile_id or 'direct_joint_effort_v1'
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
-                                                       source=source, profile_id=profile_id)
+                source=source, profile_id=profile_id, subject=subject, declarations=declarations)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0], 'solution': None, 'physical_execution': physical,
                 'reset_plan': self.reset_plan(artifact, source, seed, sampled),
