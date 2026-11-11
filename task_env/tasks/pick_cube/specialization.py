@@ -357,17 +357,16 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile="r3_continuous_v1",
-                          resolved_config=None, task_config=None, physical_fixture=False):
+                          resolved_config=None, task_config=None, physical_fixture=False,
+                          controller_builder=None):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
         raise ValueError("F06 Isaac freezes the existing r3_continuous_v1 profile")
-    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
     from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessSolution
 
-    # Reuse the task's existing action/readiness configuration and production
-    # R3 physical profile; only the source-bound position writer changes.
+    # The Task supplies action/readiness data; the selected Controller owns execution.
     legacy = build_reference(backend="cpu", include_solution=False,
                              controller_profile=controller_profile, resolved_config=resolved_config, task_config=task_config)
     robot = legacy["source"].agents[0]
@@ -382,28 +381,37 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     loaded = load_usd_asset_delivery(manifest_path)
     if hashlib.sha256(panda_xml.encode("utf-8")).hexdigest() != loaded.delivery.source_entry_sha256:
         raise ValueError("F06 kinematics Panda XML differs from the frozen source-entry bytes")
-    dynamic_profile, _profile_source = _r3_dynamic_profile()
-    controller = PandaPositionServoProfileV1.from_usd_source(
-        runtime_input.artifact, runtime_input.runtime_source,
-        execution=runtime_input.execution, kinematics_source_xml=panda_xml,
-        config=legacy["source"].config.action,
-        pose_target_method="achieved_state_dls_v1",
-        arm_tracking_method="production_r3_continuous_v1",
-        arm_tracking_profile=dynamic_profile,
-        arm_joint_velocity_limit_rad_s=(
-            PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
-        ),
-        entity_id="panda-v1", hand_frame_id="ee",
-        tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
-    )
+    action_config = legacy["source"].config.action
+    physical = None
+    if controller_builder is None:
+        from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+        dynamic_profile, _profile_source = _r3_dynamic_profile()
+        controller = PandaPositionServoProfileV1.from_usd_source(
+            runtime_input.artifact, runtime_input.runtime_source,
+            execution=runtime_input.execution, kinematics_source_xml=panda_xml,
+            config=action_config, pose_target_method="achieved_state_dls_v1",
+            arm_tracking_method="production_r3_continuous_v1", arm_tracking_profile=dynamic_profile,
+            arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
+            entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
+        )
+    else:
+        physical = controller_builder(robot, runtime_input, panda_xml, action_config)
+        from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
+        if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
+            raise TypeError('USD Controller builder must return one physical execution')
+        controller = physical.controllers[0]
     readiness = legacy["readiness"]
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     source_ids = dict(legacy["source_sha256"])
-    for path in (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
-                 Path(__file__).parents[2] / "runtime/sessions/api.py",
-                 Path(__file__).parents[2] / "controllers/canonical/position_profile.py",
-                 Path(__file__).parents[2] / "controllers/canonical/kinematics.py"):
+    if physical is not None:
+        source_ids.pop("task_env/controllers/canonical/position_profile.py", None)
+    identity_paths = (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
+                      Path(__file__).parents[2] / "runtime/sessions/api.py",
+                      Path(__file__).parents[2] / "controllers/canonical/kinematics.py")
+    if physical is None:
+        identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
+    for path in identity_paths:
         source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
             path.read_bytes()
         ).hexdigest()
@@ -427,7 +435,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         "artifact_sha256": runtime_input.artifact.identity_hash,
         "runtime_config": effective_config,
         "runtime_config_sha256": effective_config_sha,
-        "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
+        "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
         "resolved_controller_gripper": legacy["resolved_configuration"]["resolved_controller_gripper"],
         "controller_identity": controller.identity,
         "solution_identity": solution_identity,
@@ -440,7 +448,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         "execution_spec_v1": runtime_input.execution.to_mapping(),
         "reset_plan_identity_sha256": runtime_input.reset_plan.identity_hash,
         "f06_delivery_manifest_sha256": runtime_input.delivery_manifest_sha256,
-        "tcp_profile": controller.tcp_profile.to_mapping(),
+        "tcp_profile": PANDA_PICKCUBE_EE_TCP_V1.to_mapping(),
         "qualification": "NOT_REQUALIFIED",
     }
     return {
@@ -450,6 +458,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         "source": runtime_input.runtime_source,
         "readiness": readiness,
         "controller": controller,
+        **({} if physical is None else {"physical_execution": physical}),
         "solution": solution,
         "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
         "solution_identity": solution_identity,

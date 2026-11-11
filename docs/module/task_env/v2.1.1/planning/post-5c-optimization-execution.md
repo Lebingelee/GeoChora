@@ -832,3 +832,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +18／−8，净增 10 行；测试／诊断代码无修改；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。物理 Controller 的 V2 观测与 task RGB renderer 的 V1 状态分别核对 Runtime 边界，renderer 本身、clock 和物理提交 owner 未改变。
 
 91 项版本检查通过；MJCF／USD 五种 profile 共十组 source 和 physical Controller 合同对照一致。Isaac joint effort／CUDA／同步 RGB 完成两次 reset、一次 step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知。首次运行因物理构造未传入 F06 准入输入被拒，未观测物理推进、按 59 次保守预留；第二次修正后通过，窗口累计按 100 次记账。SDK 日志仍有只读目录提示、渲染预热错误及关闭时菜单扩展异常；callback 取消订阅接口也报告 AttributeError，进程和独立读回成功。MuJoCo joint→R3 切换／H5 读回通过、观测 10 个 native 子步；GeoPhys 和完整 Solution 本批未重跑。冻结各轮 diff、计划、对照及收据位于 ignored `workspace/maintenance/v211_usd_physical_state_20261112_VUQQP8/`。E01～E04 仍未接收。
+
+### 6.73 USD effort 直接构造物理 Controller
+
+输入 `d75109f2`。PickCube USD effort 原先先构造 PositionServo，再借其 action config 和运动学模型构造物理 Controller；现在共同 USD source 构造将已验证的 source、动作配置和模型文本交给选定的 Controller 构造者，effort 直接创建物理执行，需要 R3 时才创建运动学模型。正式 Position 仍使用自身 PositionServo。effort 的来源身份不再包含未使用的 PositionServo 文件；准确的物理 Controller 身份在首次构造时写入 resolved configuration。共同参考 source 准备仍创建参考 Controller，本批没有消除该剩余依赖。
+
+生产修改 2 文件 +44／−36，净增 8 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。F06 source、Artifact、ExecutionSpec、source closure 和 native 准入仍由已有 Runtime 检查；renderer、物理提交和 clock 未改变。
+
+91 项版本检查通过。禁用 USD PositionServo 构造后，五种 effort profile 的真实 source 构建通过，MJCF／USD 十组 physical Controller 合同与输入版本一致；最终静态检查确认 effort 的实际 Controller 身份和来源记录。Isaac effort 与正式 Position 分别完成两次 reset、一次 step、三帧独立读回和 Env／App 关闭，各观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知；Position H5 有一条 transition 和两个 observation。两次 SDK 日志均有只读目录及渲染预热错误，读回和进程退出成功。原生运行之后只调整 PositionServo 的延迟导入及 effort 来源记录，最终代码已用静态 source 检查和版本检查复核，未再次重跑 GPU。GeoPhys、MuJoCo 和完整 Solution 本批未重跑。冻结各轮 diff、计划、对照和收据位于 ignored `workspace/maintenance/v211_usd_no_position_20261112_N3k8lC/`；E01～E04 仍未接收。
