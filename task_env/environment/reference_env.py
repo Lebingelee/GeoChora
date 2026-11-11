@@ -3676,12 +3676,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 writers = (writer,)
                 resource_owners = ((writer, resources),)
             from ..runtime.sessions.control_submission import submit_control_command
-            from ..runtime.sessions.legacy_native_feedback_binding import source_closure_identity
             return submit_control_command(
                 self.session, target, command_kind='position-target',
                 command_sha256=target.identity_hash,
                 source_id=source.source_id,
-                source_closure_sha256=source_closure_identity(self.session),
+                source_closure_sha256=source.source_closure_digest,
                 artifact_sha256=self.artifact.identity_hash,
                 boundary=boundary, sample_clock=sample_clock,
                 controller_generation=lifecycle.controller_generation,
@@ -3692,8 +3691,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 lowering=lowering, lower=lower,
                 subject_execution_mode=(
                     'native-feedback' if self.binding.interval_mode == 'native' else 'boundary-hold'
-                ) if (getattr(source, 'position_subject_binding', None) is not None
-                      or getattr(self.session, '_legacy_native_feedback_binding', None) is not None) else None,
+                ) if getattr(source, 'position_subject_binding', None) is not None else None,
             )
 
         def apply_control():
@@ -3749,11 +3747,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                                    observed_diagnostics)
             from contextlib import nullcontext
             from ..runtime.sessions.control import position_subject_interval
-            from ..runtime.sessions.legacy_native_feedback_binding import native_feedback_interval
             subject_scope = (position_subject_interval(self.session, target, self.state, controller=self._selected_controller)
                              if getattr(self.value['source'], 'position_subject_binding', None) is not None
-                             else native_feedback_interval(self.session, target, self.state, controller=self._selected_controller)
-                             if getattr(self.session, '_legacy_native_feedback_binding', None) is not None
                              else nullcontext())
             with subject_scope:
                 if self.binding.interval_mode == 'native':

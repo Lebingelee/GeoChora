@@ -976,3 +976,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +9／−15，净减 6 行；版本诊断修改 1 文件 +8／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。共同控制物化减少具体任务关节名称和重复分支，任务专属 USD 准入仍在 Runtime 的既有位置，尚需继续归位；renderer、clock 和提交 owner 未改。
 
 115 项版本检查通过，包含对篡改的 USD native target 映射在 source 准入处的拒绝。Isaac CUDA PickCube Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和独立读回成功。F04、MuJoCo、GeoPhys 和完整 Solution 本批未重跑；不能将 F06 的结果扩展到这些路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_native_position_binding_20261112_yh9ip87m/`；E01～E04 仍未接收。
+
+### 6.91 native feedback 只消费 source-owned 主体绑定
+
+输入 `e14d4135`。共同 Runtime 曾在 native-feedback 控制缺少 source 主体绑定时，额外创建旧 source／Controller 绑定，使用独立 boundary scope 和 scene interval；普通及隔离 worker 都维护该旁路。现在 native-feedback 控制要求 source 已持有编译主体绑定，缺失时在物化前拒绝；boundary、提交和 worker 均消费同一 source 及其主体绑定。删除旧绑定、重复 interval 和相关 fallback，保留主体路径的身份、资源、时钟及单次提交检查。USD Position 自有的 source／Controller plan 路径继续使用其对应的物化合同。
+
+生产范围 8 文件：修改 7、删除 1，+7／−203，净减 196 行，无整文件迁移；版本诊断修改 1 文件 +9／−0，本文与当前状态文档修改 2 文件。项目 tracked 文件由 1357 减至 1356。本批移除旧诊断旁路而使正式 native feedback 依赖真实主体，不表示全部任务构造和 adapter 的职责已经收敛。
+
+116 项版本检查通过，包括缺少 source 主体时在物化前拒绝。MuJoCo 四任务与装配 Panda 的进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube 与 NutAssembly 的 MuJoCo 隔离 worker 均完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_native_subject_only_20261112_yhysmfg5/` 和 `workspace/maintenance/v211_native_subject_isaac_20261112_krix37zp/`；E01～E04 仍未接收。

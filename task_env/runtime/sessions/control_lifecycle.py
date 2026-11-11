@@ -53,10 +53,7 @@ def _dispatch_record(env, command_kind, controller_identities, generation):
     boundary = session.state_boundary_identity()
     source = env.value.get('source')
     artifact = env.artifact
-    from .legacy_native_feedback_binding import source_closure_identity
-    closure = (source_closure_identity(session)
-               if getattr(session, '_legacy_native_feedback_binding', None) is not None
-               else source.source_closure_digest)
+    closure = source.source_closure_digest
     receipt = ControlLifecycleDispatchV1(
         'control-lifecycle-dispatch-v1', command_kind,
         source.source_id, closure, artifact.identity_hash,

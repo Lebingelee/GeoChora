@@ -139,15 +139,12 @@ def _materialize_selected(payload):
                                               if binding.interval_mode == 'native' else None))
             from contextlib import nullcontext
             from .control import position_subject_interval
-            from .legacy_native_feedback_binding import native_feedback_interval
 
             def subject_scoped(operation):
                 def invoke(target, *args, **kwargs):
                     state = session.snapshot()
                     if getattr(source, 'position_subject_binding', None) is not None:
                         scope = position_subject_interval(session, target, state, controller=selected.controller)
-                    elif getattr(session, '_legacy_native_feedback_binding', None) is not None:
-                        scope = native_feedback_interval(session, target, state, controller=selected.controller)
                     else:
                         scope = nullcontext()
                     with scope:

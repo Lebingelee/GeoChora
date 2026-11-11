@@ -359,44 +359,6 @@ def prepare_physical_scene_interval(*, session, execution, resolved):
         binding.identity_hash, None, None, context.row, dt, count, tuple(contributions))
 
 
-def prepare_legacy_native_feedback_scene_interval(*, session, target, source_id,
-        source_closure_sha256, artifact_sha256, boundary, sample_clock, resource_owners):
-    """Bind one R3 native-feedback interval to its admitted legacy source."""
-    from .legacy_native_feedback_binding import LegacyNativeFeedbackBindingV1
-    from ...controllers.canonical.contracts import CanonicalControlTarget
-    binding = getattr(session, '_legacy_native_feedback_binding', None)
-    if type(binding) is not LegacyNativeFeedbackBindingV1 or type(target) is not CanonicalControlTarget:
-        raise ValueError('legacy native feedback requires its admitted binding and target')
-    binding.validate_live(session)
-    expected_boundary = (boundary.provider_materialization_id, boundary.episode_id,
-                         boundary.state_revision, boundary.control_step)
-    if ((source_id, source_closure_sha256, artifact_sha256) !=
-            (binding.source_id, binding.source_closure_sha256, binding.artifact_sha256)
-            or getattr(boundary, 'artifact_identity_hash', None) != artifact_sha256
-            or getattr(boundary, 'source_closure_digest', None) != source_closure_sha256
-            or getattr(session, '_legacy_native_feedback_inflight', None) !=
-               (expected_boundary, target.identity_hash, binding.controller_identity)
-            or target.controller_identity != binding.controller_identity
-            or target.task_artifact_hash != artifact_sha256
-            or set(target.arm_servo_position) != set(dict(binding.joint_targets))
-            or target.gripper.semantic_id != binding.gripper_semantic_id
-            or resource_owners != ((binding.writer_id, binding.resources),)):
-        raise ValueError('legacy native feedback interval differs from its live binding')
-    timebase = session._artifact.timebase
-    count, dt, control_dt = timebase.control_substeps, float(timebase.physics_dt), float(timebase.control_dt)
-    if (type(count) is not int or count <= 0 or not math.isfinite(dt) or dt <= 0
-            or not math.isfinite(control_dt)
-            or not math.isclose(dt * count, control_dt, rel_tol=1e-12, abs_tol=1e-12)):
-        raise ValueError('legacy native feedback interval differs from its Artifact timebase')
-    contribution = SceneCommandContributionV1('robot-controller',
-        'position-reference-native-feedback', ('rad', 'm'), 'controller-managed',
-        None, binding.writer_id, binding.controller_identity, None,
-        target.identity_hash, binding.resources, 0, count)
-    return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
-        source_closure_sha256, artifact_sha256, boundary, sample_clock, binding.identity_hash,
-        None, None, None, dt, count, (contribution,))
-
-
 def prepare_subject_position_scene_interval(*, session, target, source_id,
         source_closure_sha256, artifact_sha256, boundary, sample_clock,
         resource_owners, execution_mode):
@@ -865,10 +827,9 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
         raise ValueError('control commit Controller generation is stale')
     source = getattr(session, '_source', None)
     artifact = getattr(session, '_artifact', None)
-    from .legacy_native_feedback_binding import source_closure_identity
     source_mismatch = (source is not None and (
         getattr(source, 'source_id', None) != source_id
-        or source_closure_identity(session) != source_closure_sha256))
+        or source.source_closure_digest != source_closure_sha256))
     artifact_mismatch = (artifact is not None
                          and getattr(artifact, 'identity_hash', None) != artifact_sha256)
     if source_mismatch or artifact_mismatch:
@@ -1054,14 +1015,6 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
             source_id=source_id, source_closure_sha256=source_closure_sha256,
             artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
             resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
-    elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
-          and getattr(session, '_legacy_native_feedback_binding', None) is not None):
-        if subject_execution_mode != 'native-feedback':
-            raise ValueError('legacy native feedback requires its actual execution mode')
-        scene_interval = prepare_legacy_native_feedback_scene_interval(session=session, target=command,
-            source_id=source_id, source_closure_sha256=source_closure_sha256,
-            artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
-            resource_owners=payload['resource_owners'])
     if scene_interval is None and (lifecycle is not None or command_kind == 'physical-effort-sequence'):
         # A selected lifecycle is a production dispatch, not the historical
         # standalone submission interface.  Do not consume its replay key or

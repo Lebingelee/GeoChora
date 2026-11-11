@@ -310,3 +310,12 @@ def test_physical_early_failure_releases_prepared_task_source(monkeypatch):
         PickCubeReferenceEnv.selected_binding(config)
     assert raised.value is failure
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_native_feedback_requires_source_owned_subject_before_materialization():
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.control import materialize_control
+
+    source = SimpleNamespace(position_subject_binding=None)
+    with pytest.raises(ValueError, match='source-owned subject binding'):
+        materialize_control(None, None, source=source, binding=None, selected_controller=object())

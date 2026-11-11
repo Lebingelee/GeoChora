@@ -922,6 +922,8 @@ def materialize_control(
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
 
+    if selected_controller is not None and getattr(source, 'position_subject_binding', None) is None:
+        raise ValueError('native feedback control requires a source-owned subject binding')
     declared_execution = execution
     from .api import _session_admission_input_route
     f04_native = False
@@ -1128,20 +1130,6 @@ def materialize_control(
                 admission_error.add_note(
                     f'F04 App owner cleanup after receipt admission failure also failed: '
                     f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            raise
-    if (selected_controller is not None
-            and getattr(source, 'position_subject_binding', None) is None):
-        try:
-            from .legacy_native_feedback_binding import install_admitted_binding
-            install_admitted_binding(session, source=source, artifact=artifact,
-                                     controller=selected_controller)
-        except BaseException as admission_error:
-            try:
-                session.close()
-            except BaseException as cleanup_error:
-                admission_error.add_note(
-                    f'legacy native feedback cleanup after binding failure also failed: {cleanup_error!r}'
                 )
             raise
     session._control_binding = binding
