@@ -65,9 +65,6 @@ _MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
 # converging toward the command would otherwise wind the correction up and
 # drag the command past the target.
 _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO = 0.05
-# Descend toward the grasp gate in small Cartesian steps; a large step makes
-# the joint-space servo swing the TCP upward before it settles.
-_GRASP_DESCEND_MAX_TRANSLATION_PER_STEP = 0.004
 # The descend stage ends on a measured grasp-height interlock: a TCP that settles
 # above the planned grasp height leaves only the pad tips on the cube top edge.
 _GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
@@ -102,10 +99,15 @@ class MeasuredTcpGate:
     max_horizontal_error_m: float | None = None
     maximum_height_above_cube_top_m: float | None = None
     require_settled: bool = False
+    # Wait budget in pose-hold units.  The grasp-height descend ends with a
+    # joint-space servo transient that can take most of one hold to settle.
+    wait_hold_multiple: int = 1
 
     def __post_init__(self) -> None:
         if not self.name or type(self.after_actions) is not int or self.after_actions < 0:
             raise ValueError("measured TCP gate requires a name and nonnegative action boundary")
+        if type(self.wait_hold_multiple) is not int or self.wait_hold_multiple < 1:
+            raise ValueError("measured TCP gate wait budget must be a positive hold multiple")
         if (not np.isfinite(self.minimum_height_above_cube_top_m)
                 or self.minimum_height_above_cube_top_m <= 0.0):
             raise ValueError("measured TCP gate clearance must be finite and positive")
@@ -536,8 +538,7 @@ class PickCubeSolution:
         )
         gated = getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False)
         actions = self._planner.plan_translation_only(
-            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0,
-            max_translation_per_step=(_GRASP_DESCEND_MAX_TRANSLATION_PER_STEP if gated else None),
+            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0
         )
         gates = ()
         if gated:
@@ -553,6 +554,7 @@ class PickCubeSolution:
                         _GRASP_CLEARANCE_ABOVE_CUBE_TOP + _GRASP_HEIGHT_UPPER_TOLERANCE
                     ),
                     require_settled=True,
+                    wait_hold_multiple=2,
                 ),
             )
         return SegmentPlan(actions=actions, target_pose=target, measured_tcp_gates=gates)
@@ -683,7 +685,7 @@ class PickCubeReadinessConfig:
             "transition_ticks": base.close_transition_steps, "pose_timeout_s": 1.,
             "formula": "max(ceil(range/opening_step),ceil(range/force_adjust_step))+ceil(margin/control_dt)",
             "measured_tcp_clearance_gate": measured_tcp_clearance_gate,
-            "measured_tcp_clearance_gate_hold_ticks": 3 * int(pose) if measured_tcp_clearance_gate else 0,
+            "measured_tcp_clearance_gate_hold_ticks": 4 * int(pose) if measured_tcp_clearance_gate else 0,
         }
         return cls(
             base, float(dt),
@@ -698,7 +700,8 @@ class PickCubeReadinessConfig:
     @property
     def global_safety_cap(self):
         gate_holds = (
-            3 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
+            # Two clearance gate holds plus a two-hold grasp-height gate.
+            4 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
         )
         return self.base.action_budget + sum(policy.hold_ticks for policy in self.policies) + gate_holds
 
@@ -938,7 +941,8 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._advance_measured_tcp_gates(observation)
             gate = self._pending_measured_tcp_gate(self._segments[self._segment_index])
             if gate is not None and self._action_index >= gate.after_actions:
-                if self._measured_tcp_gate_wait_ticks >= self.readiness_config.policies[0].hold_ticks:
+                if (self._measured_tcp_gate_wait_ticks
+                        >= gate.wait_hold_multiple * self.readiness_config.policies[0].hold_ticks):
                     self._fail(f"measured_tcp_clearance_timeout:{gate.name}")
                 return
         if not exhausted:
@@ -1155,8 +1159,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
             })
             self._measured_tcp_gate_index += 1
             self._measured_tcp_gate_wait_ticks = 0
-            # The converged servo-offset correction stays for later holds in this
-            # segment; the settle reference restarts with the next hold.
+            # Each hold integrates its own correction: a correction carried from a
+            # clearance gate would offset the later pose hold away from its target.
+            self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
             self._measured_tcp_hold_previous_tcp = None
 
 
