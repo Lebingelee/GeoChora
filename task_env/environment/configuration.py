@@ -365,7 +365,7 @@ def _resolve_selected_config(environment_type, config):
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "controller", "provider", "backend", "horizon",
+    allowed = {"execution", "episode", "task", "control", "controller", "provider", "backend", "horizon",
                "controller_profile", "source_delivery_manifest", "robot"}
     unknown = set(values) - allowed
     if unknown:
@@ -404,6 +404,15 @@ def _resolve_selected_config(environment_type, config):
         if not isinstance(section, Mapping):
             raise TypeError(f"{name} must be a mapping")
         sections[name] = dict(section)
+    control = values.get('control', {})
+    if not isinstance(control, Mapping) or set(control) - {'profile_id'}:
+        raise ValueError('selected control configuration supports profile_id only')
+    if 'profile_id' in control:
+        profile = control['profile_id']
+        previous = sections['task'].get('controller_profile', profile)
+        if previous != profile:
+            raise ValueError('control.profile_id conflicts with task.controller_profile')
+        sections['task']['controller_profile'] = profile
     allowed_sections = {
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
@@ -597,8 +606,8 @@ def _resolve_selected_config(environment_type, config):
     return result
 
 
-def _normalize_controller_selection(environment_type, config):
-    """Decode the common Controller selector into the retained config codecs."""
+def _normalize_controller_selection(config):
+    """Decode the common Controller selector before either retained codec."""
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if not isinstance(config, Mapping):
@@ -608,9 +617,7 @@ def _normalize_controller_selection(environment_type, config):
         return config
     values, controller = dict(config), dict(controller)
     profile = controller.pop('profile_id')
-    section, key = (('task', 'controller_profile')
-                    if getattr(environment_type, 'uses_selected_public_config', False)
-                    else ('control', 'profile_id'))
+    section, key = 'control', 'profile_id'
     legacy = dict(values.get(section, {}))
     if key in legacy and legacy[key] != profile:
         raise ValueError(f'controller.profile_id conflicts with {section}.{key}')
@@ -636,7 +643,7 @@ def _resolve_task_env_config_impl(
     cannot replace task-owned scene, object, agent, or success-definition fields.
     """
 
-    config = _normalize_controller_selection(environment_type, config)
+    config = _normalize_controller_selection(config)
     if getattr(environment_type, "uses_selected_public_config", False):
         return _resolve_selected_config(environment_type, config)
     if isinstance(config, ResolvedEnvConfig):

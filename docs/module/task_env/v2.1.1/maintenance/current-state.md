@@ -47,3 +47,5 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 第六批将 Isaac source 首次重复编译收敛到共同构造，并让实际 physical execution 提供动作合同；Isaac 正式配置完成两次 reset／非零 step／三次 RGB 与独立读回。首次预检失败及受限修复、资源账和 SDK 退订诊断均保留。生产累计净增 182 行，文件数不变；其余 E00～E04 仍待逐项完成，细节见[第六批记录](../planning/post-5c-optimization-execution.md#65-第六批编译后的-controller-合同与-isaac-正式入口复验)。
 
 第七批修复隔离 worker 的 source-bound 控制提交：正式 PickCube 在 MuJoCo CPU 和 GeoPhys CPU 两条受测路线均完成 reset／单 interval／第二次 reset／close。失败、未观测子步的保守计费和一次无锁资产解析的偏差保留；累计生产净增 228 行、tracked 文件数不变。见[第七批记录](../planning/post-5c-optimization-execution.md#66-第七批隔离-worker-的状态边界与控制归属)。
+
+第八批将 Controller selector 在两类配置 codec 之前统一归一化；PickCube 也接受 `control.profile_id`，原输入、身份与能力限制保持。累计生产净增 235 行，详细证据见[第八批记录](../planning/post-5c-optimization-execution.md#67-第八批共同-controller-selector-的配置入口)。

@@ -297,3 +297,11 @@ G05 保持原有界接收；本批不是 E00～E04 总接收，不进入 G06。
 | E04 | source-bound boundary、clock 和提交跨 parent／worker 对齐，GeoPhys 标量编码问题修复 | 其余 action／model／renderer 及 worker 组合按影响核对 |
 
 G05 继续有界接收，E00～E04 和项目优化尚未整体接收；不进入 G06。
+
+### 6.7 第八批：共同 Controller selector 的配置入口
+
+输入 `dd1538f3`。`controller.profile_id` 现在在共同配置入口统一归一化为 `control.profile_id`，不再由这一层根据 Task class 标志选择不同字段。PickCube 的既有 selected codec 在兼容边界读取相同的 `control.profile_id`，继续识别旧 `task.controller_profile`，冲突拒绝；Pendulum／双轮车沿已有 ControlConfig 消费它。三种任务的 mapping／YAML 与旧写法解析结果相等，原已解析身份和任务允许的 profile 范围保持；NutAssembly 仍拒绝未支持 profile。实际公开 factory 继续消费相同已解析合同，不因此宣称两种底层 resolved codec 已合并。
+
+15 项按节点选择的配置纯合同和 1 项公开 factory 消费合同通过；不运行物理，也不把解析测试写成 native 证据。`config-controller-008.log`、`config-factory-008.log` 留存。PickCube 与两个简单任务的既有真实构造使用同一解析结果，本次复用相关 native 证据；后续其他 codec／输入仍需对账。
+
+本批 1 个生产文件 +14／−7、净增 7 行，1 个测试文件 +1 行；累计生产 +1,585／−1,350，净增 235 行，累计测试 +693／−8；无文件新增、删除或迁移。逐文件和文档度量见 `implementation-metrics-008.json`。E01 的共同输入归一化进一步收敛，E00～E04 仍未整体完成，G05 保持原有界接收。

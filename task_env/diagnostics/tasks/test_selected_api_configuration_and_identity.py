@@ -20,6 +20,7 @@ def test_common_controller_selector_preserves_legacy_resolution_and_rejects_conf
     path.write_text(yaml.safe_dump(canonical))
     old = resolve_task_env_config(task, {section: {key: profile}})
     assert resolve_task_env_config(task, canonical) == old
+    assert resolve_task_env_config(task, {'control': {'profile_id': profile}}) == old
     assert resolve_task_env_config(task, path) == old
     with pytest.raises(ValueError, match='conflicts'):
         resolve_task_env_config(task, {**canonical, section: {key: 'different'}})
