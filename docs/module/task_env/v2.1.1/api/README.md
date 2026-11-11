@@ -8,6 +8,16 @@
 
 Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，由调用方交给 `env.step(action)`；现存 `step_expert()` 是受限兼容，不是新标准 Env API。部分 `step_with_solution()` 路线由 Env 调用调用方持有的 Solution，属于受限过渡；NutAssembly 现支持调用方直接传入含来源边界和控制请求的 `ExpertAction`，并在 `observe` 校验五个 native 样本；裸数组仍拒绝。PickCube seed31 与 NutAssembly seed19 已在 MuJoCo CPU 上完成有界物理回归和独立读回，证据及源码身份见[验证记录](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。详见[当前 Solution 说明](../../../../../task_env/doc/api/planning/task_owned_solutions.md)。
 
+## 5c 后优化：当前正式构造增量
+
+正式 PickCube、NutAssembly、Pendulum 和双轮车已由同一个 `SelectedReferenceEnv.from_resolved_config` 构造 owner 消费任务声明。两个既有 resolved 配置值类型继续兼容；高级 candidate factory、execution 字段与 provider kwargs 尚未完成收敛，优化整体仍在实施。范围、原始检查及剩余条件见[实施记录 6.1](../planning/post-5c-optimization-execution.md#61-第二批正式构造与声明主体)。
+
+支持选择 profile 的任务可统一写 `config={"controller": {"profile_id": ...}}`，例如 PickCube 的 `r3_continuous_v1`，或 Pendulum／双轮车的 `direct_joint_effort_v1`、已有限定路线的 `velocity_damped_joint_effort_v1`。旧 `task.controller_profile`／`control.profile_id` 由配置 owner 单向归一化，同义值保持原解析结果，冲突拒绝；不扩大任务原有可选 profile，NutAssembly 仍拒绝其未公开支持的 profile 选择。Mapping 与 YAML 使用同一解析。
+
+四主体的 MuJoCo CPU 正式构造提供同一 `env.robot` 视图：`subjects`、`controllers` 和 `root_frames` 引用实际准入的声明与 owner，`controller` 与 Env 当前 Controller 是同一对象；reset 重绑后返回当前视图。装配 Panda 保留 arm／hand 两个 subject 及两个 Controller，不把它们压成一个控制器。视图不创建 Runtime、第二个推进者或状态副本。旧组件 Panda 的 `references`／`gripper`／`ee` 便利投影继续保留；当前 selected 视图未声明这些投影时相应字段为 None，使用共同 subject／Frame 声明，不为 Pendulum／双轮车制造 Panda 属性。
+
+两个简单任务的 TaskDefinition 通过既有 TaskLifecycleAdapter 消费公开 Runtime 具名状态，Env 负责随机流、reset transaction 和资源生命周期；任务模块保留自己的采样范围、奖励、成功语义及状态投影。`build_runtime=False` 继续保留无 provider 构建的组件兼容合同，不代表 native batch。当前增量的真实复验为五条 MuJoCo CPU 短程路线及简单任务 RNG 序列，未新增 GeoPhys／Isaac、真实 RGB、完整 Solution 或任意跨组合的接收结论。
+
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 
 公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `task.controller_profile="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。

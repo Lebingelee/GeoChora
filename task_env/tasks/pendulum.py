@@ -678,91 +678,17 @@ class PendulumEnv(BaseTaskEnv):
     """Single Pendulum with a shared source-bound physical runtime."""
 
     uses_component_task_config = True
-    prefer_reference_factory = True
+    physical_task_timebase = (.002, 25)
     selected_physical_controller_profiles = (
         'direct_joint_effort_v1',
         'velocity_damped_joint_effort_v1',
     )
 
     @classmethod
-    def from_reference_config(cls, config=None, *, render_mode=None, provider='geophys',
-                              backend='cpu', task_rgb_camera=None, task_renderer=None,
-                              build_runtime=True, source_delivery_manifest=None, **kwargs):
-        from ..environment.configuration import resolve_task_env_config
-        from .pendulum_physical import build_pendulum_environment
-        if kwargs:
-            raise ValueError(f'unsupported Pendulum options: {sorted(kwargs)}')
-        resolved = resolve_task_env_config(cls, config)
-        if build_runtime is False:
-            if provider != 'geophys' or backend != resolved.runtime.backend:
-                raise ValueError('unbuilt Pendulum uses its component configuration only')
-            return cls(config=resolved, render_mode=render_mode, build_runtime=False,
-                       task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
-        if build_runtime is not True:
-            raise TypeError('build_runtime must be a boolean')
-        return build_pendulum_environment(cls, resolved, provider=provider,
-            backend=backend, render_mode=render_mode,
-            task_rgb_camera=task_rgb_camera, task_renderer=task_renderer,
-            source_delivery_manifest=source_delivery_manifest)
-
-    def observation(self, state):
-        observation, info, evaluation = super().observation(state)
-        if getattr(self, '_legacy_camera_observations', False):
-            from dataclasses import asdict
-            from ..environment.reference_env import _json_value
-            metadata = self.session.capture_legacy_camera_metadata()
-            info = {**info, 'camera_capture': {
-                'source': 'SensorObservation.camera_metadata',
-                'observation_boundary': {'elapsed_steps': state.control_step,
-                                         'simulation_time_s': float(state.simulation_time)},
-                'cameras': {name: _json_value(asdict(value)) for name, value in metadata.items()}}}
-        camera = getattr(self, '_pendulum_camera_spec', None)
-        if camera is not None:
-            from dataclasses import asdict
-            from ..environment.reference_env import _json_value
-            native = self.session.task_camera_binding(self.typed_state.view)['native']
-            receipt = dict(info['task_rgb_v1'])
-            receipt.update(camera_name=camera.name, requested_camera=_json_value(asdict(camera)),
-                realized_camera=_json_value(native), renderer=self._task_rgb_config[1],
-                render_backend='rasterizer', observation_boundary={
-                    'episode_id': self.typed_state.view.boundary.episode_id,
-                    'control_step': state.control_step,
-                    'simulation_time_s': float(state.simulation_time)})
-            info = {**info, 'task_rgb_v1': receipt}
-        return observation, info, evaluation
-
-    def reset(self, *, seed=None, options=None):
-        if self._has_component_assembly():
-            return super().reset(seed=seed, options=options)
-        from ..environment.reference_env import GymEnvBase
-        GymEnvBase.reset(self, seed=seed)
-        actual_seed = int(self.np_random_seed)
-        self._pendulum_pending_reset['sampled'] = PENDULUM_TASK_SEMANTICS.sample_reset(self.np_random)
-        try:
-            observation, info = super().reset(seed=actual_seed, options=options)
-            sample = self.value['reset_plan'].reset_sample
-            info['reset_parameters'] = {'profile': 'pendulum_uniform_angle_velocity_v1',
-                'angle_range_rad': [-math.pi, math.pi], 'angular_velocity_range_rad_s': [-1., 1.],
-                'theta_rad': sample.joint_position['pendulum-v1/pendulum_hinge'],
-                'theta_dot_rad_s': sample.joint_velocity['pendulum-v1/pendulum_hinge']}
-            from ..environment.task_definition import EpisodeTerminationPolicyV1
-            info.update(seed=seed, task_uid=self.config.task.task_uid,
-                        stage='stage4_gym_contract', episode_id=self.session.episode_id,
-                        resolved_control_metadata=self.metadata['action_schema'],
-                        termination_policy=EpisodeTerminationPolicyV1().to_mapping())
-            return observation, info
-        finally:
-            self._pendulum_pending_reset.clear()
-
-    def get_record_metadata(self):
-        if self._has_component_assembly():
-            return super().get_record_metadata()
-        return {'env_metadata': {**self.metadata, 'action_schema': {
-                    'schema_id': 'task-env.pendulum.torque.v1', 'schema_version': 'task-env-action-v1',
-                    'mode': 'direct_torque', 'components': ['torque'], 'unit': 'N*m'}},
-                'resolved_config': self.value['resolved_configuration'],
-                'universal_action_schema': {'version': 'task-env-action-v1', 'dimension': 1,
-                                            'components': ['torque']}}
+    def selected_binding(cls, config, *, provider, backend, source_delivery_manifest=None):
+        from .pendulum_physical import task_binding
+        return task_binding(config, provider=provider, backend=backend,
+                            source_delivery_manifest=source_delivery_manifest)
 
     uid = PENDULUM_ENV_ID
     task_uid = PENDULUM_TASK_UID

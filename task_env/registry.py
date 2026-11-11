@@ -158,10 +158,12 @@ def make_env(
     task_renderer = kwargs.pop('task_renderer', None)
     if (task_rgb_camera is None) != (task_renderer is None):
         raise ValueError('task RGB camera and fixed renderer must be declared together')
-    factory_owns_rgb = bool(
-        getattr(environment_type, 'task_rgb_factory_prepares_runtime', False)
-        or getattr(environment_type, 'uses_component_task_config', False)
-    )
+    if (getattr(environment_type, "uses_selected_public_config", False)
+            or getattr(environment_type, "uses_component_task_config", False)):
+        resolved_config = resolve_task_env_config(environment_type, config)
+        return environment_type.from_resolved_config(resolved_config, render_mode=render_mode,
+            task_rgb_camera=task_rgb_camera, task_renderer=task_renderer, **kwargs)
+    factory_owns_rgb = bool(getattr(environment_type, 'task_rgb_factory_prepares_runtime', False))
     if task_rgb_camera is not None and factory_owns_rgb:
         kwargs.update(task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
 
@@ -183,9 +185,6 @@ def make_env(
                 raise
         return env
 
-    if getattr(environment_type, "uses_selected_public_config", False):
-        resolved_config = resolve_task_env_config(environment_type, config)
-        return finish(environment_type.from_resolved_config(resolved_config, render_mode=render_mode, **kwargs))
     from .environment.reference_env import SelectedReferenceEnv
 
     reference_config = getattr(environment_type, 'from_reference_config', None)
@@ -194,10 +193,7 @@ def make_env(
         is SelectedReferenceEnv.from_reference_config.__func__
     )
     uses_reference_binding = getattr(environment_type, 'binding', None) is not None
-    if (reference_config is not None
-            and (not getattr(environment_type, 'uses_component_task_config', False)
-                 or getattr(environment_type, 'prefer_reference_factory', False))
-            and (uses_reference_binding or not inherited_default)):
+    if reference_config is not None and (uses_reference_binding or not inherited_default):
         # Other selected candidates retain their bounded compatibility route.
         return finish(environment_type.from_reference_config(config, render_mode=render_mode, **kwargs))
     resolved_config = resolve_task_env_config(environment_type, config)

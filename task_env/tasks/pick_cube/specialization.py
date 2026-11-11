@@ -741,7 +741,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                 adapter = adapt_robot_source
         environment = (_nut_aligned_environment_config(config.environment)
                        if profile in _PICKCUBE_R3_PROFILES else config.environment)
-        return make_reference_binding(
+        binding = make_reference_binding(
             controller_profile=profile, source_delivery_manifest=config.source_delivery_manifest,
             resolved_config=environment,
             lift_height_m=dict(config.task_parameters).get("lift_height_m"),
@@ -751,50 +751,19 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             cube_force_z_N=cube_force_z_N,
         )
 
-    @classmethod
-    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
-        from ...environment.config import ResolvedSelectedConfig
-        if type(config) is not ResolvedSelectedConfig:
-            raise TypeError("selected construction requires resolved configuration")
-        from ...environment.configuration import resolve_task_env_config
-        config = resolve_task_env_config(cls, config)
-        if kwargs or render_mode is not None:
-            raise ValueError('selected reference admits state-only execution without extra kwargs')
-        provider = config.physics_provider
-        backend = config.environment.runtime.backend
-        horizon = config.environment.episode.horizon
-        profile = config.controller_profile
-        manifest = config.source_delivery_manifest
-        binding = cls.selected_binding(config)
-        if provider == 'isaacsim':
-            from ...runtime.sessions.provenance import preflight_interpreter_before_source
-            preflight_interpreter_before_source(
-                config.execution_spec_v2,
-                requested=(None if config.requested_execution_json is None
-                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
-            environment = (_nut_aligned_environment_config(config.environment)
-                           if profile in _PICKCUBE_R3_PROFILES else config.environment)
-            initial = build_isaac_reference(delivery_manifest=manifest, task_seed=31,
-                                            horizon=horizon, include_solution=False,
-                                            controller_profile=profile, resolved_config=environment,
-                                            task_config=json.loads(config.task_configuration_json))
-            env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
-                      _execution_spec_v1=initial['execution_spec_v1'], _initial_value=initial)
-        else:
-            env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding)
-        env.resolved_public_config = config
         if config.reset_profile is not None:
             from ...observations.selected_reference import switch_observation_space
-            env.observation_space = switch_observation_space()
-            env.metadata['observation_schema'] = {
-                'schema_version': config.reset_profile,
-                'hand_pose_frame': 'panda-v1/ee',
-                'joint_order': [*(f'panda-v1/joint{i}' for i in range(1, 8)),
-                                'panda-v1/finger_joint1', 'panda-v1/finger_joint2'],
-                'joint_position_units': ['rad'] * 7 + ['m'] * 2,
-                'joint_velocity_units': ['rad/s'] * 7 + ['m/s'] * 2,
-            }
-        return env
+            binding = replace(binding,
+                observation_space_factory=lambda _env: dict(switch_observation_space().spaces),
+                observation_metadata={
+                    'schema_version': config.reset_profile,
+                    'hand_pose_frame': 'panda-v1/ee',
+                    'joint_order': [*(f'panda-v1/joint{i}' for i in range(1, 8)),
+                                    'panda-v1/finger_joint1', 'panda-v1/finger_joint2'],
+                    'joint_position_units': ['rad'] * 7 + ['m'] * 2,
+                    'joint_velocity_units': ['rad/s'] * 7 + ['m/s'] * 2,
+                })
+        return binding
 
 
 

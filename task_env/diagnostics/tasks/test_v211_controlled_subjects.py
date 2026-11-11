@@ -13,6 +13,118 @@ from task_env.runtime.sessions.physical_control import (
 )
 
 
+@pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
+def test_formal_task_config_uses_shared_construction_and_owned_definition(monkeypatch, tmp_path, uid):
+    import yaml
+    from task_env import make_env
+    from task_env.registry import ENV_REGISTRY
+    from task_env.environment.lifecycle import TaskLifecycleAdapter
+    from task_env.environment.configuration import resolve_task_env_config
+    import task_env.tasks
+
+    task = ENV_REGISTRY.get(uid)
+    def forbidden_legacy_factory(*args, **kwargs):
+        raise AssertionError('formal caller re-entered legacy environment construction')
+    monkeypatch.setattr(task, 'from_reference_config', forbidden_legacy_factory)
+    values = {'runtime': {'backend': 'cpu'}, 'episode': {'horizon': 8},
+              'controller': {'profile_id': 'velocity_damped_joint_effort_v1'}}
+    path = tmp_path / 'task.yaml'
+    path.write_text(yaml.safe_dump(values))
+    first = make_env(uid, config=values, provider='mujoco', backend='cpu')
+    second = make_env(uid, config=path, provider='mujoco', backend='cpu')
+    try:
+        assert first.config == second.config == resolve_task_env_config(task, values)
+        assert isinstance(first._task_lifecycle, TaskLifecycleAdapter)
+        assert first._task_lifecycle.task_definition is first._task_definition
+        assert first._task_definition is not second._task_definition
+        assert first.controller.profile_id == second.controller.profile_id == 'velocity_damped_joint_effort_v1'
+        assert first.session is None and second.session is None
+        assert first.get_record_metadata()['universal_action_schema']['components'] == first.binding.action_schema['components']
+    finally:
+        first.close()
+        second.close()
+
+
+@pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
+def test_invalid_task_camera_rejects_before_source_or_isaac_owner(monkeypatch, uid):
+    from task_env import make_env
+    from task_env.registry import ENV_REGISTRY
+    from task_env.environment.config import CameraSpec
+    import task_env.tasks
+
+    def forbidden_binding(*args, **kwargs):
+        raise AssertionError('invalid camera reached task/source construction')
+    monkeypatch.setattr(ENV_REGISTRY.get(uid), 'selected_binding', forbidden_binding)
+    with pytest.raises(ValueError, match='finite world CameraSpec'):
+        make_env(uid, config={'runtime': {'backend': 'cuda'}}, provider='isaacsim', backend='cuda',
+            source_delivery_manifest='never-read.json',
+            task_rgb_camera=CameraSpec(name='task', quaternion_wxyz=(0., 0., 0., 0.), depth=False),
+            task_renderer='isaacsim')
+
+
+def test_physical_task_rejects_foreign_resolved_identity_before_binding(monkeypatch):
+    from task_env.tasks.pendulum import PendulumEnv
+    from task_env.tasks.two_wheel_balance import TwoWheelBalanceEnv
+    def forbidden_binding(*args, **kwargs):
+        raise AssertionError('foreign Task identity reached source construction')
+    monkeypatch.setattr(PendulumEnv, 'selected_binding', forbidden_binding)
+    with pytest.raises(ValueError, match='declared Task identity'):
+        PendulumEnv.from_resolved_config(TwoWheelBalanceEnv.default_config(), provider='mujoco')
+
+
+def test_legacy_class_binding_preserves_scalar_factory_input(monkeypatch):
+    from task_env import make_env
+    from task_env.registry import ENV_REGISTRY
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    class LegacyTask(SelectedReferenceEnv):
+        uid = 'legacy-class-binding-example'
+        binding = PickCubeReferenceEnv.binding
+    monkeypatch.setattr(ENV_REGISTRY, 'get', lambda _uid: LegacyTask)
+    env = make_env(LegacyTask.uid, config={'provider': 'mujoco', 'backend': 'cpu', 'horizon': 8})
+    try:
+        assert not env._has_component_assembly()
+        assert (env.provider, env.backend, env.horizon) == ('mujoco', 'cpu', 8)
+        assert env.binding is LegacyTask.binding
+        assert env.session is None
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('uid, config, options, subject_count, controller_count', [
+    ('pendulum-v1', {}, {'provider': 'mujoco'}, 1, 1),
+    ('two-wheel-balance-v1', {}, {'provider': 'mujoco'}, 1, 1),
+    ('pick-cube-p16-reference-v1', {'provider': 'mujoco'}, {}, 1, 1),
+    ('pick-cube-p16-reference-v1', {'provider': 'mujoco', 'robot': {'uid': 'panda-arm-hand-v1'},
+                                 'task': {'controller_profile': 'r1_split'}}, {}, 2, 2),
+])
+def test_robot_view_reuses_admitted_subjects_and_controller_owners(
+        uid, config, options, subject_count, controller_count):
+    from task_env import make_env
+    env = make_env(uid, config=config, **options)
+    try:
+        robot = env.robot
+        physical = env._selected_controller_binding.physical_execution
+        if physical is not None:
+            assert robot.subjects is physical.subjects
+            assert robot.controllers is physical.controllers
+        else:
+            binding = env.value['source'].position_subject_binding
+            assert robot.subjects is binding.subjects
+            identities = {item.controller_identity for item in binding.plan.controller_bindings}
+            assert identities == {item.identity for item in robot.controllers}
+            with pytest.raises(ValueError, match='retained position subjects'):
+                replace(binding, subjects=(replace(binding.subjects[0], source_id='foreign'),
+                                           *binding.subjects[1:]))
+        assert len(robot.subjects) == subject_count and len(robot.controllers) == controller_count
+        assert robot.controller is env.controller
+        assert robot.root_frames == tuple(subject.root_frame for subject in robot.subjects)
+        assert robot.gripper is None and robot.ee is None
+        assert env.session is None
+    finally:
+        env.close()
+
+
 def _fixture():
     plan, context, effort, _ = _case()
     subject = ControlledSubjectV1('subject-a', 'arm', 'source-a', 'b'*64, 'references_existing',

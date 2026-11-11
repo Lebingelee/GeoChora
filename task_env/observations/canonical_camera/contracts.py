@@ -44,6 +44,27 @@ class CameraGeometry(Contract):
     depth_convention: str = 'optical_z_m_float32'
     capture_phase: str = 'post_control_step'
 
+    @classmethod
+    def from_camera_spec(cls, spec, *, task_artifact_hash):
+        """Lower the public camera declaration into source-linked geometry."""
+        from ...environment.config import CameraSpec
+        if type(spec) is not CameraSpec or spec.frame != 'world':
+            raise TypeError('task RGB requires a world CameraSpec')
+        quaternion = np.asarray(spec.quaternion_wxyz, dtype=np.float64)
+        norm = np.linalg.norm(quaternion)
+        if not np.isfinite(norm) or norm < 1e-12:
+            raise ValueError('camera quaternion must be finite and nonzero')
+        w, x, y, z = map(float, quaternion / norm)
+        transform = ((1-2*(y*y+z*z), 2*(x*y-z*w), 2*(x*z+y*w), spec.position[0]),
+                     (2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w), spec.position[1]),
+                     (2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y), spec.position[2]),
+                     (0., 0., 0., 1.))
+        camera = cls('camera-observation-v0', task_artifact_hash, spec.name, 'world',
+                     transform, MOUNT_FROM_CAMERA, spec.width, spec.height, spec.fov_y,
+                     spec.near, spec.far, spec.rgb, spec.depth, spec.rgb_layout, spec.rgb_dtype)
+        camera.validate()
+        return camera
+
     def validate(self):
         _choice(self.schema_version, {'camera-observation-v0'}, 'camera schema')
         if not re.fullmatch('[0-9a-f]{64}', self.task_artifact_hash):

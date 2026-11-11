@@ -558,6 +558,32 @@ def _resolve_selected_config(environment_type, config):
     return result
 
 
+def _normalize_controller_selection(environment_type, config):
+    """Decode the common Controller selector into the retained config codecs."""
+    if isinstance(config, (str, Path)):
+        config = load_yaml_mapping(config)
+    if not isinstance(config, Mapping):
+        return config
+    controller = config.get('controller')
+    if not isinstance(controller, Mapping) or 'profile_id' not in controller:
+        return config
+    values, controller = dict(config), dict(controller)
+    profile = controller.pop('profile_id')
+    section, key = (('task', 'controller_profile')
+                    if getattr(environment_type, 'uses_selected_public_config', False)
+                    else ('control', 'profile_id'))
+    legacy = dict(values.get(section, {}))
+    if key in legacy and legacy[key] != profile:
+        raise ValueError(f'controller.profile_id conflicts with {section}.{key}')
+    legacy[key] = profile
+    values[section] = legacy
+    if controller:
+        values['controller'] = controller
+    else:
+        values.pop('controller')
+    return values
+
+
 def _resolve_task_env_config_impl(
     environment_type,
     config: ResolvedEnvConfig | Mapping[str, object] | str | Path | None,
@@ -571,6 +597,7 @@ def _resolve_task_env_config_impl(
     cannot replace task-owned scene, object, agent, or success-definition fields.
     """
 
+    config = _normalize_controller_selection(environment_type, config)
     if getattr(environment_type, "uses_selected_public_config", False):
         return _resolve_selected_config(environment_type, config)
     if isinstance(config, ResolvedEnvConfig):

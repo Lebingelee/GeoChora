@@ -2090,7 +2090,7 @@
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
     "current_step": "E00-E04",
-    "next_step": "E01 formal construction and E02 subject facade migration",
+    "next_step": "E01 advanced candidate input/execution normalization and E02 TaskDefinition interface review",
     "implementation_attempt_count": 1,
     "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
     "implementation_package_dispatched": false,
@@ -2104,15 +2104,20 @@
     "refs_reorganized_this_kickoff": false,
     "events": {
       "E00": "BASELINE_RECORDED",
-      "E01": "PENDING_IMPLEMENTATION",
-      "E02": "PENDING_IMPLEMENTATION",
+      "E01": "IMPLEMENTING_FORMAL_FACTORY_AND_CONTROLLER_SELECTOR_VERIFIED",
+      "E02": "IMPLEMENTING_FOUR_SUBJECT_VIEW_AND_SIMPLE_TASK_LIFECYCLE_VERIFIED",
       "E03": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED",
       "E04": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED"
     },
     "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
     "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
-    "event_native_cpu_runs": 5,
-    "event_native_substeps": 60,
-    "event_implementation_complete": false
+    "event_native_cpu_runs": 11,
+    "event_native_substeps": 150,
+    "event_implementation_complete": false,
+    "event_native_cpu_failed_runs": 1,
+    "event_native_failure_reason": "Independent Pendulum oracle used float64 instead of declared float32; corrected oracle passed without production sampler changes.",
+    "latest_increment_input_head": "c4ce6df39e81bbd4b57b3611e8259f36cf9ab534",
+    "latest_increment_pure_unique_nodes": 124,
+    "latest_increment_evidence": "implementation-metrics-002.json; cpu-independent-readback-002.json"
   }
 }

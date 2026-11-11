@@ -576,12 +576,20 @@ class PositionSubjectControlBindingV1:
     subject_identity_sha256: str
     resource_native_names: tuple[tuple[str, str, str], ...]
     joint_native_ownership: tuple[tuple[str, str, str, str, str], ...]
+    subjects: tuple = ()
 
     def __post_init__(self):
         from ..runtime.sessions.control import ControlBindingPlanV1
         if type(self.plan) is not ControlBindingPlanV1 or not self.plan._compiled:
             raise ValueError('position subject binding requires a compiled Controller plan')
         _digest(self.subject_identity_sha256, 'position subject identity')
+        if type(self.subjects) is not tuple:
+            raise TypeError('retained position subjects must be immutable')
+        if self.subjects:
+            from ..runtime.sessions.control import position_subject_identity
+            if position_subject_identity(self.plan, self.subjects) != self.subject_identity_sha256:
+                raise ValueError('retained position subjects differ from their admitted identity')
+
         if (type(self.resource_native_names) is not tuple
                 or any(type(row) is not tuple or len(row) != 3 for row in self.resource_native_names)):
             raise TypeError('position resource mappings require immutable entity/actuator/native triples')

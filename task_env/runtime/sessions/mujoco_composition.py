@@ -488,7 +488,7 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
         scene = declare_panda_scene(robot, entity_id=existing_robot_entity,
                                     scene_id='integrated-panda-position')
         joints = tuple(recipe.controlled_joints)
-        plan, subject_identity = compile_panda_position_subjects(
+        plan, subject_identity, subjects = compile_panda_position_subjects(
             source_scene=scene, components=((existing_robot_entity, 'link0', joints, None),),
             site_entity=existing_robot_entity, site_name='nutassembly_ee_site',
             groups=((existing_robot_entity, 'arm'), (existing_robot_entity, 'gripper')),
@@ -500,7 +500,7 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
             tuple((entity, actuator, actuator) for entity, actuator, _ in plan.resource_writers),
             tuple((f'{existing_robot_entity}/{name}', existing_robot_entity, name, name,
                    f'actuator{i + 1}' if i < 7 else 'actuator8')
-                  for i, name in enumerate(joints)))
+                  for i, name in enumerate(joints)), subjects=subjects)
         legacy_task = CompositionSourceV1(source.source_id, source.source_closure_digest,
                                           (*task_entities, existing_robot_entity))
         legacy_robot = CompositionSourceV1(source.source_id, source.source_closure_digest,
@@ -535,7 +535,7 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
         task_hand_name=task_hand, source_hand_name=source_hand)
     fixed = declaration.attachment_plan
     arm, hand = fixed.parent_entity_id, fixed.child_entity_id
-    control_plan, subject_identity = robot.compile_position_binding(
+    control_plan, subject_identity, subjects = robot.compile_position_binding(
         declaration, artifact=artifact, controller=controller,
         task_closure_sha256=source.source_closure_digest)
     position = PositionSubjectControlBindingV1(control_plan, subject_identity, tuple(
@@ -546,7 +546,7 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
         for entity, names, actuator_names in (
             (arm, tuple(f'joint{i}' for i in range(1, 8)), tuple(f'actuator{i}' for i in range(1, 8))),
             (hand, ('finger_joint1', 'finger_joint2'), ('actuator8', 'actuator8')))
-        for name, actuator in zip(names, actuator_names, strict=True)))
+        for name, actuator in zip(names, actuator_names, strict=True)), subjects=subjects)
     robot_sources = tuple(CompositionSourceV1(
         declaration.source_by_entity[entity].source_id, fixed.source_closure_sha256, (entity,))
         for entity in (arm, hand))

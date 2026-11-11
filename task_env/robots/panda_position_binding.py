@@ -131,4 +131,4 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
         for entity, root_frame, joint_names, parent in components)
     subject_identity = validate_position_control_subjects(scene=scene, root=root, children=children,
         subjects=subjects, plan=plan, attachment_scene=source_scene if attachment is not None else None)
-    return plan, subject_identity
+    return plan, subject_identity, subjects

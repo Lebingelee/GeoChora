@@ -443,6 +443,13 @@ def inspect_selected_interpreter(selection):
                                                       solver_family=selection.solver_family)
 
 
+def preflight_selected_source(selection, *, requested, task_uid):
+    """Admit source builds that require their native interpreter environment."""
+    if selection.physics_provider == 'isaacsim':
+        return preflight_interpreter_before_source(selection, requested=requested, task_uid=task_uid)
+    return None
+
+
 def preflight_interpreter_before_source(selection, *, requested, task_uid):
     """Reject unavailable interpreter dependencies before source construction."""
     from .transport import request_identity

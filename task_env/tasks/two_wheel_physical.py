@@ -21,7 +21,7 @@ from ..assembly.compiler import compile_reference_source
 from ..assembly.source import TaskSceneSource
 from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
-from ..environment.reference_binding import ReferenceTaskBinding
+from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
 from ..robots.two_wheel_balance import TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
@@ -113,6 +113,7 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
     if provider == 'isaacsim':
         if source_delivery_manifest is None:
             raise ValueError('Two-wheel Isaac requires its explicit source_delivery_manifest')
+        ensure_g05_isaac_app_open()
         isaac_loaded = load_g05_isaac_delivery(source_delivery_manifest)
         source_revision = isaac_loaded.delivery.asset_definition.source_revision
     else:
@@ -195,123 +196,54 @@ def _observation_spaces(_env):
     return {'state': Dict({'proprioception': Box(-np.inf, np.inf, (7,), dtype=np.float32)})}
 
 
-def _observe(env, state):
+def _task_state(state):
     snapshot = RuntimeSnapshot(qpos=np.asarray([state.joint_position[j] for j in JOINTS], dtype=np.float32),
         qvel=np.asarray([state.joint_velocity[j] for j in JOINTS], dtype=np.float32), simulation_time=state.simulation_time)
-    definition = env._two_wheel_task_definition
-    evaluation = definition.reset(snapshot) if state.control_step == 0 else definition.evaluate(
-        state=snapshot, action=env.controller.last_action, elapsed_steps=state.control_step)
-    observation = definition.build_observation(snapshot)
-    info = {'is_success': evaluation.success, 'task_failure': evaluation.failure,
-        'task_metrics': dict(evaluation.metrics), 'reward_terms': dict(evaluation.reward_terms),
-        'task_reward': evaluation.reward, 'elapsed_steps': state.control_step,
-        'simulation_time_s': state.simulation_time, 'external_action': env.controller.last_action.copy(),
-        'universal_action': env.controller.last_action.copy(), 'success_definition': TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
-        'observation_schema': env._two_wheel_observation_schema}
-    return observation, info, evaluation
+    return snapshot
 
 
-def build_two_wheel_environment(environment_type, config, *, provider, backend, render_mode=None,
-                                task_rgb_camera=None, task_renderer=None,
-                                source_delivery_manifest=None):
-    if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu'), ('isaacsim', 'cuda')}:
-        raise ValueError('two-wheel physical route requires GeoPhys/MuJoCo CPU or the admitted Isaac CUDA route')
-    if (config.control.profile_id == 'velocity_damped_joint_effort_v1'
-            and (provider, backend) != ('mujoco', 'cpu')):
-        raise ValueError('velocity-damped Controller is admitted only by the tested MuJoCo CPU source-state model')
-    if provider == 'isaacsim' and render_mode is not None:
-        raise ValueError('Two-wheel G05 Isaac route is state-only and does not admit rendering')
-    if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
-        raise ValueError('two-wheel admits human construction or GeoPhys CPU rgb_array')
-    if render_mode == 'rgb_array' and config.render.backend not in {'raytracer', 'rasterizer'}:
-        raise ValueError('two-wheel observer requires a GeoPhys renderer')
-    if config.render.camera_obs and provider != 'geophys':
-        raise ValueError('legacy camera observations require GeoPhys CPU')
-    if (config.runtime.physics_dt, config.runtime.control_substeps, config.runtime.backend) != (.002, 25, backend):
-        raise ValueError('two-wheel requires its original 25 by 2 ms CPU timebase')
-    if (task_rgb_camera is None) != (task_renderer is None):
-        raise ValueError('task RGB camera and fixed renderer must be supplied together')
-    if task_rgb_camera is not None:
-        from ..environment.config import CameraSpec
-        if (not isinstance(task_rgb_camera, CameraSpec) or task_rgb_camera.frame != 'world'
-                or not np.isfinite((task_rgb_camera.fov_y, task_rgb_camera.near, task_rgb_camera.far)).all()):
-            raise ValueError('two-wheel task RGB requires a finite world CameraSpec')
-    if provider == 'isaacsim':
-        if source_delivery_manifest is None:
-            raise ValueError('Two-wheel Isaac requires its explicit source_delivery_manifest')
-        # Reuse the single process App owner for both the source inspection and
-        # later native materialization, keeping Kit's USD libraries first.
-        ensure_g05_isaac_app_open()
-    pending = {}
+def reset_metadata(sample):
+    return {'profile': 'two_wheel_balance_uniform_perturbation_v1',
+        'pitch_rad': sample.joint_position[JOINTS[0]],
+        'pitch_rate_rad_s': sample.joint_velocity[JOINTS[0]],
+        'left_wheel_position_rad': sample.joint_position[JOINTS[1]],
+        'right_wheel_position_rad': sample.joint_position[JOINTS[2]],
+        'left_wheel_rate_rad_s': sample.joint_velocity[JOINTS[1]],
+        'right_wheel_rate_rad_s': sample.joint_velocity[JOINTS[2]],
+        'pitch_range_rad': [-.08, .08], 'pitch_rate_range_rad_s': [-.20, .20],
+        'wheel_position_range_rad': [-.02, .02], 'wheel_rate_range_rad_s': [-.30, .30]}
+
+
+def task_binding(config, *, provider, backend, source_delivery_manifest=None):
+    """Declare wheel/task semantics and source construction; Env owns lifecycle."""
     def build_seeded(_provider, _backend, seed, _horizon):
-        return _build(config, seed, pending.get('sampled'), provider=provider,
+        return _build(config, seed, provider=provider,
+                      source_delivery_manifest=source_delivery_manifest)
+    def build_sampled(_provider, _backend, seed, _horizon, sampled):
+        return _build(config, seed, sampled, provider=provider,
                       source_delivery_manifest=source_delivery_manifest)
     def reset_seed(seed):
-        if type(seed) is not int or seed < 0: raise ValueError('seed must be a nonnegative integer')
+        if type(seed) is not int or seed < 0:
+            raise ValueError('seed must be a nonnegative integer')
         return seed
-    binding = ReferenceTaskBinding(build=lambda _provider: _build(
+    task_definition = lambda: TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2)
+    observation_schema = TwoWheelBalanceObservationBuilder(
+        joint_ids={'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}).schema
+    return ReferenceTaskBinding(build=lambda _provider: _build(
         config, 31, provider=provider, source_delivery_manifest=source_delivery_manifest),
-        build_seeded=build_seeded,
+        build_seeded=build_seeded, build_sampled=build_sampled,
+        task_reset_sampler=sample_reset, task_reset_metadata=reset_metadata,
+        task_definition_factory=task_definition, task_state_projection=_task_state,
+        task_observation_schema=observation_schema,
+        external_action_contract=TWO_WHEEL_ACTION_CONTRACT,
         reset_sample=lambda _artifact, _seed: None, evaluate=lambda _state, _semantics: None,
         object_poses=(), external_actions=True, interval_mode='grouped', recorder_mode='execution',
         reset_seed=reset_seed, action_schema={'schema_id': 'task-env.two-wheel-balance.wheel-torque.v1',
             'schema_version': 'task-env-action-v1', 'mode': 'direct_wheel_torque',
             'components': ['left_wheel_torque', 'right_wheel_torque'], 'low': -1.5, 'high': 1.5, 'unit': 'N*m'},
         action_space_factory=lambda: Dict({'torque': Box(-1.5, 1.5, (2,), dtype=np.float32)}),
-        prepare_action=lambda value: value, observation_space_factory=_observation_spaces, observation_projection=_observe,
+        prepare_action=lambda value: value, observation_space_factory=_observation_spaces, observation_projection=observe_task_definition,
         physical_control_profile=lambda env: env.value['physical_execution'],
         physical_direct_effort_feedback=(config.control.profile_id in (None, 'direct_joint_effort_v1')),
         physical_terminate_on_success=True,
         physical_ignore_done=config.episode.ignore_done)
-    execution_spec = (_build(config, 31, provider=provider,
-                             source_delivery_manifest=source_delivery_manifest).get('execution_spec_v1')
-                      if provider == 'isaacsim' else None)
-    env = environment_type(provider=provider, backend=backend, horizon=config.episode.horizon,
-                           _binding=binding, _execution_spec_v1=execution_spec)
-    env.config = config
-    from ..environment.reference_env import build_stage0_metadata
-    from dataclasses import replace
-    env._env_metadata = replace(build_stage0_metadata(env.uid, config), external_action=TWO_WHEEL_ACTION_CONTRACT,
-                                physics_engine=('GeoPhys' if provider == 'geophys'
-                                                else 'Isaac Sim PhysX' if provider == 'isaacsim' else 'MuJoCo'),
-                                camera_specs=((task_rgb_camera,) if task_rgb_camera is not None else config.render.cameras))
-    env._two_wheel_pending_reset = pending
-    ids = {'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}
-    env._two_wheel_task_definition = TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2)
-    env._two_wheel_observation_schema = TwoWheelBalanceObservationBuilder(joint_ids=ids).schema
-    env.metadata['reference_profile'] = env.reference_profile()
-    env._legacy_camera_observations = bool(config.render.camera_obs)
-    if render_mode == 'human':
-        env.render_mode = render_mode
-        env._human_display_unavailable = True
-        env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
-                            render_mode=render_mode, human_display_available=False)
-    elif render_mode == 'rgb_array':
-        env.render_mode = render_mode
-        env._legacy_observer_requested = True
-        env.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
-                            human_display_available=False, render_backend=config.render.backend,
-                            render_resolution=(config.render.width, config.render.height))
-    if task_rgb_camera is not None:
-        from ..observations.canonical_camera.contracts import CameraGeometry, MOUNT_FROM_CAMERA
-        c = task_rgb_camera
-        w, x, y, z = c.quaternion_wxyz
-        norm = (w*w+x*x+y*y+z*z)**.5
-        if not np.isfinite(norm) or norm < 1e-12:
-            env.close()
-            raise ValueError('camera quaternion must be finite and nonzero')
-        w, x, y, z = (v/norm for v in (w, x, y, z))
-        transform = ((1-2*(y*y+z*z), 2*(x*y-z*w), 2*(x*z+y*w), c.position[0]),
-                     (2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w), c.position[1]),
-                     (2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y), c.position[2]),
-                     (0., 0., 0., 1.))
-        camera = CameraGeometry('camera-observation-v0', env.artifact.identity_hash, c.name, 'world',
-            transform, MOUNT_FROM_CAMERA, c.width, c.height, c.fov_y, c.near, c.far,
-            c.rgb, c.depth, c.rgb_layout, c.rgb_dtype)
-        try:
-            env._configure_task_rgb(camera, task_renderer)
-            env._two_wheel_camera_spec = c
-        except BaseException:
-            env.close()
-            raise
-    return env

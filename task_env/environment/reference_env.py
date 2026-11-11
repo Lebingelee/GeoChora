@@ -327,7 +327,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def robot(self):
         """The single resolved robot owned by this environment runtime."""
 
-        self._require_runtime()
+        if self._has_component_assembly():
+            self._require_runtime()
         if self._robot is None:
             raise StageUnavailableError(
                 "This environment does not expose a single resolved robot."
@@ -788,31 +789,136 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     @classmethod
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
+        if (getattr(cls, 'uses_selected_public_config', False)
+                or getattr(cls, 'uses_component_task_config', False)):
+            from .configuration import resolve_task_env_config
+            return cls.from_resolved_config(resolve_task_env_config(cls, config),
+                                            render_mode=render_mode, **kwargs)
         values = {} if config is None else dict(config)
-        if kwargs or render_mode is not None:
-            raise ValueError('selected reference admits state-only execution without extra kwargs')
-        if set(values) - {'provider', 'backend', 'horizon'}:
-            raise ValueError('selected reference config admits provider/backend/horizon only; legacy overlays are incompatible')
+        if kwargs or render_mode is not None or set(values) - {'provider', 'backend', 'horizon'}:
+            raise ValueError('legacy class binding admits state-only provider/backend/horizon only')
         return cls(**values)
 
     @classmethod
-    def from_resolved_config(cls, config, *, render_mode=None, **kwargs):
-        """Assemble a selected task that supplies its own binding for a config."""
-        from .config import ResolvedSelectedConfig
+    def from_resolved_config(cls, config, *, render_mode=None,
+                             task_rgb_camera=None, task_renderer=None, **kwargs):
+        """Compile declarations once, then construct the common Env owner.
 
-        if type(config) is not ResolvedSelectedConfig or config.task_uid != cls.uid:
-            raise TypeError('selected construction requires its own resolved configuration')
-        # Direct advanced callers must pass through the same validation as the
-        # public factory; a fabricated resolved value is not an admission token.
+        ResolvedSelectedConfig and ResolvedEnvConfig retain their existing input
+        codecs; they do not select different selected-Env lifecycles.
+        """
+        from .config import ResolvedSelectedConfig
         from .configuration import resolve_task_env_config
+        selected = type(config) is ResolvedSelectedConfig
+        if selected and config.task_uid != cls.uid:
+            raise TypeError('selected construction requires its own resolved configuration')
+        if not selected and type(config) is not ResolvedEnvConfig:
+            raise TypeError('environment construction requires resolved configuration')
         config = resolve_task_env_config(cls, config)
-        if kwargs or render_mode is not None:
-            raise ValueError('selected reference admits state-only execution without extra kwargs')
-        binding = cls.selected_binding(config)
-        env = cls(provider=config.physics_provider, backend=config.environment.runtime.backend,
-                  horizon=config.environment.episode.horizon, _binding=binding)
-        env.resolved_public_config = config
+        camera, renderer = task_rgb_camera, task_renderer
+        if (camera is None) != (renderer is None):
+            raise ValueError('task RGB camera and fixed renderer must be declared together')
+        if selected:
+            if kwargs or render_mode is not None:
+                raise ValueError('selected reference admits state-only execution without extra kwargs')
+            provider, backend = config.physics_provider, config.environment.runtime.backend
+            environment = config.environment
+            binding = cls.selected_binding(config)
+            import json
+            from ..runtime.sessions.provenance import preflight_selected_source
+            preflight_selected_source(config.execution_spec_v2,
+                requested=(None if config.requested_execution_json is None
+                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
+        else:
+            provider = kwargs.pop('provider', 'geophys')
+            backend = kwargs.pop('backend', config.runtime.backend)
+            build_runtime = kwargs.pop('build_runtime', True)
+            manifest = kwargs.pop('source_delivery_manifest', None)
+            if kwargs:
+                raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
+            if type(build_runtime) is not bool:
+                raise TypeError('build_runtime must be a boolean')
+            if not build_runtime or not callable(getattr(cls, 'selected_binding', None)):
+                if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
+                    raise ValueError('component construction uses its configured GeoPhys route')
+                if config.runtime.batch_physics_layout != 'merged_scene':
+                    raise StageUnavailableError('single TaskEnv construction requires merged_scene')
+                return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
+                           task_rgb_camera=camera, task_renderer=renderer)
+            cls._validate_physical_task_config(config, provider, backend, render_mode, camera, renderer, manifest)
+            environment = config
+            binding = cls.selected_binding(config, provider=provider, backend=backend,
+                                           source_delivery_manifest=manifest)
+        horizon = environment.episode.horizon
+        initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial()
+        env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
+                  _execution_spec_v1=initial.get('execution_spec_v1'), _initial_value=initial)
+        try:
+            if selected:
+                env.resolved_public_config = config
+            else:
+                env.config = environment
+                env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
+                    external_action=binding.external_action_contract,
+                    physics_engine={'geophys': 'GeoPhys', 'mujoco': 'MuJoCo',
+                                    'isaacsim': 'Isaac Sim PhysX'}[provider],
+                    camera_specs=(camera,) if camera is not None else environment.render.cameras)
+                env.metadata['reference_profile'] = env.reference_profile()
+                env._legacy_camera_observations = bool(environment.render.camera_obs)
+                if render_mode is not None:
+                    env.render_mode = render_mode
+                    env._human_display_unavailable = True
+                    env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
+                        render_mode=render_mode, human_display_available=False)
+                    if render_mode == 'rgb_array':
+                        env._legacy_observer_requested = True
+                        env.metadata.update(render_backend=environment.render.backend,
+                            render_resolution=(environment.render.width, environment.render.height))
+            if camera is not None:
+                from .config import CameraSpec
+                from ..observations.canonical_camera import CameraGeometry
+                geometry = (CameraGeometry.from_camera_spec(camera, task_artifact_hash=env.artifact.identity_hash)
+                            if type(camera) is CameraSpec else camera)
+                env._configure_task_rgb(geometry, renderer)
+                if type(camera) is CameraSpec:
+                    env._task_camera_spec = camera
+        except BaseException as error:
+            try:
+                env.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'environment construction cleanup also failed: {cleanup_error!r}')
+            raise
         return env
+
+    @classmethod
+    def _validate_physical_task_config(cls, config, provider, backend, render_mode, camera, renderer, manifest):
+        if (config.task.task_uid, config.scene.scene_uid, config.task.success_definition) != (
+                cls.task_uid, cls.scene_uid, cls.success_definition):
+            raise ValueError('physical task configuration differs from its declared Task identity')
+        if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu'), ('isaacsim', 'cuda')}:
+            raise ValueError('physical route requires GeoPhys/MuJoCo CPU or the admitted Isaac CUDA route')
+        if (config.control.profile_id == 'velocity_damped_joint_effort_v1'
+                and (provider, backend) != ('mujoco', 'cpu')):
+            raise ValueError('velocity-damped Controller is admitted only by the tested MuJoCo CPU source-state model')
+        if provider == 'isaacsim' and (manifest is None or render_mode is not None):
+            raise ValueError('Isaac physical route requires an explicit source_delivery_manifest and state-only construction')
+        if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
+            raise ValueError('physical task admits human construction or GeoPhys CPU rgb_array')
+        if render_mode == 'rgb_array' and config.render.backend not in {'raytracer', 'rasterizer'}:
+            raise ValueError('physical observer requires a GeoPhys renderer')
+        if config.render.camera_obs and provider != 'geophys':
+            raise ValueError('legacy camera observations require GeoPhys CPU')
+        if (config.runtime.physics_dt, config.runtime.control_substeps, config.runtime.backend) != (*cls.physical_task_timebase, backend):
+            raise ValueError('physical task requires its declared timebase and backend')
+        if (camera is None) != (renderer is None):
+            raise ValueError('task RGB camera and fixed renderer must be supplied together')
+        if camera is not None:
+            from ..environment.config import CameraSpec
+            if (type(camera) is not CameraSpec or camera.frame != 'world'
+                    or not np.isfinite((*camera.quaternion_wxyz, *camera.position,
+                                        camera.fov_y, camera.near, camera.far)).all()
+                    or np.linalg.norm(camera.quaternion_wxyz) < 1e-12):
+                raise ValueError('task RGB requires a finite world CameraSpec with nonzero quaternion')
 
     @classmethod
     def from_position_candidate(
@@ -941,6 +1047,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.position_profile = selected.position
         self.controller = selected.controller
         self._selected_controller_binding = selected
+        from ..robots.runtime import RobotRuntime
+        self._robot = RobotRuntime.from_selected(value, selected)
 
     def _episode_execution_state(self):
         state = self.__dict__.get('_episode_state')
@@ -1280,6 +1388,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
+        if self.binding.task_definition_factory is not None:
+            self._task_definition = self.binding.task_definition_factory()
+            self._task_lifecycle = TaskLifecycleAdapter(task_definition=self._task_definition,
+                horizon=self.horizon, ignore_done=self.binding.physical_ignore_done)
         self.dual_entity_position = len(self.position_profiles) == 2
         if (not self.position_profile and not mixed_control_candidate
                 and self.binding.physical_control_profile is None):
@@ -1297,6 +1409,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
+        if self.binding.observation_metadata is not None:
+            self.metadata['observation_schema'] = dict(self.binding.observation_metadata)
         self.supports_structured_control_recording = bool(mixed_control_candidate)
         if mixed_control_candidate:
             action_schema = self.value.get('action_schema')
@@ -1429,7 +1543,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._execution_fault = None
         try:
             if _initial_value is not None:
-                if (_execution_spec_v1 is None or not isinstance(_initial_value, dict)
+                if (not isinstance(_initial_value, dict)
                         or _initial_value.get('execution_spec_v1') != _execution_spec_v1):
                     raise ValueError('precompiled selected value must match its execution specification')
                 self.value = _initial_value
@@ -1698,10 +1812,34 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 return component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
             return self._prepare_reference_reset(seed=seed, options=options)
 
+        if not self._has_component_assembly():
+            return self._reset_selected_task(seed=seed, options=options)
         result = self._execute_reset_operations(prepare)
-        if component_lifecycle is not None:
-            return self._format_component_reset(component_lifecycle, result, seed)
-        return result
+        return self._format_component_reset(component_lifecycle, result, seed)
+
+    def _reset_selected_task(self, *, seed, options, external_solution=None):
+        requested_seed = seed
+        sampled = self.binding.task_reset_sampler is not None
+        if sampled:
+            requested_seed = None if seed is _RESET_SEED_UNSET else seed
+            GymEnvBase.reset(self, seed=requested_seed)
+            seed = int(self.np_random_seed)
+            self._reset_reconstruction.sampled_reset = self.binding.task_reset_sampler(self.np_random)
+        try:
+            result = self._execute_reset_operations(lambda: self._prepare_reference_reset(
+                seed=seed, options=options, external_solution=external_solution))
+            if sampled:
+                from .task_definition import EpisodeTerminationPolicyV1
+                observation, info = result
+                info.update(reset_parameters=self.binding.task_reset_metadata(self.value['reset_plan'].reset_sample),
+                    seed=requested_seed, task_uid=self.config.task.task_uid, stage='stage4_gym_contract',
+                    episode_id=self.session.episode_id, resolved_control_metadata=self.metadata['action_schema'],
+                    termination_policy=EpisodeTerminationPolicyV1().to_mapping())
+                result = observation, info
+            return result
+        finally:
+            if sampled:
+                self._reset_reconstruction.sampled_reset = None
 
     def physical_action_spec(self):
         """Return the currently committed reset-scoped physical action identity."""
@@ -1748,8 +1886,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
         self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
-        return self._execute_reset_operations(lambda: self._prepare_reference_reset(
-            seed=seed, options=options, external_solution=solution))
+        return self._reset_selected_task(seed=seed, options=options, external_solution=solution)
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
@@ -2561,6 +2698,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             observation['task_rgb'] = image
             info = dict(info)
             info['task_rgb_v1'] = receipt
+        if getattr(self, '_legacy_camera_observations', False):
+            metadata = self.session.capture_legacy_camera_metadata()
+            info = {**info, 'camera_capture': {
+                'source': 'SensorObservation.camera_metadata',
+                'observation_boundary': {'elapsed_steps': state.control_step,
+                                         'simulation_time_s': float(state.simulation_time)},
+                'cameras': {name: _json_value(asdict(value)) for name, value in metadata.items()}}}
         if self._selected_execution_context()[0] is not None:
             info = dict(info)
             info['execution_configuration_v1'] = self.get_execution_receipt()
@@ -2570,7 +2714,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if getattr(self, '_task_rgb_consumer', None) is None:
             self._task_rgb_consumer = self._new_task_rgb_consumer()
         publication = self._publish_task_rgb_typed_state(state)
-        return self._task_rgb_consumer.capture(publication.view)
+        image, receipt = self._task_rgb_consumer.capture(publication.view)
+        camera = getattr(self, '_task_camera_spec', None)
+        if camera is not None:
+            native = self.session.task_camera_binding(publication.view)['native']
+            renderer = self._task_rgb_config[1]
+            receipt = {**receipt, 'camera_name': camera.name,
+                'requested_camera': _json_value(asdict(camera)), 'realized_camera': _json_value(native),
+                'renderer': renderer, 'render_backend': {
+                    'mujoco': 'native-opengl', 'geophys': 'rasterizer', 'isaacsim': 'rtx'}[renderer],
+                'observation_boundary': {'episode_id': publication.view.boundary.episode_id,
+                    'control_step': state.control_step, 'simulation_time_s': float(state.simulation_time)}}
+        return image, receipt
 
     def _configure_task_rgb(self, camera, renderer):
         """Fix one task camera and renderer for this Env before its first reset."""
@@ -4954,6 +5109,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
         if self._has_component_assembly():
             return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
+        if self.binding.task_definition_factory is not None:
+            schema = {key: value for key, value in self.binding.action_schema.items()
+                      if key not in {'low', 'high'}}
+            return {'env_metadata': {**self.metadata, 'action_schema': schema},
+                'resolved_config': self.value['resolved_configuration'],
+                'universal_action_schema': {'version': schema['schema_version'],
+                    'dimension': len(schema['components']), 'components': schema['components']}}
         if not getattr(self, 'mixed_control_profile', False):
             if getattr(self, 'position_profile', False):
                 return self._position_record_metadata()

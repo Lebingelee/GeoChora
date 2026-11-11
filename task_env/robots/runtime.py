@@ -76,15 +76,50 @@ class RobotRuntime:
     """Single robot runtime view exposed as ``env.robot``."""
 
     uid: str
-    references: AgentReferences
-    controller: RobotControllerHandle
-    gripper: PandaGripperController
-    base: RobotFrameReference
-    ee: RobotFrameReference
-    world: RobotFrameReference
+    references: AgentReferences | None = None
+    controller: object | None = None
+    gripper: PandaGripperController | None = None
+    base: object | None = None
+    ee: RobotFrameReference | None = None
+    world: RobotFrameReference | None = None
+    subjects: tuple = ()
+    controllers: tuple = ()
+
+    @classmethod
+    def from_selected(cls, value, selected):
+        """Expose the admitted subjects and their actual Controller owners.
+
+        No native resource, state copy, or Controller is created by this view.
+        Component-only Panda conveniences remain optional capabilities.
+        """
+        source = value['source']
+        physical = selected.physical_execution
+        if physical is not None:
+            subjects, controllers = physical.subjects, physical.controllers
+        else:
+            binding = getattr(source, 'position_subject_binding', None)
+            subjects = () if binding is None else binding.subjects
+            declare = getattr(selected.controller, 'position_binding_requirements', None)
+            controllers = (tuple(row[0] for row in declare()) if callable(declare)
+                           else (selected.controller,))
+        if not subjects:
+            return None
+        roots = tuple(subject for subject in subjects if subject.parent_subject_id is None)
+        request = getattr(source, 'source_composition_request', None)
+        uid = request.robot_uid if request is not None else subjects[0].entity_id
+        return cls(uid=uid, controller=selected.controller, subjects=subjects,
+                   controllers=controllers, base=roots[0].root_frame if len(roots) == 1 else None,
+                   world=RobotFrameReference('world', 'world', None, 'world'))
+
+    @property
+    def root_frames(self):
+        """Source-owned root Frames, retaining nested subject identities."""
+        return tuple(subject.root_frame for subject in self.subjects)
 
     @property
     def arm_joint_order(self) -> tuple[str, ...]:
+        if self.references is None:
+            raise AttributeError('this Robot does not declare a legacy arm joint projection')
         return self.references.arm_joint_names
 
 

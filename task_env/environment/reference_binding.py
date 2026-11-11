@@ -29,6 +29,7 @@ class _ResetReconstruction:
     """Task binding's reconstruction policy for one selected configuration."""
     def __init__(self, binding, provider, backend, horizon):
         self.binding, self.provider, self.backend, self.horizon = binding, provider, backend, horizon
+        self.sampled_reset = None
 
     def build_switch_candidate(self, seed):
         if self.binding.build_seeded is None:
@@ -84,6 +85,9 @@ class _StandardResetReconstruction(_ResetReconstruction):
     def build_reset(self, current, seed, external_solution):
         if external_solution is not None:
             return self.binding.build_external(self.provider)
+        if self.binding.build_sampled is not None:
+            return self.binding.build_sampled(
+                self.provider, self.backend, seed, self.horizon, self.sampled_reset)
         if self.binding.build_seeded is not None:
             return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
         return self.binding.build_for_provider(self.provider)
@@ -308,6 +312,26 @@ def validate_initial_state_publication(session, publication, state):
     return publication
 
 
+def observe_task_definition(env, state):
+    """Project public Runtime state into the existing TaskDefinition lifecycle."""
+    snapshot = env.binding.task_state_projection(state)
+    lifecycle = env._task_lifecycle
+    evaluation = (lifecycle.reset_task(state=snapshot) if state.control_step == 0
+                  else lifecycle.evaluate_task(state=snapshot, action=env.controller.last_action,
+                                               elapsed_steps=state.control_step))
+    observation = env._task_definition.build_observation(snapshot)
+    return observation, {
+        'is_success': evaluation.success, 'task_failure': evaluation.failure,
+        'task_metrics': dict(evaluation.metrics), 'reward_terms': dict(evaluation.reward_terms),
+        'task_reward': evaluation.reward, 'elapsed_steps': state.control_step,
+        'simulation_time_s': state.simulation_time,
+        'external_action': env.controller.last_action.copy(),
+        'universal_action': env.controller.last_action.copy(),
+        'success_definition': env.config.task.success_definition,
+        'observation_schema': env.binding.task_observation_schema,
+    }, evaluation
+
+
 @dataclass(frozen=True)
 class ReferenceTaskBinding:
     """Internal task-to-reference adapter; not a new public task protocol."""
@@ -336,6 +360,14 @@ class ReferenceTaskBinding:
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
     build_seeded: Callable | None = None
+    build_sampled: Callable | None = None
+    task_reset_sampler: Callable | None = None
+    task_reset_metadata: Callable | None = None
+    task_definition_factory: Callable | None = None
+    task_state_projection: Callable | None = None
+    task_observation_schema: object | None = None
+    external_action_contract: object | None = None
+    observation_metadata: dict | None = None
     build_native_feedback_profile: Callable | None = None
     admit_native_feedback_profile: Callable | None = None
     build_mixed_control_profile: Callable | None = None
@@ -373,6 +405,13 @@ class ReferenceTaskBinding:
     build_receives_binding: bool = False
 
     def __post_init__(self):
+        sampling = (self.build_sampled, self.task_reset_sampler, self.task_reset_metadata)
+        if any(value is not None for value in sampling) and not all(map(callable, sampling)):
+            raise ValueError('sampled reset requires construction, RNG sampler and metadata projection')
+        semantics = (self.task_definition_factory, self.task_state_projection)
+        if any(value is not None for value in semantics) and (
+                not all(map(callable, semantics)) or self.task_observation_schema is None):
+            raise ValueError('TaskDefinition requires construction, state projection and observation schema')
         if self.task_com_wrench_factory is not None and not callable(self.task_com_wrench_factory):
             raise TypeError('Task COM wrench factory must be callable')
         if type(self.physical_direct_effort_feedback) is not bool:

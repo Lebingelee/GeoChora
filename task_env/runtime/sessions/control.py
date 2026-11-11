@@ -2634,7 +2634,6 @@ def validate_position_control_subjects(*, scene, root, children, subjects, plan,
     if len(owning_sources) != len(set(owning_sources)):
         raise ValueError('position subjects cannot duplicate source ownership')
     used = set()
-    subject_facts = []
     for subject in subjects:
         if subject.entity_id not in owners:
             raise ValueError('position subject lacks an Assembly entity owner')
@@ -2680,12 +2679,6 @@ def validate_position_control_subjects(*, scene, root, children, subjects, plan,
                 raise ValueError('position subject attachment differs from source ownership')
         elif subject.parent_subject_id is not None:
             raise ValueError('unconstrained subject cannot have a parent')
-        subject_facts.append({'subject_id': subject.subject_id, 'entity_id': subject.entity_id,
-            'source_id': subject.source_id, 'source_closure': subject.source_closure_sha256,
-            'ownership': subject.source_ownership, 'root_mode': subject.root_mode,
-            'root': subject.root_frame.to_mapping(), 'parent': subject.parent_subject_id,
-            'channels': subject.channel_paths, 'writers': subject.controller_writers,
-            'attachment': None if subject.attachment_plan is None else subject.attachment_plan.identity_hash})
     if {entity for entity, _, _ in plan.resource_writers} != {s.entity_id for s in subjects}:
         raise ValueError('every position resource must have exactly one subject owner')
     if plan.cross_entity_frame_grants:
@@ -2693,6 +2686,19 @@ def validate_position_control_subjects(*, scene, root, children, subjects, plan,
                        if subject.attachment_plan is not None}
         if plan.feedback_attachment_identity_hash not in attachments:
             raise ValueError('position feedback grants differ from the actual subject Attachment')
+    return position_subject_identity(plan, subjects)
+
+
+def position_subject_identity(plan, subjects):
+    """Identity of the already validated subjects retained with a binding."""
+    subject_facts = []
+    for subject in subjects:
+        subject_facts.append({'subject_id': subject.subject_id, 'entity_id': subject.entity_id,
+            'source_id': subject.source_id, 'source_closure': subject.source_closure_sha256,
+            'ownership': subject.source_ownership, 'root_mode': subject.root_mode,
+            'root': subject.root_frame.to_mapping(), 'parent': subject.parent_subject_id,
+            'channels': subject.channel_paths, 'writers': subject.controller_writers,
+            'attachment': None if subject.attachment_plan is None else subject.attachment_plan.identity_hash})
     return _schema_hash({'schema_version': 'position-subject-binding-v1',
-                         'scene': scene.identity_hash, 'assembly': plan.assembly_identity_hash,
+                         'scene': plan.scene_identity_hash, 'assembly': plan.assembly_identity_hash,
                          'controller': plan.identity_hash, 'subjects': subject_facts})

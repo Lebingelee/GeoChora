@@ -42,4 +42,4 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## E00～E04 当前实施
 
-维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。已完成首批共享 reset／close／mixed Solution 分派修复，生产 Python 暂净减 99 行；40 项纯合同和五个限定 MuJoCo CPU 检查通过，累计观测 60 个原生子步。E01／E02 尚待构建与主体门面迁移，E03／E04 仍实施中。详细变化、度量口径、证据及未覆盖项统一见[执行安排第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不据此提前签收事件或启动 G06。
+维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。首批 reset／close／mixed Solution 修复后，正式 Task caller 已进入共同构造 owner，四主体已暴露实际绑定的 Robot 视图，简单 TaskDefinition 使用既有 lifecycle。当前累计生产 Python 净减 126 行，项目文件数不变；124 个不同的定向纯合同节点通过。最新五个 MuJoCo CPU 交集通过，含装配 Panda 非零步与简单任务 RNG 序列；整个窗口累计 11 次 native run／150 子步（含一次检查器精度 oracle 失败，原记录保留）。E01～E04 仍实施中：高级 candidate 输入、execution 配置、Panda／Nut 语义接口及其余职责仍需对账。详细变化、度量、证据及限制统一见[执行安排第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收事件或启动 G06。
