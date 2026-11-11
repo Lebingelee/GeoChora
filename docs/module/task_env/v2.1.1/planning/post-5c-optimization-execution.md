@@ -782,3 +782,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 5 文件 +11／−15，净减 4 行；版本诊断修改 1 文件 +32／−2，覆盖 USD source 身份绑定及两个正式任务实际只生成一次声明；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer 的推进、clock、状态及资源合同未改；这项收敛只覆盖简单主体，Panda 和完整 adapter 整理仍需继续。
 
 78 项版本检查通过；MuJoCo Pendulum 和双轮车各完成 reset、step 和关闭，分别观测 25 个 native 子步。GeoPhys 两任务短程均通过，内部物理子步未观测、按每次 50 保守预留。Isaac 的最终 source 身份绑定通过无 SDK 合同检查，本批未进行 Isaac 原生运行；完整 Solution 未重跑。冻结 diff、计划和 CPU 收据位于 ignored `workspace/maintenance/v211_checked_subject_20261112_6l8UzF/`。E01～E04 仍未接收。
+
+### 6.67 PickCube direct effort 统一物理状态路径
+
+输入 `247319d8`。PickCube direct effort 的 MuJoCo 路线原已直接使用物理 Controller 和 V2 状态，GeoPhys 同一控制模式却额外创建 Position Controller、编译 Position binding 并使用 V1 状态。现在两者按控制能力选择相同路径：无 reset 切换的 direct effort 使用自身 Controller 和 V2 状态；Position 及 reset 切换路线保留自己的语义与 source 检查。仅影响 MJCF direct effort，不扩大 Isaac 准入。
+
+生产修改 1 文件 +2／−3，净减 1 行；版本诊断修改 1 文件 +26／−0，检查 MuJoCo 和 GeoPhys 的 direct effort 构造不再调用 Position Controller；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。GeoPhys 现在通过 physical Runtime 的 source、V2 状态、同一个控制提交和 clock；renderer 未改。
+
+80 项版本检查通过。GeoPhys direct effort 实际完成 reset、step、二次 reset 和重复关闭，观测到一次控制 interval 对应 0.01 秒；native 内部子步未观测、按 50 保守预留。补充的 GeoPhys 录像尝试在开始写入前因 direct effort 构造未提供 Solution identity 被记录器拒绝，未完成 H5 读回；该 identity 在本批输入版本也只由 reset 切换路线提供，记录器整理仍待处理。MuJoCo direct 的生产分支未变，其先前运行证据按原范围保留；Isaac 和完整 Solution 本批未重跑。冻结生产 diff、最终 diff、计划与两次运行收据位于 ignored `workspace/maintenance/v211_direct_effort_state_20261112_xkZyFZ/`。E01～E04 仍未接收。

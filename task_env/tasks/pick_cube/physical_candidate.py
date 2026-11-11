@@ -221,9 +221,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
             scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
         reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
-        # GeoPhys and reset-scoped reference controllers retain their existing
-        # bounded compatibility route until separately migrated and verified.
-        direct_physical = provider == 'mujoco' and control_kind == 'direct' and not reset_switch
+        # Direct effort does not require a Position Controller for state publication.
+        direct_physical = control_kind == 'direct' and not reset_switch
         position = (None if direct_physical else
                     PandaPositionServoProfileV1.from_source(artifact, source, entity_id='panda-v1'))
         plan = (None if direct_physical else
