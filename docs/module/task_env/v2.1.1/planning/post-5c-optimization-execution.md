@@ -702,3 +702,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +15／−77，净减 62 行；诊断／测试代码无变更；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1366。正式 Runtime 的 source、clock、提交和 renderer 数据路径未改；清除的是诊断专属 admission authority。
 
 72 项版本检查通过。四任务 MuJoCo 短程通过，观测 60 个 native 子步。Isaac PickCube joint effort／CUDA／同步 RGB 实际完成两次 reset、一次非零 step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，订阅前启动推进未知。GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。CPU 原计划仅列四个 MuJoCo case，后补 GeoPhys 一次并记录；按原每次 50 的全部保守预留合计为 250，高于计划中原列的 200，实际四个已观测 MuJoCo 子步加 GeoPhys 保守预留为 110。完整 Solution 本批未重跑。冻结 diff、计划、补充说明、独立读回及收据位于 ignored `workspace/maintenance/v211_retire_c05c_admission_20261112_001/`。E01～E04 仍未接收。
+
+### 6.57 退休旧 Position 输入的 observation 和录像 writer
+
+输入 `0a53d8a8`。旧 Position candidate 输入和 classifier 已无正式生产者，但共同 observation 及录像 writer 仍包含 F04／F05 专属分支和 200 余行 metadata。移除这些历史输入专属的实时分流、classifier 和 writer；F06 正式 Isaac Position 的公开状态、native Position 写入确认、逐 substep 推进收据与 provenance 校验保留。历史录像读取器未改；这不代表 E10 的全部 recorder 整理已经完成。
+
+生产修改 3 文件 +11／−276，净减 265 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。正式构建路径不再检查无生产者的旧 Position 输入；Runtime clock、物理提交、adapter 和 renderer 未改。
+
+72 项版本检查通过。MuJoCo 装配 Panda Position 的双 writer 录像完成逻辑读回、physical joint→R3 切换录像完成 H5 读回，共观测 15 个 native 子步。Isaac 正式 R3 Position／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭；H5 独立读回包含一条 structured transition、native Position Ack、5 个 native 推进收据、两个 typed-state 样本，观测 41 次 callback，订阅前启动推进未知。首次 Isaac 运行因测试相机仍绑定旧 physical Artifact，被身份检查拒绝并在退出 SDK 时异常；第二次用当前 Position Artifact 绑定相机后通过。首次未观测推进按 59 次保守计入，累计记账 100 次。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、计划、两次运行、H5 检查及收据位于 ignored `workspace/maintenance/v211_retire_position_input_writer_20261112_001/`。E01～E04 仍未接收。

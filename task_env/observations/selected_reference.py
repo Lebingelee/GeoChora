@@ -240,24 +240,12 @@ def build_selected_observation(self, state):
         'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
         'simulation_time_s': float(state.simulation_time)}
     if getattr(self, 'position_profile', False):
-        from ..environment.reference_binding import position_input_kind
-        input_kind = position_input_kind(self.binding, self.value.get('versioned_position_input'))
-        if input_kind == 'dg02_geophys':
-            info.update({
-                'task_success_semantics': 'raw_predicate_only',
-                'raw_task_predicate': bool(evaluation.success),
-                'lifecycle_valid_success': None,
-                'lifecycle_valid_success_assessed': False,
-                'lifecycle_terminated': bool(evaluation.failure),
-            })
         boundary = self.typed_state.view.boundary
         info['state_boundary_identity'] = boundary.to_mapping()
         info['state_boundary_id'] = boundary.boundary_id
         info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-        if self.value.get('f06_pickcube_isaac_input') is not None or input_kind in (
-            'f04', 'f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native',
-        ):
-            # Versioned USD state-only routes expose the Core-owned typed
+        if self.value.get('f06_pickcube_isaac_input') is not None:
+            # The admitted USD route exposes the Core-owned typed
             # publication used by observations and Position control.
             info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
         if self.camera_observation_config is not None:

@@ -191,19 +191,6 @@ def legacy_position_physical_observation_binding(env):
             env.position_frame_bindings, env._position_requirements())
 
 
-def position_input_kind(binding, value):
-    """Ask the task binding to classify a versioned Position input, if present."""
-    if value is None:
-        return None
-    classify = getattr(binding, 'classify_position_input', None)
-    if not callable(classify):
-        raise TypeError('versioned Position value requires its task-owned input classifier')
-    kind = classify(value)
-    if kind not in {'f04', 'f05_native', 'dg02_geophys', 'dg04_isaac_native'}:
-        raise ValueError('versioned Position input classifier returned an unsupported kind')
-    return kind
-
-
 def resolve_reset_execution(binding, value, declared, *, seed, provider, backend):
     """Keep rebuilt task execution bound to its declared route and reset seed."""
     from ..artifacts import ExecutionSpec, ExecutionSpecV1
@@ -442,7 +429,6 @@ class ReferenceTaskBinding:
     physical_direct_effort_feedback: bool = False
     physical_terminate_on_success: bool = False
     physical_ignore_done: bool = False
-    classify_position_input: Callable | None = None
     build_receives_binding: bool = False
     compose_robot_source: Callable | None = None
 
@@ -521,8 +507,6 @@ class ReferenceTaskBinding:
         if (self.legacy_position_expert_admission is not None
                 and not callable(self.legacy_position_expert_admission)):
             raise ValueError('legacy Position expert admission must be callable when supplied')
-        if self.classify_position_input is not None and not callable(self.classify_position_input):
-            raise ValueError('position input classifier must be callable when supplied')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:

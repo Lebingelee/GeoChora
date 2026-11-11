@@ -4,7 +4,6 @@ import hashlib
 from dataclasses import asdict
 
 import numpy as np
-from ..environment.reference_binding import position_input_kind
 
 
 def position_episode_end_payload(*, state, boundary, source_closure_digest,
@@ -133,224 +132,6 @@ def pending_controller_switch_receipt(pending, *, published_step, execution_faul
 def position_record_metadata(self):
     from dataclasses import asdict
 
-
-    versioned_position_input = self.value.get('versioned_position_input')
-    versioned_input_kind = position_input_kind(self.binding, versioned_position_input)
-    f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
-    f05_native_input = versioned_position_input if versioned_input_kind == 'f05_native' else None
-    f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
-    f05_dg04_input = versioned_position_input if versioned_input_kind == 'dg04_isaac_native' else None
-    f05_native_route = f05_native_input is not None
-    f05_dg02_route = f05_dg02_input is not None
-    f05_dg04_route = f05_dg04_input is not None
-    f05_native_core_route = f05_native_route or f05_dg02_route or f05_dg04_route
-    f05_route = f05_native_core_route
-    f05_host_model_route = f05_route and not f05_dg04_route
-    if f04_input is not None or f05_route:
-        f04_route = f04_input is not None
-        versioned_input = (
-            f05_dg04_input if f05_dg04_route else
-            f05_dg02_input if f05_dg02_route else
-            f05_native_input if f05_native_route else f04_input
-        )
-        source = self.value['source']
-        source_scene = source.scene_source
-        loaded = source_scene.loaded_delivery
-        delivery = loaded.delivery
-        representation = source_scene.representation
-        drive_receipt = getattr(self.session, '_drive_receipt', None)
-        native_metadata = self.session._native_io_metadata
-        reset_receipt = self.session._reset_write_receipt
-        if reset_receipt is None:
-            raise RuntimeError('versioned USD recording requires the successful Core reset write receipt')
-        f04_native = bool(f04_route and drive_receipt is not None
-                          and drive_receipt.provenance_kind == 'native_runtime')
-        f05_native = bool(f05_native_core_route and drive_receipt is not None
-                          and drive_receipt.provenance_kind == 'native_runtime')
-        expected_provenance = 'native_runtime' if f04_native or f05_native else 'synthetic_fixture'
-        if (drive_receipt is None or drive_receipt.provenance_kind != expected_provenance):
-            raise RuntimeError('versioned USD recording receipt provenance differs from its execution route')
-        if f04_native:
-            if not (source.scene_source.source_verified or source.scene_source.locally_validated):
-                raise RuntimeError('F04 recording requires a loader-verified upstream or fixed local production delivery')
-            bootstrap = self.session._native_io.bootstrap_receipt()
-        elif f05_native:
-            bootstrap = self.session._native_io.bootstrap_receipt()
-        else:
-            bootstrap = None
-        action_schema = self.position_profiles[0].controller_binding().action_schema
-        profile = {
-            'schema_version': (
-                'f04-isaac-core-position-recording-profile-v1' if f04_native else
-                'f05-dg04-isaac-native-core-position-profile-v1' if f05_dg04_route else
-                'f05-dg02-geophys-usd-core-position-native-profile-v1' if f05_dg02_route else
-                'f05-geophys-core-position-native-profile-v1' if f05_native else
-                'f04-core-position-synthetic-io-s1-profile-v1'
-            ),
-            'profile_id': (
-                'f04-isaac-panda-position-native-v1' if f04_native else
-                'f05-dg04-isaac-native-mimic-v1' if f05_dg04_route else
-                'geophys-usd-position-f05-dg02-core-v1' if f05_dg02_route else
-                'geophys-usd-position-f05-native-v1' if f05_native else
-                'f04-local-source-synthetic-io-s1-v1'
-            ),
-            'provenance_kind': 'native_runtime' if f04_native or f05_native else 'synthetic_fixture',
-            'runtime_admitted': bool(f04_native or f05_native),
-            'source_verified': bool(source_scene.source_verified),
-            'source_validation_provenance_kind': delivery.provenance_kind,
-            'task_source_identity_sha256': versioned_input.task_source.identity_hash,
-            'task_artifact_identity_sha256': self.artifact.identity_hash,
-            'scene_identity_sha256': self.position_scene.identity_hash,
-            'source_id': source.source_id,
-            'source_closure_sha256': source.source_closure_digest,
-            'usd_delivery': {
-                'asset_identity_sha256': delivery.asset_identity_hash,
-                'delivery_sha256': loaded.delivery_sha256,
-                'closure_sha256': loaded.closure_sha256,
-                'provenance_kind': delivery.provenance_kind,
-                'source_revision': delivery.source_revision,
-                'entry_file': delivery.entry_file,
-                'entry_prim': delivery.entry_prim,
-                'variant_selections': dict(delivery.variant_selections),
-                'validation_report_path': delivery.validation_report_path,
-                'validation_report_sha256': delivery.validation_report_sha256,
-                'validation_report_payload_sha256': hashlib.sha256(loaded.report_bytes).hexdigest(),
-                'validation_report_id': loaded.report.report_id,
-                'validation_report_passed': loaded.report.passed,
-                'validation_report_provenance_kind': loaded.report.provenance_kind,
-                'locally_validated': bool(getattr(loaded, 'locally_validated', False)),
-                **({
-                    'source_closure_sha256': delivery.source_closure_sha256,
-                    'source_manifest_sha256': delivery.source_manifest_sha256,
-                    'source_variant_selections': dict(delivery.source_variant_selections),
-                    'source_variant_selection_sha256': delivery.source_variant_selection_sha256,
-                    'recipe_sha256': delivery.recipe_sha256,
-                    'checker_sha256': delivery.checker_sha256,
-                } if getattr(loaded, 'locally_validated', False) else {}),
-            },
-            'representation': {
-                'identity_sha256': representation.identity_hash,
-                'provider': representation.provider,
-                'provider_build_identity': representation.provider_build_identity,
-                'requested_target_build_identity': representation.provider_build_identity,
-                **({'actual_execution_build_identity': native_metadata.provider_build_identity}
-                   if f05_native else {}),
-                'decision': representation.decision,
-                'runtime_admitted': representation.runtime_admitted,
-                'source_verified': representation.source_verified,
-            },
-            'execution_spec_v1': self.execution.to_mapping(),
-            'execution_identity_sha256': self.execution.identity_hash,
-            'device': self.execution.physics_device,
-            'backend': self.execution.physics_backend,
-            'provider_build_identity': native_metadata.provider_build_identity,
-            **({
-                'requested_target_build_identity': versioned_input.host_model_producer_identity.requested_target_build_identity,
-                'actual_provider_build_identity': versioned_input.host_model_producer_identity.actual_provider_build_identity,
-                'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256,
-                'host_model_producer_identity': versioned_input.host_model_producer_identity.to_mapping(),
-            } if f05_host_model_route else {}),
-            'timebase': {
-                'physics_dt_s': self.artifact.timebase.physics_dt,
-                'control_substeps': self.artifact.timebase.control_substeps,
-                'control_dt_s': self.artifact.timebase.control_dt,
-                'clock_domain': 'evaluation_boundary',
-            },
-            'reset_plan_identity_sha256': self.value['reset_plan'].identity_hash,
-            'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
-            'reset_write_receipt': reset_receipt.to_mapping(),
-            'controller_identity_sha256': self.position_profiles[0].identity,
-            'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
-            'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
-            'native_position_drive_receipt': (
-                drive_receipt.to_mapping() if f05_dg04_route else asdict(drive_receipt)
-            ),
-            **({'public_model_identity_sha256': drive_receipt.public_model_identity_sha256}
-               if f05_host_model_route else {}),
-            'native_runtime_io_metadata': native_metadata.to_mapping(),
-            **({'native_public_bootstrap_receipt': bootstrap} if f04_native or f05_native else {}),
-            'native_source_mappings': {
-                'joints': dict(source.joints), 'bodies': dict(source.bodies),
-                'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
-                'joint_targets': dict(source.joint_targets),
-            },
-            ('source_calibrated_kinematics_source_sha256' if f04_route or f05_route
-             else 'static_kinematics_source_sha256'): versioned_input.kinematics_source_sha256,
-            'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
-            **({'typed_state_h5_witness_schema_version': 'f05-public-typed-state-witness-v1'}
-               if f05_route else {}),
-            'recording_scope': (
-                'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
-                if f04_native else
-                'F05 DG04 source-bound Menagerie USD / Isaac 6.2.0.0 GPU PhysX native-mimic Core Position diagnostic'
-                if f05_dg04_route and f05_native else
-                'F05 DG04 synthetic lowest NativeRuntimeIO Core Position S1; no native physics admission'
-                if f05_dg04_route else
-                'F05 DG02 source-preserving Menagerie USD / GeoPhys CPU Core Position cell'
-                if f05_dg02_route else
-                'F05 frozen Menagerie USD / GeoPhys CPU native Core Position cell'
-                if f05_native else
-                'F05 public GeoPhys host-model synthetic S1; no provider solver or physics admission'
-                if f05_route else 'Core synthetic S1 conformance; no provider physics or native admission'
-            ),
-        }
-        action_components = tuple(action_schema.components)
-        return {
-            'env_metadata': {
-                'env_name': (
-                    'SelectedReferenceEnv.F04IsaacPandaPosition' if f04_native else
-                    'SelectedReferenceEnv.F05Dg04IsaacNativePosition' if f05_dg04_route else
-                    'SelectedReferenceEnv.F05Dg02GeoPhysUsdCorePosition' if f05_dg02_route else
-                    'SelectedReferenceEnv.F05MenagerieGeoPhysCpuNativePosition' if f05_native else
-                    'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
-                    'SelectedReferenceEnv.F05GeoPhysUsdSyntheticIOS1' if f05_route else
-                    'SelectedReferenceEnv.VersionedPositionCandidate'
-                ),
-                'task_name': self.artifact.task_id,
-                'task_version': self.artifact.artifact_version,
-                'scene_uid': self.position_scene.scene_id,
-                'agent_uids': ('panda-main',),
-                'physics_dt': self.artifact.timebase.physics_dt,
-                'control_substeps': self.artifact.timebase.control_substeps,
-                'control_frequency': 1.0 / self.artifact.timebase.control_dt,
-                'action_schema': asdict(action_schema),
-                'observation_schema': {'leaf_specs': (
-                    {'path': 'state.ee_pose', 'semantic': 'hand_origin_tcp_pose_world'},
-                    {'path': 'state.joint_position', 'semantic': 'named_arm_then_finger_joint_positions'},
-                    {'path': 'state.hand_pose', 'semantic': 'measured_hand_frame_pose_world'},
-                    {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
-                    {'path': 'privileged_state.target_body_pose', 'semantic': 'floating_target_body_pose_world'},
-                )},
-                'reference_profile': profile,
-            },
-            'universal_action_schema': {
-                'version': ('f04-isaac-core-position-action-v1'
-                            if f04_route else 'f05-dg02-geophys-usd-core-position-action-v1'
-                            if f05_dg02_route else 'f05-dg04-isaac-native-mimic-position-action-v1'
-                            if f05_dg04_route else 'f05-geophys-native-position-action-v1'
-                            if f05_native else 'f05-geophys-usd-position-synthetic-s1-action-v1'),
-                'dimension': len(action_components), 'components': action_components,
-            },
-            'resolved_config': {
-                'provider': self.provider, 'backend': self.backend,
-                'device': self.execution.physics_device, 'horizon': self.horizon,
-                'controller_profile': self.position_profiles[0].profile_id,
-                'execution_identity_sha256': self.execution.identity_hash,
-            },
-            'candidate_identity': {
-                'task_artifact_identity_hash': self.artifact.identity_hash,
-                'task_source_identity_sha256': versioned_input.task_source.identity_hash,
-                'scene_identity_hash': self.position_scene.identity_hash,
-                'source_id': source.source_id,
-                'source_closure_digest': source.source_closure_digest,
-                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-                'execution_identity_sha256': self.execution.identity_hash,
-                'controller_identity_sha256': self.position_profiles[0].identity,
-                'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
-                **({'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256}
-                   if f05_host_model_route else {}),
-            },
-        }
 
     profile = self.position_profiles[0]
     action_schema = profile.controller_binding().action_schema
@@ -509,38 +290,23 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
     applied_payload = applied.to_mapping()
     if 'gravity_compensation_v1' in self.info:
         applied_payload['gravity_compensation_v1'] = self.info['gravity_compensation_v1']
-    versioned_position_input = self.value.get('versioned_position_input')
-    versioned_input_kind = position_input_kind(self.binding, versioned_position_input)
-    f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
-    f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
-    if (f04_input is not None or versioned_input_kind == 'f05_native'
-            or f05_dg02_input is not None
-            or versioned_input_kind == 'dg04_isaac_native'
-            or self.value.get('f06_pickcube_isaac_input') is not None):
+    if self.value.get('f06_pickcube_isaac_input') is not None:
         evidence = self.session.native_interval_evidence
         native_ack = evidence['position_ack']
         native_advances = evidence['advances']
         advance_attempts = evidence['advance_attempts']
         if native_ack is None or len(native_advances) != self.artifact.timebase.control_substeps:
-            raise ValueError('versioned USD recording requires a complete native Position Ack and interval receipts')
+            raise ValueError('USD recording requires a complete native Position Ack and interval receipts')
         applied_payload['native_position_write_ack_v1'] = native_ack
         applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
         applied_payload['native_interval_advance_attempts'] = advance_attempts
-        if (f04_input is not None or versioned_input_kind == 'f05_native'
-                or f05_dg02_input is not None
-                or versioned_input_kind == 'dg04_isaac_native'
-                or self.value.get('f06_pickcube_isaac_input') is not None):
-            provenance = evidence['provenance_kind']
-            if provenance == 'native_runtime':
-                execution_class = 'native_runtime_accepted_physics'
-            elif provenance == 'synthetic_fixture':
-                execution_class = 'synthetic_fixture_no_physics'
-            else:
-                raise ValueError(
-                    'F04 Position recording requires an explicit native-I/O execution provenance'
-                )
-        else:
+        provenance = evidence['provenance_kind']
+        if provenance == 'native_runtime':
+            execution_class = 'native_runtime_accepted_physics'
+        elif provenance == 'synthetic_fixture':
             execution_class = 'synthetic_fixture_no_physics'
+        else:
+            raise ValueError('Position recording requires explicit native-I/O execution provenance')
         applied_payload['native_io_execution_class'] = execution_class
     canonical_action = {
         **canonical.to_mapping(),
@@ -670,10 +436,7 @@ def position_record_reset_info(self):
             # observation. Generic H5 v3 consumes this only for the
             # bounded versioned typed-state witness extension.
             'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-        } if position_input_kind(
-            self.binding, self.value.get('versioned_position_input'),
-        ) in ('f05', 'f05_native', 'dg02_geophys', 'dg04_isaac_native')
-          or self.value.get('f06_pickcube_isaac_input') is not None else {}),
+        } if self.value.get('f06_pickcube_isaac_input') is not None else {}),
         **({
             'camera_observation_v1': self.info['camera_observation_v1'],
         } if self.camera_observation_config is not None else {}),
