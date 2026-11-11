@@ -99,6 +99,7 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
     left_actuator_name: str = "left_wheel_torque"
     right_actuator_name: str = "right_wheel_torque"
     assembly_id = 'two-wheel-source-assembly'
+    source_xml = TWO_WHEEL_BALANCE_MJCF_XML
 
     frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 

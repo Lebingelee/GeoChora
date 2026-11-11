@@ -9,17 +9,15 @@ import numpy as np
 from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
     SemanticDefinition, Timebase)
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
-from ..artifacts import ExecutionSpecV1, RendererSelectionV1
-from ..assembly.assets import _source_closure_digest
-from ..assembly.compiler import compile_reference_source
-from ..assembly.source import TaskSceneSource
 from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
 from ..robots.two_wheel_balance import TWO_WHEEL_BALANCE_MJCF_XML, TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import build_existing_subject_effort
-from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+from ..runtime.sessions.declared_effort_source import (
+    declared_effort_scene, compile_declared_effort_source,
+)
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
     ensure_g05_isaac_app_open, load_g05_isaac_delivery,
@@ -33,12 +31,6 @@ NAMES = ('chassis_pitch', 'left_wheel_hinge', 'right_wheel_hinge')
 JOINTS = tuple(f'{ENTITY}/{name}' for name in NAMES)
 FRAMES = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 ACTUATORS = ('left_wheel_torque', 'right_wheel_torque')
-USD_BODY_PATHS = {
-    'balance_anchor': 'Geometry/balance_anchor',
-    'balance_chassis': 'Geometry/balance_anchor/balance_chassis',
-    'left_wheel': 'Geometry/balance_anchor/balance_chassis/left_wheel',
-    'right_wheel': 'Geometry/balance_anchor/balance_chassis/right_wheel',
-}
 
 
 
@@ -80,54 +72,17 @@ def _reset_plan(artifact, source, seed, sampled):
 
 
 def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_manifest=None):
-    import xml.etree.ElementTree as ET
-    isaac_loaded = None
-    if provider == 'isaacsim':
-        if source_delivery_manifest is None:
-            raise ValueError('Two-wheel Isaac requires its explicit source_delivery_manifest')
-        ensure_g05_isaac_app_open()
-        isaac_loaded = load_g05_isaac_delivery(source_delivery_manifest)
-        source_revision = isaac_loaded.delivery.asset_definition.source_revision
-    else:
-        source_revision = None
     robot = TwoWheelBalanceEntity()
-    scene = robot.scene_definition(source_revision=source_revision); task_source, artifact = _declaration(scene)
-    xml = ET.fromstring(TWO_WHEEL_BALANCE_MJCF_XML); section = xml.find('./actuator')
-    motors = xml.findall('./actuator/motor')
-    if section is None or len(section) != 2 or len(motors) != 2:
-        raise ValueError('two-wheel source requires exactly two motors')
-    for motor, actuator, joint in zip(motors, ACTUATORS, NAMES[1:], strict=True):
-        if (motor.get('name'), motor.get('joint'), motor.get('gear'), motor.get('ctrllimited'), motor.get('ctrlrange')) != (actuator, joint, '1', 'true', '-1.5 1.5'):
-            raise ValueError('two-wheel source motor transmission differs from declaration')
-    base = Path(__file__).resolve().parent
-    projected = project_scene_definition_v3_to_mjcf(TWO_WHEEL_BALANCE_MJCF_XML, scene)
-    closure = _source_closure_digest({'scene.xml': projected.encode(), **source_asset_bytes(base, projected)})
+    scene = declared_effort_scene(robot, provider=provider,
+        source_delivery_manifest=source_delivery_manifest)
+    task_source, artifact = _declaration(scene)
     composition = TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID,
                                       success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION)
-    if provider == 'isaacsim':
-        source = build_g05_isaac_runtime_source(
-            manifest_path=source_delivery_manifest, artifact=artifact, scene=scene,
-            task_source_identity_sha256=task_source.identity_hash,
-            joints=dict(zip(JOINTS, NAMES, strict=True)),
-            bodies={f'{ENTITY}/{name}': USD_BODY_PATHS[name] for name in FRAMES},
-            frames={}, free_joints={}, joint_targets=dict(zip(JOINTS, NAMES, strict=True)),
-        )
-        closure = source.source_closure_digest
-        execution_spec = ExecutionSpecV1(
-            'execution-spec-v1', 'isaacsim', 'cuda', G05_ISAAC_EFFORT_PROFILE,
-            seed, 'best_effort',
-            RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
-            physics_device='cuda:0', camera_overrides=(),
-        )
-    else:
-        source = compile_reference_source(artifact=artifact,
-            scene_source=TaskSceneSource(TWO_WHEEL_BALANCE_MJCF_XML, base, f'scene-definition-v3:{scene.identity_hash}'),
-            composition=composition, config=config, joints=dict(zip(JOINTS, NAMES, strict=True)),
-            bodies={f'{ENTITY}/{name}': name for name in FRAMES}, frames={}, free_joints={},
-            joint_targets={}, open_actuators=(), scene_definition=scene, source_closure_digest=closure,
-            torque_actuators=dict(zip(JOINTS[1:], ACTUATORS, strict=True)),
-            actuator_units={a: 'N*m' for a in ACTUATORS})
-        execution_spec = None
+    source, execution_spec, closure = compile_declared_effort_source(
+        robot=robot, scene=scene, artifact=artifact, task_source=task_source,
+        composition=composition, config=config, provider=provider,
+        source_delivery_manifest=source_delivery_manifest, seed=seed,
+        base_dir=Path(__file__).resolve().parent)
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
     physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
         source=source, profile_id=selected_profile_id)

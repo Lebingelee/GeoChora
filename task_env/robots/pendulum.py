@@ -79,6 +79,7 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
     joint_name: str = "pendulum_hinge"
     actuator_name: str = "pendulum_torque"
     assembly_id = 'pendulum-source-assembly'
+    source_xml = PENDULUM_MJCF_XML
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))

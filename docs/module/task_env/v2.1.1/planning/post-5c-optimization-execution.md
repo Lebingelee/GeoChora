@@ -436,3 +436,11 @@ MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step
 生产修改 6 个文件，+156／−141，净增 15 行，文件数无增减；两段内联 XML 和 Scene 声明为职责迁移，不能把迁移行当成新功能或精简成果，另有调用与 imports 调整。测试／诊断文件无改动，文档修改两份，项目 tracked 文件数不变。Robot 自身声明仍有不同拓扑，属于主体差异；目前尚没有完整统一的场景组合器。renderer、clock、提交与 provider adapter 本次未修改。
 
 同一进程将旧 `_scene` 与新 Robot 声明分别按无 revision 和指定 revision 比较，四组 SceneDefinition 与 identity hash 均一致；内联 XML 内容亦未改动。第一次在移除旧模块 imports 后重跑比较时检查脚本缺少 `PoseWorld`，未启动物理；向比较命名空间补入原 artifacts 符号后通过。正式 Pendulum／双轮车 MuJoCo CPU 均完成 reset、非零 action、第二次 reset 和 close，各 25 个可观测子步。版本诊断 8 项纯合同通过。计划、冻结 diff、比较结果与运行记录位于 ignored `workspace/maintenance/v211_robot_scene_20261112_001/`。此前 GeoPhys CPU 的对应有界证据仍可作为历史参考，场景与内容身份一致，但本批未重跑 GeoPhys；Isaac 和 renderer 同样未重跑。E01～E04 仍未全部完成，不以本批为四主体统一或 adapter 全面接收。
+
+### 6.24 简单主体按声明共同编译 source
+
+输入 `c1f11e60`。Pendulum／双轮车 Task 不再各自实现 MJCF 电机验证、关节及 body 映射、source closure 和 provider source 分支：新的 Runtime source 编译器读取 Robot 的 XML、Scene articulation 和受控关节声明，验证 actuator 名称、关节、齿轮比及力矩范围，再构造相应 RuntimeSource；Isaac 的既有受限 USD source 准入仍由 Isaac source owner 执行。相同 Robot 实例仍交给共同主体 effort 构建器。Task 继续负责各自的语义、reset 和 Artifact；没有声称两个 tabletop Task 已使用此 source 编译路径，renderer、clock 与控制提交本批未改。
+
+生产新增 1 个共同 source 编译器文件（93 行），修改 4 个文件 +23／−111，合计 +116／−111，净增 5 行；电机验证、provider 映射及闭包构造为重写迁移，不能将搬迁行计算为新增功能。新增 1 个版本诊断文件（45 行），修改 2 份文档；项目 tracked 文件净增 2，未删除或移动文件。共同构建去掉两个任务中的相同决策，但完整四任务 source 统一和 Panda 路线仍待后续，E01～E04 不因此关闭。
+
+两个任务分别在 MuJoCo CPU、GeoPhys CPU 完成 reset、非零 action、第二次 reset 和 close；MuJoCo 各观测 25 子步，GeoPhys 内部子步未观测，按计划各保守预留 50。MuJoCo 新旧结果中的 Scene identity、reset sample、Robot／Controller identity 和单步奖励一致。10 项纯合同通过，新增检查覆盖两任务 Isaac body／joint 映射与齿轮篡改拒绝，使用 stub，不代表 Isaac 实际运行；原有 Isaac 有界证据不自动扩展到本批代码。计划、生产冻结 diff 和运行结果在 ignored `workspace/maintenance/v211_declared_source_20261112_001/`；本批未实测 Isaac 或 renderer。

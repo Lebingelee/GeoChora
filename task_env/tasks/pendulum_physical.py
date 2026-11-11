@@ -10,17 +10,15 @@ import numpy as np
 from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
     SemanticDefinition, Timebase)
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
-from ..artifacts import ExecutionSpecV1, RendererSelectionV1
-from ..assembly.assets import _source_closure_digest
-from ..assembly.compiler import compile_reference_source
-from ..assembly.source import TaskSceneSource
 from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
 from ..robots.pendulum import PENDULUM_MJCF_XML, PendulumEntity, PENDULUM_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import build_existing_subject_effort
-from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+from ..runtime.sessions.declared_effort_source import (
+    declared_effort_scene, compile_declared_effort_source,
+)
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
     ensure_g05_isaac_app_open, load_g05_isaac_delivery,
@@ -69,60 +67,17 @@ def _reset_plan(artifact, source, seed, sampled=None):
 
 
 def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_manifest=None):
-    import xml.etree.ElementTree as ET
-    isaac_loaded = None
-    if provider == 'isaacsim':
-        if source_delivery_manifest is None:
-            raise ValueError('Pendulum Isaac requires its explicit source_delivery_manifest')
-        ensure_g05_isaac_app_open()
-        isaac_loaded = load_g05_isaac_delivery(source_delivery_manifest)
-        source_revision = isaac_loaded.delivery.asset_definition.source_revision
-    else:
-        source_revision = None
     robot = PendulumEntity()
-    scene = robot.scene_definition(source_revision=source_revision)
+    scene = declared_effort_scene(robot, provider=provider,
+        source_delivery_manifest=source_delivery_manifest)
     task_source, artifact = _declaration(scene)
-    # Validate exact source motor semantics before creating any provider.
-    root_xml = ET.fromstring(PENDULUM_MJCF_XML)
-    motors = root_xml.findall('./actuator/motor')
-    actuator_section = root_xml.find('./actuator')
-    if (actuator_section is None or len(actuator_section) != 1 or len(motors) != 1
-            or motors[0].get('name') != 'pendulum_torque'
-            or motors[0].get('joint') != 'pendulum_hinge'
-            or motors[0].get('gear') != '1' or motors[0].get('ctrllimited') != 'true'
-            or motors[0].get('ctrlrange') != '-2 2'):
-        raise ValueError('source does not declare the expected single unit-gear motor')
-    base = Path(__file__).resolve().parent
-    projected = project_scene_definition_v3_to_mjcf(PENDULUM_MJCF_XML, scene)
-    closure = _source_closure_digest({'scene.xml': projected.encode(), **source_asset_bytes(base, projected)})
     composition = TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                                       success_definition=PENDULUM_SUCCESS_DEFINITION)
-    if provider == 'isaacsim':
-        source = build_g05_isaac_runtime_source(
-            manifest_path=source_delivery_manifest, artifact=artifact, scene=scene,
-            task_source_identity_sha256=task_source.identity_hash,
-            joints={JOINT: 'pendulum_hinge'},
-            bodies={'pendulum-v1/pendulum_anchor': 'Geometry/pendulum_anchor',
-                    'pendulum-v1/pendulum_link': 'Geometry/pendulum_anchor/pendulum_link'},
-            frames={}, free_joints={}, joint_targets={JOINT: 'pendulum_hinge'},
-        )
-        closure = source.source_closure_digest
-        execution_spec = ExecutionSpecV1(
-            'execution-spec-v1', 'isaacsim', 'cuda', G05_ISAAC_EFFORT_PROFILE,
-            seed, 'best_effort',
-            RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
-            physics_device='cuda:0', camera_overrides=(),
-        )
-    else:
-        source = compile_reference_source(artifact=artifact,
-            scene_source=TaskSceneSource(PENDULUM_MJCF_XML, base, f'scene-definition-v3:{scene.identity_hash}'),
-            composition=composition, config=config, joints={JOINT: 'pendulum_hinge'},
-            bodies={'pendulum-v1/pendulum_anchor': 'pendulum_anchor',
-                    'pendulum-v1/pendulum_link': 'pendulum_link'}, frames={},
-            free_joints={}, joint_targets={}, open_actuators=(), scene_definition=scene,
-            source_closure_digest=closure, torque_actuators={JOINT: 'pendulum_torque'},
-            actuator_units={'pendulum_torque': 'N*m'})
-        execution_spec = None
+    source, execution_spec, closure = compile_declared_effort_source(
+        robot=robot, scene=scene, artifact=artifact, task_source=task_source,
+        composition=composition, config=config, provider=provider,
+        source_delivery_manifest=source_delivery_manifest, seed=seed,
+        base_dir=Path(__file__).resolve().parent)
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
     physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
         source=source, profile_id=selected_profile_id)

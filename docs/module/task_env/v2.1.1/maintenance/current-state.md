@@ -61,3 +61,5 @@ Pendulum 和双轮车现由各自 Robot 声明受控关节、writer 和 source �
 此前增量让 reset 策略由任务 binding 声明，并移除 Panda source 检查中的历史 checkout 绝对路径；当时的 Position 旧入口自动目录回收记录见[实施记录](../planning/post-5c-optimization-execution.md#614-reset-重建能力归属)。该入口及其专属目录管理现已退休。
 
 最新简单主体职责整理进一步将 Pendulum／双轮车的内联资产和 Scene 拓扑声明移至 Robot；正式构建用同一个 Robot 实例声明场景及绑定控制。两个 MuJoCo CPU 短程通过、场景身份与原实现一致；GeoPhys、Isaac 和 renderer 未在此批重跑。Task 中的 source 编译及 provider 分流仍待进一步归位，E01～E04 未完成。详见[实施记录 6.23](../planning/post-5c-optimization-execution.md#623-简单主体-scene-声明归-robot)。
+
+Pendulum／双轮车的传动校验与 provider source 映射现由共同 source 编译器从 Robot 和 Scene 声明生成，Task 不再各自接线；MuJoCo CPU 和 GeoPhys CPU 的两任务短程均通过。Isaac 映射仅做不启动 SDK 的合同检查，完整四任务构建统一仍待完成。详见[实施记录 6.24](../planning/post-5c-optimization-execution.md#624-简单主体按声明共同编译-source)。
