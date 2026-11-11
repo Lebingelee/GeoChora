@@ -542,3 +542,11 @@ MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller�
 生产修改 3 文件 +28／−33，净减 5 行；版本诊断无改动，实施和当前状态文档 2 文件修改；无新增、删除或迁移文件，tracked 文件数不变。相同显式采样输入下，两任务的完整 reset plan mapping 与 identity 均与输入版本一致。MuJoCo CPU 两任务均完成 reset、非零 action、重复同 seed reset、无 seed RNG 续采和 close，各观测 25 子步；样本 identity、RNG 序列、Robot identity 和单步奖励与前次相同。32 项版本纯合同通过。
 
 native 验证后只将共同函数及两个调用点改名，明确其 effort 范围；最终代码重新通过纯合同及两任务 reset plan 完整 mapping／identity 对照，未重复物理运行。GeoPhys、Isaac 和 renderer 本批未重跑；provider source、clock 和提交未改。计划、运行时冻结 diff 和对照在 ignored `workspace/maintenance/v211_joint_reset_20261112_001/`；E01～E04 仍未完成。
+
+### 6.37 简单主体共同 Task／Robot 构建编排
+
+输入 `f3b01851`。Pendulum 和双轮车的 Task 文件不再分别编排 Robot 实例、Scene、Artifact、source、Controller、physical execution 和 ReferenceTaskBinding；二者提供 Task 身份／语义、Robot factory、reset 采样和动作合同，由共同 binding owner 按相同顺序构建。动作 schema 与空间从各自现有动作合同生成，source 原始 hash 来自 Robot 声明；任务的奖励、观测和采样不合并。两个任务的共同化已经发生在实际构建步骤，不仅是运行后 Robot 视图；tabletop 仍有不同的 Position／source 构建路径，不能因此宣称四任务已统一。
+
+生产修改 3 文件 +110／−130，净减 20 行；共同编排涉及职责重写迁移，非整文件搬迁；版本诊断未改，实施和当前状态文档 2 文件修改。无新增、删除或迁移文件，tracked 文件数不变。source／provider 的原有校验和 Runtime 物化仍由已有 adapter 执行，renderer、clock 和动作提交代码未改。
+
+MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、非零 action、同 seed 重置、无 seed RNG 续采和 close，共 100 个可观测子步；同 seed 原路线的 Robot／Controller、reset sample、RNG 序列和单步奖励一致。GeoPhys CPU 两任务 direct 路线同样完成短程并与前次对应身份及结果一致，内部子步未观测，各保守预留 50。32 项版本纯合同通过。Isaac 和 renderer 本批未重跑；计划、冻结 diff 和对照在 ignored `workspace/maintenance/v211_shared_effort_build_20261112_001/`。E01～E04 仍未完成。

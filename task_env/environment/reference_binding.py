@@ -617,3 +617,81 @@ class ReferenceTaskBinding:
         if schema == declared and getattr(self.action_space_factory, '__self__', None) is physical:
             return self
         return replace(self, action_schema=schema, action_space_factory=physical.action_space)
+
+
+@dataclass(frozen=True)
+class ExistingSubjectEffortTask:
+    """Task declarations consumed by the shared existing-subject construction path."""
+    robot_factory: Callable
+    compile_declaration: Callable
+    reset_plan: Callable
+    composition: object
+    construction_id: str
+    source_revision: str
+    source_base_dir: object
+    reset_sampler: Callable
+    reset_metadata: Callable
+    definition_factory: Callable
+    state_projection: Callable
+    observation_schema: object
+    observation_space_factory: Callable
+    action_contract: object
+
+    def bind(self, config, *, provider, backend, source_delivery_manifest=None):
+        """Build one Task binding; native resource ownership stays with Runtime."""
+        import hashlib
+        import numpy as np
+        from .gym_compat import Box, Dict
+        from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
+        from ..runtime.sessions.physical_control import build_existing_subject_effort
+
+        def build(seed, sampled=None):
+            robot = self.robot_factory()
+            scene = declared_effort_scene(robot, provider=provider,
+                                          source_delivery_manifest=source_delivery_manifest)
+            task_source, artifact = self.compile_declaration(scene, robot)
+            source, execution_spec, closure = compile_declared_effort_source(
+                robot=robot, scene=scene, artifact=artifact, task_source=task_source,
+                composition=self.composition, config=config, provider=provider,
+                source_delivery_manifest=source_delivery_manifest, seed=seed,
+                base_dir=self.source_base_dir)
+            profile_id = config.control.profile_id or 'direct_joint_effort_v1'
+            physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
+                                                       source=source, profile_id=profile_id)
+            return {'artifact': artifact, 'task_source': task_source, 'source': source,
+                'controller': physical.controllers[0], 'solution': None, 'physical_execution': physical,
+                'reset_plan': self.reset_plan(artifact, source, seed, sampled),
+                'construction_id': self.construction_id,
+                'source_revision': scene.assets[0].source_revision or self.source_revision,
+                'execution_spec_v1': execution_spec, 'selected_controller_profile_id': profile_id,
+                'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
+                                  'projected_closure': closure},
+                'resolved_configuration': {'physics_dt': artifact.timebase.physics_dt,
+                                           'control_substeps': artifact.timebase.control_substeps}}
+
+        def reset_seed(seed):
+            if type(seed) is not int or seed < 0:
+                raise ValueError('seed must be a nonnegative integer')
+            return seed
+
+        action = self.action_contract
+        return ReferenceTaskBinding(
+            build=lambda _provider: build(31),
+            build_seeded=lambda _provider, _backend, seed, _horizon: build(seed),
+            build_sampled=lambda _provider, _backend, seed, _horizon, sampled: build(seed, sampled),
+            task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,
+            task_definition_factory=self.definition_factory, task_state_projection=self.state_projection,
+            task_observation_schema=self.observation_schema, external_action_contract=action,
+            reset_sample=lambda _artifact, _seed: None, evaluate=lambda _state, _semantics: None,
+            object_poses=(), external_actions=True, interval_mode='grouped', recorder_mode='execution',
+            reset_seed=reset_seed, action_schema={'schema_id': action.schema_id,
+                'schema_version': action.schema_version, 'mode': action.mode,
+                'components': list(action.components), 'low': action.low, 'high': action.high,
+                'unit': action.unit},
+            action_space_factory=lambda: Dict({'torque': Box(action.low, action.high,
+                                                             (action.dimension,), dtype=np.float32)}),
+            prepare_action=lambda value: value, observation_space_factory=self.observation_space_factory,
+            observation_projection=observe_task_definition,
+            physical_control_profile=lambda env: env.value['physical_execution'],
+            physical_direct_effort_feedback=(config.control.profile_id in (None, 'direct_joint_effort_v1')),
+            physical_terminate_on_success=True, physical_ignore_done=config.episode.ignore_done)
