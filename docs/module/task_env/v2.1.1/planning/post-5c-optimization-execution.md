@@ -340,3 +340,9 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 | 组件与 leaf | 组件先由 `TaskLifecycleAdapter.prepare_step` 交 episode coordinator；leaf 通过上述共同 selected dispatch 进入 `_prepare_leaf_position`／`dispatch_leaf_control_interval` | 既有主体和 leaf 合同；不把不同 typed 动作表示合并，也不声称所有组合实测 |
 
 本次无受影响实际 caller，复用既有 native 证据；仅做 Python AST、调用者搜索和差异检查。逐项故障与所有支持模式的完整对账仍未结束，不提前宣布 E04 接收。
+
+### 6.11 Panda MJCF source 检查归属
+
+输入 `6d556a4d`。Panda MJCF 的 fixed tendon／equality、actuator 映射、gain／bias 及有限有符号 force range 检查，现在由既有 MuJoCo source adapter `panda_effort_source_limits` 完成；Position candidate 的 Controller 声明读取 adapter 返回的限值。原 source closure、九个具名 joint、任务特有的 gripper cap、wrench 目标及后续 native admission 均保留。该改动按格式责任归位，**不是**新增 Panda 通用资格；Task 仍有其他待迁的 Robot／Controller 编译职责。
+
+生产 2 个文件 +37／−30，净增 7 行；其中 29 行检查逻辑原样跨文件迁移、另移动 1 条 import，单列而不冒充删除；无文件新增／删除。8 个双锁下的真实 source 编译／fake terminal 合同通过，包含 tendon 篡改、source closure 和实际 Controller 输出；fake terminal 不证明 native。最终改动下正式 PickCube direct effort 走真实 MuJoCo CPU reset→非零 step→第二次 reset→重复 close，通过且观测到 5 个 native 子步。累计监督 46 次，已有可观测 310 子步；7 次 worker 的实际子步未知；加既有保守预留及无锁检查器偏差，累计计费 960／2,000。计划、冻结 diff、结果、纯合同日志位于 ignored `cpu-run-plan-024.json`、`cpu-source-024.diff`、`cpu-024-direct/`、`panda-source-010-pure.log`；不宣称完整 Solution 或其他 source 的资格。

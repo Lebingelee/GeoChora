@@ -6,7 +6,6 @@ be checked against a session's native build before any physical batch is sent.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-import math
 
 from ...artifacts import FrameReference, JointReference
 from ...artifacts.logical_assembly import (
@@ -52,35 +51,8 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, wrench_targe
     if any(name not in definitions or source.joints.get(f'{entity}/{name}') != name for name in names):
         raise ValueError('Panda effort profile requires the exact nine named source joints')
     root_xml = ET.fromstring(source.scene_source.xml)
-    defaults = root_xml.find("./default/default[@class='panda']/general")
-    actuators = {node.get('name'): node for node in root_xml.findall('./actuator/general')}
-    tendon = root_xml.find("./tendon/fixed[@name='split']")
-    equality = root_xml.find("./equality/joint[@joint1='finger_joint1'][@joint2='finger_joint2']")
-    if (defaults is None or tendon is None or equality is None
-            or tuple((x.get('joint'), x.get('coef')) for x in tendon.findall('joint'))
-            != (('finger_joint1', '0.5'), ('finger_joint2', '0.5'))
-            or equality.get('polycoef', '0 1 0 0 0').split() != ['0', '1', '0', '0', '0']
-            or equality.get('active', 'true').lower() not in {'true', '1'}
-            or any(node.get('gear') is not None for node in root_xml.findall('.//default/general'))):
-        raise ValueError('Panda tendon/equality/default gear source is not the declared pair')
-    limits = []
-    for i in range(1, 9):
-        actuator = actuators.get(f'actuator{i}')
-        expected = {'joint': f'joint{i}'} if i < 8 else {'tendon': 'split'}
-        if (actuator is None or any(actuator.get(k) != v for k, v in expected.items())
-                or actuator.get('class') != 'panda' or actuator.get('gear') is not None
-                or actuator.get('biastype', defaults.get('biastype')) != 'affine'):
-            raise ValueError('Panda actuator mapping differs from the declared source')
-        gain = tuple(float(x) for x in actuator.get('gainprm', '').split())
-        bias = tuple(float(x) for x in actuator.get('biasprm', '').split())
-        if (not gain or len(bias) < 3 or not all(math.isfinite(v) for v in (*gain, *bias))
-                or gain[0] <= 0 or bias[1] >= 0 or bias[2] > 0):
-            raise ValueError('Panda source does not declare the expected position drive')
-        raw = actuator.get('forcerange', defaults.get('forcerange'))
-        pair = tuple(float(x) for x in raw.split()) if raw else ()
-        if len(pair) != 2 or not all(math.isfinite(v) for v in pair) or not pair[0] < 0 < pair[1]:
-            raise ValueError('Panda actuator requires a finite signed force range')
-        limits.append(pair)
+    from ...runtime.sessions.mujoco_composition import panda_effort_source_limits
+    limits = panda_effort_source_limits(root_xml)
     if gripper_force_limit is not None:
         if (getattr(artifact, 'artifact_id', None) != 'pickcube-mjcf-physical-effort-task-v1'
                 or native_drive != 'disabled' or float(gripper_force_limit) != 10.
