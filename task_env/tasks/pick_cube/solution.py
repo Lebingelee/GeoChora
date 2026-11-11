@@ -60,6 +60,14 @@ _OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
 _MEASURED_TCP_HOLD_INTEGRAL_GAIN = 0.10
 _MEASURED_TCP_HOLD_MAX_CORRECTION_M = 0.040
 _MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
+# The hold integrator only accumulates while the measured TCP is static
+# relative to its error, which is a steady servo offset.  A TCP that is still
+# converging toward the command would otherwise wind the correction up and
+# drag the command past the target.
+_MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO = 0.05
+# Descend toward the grasp gate in small Cartesian steps; a large step makes
+# the joint-space servo swing the TCP upward before it settles.
+_GRASP_DESCEND_MAX_TRANSLATION_PER_STEP = 0.004
 # The descend stage ends on a measured grasp-height interlock: a TCP that settles
 # above the planned grasp height leaves only the pad tips on the cube top edge.
 _GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
@@ -526,11 +534,13 @@ class PickCubeSolution:
             ],
             dtype=np.float32,
         )
+        gated = getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False)
         actions = self._planner.plan_translation_only(
-            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0
+            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0,
+            max_translation_per_step=(_GRASP_DESCEND_MAX_TRANSLATION_PER_STEP if gated else None),
         )
         gates = ()
-        if getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False):
+        if gated:
             gates = (
                 MeasuredTcpGate(
                     "grasp_height",
@@ -1076,10 +1086,13 @@ class PickCubeReadinessSolution(PickCubeSolution):
             tcp = self._ee_pose(observation)[:3].astype(np.float32)
             previous = self._measured_tcp_hold_previous_tcp
             self._measured_tcp_hold_previous_tcp = tcp
+            error = action[:3] - tcp
             settled = previous is not None and float(
                 np.linalg.norm(tcp - previous)
-            ) <= _MEASURED_TCP_HOLD_SETTLED_STEP_M
-            error = action[:3] - tcp
+            ) <= min(
+                _MEASURED_TCP_HOLD_SETTLED_STEP_M,
+                _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO * float(np.linalg.norm(error)),
+            )
             if settled and np.isfinite(error).all():
                 self._measured_tcp_hold_correction = np.clip(
                     self._measured_tcp_hold_correction
