@@ -29,6 +29,10 @@
 - 只执行能建立原 5c 出口与本次共享架构所需的最少合同和真实检查；不要求历史矩阵的数值、测试模块或像素逐项复刻。真实 Isaac 同步 RGB 和至少一个真实跨组合仍需证明，不以 fake、单纯 shape 或旧代码结果冒称最终代码通过。
 - 中断前的 Isaac 资源键错误和输出限额停止是独立事实，旧证据、预算与未知项保留；后续窗口按维护者授权单独记账，不修改原记录。新方案优先于本页此前对 7／8 的过时操作安排，且不重新开启已接收的单元 1–6。
 
+## 2026-11-11：单元 7／8 独立有界接收
+
+Core `a53bf19d` 的单元 7／8 已按[Sol 主审](../maintenance/reviews/20261111_unit007_008_sol_review_a53bf19d.md)有界接收：独立 renderer 状态投影、真实 Isaac reset／非零 step／二次 reset 的同步 RGB 与关闭，以及 GeoPhys CPU → MuJoCo renderer-only 均有适用证据。本轮局部职责迁移接收不等于所有入口、registry 和兼容路径已整理完成。下一步为单元 9 综合对账；5c 接收后按[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)完成代码与项目优化及人工接收，再进入 G06。台账不是倒灌到本轮的额外验收门；不重加复杂像素阈值、跨 provider 数值一致、启动 unknown 归零或整张历史矩阵。
+
 ## 共同目标和调用链
 
 ```text
