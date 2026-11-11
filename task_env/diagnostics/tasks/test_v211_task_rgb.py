@@ -104,7 +104,9 @@ def test_task_rgb_rejects_wrong_episode_before_calling_renderer():
     consumer.close()
 
 
-def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkeypatch):
+@pytest.mark.parametrize('entry', ['reset', 'reset_for_solution'])
+def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkeypatch, entry):
+    from types import SimpleNamespace
     from task_env.environment.reference_env import SelectedReferenceEnv
 
     events = []
@@ -127,6 +129,9 @@ def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkey
     env._defer_task_rgb_capture = False
     env._reset_failure_receipt = 'prior'
     env.state = 'published-state'
+    env.value = {}
+    env.binding = SimpleNamespace(build_external=lambda _provider: None,
+                                  validate_external_solution=lambda _value, _solution: None)
 
     def after_commit(state, result):
         assert state == env.state
@@ -144,7 +149,7 @@ def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkey
     monkeypatch.setattr(env, '_has_component_assembly', lambda: False, raising=False)
     monkeypatch.setattr(env, '_prepare_reference_reset', lambda **_kwargs: operations, raising=False)
 
-    result = SelectedReferenceEnv.reset(env)
+    result = (env.reset() if entry == 'reset' else env.reset_for_solution(object()))
 
     assert result == ({'task_rgb': 'captured'}, {'task_rgb_v1': 'receipt'})
     assert events == ['execute_reset_return', 'task_rgb_capture']

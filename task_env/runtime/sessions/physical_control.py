@@ -489,6 +489,22 @@ class PhysicalControlExecutionV1:
         # Existing shape-only physical controllers retain their established v1 contract.
         return Box(-np.inf, np.inf, shape=shape, dtype=np.float32)
 
+    def preflight(self, *, provider, backend, artifact, source):
+        """Delegate source-bound admission to the selected physical adapter."""
+        from importlib import import_module
+        from ...environment.types import StageUnavailableError
+
+        adapters = {
+            ('mujoco', 'cpu'): ('.mujoco_physical', 'preflight_physical_mujoco'),
+            ('geophys', 'cpu'): ('.geophys_physical', 'preflight_physical_geophys'),
+            ('isaacsim', 'cuda'): ('.isaac_physical', 'preflight_physical_isaac'),
+        }
+        try:
+            module, method = adapters[provider, backend]
+        except KeyError as error:
+            raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented') from error
+        return getattr(import_module(module, __package__), method)(self, artifact, source)
+
     def validate_source(self, *, scene, artifact_sha256, source_id, source_closure_sha256, source=None):
         """Recheck an execution selection against the actual task source."""
         _validate_compiled_binding(self.compiled)

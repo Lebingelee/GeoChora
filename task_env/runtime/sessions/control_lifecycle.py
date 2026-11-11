@@ -165,9 +165,10 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             env._stopped = True
             raise RuntimeError('selected position-control horizon is exhausted')
         from ...controllers.canonical.contracts import StructuredActionRequestV1
+        admit_legacy_action = getattr(env.binding, 'legacy_position_expert_admission', None)
         if (not isinstance(action, StructuredActionRequestV1)
-                and env.value.get('f06_pickcube_isaac_input') is not None
-                and len(profiles) == 1):
+                and len(profiles) == 1
+                and callable(admit_legacy_action) and admit_legacy_action(env.value)):
             from .control import single_position_action_request
             action = single_position_action_request(
                 action, scene=env.position_scene, plan=env.position_plan,

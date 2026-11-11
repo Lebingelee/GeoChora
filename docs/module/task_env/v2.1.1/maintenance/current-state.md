@@ -14,11 +14,11 @@
 | --- | --- |
 | 分支 | `codex/v211-stage5-diagnostic`；优化复用，不新增分支／worktree |
 | 输入 Core HEAD | `1f1359eef9bfff73cf7688a8270c5f06471dc614`；是启动输入，不是随文档提交滚动的最新 HEAD |
-| 生产实现 | `a53bf19d2526c6c336dd5d0d7108eb0f643f80bd`；输入 `task_env` tree 为 `c4460cd6bcc96a16067d3f61556a66e52da23bbc` |
+| 5c 接收生产基线 | `a53bf19d2526c6c336dd5d0d7108eb0f643f80bd`；输入 `task_env` tree 为 `c4460cd6bcc96a16067d3f61556a66e52da23bbc` |
 | GeoPhys／Menagerie | `c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7`／`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` |
 | 工作树 | 启动时 tracked clean；四个既有 untracked 输入原样保护，含优化台账 |
-| 执行窗口 | 单元 9 已有返包及释放记录；启动观察未见本仓库 native worker，前序协调 chat 为 idle；本轮只有当前 chat 写启动文档，未取得 native lease |
-| 当前改动 | O0 状态／计划文档；不代表 O1～O8 实施完成。后续每包重新核对 HEAD、dirty 归属与资源，不沿用本表充当实时锁 |
+| 执行窗口 | 单元 9 已有返包及释放记录；启动观察未见本仓库 native worker，前序协调 chat 为 idle；启动时当前 chat 仅写 O0 文档；后续直接实施 E00～E04 的资源使用按其运行计划及释放记录核对 |
+| 当前改动 | 启动文档之后维护者已直接授权 E00～E04；实施状态及首批代码／CPU 证据见执行计划第 6 节。其余优化与最终接收尚未完成，不沿用启动表充当实时锁 |
 
 保护输入为 `MUJOCO_LOG.TXT`、2026-10-30 runtime route handoff、stage3 gravity proposal 和用户优化台账。精确大小／SHA-256 与原工作树状态在 ignored [输入快照](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json)。没有将它们加入本轮提交，也没有清理原始输出、改动 pins、merge／push／tag。
 
@@ -39,3 +39,7 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 下一实施范围是 O1：配置字段归属／覆盖顺序、正式构建请求、旧 UID／factory 的迁移表；随后按 O2～O4 归位生命周期、source／renderer／observation 和 Recorder／caller。O5 必须完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 逐项主审后才进入 O7 的项目清理。详见执行计划及原台账。
 
 规划 [capability-matrix.json](../capabilities/capability-matrix.json) 尚待按实际证据逐格对账，旧 `NOT_RUN` 目标不能替代最新主审判断，也不能仅凭阶段接收批量改成 PASS。当前本地成果尚未合入 develop／main，未发布。
+
+## E00～E04 当前实施
+
+维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。已完成首批共享 reset／close／mixed Solution 分派修复，生产 Python 暂净减 99 行；40 项纯合同和五个限定 MuJoCo CPU 检查通过，累计观测 60 个原生子步。E01／E02 尚待构建与主体门面迁移，E03／E04 仍实施中。详细变化、度量口径、证据及未覆盖项统一见[执行安排第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不据此提前签收事件或启动 G06。

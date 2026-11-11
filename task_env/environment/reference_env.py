@@ -1662,28 +1662,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._task_rgb_typed_state = publication
         return publication
 
-    def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
-        self._episode_execution_state().require_open('environment is closed')
-        component_lifecycle = None
-        defer_task_rgb = (not self._has_component_assembly()
-                          and getattr(self, '_task_rgb_config', None) is not None)
-        if defer_task_rgb:
+    def _execute_reset_operations(self, prepare):
+        """Commit every reset entry through one publication/capture lifecycle."""
+        defer_rgb = (not self._has_component_assembly()
+                     and getattr(self, '_task_rgb_config', None) is not None)
+        if defer_rgb:
             self._defer_task_rgb_capture = True
-        after_commit = None
-        operations = None
         try:
-            if self._has_component_assembly():
-                seed = None if seed is _RESET_SEED_UNSET else seed
-                GymEnvBase.reset(self, seed=seed)
-                self._last_camera_metadata = {}
-                component_lifecycle = self._require_task_lifecycle()
-                operations = component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
-            else:
-                operations = self._prepare_reference_reset(seed=seed, options=options)
+            operations = prepare()
             after_commit = operations.pop('after_commit', None)
             result = self._episode_execution_state().execute_reset(**operations)
         finally:
-            if defer_task_rgb:
+            if defer_rgb:
                 self._defer_task_rgb_capture = False
         self._reset_failure_receipt = None
         if after_commit is not None:
@@ -1692,6 +1682,23 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as error:
                 operations['on_failure']('task_rgb_capture_after_reset_commit', error)
                 raise
+        return result
+
+    def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
+        self._episode_execution_state().require_open('environment is closed')
+        component_lifecycle = None
+
+        def prepare():
+            nonlocal component_lifecycle, seed
+            if self._has_component_assembly():
+                seed = None if seed is _RESET_SEED_UNSET else seed
+                GymEnvBase.reset(self, seed=seed)
+                self._last_camera_metadata = {}
+                component_lifecycle = self._require_task_lifecycle()
+                return component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
+            return self._prepare_reference_reset(seed=seed, options=options)
+
+        result = self._execute_reset_operations(prepare)
         if component_lifecycle is not None:
             return self._format_component_reset(component_lifecycle, result, seed)
         return result
@@ -1741,26 +1748,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
         self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
-        defer_task_rgb = getattr(self, '_task_rgb_config', None) is not None
-        if defer_task_rgb:
-            self._defer_task_rgb_capture = True
-        after_commit = None
-        operations = None
-        try:
-            operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
-            after_commit = operations.pop('after_commit', None)
-            result = self._episode_execution_state().execute_reset(**operations)
-        finally:
-            if defer_task_rgb:
-                self._defer_task_rgb_capture = False
-        self._reset_failure_receipt = None
-        if after_commit is not None:
-            try:
-                result = after_commit(self.state, result)
-            except BaseException as error:
-                operations['on_failure']('task_rgb_capture_after_reset_commit', error)
-                raise
-        return result
+        return self._execute_reset_operations(lambda: self._prepare_reference_reset(
+            seed=seed, options=options, external_solution=solution))
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         self._episode_execution_state().require_open('environment is closed')
@@ -1779,22 +1768,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             requested_controller = None if options is None else options.get('controller')
             physical_candidate = physical_selection.prepare(requested_controller)
             options = None
-        if self.binding.physical_control_profile is not None and (
-                (self.provider, self.backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}):
-            raise StageUnavailableError('physical-control RuntimeSession adapter is not implemented')
         if self.binding.physical_control_profile is not None:
-            if self.provider == 'mujoco':
-                from ..runtime.sessions.mujoco_physical import preflight_physical_mujoco as preflight_physical
-            elif self.provider == 'geophys':
-                from ..runtime.sessions.geophys_physical import preflight_physical_geophys as preflight_physical
-            else:
-                from ..runtime.sessions.isaac_physical import preflight_physical_isaac as preflight_physical
             profile = (physical_candidate.execution if physical_candidate is not None
                        else self.binding.physical_control_profile(self))
             declared_physical = self.value.get('physical_execution')
             if declared_physical is not None and profile is not declared_physical:
                 raise ValueError('physical execution differs from the selected declaration')
-            preflight_physical(profile, self.artifact, self.value['source'])
+            profile.preflight(provider=self.provider, backend=self.backend,
+                              artifact=self.artifact, source=self.value['source'])
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         switch_candidate = None
@@ -2074,8 +2055,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if build.skip_gravity:
                 return
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
-                if self.uid not in ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'):
-                    raise ValueError('gravity compensation is limited to the selected Panda tasks')
                 self.session.configure_gravity_compensation()
 
         def reset_runtime():
@@ -3277,8 +3256,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     publish=publish, on_failure=on_failure)
 
     def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
-        operations = self._prepare_mixed_control(action, proposal=proposal, observer_solution=observer_solution)
-        return self._episode_execution_state().execute_interval(**operations)
+        return self._step(action, proposal=proposal, observer_solution=observer_solution)
 
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
         self._mixed_controller_preparation_started = False
@@ -3518,7 +3496,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         if callable(add_note):
                             add_note(f'mixed external Solution abort also failed: {abort_error!r}')
                 raise
-            return self._step_mixed_control(
+            return self._step(
                 proposal.action, proposal=proposal, observer_solution=solution,
             )
         try:
@@ -4483,193 +4461,99 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def _close_reference_resources(self):
-        ui_provider, self._ui_render_provider = getattr(self, '_ui_render_provider', None), None
-        ui_error = None
-        if ui_provider is not None:
+        """Release each owned resource once, retaining the first cleanup failure."""
+        first_error = None
+
+        def cleanup(label, operation):
+            nonlocal first_error
             try:
-                ui_provider.close()
+                return operation(), None
             except BaseException as error:
-                ui_error = error
-        if getattr(self, 'mixed_control_profile', False):
-            first_error = ui_error
-            try:
-                # A latched interval fault can leave the Recorder at the
-                # prior complete T/T+1 boundary. Do not synthesize a stop
-                # event or try to freeze that incomplete trajectory; retain
-                # the original fault and proceed with resource cleanup.
-                if (self.session is not None and self._mixed_episode_end is None
-                        and self._execution_fault is None):
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'{label} also failed: {type(error).__name__}: {error}')
+                return None, error
+
+        ui, self._ui_render_provider = getattr(self, '_ui_render_provider', None), None
+        if ui is not None:
+            cleanup('UI provider close', ui.close)
+        mixed = bool(getattr(self, 'mixed_control_profile', False))
+        position = bool(getattr(self, 'position_profile', False))
+        healthy = getattr(self, '_execution_fault', None) is None
+
+        def finalize():
+            if mixed:
+                if self.session is not None and self._mixed_episode_end is None:
                     self.stop('environment_close')
-                if (self.recorder is not None and getattr(self.recorder, 'active', False)
-                        and self._execution_fault is None):
-                    reason = (self._mixed_episode_end.outcome.end_reason
-                              if self._mixed_episode_end is not None else 'environment_close')
-                    self.finish_recording(reason)
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(f'mixed-control finalization also failed: {error!r}')
-            session_was_materialized = self.session is not None
-            active_session, self.session = self.session, None
-            if active_session is not None:
-                first_error, self._mixed_close_receipt = close_session_and_runtime_owner(
-                    active_session, first_error=first_error,
-                    session_error_label='mixed-control session close',
-                    owner_error_label='mixed-control Runtime owner close',
-                    capture_close_receipt=True,
-                )
-            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
-            try:
-                if receipt is not None:
-                    receipt.close()
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(f'mixed-control source receipt cleanup also failed: {type(error).__name__}: {error}')
-            task_resource_receipt = None
-            task_resource_error = None
-            try:
-                if self.binding.close_task_resources is not None:
-                    task_resource_receipt = self.binding.close_task_resources()
-            except BaseException as error:
-                task_resource_error = error
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(
-                        f'mixed-control task resource cleanup also failed: {type(error).__name__}: {error}'
-                    )
+                end = self._mixed_episode_end
+            elif position:
+                if getattr(self, '_published_position_state', None) is None:
+                    return
+                if self._position_episode_end is None:
+                    self.stop('environment_close')
+                end = self._position_episode_end
+            else:
+                if (self.value.get('physical_execution') is not None
+                        and getattr(self, '_physical_published_state', None) is not None
+                        and self._last_episode_end is None):
+                    self.stop('environment_close')
+                return
+            recorder = getattr(self, 'recorder', None)
+            if recorder is not None and getattr(recorder, 'active', False):
+                reason = end.outcome.end_reason if end is not None else 'environment_close'
+                self.finish_recording(reason)
+
+        if healthy:
+            cleanup('episode finalization', finalize)
+        cleanup('camera consumer close', self._close_camera_consumer)
+        session, self.session = self.session, None
+        session_was_materialized = session is not None
+        first_error, receipt = close_session_and_runtime_owner(
+            session, first_error=first_error, session_error_label='RuntimeSession close',
+            owner_error_label='Runtime owner close', capture_close_receipt=mixed)
+        if mixed and session_was_materialized:
+            self._mixed_close_receipt = receipt
+        closed_sessions = {id(session)} if session_was_materialized else set()
+        for abandoned in getattr(self, '_failed_runtime_sessions', ()):
+            if id(abandoned) in closed_sessions:
+                continue
+            closed_sessions.add(id(abandoned))
+            first_error, _ = close_session_and_runtime_owner(
+                abandoned, first_error=first_error,
+                session_error_label='failed reset RuntimeSession close',
+                owner_error_label='failed reset Runtime owner close')
+        self._failed_runtime_sessions = []
+        source = self.value.get('source')
+        source_receipt = getattr(source, 'execution_source_receipt', None)
+        if source_receipt is not None:
+            cleanup('source receipt cleanup', source_receipt.close)
+        task_receipt = None
+        task_error = None
+        if self.binding.close_task_resources is not None:
+            task_receipt, task_error = cleanup('task resource cleanup', self.binding.close_task_resources)
+        if mixed:
             if not session_was_materialized and self._mixed_close_receipt is None:
-                source = self.value.get('source')
-                fault = self._execution_fault
+                fault = getattr(self, '_execution_fault', None)
                 self._mixed_close_receipt = {
                     'schema_version': 'mixed-control-selected-close-v1',
-                    # No RuntimeSession was published. The selected environment
-                    # and its receipt-owned source snapshot have still completed
-                    # their cleanup attempt; keep that distinct from a native
-                    # RuntimeSession close receipt.
-                    'session_closed': True,
-                    'session_materialized': False,
-                    'session_close_status': 'not_materialized',
-                    'environment_closed': True,
+                    'session_closed': True, 'session_materialized': False,
+                    'session_close_status': 'not_materialized', 'environment_closed': True,
                     'cleanup_completed': first_error is None,
                     'cleanup_error': None if first_error is None else {
-                        'type': type(first_error).__name__, 'message': str(first_error),
-                    },
-                    'source_id': (
-                        None if source is None else source.scene_source.source_id
-                    ),
-                    'source_closure_digest': (
-                        None if source is None else source.source_closure_digest
-                    ),
+                        'type': type(first_error).__name__, 'message': str(first_error)},
+                    'source_id': None if source is None else source.scene_source.source_id,
+                    'source_closure_digest': None if source is None else source.source_closure_digest,
                     'execution_fault_phase': None if fault is None else fault.phase,
                     'execution_fault_message': None if fault is None else fault.message,
                 }
             if self._mixed_close_receipt is not None:
                 self._mixed_close_receipt = dict(self._mixed_close_receipt)
-                if task_resource_receipt is not None:
-                    self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
-                if task_resource_error is not None:
+                if task_receipt is not None:
+                    self._mixed_close_receipt['task_resource_close_receipt'] = task_receipt
+                if task_error is not None:
                     self._mixed_close_receipt['task_resource_close_error'] = {
-                        'type': type(task_resource_error).__name__,
-                        'message': str(task_resource_error),
-                    }
-            if first_error is not None:
-                raise first_error
-            return
-        if not getattr(self, 'position_profile', False):
-            first_error = ui_error
-            if (self.value.get('physical_execution') is not None
-                    and getattr(self, '_physical_published_state', None) is not None
-                    and self._last_episode_end is None and self._execution_fault is None):
-                try:
-                    self.stop('environment_close')
-                except BaseException as error:
-                    if first_error is None:
-                        first_error = error
-                    else:
-                        first_error.add_note(f'physical episode finalization also failed: {error!r}')
-            try:
-                self._close_camera_consumer()
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(f'camera consumer close also failed: {error!r}')
-            session, self.session = self.session, None
-            first_error, _ = close_session_and_runtime_owner(
-                session, first_error=first_error,
-                session_error_label='session close',
-                owner_error_label='Runtime owner close after session close',
-            )
-            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
-            try:
-                if receipt is not None:
-                    receipt.close()
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(
-                        f'execution source receipt cleanup also failed: {type(error).__name__}: {error}'
-                    )
-            task_resource_receipt = None
-            try:
-                if self.binding.close_task_resources is not None:
-                    task_resource_receipt = self.binding.close_task_resources()
-            except BaseException as error:
-                if first_error is None:
-                    first_error = error
-                else:
-                    first_error.add_note(
-                        f'task resource cleanup also failed: {type(error).__name__}: {error}'
-                    )
-            if getattr(self, 'mixed_control_profile', False) and self._mixed_close_receipt is not None:
-                self._mixed_close_receipt = dict(self._mixed_close_receipt)
-                if task_resource_receipt is not None:
-                    self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
-            if first_error is not None:
-                raise first_error
-            return
-        first_error = ui_error
-
-        def retain_cleanup_error(primary, label, cleanup_error):
-            if primary is None:
-                return cleanup_error
-            add_note = getattr(primary, 'add_note', None)
-            if callable(add_note):
-                add_note(f'{label} also failed: {type(cleanup_error).__name__}: {cleanup_error}')
-            return primary
-
-        if self._published_position_state is not None and self._execution_fault is None:
-            try:
-                if self._position_episode_end is None:
-                    self.stop('environment_close')
-                if self.recorder is not None and getattr(self.recorder, 'active', False):
-                    self.finish_recording(self._position_episode_end.outcome.end_reason)
-            except BaseException as error:
-                first_error = error
-        try:
-            self._close_camera_consumer()
-        except BaseException as error:
-            first_error = retain_cleanup_error(
-                first_error, 'camera consumer close after Position finalization', error,
-            )
-        session, self.session = self.session, None
-        first_error, _ = close_session_and_runtime_owner(
-            session, first_error=first_error,
-            session_error_label='RuntimeSession close after Position finalization',
-            owner_error_label='Runtime owner close after Position finalization',
-        )
-        for abandoned in getattr(self, '_failed_runtime_sessions', ()):
-            first_error, _ = close_session_and_runtime_owner(
-                abandoned, first_error=first_error,
-                session_error_label='failed reset RuntimeSession close',
-                owner_error_label='failed reset Runtime owner close',
-            )
-        self._failed_runtime_sessions = []
+                        'type': type(task_error).__name__, 'message': str(task_error)}
         if first_error is not None:
             raise first_error
 

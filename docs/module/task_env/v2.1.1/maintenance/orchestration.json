@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-11",
-  "status": "POST_5C_CODE_AND_PROJECT_OPTIMIZATION_STARTED",
+  "status": "POST_5C_E00_E04_IMPLEMENTING",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Prepare O1 formal configuration/construction implementation package against actual HEAD; follow post-5c execution plan, preserve protected inputs and bound native scope separately. G06 remains not started.",
+  "next_action": "Continue E01/E02 common construction and subject facade migration and remaining E03/E04 ownership work under direct maintainer scope; first common reset/close/control fixes verified, whole objective not complete. No G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2082,17 +2082,17 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "O0_BASELINE_RECORDED_O1_NEXT",
+    "status": "E00_E04_IMPLEMENTING",
     "date": "2026-11-11",
     "authority": "Maintainer explicitly confirmed: 现在我们正式进入5c之后的优化阶段。",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
-    "current_step": "O0",
-    "next_step": "O1",
-    "implementation_attempt_count": 0,
-    "implementation_executor": null,
+    "current_step": "E00-E04",
+    "next_step": "E01 formal construction and E02 subject facade migration",
+    "implementation_attempt_count": 1,
+    "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
@@ -2101,6 +2101,18 @@
     "native_runs_this_kickoff": 0,
     "deletions_this_kickoff": 0,
     "snapshot_ref": "../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json",
-    "refs_reorganized_this_kickoff": false
+    "refs_reorganized_this_kickoff": false,
+    "events": {
+      "E00": "BASELINE_RECORDED",
+      "E01": "PENDING_IMPLEMENTATION",
+      "E02": "PENDING_IMPLEMENTATION",
+      "E03": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED",
+      "E04": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED"
+    },
+    "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
+    "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
+    "event_native_cpu_runs": 5,
+    "event_native_substeps": 60,
+    "event_implementation_complete": false
   }
 }

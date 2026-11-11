@@ -64,6 +64,68 @@ def test_capability_dispatch_does_not_require_source_composition_request_or_pand
     assert env.session._control_lifecycle_dispatch.stage == 'prepared'
 
 
+@pytest.mark.parametrize('admitted', [False, True])
+def test_position_array_admission_belongs_to_task_binding(monkeypatch, admitted):
+    from task_env.controllers.canonical.contracts import StructuredActionRequestV1
+    from task_env.runtime.sessions import control
+
+    env = _environment(_DeclaredController())
+    env.horizon = 4
+    env.state = SimpleNamespace(control_step=0)
+    env.position_profiles = (_DeclaredController(),)
+    env.position_plan = object()
+    env.position_scene = object()
+    # A historical task key alone must not grant plain-array admission.
+    if not admitted:
+        env.value['f06_pickcube_isaac_input'] = object()
+    env.binding.legacy_position_expert_admission = lambda _value: admitted
+    request = object.__new__(StructuredActionRequestV1)
+    converted = []
+    monkeypatch.setattr(control, 'single_position_action_request',
+                        lambda action, **_kwargs: converted.append(action) or request)
+    monkeypatch.setattr(control, 'prepare_structured_action', lambda *_args: None)
+    env._prepare_position_profile = lambda action: action
+    action = [.1] * 8
+    if admitted:
+        assert prepare_selected_control_action(env, action) is request
+        assert converted == [action]
+        assert env.session._control_lifecycle_dispatch.stage == 'prepared'
+    else:
+        with pytest.raises(TypeError, match='StructuredActionRequestV1'):
+            prepare_selected_control_action(env, action)
+        assert converted == []
+
+
+@pytest.mark.parametrize('provider,backend,module,method', [
+    ('mujoco', 'cpu', 'mujoco_physical', 'preflight_physical_mujoco'),
+    ('geophys', 'cpu', 'geophys_physical', 'preflight_physical_geophys'),
+    ('isaacsim', 'cuda', 'isaac_physical', 'preflight_physical_isaac'),
+])
+def test_physical_execution_delegates_admission_to_adapter(monkeypatch, provider, backend, module, method):
+    from importlib import import_module
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    owner = import_module('task_env.runtime.sessions.' + module)
+    execution = object.__new__(PhysicalControlExecutionV1)
+    artifact, source = object(), object()
+    calls = []
+    monkeypatch.setattr(owner, method, lambda *args: calls.append(args))
+    execution.preflight(provider=provider, backend=backend, artifact=artifact, source=source)
+    assert calls == [(execution, artifact, source)]
+
+
+def test_unsupported_physical_adapter_rejects_before_adapter_import(monkeypatch):
+    import importlib
+    from task_env.environment.types import StageUnavailableError
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    monkeypatch.setattr(importlib, 'import_module',
+                        lambda *_args: pytest.fail('unsupported adapter must not import a provider'))
+    execution = object.__new__(PhysicalControlExecutionV1)
+    with pytest.raises(StageUnavailableError, match='not implemented'):
+        execution.preflight(provider='mujoco', backend='cuda', artifact=object(), source=object())
+
+
 @pytest.mark.parametrize('controller_started', (False, True))
 def test_physical_preparation_faults_only_after_unrecoverable_controller_work(controller_started):
     from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1

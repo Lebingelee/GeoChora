@@ -186,6 +186,50 @@ def test_solution_step_preserves_context_through_shared_dispatch():
     assert session._control_lifecycle_dispatch.stage == 'prepared'
 
 
+@pytest.mark.parametrize('mixed', [False, True], ids=('canonical', 'mixed'))
+def test_external_solution_installs_dispatch_before_controller_preparation(mixed):
+    """Solution input must enter the same dispatch as an ordinary action."""
+    from contextlib import nullcontext
+    from types import MethodType
+    from task_env.diagnostics.tasks.test_v211_control_lifecycle_capability import _DeclaredController
+    from task_env.diagnostics.tasks.test_v211_control_submission_contract import _Session
+
+    session = _Session()
+    proposal = ExpertAction([.1] * 8, 'go')
+    solution = SimpleNamespace(done=False, failed=False, act=lambda *_args: proposal)
+    prepared = []
+
+    def prepare(action, **context):
+        prepared.append((getattr(session, '_control_lifecycle_dispatch', None), action, context))
+        return {'action': action}
+
+    episode = SimpleNamespace(fault=None, require_step=lambda **_kwargs: None,
+                              execute_interval=lambda **operations: operations)
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: episode, _external_solution_owner=solution,
+        _validate_external_solution=lambda _solution: None, _stopped=False,
+        session=session, _episode_mode=None, _physical_reset_selection=None,
+        mixed_control_profile=mixed, leaf_position_profile=False,
+        _require_published_execution_info=lambda: None, obs={}, info={}, state=object(),
+        position_profile=False, position_profiles=(), position_plan=None,
+        binding=SimpleNamespace(physical_control_profile=None, abort_solution_on_runtime_error=False),
+        value={'source': SimpleNamespace(source_id='task', source_closure_digest='a' * 64)},
+        artifact=SimpleNamespace(identity_hash='b' * 64), controller=_DeclaredController(),
+        _prepare_reference_step=prepare, _prepare_mixed_control=prepare,
+        _selected_com_wrench_scope=lambda _value: nullcontext(),
+    )
+    env._step = MethodType(SelectedReferenceEnv._step, env)
+    env._step_mixed_control = MethodType(SelectedReferenceEnv._step_mixed_control, env)
+    result = SelectedReferenceEnv.step_with_solution(env, solution)
+    dispatch, action, context = prepared[0]
+    assert dispatch is not None
+    assert dispatch.command_kind == ('mixed-actuator-command' if mixed else 'position-target')
+    assert action is proposal.action
+    assert context == {'proposal': proposal, 'observer_solution': solution}
+    assert result == {'action': proposal.action}
+    assert len(prepared) == 1
+
+
 def test_solution_pre_dispatch_failure_latches_after_proposal(monkeypatch):
     from contextlib import nullcontext
     from task_env.runtime.sessions import control_lifecycle
