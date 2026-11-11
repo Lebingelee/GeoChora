@@ -8,6 +8,7 @@ import inspect
 import json
 import math
 from pathlib import Path
+from typing import NamedTuple
 import subprocess
 
 import numpy as np
@@ -185,7 +186,6 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              Path(inspect.getsourcefile(compile_panda_box_source)).resolve(),
              Path(__file__).parents[2].joinpath("assembly/compiler.py").resolve(),
              Path(inspect.getsourcefile(compile_declared_artifact)).resolve(),
-             Path(inspect.getsourcefile(type(controller))).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
              Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
              Path(inspect.getsourcefile(panda_reference_control_binding)).resolve(),
@@ -202,6 +202,8 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              root / "task_env/recorders/position_metadata.py",
              root / "task_env/observations/selected_reference.py",
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
+    if controller is not None:
+        files.add(Path(inspect.getsourcefile(type(controller))).resolve())
     canonical = root / "task_env" / "controllers" / "canonical"
     files.update(path.resolve() for path in canonical.glob("*.py") if path.is_file())
     if profile_source is not None:
@@ -215,11 +217,23 @@ def _r3_dynamic_profile():
     return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
-    """Construct the single selected P1.6 route without importing a provider."""
-    from ...controllers.canonical import ProductionCanonicalPandaController
-    from ...controllers.canonical.contracts import digest
-    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
+class _PreparedReferenceSource(NamedTuple):
+    task_config: dict
+    recipe: dict
+    config: object
+    is_r3_profile: bool
+    dynamic_profile: object
+    profile_source: object
+    artifact: object
+    source: object
+    posture_path_profile: object
+    readiness: object
+
+
+def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
+                              lift_height_m=None, task_config=None):
+    """Compile Task source and readiness without constructing a Controller."""
+    from .solution import PickCubeReadinessConfig
 
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
@@ -270,6 +284,20 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
             ))) if is_r3_profile else 0
         ),
     )
+    return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,
+        profile_source, artifact, source, posture_path_profile, readiness)
+
+
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
+    """Construct the single selected P1.6 route without importing a provider."""
+    from ...controllers.canonical import ProductionCanonicalPandaController
+    from ...controllers.canonical.contracts import digest
+    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
+
+    (task_config, recipe, config, is_r3_profile, dynamic_profile, profile_source,
+     artifact, source, posture_path_profile, readiness) = _prepare_reference_source(
+        backend=backend, controller_profile=controller_profile, resolved_config=resolved_config,
+        lift_height_m=lift_height_m, task_config=task_config)
     if controller_profile == "r1":
         controller = ProductionCanonicalPandaController.from_source(artifact, source)
     elif controller_profile == "r1_split":
@@ -367,8 +395,19 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     from .solution import PickCubeReadinessSolution
 
     # The Task supplies action/readiness data; the selected Controller owns execution.
-    legacy = build_reference(backend="cpu", include_solution=False,
-                             controller_profile=controller_profile, resolved_config=resolved_config, task_config=task_config)
+    if controller_builder is None:
+        legacy = build_reference(backend="cpu", include_solution=False,
+                                 controller_profile=controller_profile, resolved_config=resolved_config,
+                                 task_config=task_config)
+    else:
+        prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
+                                             resolved_config=resolved_config, task_config=task_config)
+        source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
+        legacy = {"source": prepared.source, "artifact": prepared.artifact, "readiness": prepared.readiness,
+                  "source_sha256": source_ids,
+                  "resolved_configuration": {"runtime_config": asdict(prepared.config),
+                                              "task_recipe": prepared.task_config,
+                                              "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
     robot = legacy["source"].agents[0]
     runtime_input = build_pickcube_isaac_runtime_input_v1(
         delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,

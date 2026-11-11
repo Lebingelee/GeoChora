@@ -840,3 +840,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +44／−36，净增 8 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。F06 source、Artifact、ExecutionSpec、source closure 和 native 准入仍由已有 Runtime 检查；renderer、物理提交和 clock 未改变。
 
 91 项版本检查通过。禁用 USD PositionServo 构造后，五种 effort profile 的真实 source 构建通过，MJCF／USD 十组 physical Controller 合同与输入版本一致；最终静态检查确认 effort 的实际 Controller 身份和来源记录。Isaac effort 与正式 Position 分别完成两次 reset、一次 step、三帧独立读回和 Env／App 关闭，各观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知；Position H5 有一条 transition 和两个 observation。两次 SDK 日志均有只读目录及渲染预热错误，读回和进程退出成功。原生运行之后只调整 PositionServo 的延迟导入及 effort 来源记录，最终代码已用静态 source 检查和版本检查复核，未再次重跑 GPU。GeoPhys、MuJoCo 和完整 Solution 本批未重跑。冻结各轮 diff、计划、对照和收据位于 ignored `workspace/maintenance/v211_usd_no_position_20261112_N3k8lC/`；E01～E04 仍未接收。
+
+### 6.74 Task source 准备不再创建参考 Controller
+
+输入 `f4ea172f`。PickCube 的 Task source 编译、reset readiness 和参考 Controller 原由同一函数一并构造，导致 MJCF／USD effort 即使不使用参考 Controller 也要创建它。现在共同 source 准备返回具名的 Task、source、配置与 readiness 结果；正式参考路线再构造自己的 Controller，两个 effort source 路线直接构造物理 Controller。Task、Robot、source 与 Controller 的实际构造关系得到分离；现有 source closure 和 Runtime 准入未放宽。
+
+生产修改 2 文件 +60／−14，净增 46 行，主要是具名准备结果和 USD effort 的真实身份／配置组合；版本诊断修改 1 文件 +8／−3，验证 MJCF source、Scene 和 Controller 复用 Robot 且不创建参考 Controller；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer、clock 和控制提交 owner 未改变；Task 的其余 source 专属构造仍待收敛。
+
+91 项版本检查通过。禁止参考 Controller 与 USD PositionServo 构造后，五种 MJCF／USD effort 的十组真实 source／Controller 合同对照一致。最终代码的 MuJoCo 参考 R3 短程与 joint→R3 切换／H5 读回通过，共观测 15 个 native 子步。Isaac joint effort／同步 RGB 在具名结果整理之前完成两次 reset、step、三帧独立读回和关闭，观测 41 次 physics callback，采图期间无额外推进、订阅前启动推进未知；最终具名化结果已做十组静态合同和版本检查，未再次重跑 GPU。Isaac 日志有只读目录、渲染预热及 callback 取消订阅异常，进程和读回成功。GeoPhys 与完整 Solution 本批未重跑。各轮 diff、计划、对照及收据位于 ignored `workspace/maintenance/v211_task_source_without_controller_20261112_eALPcy/`；E01～E04 仍未接收。

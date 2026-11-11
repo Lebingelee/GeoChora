@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from contextlib import ExitStack
+from pathlib import Path
 
 
 
@@ -151,12 +152,18 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
     from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _configuration, build_reference, evaluate
+    from .specialization import _configuration, _prepare_reference_source, evaluate
     from .task import PickCubeTaskDefinition
 
     task_config = _configuration()
-    base = build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
-    original, legacy_artifact = base['source'], base['artifact']
+    prepared = _prepare_reference_source(
+        backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config)
+    legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
+    from .solution import PickCubeReadinessSolution
+    import subprocess
+    revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
+                                        'rev-parse', 'HEAD'], text=True).strip()
+    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     # The force-observation fixture starts inside the paired finger limits;
     # it retains PickCube semantics and is a distinct Artifact identity.
     if not reset_switch:
@@ -235,11 +242,11 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0],
                 'solution': None, 'reset_plan': reset_plan,
-                **({'solution_factory': base['solution_factory'], 'solution_identity': base['solution_identity'],
-                    'readiness': base['readiness']} if reset_switch else {}),
+                **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
+                    'solution_identity': solution_identity, 'readiness': readiness} if reset_switch else {}),
                 'physical_execution': physical,
                 'construction_id': 'pickcube-mjcf-physical-candidate-v1',
-                'source_revision': base['source_revision'], 'source_sha256': {
+                'source_revision': revision, 'source_sha256': {
                     'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
                     'projected_closure': closure},
                 'resolved_configuration': {'provider': _provider, 'backend': 'cpu',

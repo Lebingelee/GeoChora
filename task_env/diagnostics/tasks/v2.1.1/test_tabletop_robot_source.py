@@ -106,16 +106,17 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.runtime.sessions import source_scene_import
     from task_env.tasks.pick_cube import specialization
+    from task_env.controllers.canonical.execution import ReferenceExecutionController
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     built, declared, bound = [], [], []
-    original_reference = specialization.build_reference
+    original_reference = specialization._prepare_reference_source
     original_scene = source_scene_import.declare_panda_scene
     original_control = PandaAgent.build_direct_effort_execution
 
     def reference(*args, **kwargs):
         value = original_reference(*args, **kwargs)
-        built.append(value['source'].agents[0])
+        built.append(value.source.agents[0])
         return value
 
     def scene(robot, **kwargs):
@@ -126,7 +127,11 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
         bound.append(robot)
         return original_control(robot, *args, **kwargs)
 
-    monkeypatch.setattr(specialization, 'build_reference', reference)
+    def reject_reference(*args, **kwargs):
+        raise AssertionError('effort source preparation must not construct a reference Controller')
+
+    monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_reference)
+    monkeypatch.setattr(specialization, '_prepare_reference_source', reference)
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', scene)
     monkeypatch.setattr(PandaAgent, 'build_direct_effort_execution', control)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
