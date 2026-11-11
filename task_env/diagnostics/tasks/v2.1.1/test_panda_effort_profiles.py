@@ -22,9 +22,20 @@ def test_formal_panda_effort_profile_source_contract(profile, controller_type, d
         value = binding.build('mujoco')
         execution = value['physical_execution']
         assert type(execution.controllers[0]).__name__ == controller_type
+        assert [subject.subject_id for subject in execution.subjects] == ['panda-v1']
         assert execution.action_space().shape == (dimension,)
         assert execution.compiled.binding.source_closure_sha256 == value['source'].source_closure_digest
         if profile.startswith('panda-r3'):
             assert any(field.field_name == 'frame_pose_world' for field in execution.requirements.requirements)
     finally:
         binding.close_task_resources()
+
+
+def test_panda_subject_rejects_incomplete_native_transmission_declaration():
+    from task_env.robots.panda import PandaAgent
+
+    with pytest.raises(ValueError, match='nine named transmission channels'):
+        PandaAgent.physical_subject_declaration(
+            entity_id='panda-v1', source_id='test-source', source_closure_sha256='a' * 64,
+            native_ranges=((-5., 5.),) * 8, native_drive='disabled',
+            native_actuators=('joint1',), transmission_ids=('drive1',))

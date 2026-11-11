@@ -662,3 +662,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +58／−42，净增 16 行；版本诊断新增 1 文件 +30／−0；本文和当前状态文档修改 2 文件。无生产文件新增、删除或整文件迁移，项目 tracked 文件数由 1365 增至 1366。新增生产行是 Controller owner 中对普通、动态和质量矩阵组合的统一及不匹配检查；质量模型内容和 source 约束未放宽。renderer、clock、状态传输与物理提交没有改动。
 
 67 项版本检查通过；新增检查覆盖四种正式 Panda 参考 effort 配置的 source closure、Controller 类型、动作空间及 pose 所需状态。首次新增检查误读动作 schema 的 `dimension` 字段而失败，修正为检查真实 action space 后全部通过。MuJoCo CPU 实际完成 joint 到 R3 的 reset 切换、推进、非法 reset 后保全、H5 读回及重复 close，观测 10 个 native 子步。Isaac 的四种参考 effort 配置对真实 USD source 完成 Controller 和 binding 构造检查，没有启动 Isaac SDK 或推进物理；GeoPhys、renderer 及完整 Solution 未在本批重跑。冻结 diff、计划、MuJoCo 结果和 Isaac source 检查位于 ignored `workspace/maintenance/v211_panda_effort_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.52 USD Panda effort 使用共同主体构建
+
+输入 `9032fb38`。原 USD effort 路线在 PickCube Task 内重复创建 LogicalAssembly、物理通道、Controller 与状态需求，且没有 ControlledSubject；现在 USD source 保留已校验的 closure、drive／mimic transmission、Frame 和 native range 声明，交给 Panda 与 Runtime 同一主体声明、Assembly 编译和 physical execution 构建机制，与 MJCF 路线共同构造。source-specific transmission／动作模型身份作为数据传入，不放宽其 native admission。构造对照覆盖五种 Controller 的真实 MJCF／USD source：绑定、Controller action schema、状态需求及 joint／frame 映射逐项一致，USD 额外获得 `panda-v1` subject。
+
+首次真实 Isaac 检查发现既有正式入口错误：USD physical binding 仍带 Position scalar 标记，导致实际 `make_env` 误选 Position source composer 并拒绝 effort profile。已清除此标记，新增检查覆盖该边界；同一次失败的 Isaac 清理还发生 SDK 菜单异常和退出时段错误，原始日志与收据保留。第二次实际运行正常完成两次 reset、非零 step、三帧同步 RGB、独立帧读回、重复 Env close 和 App close；观测 41 次 callback，订阅之前的启动推进未知。首次失败未能观测推进，按预留 59 次保守计入；两次累计记账 100 次。
+
+生产修改 3 文件 +64／−88，净减 24 行；版本诊断修改 2 文件 +21／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1366。69 项版本检查通过；MuJoCo direct effort 与 joint→R3 reset 切换、记录读回和 close 短程通过，共观测 15 个 native 子步。GeoPhys 与完整 Solution 本批未重跑，原 evidence 的复用限于未受影响行为；Isaac 的本次结果仅覆盖指定 USD、joint effort、CUDA 和同步 RGB 组合。计划、两次冻结 diff、实际前后 source 对照和全部运行收据位于 ignored `workspace/maintenance/v211_usd_robot_owner_20261112_001/`。E01～E04 仍未接收。

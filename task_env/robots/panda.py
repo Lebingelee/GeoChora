@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -39,8 +39,20 @@ def panda_reference_control_binding():
     return ControlBinding('panda-v1/gripper', 0.08)
 
 
+@dataclass(frozen=True)
+class PandaEffortSourceLayout:
+    """Source-admitted transmission names and identity for one Panda layout."""
+    native_actuators: tuple[str, ...]
+    transmission_ids: tuple[str, ...]
+    assembly_id: str
+    nested_component_id: str
+    model_id: str
+    finger_action_id: str
+
+
 def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
-                                        native_drive, native_ranges):
+                                        native_drive, native_ranges, layout=None,
+                                        joint_bindings=None, frame_bindings=None):
     """Bind Panda's declared channels to a direct-effort Controller execution.
 
     The source adapter supplies verified native ranges; this function does not
@@ -57,15 +69,24 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
                    if a.entity_id == entity_id for j in a.joints}
     if any(name not in definitions or source.joints.get(f'{entity_id}/{name}') != name for name in names):
         raise ValueError('Panda effort profile requires the exact nine named source joints')
+    if layout is None:
+        layout = PandaEffortSourceLayout(
+            tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9)),
+            tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9)),
+            'panda-direct-effort-assembly', 'panda-direct-effort-components',
+            'direct-effort-zero-bias-v1', 'finger-tendon-effort')
+    if not isinstance(layout, PandaEffortSourceLayout):
+        raise TypeError('Panda effort construction requires a source layout')
     subject, declarations = PandaAgent.physical_subject_declaration(
         entity_id=entity_id, source_id=source.source_id,
         source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
-        native_drive=native_drive)
+        native_drive=native_drive, native_actuators=layout.native_actuators,
+        transmission_ids=layout.transmission_ids)
     def make_controller(binding, writer):
         keys = tuple(f'{entity_id}/{name}' for name in names)
         kinds = tuple(definitions[name].kind for name in names)
         requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
-            'direct-effort-zero-bias-v1', 'geochora', 'v1', 'stdlib', source.source_id,
+            layout.model_id, 'geochora', 'v1', 'stdlib', source.source_id,
             source.source_closure_digest, keys,
             tuple('rad' if kind == 'revolute' else 'm' for kind in kinds), 'joint_bias',
             tuple('N*m' if kind == 'revolute' else 'N' for kind in kinds),
@@ -73,22 +94,24 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
             0., 'pure_no_physics_step', writer, 'none', 'required')
         zero = (0.,) * len(names)
         model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
-        action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + ('finger-tendon-effort',)
+        action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + (layout.finger_action_id,)
         matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
                              for j in range(8)) for i in range(len(names)))
         profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, action_names, keys, matrix, requirement)
         return LinearEffortControllerV1(profile, binding, model)
     definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
                              for j in a.joints if j.kind != 'fixed'}
-    joint_bindings = {semantic: definitions_by_native[native]
-                      for semantic, native in (*source.joints.items(), *source.free_joints.items())}
-    frame_bindings = {name: (artifact.legacy_frame_bindings[name]
-                             if name in artifact.legacy_frame_bindings
-                             else FrameReference(*name.split('/', 1)))
-                      for name in (*source.bodies, *source.frames)}
+    if joint_bindings is None:
+        joint_bindings = {semantic: definitions_by_native[native]
+                          for semantic, native in (*source.joints.items(), *source.free_joints.items())}
+    if frame_bindings is None:
+        frame_bindings = {name: (artifact.legacy_frame_bindings[name]
+                                 if name in artifact.legacy_frame_bindings
+                                 else FrameReference(*name.split('/', 1)))
+                          for name in (*source.bodies, *source.frames)}
     return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
-        subject=subject, declarations=declarations, assembly_id='panda-direct-effort-assembly',
-        nested_component_id='panda-direct-effort-components', controller_factory=make_controller,
+        subject=subject, declarations=declarations, assembly_id=layout.assembly_id,
+        nested_component_id=layout.nested_component_id, controller_factory=make_controller,
         state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings)
 
 
@@ -121,20 +144,26 @@ class PandaAgent(BaseAgent):
 
     @staticmethod
     def physical_subject_declaration(*, entity_id, source_id, source_closure_sha256,
-                                     native_ranges, native_drive, split=False):
+                                     native_ranges, native_drive, split=False,
+                                     native_actuators=None, transmission_ids=None):
         """Describe Panda channels before any physical binding is constructed."""
         from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
         names = PandaAgent.physical_joint_names()
         if len(native_ranges) != 8:
             raise ValueError('Panda source requires eight checked actuator ranges')
+        if native_actuators is None:
+            native_actuators = tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9))
+        if transmission_ids is None:
+            transmission_ids = tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9))
+        if len(native_actuators) != 9 or len(transmission_ids) != 9:
+            raise ValueError('Panda source requires nine named transmission channels')
         writers = ('panda-arm-effort', 'panda-hand-effort') if split else ('panda-direct-effort',)
         paths = tuple(('robot', name) for name in names)
         subject = ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
             'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None, paths, writers)
         declarations = tuple(SubjectJointDeclarationV1(
             path, name, ((writers[0] if i < 7 else writers[-1]),),
-            f'actuator{i+1}' if i < 7 else 'actuator8',
-            f'arm-transmission-{i+1}' if i < 7 else 'split-transmission',
+            native_actuators[i], transmission_ids[i],
             1.0 if i < 7 else 0.5, native_ranges[i if i < 7 else 7], native_drive)
             for i, (name, path) in enumerate(zip(names, paths, strict=True)))
         return subject, declarations

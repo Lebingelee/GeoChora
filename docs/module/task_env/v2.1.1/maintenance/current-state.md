@@ -117,3 +117,5 @@ Panda direct effort 与两个简单主体现通过共同 Runtime 入口构建单
 四个正式任务的 mapping／YAML 构造现只调用一次配置解析器，外部已解析对象仍执行一致性检查；MuJoCo、隔离 worker 与 GeoPhys 的受影响短程已复验。详见[实施记录 6.50](../planning/post-5c-optimization-execution.md#650-正式公共配置只解析一次)。
 
 Panda 参考 effort 的普通、动态和质量矩阵 Controller 组合已归共同控制 owner，MJCF／USD 各自保留 source、TCP 和 frame 的声明与校验。MuJoCo reset 切换短程及 USD source 构造检查通过；详见[实施记录 6.51](../planning/post-5c-optimization-execution.md#651-panda-参考-effort-controller-组合归控制-owner)。
+
+USD 与 MJCF 的 Panda effort 现通过同一主体声明及 Runtime 构建；修复 USD 力矩 binding 被误认作 Position source 的错误。指定 Isaac CUDA／同步 RGB 路线及 MuJoCo 受影响短程已复验；首次失败及 SDK 清理异常保留。详见[实施记录 6.52](../planning/post-5c-optimization-execution.md#652-usd-panda-effort-使用共同主体构建)。

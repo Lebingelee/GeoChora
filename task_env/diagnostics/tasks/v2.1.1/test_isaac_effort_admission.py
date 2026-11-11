@@ -41,3 +41,13 @@ def test_compiled_action_contract_requires_a_real_physical_execution():
         binding.bind_compiled_control({})
     with pytest.raises(TypeError, match='requires PhysicalControlExecutionV1'):
         binding.bind_compiled_control({'physical_execution': object()})
+
+
+def test_usd_effort_binding_does_not_request_position_source_composition():
+    from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    binding = make_isaac_physical_binding(delivery_manifest='unused-until-build', seed=31,
+        horizon=8, drive_mode='effort-only', control_kind='joint')
+    assert binding.scalar_control_binding is None
+    assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding

@@ -44,7 +44,7 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         return actual
     from ...environment.reference_binding import legacy_position_physical_observation_binding
     return replace(base, build=build, build_seeded=build_seeded, reset_seed=reset_seed,
-        action_space_factory=None,
+        scalar_control_binding=None, action_space_factory=None,
         physical_observation_binding=legacy_position_physical_observation_binding,
         action_schema=None,
         recorder_mode='execution', interval_mode='grouped')
