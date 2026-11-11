@@ -484,3 +484,13 @@ MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 rese
 生产修改 2 文件 +5／−122，净减 117 行；无文件新增、删除或迁移，tracked 文件数不变；版本诊断未改，实施与当前状态 2 文档修改。生命周期更直接地由正式配置和共同 Task binding 进入；provider、renderer、clock 和控制提交代码未改。27 项版本纯合同通过。
 
 第一次冻结版本中，四任务的六条 MuJoCo CPU 短程通过（70 个可观测子步）；随后去掉共同构造上已无用途的两个候选专用参数，并按最终 diff 再次运行同六条路线，全部通过（再 70 个子步）。每条均完成 reset、非零 action 或 Nut 单个 Solution interval、再次 reset 和 close，两个版本合计 140 个观测子步。计划、两个冻结 diff 和各结果在 ignored `workspace/maintenance/v211_retire_position_constructor_20261112_001/`。GeoPhys、Isaac 和 renderer 未在本批复跑，E01～E04 未完成。
+
+### 6.30 退休 leaf 控制分派并修复 worker 配置投影
+
+输入 `ec114139`。四个正式 Task 没有生成旧诊断 leaf plan；移除 selected Controller 的 leaf 准入、leaf Runtime builder、Env 内的 leaf interval／记录入口、lifecycle 分派及对应预检分支。显式传入旧 leaf plan 将被拒绝。装配 Panda 仍使用的主体配置声明和一般 Position／effort 合同保留；记录器、观察与底层 provider 中其他历史 leaf 代码还未整体清理。
+
+本批首次隔离 worker 测试揭示此前规范配置迁移遗漏：记录配置投影仍将 Controller profile 写入已退休的 `task.controller_profile`，worker 在重建解析阶段失败。将该投影改为 `controller.profile_id`，并保留 Robot、Controller 参数与 episode 的正式重建字段；版本纯合同增加投影到实际解析器的往返检查。首次失败及原冻结 diff 保留，不称其通过。
+
+生产修改 8 文件 +34／−223，净减 189 行；版本诊断 1 文件 +21；本记录与当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。六条 MuJoCo CPU 进程内路线在首版 diff 下各完成 reset／非零 action 或 Nut 单个 Solution interval／再次 reset／close，合计 70 可观测子步；后续变动仅为记录配置投影及对应测试。最终 diff 下 PickCube 与 NutAssembly MuJoCo 隔离 worker 均通过相同生命周期，worker 内部子步不可观测，各保守计费 50；首次失败也按预留保守计费 50。28 项版本纯合同在最终 diff 下通过。
+
+本批未重跑 GeoPhys、Isaac、renderer 或完整 Solution。leaf 低层代码及非本轮触及的观察／记录分支尚未完成审计；E01～E04 仍未完成。两个冻结 diff、计划、失败与成功结果见 ignored `workspace/maintenance/v211_retire_leaf_dispatch_20261112_001/`。

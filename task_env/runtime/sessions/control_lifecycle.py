@@ -134,29 +134,6 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
                          int(getattr(env.controller, 'generation', 0)))
         return env._prepare_mixed_control(action, **context)
 
-    if getattr(env, 'leaf_position_profile', False):
-        plan = env.leaf_plan
-        if plan is None or not getattr(plan, '_compiled', False):
-            raise ValueError('leaf Position route requires a compiled control plan')
-        if env.state.control_step >= env.horizon:
-            env._stopped = True
-            raise RuntimeError('selected position-control horizon is exhausted')
-        if getattr(env, 'fixed_attachment_leaf_position_profile', False):
-            from ...controllers.canonical.leaf_actions import AttachedLeafActionSetV1 as ActionType
-        else:
-            from ...controllers.canonical.leaf_actions import LeafPositionActionSetV1 as ActionType
-        if type(action) is not ActionType:
-            raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
-        action.structured_request(env.position_scene, plan)
-        identities = tuple(sorted(entry.binding.identity_hash for entry in plan.leaves))
-        _dispatch_record(env, 'position-target', identities, 0)
-        result = env._prepare_leaf_position(action)
-        current = env.session._control_lifecycle_dispatch
-        if current.stage == 'preparing':
-            from dataclasses import replace
-            env.session._control_lifecycle_dispatch = replace(current, stage='prepared')
-        return result
-
     if has_position_control_capability(env):
         profiles = env.position_profiles
         identities = tuple(profile.identity for profile in profiles)

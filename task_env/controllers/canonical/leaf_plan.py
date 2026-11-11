@@ -262,10 +262,6 @@ class EffectiveLeafPlanV1:
     fixed_attachment_plan_identity_sha256: str | None = None
     _compiled: bool = field(default=False, init=False, repr=False, compare=False)
 
-    def selected_runtime_builder(self, selected):
-        from ...runtime.sessions.selected_materialization import LeafRuntimeBuilder
-        return LeafRuntimeBuilder(self)
-
     def position_state_requirements(self):
         """Return the typed state demanded by the compiled effective leaves."""
         from ...artifacts import StateRequirements

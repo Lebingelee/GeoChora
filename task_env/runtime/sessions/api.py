@@ -1488,7 +1488,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
     from ...artifacts import CapabilityAssessmentV1, CapabilityAssessmentRowV1
     from .control import (ControlBinding, ControlBindingPlanV1, bind_selected_controller,
                           prepare_position_control_materialization, project_controller_feedback,
-                          project_leaf_feedback, declared_source_capabilities)
+                          declared_source_capabilities)
     from ...artifacts.contracts import SUPPORTED_STATUSES
 
     if dependency_status not in {'available', 'unavailable', 'unknown'}:
@@ -1616,7 +1616,6 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
     plan = value.get('controller_binding_plan')
     declared_bindings = ()
     projected_feedback = ()
-    leaf_plan = None
     try:
         if plan is not None:
             if (type(plan) is not ControlBindingPlanV1 or not plan._compiled
@@ -1629,7 +1628,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                                             provider=selection.physics_provider,
                                             backend=selection.physics_backend)
         if selection.deployment == 'isolated_worker' and (
-                selected.mixed or selected.leaf_plan is not None or len(selected.position_profiles) > 1):
+                selected.mixed or len(selected.position_profiles) > 1):
             raise ValueError('selected worker profile is outside the scalar adapter envelope')
         if selected.mixed:
             execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
@@ -1637,14 +1636,6 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
             manifest = _mixed_actuator_manifest(artifact, execution, source)
             actual_capabilities = {item.name for item in manifest.capabilities
                                    if item.status in SUPPORTED_STATUSES}
-        elif selected.leaf_plan is not None:
-            leaf_plan = selected.leaf_plan
-            if (source.scene_definition is None
-                    or leaf_plan.source_closure_sha256 != source.source_closure_digest):
-                raise ValueError('leaf plan differs from the selected Scene or source closure')
-            projected_feedback = project_leaf_feedback(
-                source.scene_definition, value.get('logical_assembly'),
-                value.get('child_assemblies', {}), leaf_plan)
         elif value.get('physical_execution') is not None:
             from .physical_control import PhysicalControlExecutionV1
             physical = value['physical_execution']
@@ -1758,14 +1749,6 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         for entity_id, actuator_id, writer_id in plan.resource_writers:
             row('control_resource_binding', 'resource:' + entity_id + '/' + actuator_id,
                 reason='compiled Scene actuator resource is assigned to writer ' + writer_id)
-    elif leaf_plan is not None:
-        for entry in leaf_plan.leaves:
-            leaf = entry.binding
-            row('control_group_binding', 'group:' + leaf.entity_id + '/' + leaf.control_group_id,
-                reason='resolved logical Assembly assigns the ControlGroup to writer ' + leaf.writer_id)
-        for entity_id, actuator_id, writer_id in leaf_plan.resource_writers:
-            row('control_resource_binding', 'resource:' + entity_id + '/' + actuator_id,
-                reason='compiled leaf plan assigns the actuator resource to writer ' + writer_id)
     for name, subject, required, supported, valid, reason, oracle in project_feedback_assessment(
             projected_feedback, artifact, source, actual_capabilities, helper):
         row(name, subject, required=required, implemented=supported, valid=valid,

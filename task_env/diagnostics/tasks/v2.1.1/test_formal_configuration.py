@@ -123,3 +123,24 @@ def test_builtin_harness_outputs_formal_controller_configuration(monkeypatch, tm
     assert config['controller'] == {'profile_id': spec.controller_profile}
     importlib.import_module('task_env.tasks')
     assert resolve_task_env_config(ENV_REGISTRY.get(spec.task_uid), config).controller_profile == spec.controller_profile
+
+
+def test_recorded_formal_configuration_reconstructs_controller_and_episode():
+    from task_env.recorders.reference_provenance import recorded_execution_configuration
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    original = resolve_task_env_config(task, {
+        'execution': {'physics_provider': 'mujoco'},
+        'episode': {'horizon': 8, 'seed': 31, 'ignore_done': True},
+        'controller': {'profile_id': 'r1_split'},
+        'robot': {'uid': 'panda-arm-hand-v1'},
+    })
+    projected = recorded_execution_configuration(uid=task.uid, provider='mujoco', backend='cpu',
+                                                  horizon=8, resolved=original)
+    assert projected['controller']['profile_id'] == 'r1_split'
+    assert 'controller_profile' not in projected['task']
+    rebuilt = resolve_task_env_config(task, {k: v for k, v in projected.items() if k != 'env_id'})
+    assert rebuilt.environment == original.environment
+    assert rebuilt.controller_profile == original.controller_profile
+    assert rebuilt.robot_uid == original.robot_uid
+    assert rebuilt.execution_spec_v2 == original.execution_spec_v2

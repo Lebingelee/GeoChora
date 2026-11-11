@@ -103,7 +103,6 @@ class SelectedControllerBinding:
     """Admitted controller and profile facts for selected environment assembly."""
     controller: object
     position_profiles: tuple
-    leaf_plan: object | None
     mixed: bool
     position: bool
     requires_reset_plan: bool = False
@@ -370,14 +369,8 @@ def _match_position_profiles(value, profiles):
 
 def bind_selected_controller(value, *, binding, provider, backend):
     """Admit a declared controller against its source and execution route."""
-    leaf_plan = value.get('leaf_plan')
-    if leaf_plan is not None:
-        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-        if type(leaf_plan) is not EffectiveLeafPlanV1 or not leaf_plan._compiled:
-            raise TypeError('leaf Position route requires a compiled EffectiveLeafPlanV1')
-        if (leaf_plan.provider_name, leaf_plan.backend) != (provider, backend):
-            raise ValueError('leaf plan provider/backend differs from the selected environment')
-        return SelectedControllerBinding(None, (), leaf_plan, False, True, True)
+    if value.get('leaf_plan') is not None:
+        raise ValueError('diagnostic leaf Position execution has been retired')
 
     raw = value['controller']
     if value.get('selected_controller_kind') == 'mixed_actuator_v1':
@@ -388,7 +381,7 @@ def bind_selected_controller(value, *, binding, provider, backend):
                 or type(getattr(raw, 'identity', None)) is not str
                 or getattr(plan, 'controller_identity', None) != raw.identity):
             raise TypeError('mixed-control route requires a controller bound to its typed source plan')
-        return SelectedControllerBinding(raw, (), None, True, False)
+        return SelectedControllerBinding(raw, (), True, False)
 
     profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
     capabilities = tuple(_selected_position_capability(item) for item in profiles)
@@ -400,13 +393,13 @@ def bind_selected_controller(value, *, binding, provider, backend):
         profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
         capabilities = tuple(_selected_position_capability(item) for item in profiles)
         matches = _match_position_profiles(value, profiles)
-        return SelectedControllerBinding(profiles[0], profiles, None, False, True, True,
+        return SelectedControllerBinding(profiles[0], profiles, False, True, True,
                                          capabilities, matches)
     if isinstance(raw, (tuple, list)):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
     physical_match = _match_physical_execution(value)
     physical_execution = value.get('physical_execution') if physical_match is not None else None
-    return SelectedControllerBinding(raw, (), None, False, False,
+    return SelectedControllerBinding(raw, (), False, False,
                                      value.get('physical_execution') is not None,
                                      (), (() if physical_match is None else (physical_match,)),
                                      physical_execution)

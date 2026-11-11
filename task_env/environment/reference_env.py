@@ -1056,8 +1056,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             value, binding=self.binding, provider=self.provider, backend=self.backend,
         )
         self.mixed_control_profile = selected.mixed
-        self.leaf_plan = selected.leaf_plan
-        self.leaf_position_profile = selected.leaf_plan is not None
+        self.leaf_plan = None
+        self.leaf_position_profile = False
         self.position_profiles = selected.position_profiles
         self.position_profile = selected.position
         self.controller = selected.controller
@@ -3812,131 +3812,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             )
             raise
         return event
-
-    def _prepare_leaf_position(self, action):
-        """Dispatch one real R02b two-leaf interval through the selected lifecycle."""
-        if not getattr(self, 'leaf_position_profile', False) or self.session is None:
-            raise RuntimeError('R02c leaf plan and RuntimeSession are required')
-        if self._closed or self._stopped or self.state.control_step >= self.horizon:
-            raise RuntimeError('reset required or R02c leaf episode is stopped')
-        from ..runtime.sessions.leaf_control import (
-            LeafActionRequestV1, LeafControlIntervalRequestV1,
-            dispatch_leaf_control_interval,
-        )
-        if getattr(self, 'fixed_attachment_leaf_position_profile', False):
-            from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
-        else:
-            from ..controllers.canonical.leaf_actions import MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID
-
-        request = action.structured_request(self.position_scene, self.leaf_plan)
-        leaf_request = LeafControlIntervalRequestV1(
-            'leaf-control-interval-request-v1', self.leaf_plan.identity_sha256,
-            self.session.leaf_materialization_receipt, self.typed_state,
-            self.session.leaf_configuration_revision,
-            (
-                LeafActionRequestV1('leaf-action-request-v1', ARM_WRITER_ID, action.arm),
-                LeafActionRequestV1('leaf-action-request-v1', HAND_WRITER_ID, action.hand),
-            ),
-        )
-        before_state = self.state
-        transition_counts_before = self._recording_counts(self.recorder)
-        append_attempted = False
-        completed = False
-
-        def apply_control():
-            return dispatch_leaf_control_interval(
-                self.leaf_plan, leaf_request, scene=self.position_scene, runtime=self.session,
-            )
-
-        def advance(result):
-            nonlocal completed
-            self.state = self.session.snapshot()
-            self.typed_state = result.next_publication
-            completed = True
-            self.feedback = None
-            self.last_leaf_transition = (action, result)
-
-        def evaluate(state):
-            self.obs, self.info, self.evaluation = self.observation(state)
-            self.info.update({
-                'provider': self.provider,
-                'leaf_effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-            })
-            return self.evaluation
-
-        def publish(result, state, evaluation, observation):
-            nonlocal append_attempted
-            terminated, truncated = self._episode_execution_state().step_outcome(
-                task_terminated=evaluation.failure, task_truncated=False,
-                control_step=state.control_step, horizon=self.horizon,
-            )
-            self._episode_execution_state().finish_step(
-                terminated=terminated, truncated=truncated,
-            )
-            self._episode_mode = 'external'
-            self._last_position_terminated = terminated
-            self._last_position_truncated = truncated
-            self._last_position_request = request
-            if self.recorder is not None:
-                append_attempted = True
-                from ..recorders.position_metadata import record_leaf_position_transition
-                record_leaf_position_transition(
-                    self, action, request, result, terminated=terminated, truncated=truncated,
-                )
-            self._published_position_state = state
-            self._published_position_typed_state = self.typed_state
-            self._published_position_obs = observation
-            self._published_position_info = dict(self.info)
-            self._published_position_evaluation = evaluation
-            if terminated or truncated:
-                self._position_episode_end = self._make_position_episode_end(
-                    'task_terminal' if terminated else 'horizon_reached',
-                    terminated=terminated, truncated=not terminated,
-                    bootstrap_allowed=not terminated,
-                )
-                self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
-            return observation, float(evaluation.reward), terminated, truncated, self.info
-
-        def on_failure(phase, error):
-            nonlocal completed
-            if append_attempted:
-                phase = 'record_leaf_transition'
-            after_state = None
-            readback_error = None
-            try:
-                after_state = self.session.snapshot()
-                self.state = after_state
-            except BaseException as snapshot_error:
-                readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
-            completed = completed or (
-                after_state is not None and after_state.control_step == before_state.control_step + 1
-            )
-            self._latch_fault(
-                phase, error, before_state=before_state, after_state=after_state,
-                interval_attempted=True, interval_completed=completed,
-                native_substeps_expected=self.artifact.timebase.control_substeps,
-                transition_status=self._fault_transition_status(
-                    self.recorder, transition_counts_before, append_attempted=append_attempted,
-                ), readback_error=readback_error,
-            )
-            self._stopped = True
-
-        return dict(
-            apply_control=apply_control, advance=advance,
-            read_state=lambda: self.state, evaluate=evaluate,
-            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
-            phases=('leaf_control_preflight', 'leaf_control_preflight',
-                    'leaf_control_preflight', 'leaf_observation',
-                    'leaf_observation', 'leaf_observation'),
-        )
-
-    def _record_leaf_position_transition(self, action, request, result, *, terminated, truncated):
-        # Retained for diagnostic consumers of the historical internal method.
-        from ..recorders.position_metadata import record_leaf_position_transition
-        return record_leaf_position_transition(
-            self, action, request, result, terminated=terminated, truncated=truncated,
-        )
 
     def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action

@@ -136,36 +136,6 @@ class PositionRuntimeBuilder:
 
 
 @dataclass(frozen=True)
-class LeafRuntimeBuilder:
-    plan: object
-    priority = 30
-
-    @property
-    def declaring_owner(self):
-        return self.plan
-
-    def create(self, env, selection, start_worker, _materialize, materialize_control):
-        from .control import prepare_position_control_materialization
-        source = env.value['source']
-        env.position_scene = source.scene_definition
-        selector = env.binding.position_control_binding
-        plan, joints, frames, position_binding = prepare_position_control_materialization(
-            source=source, artifact=env.artifact, profiles=(), leaf_position=True,
-            plan=env.value.get('controller_binding_plan'), select_binding=selector,
-            value=env.value, capabilities=())
-        env.position_plan, env.position_joint_bindings, env.position_frame_bindings = plan, joints, frames
-        env._position_state_declaration = self.plan
-        if _worker(selection):
-            env.session = start_worker()
-        else:
-            env.session = materialize_control(env.artifact, env.execution, source=source,
-                                              binding=position_binding, leaf_plan=self.plan)
-        env._materialized_position_control_binding = position_binding
-        env._materialized_position_control_selector = selector
-        return RuntimeBuildResult((PositionInitialState(self.plan, env.position_scene, joints, frames, (), plan),))
-
-
-@dataclass(frozen=True)
 class MixedRuntimeBuilder:
     plan: object
     priority = 20
@@ -221,7 +191,7 @@ class ScalarRuntimeBuilder:
 def build_selected_runtime(env, selected, selection, start_worker, materialize, materialize_control):
     """Execute one admitted builder, then compose declared physical/state capabilities."""
     source = env.value['source']
-    providers = (env.value.get('physical_execution'), selected.leaf_plan,
+    providers = (env.value.get('physical_execution'),
                  *selected.position_capabilities[:1], getattr(source, 'mixed_actuator_plan', None),
                  getattr(env.binding, 'scalar_control_binding', None))
     candidates = []

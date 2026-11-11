@@ -53,13 +53,30 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
         execution['source_delivery_manifest'] = resolved.source_delivery_manifest
     if getattr(resolved, 'reset_profile', None) is not None:
         execution['reset_profile'] = resolved.reset_profile
-    task = dict(resolved.task_parameters)
-    if resolved.controller_profile is not None:
-        task['controller_profile'] = resolved.controller_profile
+    if resolved.source_workspace is not None:
+        execution['source_workspace'] = resolved.source_workspace
+    episode = resolved.environment.episode
     result = {'env_id': uid, 'execution': execution,
-              'episode': {'horizon': resolved.environment.episode.horizon}, 'task': task}
+              'episode': {'horizon': episode.horizon, 'seed': episode.seed,
+                          'ignore_done': episode.ignore_done},
+              'task': dict(resolved.task_parameters)}
+    controller = {}
+    if resolved.controller_profile is not None:
+        controller['profile_id'] = resolved.controller_profile
     if resolved.gravity_compensation:
-        result['controller'] = {'gravity_compensation': True}
+        controller['gravity_compensation'] = True
+    parameters = json.loads(resolved.controller_parameters_json)
+    if parameters:
+        controller['parameters'] = parameters
+    if controller:
+        result['controller'] = controller
+    robot = {}
+    if resolved.robot_uid is not None:
+        robot['uid'] = resolved.robot_uid
+    if resolved.native_drive is not None:
+        robot['native_drive'] = resolved.native_drive
+    if robot:
+        result['robot'] = robot
     return result
 
 
