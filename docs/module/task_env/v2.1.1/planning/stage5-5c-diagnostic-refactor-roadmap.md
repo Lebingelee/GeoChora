@@ -37,6 +37,10 @@ Core `a53bf19d` 的单元 7／8 已按[Sol 主审](../maintenance/reviews/202611
 
 单元 9 已完成离线 G1～G6 综合对账，执行者建议 `READY_FOR_SOL_5C_BOUNDED_REVIEW`；**单元 9 已交付、待独立主审、待维护者接收**，不等于本页已签署整个 5c。生产实现仍为 `a53bf19d`，没有新 native 或矩阵复验；旧证据按受测身份及共同 reset／RGB 的实际变更逐项解释。见[执行者综合交付索引](../maintenance/reviews/20261111_unit009_executor_5c_closeout.md)。5c 接收后仍须完成维护者指定的代码／入口／项目优化并人工接收，之后才决定 G06；本轮未进入优化施工。
 
+## 2026-11-11 后续决定：Sol 有界接收 5c 功能
+
+[单元 9 独立综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)已完成，结论为 `SOL_ACCEPTED_BOUNDED_5C`，取代上一段的待主审状态，维护者最终接收仍待确认。四主体、三 provider 的受测标量路由、同步任务 RGB、固定 renderer 及真实跨组合按明确身份和影响有界接收；没有新增 native、全矩阵或像素评分门。后续代码优化与项目优化仍未接收，不因本次功能接收而跳过；按[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)经安排、实施及人工接收后才决定 G06。
+
 ## 共同目标和调用链
 
 ```text

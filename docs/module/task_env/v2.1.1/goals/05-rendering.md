@@ -6,7 +6,7 @@
 
 复用 render backend registry、single／parallel providers、camera API／source 及 provider 公开场景数据。selected 配置／session 当前仍 state-only；必须把场景、实际状态、采样、obs 和关闭一起接通，不能仅新增 renderer 名称。
 
-2026-11-11 当前注记：上段 state-only 及下文 2026-11-08“尚未完整贯通”描述保留为历史起点。单元 1～8 已有各自有界成果，最新同步 RGB 与跨组合见[单元 7／8 独立接收](../maintenance/reviews/20261111_unit007_008_sol_review_a53bf19d.md)；单元 9 已提交[综合对账建议](../maintenance/reviews/20261111_unit009_executor_5c_closeout.md)，待主线 Sol 独立主审及维护者决定整个 5c。此注记不提前宣布 G05、优化或 G06 已通过。
+2026-11-11 当前注记：上段 state-only 及下文 2026-11-08“尚未完整贯通”描述保留为历史起点。单元 9 的[Sol 综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)已对修订后的 5c 功能作有界接收，维护者最终接收待确认；原 5a／5b 有界结果继续按影响保留。生产身份为 `a53bf19d`，综合交付为 `b23fb3cc`；不宣称任意组合或完整 Qualification。代码／入口及项目优化仍须另行完成和人工接收，尚未进入 G06。
 
 <a id="5a"></a>
 ## 5a：公开场景数据和原生绑定
