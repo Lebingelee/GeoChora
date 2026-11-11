@@ -357,7 +357,7 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 
 输入 `76a05cbe`。`resolve_execution_plan` 不再按 `panda-v1` 名称决定是否检查 Controller；它读取 Robot 声明的 `component_controller_kinds`，再将已有 `robot.controller` 的 kind／reference 记入计划。Panda 的公开 `supported_controller_kinds()` 与静态声明共用同一组值；没有此组件能力的 Robot 保持原空选择。只有 UID 时可从已登记的 Robot 类型读取静态声明，无需实例化 Robot 或启动 provider；未知 UID 仍留给正常 registry 构造边界。实际 agent iterable 只消费一次。此机制让其他 Robot 可以声明相同的组件合同，但不扩大其 native、source 或多主体资格。
 
-本批生产 3 个文件 +27／−10，测试 1 个文件 +24；不新增／删除／迁移文件。4 项纯静态合同通过，覆盖另一名称的能力声明、不同 kind 拒绝、Panda 缺配置拒绝和多 agent 边界。另用真实 `PandaAgent` 声明与修改前执行计划作完整 mapping／identity 比较，结果相等；没有运行物理。证据为 `component-capability-012-pure.log` 和 `component-capability-012-comparison.json`。其余主体的实际 Runtime 构建和 native 能力仍按已有范围对账；E02／E04 未据此整体接收。
+本批生产 3 个文件 +27／−10，测试 1 个文件 +24；不新增／删除／迁移文件。4 项纯静态合同通过，覆盖另一名称的能力声明、不同 kind 拒绝、Panda 缺配置拒绝和多 agent 边界。另用真实 `PandaAgent` 声明与修改前执行计划作完整 mapping／identity 比较，结果相等；没有运行物理；独立 import guard 阻止 MuJoCo、Taichi、Isaac、USD 与 Warp 相关模块后，Panda UID 静态解析仍通过。证据为 `component-capability-012-pure.log`、`component-capability-012-comparison.json` 和 `component-capability-012-import-guard.log`。其余主体的实际 Runtime 构建和 native 能力仍按已有范围对账；E02／E04 未据此整体接收。
 
 ### 6.14 reset 重建能力归属
 
