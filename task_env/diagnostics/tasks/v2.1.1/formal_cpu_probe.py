@@ -67,6 +67,11 @@ try:
 
     receipt=getattr(env.value['source'],'execution_source_receipt',None)
     snapshot=None if receipt is None else str(receipt.snapshot_root)
+    physical_source = (Path(env.value['source'].scene_source.base_dir)
+                       if args.case == 'panda-joint' and args.record else None)
+    if physical_source is not None:
+        assert physical_source.exists()
+        result['physical_source_before_close'] = str(physical_source)
     result['source_snapshot']=snapshot
     if args.case!='assembled-unreset':
         if args.case=='nut':
@@ -169,6 +174,9 @@ try:
     env.close();env.close();result['repeated_close_completed']=True
     result['current_source_snapshot_exists_after_close']=None if current_snapshot is None else Path(current_snapshot).exists()
     result['source_snapshot_exists_after_close']=None if snapshot is None else Path(snapshot).exists()
+    if physical_source is not None:
+        assert not physical_source.exists()
+        result['physical_source_removed_after_close'] = True
     result['status']='PASS'
 except BaseException as error:
     result['status']='FAIL';result['error']={'type':type(error).__name__,'message':str(error),

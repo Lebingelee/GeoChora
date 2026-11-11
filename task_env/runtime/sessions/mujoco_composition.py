@@ -61,27 +61,18 @@ def checked_panda_effort_source_limits(source, scene):
     return panda_effort_source_limits(ET.fromstring(source.scene_source.xml))
 
 
-def bind_reference_scene_source(source, *, artifact, scene, bodies, frames, workspace=None):
+def bind_reference_scene_source(source, *, artifact, scene, bodies, frames):
     """Bind declared Scene names to a verified MJCF snapshot without native I/O.
 
-    Normal construction borrows its existing owned receipt. An advanced caller
-    may request the historical persistent copy; its directory stays caller-owned.
-    The caller retains the original receipt until the binding is retired.
+    The caller retains the original owned receipt until the binding is retired.
     """
     from dataclasses import replace
-    from pathlib import Path
-    import shutil
     from ...assembly.assets import _source_closure_digest
     from ...assembly.source import TaskSceneSource
     from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
     receipt = source.execution_source_receipt
     receipt.validate_snapshot()
     destination = receipt.snapshot_root
-    if workspace is not None:
-        root = Path(workspace).resolve()
-        root.mkdir(parents=True, exist_ok=True)
-        destination = root / 'source-snapshot'
-        shutil.copytree(receipt.snapshot_root, destination)
     xml = receipt.importer_xml.decode('utf-8')
     projected = project_scene_definition_v3_to_mjcf(xml, scene)
     closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),

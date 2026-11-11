@@ -53,8 +53,6 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
         execution['source_delivery_manifest'] = resolved.source_delivery_manifest
     if getattr(resolved, 'reset_profile', None) is not None:
         execution['reset_profile'] = resolved.reset_profile
-    if resolved.source_workspace is not None:
-        execution['source_workspace'] = resolved.source_workspace
     episode = resolved.environment.episode
     result = {'env_id': uid, 'execution': execution,
               'episode': {'horizon': episode.horizon, 'seed': episode.seed,

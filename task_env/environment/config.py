@@ -598,7 +598,6 @@ class ResolvedSelectedConfig:
     robot_uid: str | None = None
     native_drive: str | None = None
     controller_parameters_json: str = '{}'
-    source_workspace: str | None = None
 
     def __post_init__(self) -> None:
         if self.native_drive not in (None, 'position', 'disabled'):
@@ -606,8 +605,6 @@ class ResolvedSelectedConfig:
         if (type(self.controller_parameters_json) is not str
                 or not isinstance(json.loads(self.controller_parameters_json), dict)):
             raise TypeError('Controller parameters must be a JSON object')
-        if self.source_workspace is not None and (type(self.source_workspace) is not str or not self.source_workspace):
-            raise TypeError('source workspace must be a nonempty path')
         if self.robot_uid is not None and (type(self.robot_uid) is not str or not self.robot_uid.strip() or self.robot_uid != self.robot_uid.strip()):
             raise ValueError("selected robot_uid must be a nonempty trimmed string")
         if self.reset_profile not in (None, 'pickcube-state-only-switch-v1'):

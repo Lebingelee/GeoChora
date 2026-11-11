@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
 from contextlib import ExitStack
 
 
@@ -21,10 +20,10 @@ _PANDA_NORMALIZED_CLOSURE_SHA256 = 'cbb7c0a3a68a5e08161651933aef262d340659c04fef
 
 
 def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
-                                    parameters, workspace, gravity_compensation, reset_profile,
+                                    parameters, gravity_compensation, reset_profile,
                                     source_delivery_manifest, execution_spec, task_parameters, horizon):
     if profile not in PICKCUBE_PHYSICAL_PROFILES:
-        if native_drive is not None or parameters or workspace is not None:
+        if native_drive is not None or parameters:
             raise ValueError('Robot/Controller/source options require a declared physical profile')
         return
     kind = PICKCUBE_PHYSICAL_PROFILES[profile]
@@ -35,7 +34,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
     if robot_uid not in (None, 'panda-v1') or gravity_compensation or reset_profile is not None:
         raise ValueError('physical profile requires its declared Panda source without Position-only options')
     if provider == 'isaacsim':
-        if source_delivery_manifest is None or parameters or workspace is not None or task_parameters:
+        if source_delivery_manifest is None or parameters or task_parameters:
             raise ValueError('Isaac physical control requires its USD delivery without MJCF-only options')
         if horizon > 1000:
             raise ValueError('Isaac physical source horizon must be in [1, 1000]')
@@ -58,10 +57,6 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
     if 'cube_force_z_N' in task_parameters and (provider, drive, kind, switch) != (
             'mujoco', 'position', 'direct', False):
         raise ValueError('PickCube Task COM force requires MuJoCo direct coexist control')
-    if workspace is not None:
-        root = Path(workspace)
-        if root.exists() and any(root.iterdir()):
-            raise ValueError('physical source_workspace must be fresh or empty')
 
 
 def physical_binding_from_config(config):
@@ -76,7 +71,7 @@ def physical_binding_from_config(config):
             horizon=config.environment.episode.horizon,
             drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind)
     force = dict(config.task_parameters).get('cube_force_z_N')
-    return make_physical_binding(root=config.source_workspace, provider=config.physics_provider,
+    return make_physical_binding(provider=config.physics_provider,
         horizon=config.environment.episode.horizon, seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
@@ -168,7 +163,7 @@ def _pickcube_mjcf_scene(task_config):
         cube_joint='PickCube_joint', table_frame='grasp_table')
 
 
-def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, control_kind,
+def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                           reset_switch=False, space_policy='dynamic', cube_force_z_N=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...artifacts import FrameReference
@@ -229,9 +224,7 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
         bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
         from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
-            scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'}, workspace=root)
-        if root is not None:
-            resources.close()
+            scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
         reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
         # GeoPhys and reset-scoped reference controllers retain their existing
         # bounded compatibility route until separately migrated and verified.

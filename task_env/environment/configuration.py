@@ -321,8 +321,6 @@ def _resolve_selected_config(environment_type, config):
         config['controller'] = {'parameters': json.loads(supplied.controller_parameters_json)}
         if supplied.gravity_compensation:
             config['controller']['gravity_compensation'] = True
-        if supplied.source_workspace is not None:
-            config['execution']['source_workspace'] = supplied.source_workspace
         if supplied.native_drive is not None:
             config.setdefault('robot', {})['native_drive'] = supplied.native_drive
         if supplied.reset_profile is not None:
@@ -380,7 +378,7 @@ def _resolve_selected_config(environment_type, config):
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
-                      "deployment", "interpreter", "native_dt", "reset_profile", "source_workspace"},
+                      "deployment", "interpreter", "native_dt", "reset_profile"},
         "episode": {"horizon", "seed", "ignore_done"},
         "task": set(environment_type.selected_parameter_limits),
     }
@@ -467,11 +465,6 @@ def _resolve_selected_config(environment_type, config):
     seed = sections['episode'].get('seed', base.episode.seed)
     if seed is not None and (type(seed) is not int or seed < 0):
         raise ValueError('episode.seed must be a nonnegative integer or None')
-    workspace = execution_defaults.get('source_workspace')
-    if workspace is not None:
-        if not isinstance(workspace, (str, Path)) or not str(workspace):
-            raise ValueError('execution.source_workspace must be a nonempty path')
-        workspace = str(Path(workspace).resolve())
     horizon = sections["episode"].get("horizon", base.episode.horizon)
     if type(horizon) is not int or not 1 <= horizon <= 6000:
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
@@ -511,11 +504,11 @@ def _resolve_selected_config(environment_type, config):
     validate = getattr(environment_type, 'validate_selected_configuration', None)
     if callable(validate):
         validate(provider=provider, backend=backend, profile=profile, robot_uid=robot_uid,
-                 native_drive=native_drive, parameters=dict(parameters), workspace=workspace,
+                 native_drive=native_drive, parameters=dict(parameters),
                  gravity_compensation=gravity_compensation, reset_profile=reset_profile,
                  source_delivery_manifest=manifest, execution_spec=selection, task_parameters=dict(params),
                  horizon=horizon)
-    elif native_drive is not None or parameters or workspace is not None:
+    elif native_drive is not None or parameters:
         raise ValueError('task does not declare these Robot/Controller/source options')
     result = ResolvedSelectedConfig(
         environment=env,
@@ -527,7 +520,6 @@ def _resolve_selected_config(environment_type, config):
         reset_profile=reset_profile,
         robot_uid=robot_uid,
         native_drive=native_drive, controller_parameters_json=controller_parameters_json,
-        source_workspace=workspace,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
@@ -551,8 +543,6 @@ def _resolve_selected_config(environment_type, config):
             original['controller']['gravity_compensation'] = True
         if result.native_drive is not None:
             original.setdefault('robot', {})['native_drive'] = result.native_drive
-        if result.source_workspace is not None:
-            original['execution']['source_workspace'] = result.source_workspace
         if result.controller_profile is not None:
             original['controller']['profile_id'] = result.controller_profile
         reconstructed = _resolve_selected_config(environment_type, original)

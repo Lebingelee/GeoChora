@@ -566,3 +566,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产代码修改 5 文件 +51／−42，净增 9 行；版本诊断修改 1 文件 +5／−5；本记录和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1364；代码改写中的引用迁移不计为文件删除或代码精简。配置解析、provider／renderer adapter、source、clock 与实际提交实现未改，四任务完整共同构造和内部 Position 投影进一步归位仍未完成。
 
 37 项版本纯合同通过。MuJoCo CPU 的四任务短程以及装配 Panda 通过；可切换 PickCube 在最终代码上完成实际 joint 动作、H5 写入读回、无效选择拒绝、切换至 r3-pose 后再次推进，确认 Env／Robot／已提交执行为同一 Controller。首轮四任务及可切换路线观测 70 子步；只移除可写 setter 后最终代码另观测 15 子步，合计 85。GeoPhys、Isaac 和 renderer 未在本批重跑，不外推完整 Solution 或其他 provider。运行计划、冻结 diff 与结果位于 ignored `workspace/maintenance/v211_controller_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.40 退休诊断 source_workspace 输入
+
+输入 `0916cc99`。四个正式任务共同的配置解析不再接受历史诊断的 `execution.source_workspace`；PickCube 物理路径不再通过公开配置指定、复制或保留外部 source 目录。MuJoCo source lowering 直接消费现有受管快照，正式 binding 保持快照所有权直至关闭；配置对象、记录重建投影和 provider adapter 中为旧输入服务的字段及复制分支一并移除。该变更不移除真实 source 资产、校验或快照生命周期，也不改变 Isaac 的 delivery manifest 合同。
+
+生产修改 5 文件 +11／−42，净减 31 行；版本诊断修改 2 文件 +18／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1364；删除的复制分支不涉及整文件搬迁。移除一项正式配置特殊输入和一个 source adapter 分支，未改变 Runtime 物理推进、时钟、renderer 或通用构造协议。
+
+41 项版本纯合同通过，四个正式任务均拒绝旧字段。MuJoCo CPU 的 PickCube reset-scoped joint／r3 切换及 H5 记录读回、direct effort、普通 Position、Nut Solution 单 interval 均通过，共观测 25 物理子步；物理 source 在构造后存在、关闭后移除，重复关闭成功。GeoPhys、Isaac、renderer 和完整 Solution 本批未重跑，已有证据按具体影响保留；计划、冻结 diff 及结果在 ignored `workspace/maintenance/v211_retire_source_workspace_20261112_001/`。E01～E04 仍未接收。

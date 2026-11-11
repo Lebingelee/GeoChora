@@ -187,3 +187,13 @@ def test_robot_choice_rejects_a_different_task_subject():
     importlib.import_module('task_env.tasks')
     with pytest.raises(ValueError, match='does not admit'):
         resolve_task_env_config(ENV_REGISTRY.get('pendulum-v1'), {'robot': {'uid': 'panda-v1'}})
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_formal_configuration_rejects_diagnostic_source_workspace(uid):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(KeyError, match='source_workspace'):
+        resolve_task_env_config(ENV_REGISTRY.get(uid), {'execution': {'source_workspace': '/tmp/old-source'}})
