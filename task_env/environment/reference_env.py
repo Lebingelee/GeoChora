@@ -998,33 +998,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return resolved.execution_spec_v2, resolved.requested_execution_json
         return None, None
 
-    @classmethod
-    def from_mixed_control_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=6000):
-        """Construct a typed source-bound mixed-control candidate through the existing route."""
-        if not isinstance(binding, ReferenceTaskBinding):
-            raise TypeError('mixed-control candidate requires the existing ReferenceTaskBinding owner')
-        if provider not in {'mujoco', 'geophys'} or backend != 'cpu':
-            raise ValueError('mixed-control candidate currently admits MuJoCo or GeoPhys CPU')
-        if (binding.build_mixed_control_profile is None
-                or binding.reset_sample_with_options is None
-                or binding.prepare_mixed_control is None
-                or binding.observe_mixed_control is None
-                or binding.mixed_record_metadata is None):
-            raise TypeError('binding does not own the complete mixed-control lifecycle hooks')
-        candidate_type = cls
-        if getattr(cls, 'uid', None) == 'base-task-env':
-            candidate_type = type(
-                'MixedControlSelectedReferenceEnv', (cls,),
-                {'uid': 'selected-reference-mixed-control-v1'},
-            )
-        env = candidate_type(
-            provider=provider, backend=backend, horizon=horizon,
-            _binding=binding, _mixed_control_candidate=True,
-        )
-        if not getattr(env, 'mixed_control_profile', False):
-            env.close()
-            raise TypeError('candidate did not construct its typed mixed-control profile')
-        return env
 
     def _bind_selected_controller(self, value):
         from ..runtime.sessions.control import bind_selected_controller
@@ -1032,7 +1005,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         selected = bind_selected_controller(
             value, binding=self.binding, provider=self.provider, backend=self.backend,
         )
-        self.mixed_control_profile = selected.mixed
         self.position_profiles = selected.position_profiles
         self.position_profile = selected.position
         self._selected_controller = selected.controller
@@ -1065,29 +1037,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     @property
     def _position_episode_end(self):
-        if getattr(self, '_mixed_control_candidate', False):
-            return None
         return self._episode_execution_state().episode_end
 
     @_position_episode_end.setter
     def _position_episode_end(self, value):
-        if not getattr(self, '_mixed_control_candidate', False):
-            self._episode_execution_state().episode_end = value
-        elif value is not None:
-            raise ValueError('Position episode end is not valid for mixed control')
-
-    @property
-    def _mixed_episode_end(self):
-        if not getattr(self, '_mixed_control_candidate', False):
-            return None
-        return self._episode_execution_state().episode_end
-
-    @_mixed_episode_end.setter
-    def _mixed_episode_end(self, value):
-        if getattr(self, '_mixed_control_candidate', False):
-            self._episode_execution_state().episode_end = value
-        elif value is not None:
-            raise ValueError('mixed episode end is not valid for Position control')
+        self._episode_execution_state().episode_end = value
 
     @property
     def _selected_episode_id(self):
@@ -1382,7 +1336,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             task_definition=self._task_definition, horizon=self.horizon,
             ignore_done=self.binding.physical_ignore_done))
 
-    def _initialize_selected_value(self, *, mixed_control_candidate, camera_observation_config):
+    def _initialize_selected_value(self, *, camera_observation_config):
         """Initialize task-declared metadata before the selected Env is published."""
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
@@ -1391,8 +1345,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._bind_selected_controller(self.value)
         self._bind_selected_task_definition()
         self.dual_entity_position = len(self.position_profiles) == 2
-        if (not self.position_profile and not mixed_control_candidate
-                and self._physical_execution() is None):
+        if (not self.position_profile and self._physical_execution() is None):
             if type(self.binding.scalar_control_binding) is not ControlBinding:
                 raise TypeError('selected scalar control requires its declared ControlBinding')
         if camera_observation_config is not None and not self.position_profile:
@@ -1409,21 +1362,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             'control_dt': self.artifact.timebase.control_dt}
         if self.binding.observation_metadata is not None:
             self.metadata['observation_schema'] = dict(self.binding.observation_metadata)
-        self.supports_structured_control_recording = bool(mixed_control_candidate)
-        if mixed_control_candidate:
-            action_schema = self.value.get('action_schema')
-            if not isinstance(action_schema, Mapping):
-                raise TypeError('mixed-control task binding must supply its typed action schema')
-            self.metadata['action_schema'] = dict(action_schema)
-            self.action_space = self.value.get('action_space')
-            self.observation_space = self.value.get('observation_space')
-            if self.action_space is None or self.observation_space is None:
-                raise TypeError('mixed-control task binding must supply task-owned spaces')
-        else:
-            self.metadata['action_schema'] = dict(self.binding.action_schema)
-            self.action_space = self.binding.action_space_factory()
-        if not mixed_control_candidate:
-            observation_spaces = self.binding.observation_space_factory(self)
+        self.supports_structured_control_recording = False
+        self.metadata['action_schema'] = dict(self.binding.action_schema)
+        self.action_space = self.binding.action_space_factory()
+        observation_spaces = self.binding.observation_space_factory(self)
         if camera_observation_config is not None:
             from ..observations.selected_reference import position_camera_observation_declaration
 
@@ -1451,14 +1393,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'same_boundary_as_observation': True,
                 },
             }
-        if not mixed_control_candidate:
-            self.observation_space = Dict(observation_spaces)
+        self.observation_space = Dict(observation_spaces)
 
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
                  camera_observation_config=None, _execution_spec_v1=None,
-                 _mixed_control_candidate=False,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
         self._uses_component_assembly = bool(
             (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
@@ -1493,11 +1433,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
                     raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
                 self.binding = _binding
-            if _mixed_control_candidate and (
-                (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
-                or self.binding.build_mixed_control_profile is None
-            ):
-                raise ValueError('mixed-control candidate requires its scalar CPU task binding')
             if not isinstance(self.binding, ReferenceTaskBinding):
                 raise TypeError('selected reference requires an explicit task binding')
             if _execution_spec_v1 is not None:
@@ -1511,13 +1446,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..runtime.sessions.api import validate_selected_position_route
                 validate_selected_position_route(_execution_spec_v1)
             self._declared_execution_spec_v1 = _execution_spec_v1
-            self._mixed_control_candidate = bool(_mixed_control_candidate)
-            if not _mixed_control_candidate:
-                if (_execution_spec_v1 is None
-                        and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
-                    raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
+            if (_execution_spec_v1 is None
+                    and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
+                raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
-                provider, backend, horizon, mixed=bool(_mixed_control_candidate))
+                provider, backend, horizon)
             self.provider, self.backend, self.horizon = provider, backend, horizon
             self._execution_fault = None
             if _initial_value is not None:
@@ -1528,7 +1461,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             else:
                 self.value = self._reset_reconstruction.initial()
             self._initialize_selected_value(
-                mixed_control_candidate=_mixed_control_candidate,
                 camera_observation_config=camera_observation_config,
             )
             self.session = None
@@ -1538,11 +1470,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._episode_mode = None
             self._stopped = True
             self._position_episode_end = None
-            self._mixed_episode_end = None
-            self._mixed_close_receipt = None
-            self._mixed_reset_context = None
-            self._mixed_record_metadata = None
-            self._mixed_reset_plan = None
             self._compiled_layout_pre_reset = None
             self._compiled_layout_post_reset = None
             self._published_position_state = None
@@ -1581,18 +1508,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from copy import deepcopy
         return deepcopy(getattr(self, '_reset_failure_receipt', None))
 
-    def get_runtime_progress_receipt(self):
-        if not getattr(self, 'mixed_control_profile', False) or self.session is None:
-            raise StageUnavailableError('mixed runtime progress is unavailable on this selected route')
-        return self.session.runtime_progress_receipt
 
-    @property
-    def close_receipt(self):
-        if not getattr(self, 'mixed_control_profile', False):
-            raise StageUnavailableError('mixed-control close evidence is unavailable on this selected route')
-        if self._mixed_close_receipt is None:
-            raise RuntimeError('mixed-control selected environment close has not completed')
-        return dict(self._mixed_close_receipt)
 
     def _latch_fault(
         self,
@@ -1897,7 +1813,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if pair not in _TASK_RGB_PAIRS:
                     raise ValueError('reset physics selection is incompatible with the fixed task RGB renderer')
             seed = switch_candidate.task_seed
-            options, mixed_reset_plan, mixed_reset_sample = {}, None, None
+            options = {}
             candidate_binding = type(self)._bind_robot_source_composer(
                 type(self).selected_binding(switch_candidate.config), switch_candidate.config)
             candidate_reconstruction = candidate_binding.reset_reconstruction_strategy(
@@ -1911,12 +1827,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 preflight_interpreter_before_source(selection, requested=json.loads(requested_json), task_uid=self.uid)
             candidate_value = candidate_reconstruction.build_switch_candidate(seed)
         else:
-            seed, options, mixed_reset_plan, mixed_reset_sample = prepare_selected_reset(
+            seed = prepare_selected_reset(
                 self.binding, seed=seed, seed_unset=_RESET_SEED_UNSET, options=options,
-                mixed=self._mixed_control_candidate,
-                has_session=self.session is not None, previous_sample=getattr(self, 'sample', None),
-                artifact=self.artifact, value=self.value,
-                requires_reset_plan=prepared_reset_plan_required,
+                value=self.value, requires_reset_plan=prepared_reset_plan_required,
             )
             selection, requested_json = self._selected_execution_context()
         deployment_receipt = None
@@ -1935,7 +1848,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                              source=preflight_value['source'],
                              controller=preflight_value.get('controller'), seed=seed)
                 if selection.deployment == 'isolated_worker':
-                    if self._mixed_control_candidate or self.dual_entity_position:
+                    if self.dual_entity_position:
                         receipt = describe_execution_selection(selection, **facts)
                         receipt['phase'] = 'static_preflight'
                         raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
@@ -1981,9 +1894,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.typed_state = None
         self._task_rgb_typed_state = None
         self.last_position_transition = None
-        if self._mixed_control_candidate:
-            # Publish a candidate reset plan only after the replacement begins.
-            self._mixed_reset_plan = mixed_reset_plan
         previous_session, self.session = self.session, None
         previous_value = self.value
         previous_session_close_attempted = False
@@ -2017,8 +1927,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 reset_effects['previous_session_close_attempted'] = True
                 previous_session.close()
                 reset_effects['previous_session_close_completed'] = True
-                if self._mixed_control_candidate:
-                    self._mixed_close_receipt = previous_session.close_receipt
             if physical_candidate is not None:
                 physical_selection.commit(physical_candidate)
                 self.action_space = physical_selection.action_space()
@@ -2093,14 +2001,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'reset_sample'
             from .reference_binding import resolve_selected_reset_effect
             self.sample, selected_reset_plan = resolve_selected_reset_effect(
-                self.binding, self.value, self.artifact, seed,
-                mixed=self._mixed_control_candidate, mixed_plan=mixed_reset_plan,
-                mixed_sample=mixed_reset_sample)
+                self.binding, self.value, self.artifact, seed)
             if ((not switching and prepared_reset_plan_required
                     or getattr(getattr(self, '_selected_controller_binding', None), 'requires_reset_plan', False))
                     and selected_reset_plan is None):
                 raise ValueError('rebuilt Controller capability requires a declared reset plan')
-            if self._mixed_control_candidate or selected_reset_plan is None:
+            if selected_reset_plan is None:
                 self._selected_episode_id = uuid4().hex
             from .reference_binding import resolve_reset_execution
             self.execution = resolve_reset_execution(
@@ -2275,50 +2181,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     switch_candidate, provider=self.provider, provider_seed=self.execution.provider_seed,
                     configuration_generation=self._switch_generation,
                     topology_generation=self._switch_topology_generation)
-            if self.mixed_control_profile:
-                realization = self.value['reset_realizations'].get(self.sample.sample_id)
-                if not isinstance(realization, dict):
-                    raise ValueError('mixed-control reset sample has no matching source-derived realization receipt')
-                reset_readback = self.session.reset_readback_v1
-                reset_readback_mapping = (
-                    reset_readback.to_mapping()
-                    if callable(getattr(reset_readback, 'to_mapping', None))
-                    else dict(reset_readback)
-                )
-                self._mixed_reset_context = {
-                    'reset_sample_v1': self.sample.to_mapping(),
-                    'reset_realization_v1': realization,
-                    'reset_readback_v1': reset_readback_mapping,
-                }
-                self.info.update({
-                    **self._mixed_reset_context,
-                    'compiled_model_layout_v1': self.session.compiled_layout_receipt,
-                    'pre_reset_compiled_validation_v1': self._compiled_layout_pre_reset,
-                })
-                if self._compiled_layout_post_reset is not None:
-                    self.info['post_reset_compiled_validation_v1'] = self._compiled_layout_post_reset
-                compiled_model_options = getattr(
-                    self.session, 'compiled_model_options_receipt_v1', None,
-                )
-                if compiled_model_options is not None:
-                    self.info['compiled_model_options_v1'] = compiled_model_options
-                if self._mixed_reset_plan is not None:
-                    plan_receipt = {
-                        'reset_plan_v1': self._mixed_reset_plan.to_mapping(),
-                        'reset_plan_identity_sha256': self._mixed_reset_plan.identity_hash,
-                        'reset_plan_evidence_v1': self.session.reset_plan_evidence,
-                    }
-                    self._mixed_reset_context.update(plan_receipt)
-                    self.info.update(plan_receipt)
-                # Freeze task-owned metadata at the reset boundary. Later
-                # observations replace ``info``; record metadata must retain
-                # the source-derived realization/readback that opened this
-                # episode rather than re-reading a transition-only mapping.
-                self._mixed_record_metadata = dict(
-                    self.binding.mixed_record_metadata(self),
-                )
-            if (not self.position_profile and not self.mixed_control_profile
-                    and self._physical_execution() is None):
+            if (not self.position_profile and self._physical_execution() is None):
                 self._publish_execution_info(self.info)
             self._last_position_terminated = False
             self._last_position_truncated = False
@@ -2353,9 +2216,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 failure_phase = 'task_camera_binding'
                 self.session.bind_task_camera(task_camera, self.typed_state.view)
             failure_phase = 'arm_schedule_reset'
-            if self.mixed_control_profile:
-                self.arm_schedule = None
-            elif all(callable(getattr(self._selected_controller, name, None))
+            if all(callable(getattr(self._selected_controller, name, None))
                    for name in ('begin', 'target', 'applied')):
                 # The Controller itself owns acknowledged arm hold/ramp memory.
                 self.arm_schedule = self._selected_controller
@@ -2365,7 +2226,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._active_native_interval_receipt = None
             self._episode_mode = None
             self._position_episode_end = None
-            self._mixed_episode_end = None
             self._published_position_state = self.state
             self._published_position_typed_state = getattr(self, 'typed_state', None)
             self._published_position_obs = self.obs
@@ -2646,11 +2506,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.binding.validate_external_solution(self.value, solution)
 
     def observation(self, state):
-        if self.mixed_control_profile:
-            from ..observations.selected_reference import build_selected_observation
-            observation, info, evaluation = build_selected_observation(self, state)
-        else:
-            observation, info, evaluation = self.binding.observation_projection(self, state)
+        observation, info, evaluation = self.binding.observation_projection(self, state)
         if (getattr(self, '_task_rgb_config', None) is not None
                 and not getattr(self, '_defer_task_rgb_capture', False)):
             if self._task_rgb_consumer is None:
@@ -3372,186 +3228,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     evaluate=evaluate, observe=lambda _state: self.obs,
                     publish=publish, on_failure=on_failure)
 
-    def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
-        self._mixed_controller_preparation_started = False
-        try:
-            return self._prepare_mixed_control_impl(
-                action, proposal=proposal, observer_solution=observer_solution)
-        except BaseException as error:
-            if self._mixed_controller_preparation_started:
-                self._latch_fault('mixed_control_preparation', error, before_state=self.state)
-            raise
-        finally:
-            self._mixed_controller_preparation_started = False
 
-    def _prepare_mixed_control_impl(self, action, *, proposal=None, observer_solution=None):
-        """Run one task-prepared named command through the existing RuntimeSession."""
-        from ..controllers.canonical.contracts import AppliedMixedActuatorCommandV1
-        from ..runtime.sessions.control import (
-            mixed_stepwise_receipt, mixed_substep_controller, validate_mixed_control_preparation,
-        )
-        from ..recorders.recorder import mixed_control_transition
-
-        if self._stopped or self.session is None:
-            raise RuntimeError('reset required or mixed-control episode already stopped')
-        if self.state.control_step >= self.horizon:
-            self.stop('horizon_reached')
-            raise RuntimeError('selected mixed-control horizon is exhausted')
-        if (proposal is None) != (observer_solution is None):
-            raise ValueError('mixed Solution actions require both proposal and Solution owner')
-        if proposal is not None:
-            from ..planners.contracts import ExpertAction
-            if type(proposal) is not ExpertAction:
-                raise TypeError('mixed-control Solution must return the existing ExpertAction contract')
-            if self._external_solution_owner is None or observer_solution is not self._external_solution_owner:
-                raise ValueError('mixed-control Solution does not own the selected episode')
-            if not np.array_equal(np.asarray(action), proposal.action):
-                raise ValueError('mixed-control Solution proposal action was changed before preparation')
-        before = self.state
-        self._mixed_controller_preparation_started = True
-        prepared = self.binding.prepare_mixed_control(self, action, before)
-        stepwise = self.binding.prepare_mixed_control_substep is not None
-        action_values, universal_action, request, target, writer_control = validate_mixed_control_preparation(
-            prepared, stepwise=stepwise, source=self.value['source'], artifact=self.artifact,
-            session=self.session, sample=self.sample, before=before,
-        )
-        applied = None
-        applied_payload = None
-        stepwise_receipt = None
-        interval_attempted = False
-        interval_completed = False
-        failure_phase = 'mixed_control_application'
-
-        def apply_control():
-            nonlocal interval_attempted, interval_completed, applied
-            nonlocal applied_payload, stepwise_receipt, failure_phase
-            interval_attempted = True
-            if stepwise:
-                failure_phase = 'mixed_physics_substep_interval'
-                stepwise_session = getattr(self.session, 'step_mixed_actuator_interval', None)
-                if not callable(stepwise_session):
-                    raise StageUnavailableError(
-                        'selected RuntimeSession does not support physics-rate mixed actuator control'
-                    )
-                make_substep_command, controller_receipts = mixed_substep_controller(
-                    self.binding.prepare_mixed_control_substep, self, prepared,
-                )
-                self.state, stepwise_receipt = stepwise_session(make_substep_command)
-                stepwise_receipt, applied_payload = mixed_stepwise_receipt(
-                    stepwise_receipt, controller_receipts,
-                    substeps=self.artifact.timebase.control_substeps, target=target,
-                )
-                interval_completed = True
-            else:
-                applied = self.session.apply_mixed_actuator_command(target)
-                if type(applied) is not AppliedMixedActuatorCommandV1:
-                    raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
-                applied_payload = applied.to_mapping()
-            return applied_payload
-
-        def advance(_applied):
-            nonlocal failure_phase, interval_completed
-            if not stepwise:
-                failure_phase = 'mixed_physics_step'
-                self.state = self.session.step()
-                interval_completed = True
-
-        def evaluate(_state):
-            nonlocal failure_phase
-            failure_phase = 'mixed_observation'
-            self.obs, self.info, self.evaluation = self.observation(self.state)
-            self.info.update({
-                'provider': self.provider,
-                'external_action': action_values,
-                'universal_action': universal_action,
-                'mixed_actuator_command_v1': target.to_mapping(),
-                'applied_mixed_actuator_command_v1': applied_payload,
-            })
-            if stepwise_receipt is not None:
-                self.info['physics_rate_control_v1'] = stepwise_receipt
-            return self.evaluation
-
-        def publish(_control, _state, _evaluation, _observation):
-            nonlocal failure_phase
-            if proposal is not None:
-                failure_phase = 'mixed_solution_observation'
-                extra = self.binding.observe_expert_kwargs(self, ())
-                if not isinstance(extra, Mapping):
-                    raise TypeError('mixed Solution observation kwargs must be a mapping')
-                observer_solution.observe(
-                    self.obs, float(self.evaluation.reward), bool(self.evaluation.failure),
-                    bool(self.state.control_step >= self.horizon), task_info_for_solution(self.info), **dict(extra),
-                )
-                if hasattr(observer_solution, 'outcome_report'):
-                    report = observer_solution.outcome_report()
-                    if not isinstance(report, Mapping):
-                        raise TypeError('mixed Solution outcome_report() must return a mapping')
-                    self.info.update(dict(report))
-                self.info.update(
-                    selected_policy_execution_complete=bool(observer_solution.done),
-                    selected_policy_execution_failed=bool(observer_solution.failed),
-                    expert_failure_reason=getattr(observer_solution, 'failure_reason', None),
-                    selected_solution_action_v1={
-                        'solution_identity': getattr(observer_solution, 'identity', None),
-                        'stage': proposal.stage,
-                        'diagnostics': dict(proposal.diagnostics),
-                    },
-                )
-                if bool(observer_solution.done) and bool(observer_solution.failed):
-                    raise ValueError('mixed Solution cannot be complete and failed at one boundary')
-            transition = mixed_control_transition(
-                request, writer_control, target, applied_payload, stepwise_receipt,
-            )
-            terminated, truncated = self._episode_execution_state().step_outcome(
-                task_terminated=bool(self.evaluation.failure) if proposal is not None else False,
-                task_truncated=False, control_step=self.state.control_step, horizon=self.horizon,
-            )
-            if proposal is not None and observer_solution.done:
-                terminated = False
-                truncated = False
-            if proposal is not None and observer_solution.failed and not truncated:
-                terminated = True
-            if self.recorder is not None and getattr(self.recorder, 'active', False):
-                failure_phase = 'mixed_recorder_append'
-                self.recorder.append_transition(
-                    action_values, universal_action, self.obs, float(self.evaluation.reward),
-                    bool(self.evaluation.success), terminated, truncated, self.info,
-                    structured_control=transition,
-                )
-            self._episode_mode = 'external_solution' if proposal is not None else 'external'
-            if proposal is not None and observer_solution.done:
-                self.stop('solution_completed')
-                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
-            elif proposal is not None and observer_solution.failed and not truncated:
-                self.stop('solution_failed')
-                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
-            elif truncated:
-                self.stop('horizon_reached')
-                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
-            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-
-        def on_failure(_phase, error):
-            after = None
-            readback_error = None
-            if interval_attempted:
-                try:
-                    after = self.session.snapshot()
-                    self.state = after
-                except BaseException as snapshot_error:
-                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
-            self._latch_fault(
-                failure_phase, error, before_state=before, after_state=after,
-                interval_attempted=interval_attempted,
-                interval_completed=interval_completed,
-                native_substeps_expected=self.artifact.timebase.control_substeps,
-                transition_status='not_recorded', readback_error=readback_error,
-            )
-
-        return dict(
-            apply_control=apply_control, advance=advance,
-            read_state=lambda: self.state, evaluate=evaluate,
-            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
-        )
 
     def step_with_solution(self, solution):
         """Run one caller-owned Solution action through the selected lifecycle.
@@ -3594,25 +3271,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._latch_fault('physical_external_solution_proposal', error, before_state=self.state)
                 raise
             return self._episode_execution_state().execute_interval(**operations)
-        if getattr(self, 'mixed_control_profile', False):
-            try:
-                proposal = solution.act(self.obs, task_info_for_solution(self.info))
-                from ..planners.contracts import ExpertAction
-                if type(proposal) is not ExpertAction:
-                    raise TypeError('mixed external Solution act() must return ExpertAction')
-            except BaseException as error:
-                self._latch_fault('mixed_external_solution_proposal', error, before_state=self.state)
-                if self.binding.abort_solution_on_runtime_error:
-                    try:
-                        solution.abort('runtime_error')
-                    except BaseException as abort_error:
-                        add_note = getattr(error, 'add_note', None)
-                        if callable(add_note):
-                            add_note(f'mixed external Solution abort also failed: {abort_error!r}')
-                raise
-            return self._step(
-                proposal.action, proposal=proposal, observer_solution=solution,
-            )
         try:
             self._require_published_execution_info()
         except BaseException as error:
@@ -4343,16 +4001,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         ui, self._ui_render_provider = getattr(self, '_ui_render_provider', None), None
         if ui is not None:
             cleanup('UI provider close', ui.close)
-        mixed = bool(getattr(self, 'mixed_control_profile', False))
         position = bool(getattr(self, 'position_profile', False))
         healthy = getattr(self, '_execution_fault', None) is None
 
         def finalize():
-            if mixed:
-                if self.session is not None and self._mixed_episode_end is None:
-                    self.stop('environment_close')
-                end = self._mixed_episode_end
-            elif position:
+            if position:
                 if getattr(self, '_published_position_state', None) is None:
                     return
                 if self._position_episode_end is None:
@@ -4376,9 +4029,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         session_was_materialized = session is not None
         first_error, receipt = close_session_and_runtime_owner(
             session, first_error=first_error, session_error_label='RuntimeSession close',
-            owner_error_label='Runtime owner close', capture_close_receipt=mixed)
-        if mixed and session_was_materialized:
-            self._mixed_close_receipt = receipt
+            owner_error_label='Runtime owner close')
         closed_sessions = {id(session)} if session_was_materialized else set()
         for abandoned in getattr(self, '_failed_runtime_sessions', ()):
             if id(abandoned) in closed_sessions:
@@ -4393,32 +4044,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         source_receipt = getattr(source, 'execution_source_receipt', None)
         if source_receipt is not None:
             cleanup('source receipt cleanup', source_receipt.close)
-        task_receipt = None
-        task_error = None
         if self.binding.close_task_resources is not None:
-            task_receipt, task_error = cleanup('task resource cleanup', self.binding.close_task_resources)
-        if mixed:
-            if not session_was_materialized and self._mixed_close_receipt is None:
-                fault = getattr(self, '_execution_fault', None)
-                self._mixed_close_receipt = {
-                    'schema_version': 'mixed-control-selected-close-v1',
-                    'session_closed': True, 'session_materialized': False,
-                    'session_close_status': 'not_materialized', 'environment_closed': True,
-                    'cleanup_completed': first_error is None,
-                    'cleanup_error': None if first_error is None else {
-                        'type': type(first_error).__name__, 'message': str(first_error)},
-                    'source_id': None if source is None else source.scene_source.source_id,
-                    'source_closure_digest': None if source is None else source.source_closure_digest,
-                    'execution_fault_phase': None if fault is None else fault.phase,
-                    'execution_fault_message': None if fault is None else fault.message,
-                }
-            if self._mixed_close_receipt is not None:
-                self._mixed_close_receipt = dict(self._mixed_close_receipt)
-                if task_receipt is not None:
-                    self._mixed_close_receipt['task_resource_close_receipt'] = task_receipt
-                if task_error is not None:
-                    self._mixed_close_receipt['task_resource_close_error'] = {
-                        'type': type(task_error).__name__, 'message': str(task_error)}
+            cleanup('task resource cleanup', self.binding.close_task_resources)
         if first_error is not None:
             raise first_error
 
@@ -4526,65 +4153,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     task_success=bool(evaluation.success),
                     solution_completed=(bool(solution.done) if solution is not None else None))
                 return self._last_episode_end
-
-            return dict(closed_message='cannot stop a closed selected environment',
-                        ensure_boundary=ensure_boundary, create_end=create_end)
-        if getattr(self, 'mixed_control_profile', False):
-            def ensure_boundary():
-                if self.session is None or getattr(self, 'state', None) is None:
-                    raise RuntimeError('mixed-control reset must complete before Stop')
-
-            def create_end():
-                from ..trajectory.canonical.episode import make_episode_end_v1
-                fault = self._execution_fault
-                solution = self._external_solution_owner
-                solution_done = bool(getattr(solution, 'done', False)) if solution is not None else None
-                solution_failed = bool(getattr(solution, 'failed', False)) if solution is not None else None
-                if reason == 'solution_completed' and solution_done is not True:
-                    raise ValueError('solution_completed requires the active caller-owned Solution to be done')
-                if reason == 'solution_failed' and solution_failed is not True:
-                    raise ValueError('solution_failed requires the active caller-owned Solution to be failed')
-                end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
-                    reason, selected_reasons=True,
-                )
-                success = None if fault is not None else bool(self.evaluation.success)
-                event_sequence = 0
-                if self.recorder is not None and getattr(self.recorder, 'active', False):
-                    event_sequence = self.recorder.next_boundary_event_sequence(int(self.state.control_step))
-                payload = {
-                    'requested_reason': reason,
-                    'control_step': int(self.state.control_step),
-                    'simulation_time_s': float(self.state.simulation_time),
-                    'source_id': self.value['source'].scene_source.source_id,
-                    'source_closure_digest': self.value['source'].source_closure_digest,
-                    'reset_sample_id': self.sample.sample_id,
-                    'controller_identity': self._selected_controller.identity,
-                    'task_evaluation_success': success,
-                }
-                if solution is not None:
-                    payload['solution_identity'] = getattr(solution, 'identity', None)
-                    payload['solution_done'] = solution_done
-                    payload['solution_failed'] = solution_failed
-                    payload['solution_failure_reason'] = getattr(solution, 'failure_reason', None)
-                if fault is not None:
-                    payload['fault'] = fault.to_mapping()
-                self._mixed_episode_end = make_episode_end_v1(
-                    episode_id=self.session.episode_id,
-                    final_boundary=int(self.state.control_step),
-                    end_reason=end_reason,
-                    terminated=terminated,
-                    truncated=truncated,
-                    bootstrap_allowed=bootstrap_allowed,
-                    source='task_env.selected_reference.mixed_control_v1',
-                    payload=payload,
-                    event_sequence=event_sequence,
-                    task_success=(None if fault is not None else success),
-                    solution_completed=(
-                        None if solution is None else
-                        bool(solution_done and not solution_failed)
-                    ),
-                )
-                return self._mixed_episode_end
 
             return dict(closed_message='cannot stop a closed selected environment',
                         ensure_boundary=ensure_boundary, create_end=create_end)
@@ -4700,7 +4268,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..trajectory.canonical.execution import ExecutionRecorder
         if (self.session is None or self.state.control_step != 0 or self.recorder is not None
                 or self._stopped or self._position_episode_end is not None
-                or self._mixed_episode_end is not None):
+):
             raise RuntimeError('recording starts exactly once at reset boundary')
         if getattr(self, '_physical_reset_selection', None) is not None:
             from ..recorders.recorder import begin_structured_recording
@@ -4708,13 +4276,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.recording_path, self.recorder = begin_structured_recording(
                 path, horizon=self.horizon, observation=self.obs, reset_info=self.info,
                 metadata_factory=lambda: physical_record_metadata(self),
-            )
-            return
-        if getattr(self, 'mixed_control_profile', False):
-            from ..recorders.recorder import begin_structured_recording
-            self.recording_path, self.recorder = begin_structured_recording(
-                path, horizon=self.horizon, observation=self.obs, reset_info=self.info,
-                metadata_factory=self.get_record_metadata,
             )
             return
         if getattr(self, 'position_profile', False):
@@ -4795,16 +4356,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return finalize_structured_recording(
                 self.recorder, self.recording_path, self._last_episode_end, reason, position=True,
             )
-        if getattr(self, 'mixed_control_profile', False):
-            from ..recorders.recorder import finalize_structured_recording
-
-            if self.recorder is None or not getattr(self.recorder, 'active', False):
-                raise RuntimeError('no active mixed-control recording')
-            if self._mixed_episode_end is None:
-                self.stop(str(reason))
-            return finalize_structured_recording(
-                self.recorder, self.recording_path, self._mixed_episode_end, reason, position=False,
-            )
         if getattr(self, 'position_profile', False):
             from ..recorders.recorder import finalize_structured_recording
             if self.recorder is None or not getattr(self.recorder, 'active', False):
@@ -4829,7 +4380,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def get_record_metadata(self):
-        """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
+        """Return task metadata for the current recording route."""
         if self._has_component_assembly():
             return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
         if self.binding.external_action_contract is not None:
@@ -4839,20 +4390,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 'resolved_config': self.value['resolved_configuration'],
                 'universal_action_schema': {'version': schema['schema_version'],
                     'dimension': len(schema['components']), 'components': schema['components']}}
-        if not getattr(self, 'mixed_control_profile', False):
-            if getattr(self, 'position_profile', False):
-                return self._position_record_metadata()
-            return {'execution_configuration_v1': self.get_execution_receipt()}
-        value = self._mixed_record_metadata
-        if value is None:
-            value = self.binding.mixed_record_metadata(self)
-        if not isinstance(value, Mapping):
-            raise TypeError('task recording metadata hook must return a mapping')
-        result = dict(value)
-        if self._selected_execution_context()[0] is not None:
-            result['execution_configuration_v1'] = self.get_execution_receipt()
-        return result
-
+        if getattr(self, 'position_profile', False):
+            return self._position_record_metadata()
+        return {'execution_configuration_v1': self.get_execution_receipt()}
     def _position_record_metadata(self):
         from ..recorders.position_metadata import position_record_metadata
         result = position_record_metadata(self)

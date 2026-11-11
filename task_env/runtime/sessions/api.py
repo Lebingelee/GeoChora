@@ -1138,16 +1138,9 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         selected = bind_selected_controller(value, binding=binding,
                                             provider=selection.physics_provider,
                                             backend=selection.physics_backend)
-        if selection.deployment == 'isolated_worker' and (
-                selected.mixed or len(selected.position_profiles) > 1):
+        if selection.deployment == 'isolated_worker' and len(selected.position_profiles) > 1:
             raise ValueError('selected worker profile is outside the scalar adapter envelope')
-        if selected.mixed:
-            execution = ExecutionSpec(selection.physics_provider, PROFILE, 'none',
-                                      selection.physics_backend, 0, 'strict')
-            manifest = _mixed_actuator_manifest(artifact, execution, source)
-            actual_capabilities = {item.name for item in manifest.capabilities
-                                   if item.status in SUPPORTED_STATUSES}
-        elif value.get('physical_execution') is not None:
+        if value.get('physical_execution') is not None:
             from .physical_control import PhysicalControlExecutionV1
             physical = value['physical_execution']
             position_owner = (selected.position and len(selected.position_capabilities) == 1

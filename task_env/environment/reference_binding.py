@@ -137,28 +137,6 @@ class _StandardResetReconstruction(_ResetReconstruction):
         return artifact, seed, solution
 
 
-class _MixedResetReconstruction(_ResetReconstruction):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self._initial_pending = True
-
-    def initial(self, *, seed=31):
-        return self.binding.build_mixed_control_profile(self.provider, self.backend)
-
-    def build_reset(self, current, seed, external_solution):
-        if self._initial_pending:
-            self._initial_pending = False
-            return current
-        return self.binding.build_mixed_control_profile(self.provider, self.backend)
-
-    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
-        if value['artifact'] != artifact:
-            raise ValueError('selected Artifact changed between construction and reset')
-        solution = self._validate_solutions(value, external_solution)
-        set_phase('reset_seed')
-        return artifact, self.binding.reset_seed(seed), solution
-
-
 def legacy_position_physical_observation_binding(env):
     """Compatibility projection for selected callers that still publish V1 state."""
     return (env.position_scene, env.position_joint_bindings,
@@ -208,70 +186,23 @@ def selected_episode_reset_plan(value):
     return plan
 
 
-def prepare_selected_reset(binding, *, seed, seed_unset, options, mixed,
-                           has_session, previous_sample, artifact, value, requires_reset_plan=False):
-    """Validate reset inputs and resolve a task-bound sample before runtime changes."""
-    mixed_plan = None
-    if mixed:
-        if options is None:
-            options = {}
-        if not isinstance(options, Mapping) or any(type(key) is not str for key in options):
-            raise TypeError('mixed-control reset options must be a string-keyed mapping')
-        if 'reset_plan_v1' in options:
-            from ..artifacts import ResetPlanV1
-            mixed_plan = options['reset_plan_v1']
-            if type(mixed_plan) is not ResetPlanV1:
-                raise TypeError('mixed-control reset_plan_v1 must be the public ResetPlanV1 contract')
-            mixed_plan.validate()
-            sample = mixed_plan.reset_sample
-            if (sample.task_artifact_hash != artifact.identity_hash
-                    or sample.source_id != value['source'].scene_source.source_id
-                    or sample.source_closure_digest != value['source'].source_closure_digest):
-                raise ValueError('ResetPlanV1 Artifact/source identity differs from this selected candidate')
-            if seed is seed_unset:
-                seed = sample.task_seed
-            elif type(seed) is not int or seed != sample.task_seed:
-                raise ValueError('ResetPlanV1 seed differs from reset seed')
-    elif options:
+def prepare_selected_reset(binding, *, seed, seed_unset, options, value, requires_reset_plan=False):
+    """Validate reset inputs before changing the live RuntimeSession."""
+    if options:
         raise ValueError('selected reference reset options are not supported')
-    declared_plan = None if mixed else selected_episode_reset_plan(value)
-    if requires_reset_plan and declared_plan is None:
+    plan = selected_episode_reset_plan(value)
+    if requires_reset_plan and plan is None:
         raise ValueError('selected Controller capability requires a declared reset plan')
     if seed is seed_unset:
-        if mixed and mixed_plan is not None:
-            seed = mixed_plan.reset_sample.task_seed
-        elif mixed and has_session:
-            seed = previous_sample.task_seed
-        elif declared_plan is not None:
-            seed = declared_plan.reset_sample.task_seed
-        else:
-            seed = 19
-    if declared_plan is not None:
-        seed = binding.reset_seed(seed)
-        if binding.build_seeded is None and seed != declared_plan.reset_sample.task_seed:
-            raise ValueError('selected reset seed must match its fixed EpisodeResetPlan')
-    if not mixed and declared_plan is None:
-        # Task seed validation is pure preflight and must not close a live session.
-        seed = binding.reset_seed(seed)
-    mixed_sample = None
-    if mixed:
-        seed = binding.reset_seed(seed)
-        mixed_sample = binding.reset_sample_with_options(artifact, seed, options, value['source'])
-        from ..artifacts import ResetSampleV1
-        if type(mixed_sample) is not ResetSampleV1:
-            raise TypeError('mixed-control reset binding must return ResetSampleV1')
-        if (mixed_sample.task_artifact_hash != artifact.identity_hash
-                or mixed_sample.source_id != value['source'].scene_source.source_id
-                or mixed_sample.source_closure_digest != value['source'].source_closure_digest
-                or mixed_sample.task_seed != seed):
-            raise ValueError('mixed-control reset sample differs from its selected source or seed')
-    return seed, options, mixed_plan, mixed_sample
+        seed = plan.reset_sample.task_seed if plan is not None else 19
+    seed = binding.reset_seed(seed)
+    if plan is not None and binding.build_seeded is None and seed != plan.reset_sample.task_seed:
+        raise ValueError('selected reset seed must match its fixed EpisodeResetPlan')
+    return seed
 
 
-def resolve_selected_reset_effect(binding, value, artifact, seed, *, mixed, mixed_plan, mixed_sample):
-    """Resolve the rebuilt task's sample and the one provider reset operation."""
-    if mixed:
-        return mixed_sample, mixed_plan
+def resolve_selected_reset_effect(binding, value, artifact, seed):
+    """Resolve the rebuilt task sample and its provider reset operation."""
     plan = selected_episode_reset_plan(value)
     if plan is not None:
         if plan.reset_sample.task_seed != seed:
@@ -371,13 +302,6 @@ class ReferenceTaskBinding:
     task_observation_schema: object | None = None
     external_action_contract: object | None = None
     observation_metadata: dict | None = None
-    build_mixed_control_profile: Callable | None = None
-    reset_sample_with_options: Callable | None = None
-    prepare_mixed_control: Callable | None = None
-    prepare_mixed_control_substep: Callable | None = None
-    observe_mixed_control: Callable | None = None
-    mixed_record_metadata: Callable | None = None
-    pre_reset_session_validator: Callable | None = None
     post_reset_session_validator: Callable | None = None
     close_task_resources: Callable | None = None
     action_schema: dict | None = None
@@ -424,21 +348,12 @@ class ReferenceTaskBinding:
         if type(self.build_receives_binding) is not bool:
             raise TypeError('build_receives_binding must be a boolean')
         compiled_physical_action = self.action_schema is None and self.action_space_factory is None
-        if self.build_mixed_control_profile is None and (
-                not callable(self.prepare_action) or (not compiled_physical_action and (
-                    not callable(self.action_space_factory)
-                    or not isinstance(self.action_schema, dict) or not self.action_schema))):
+        if (not callable(self.prepare_action) or (not compiled_physical_action and (
+                not callable(self.action_space_factory)
+                or not isinstance(self.action_schema, dict) or not self.action_schema))):
             raise TypeError('selected action schema, space and preparation must be explicitly declared')
-        if self.build_mixed_control_profile is not None and (
-                self.action_space_factory is not None or self.prepare_action is not None
-                or self.action_schema is not None):
-            raise ValueError('mixed-control action contract is supplied by its task construction')
-        if self.build_mixed_control_profile is None and (
-                not callable(self.observation_space_factory) or not callable(self.observation_projection)):
+        if not callable(self.observation_space_factory) or not callable(self.observation_projection):
             raise TypeError('selected observation space and projection must be explicitly declared')
-        if self.build_mixed_control_profile is not None and (
-                self.observation_space_factory is not None or self.observation_projection is not None):
-            raise ValueError('mixed-control observation contract is supplied by its task construction')
         if self.action_schema is not None and not isinstance(self.action_schema, dict):
             raise TypeError('selected task action schema must be a dictionary')
         if self.interval_mode not in {"grouped", "native"}:
@@ -480,18 +395,6 @@ class ReferenceTaskBinding:
             raise ValueError('native controller requests require the selected native sample contract')
         if self.external_solution_actions and not self.external_actions and not self.control_request_required:
             raise ValueError('caller-driven guarded Solution actions require the native control request contract')
-        mixed_hooks = (
-            self.build_mixed_control_profile, self.reset_sample_with_options,
-            self.prepare_mixed_control, self.observe_mixed_control,
-            self.mixed_record_metadata, self.pre_reset_session_validator,
-        )
-        if any(value is not None for value in mixed_hooks) and any(
-            not callable(value) for value in mixed_hooks
-        ):
-            raise ValueError('mixed-control binding requires its complete task-owned hook set')
-        if (self.prepare_mixed_control_substep is not None
-                and not callable(self.prepare_mixed_control_substep)):
-            raise ValueError('mixed-control substep preparation hook must be callable when supplied')
         if (self.post_reset_session_validator is not None
                 and not callable(self.post_reset_session_validator)):
             raise ValueError('post-reset session validator must be callable when supplied')
@@ -519,12 +422,8 @@ class ReferenceTaskBinding:
 
         return cls(build=build, build_receives_binding=True, **binding_fields)
 
-    def reset_reconstruction_strategy(self, provider, backend, horizon, *, mixed=False):
+    def reset_reconstruction_strategy(self, provider, backend, horizon):
         """Select task-owned reconstruction once when a configuration is admitted."""
-        if mixed:
-            if not callable(self.build_mixed_control_profile):
-                raise ValueError('mixed-control candidate requires its task reconstruction binding')
-            return _MixedResetReconstruction(self, provider, backend, horizon)
         return _StandardResetReconstruction(self, provider, backend, horizon)
 
     def build_for_provider(self, provider):
@@ -536,11 +435,9 @@ class ReferenceTaskBinding:
     def bind_compiled_control(self, value):
         """Bind the physical action contract to the Controllers actually compiled.
 
-        Explicit task action contracts and mixed-control construction keep their
-        existing owners. Physical contracts can be resolved after source compile.
+        Explicit task action contracts keep their owners. Physical contracts can
+        be resolved after source compile.
         """
-        if self.build_mixed_control_profile is not None:
-            return self
         physical = value.get('physical_execution')
         declared = self.action_schema
         if declared is not None and declared.get('schema_version') != 'physical-control-actions-v1':

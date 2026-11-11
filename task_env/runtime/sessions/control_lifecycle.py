@@ -127,11 +127,6 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             env.session._control_lifecycle_dispatch = replace(current, stage='prepared')
         return result
 
-    if getattr(env, 'mixed_control_profile', False):
-        _dispatch_record(env, 'mixed-actuator-command', (env.controller.identity,),
-                         int(getattr(env.controller, 'generation', 0)))
-        return env._prepare_mixed_control(action, **context)
-
     if has_position_control_capability(env):
         profiles = env.position_profiles
         identities = tuple(profile.identity for profile in profiles)

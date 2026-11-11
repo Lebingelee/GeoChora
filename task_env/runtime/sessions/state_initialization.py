@@ -50,16 +50,6 @@ class PhysicalInitialState:
 
 
 @dataclass(frozen=True)
-class MixedInitialState:
-    controller: object
-    failure_phase: str = 'snapshot_readback'
-
-    def initialize(self, _session, state):
-        self.controller.reset(state)
-        return InitialStateResult()
-
-
-@dataclass(frozen=True)
 class LegacyFeedbackInitialState:
     controller: object
     failure_phase: str = 'controller_feedback'

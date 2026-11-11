@@ -112,8 +112,8 @@ def _materialize_selected(payload):
             raise ValueError('worker rebuilt request failed capability preflight')
         selected = bind_selected_controller(value, binding=binding, provider=provider, backend=backend)
         handlers = {}
-        if selected.mixed or len(selected.position_profiles) > 1:
-            raise ValueError('worker route does not implement mixed or multi-writer profiles')
+        if len(selected.position_profiles) > 1:
+            raise ValueError('worker route does not implement multi-writer profiles')
         if selected.position:
             plan, joints, frames, control_binding = prepare_position_control_materialization(
                 source=source, artifact=artifact, profiles=selected.position_profiles,

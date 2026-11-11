@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from ...environment.types import StageUnavailableError
 from .state_initialization import (
-    LegacyFeedbackInitialState, MixedInitialState, PhysicalInitialState, PositionInitialState,
+    LegacyFeedbackInitialState, PhysicalInitialState, PositionInitialState,
 )
 
 
@@ -137,25 +137,6 @@ class PositionRuntimeBuilder:
         initial = PositionInitialState(plan, env.position_scene, joints, frames,
                                        self.capabilities, plan)
         return RuntimeBuildResult((initial,))
-
-
-@dataclass(frozen=True)
-class MixedRuntimeBuilder:
-    plan: object
-    priority = 20
-
-    @property
-    def declaring_owner(self):
-        return self.plan
-
-    def create(self, env, _selection, _start_worker, materialize, _materialize_control):
-        env.position_profile = False
-        env.session = materialize(env.artifact, env.execution, source=env.value['source'])
-        env.session.bind_mixed_controller(env._selected_controller.identity)
-        if env.binding.pre_reset_session_validator is None:
-            raise ValueError('mixed-control candidate requires compiled-layout validation before reset')
-        env._compiled_layout_pre_reset = env.binding.pre_reset_session_validator(env.session, env.value)
-        return RuntimeBuildResult((MixedInitialState(env._selected_controller),))
 
 
 @dataclass(frozen=True)

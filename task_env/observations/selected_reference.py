@@ -159,34 +159,6 @@ def _position_task_evaluation_state(state, adapted):
 
 
 def build_selected_observation(self, state):
-    if getattr(self, 'mixed_control_profile', False):
-        result = self.binding.observe_mixed_control(self, state)
-        if not isinstance(result, tuple) or len(result) != 3:
-            raise TypeError('mixed-control observation hook must return observation, info, evaluation')
-        obs, info, evaluation = result
-        from ..environment.types import TaskEvaluation
-        if not isinstance(obs, Mapping) or not isinstance(info, Mapping) or not isinstance(evaluation, TaskEvaluation):
-            raise TypeError('mixed-control observation hook returned untyped values')
-        contact = info.get('contact_summary_v2')
-        if contact is not None:
-            if not isinstance(contact, Mapping):
-                raise TypeError('RuntimeSession contact summary must remain a mapping')
-            source = self.value['source']
-            expected = (
-                source.scene_source.source_id, source.source_closure_digest,
-                self.session.provider_materialization_id, self.session.episode_id,
-                self.sample.sample_id, int(state.control_step),
-                int(self.session.state_revision), float(state.simulation_time),
-            )
-            observed = (
-                contact.get('source_id'), contact.get('source_closure_digest'),
-                contact.get('provider_materialization_id'), contact.get('episode_id'),
-                contact.get('reset_sample_id'), contact.get('control_step'),
-                contact.get('state_revision'), contact.get('simulation_time_s'),
-            )
-            if observed != expected:
-                raise ValueError('RuntimeSession contact summary is stale or belongs to another state revision')
-        return dict(obs), dict(info), evaluation
     if getattr(self, 'position_profile', False):
         adapted = self.position_profiles[0]._adapt_publication(self.typed_state)
         evaluation_state = _position_task_evaluation_state(state, adapted)

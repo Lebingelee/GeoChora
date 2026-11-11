@@ -103,7 +103,6 @@ class SelectedControllerBinding:
     """Admitted controller and profile facts for selected environment assembly."""
     controller: object
     position_profiles: tuple
-    mixed: bool
     position: bool
     requires_reset_plan: bool = False
     position_capabilities: tuple = ()
@@ -387,14 +386,7 @@ def bind_selected_controller(value, *, binding, provider, backend):
 
     raw = value['controller']
     if value.get('selected_controller_kind') == 'mixed_actuator_v1':
-        plan = getattr(value.get('source'), 'mixed_actuator_plan', None)
-        if (binding is None or binding.build_mixed_control_profile is None or plan is None
-                or not callable(getattr(raw, 'compute_target', None))
-                or not callable(getattr(raw, 'identity_mapping', None))
-                or type(getattr(raw, 'identity', None)) is not str
-                or getattr(plan, 'controller_identity', None) != raw.identity):
-            raise TypeError('mixed-control route requires a controller bound to its typed source plan')
-        return SelectedControllerBinding(raw, (), True, False)
+        raise ValueError('diagnostic mixed-actuator candidate has been retired')
 
     profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
     capabilities = tuple(_selected_position_capability(item) for item in profiles)
@@ -406,91 +398,16 @@ def bind_selected_controller(value, *, binding, provider, backend):
         profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
         capabilities = tuple(_selected_position_capability(item) for item in profiles)
         matches = _match_position_profiles(value, profiles)
-        return SelectedControllerBinding(profiles[0], profiles, False, True, True,
+        return SelectedControllerBinding(profiles[0], profiles, True, True,
                                          capabilities, matches)
     if isinstance(raw, (tuple, list)):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
     physical_match = _match_physical_execution(value)
     physical_execution = value.get('physical_execution') if physical_match is not None else None
-    return SelectedControllerBinding(raw, (), False, False,
+    return SelectedControllerBinding(raw, (), False,
                                      value.get('physical_execution') is not None,
                                      (), (() if physical_match is None else (physical_match,)),
                                      physical_execution)
-
-
-def mixed_substep_controller(hook, env, prepared):
-    """Validate each task-produced native-rate command and retain its receipt."""
-    controller_receipts = []
-
-    def make_substep_command(state, substep_index, substep_count, state_revision):
-        control = hook(env, prepared, state, substep_index, substep_count, state_revision)
-        if not isinstance(control, Mapping) or set(control) != {'target', 'controller_receipt'}:
-            raise TypeError('mixed substep Controller hook returned unknown or missing fields')
-        target = control['target']
-        if type(target) is not MixedActuatorCommandV1:
-            raise TypeError('mixed substep Controller hook must return MixedActuatorCommandV1')
-        target.validate()
-        receipt = control['controller_receipt']
-        if not isinstance(receipt, Mapping):
-            raise TypeError('mixed substep Controller receipt must be a mapping')
-        controller_receipts.append(dict(receipt))
-        return target
-
-    return make_substep_command, controller_receipts
-
-
-def mixed_stepwise_receipt(receipt, controller_receipts, *, substeps, target):
-    """Bind each controller receipt to the native interval and its first target."""
-    if (not isinstance(receipt, Mapping)
-            or not isinstance(receipt.get('substeps'), list)
-            or len(receipt['substeps']) != substeps
-            or len(controller_receipts) != substeps):
-        raise ValueError('RuntimeSession stepwise receipt differs from the admitted substep count')
-    rows = [{**dict(row), 'controller_receipt': controller_receipt}
-            for row, controller_receipt in zip(receipt['substeps'], controller_receipts, strict=True)]
-    result = {**dict(receipt), 'substeps': rows}
-    first_row = rows[0]
-    applied = first_row.get('applied')
-    if (not isinstance(applied, Mapping)
-            or first_row.get('target_identity_sha256') != target.identity_hash
-            or first_row.get('target') != target.to_mapping()):
-        raise ValueError('stepwise RuntimeSession first command differs from prepared outer target')
-    return result, applied
-
-
-def validate_mixed_control_preparation(prepared, *, stepwise, source, artifact, session, sample, before):
-    """Validate task-prepared mixed controls against the live RuntimeSession boundary."""
-    fields = {'action_values', 'universal_action', 'request', 'target', 'writer_control'}
-    if stepwise:
-        fields.add('substep_context')
-    if not isinstance(prepared, Mapping) or set(prepared) != fields:
-        raise TypeError('mixed-control preparation must return the exact typed preparation fields')
-    action_values = tuple(float(value) for value in prepared['action_values'])
-    universal_action = tuple(float(value) for value in prepared['universal_action'])
-    if (not action_values or len(action_values) != len(universal_action)
-            or any(not math.isfinite(value) for value in (*action_values, *universal_action))):
-        raise ValueError('mixed-control task preparation returned invalid action values')
-    request, target, writer_control = prepared['request'], prepared['target'], prepared['writer_control']
-    if type(request) is not StructuredActionRequestV1 or type(target) is not MixedActuatorCommandV1:
-        raise TypeError('mixed-control preparation must return a StructuredActionRequest and MixedActuatorCommand')
-    request.validate()
-    target.validate()
-    if not isinstance(writer_control, Mapping) or set(writer_control) != {
-        'writer_id', 'action_schema_id', 'components', 'groups', 'requested_action', 'canonical_action',
-    }:
-        raise TypeError('mixed-control task writer metadata has unknown or missing fields')
-    if (target.plan_identity_hash != source.mixed_actuator_plan.identity_hash
-            or target.task_artifact_hash != artifact.identity_hash
-            or target.source_id != source.scene_source.source_id
-            or target.source_closure_digest != source.source_closure_digest
-            or target.provider_materialization_id != session.provider_materialization_id
-            or target.episode_id != session.episode_id
-            or target.reset_sample_id != sample.sample_id
-            or target.control_step != session.snapshot().control_step
-            or target.state_revision != session.state_revision
-            or target.simulation_time_s != before.simulation_time):
-        raise ValueError('mixed-control target differs from the live source boundary')
-    return action_values, universal_action, request, target, writer_control
 
 
 def _binding_identity(value):

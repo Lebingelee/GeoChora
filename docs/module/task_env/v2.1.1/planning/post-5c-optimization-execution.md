@@ -952,3 +952,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +51／−728，净减 677 行，其中共同提交约 48 行主要为移除旧分支后的缩进迁移；版本诊断未修改，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。此次删去一条旧诊断提交链，四任务构建入口与 renderer 没有改变；不能据此声称 E01～E04 已完成。
 
 115 项版本检查通过。MuJoCo 下四个正式任务和装配 Panda 均完成短程，依次观察一体 Panda 5、装配 Panda 5、NutAssembly 5、Pendulum 25、双轮车 25 个 native 子步；装配 Panda 两个 writer 在同一提交中均被确认。另以 PickCube 物理 Controller 完成 reset 切换及 H5 读回，观察 10 个子步。两份已有历史 H5 通过现有 reader 读回，验证解码而非恢复旧运行路径。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回与关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热与关闭异常，但进程和独立读回成功。GeoPhys 和完整 Solution 本批未重跑；历史证据仅证明其具体受测代码与路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_retire_leaf_dispatch_20261112_589tdcfx/` 和 `workspace/maintenance/v211_retire_leaf_dispatch_cpu_20261112_gyk_7vmw/`。
+
+### 6.88 退出旧 mixed-actuator candidate 的 Env 生命周期
+
+输入 `0840e833`。历史 mixed-actuator candidate 是一套只由旧诊断构建的独立 Env／Controller 绑定，四个正式任务没有声明其构建或控制 hooks。删除该入口，以及其专属 reset 重建、观察、施控、录像、Stop／close、worker 准入和 selected Runtime 物化分支；正式任务继续使用共同 reset 与控制提交，身份、单位、时钟、资源和故障检查不随该入口放宽。与之不同的 Position／physical 组合提交代码保留；本批未实际验证该组合，不能据此声明它受支持。provider 内仍有历史 mixed-actuator 原语，未在本批完整清理。
+
+生产修改 10 文件 +58／−779，净减 721 行；其中部分新增为去除条件分支后的代码缩进迁移，无整文件迁移。版本诊断未修改，本文与当前状态文档修改 2 文件；无新增或删除文件，tracked 文件数保持 1357。本批消除的是旧诊断的专属 Env 生命周期，未改变四个任务的配置入口，也未完成 E01～E04 的全部构造收敛。
+
+115 项版本检查通过。MuJoCo 的四个正式任务及装配 Panda 完成短程，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；装配两个 writer 在同一提交中均获确认。PickCube 物理 Controller 的 reset 切换及 H5 读回通过，观察 10 个子步。NutAssembly GeoPhys CPU 完成 reset、Solution 单步、再次 reset 和重复关闭，控制时间从 0 推进至 0.01 秒；native 子步未计数，导入日志含 MJCF 语义诊断。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据分别位于 ignored `workspace/maintenance/v211_retire_mixed_cpu_20261112_9fmd71fa/`、`workspace/maintenance/v211_retire_mixed_geophys_20261112_kmd1habf/` 和 `workspace/maintenance/v211_retire_mixed_isaac_20261112_17i725j0/`；E01～E04 仍未接收。
