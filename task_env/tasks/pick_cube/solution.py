@@ -51,6 +51,12 @@ _CAPTURE_RELATIVE_ROTATION_SPEED_RAD_S = 0.05
 # path is allowed to traverse over the cube or descend toward it.
 _MEASURED_CLEARANCE_TOLERANCE = 0.005
 _OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
+# While a measured-TCP gate holds, the held absolute-pose command is nudged by a
+# bounded integral of the measured TCP error. Position servos can settle with a
+# steady-state offset at high, extended poses; re-emitting the identical command
+# would never close that gap. The physical gate thresholds stay unchanged.
+_MEASURED_TCP_HOLD_INTEGRAL_GAIN = 0.10
+_MEASURED_TCP_HOLD_MAX_CORRECTION_M = 0.040
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -646,6 +652,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_index = 0
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
+        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
         self._last_public_observation = None
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -691,6 +698,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_index = 0
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
+        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
         self._last_public_observation = observation
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -725,7 +733,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
             if gate.after_actions == 0:
                 self._fail(f"measured_tcp_gate_has_no_prior_action:{gate.name}")
                 raise RuntimeError(self.failure_reason)
-            action = segment.plan.actions[gate.after_actions - 1]
+            action = self._corrected_gate_hold_action(
+                segment.plan.actions[gate.after_actions - 1]
+            )
         else:
             action = segment.plan.actions[-1] if self._last_wait else segment.plan.actions[self._action_index]
         diagnostics = {
@@ -977,6 +987,21 @@ class PickCubeReadinessSolution(PickCubeSolution):
         gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
         return gate if self._action_index >= gate.after_actions else None
 
+    def _corrected_gate_hold_action(self, planned_action):
+        action = np.array(planned_action, dtype=np.float32, copy=True)
+        observation = self._last_public_observation
+        if observation is not None:
+            error = action[:3] - self._ee_pose(observation)[:3]
+            if np.isfinite(error).all():
+                self._measured_tcp_hold_correction = np.clip(
+                    self._measured_tcp_hold_correction
+                    + _MEASURED_TCP_HOLD_INTEGRAL_GAIN * error.astype(np.float32),
+                    -_MEASURED_TCP_HOLD_MAX_CORRECTION_M,
+                    _MEASURED_TCP_HOLD_MAX_CORRECTION_M,
+                ).astype(np.float32)
+        action[:3] += self._measured_tcp_hold_correction
+        return action
+
     @classmethod
     def _measured_tcp_gate_metrics(cls, gate, observation):
         ee_pose = cls._ee_pose(observation)
@@ -1020,6 +1045,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             })
             self._measured_tcp_gate_index += 1
             self._measured_tcp_gate_wait_ticks = 0
+            self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
