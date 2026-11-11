@@ -25,9 +25,7 @@ from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifa
 from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
-from ...controllers.canonical.execution import (
-    ReferenceExecutionController, StableArmTargetHold,
-)
+from ...controllers.canonical.execution import ReferenceExecutionController
 from ...environment import (
     RuntimeSnapshot,
     TaskCompositionSpec,
@@ -277,31 +275,22 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         from ...controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
         controller = SplitPandaPositionControllerV1(artifact, source)
     else:
-        from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
-        controller = ProductionCanonicalPandaControllerR3.from_source(
-            artifact, source, profile=dynamic_profile,
+        execution_controller = ReferenceExecutionController.from_source(
+            artifact, source, profile=dynamic_profile, force_limit_N=10.0,
             joint_velocity_limit_rad_s=(
                 PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
             ),
         )
+        controller = execution_controller.hold.controller
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     base_controller_identity = None
     execution_profile = None
     if is_r3_profile:
-        # Match NutAssembly's complete selected R3 execution chain while keeping
-        # PickCube's Artifact, source, reset and Solution task-owned.
-        controller.gripper_config = replace(
-            controller.gripper_config, force_limit_N=10.0,
-        )
         base_controller_identity = controller.identity
-        arm_hold = StableArmTargetHold(controller)
-        execution_controller = ReferenceExecutionController(
-            arm_hold, artifact.timebase.control_dt, gripper_rate_hz=500,
-        )
         execution_support_sha256 = {
             "arm_and_execution_wrapper": hashlib.sha256(
-                Path(inspect.getsourcefile(StableArmTargetHold)).read_bytes()
+                Path(inspect.getsourcefile(type(execution_controller.hold))).read_bytes()
             ).hexdigest(),
             "execution_controller": hashlib.sha256(
                 Path(inspect.getsourcefile(ReferenceExecutionController)).read_bytes()

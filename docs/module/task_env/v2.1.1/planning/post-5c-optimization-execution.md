@@ -604,3 +604,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 3 文件 +38／−21，净增 17 行，主要是共同 source 编译的部分组件解析与身份校验，以及在 tabletop 构建中传递同一实例；无整文件迁移。版本诊断新增 1 文件 +38／−0；本文与当前状态文档修改 2 文件。项目 tracked 文件数 1364 → 1365，净增 1，无文件删除。source 编译接口改变，provider 原生映射、clock、控制提交与 renderer 未改。
 
 49 项版本检查通过，其中新增 3 项会读取真实 tabletop source 资产，核对 Artifact 声明使用的 Robot 与 RuntimeSource 的 Robot 为同一对象，并拒绝 foreign Robot；其余 46 项为既有版本合同。MuJoCo CPU 四任务、装配 Panda 和 PickCube direct effort 均完成短程，共观测 70 子步；与 6.42 同 seed 比较，主体、reset、可用 Artifact／Scene／source 身份及单步奖励相同，Nut Controller 身份按其源码绑定合同变化，其他比较路线 Controller 身份相同。GeoPhys CPU 的 PickCube／NutAssembly 短程通过，内部子步未观测，各保守预留 50。Isaac、renderer、完整 Solution 本批未重跑；计划、冻结 diff、身份对照及结果在 ignored `workspace/maintenance/v211_robot_source_instance_20261112_001/`。E01～E04 仍未接收。
+
+### 6.45 R3 Controller 构造归控制 owner
+
+输入 `aa471f3e`。PickCube 和 NutAssembly 不再在各自 Task 文件中重复创建 R3 控制器、配置 gripper 上限、创建 hold 和组装节拍；Controller owner 接收实际 Artifact／source、profile、force limit、速度限制和 gripper rate，完成原有对象组合。两个 Task 仍提供各自的任务语义、Solution 与来源身份；共同 owner 不启动 provider 或物理推进，也没有把 Position、effort 或其他 Controller 变成 R3。Task 中仍存在历史来源身份的单独处理，四任务 Controller／Robot 的完整绑定并未由本批收口。
+
+生产修改 3 文件 +24／−26，净减 2 行；版本诊断修改 1 文件 +20／−0；本文与当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，项目 tracked 文件数保持 1365。两份 Task 文件减少重复控制构造，实际 R3、hold 和 gripper 依旧由同一个 Controller 组合 owner 管理。provider／renderer adapter、source 映射、clock 和实际提交未更改。
+
+51 项版本检查通过，其中 5 项读取真实 tabletop source；新增检查确认两个任务的 R3、hold、gripper 指向同一个基础 Controller，保持 500 Hz、10 N 和 Artifact 控制周期。MuJoCo CPU 的 PickCube、NutAssembly 与 PickCube reset-scoped joint／r3 各完成短程，切换路线含 H5 读回；初版及将 Controller 选项改为显式参数后的最终版各 20 子步，合计观测 40 子步。最终版与上批比较，Artifact、source、reset、主体和单步奖励一致；Controller 源码身份变化，历史身份不替换。GeoPhys CPU 的两个 tabletop 短程通过，内部子步未观测，各保守预留 50。Isaac USD source 与 physical 动作合同完成静态检查，未启动 SDK；renderer 和完整 Solution 本批未复验。计划、冻结 diff、身份对照及结果位于 ignored `workspace/maintenance/v211_r3_controller_owner_20261112_001/`；E01～E04 仍未接收。

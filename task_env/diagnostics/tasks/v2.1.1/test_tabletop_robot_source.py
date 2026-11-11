@@ -36,3 +36,23 @@ def test_source_rejects_robot_outside_task_composition():
         compile_reference_source(artifact=artifact, scene_source=None, composition=composition, config=None,
             bodies={}, frames={}, free_joints={}, joint_targets={}, open_actuators=(),
             agents=(SimpleNamespace(uid='foreign-robot'),))
+
+
+@pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
+def test_r3_execution_controller_owns_hold_and_gripper(task_name):
+    from task_env.controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
+    from task_env.tasks.pick_cube.specialization import build_reference as build_pickcube
+    from task_env.tasks.nut_assembly.specialization import build_reference as build_nut
+
+    value = (build_pickcube(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+             if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
+    try:
+        controller = value['controller']
+        assert isinstance(controller, ReferenceExecutionController)
+        assert isinstance(controller.hold, StableArmTargetHold)
+        assert controller.inner.controller is controller.hold.controller
+        assert controller.gripper_rate_hz == 500
+        assert controller.gripper_config.force_limit_N == 10.0
+        assert controller.control_dt == value['artifact'].timebase.control_dt
+    finally:
+        value['source'].execution_source_receipt.close()

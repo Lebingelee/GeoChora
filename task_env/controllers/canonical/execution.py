@@ -153,6 +153,18 @@ class StableArmTargetHold:
 class ReferenceExecutionController:
     """Compose the shared R3 arm hold and gripper cadence owners."""
 
+    @classmethod
+    def from_source(cls, artifact, source, *, profile, force_limit_N,
+                    gripper_rate_hz=500, joint_velocity_limit_rad_s=2.0):
+        """Bind the declared source and compose the R3 execution owners."""
+        from .production_r3 import ProductionCanonicalPandaControllerR3
+
+        controller = ProductionCanonicalPandaControllerR3.from_source(
+            artifact, source, profile=profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+        controller.gripper_config = replace(controller.gripper_config, force_limit_N=force_limit_N)
+        return cls(StableArmTargetHold(controller), artifact.timebase.control_dt,
+                   gripper_rate_hz=gripper_rate_hz)
+
     def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
         self.hold = hold
         if gripper_rate_hz == 500:

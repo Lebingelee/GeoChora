@@ -25,9 +25,9 @@ from ...assembly.compiler import (
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
-from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
+from ...controllers.canonical.execution import ReferenceExecutionController
 from ...controllers.canonical.production_r3 import (
-    ProductionCanonicalPandaControllerR3, R3_PROFILE_PATH, load_r3_dynamic_profile,
+    R3_PROFILE_PATH, load_r3_dynamic_profile,
 )
 from ...environment import TaskCompositionSpec
 from ...environment.configuration import (
@@ -435,11 +435,10 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         lift_height_m=lift_height_m, task_config=task_config, robot=robot,
     )
     dynamic = load_r3_dynamic_profile()
-    controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
-    # The accepted R3 route fixes a 10 N force target/cap while preserving its
-    # controller law and task-facing close authorization.
-    controller.gripper_config = replace(controller.gripper_config, force_limit_N=10.0)
-    holder = StableArmTargetHold(controller)
+    execution_controller = ReferenceExecutionController.from_source(
+        artifact, source, profile=dynamic, gripper_rate_hz=gripper_control_hz,
+        force_limit_N=recipe['controller']['force_cap_N'])
+    controller = execution_controller.hold.controller
     settings = dict(recipe["solution"]["config"])
     settings["grasp_offset"] = tuple(settings["grasp_offset"])
     settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
@@ -512,9 +511,7 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         "qualification": "NOT_REQUALIFIED",
         }
     return {"construction_id": construction_id, "artifact": artifact, "source": source,
-        "controller": ReferenceExecutionController(
-            holder, artifact.timebase.control_dt, gripper_rate_hz=gripper_control_hz,
-        ),
+        "controller": execution_controller,
         "controller_identity": controller.identity,
         "solution": solution,
         "solution_factory": lambda: solution_type(**solution_arguments),

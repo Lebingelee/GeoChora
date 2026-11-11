@@ -103,3 +103,5 @@ Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、A
 Runtime 现直接消费已声明或 reset 已提交的 physical execution；正式物理任务不再分别提供取回该对象的 binding 回调。MuJoCo 四任务／物理序列与 GeoPhys 两条受影响路线通过短程；Isaac 仅完成静态构建合同检查。详见[实施记录 6.43](../planning/post-5c-optimization-execution.md#643-runtime-直接消费-physical-execution-声明)。
 
 PickCube／NutAssembly 的 Artifact 和 RuntimeSource 现消费构建时同一个 Robot 实例；MuJoCo 四任务／装配 Panda 和 GeoPhys 两个 tabletop 任务短程通过。装配 source 替换及完整构建链仍待收敛，详见[实施记录 6.44](../planning/post-5c-optimization-execution.md#644-tabletop-artifact-与-runtimesource-使用同一个-robot-实例)。
+
+PickCube 与 NutAssembly 的 R3、arm hold 与 gripper cadence 现由共同 Controller owner 从已声明 source 构造；MuJoCo 与 GeoPhys tabletop 短程已复验，完整 Controller 构建统一尚未完成。详见[实施记录 6.45](../planning/post-5c-optimization-execution.md#645-r3-controller-构造归控制-owner)。
