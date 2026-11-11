@@ -181,3 +181,5 @@ Isaac Position 已通过 Panda 共同主体编译生成实际 Controller plan，
 Controller 变更限定于 reset；旧 episode 内 Position 替换及其专属状态、录像分支已退出，MuJoCo reset 切换和 Isaac 录像短程通过。详见[实施记录 6.82](../planning/post-5c-optimization-execution.md#682-controller-切换限定于-reset)。
 
 USD Position 的主体和 Controller plan 已由 source 持有，Robot 与 Runtime 从同一 source 消费；Isaac 原生短程及四任务 MuJoCo 短程通过。详见[实施记录 6.83](../planning/post-5c-optimization-execution.md#683-usd-position-主体和-plan-由-source-持有)。
+
+Position Controller 选择与物化现在核对 source 持有的真实主体、writer 和资源，不再用 profile 名称冒充主体；Isaac 及四任务 MuJoCo 短程通过。详见[实施记录 6.84](../planning/post-5c-optimization-execution.md#684-position-controller-匹配实际主体)。

@@ -303,6 +303,11 @@ def _match_position_profiles(value, profiles):
     configured_profile = _selected_profile_label(value, capabilities[0].owner.profile_id)
     source_id, source_closure = source.source_id, source.source_closure_digest
     scene = source.scene_definition
+    declared = getattr(source, 'position_subject_plan', None)
+    if declared is None or not declared.subjects:
+        raise ValueError('selected Position Controller requires source-owned subjects')
+    declared_subjects = declared.subjects
+    declared_bindings = declared.plan.controller_bindings
     groups_by_key = {
         (group.entity_id, group.group_id): group
         for group in (scene.control_groups or ())
@@ -347,7 +352,12 @@ def _match_position_profiles(value, profiles):
                 resources.append((resource.entity_id, resource.actuator_id, binding.writer_id))
         controller_identities.append(owner.identity)
         writers.append(binding.writer_id)
-        subjects.append(owner.profile_id)
+        matching = tuple(subject for subject in declared_subjects
+                         if subject.entity_id == owner.entity_id
+                         and binding.writer_id in subject.controller_writers)
+        if len(matching) != 1 or binding not in declared_bindings:
+            raise ValueError('selected Position Controller differs from source-owned subject or binding')
+        subjects.append(matching[0].subject_id)
         entities.append(owner.entity_id)
         action_rows.append(asdict(binding.action_schema))
         state_hashes.append(digest(binding.feedback_requirements.to_mapping()))
@@ -357,6 +367,9 @@ def _match_position_profiles(value, profiles):
                             or getattr(model, 'source_sha256', None))
     if len(resources) != len(set((entity, resource) for entity, resource, _ in resources)):
         raise ValueError('selected Position Controllers claim overlapping actuator resources')
+    if (set(subjects) != {subject.subject_id for subject in declared_subjects}
+            or set(resources) != set(declared.plan.resource_writers)):
+        raise ValueError('selected Position Controllers do not cover the source-owned subjects')
     return (ControllerSelectionMatchV1(
         'controller-selection-match-v1', configured_profile, 'position',
         tuple(subjects), tuple(entities), tuple(controller_identities), tuple(writers),

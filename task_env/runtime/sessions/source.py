@@ -666,6 +666,11 @@ class PositionSubjectPlanV1:
             raise TypeError('Position plan requires declared controlled subjects')
         if position_subject_identity(self.plan, self.subjects) != self.subject_identity_sha256:
             raise ValueError('Position subjects differ from their compiled identity')
+        owners = {(subject.entity_id, writer) for subject in self.subjects
+                  for writer in subject.controller_writers}
+        plan_owners = {(entity, writer) for entity, _resource, writer in self.plan.resource_writers}
+        if owners != plan_owners:
+            raise ValueError('Position subjects differ from Controller resource owners')
 
 
 @dataclass(frozen=True)

@@ -920,3 +920,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +52／−5，净增 47 行；版本诊断修改 1 文件 +12／−4，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。新增类型承载实际编译 plan 和受控主体的身份，并参与 Runtime 物化；并非另建 Env。其他任务构造分流仍需处理；renderer、clock 和物理提交 owner 未改。
 
 115 项版本检查通过，包括真实 USD source 的主体／Controller plan 同源，以及外来 source 主体拒绝。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，Scene、Artifact、source、writer 与资源匹配检查全部通过；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅报告 AttributeError，SDK 日志仍有只读目录、渲染预热及关闭异常，进程和独立读回成功。MuJoCo 一体 Panda、装配 Panda、NutAssembly、Pendulum 和双轮车短程均通过，分别观察 5、5、5、25、25 个 native 子步。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_usd_source_subject_20261112_1t8_kquu/` 和 `workspace/maintenance/v211_source_subject_cpu_20261112_8e7_3qjc/`；E01～E04 仍未接收。
+
+### 6.84 Position Controller 匹配实际主体
+
+输入 `39ff2a48`。Position Controller 选择此前以 profile 名称充当主体 ID，即使 source 已持有编译主体也没有核对。现在选择阶段必须消费 source 的主体／Controller plan，以实际 subject ID 形成匹配结果，检查每个 writer、Controller binding 和资源的完整归属；物化再次核对所用主体。缺少主体或主体 writer 与资源不一致时拒绝，不再回退到虚构主体。provider 的 native 映射、renderer、clock 与实际提交 owner 未改。
+
+生产修改 3 文件 +21／−1，净增 20 行；版本诊断修改 1 文件 +7／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。此修改使 Position 选择使用真实已编译主体，未完成四任务全部构造分流的收敛。
+
+115 项版本检查通过，覆盖实际 subject ID、缺少 source 主体及错误 writer 的拒绝。Isaac CUDA Position／同步 RGB 最终代码完成两次 reset、一次非零 step、三帧独立读回和关闭，实际主体、writer、资源匹配通过；观察 41 次 physics callback，订阅前启动推进未知。此前宽松回退版本也做过一次原生运行并观察 41 次 callback，两个独立窗口的证据均保留；最终结论以严格版本的运行结果为准。两次 callback 取消订阅均报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。MuJoCo 一体 Panda、装配 Panda、NutAssembly、Pendulum 和双轮车短程均通过，分别观察 5、5、5、25、25 个 native 子步。GeoPhys 与完整 Solution 本批未重跑。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_position_subject_match_20261112_a65b6cr0/`、`workspace/maintenance/v211_position_match_final_20261112_c85jc66z/` 和 `workspace/maintenance/v211_position_match_final_cpu_20261112_f8hx6xgr/`；E01～E04 仍未接收。

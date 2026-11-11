@@ -107,6 +107,13 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
     assert plan is value['source'].position_subject_plan.plan
     assert value['controller'].source is value['source'] is value['session_admission_input'].runtime_source
     assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
+    assert selected.selection_matches[0].subject_ids == (robot.subjects[0].subject_id,)
+    without_subjects = {**value, 'source': replace(value['source'], position_subject_plan=None)}
+    with pytest.raises(ValueError, match='requires source-owned subjects'):
+        bind_selected_controller(without_subjects, binding=binding, provider='isaacsim', backend='cuda')
+    wrong_writers = (replace(robot.subjects[0], controller_writers=('foreign-writer',)),)
+    with pytest.raises(ValueError, match='Controller resource owners'):
+        PositionSubjectPlanV1(plan, position_subject_identity(plan, wrong_writers), wrong_writers)
     foreign_subjects = (replace(robot.subjects[0], source_id='foreign-source'),)
     foreign_plan = PositionSubjectPlanV1(plan, position_subject_identity(plan, foreign_subjects), foreign_subjects)
     with pytest.raises(ValueError, match='differ from their Scene, Artifact or source'):

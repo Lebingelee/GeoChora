@@ -114,6 +114,8 @@ class PositionRuntimeBuilder:
                     or match.scene_identity_sha256 != source.scene_definition.identity_hash
                     or match.writer_ids != tuple(item.writer_id for item in self.capabilities)
                     or match.controller_identities != tuple(item.owner.identity for item in self.capabilities)
+                    or set(match.subject_ids) != {
+                        subject.subject_id for subject in source.position_subject_plan.subjects}
                     or set(match.resource_keys) != set(plan.resource_writers)):
                 raise ValueError('Position materialization differs from its Controller match result')
             env._controller_selection_matches = self.selection_matches
