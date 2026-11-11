@@ -766,3 +766,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件并重命名 1 文件，+34／−34，净变化 0；原质量模型文件的既有内容随重命名迁移，新增参数准备逻辑并删除两处重复逻辑。无生产文件新增或删除，tracked 文件数保持 1358；测试／诊断代码无修改，本文及当前状态文档修改 2 文件。provider／renderer 的 source、状态、clock、提交和资源合同未改变，不能将本批视为 adapter 全部对齐。
 
 75 项版本检查通过。MJCF／USD 五种 profile 共十组真实 source 的 subject、binding、Controller identity、状态需求及动作合同与输入版本一致。MuJoCo joint→R3 reset 切换和 H5 读回通过，观测 10 个 native 子步。Isaac joint effort／CUDA／同步 RGB 完成两次 reset、一次 step、三帧独立读回及 Env／App 关闭；采图阶段无额外物理推进，订阅前启动推进未知。渲染 warmup 日志有一次推进错误后继续取得图像；SDK 关闭日志仍有菜单扩展访问已关闭 USD context 的异常，关闭收据及进程退出成功。GeoPhys、完整 Solution 和其余 profile 的原生执行本批未重跑，先前证据按实际代码影响和原限定使用。冻结 diff、计划、source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_reference_inputs_20261112_001/`。E01～E04 仍未接收。
+
+### 6.65 USD Panda 声明与 effort 构造共享 Robot
+
+输入 `21cdac15`。PickCube USD 路线原先由 Scene 声明和 effort 构造分别创建 Panda；现在复用 Task source 已声明的同一 Robot 实例，将它传入 USD Scene 编译与 effort 绑定。直接调用独立 USD source compiler 时仍可自行创建默认 Panda。源闭包、Artifact、Scene 及 native drive 的准入保持；这消除一次独立实例化，不代表已经统一所有 Task 的 source 构造。
+
+生产修改 3 文件 +13／−12，净增 1 行；版本诊断修改 1 文件 +18／−0，覆盖 Scene 使用传入 Robot；本文及当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer 的 source、状态、clock、提交和资源合同未改变。
+
+76 项版本检查通过。真实 MJCF／USD source 的五种 profile 共十组合同与输入版本一致，USD 的场景声明与 effort 构造实测收到同一 Robot 实例。Isaac joint effort／CUDA／同步 RGB 实际完成两次 reset、一次 step、三帧独立读回、重复 Env close 与 App close，观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知。渲染 warmup 日志出现推进错误后取得图像；只读环境的 stage template 权限日志与 SDK 关闭时菜单扩展异常保留，进程和读回均成功。MuJoCo、GeoPhys 及完整 Solution 本批未重跑，静态 source 对照不等于原生执行。证据位于 ignored `workspace/maintenance/v211_usd_robot_owner_20261112_001/`，本次 native 运行是 `isaac/runs/isaac-003`，目录中更早的 `001`／`002` 属于历史运行，不能混用。E01～E04 仍未接收。

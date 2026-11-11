@@ -10,7 +10,7 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         raise ValueError('Isaac physical source horizon must be in [1, 1000]')
     manifest = delivery_manifest
     def with_physical(value):
-        physical = build_f06_direct_effort_execution(value['source'].scene_definition,
+        physical = build_f06_direct_effort_execution(value['robot'], value['source'].scene_definition,
                                                       value['artifact'], value['source'])
         from .physical_reference_profile import build_pickcube_effort_profile
         position = value['controller']

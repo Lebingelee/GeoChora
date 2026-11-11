@@ -82,3 +82,21 @@ def test_each_public_environment_owns_its_binding_and_source(uid):
         first.close()
         if second is not None:
             second.close()
+
+
+def test_usd_task_scene_uses_the_supplied_robot(monkeypatch):
+    from task_env.runtime.sessions import source_scene_import
+    from task_env.tasks.pick_cube.specialization import _configuration, build_pickcube_isaac_scene
+
+    robot = PandaAgent()
+    original = source_scene_import.declare_panda_scene
+    used = []
+
+    def capture(subject, **kwargs):
+        used.append(subject)
+        return original(subject, **kwargs)
+
+    monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture)
+    scene = build_pickcube_isaac_scene(_configuration(), robot=robot)
+    assert used == [robot]
+    assert scene.robots[0].entity_id == 'panda-v1'

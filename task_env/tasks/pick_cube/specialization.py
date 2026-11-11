@@ -370,9 +370,10 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     # R3 physical profile; only the source-bound position writer changes.
     legacy = build_reference(backend="cpu", include_solution=False,
                              controller_profile=controller_profile, resolved_config=resolved_config, task_config=task_config)
+    robot = legacy["source"].agents[0]
     runtime_input = build_pickcube_isaac_runtime_input_v1(
         delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
-        physical_fixture=physical_fixture,
+        physical_fixture=physical_fixture, robot=robot,
     )
     manifest_path = Path(delivery_manifest).resolve(strict=True)
     panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
@@ -444,6 +445,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     }
     return {
         "construction_id": resolved["construction_id"],
+        "robot": robot,
         "artifact": runtime_input.artifact,
         "source": runtime_input.runtime_source,
         "readiness": readiness,
@@ -717,14 +719,15 @@ ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
 )
 
 
-def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
+def build_pickcube_isaac_scene(task_config: dict, *, robot=None) -> SceneDefinition:
     """Compose the Panda source with task-owned PickCube entities and recipe."""
     from ...registry import AGENT_REGISTRY
     from ...runtime.sessions.source_scene_import import declare_panda_scene
 
     scene_id = str(task_config["recipe"]["scene_uid"])
-    panda_scene = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
-                                      entity_id="panda-v1", scene_id=scene_id)
+    if robot is None:
+        robot = AGENT_REGISTRY.create('panda-v1')
+    panda_scene = declare_panda_scene(robot, entity_id="panda-v1", scene_id=scene_id)
     source_asset = panda_scene.assets[0]
     if not source_asset.source_content_sha256:
         raise ValueError("Panda importer must provide the consumed source closure digest")
@@ -810,11 +813,11 @@ def _canonical_task_recipe(task_config: dict) -> bytes:
     ).encode("utf-8")
 
 
-def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact):
+def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
     """Compile the existing PickCube v0 semantics against its USD Scene."""
     if set(task_config) - {'recipe', 'environment', 'execution'}:
         raise ValueError('unsupported PickCube task config fields')
-    scene = build_pickcube_isaac_scene(task_config)
+    scene = build_pickcube_isaac_scene(task_config, robot=robot)
     # Execution defaults are consumed by configuration, not Task Source.
     task_source = adapt_legacy_recipe_task_source({
         'recipe': task_config['recipe'], 'environment': task_config['environment'],
@@ -869,7 +872,7 @@ def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
 
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
-    task_config=None, physical_fixture=False,
+    task_config=None, physical_fixture=False, robot=None,
 ) -> UsdRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
 
@@ -902,7 +905,7 @@ def build_pickcube_isaac_runtime_input_v1(
                                                    if physical_fixture == 'coexist'
                                                    else 'f06-physical-effort-no-drive-v1')))
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
-        task_config, legacy_artifact,
+        task_config, legacy_artifact, robot=robot,
     )
     options = {
         "f06_goal": "PickCube-Harness-three-backend-example",

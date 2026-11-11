@@ -143,3 +143,5 @@ Isaac adapter 已退休旧 DG04 专用构造和 witness，正式 F06 Position／
 Panda effort profile 语义已从 PickCube candidate 归控制与 Robot owner，Task 继续执行 source／provider 准入；受影响 MuJoCo／Isaac 路线已复验。详见[实施记录 6.63](../planning/post-5c-optimization-execution.md#663-panda-effort-profile-语义归控制与-robot-owner)。
 
 MJCF／USD 的 Panda effort 参考参数与质量模型准入已收敛为一份 Task 声明，受影响 MuJoCo reset 切换和 Isaac effort／RGB 已复验；Task 的 source 专属构建仍待收敛。详见[实施记录 6.64](../planning/post-5c-optimization-execution.md#664-收敛-panda-effort-参考参数的重复准备)。
+
+PickCube USD Scene 声明与 effort 构造现使用同一 Panda Robot 实例；真实 source 对照和 Isaac 短程已复验。详见[实施记录 6.65](../planning/post-5c-optimization-execution.md#665-usd-panda-声明与-effort-构造共享-robot)。

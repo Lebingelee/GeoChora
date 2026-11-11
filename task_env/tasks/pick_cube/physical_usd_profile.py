@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 
-def build_f06_direct_effort_execution(scene, artifact, source):
+def build_f06_direct_effort_execution(robot, scene, artifact, source):
     """Admit the source-specific drive and mimic facts for the Panda owner."""
     from ...runtime.sessions.source import (
         UsdRuntimeSourceV1, position_joint_bindings_from_artifact,
         position_frame_bindings_from_artifact,
     )
-    from ...registry import make_agent
     from ...robots.panda import PandaEffortSourceLayout
 
     if type(source) is not UsdRuntimeSourceV1:
@@ -18,7 +17,6 @@ def build_f06_direct_effort_execution(scene, artifact, source):
             or source.task_artifact.identity_hash != artifact.identity_hash
             or source.scene_definition.identity_hash != scene.identity_hash):
         raise ValueError('F06 physical profile requires the frozen source and Artifact')
-    robot = make_agent('panda-v1')
     names = robot.physical_joint_names()
     layout = PandaEffortSourceLayout(
         tuple(name if i < 7 else 'finger_joint1' for i, name in enumerate(names)),
