@@ -798,3 +798,13 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +7／−6，净增 1 行；版本诊断修改 2 文件 +9／−5，扩展五种固定 profile 的双 CPU provider 构造检查与 R3 短程探针；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。固定 effort 不再为状态发布构造 Position Controller；Runtime source、control interval、clock 和 renderer 所有权未改。
 
 88 项版本检查通过，五种固定 profile 均验证 MuJoCo／GeoPhys 构造不调用 Position Controller。五种 MJCF／USD profile 的十组 source／Controller 合同与输入基线对照一致。MuJoCo 和 GeoPhys 的 joint／R3 effort 均完成 reset、step、二次 reset 和关闭；MuJoCo 两次各观测 5 个 native 子步，GeoPhys 内部子步未观测、两次各保守预留 50。质量模型 profile 此批只有构造检查，USD 只有 source 合同对照，Isaac 原生和完整 Solution 未重跑。冻结 production diff、最终 diff、计划与运行收据位于 ignored `workspace/maintenance/v211_fixed_effort_state_20261112_nrUXR7/`；R3 探针更新的身份另记于 `r3-plan.json`。E01～E04 仍未接收。
+
+### 6.69 MJCF Panda source 与物理构造共享 Robot
+
+输入 `c9760c17`。PickCube MJCF effort 原先为已有 Task source 新建另一个 Panda，再用于 Scene 和 Controller 构造；现在沿用该 source 已声明的 Robot，同一实例贯穿 Task source、Scene 声明和 effort 绑定。USD 已在 6.65 采用同一原则。实际 source 身份、资产闭包和传动校验不变；这尚未消除全部 Task 专属 source 构建。
+
+生产修改 1 文件 +1／−2，净减 1 行；版本诊断修改 1 文件 +40／−0，检查三个构建环节实际使用同一 Robot；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer 的 source 合同、状态、clock、提交和资源未改。
+
+89 项版本检查通过；MJCF／USD 五种 profile 共十组 source／Controller 合同对照与输入基线一致。MuJoCo direct effort 与 joint→R3 reset 切换、H5 读回和关闭通过，共观测 15 个 native 子步。GeoPhys、Isaac 原生及完整 Solution 本批未重跑；旧证据按未受影响的路线和 source 身份范围保留。冻结 diff、对照、计划及收据位于 ignored `workspace/maintenance/v211_mjcf_robot_owner_20261112_p5iHyo/`。
+
+本批另尝试让 reset 切换直接使用物理 V2 状态：首次在静态准入因缺少声明被拒，调整后 reset 通过，但录像开始时依赖 Position 专属边界和元数据而失败。该尝试已从生产 diff 撤回，失败收据保留于 ignored `workspace/maintenance/v211_switch_physical_state_20261112_J4EKMr/`；后续需要先迁移录像和 Solution 生命周期，不能仅删除 Position 对象。E01～E04 仍未接收。

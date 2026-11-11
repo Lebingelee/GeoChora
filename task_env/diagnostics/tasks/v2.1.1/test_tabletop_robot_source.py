@@ -100,3 +100,43 @@ def test_usd_task_scene_uses_the_supplied_robot(monkeypatch):
     scene = build_pickcube_isaac_scene(_configuration(), robot=robot)
     assert used == [robot]
     assert scene.robots[0].entity_id == 'panda-v1'
+
+
+def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import source_scene_import
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    built, declared, bound = [], [], []
+    original_reference = specialization.build_reference
+    original_scene = source_scene_import.declare_panda_scene
+    original_control = PandaAgent.build_direct_effort_execution
+
+    def reference(*args, **kwargs):
+        value = original_reference(*args, **kwargs)
+        built.append(value['source'].agents[0])
+        return value
+
+    def scene(robot, **kwargs):
+        declared.append(robot)
+        return original_scene(robot, **kwargs)
+
+    def control(robot, *args, **kwargs):
+        bound.append(robot)
+        return original_control(robot, *args, **kwargs)
+
+    monkeypatch.setattr(specialization, 'build_reference', reference)
+    monkeypatch.setattr(source_scene_import, 'declare_panda_scene', scene)
+    monkeypatch.setattr(PandaAgent, 'build_direct_effort_execution', control)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        binding.build('mujoco')
+        assert len(built) == len(declared) == len(bound) == 1
+        assert built[0] is declared[0] is bound[0]
+    finally:
+        binding.close_task_resources()
