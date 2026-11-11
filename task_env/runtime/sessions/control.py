@@ -304,6 +304,10 @@ def _match_position_profiles(value, profiles):
     configured_profile = _selected_profile_label(value, capabilities[0].owner.profile_id)
     source_id, source_closure = source.source_id, source.source_closure_digest
     scene = source.scene_definition
+    groups_by_key = {
+        (group.entity_id, group.group_id): group
+        for group in (scene.control_groups or ())
+    }
     controller_identities, writers, subjects, entities = [], [], [], []
     channel_keys, channel_units, resources, action_rows, state_hashes, model_hashes = [], [], [], [], [], []
     for capability in capabilities:
@@ -328,10 +332,20 @@ def _match_position_profiles(value, profiles):
                 raise ValueError('selected Position Controller resource is absent from its Scene')
             channel_keys.append(key)
             channel_units.append('rad' if joint.kind == 'revolute' else 'm')
-            resources.append((entity_id, target_bindings[key], binding.writer_id))
-        open_actuator = getattr(owner, 'open_actuator', None)
-        if open_actuator:
-            resources.append((owner.entity_id, open_actuator, binding.writer_id))
+        # Match physical resources in the same key space as the compiled plan.
+        # Position target_bindings are native Joint/DOF names on some providers
+        # (notably the admitted F06 USD route), while ControlBindingPlanV1 owns
+        # authored Scene actuator resources.  Keep those two mappings separate:
+        # the profile/source identity binds native targets, and these Scene
+        # ControlGroups bind the Controller's actuator write set.
+        for projection in binding.groups:
+            group = groups_by_key.get(projection.key)
+            if group is None or projection.entity_id != owner.entity_id:
+                raise ValueError('selected Position Controller references a foreign Scene ControlGroup')
+            for resource in group.actuator_refs:
+                if resource.entity_id != owner.entity_id:
+                    raise ValueError('selected Position Controller actuator is outside its subject Entity')
+                resources.append((resource.entity_id, resource.actuator_id, binding.writer_id))
         controller_identities.append(owner.identity)
         writers.append(binding.writer_id)
         subjects.append(owner.profile_id)
@@ -1168,6 +1182,7 @@ def materialize_control(
     selected_controller=None,
     native_feedback_gripper_control_hz=None,
     observer_render_request=None,
+    task_render_requested=False,
 ):
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
@@ -1613,6 +1628,7 @@ def materialize_control(
         _session_admission_input=session_admission_input,
         _native_feedback_profile=native_feedback_profile,
         _observer_render_request=observer_render_request,
+        _task_render_requested=task_render_requested,
     )
     if f04_native:
         try:

@@ -1291,6 +1291,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._camera_consumer = None
         self._camera_session_factory = None
         self._task_rgb_state_binding = None
+        self._task_rgb_typed_state = None
         self.typed_state = None
         self.metadata = {'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
@@ -1624,9 +1625,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._task_rgb_state_binding = result
         return result
 
-    def _publish_task_rgb_typed_state(self):
-        """Publish and validate renderer state at the RuntimeSession's current boundary."""
-        self.typed_state = None
+    def _publish_task_rgb_typed_state(self, state=None):
+        """Publish the renderer's independent projection at the current boundary."""
+        self._task_rgb_typed_state = None
+        state = self.state if state is None else state
         binding = getattr(self, '_task_rgb_state_binding', None)
         if binding is None:
             binding = self._prepare_task_rgb_state_binding()
@@ -1640,12 +1642,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             requirements=requirements,
         )
         from ..artifacts import CanonicalStatePublicationV1
+        expected_control_step = int(state.control_step)
+        expected_simulation_time = float(state.simulation_time)
         if (type(publication) is not CanonicalStatePublicationV1
                 or not publication.lifetime.may_be_retained
                 or publication.view.boundary != current_boundary
+                or publication.view.boundary.control_step != expected_control_step
                 or abs(publication.view.sample_clock.simulation_time_s
-                       - float(self.state.simulation_time)) > _boundary_interval_clock_tolerance(
-                           float(self.state.simulation_time),
+                       - expected_simulation_time) > _boundary_interval_clock_tolerance(
+                           expected_simulation_time,
                            publication.view.sample_clock.simulation_time_s,
                            self.artifact.timebase.control_dt,
                            self.artifact.timebase.physics_dt,
@@ -1654,22 +1659,39 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise ValueError('selected task RGB typed state is stale or differs from Runtime readback')
         publication.view.validate_against_scene(scene)
         publication.view.validate_requirements(requirements)
-        self.typed_state = publication
+        self._task_rgb_typed_state = publication
         return publication
 
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
         self._episode_execution_state().require_open('environment is closed')
         component_lifecycle = None
-        if self._has_component_assembly():
-            seed = None if seed is _RESET_SEED_UNSET else seed
-            GymEnvBase.reset(self, seed=seed)
-            self._last_camera_metadata = {}
-            component_lifecycle = self._require_task_lifecycle()
-            operations = component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
-        else:
-            operations = self._prepare_reference_reset(seed=seed, options=options)
-        result = self._episode_execution_state().execute_reset(**operations)
+        defer_task_rgb = (not self._has_component_assembly()
+                          and getattr(self, '_task_rgb_config', None) is not None)
+        if defer_task_rgb:
+            self._defer_task_rgb_capture = True
+        after_commit = None
+        operations = None
+        try:
+            if self._has_component_assembly():
+                seed = None if seed is _RESET_SEED_UNSET else seed
+                GymEnvBase.reset(self, seed=seed)
+                self._last_camera_metadata = {}
+                component_lifecycle = self._require_task_lifecycle()
+                operations = component_lifecycle.prepare_reset(seed=seed, options=options, rng=self.np_random)
+            else:
+                operations = self._prepare_reference_reset(seed=seed, options=options)
+            after_commit = operations.pop('after_commit', None)
+            result = self._episode_execution_state().execute_reset(**operations)
+        finally:
+            if defer_task_rgb:
+                self._defer_task_rgb_capture = False
         self._reset_failure_receipt = None
+        if after_commit is not None:
+            try:
+                result = after_commit(self.state, result)
+            except BaseException as error:
+                operations['on_failure']('task_rgb_capture_after_reset_commit', error)
+                raise
         if component_lifecycle is not None:
             return self._format_component_reset(component_lifecycle, result, seed)
         return result
@@ -1719,9 +1741,25 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
         self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)
-        operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
-        result = self._episode_execution_state().execute_reset(**operations)
+        defer_task_rgb = getattr(self, '_task_rgb_config', None) is not None
+        if defer_task_rgb:
+            self._defer_task_rgb_capture = True
+        after_commit = None
+        operations = None
+        try:
+            operations = self._prepare_reference_reset(seed=seed, options=options, external_solution=solution)
+            after_commit = operations.pop('after_commit', None)
+            result = self._episode_execution_state().execute_reset(**operations)
+        finally:
+            if defer_task_rgb:
+                self._defer_task_rgb_capture = False
         self._reset_failure_receipt = None
+        if after_commit is not None:
+            try:
+                result = after_commit(self.state, result)
+            except BaseException as error:
+                operations['on_failure']('task_rgb_capture_after_reset_commit', error)
+                raise
         return result
 
     def _prepare_reference_reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
@@ -1730,6 +1768,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise ValueError('the task RGB renderer is fixed for the lifetime of this Env')
         prior_fault = self._episode_execution_state().fault
         prior_fault_mapping = None if prior_fault is None else prior_fault.to_mapping()
+        defer_task_rgb = bool(getattr(self, '_defer_task_rgb_capture', False))
+        reset_solution = None
         from .reference_binding import prepare_selected_reset
         physical_selection = getattr(self, '_physical_reset_selection', None)
         physical_candidate = None
@@ -1861,6 +1901,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._published_position_obs = None
         self._published_position_info = None
         self._published_position_evaluation = None
+        # Retire both publications at the destructive episode boundary. The
+        # next reset readback republishes Controller state; task RGB builds a
+        # separate projection only when its observation is assembled.
+        self.typed_state = None
+        self._task_rgb_typed_state = None
         self.last_position_transition = None
         if self._mixed_control_candidate:
             # Publish a candidate reset plan only after the replacement begins.
@@ -1892,8 +1937,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._deployment_receipt = deployment_receipt
             self._close_camera_consumer()
             self._task_rgb_state_binding = None
-            if getattr(self, '_task_rgb_config', None) is not None:
-                self.typed_state = None
             failure_phase = 'reset_close'
             if previous_session is not None:
                 previous_session_close_attempted = True
@@ -2064,7 +2107,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'snapshot_readback'
             self.state = self.session.snapshot()
             self.feedback = None
-            position_published = False
             for capability in self._selected_state_capabilities:
                 failure_phase = capability.failure_phase
                 result = capability.initialize(self.session, self.state)
@@ -2074,16 +2116,76 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     self.feedback = result.feedback
                 if result.materialization_receipt is not None:
                     self.leaf_materialization = result.materialization_receipt
-                position_published = position_published or result.publishes_position
-            if getattr(self, '_task_rgb_config', None) is not None and not position_published:
-                self._publish_task_rgb_typed_state()
             return self.state
 
         def observe(_state):
-            nonlocal failure_phase
+            nonlocal failure_phase, reset_solution
             failure_phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
+            if 'reset_parameters' not in self.info:
+                sample_mapping = getattr(self.sample, 'to_mapping', None)
+                if not callable(sample_mapping):
+                    raise ValueError('selected reset sample cannot provide public reset parameters')
+                self.info['reset_parameters'] = {
+                    'schema_version': 'selected-reset-parameters-v1',
+                    'reset_sample': sample_mapping(),
+                }
+            # Task observation projections may intentionally contain only the
+            # task-specific payload. Complete the common Gym reset envelope
+            # from the values committed by this reset transaction before a
+            # deferred renderer validates and publishes the same boundary.
+            evaluation = self.evaluation
+            resolved_task = getattr(getattr(self, 'config', None), 'task', None)
+            resolved_configuration = self.value.get('resolved_configuration', {})
+            if not isinstance(resolved_configuration, Mapping):
+                resolved_configuration = {}
+            task_recipe = resolved_configuration.get('task_recipe', {})
+            resolved_recipe = task_recipe.get('recipe', {}) if isinstance(task_recipe, Mapping) else {}
+            if not isinstance(resolved_recipe, Mapping):
+                resolved_recipe = {}
+            task_source = self.value.get('task_source')
+            task_uid = (getattr(resolved_task, 'task_uid', None)
+                        or getattr(task_source, 'task_id', None)
+                        or resolved_recipe.get('task_uid')
+                        or getattr(self.artifact, 'task_id', None) or self.uid)
+            success_definition = (getattr(resolved_task, 'success_definition', None)
+                                  or resolved_recipe.get('success_definition')
+                                  or getattr(getattr(self.artifact, 'semantics', None),
+                                             'success_definition', None))
+            if type(success_definition) is not str or not success_definition:
+                raise ValueError('selected reset cannot resolve its task success definition')
+            from ..environment.types import ObservationSchema
+            observation_schema = self.info.get('observation_schema')
+            if defer_task_rgb:
+                from ..observations.selected_reference import selected_reference_observation_schema
+                observation_schema = selected_reference_observation_schema(self, self.obs)
+            elif not isinstance(observation_schema, ObservationSchema):
+                observation_schema = getattr(
+                    getattr(self, '_observation_builder', None), 'schema', None,
+                )
+            if not isinstance(observation_schema, ObservationSchema):
+                from ..observations.selected_reference import selected_reference_observation_schema
+                observation_schema = selected_reference_observation_schema(self, self.obs)
+            reset_info_defaults = {
+                'seed': None if seed is _RESET_SEED_UNSET else seed,
+                'task_uid': task_uid,
+                'stage': 'stage4_gym_contract',
+                'is_success': evaluation.success,
+                'elapsed_steps': int(self.state.control_step),
+                'task_metrics': evaluation.metrics,
+                'reward_terms': evaluation.reward_terms,
+                'task_reward': evaluation.reward,
+                'task_failure': evaluation.failure,
+                'success_definition': success_definition,
+                'resolved_control_metadata': self.metadata['action_schema'],
+                'observation_schema': observation_schema,
+                'simulation_time_s': float(self.state.simulation_time),
+            }
+            for key, value in reset_info_defaults.items():
+                self.info.setdefault(key, value)
+            if not isinstance(self.info.get('observation_schema'), ObservationSchema):
+                self.info['observation_schema'] = observation_schema
             if physical_candidate is not None:
                 self.info['physical_action_spec_v1'] = physical_selection.describe()
             if (self.value.get('physical_execution') is not None
@@ -2160,7 +2262,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self._current_control_step() != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
             reset_solution = external_solution if external_solution is not None else self.solution
-            if reset_solution is not None:
+            if reset_solution is not None and not defer_task_rgb:
                 failure_phase = 'solution_reset'
                 reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
@@ -2201,6 +2303,29 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 # The caller's instance is the only active mutable Solution
                 # owner for this episode; the task value has no active copy.
                 self.solution = None
+            return self.obs, self.info
+
+        def after_commit(state, result):
+            nonlocal failure_phase
+            if not defer_task_rgb:
+                return result
+            failure_phase = 'task_rgb_capture_after_reset_commit'
+            observation, info = result
+            image, receipt = self._capture_task_rgb_boundary(state)
+            self.obs = dict(observation)
+            self.obs['task_rgb'] = image
+            self.info = dict(info)
+            self.info['task_rgb_v1'] = receipt
+            self._published_position_obs = self.obs
+            self._published_position_info = dict(self.info)
+            if not self.observation_space.contains(self.obs):
+                raise ValueError('committed reset observation with task RGB violates observation_space')
+            self.info['observation_schema'].validate(self.obs)
+            validate_task_info(self.info, phase='reset')
+            if reset_solution is not None:
+                failure_phase = 'solution_reset'
+                reset_solution.reset(self.obs, self.info, self.metadata,
+                                     **self.binding.reset_expert_kwargs(self))
             return self.obs, self.info
 
         def on_failure(_phase, error):
@@ -2273,10 +2398,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             error.reset_failure_receipt = self.reset_failure_receipt
             self._latch_fault(failure_phase, error)
 
-        return dict(
+        operations = dict(
             prepare=prepare, materialize=materialize_runtime, reset_runtime=reset_runtime,
             read_state=read_state, observe=observe, publish=publish, on_failure=on_failure,
         )
+        if defer_task_rgb:
+            operations['after_commit'] = after_commit
+        return operations
 
     def expert_execution_info(self):
         """Return the required, validated R1 readiness at the current boundary."""
@@ -2445,10 +2573,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             observation, info, evaluation = build_selected_observation(self, state)
         else:
             observation, info, evaluation = self.binding.observation_projection(self, state)
-        if getattr(self, '_task_rgb_config', None) is not None:
+        if (getattr(self, '_task_rgb_config', None) is not None
+                and not getattr(self, '_defer_task_rgb_capture', False)):
             if self._task_rgb_consumer is None:
                 self._task_rgb_consumer = self._new_task_rgb_consumer()
-            image, receipt = self._task_rgb_consumer.capture(self.typed_state.view)
+            image, receipt = self._capture_task_rgb_boundary(state)
             observation = dict(observation)
             observation['task_rgb'] = image
             info = dict(info)
@@ -2457,6 +2586,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             info = dict(info)
             info['execution_configuration_v1'] = self.get_execution_receipt()
         return observation, info, evaluation
+
+    def _capture_task_rgb_boundary(self, state):
+        if getattr(self, '_task_rgb_consumer', None) is None:
+            self._task_rgb_consumer = self._new_task_rgb_consumer()
+        publication = self._publish_task_rgb_typed_state(state)
+        return self._task_rgb_consumer.capture(publication.view)
 
     def _configure_task_rgb(self, camera, renderer):
         """Fix one task camera and renderer for this Env before its first reset."""
@@ -3006,8 +3141,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('physical control post-step state is stale or foreign')
                 physical_publication_after.view.validate_against_scene(profile.scene)
                 physical_publication_after.view.validate_requirements(profile.requirements)
-                if (getattr(self.binding, 'physical_observation_binding', None) is None
-                        and getattr(self, '_task_rgb_config', None) is None):
+                if getattr(self.binding, 'physical_observation_binding', None) is None:
                     self.typed_state = physical_publication_after
             observation_binding = getattr(self.binding, 'physical_observation_binding', None)
             if observation_binding is not None:
@@ -3023,9 +3157,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                - float(self.state.simulation_time)) > clock_tolerance):
                     raise ValueError('physical control post-step publication is stale or foreign')
                 self.typed_state = publication_after
-            elif getattr(self, '_task_rgb_config', None) is not None:
-                self._publish_task_rgb_typed_state()
-
         def evaluate(_state):
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info = dict(self.info)
@@ -4163,8 +4294,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'control_feedback'
             self.feedback = self.session.control_feedback(self.state)
             failure_phase = 'observation'
-            if getattr(self, '_task_rgb_config', None) is not None and not self.position_profile:
-                self._publish_task_rgb_typed_state()
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
             if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):

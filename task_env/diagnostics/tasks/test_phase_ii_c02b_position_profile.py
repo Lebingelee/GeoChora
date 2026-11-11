@@ -279,6 +279,39 @@ def test_selected_position_match_binds_panda_source_artifact_channels_and_resour
     assert set(match.resource_keys) == set(plan.resource_writers)
     assert match.model_requirement_sha256 == digest((profile.model.source_sha256,))
 
+    # F06 exposes native Joint/DOF target names and has no separate open
+    # actuator binding.  Those names must not replace the authored Scene
+    # actuator keys in the Controller match receipt.
+    from task_env.runtime.sessions.control import _match_position_profiles
+    native_dof_targets = {
+        key: value.rsplit('/', 1)[-1] for key, value in source.joints.items()
+    }
+    dof_source = replace(source, joint_targets=native_dof_targets, open_actuators=())
+    dof_profile = PandaPositionServoProfileV1(
+        artifact=artifact, source=dof_source, scene=profile.scene,
+        model=profile.model, config=profile.config,
+        target_bindings={
+            f'panda-main/joint{i}': native_dof_targets[f'panda-main/joint{i}']
+            for i in range(1, 8)
+        },
+        open_actuator=None,
+    )
+    dof_match, = _match_position_profiles(
+        {**value, 'source': dof_source}, (dof_profile,),
+    )
+    assert set(dof_match.resource_keys) == set(plan.resource_writers)
+    native_target_resources = {
+        (key.split('/', 1)[0], target, dof_profile.writer_id)
+        for key, target in dof_source.joint_targets.items()
+    }
+    assert set(dof_match.resource_keys) != native_target_resources
+    wrong_dof_source = replace(
+        dof_source,
+        joint_targets={**dof_source.joint_targets, 'panda-main/joint7': 'joint6'},
+    )
+    with pytest.raises(ValueError, match='RuntimeSource identity or bindings changed'):
+        dof_profile._validate_source(wrong_dof_source)
+
     foreign_source = replace(source, source_closure_digest='0' * 64)
     with pytest.raises(ValueError, match='differs from source, Scene, or Artifact'):
         bind_selected_controller(

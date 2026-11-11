@@ -123,7 +123,11 @@ class PositionRuntimeBuilder:
             env.session = materialize_control(env.artifact, env.execution, source=source,
                 binding=position_binding, controller_binding_plan=plan, controller_profile=profiles,
                 session_admission_input=env.value.get('session_admission_input'),
-                observer_render_request=getattr(env, '_observer_render_request', None))
+                observer_render_request=getattr(env, '_observer_render_request', None),
+                task_render_requested=bool(
+                    getattr(env, 'render_mode', None) is not None
+                    or getattr(env, '_component_task_rgb', None) is not None
+                ))
         env._materialized_position_control_binding = position_binding
         env._materialized_position_control_selector = selector
         initial = PositionInitialState(plan, env.position_scene, joints, frames,

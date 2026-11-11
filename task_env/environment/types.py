@@ -1277,19 +1277,32 @@ class ObservationSchema:
         }
         for field in self.fields:
             parts = tuple(part for part in field.name.split(".") if part)
-            if len(parts) < 2:
-                raise ValueError(
-                    f"observation field {field.name} must use group.leaf naming"
-                )
+            if not parts:
+                raise ValueError("observation field name cannot be empty")
             group = parts[0]
             if group not in expected_tree:
                 raise ValueError(
                     f"observation field {field.name} uses unknown group {group}"
                 )
+            if len(parts) == 1:
+                if expected_tree[group]:
+                    raise ValueError(f"top-level observation leaf {group} conflicts with nested fields")
+                expected_tree[group] = field
+                continue
+            if not isinstance(expected_tree[group], OrderedDict):
+                raise ValueError(f"nested observation fields conflict with top-level leaf {group}")
             cursor = expected_tree[group]
             for key in parts[1:-1]:
-                cursor = cursor.setdefault(key, OrderedDict())
-            cursor[parts[-1]] = field
+                child = cursor.get(key)
+                if child is None:
+                    child = cursor[key] = OrderedDict()
+                elif not isinstance(child, OrderedDict):
+                    raise ValueError(f"nested observation field {field.name} conflicts at {key}")
+                cursor = child
+            leaf = parts[-1]
+            if leaf in cursor:
+                raise ValueError(f"observation field {field.name} conflicts with an existing field")
+            cursor[leaf] = field
 
         def _validate_tree(expected: OrderedDict[str, Any], value: Any, path: str) -> None:
             if not isinstance(value, MappingABC):
@@ -1302,7 +1315,8 @@ class ObservationSchema:
 
         for group, expected in expected_tree.items():
             value = observation[group]
-            _validate_tree(expected, value, group)
+            if isinstance(expected, OrderedDict):
+                _validate_tree(expected, value, group)
         for field in self.fields:
             parts = tuple(field.name.split("."))
             value = observation[parts[0]]

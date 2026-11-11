@@ -855,10 +855,13 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
                 _session_admission_input=None, _native_feedback_profile=None,
-                _observer_render_request=None, _legacy_observer_requested=False,
+                _observer_render_request=None, _task_render_requested=False,
+                _legacy_observer_requested=False,
                 _legacy_camera_observations=False) -> RuntimeSession:
     if type(_legacy_observer_requested) is not bool:
         raise TypeError('legacy observer request must be boolean')
+    if type(_task_render_requested) is not bool:
+        raise TypeError('task render request must be boolean')
     if _legacy_observer_requested and execution.physics_provider != 'geophys':
         raise ValueError('legacy observer is only available with GeoPhys physics')
     if type(_legacy_camera_observations) is not bool:
@@ -908,6 +911,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             artifact, declared_execution, source,
             f06_pickcube_input=_f06_pickcube_isaac_input,
             observer_render_request=_observer_render_request,
+            task_render_requested=_task_render_requested,
         )
         from .native_io import UsdCoreRuntimeSession
         try:

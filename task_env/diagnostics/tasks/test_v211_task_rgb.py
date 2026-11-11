@@ -104,6 +104,52 @@ def test_task_rgb_rejects_wrong_episode_before_calling_renderer():
     consumer.close()
 
 
+def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkeypatch):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    events = []
+
+    class ResetState:
+        stopped = True
+
+        def require_open(self, _message):
+            return None
+
+        def execute_reset(self, **operations):
+            assert 'after_commit' not in operations
+            self.stopped = False
+            events.append('execute_reset_return')
+            return {'observation': 'published'}, {'info': 'published'}
+
+    lifecycle = ResetState()
+    env = object.__new__(SelectedReferenceEnv)
+    env._task_rgb_config = object()
+    env._defer_task_rgb_capture = False
+    env._reset_failure_receipt = 'prior'
+    env.state = 'published-state'
+
+    def after_commit(state, result):
+        assert state == env.state
+        assert lifecycle.stopped is False
+        assert env._defer_task_rgb_capture is False
+        assert env._reset_failure_receipt is None
+        events.append('task_rgb_capture')
+        return {'task_rgb': 'captured'}, {'task_rgb_v1': 'receipt'}
+
+    operations = {
+        'after_commit': after_commit,
+        'on_failure': lambda phase, error: events.append(('cleanup', phase, error)),
+    }
+    monkeypatch.setattr(env, '_episode_execution_state', lambda: lifecycle, raising=False)
+    monkeypatch.setattr(env, '_has_component_assembly', lambda: False, raising=False)
+    monkeypatch.setattr(env, '_prepare_reference_reset', lambda **_kwargs: operations, raising=False)
+
+    result = SelectedReferenceEnv.reset(env)
+
+    assert result == ({'task_rgb': 'captured'}, {'task_rgb_v1': 'receipt'})
+    assert events == ['execute_reset_return', 'task_rgb_capture']
+
+
 def test_public_factory_adds_camera_to_an_independently_named_selected_task(monkeypatch):
     from types import SimpleNamespace
     from task_env.environment.gym_compat import Box, Dict

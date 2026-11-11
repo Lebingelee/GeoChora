@@ -131,6 +131,18 @@ def _validate_isaac_task_thread_count(actual: int) -> int:
     return actual
 
 
+def _isaac_app_launch_profile_id(*, f06_pickcube: bool,
+                                 observer_render_request,
+                                 task_render_requested: bool) -> str | None:
+    if type(f06_pickcube) is not bool or type(task_render_requested) is not bool:
+        raise TypeError('Isaac launch-profile selectors must be exact booleans')
+    if observer_render_request is not None or task_render_requested:
+        return V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1
+    if f06_pickcube:
+        return F06_ISAAC_APP_LAUNCH_PROFILE_V1
+    return None
+
+
 def _numeric_value_matches(actual, expected, *, abs_tol: float) -> bool:
     """Compare public USD numeric readback without requiring float64 equality."""
     return math.isclose(float(actual), float(expected), rel_tol=0.0, abs_tol=abs_tol)
@@ -144,6 +156,23 @@ def _numeric_tuple_matches(actual, expected, *, abs_tol: float) -> bool:
         _numeric_value_matches(value, target, abs_tol=abs_tol)
         for value, target in zip(actual, expected, strict=True)
     )
+
+
+def _task_render_clock_mapping(*, provider_time_s, episode_time_s):
+    """Record the provider/episode epoch relation without mutating Kit time."""
+    provider_time = float(provider_time_s)
+    episode_time = float(episode_time_s)
+    if not math.isfinite(provider_time) or not math.isfinite(episode_time):
+        raise ValueError('task render clock mapping requires finite clock values')
+    return {
+        'schema_version': 'isaac-task-render-clock-observation-v1',
+        'clock_mapping': 'episode-local state time + measured provider epoch offset = provider-global time',
+        'episode_time_s': episode_time,
+        'provider_time_s': provider_time,
+        'provider_epoch_offset_s': provider_time - episode_time,
+        'timeline_mutated': False,
+        'physics_step_requested': False,
+    }
 
 
 
@@ -811,6 +840,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._observer_render_request = observer_render_request
         self._observer_stage_time_range_receipt = None
         self._observer_render_light_receipt = None
+        self._task_renderer_stage_preparation = None
         self._observer_sensor = None
         self._observer_path = None
         self._task_camera_path = None
@@ -2229,6 +2259,114 @@ class IsaacSimNativeRuntimeIOV1:
         return (int(self._manager.get_num_physics_steps()),
                 float(self._manager.get_simulation_time()))
 
+    def _prepare_task_rgb_render_stage(self):
+        """Prepare only the live USD stage for task RGB, preserving source bytes and physics."""
+        import copy
+        import omni.timeline
+        from pxr import Gf, Sdf, UsdLux
+
+        if self._task_renderer_stage_preparation is not None:
+            return copy.deepcopy(self._task_renderer_stage_preparation)
+        if self._stage is None or self._manager is None:
+            raise RuntimeError('task RGB stage preparation requires the live source stage and manager')
+        timeline = omni.timeline.get_timeline_interface()
+        if timeline.is_playing():
+            raise RuntimeError('task RGB stage preparation requires the existing timeline to be paused')
+        before = self._counter()
+        timeline_before_s = float(timeline.get_current_time())
+        stage_id = int(self._context.get_stage_id())
+
+        reused_observer_preparation = (
+            self._observer_stage_time_range_receipt is not None
+            and self._observer_render_light_receipt is not None
+        )
+        if not reused_observer_preparation:
+            start_time_code = float(self._stage.GetStartTimeCode())
+            source_end_time_code = float(self._stage.GetEndTimeCode())
+            end_time_code = source_end_time_code
+            extended = end_time_code <= start_time_code
+            if extended:
+                # RTX annotators need a non-degenerate playback range for a
+                # static source. This touches only the disposable live stage;
+                # the verified USD closure is never saved or rewritten.
+                end_time_code = start_time_code + 1.0
+                self._stage.SetEndTimeCode(end_time_code)
+            self._observer_stage_time_range_receipt = {
+                'schema_version': 'isaac-task-rgb-stage-time-range-v1',
+                'source_start_time_code': start_time_code,
+                'source_end_time_code': source_end_time_code,
+                'effective_start_time_code': start_time_code,
+                'effective_end_time_code': end_time_code,
+                'extended_in_memory': extended,
+                'time_codes_per_second': float(self._stage.GetTimeCodesPerSecond()),
+                'frames_per_second': float(self._stage.GetFramesPerSecond()),
+                'stage_saved': False,
+            }
+
+            light_paths = sorted(
+                str(prim.GetPath()) for prim in self._stage.Traverse()
+                if prim.HasAPI(UsdLux.LightAPI)
+            )
+            added_light_path = None
+            if not light_paths:
+                added_light_path = '/GeoChoraObserverEnvironmentLight'
+                existing = self._stage.GetPrimAtPath(added_light_path)
+                if existing and existing.IsValid():
+                    if not existing.HasAPI(UsdLux.LightAPI):
+                        raise RuntimeError(
+                            'task RGB renderer-light path is occupied by a non-light prim'
+                        )
+                    light_paths.append(added_light_path)
+                    added_light_path = None
+                else:
+                    dome = UsdLux.DomeLight.Define(self._stage, Sdf.Path(added_light_path))
+                    if not dome or not dome.GetPrim().IsValid():
+                        raise RuntimeError('task RGB could not define its renderer-only dome light')
+                    dome.GetIntensityAttr().Set(1000.0)
+                    dome.GetColorAttr().Set(Gf.Vec3f(1.0, 1.0, 1.0))
+            self._observer_render_light_receipt = {
+                'schema_version': 'isaac-task-rgb-render-light-v1',
+                'source_light_paths': sorted(light_paths),
+                'added_light_path': added_light_path,
+                'added_light_type': 'UsdLux.DomeLight' if added_light_path else None,
+                'added_light_intensity': 1000.0 if added_light_path else None,
+                'added_light_color_linear_rgb': [1.0, 1.0, 1.0] if added_light_path else None,
+                'stage_saved': False,
+            }
+
+        after = self._counter()
+        timeline_after_s = float(timeline.get_current_time())
+        if (after != before or timeline.is_playing()
+                or not math.isclose(timeline_before_s, timeline_after_s, rel_tol=0.0, abs_tol=1e-12)
+                or int(self._context.get_stage_id()) != stage_id):
+            self._observer_runtime_invalid = True
+            owner = getattr(self, '_app_owner', None)
+            if owner is not None:
+                owner.invalidate_runtime('task RGB renderer-stage preparation changed the live runtime clock')
+            raise RuntimeError('task RGB renderer-stage preparation changed physics, timeline, or stage identity')
+
+        self._task_renderer_stage_preparation = {
+            'schema_version': 'isaac-task-rgb-render-stage-preparation-v1',
+            'purpose': 'source-bound task RGB only; no physics owner created',
+            'stage_id': stage_id,
+            'physics_counter_before': {'step': before[0], 'time_s': before[1]},
+            'physics_counter_after': {'step': after[0], 'time_s': after[1]},
+            'timeline_time_before_s': timeline_before_s,
+            'timeline_time_after_s': timeline_after_s,
+            'timeline_remained_paused': True,
+            'reused_observer_preparation': reused_observer_preparation,
+            'stage_time_range': copy.deepcopy(self._observer_stage_time_range_receipt),
+            'render_light': copy.deepcopy(self._observer_render_light_receipt),
+            'source_closure_digest': self._source.source_closure_digest,
+            'source_bytes_modified': False,
+            'stage_saved': False,
+        }
+        if isinstance(getattr(self, '_build_layout_facts', None), dict):
+            self._build_layout_facts['task_rgb_render_stage_preparation'] = copy.deepcopy(
+                self._task_renderer_stage_preparation
+            )
+        return copy.deepcopy(self._task_renderer_stage_preparation)
+
     def write_reset(self, sample: ResetSample,
                     position_targets: tuple[tuple[int, str, float], ...]) -> NativeResetWriteReceiptV1:
         if self._closed:
@@ -2824,6 +2962,7 @@ class IsaacSimNativeRuntimeIOV1:
         camera.validate()
         if camera.task_artifact_hash != self._artifact.identity_hash or camera.parent_frame != 'world':
             raise ValueError('task camera must be linked to this artifact and world mounted')
+        self._prepare_task_rgb_render_stage()
         metadata = resolve_camera(camera, state)
         path = '/GeoChoraTaskCamera_' + uuid.uuid4().hex
         try:
@@ -2851,6 +2990,7 @@ class IsaacSimNativeRuntimeIOV1:
             raise
 
     def task_camera_binding(self, state):
+        import copy
         import numpy as np
         from pxr import UsdGeom
         from ...observations.canonical_camera import resolve_camera
@@ -2876,6 +3016,9 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError('native task camera geometry no longer matches its declaration')
         return {'camera': camera.to_mapping(), 'camera_identity': camera.identity_hash,
                 'source_closure': self._source.source_closure_digest,
+                'renderer_stage_preparation': copy.deepcopy(
+                    self._task_renderer_stage_preparation
+                ),
                 'native_camera_prim': path, 'native_world_transform': actual.tolist(),
                 'native_focal_length': focal, 'native_vertical_aperture': vertical,
                 'native_horizontal_aperture': horizontal, 'native_clipping': clipping,
@@ -2915,16 +3058,18 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError('Isaac task renderer is unavailable or faulted')
         if camera != self._task_camera_geometry or self._task_camera_path is None:
             raise ValueError('Isaac task capture camera differs from its binding')
-        self.task_camera_binding(state)
+        binding_receipt = self.task_camera_binding(state)
+        self._task_camera_binding_receipt = binding_receipt
         try:
             return self._capture_observer_admitted(camera, state, resolve_camera, normalize_rgb,
                                                    CanonicalCameraObservation, task=True)
         except BaseException as error:
             self._observer_faulted = True
-            try:
-                self._close_task_camera_sensor()
-            except BaseException as cleanup_error:
-                error.add_note(f'Isaac task sensor cleanup also failed: {cleanup_error!r}')
+            for close in (self._close_observer, self._close_task_camera_sensor):
+                try:
+                    close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'Isaac task camera cleanup also failed: {cleanup_error!r}')
             raise
 
     def task_camera_completion(self, state):
@@ -2945,15 +3090,16 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError(f'Isaac {operation} changed the physics clock or resumed the timeline: '
                                f'before={before!r}, after={after!r}, playing={playing!r}')
 
-    def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb, observation_type, *, task=False):
+    def _capture_observer_admitted(self, camera, state, resolve_camera, normalize_rgb,
+                                   observation_type, *, task=False):
         import json
         import uuid
         import numpy as np
-        import omni.replicator.core as rep
         import omni.timeline
         import omni.usd
-        from pxr import Gf, UsdGeom
+        from pxr import Gf, UsdGeom, UsdRender
         from isaacsim.sensors.experimental.rtx import RtxCamera, CameraSensor
+        import omni.replicator.core as rep
         from ...artifacts import RendererSelectionV1
         from ...render.camera.source import CameraCaptureIdentityV1
 
@@ -2980,13 +3126,44 @@ class IsaacSimNativeRuntimeIOV1:
         self._sync()
         self._check_observer_clock(before, playing=timeline.is_playing(), operation='Fabric update')
         published_bodies = self._publish_observer_body_transforms()
+        task_clock_mapping = None
+        if task:
+            state_sample_time = float(state.sample_clock.simulation_time_s)
+            state_boundary = state.boundary.to_mapping()
+            episode_id = str(state_boundary['episode_id'])
+            task_clock_mapping = _task_render_clock_mapping(
+                provider_time_s=before[1], episode_time_s=state_sample_time,
+            )
+            prior_epoch = getattr(self, '_task_render_clock_epoch', None)
+            if (prior_epoch is not None and prior_epoch['episode_id'] == episode_id
+                    and not math.isclose(
+                        float(prior_epoch['provider_epoch_offset_s']),
+                        float(task_clock_mapping['provider_epoch_offset_s']),
+                        rel_tol=0.0, abs_tol=1e-9,
+                    )):
+                raise RuntimeError(
+                    'Isaac provider-to-episode clock epoch changed within one episode: '
+                    f'previous={prior_epoch!r}, current={task_clock_mapping!r}'
+                )
+            self._task_render_clock_epoch = {
+                'episode_id': episode_id,
+                'provider_epoch_offset_s': task_clock_mapping['provider_epoch_offset_s'],
+            }
+            print('G05_TASK_RGB_CLOCK_MAPPING '
+                  + json.dumps(task_clock_mapping, sort_keys=True), flush=True)
+        stage = omni.usd.get_context().get_stage()
+        if stage is None or stage != self._stage:
+            raise RuntimeError('Isaac observer lost its leased USD stage')
         task_sensor_created = False
         if task:
             path = self._task_camera_path
+            if path is None:
+                raise RuntimeError('Isaac task camera lost its source-bound USD prim')
             if self._task_camera_sensor is None:
                 authoring = RtxCamera(path, tick_rate=0.0, reset_xform_op_properties=False)
-                self._task_camera_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
-                                                        annotators=['rgb'])
+                self._task_camera_sensor = CameraSensor(
+                    authoring, resolution=(camera.height, camera.width), annotators=['rgb'],
+                )
                 task_sensor_created = True
             sensor = self._task_camera_sensor
         else:
@@ -2994,84 +3171,300 @@ class IsaacSimNativeRuntimeIOV1:
                 path = '/GeoChoraObserver_' + uuid.uuid4().hex
                 self._observer_path = path
                 authoring = RtxCamera(path, tick_rate=0.0)
-                self._observer_sensor = CameraSensor(authoring, resolution=(camera.height, camera.width),
-                                                     annotators=['rgb'])
+                self._observer_sensor = CameraSensor(
+                    authoring, resolution=(camera.height, camera.width), annotators=['rgb'],
+                )
             path, sensor = self._observer_path, self._observer_sensor
-        stage = omni.usd.get_context().get_stage()
-        if stage is None or stage != self._stage:
-            raise RuntimeError('Isaac observer lost its leased USD stage')
         prim = stage.GetPrimAtPath(path)
-        if not prim or not prim.IsValid():
+        if not prim or not prim.IsValid() or not prim.IsA(UsdGeom.Camera):
             raise RuntimeError('Isaac observer camera prim is unavailable')
         usd_camera = UsdGeom.Camera(prim)
         focal = 24.0
         vertical = 2.0 * focal * math.tan(camera.fov_y / 2.0)
-        usd_camera.GetFocalLengthAttr().Set(focal)
-        usd_camera.GetVerticalApertureAttr().Set(vertical)
-        usd_camera.GetHorizontalApertureAttr().Set(vertical * camera.width / camera.height)
-        usd_camera.GetClippingRangeAttr().Set(Gf.Vec2f(camera.near, camera.far))
         world = np.asarray(metadata.T_world_from_camera, dtype=np.float64).copy()
         world[:3, :3] = world[:3, :3] @ np.diag([1.0, -1.0, -1.0])
-        xform = UsdGeom.Xformable(prim)
-        xform.ClearXformOpOrder()
-        op = xform.AddTransformOp()
-        op.Set(Gf.Matrix4d(*[float(value) for value in world.T.reshape(-1)]))
-        actual = np.asarray(UsdGeom.XformCache().GetLocalToWorldTransform(prim)).T
-        if not np.allclose(actual, world, atol=1e-6, rtol=0):
-            raise RuntimeError('Isaac realized observer camera transform differs from the request')
+        if task:
+            binding = self.task_camera_binding(state)
+            actual = np.asarray(binding['native_world_transform'], dtype=np.float64)
+            if (binding['native_camera_prim'] != path
+                    or not np.allclose(actual, world, atol=1e-6, rtol=0)):
+                raise RuntimeError('Isaac task sensor is not attached to its verified bound camera')
+        else:
+            usd_camera.GetFocalLengthAttr().Set(focal)
+            usd_camera.GetVerticalApertureAttr().Set(vertical)
+            usd_camera.GetHorizontalApertureAttr().Set(vertical * camera.width / camera.height)
+            usd_camera.GetClippingRangeAttr().Set(Gf.Vec2f(camera.near, camera.far))
+            xform = UsdGeom.Xformable(prim)
+            xform.ClearXformOpOrder()
+            op = xform.AddTransformOp()
+            op.Set(Gf.Matrix4d(*[float(value) for value in world.T.reshape(-1)]))
+            actual = np.asarray(UsdGeom.XformCache().GetLocalToWorldTransform(prim)).T
+            if not np.allclose(actual, world, atol=1e-6, rtol=0):
+                raise RuntimeError('Isaac realized observer camera transform differs from the request')
         task_completions = []
+        dispatcher_path = '/Render/PostProcess/SDGPipeline/PostProcessDispatcher'
+
+        def log_task_scheduler_snapshot(phase, operation):
+            import carb
+            import omni.graph.core as og
+
+            snapshot = {
+                'phase': phase,
+                'operation': operation,
+                'physics_step': int(before[0]),
+                'physics_time_s': float(before[1]),
+                'timeline_playing': bool(timeline.is_playing()),
+                'timeline_time_s': float(timeline.get_current_time()),
+                'task_clock_mapping': task_clock_mapping,
+                'task_renderer_stage_preparation': copy.deepcopy(
+                    getattr(self, '_task_renderer_stage_preparation', None)
+                ),
+                'usd_stage_time_range': {
+                    'start_time_code': float(self._stage.GetStartTimeCode()),
+                    'end_time_code': float(self._stage.GetEndTimeCode()),
+                    'time_codes_per_second': float(self._stage.GetTimeCodesPerSecond()),
+                    'frames_per_second': float(self._stage.GetFramesPerSecond()),
+                },
+                'sensor_camera_prim': path,
+            }
+            try:
+                import usdrt
+                node = og.get_node_by_path(dispatcher_path)
+                snapshot['dispatcher_present'] = node is not None
+                if node is not None:
+                    snapshot['dispatcher_compute_count'] = int(node.get_compute_count())
+                    numerator = node.get_attribute('outputs:referenceTimeNumerator').get()
+                    denominator = node.get_attribute('outputs:referenceTimeDenominator').get()
+                    snapshot['dispatcher_reference_time_numerator'] = (
+                        None if numerator is None else int(numerator)
+                    )
+                    snapshot['dispatcher_reference_time_denominator'] = (
+                        None if denominator is None else int(denominator)
+                    )
+                    snapshot['dispatcher_reference_time_s'] = (
+                        float(numerator) / float(denominator)
+                        if numerator is not None and denominator not in (None, 0) else None
+                    )
+                settings = carb.settings.get_settings()
+                stage_id = int(omni.usd.get_context().get_stage_id())
+                snapshot['usd_stage_id'] = stage_id
+                snapshot['play_simulations_setting'] = settings.get_as_bool(
+                    '/app/player/playSimulations'
+                )
+                fabric_stage = usdrt.Usd.Stage.Attach(stage_id)
+                external_time_prim = fabric_stage.GetPrimAtPath('/ExternalSimulationTime')
+                snapshot['fabric_external_simulation_time_prim_present'] = bool(
+                    external_time_prim and external_time_prim.IsValid()
+                )
+                if external_time_prim and external_time_prim.HasAttribute('omni:time'):
+                    external_time = external_time_prim.GetAttribute('omni:time').Get()
+                    snapshot['fabric_external_simulation_time_s'] = (
+                        None if external_time is None else float(external_time)
+                    )
+                else:
+                    snapshot['fabric_external_simulation_time_s'] = None
+                snapshot['support_multi_tick_rate'] = bool(
+                    settings.get_as_bool('/rtx/hydra/supportMultiTickRate')
+                )
+                snapshot['async_rendering'] = bool(
+                    settings.get_as_bool('/omni/replicator/asyncRendering')
+                )
+                snapshot['sensor_has_data'] = bool(sensor.has_data())
+                product = sensor.render_product
+                product_prim = product.GetPrim()
+                snapshot['render_product_path'] = (
+                    str(product_prim.GetPath()) if product_prim and product_prim.IsValid() else None
+                )
+                if product_prim and product_prim.IsValid():
+                    resolution = product_prim.GetAttribute('resolution').Get()
+                    snapshot['render_product_resolution'] = (
+                        list(resolution) if resolution is not None else []
+                    )
+                    viewport_handle = product_prim.GetAttribute('viewportHandle')
+                    snapshot['render_product_viewport_handle'] = (
+                        None if not viewport_handle or not viewport_handle.IsValid()
+                        else viewport_handle.Get()
+                    )
+                    camera_rel = UsdRender.Product(product_prim).GetCameraRel()
+                    snapshot['render_product_camera_targets'] = [
+                        str(target) for target in camera_rel.GetTargets()
+                    ]
+                if task:
+                    snapshot['replicator_status'] = str(rep.orchestrator.get_status())
+                    snapshot['replicator_sim_times_to_write'] = [
+                        [int(numerator), int(denominator)]
+                        for numerator, denominator in rep.orchestrator.get_sim_times_to_write()
+                    ]
+            except Exception as error:
+                snapshot['diagnostic_read_error'] = f'{type(error).__name__}: {error}'
+            print('G05_TASK_RGB_RENDER_DIAG ' + json.dumps(snapshot, sort_keys=True), flush=True)
+            return snapshot
+
+        task_rgb_data = None
 
         def render_once(operation, *, allow_unready=False):
+            nonlocal task_rgb_data
+            task_render_pulse = None
+            task_sensor_progress = None
             if task:
+                import carb
                 import omni.graph.core as og
-                path = '/Render/PostProcess/SDGPipeline/PostProcessDispatcher'
-                node = og.get_node_by_path(path)
+                before_render_snapshot = log_task_scheduler_snapshot('before_render', operation)
+                node = og.get_node_by_path(dispatcher_path)
                 prior_count = int(node.get_compute_count()) if node else 0
-            rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0, wait_for_render=True)
+                previous_data, previous_info = sensor.get_data('rgb')
+                previous_frame_id = (
+                    previous_info.get('frameId') if isinstance(previous_info, Mapping) else None
+                )
+                if previous_frame_id is not None and type(previous_frame_id) not in (int, float, str):
+                    previous_frame_id = repr(previous_frame_id)
+                timeline_before_s = float(timeline.get_current_time())
+                settings = carb.settings.get_settings()
+                play_simulations_before = bool(
+                    settings.get_as_bool('/app/player/playSimulations')
+                )
+                # The task sensor is attached to its bound task prim. Match the
+                # known-good zero-delta synchronous Replicator path under this
+                # existing App owner; there is no second renderer or physics owner.
+                rep.orchestrator.step(rt_subframes=1, pause_timeline=True,
+                                      delta_time=0.0, wait_for_render=True)
+                after_render_snapshot = log_task_scheduler_snapshot('after_render', operation)
+                attempt_data, sensor_info = sensor.get_data('rgb')
+                timeline_after_s = float(timeline.get_current_time())
+                play_simulations_after = bool(
+                    settings.get_as_bool('/app/player/playSimulations')
+                )
+                frame_id = sensor_info.get('frameId') if isinstance(sensor_info, Mapping) else None
+                if frame_id is not None and type(frame_id) not in (int, float, str):
+                    frame_id = repr(frame_id)
+                sensor_has_data = bool(sensor.has_data())
+                timeline_time_unchanged = math.isclose(
+                    timeline_before_s, timeline_after_s, rel_tol=0.0, abs_tol=1e-9,
+                )
+                frame_id_advanced = (
+                    frame_id != previous_frame_id
+                    if frame_id is not None and previous_frame_id is not None else None
+                )
+                task_sensor_progress = {
+                    'sensor_had_payload_before': previous_data is not None,
+                    'sensor_has_data_after': sensor_has_data,
+                    'rgb_payload_available_after': attempt_data is not None,
+                    'frame_id_before': previous_frame_id,
+                    'frame_id_after': frame_id,
+                    'frame_id_advanced': frame_id_advanced,
+                }
+                task_render_pulse = {
+                    'render_owner': 'omni.replicator.core.orchestrator.step(wait_for_render=True)',
+                    'delta_time_s': 0.0,
+                    'timeline_time_before_s': timeline_before_s,
+                    'timeline_time_after_s': timeline_after_s,
+                    'timeline_time_unchanged': timeline_time_unchanged,
+                    'timeline_paused_after': not bool(timeline.is_playing()),
+                    'play_simulations_before': play_simulations_before,
+                    'play_simulations_after': play_simulations_after,
+                    'play_simulations_restored': play_simulations_before == play_simulations_after,
+                    'sensor_progress': task_sensor_progress,
+                }
+                print('G05_TASK_RGB_SYNC_CAPTURE '
+                      + json.dumps(task_render_pulse, sort_keys=True), flush=True)
+            else:
+                rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0,
+                                      wait_for_render=True)
             self._check_observer_clock(before, playing=timeline.is_playing(), operation=operation)
             if task:
-                node = og.get_node_by_path(path)
+                node = og.get_node_by_path(dispatcher_path)
                 after_count = int(node.get_compute_count()) if node else 0
                 numerator = node.get_attribute('outputs:referenceTimeNumerator').get() if node else None
                 denominator = node.get_attribute('outputs:referenceTimeDenominator').get() if node else None
                 reference = (float(numerator) / float(denominator)
                              if numerator is not None and denominator not in (None, 0) else None)
                 count_delta = after_count - prior_count
-                # Replicator 6.2 logs and returns at 1000 wait iterations.
-                # Only a new dispatch with a reference time matching the
-                # native physics clock is eligible as a completed capture.
+                fabric_before_time = before_render_snapshot.get('fabric_external_simulation_time_s')
+                fabric_after_time = after_render_snapshot.get('fabric_external_simulation_time_s')
+                fabric_clock_matches_provider = (
+                    fabric_before_time is not None and fabric_after_time is not None
+                    and math.isfinite(float(fabric_before_time))
+                    and math.isfinite(float(fabric_after_time))
+                    and abs(float(fabric_before_time) - float(before[1])) <= 1e-6
+                    and abs(float(fabric_after_time) - float(before[1])) <= 1e-6
+                )
+                timeline_matches_provider = math.isclose(
+                    float(timeline.get_current_time()), float(before[1]),
+                    rel_tol=0.0, abs_tol=1e-9,
+                )
+                frame_is_fresh = (
+                    task_sensor_progress['frame_id_advanced']
+                    if task_sensor_progress['frame_id_advanced'] is not None else count_delta > 0
+                )
+                # Timeline/provider equality is diagnostic only: the task
+                # renderer is fenced by dispatcher/Fabric time and the paused
+                # timeline must remain unchanged, not be rewritten to match.
                 complete = (0 < count_delta < 1000 and reference is not None
-                            and math.isfinite(reference) and abs(reference - float(before[1])) <= 1e-6)
+                            and math.isfinite(reference) and abs(reference - float(before[1])) <= 1e-6
+                            and sensor_has_data and attempt_data is not None and frame_is_fresh
+                            and fabric_clock_matches_provider
+                            and task_render_pulse['timeline_time_unchanged']
+                            and task_render_pulse['timeline_paused_after']
+                            and task_render_pulse['play_simulations_restored'])
+                if complete:
+                    task_rgb_data = attempt_data
                 task_completions.append({'operation': operation, 'dispatcher_before': prior_count,
                                          'dispatcher_after': after_count,
                                          'reference_time': reference, 'physics_time': float(before[1]),
-                                         'timeline_time': float(timeline.get_current_time()),
+                                         'state_sample_time': float(state.sample_clock.simulation_time_s),
+                                         'provider_epoch_offset_s': task_clock_mapping['provider_epoch_offset_s'],
+                                         'task_clock_mapping': task_clock_mapping,
+                                         'timeline_matches_provider': timeline_matches_provider,
+                                         'timeline_time_unchanged': task_render_pulse['timeline_time_unchanged'],
+                                         'fabric_clock_matches_provider': fabric_clock_matches_provider,
+                                         'sensor_camera_prim': path,
+                                         'synchronous_render_owner': task_render_pulse['render_owner'],
+                                         'synchronous_capture': task_render_pulse,
+                                         'timeline_time_s': float(timeline.get_current_time()),
+                                         'fabric_external_simulation_time': after_render_snapshot.get(
+                                             'fabric_external_simulation_time_s'
+                                         ),
+                                         'fabric_stage_id': after_render_snapshot.get('usd_stage_id'),
+                                         'fabric_clock_before': before_render_snapshot.get(
+                                             'fabric_external_simulation_time_s'
+                                         ),
+                                         'sensor_frame_id': frame_id,
+                                         'sensor_progress': task_sensor_progress,
+                                         'sensor_payload_available': attempt_data is not None,
                                          'completed': complete})
                 if not complete and not allow_unready:
                     raise RuntimeError(f'Isaac task render did not complete at the current physics time: {task_completions[-1]!r}')
                 return complete
 
         if task:
-            # The task sensor is first created inside reset, before the old
-            # post-reset observer ever rendered.  Let RTX initialize its
-            # settings without publishing this warm-up frame or advancing
-            # the already observed physics boundary.
+            # A newly created render product needs App updates before its
+            # first synchronous request. Neither initialization nor warmup may
+            # advance the physical boundary owned by the RuntimeSession.
             if task_sensor_created:
                 for _ in range(4):
                     self._app_owner.app.update()
-                    self._check_observer_clock(before, playing=timeline.is_playing(), operation='task sensor initialization')
-            for _ in range(4):
+                    self._check_observer_clock(
+                        before, playing=timeline.is_playing(),
+                        operation='task sensor initialization',
+                    )
+            # Cold RTX initialization may outlast four synchronous polls.
+            # Bound readiness retries; every poll retains the completion and
+            # no-physics-advance fences, and the worker enforces wall/memory limits.
+            for _ in range(8):
                 if render_once('task sensor warmup', allow_unready=True):
                     break
             else:
-                raise RuntimeError(f'Isaac task sensor did not complete bounded warmup: {task_completions!r}')
+                raise RuntimeError(
+                    f'Isaac task sensor did not complete bounded warmup: {task_completions!r}'
+                )
         color_settings = _read_isaac_observer_color_settings()
-        data = None
-        for _ in range(8):
-            render_once('task sensor rendering' if task else 'observer rendering')
-            data, _info = sensor.get_data('rgb')
-            if data is not None:
-                break
+        data = task_rgb_data if task else None
+        if not task:
+            for _ in range(8):
+                render_once('observer rendering')
+                data, _info = sensor.get_data('rgb')
+                if data is not None:
+                    break
         if data is None:
             raise RuntimeError('Isaac observer RGB did not complete within the bounded render wait')
         if _read_isaac_observer_color_settings() != color_settings:
@@ -3082,16 +3475,25 @@ class IsaacSimNativeRuntimeIOV1:
                                               camera.fov_y, camera.near, camera.far)
         else:
             self._task_camera_completion = {'state_boundary': state.boundary.to_mapping(),
+                                            'task_camera_binding': self._task_camera_binding_receipt,
                                             'dispatcher_completions': task_completions}
         rgb = np.array(data.numpy(), copy=True)
         selection = RendererSelectionV1('renderer-selection-v1', 'isaacsim', 'rtx',
                                         'v211_isaac_rtx_task_rgb_v1' if task else
                                         'v211_isaac_rtx_observer_v1', 'cuda:0')
         capability = {'schema': 'v211-isaac-rtx-observer-v1', 'sdk': '6.2.0.0',
-                      'capture': 'CameraSensor RGB; Replicator wait_for_render; owned host copy',
+                      'capture': ('source-bound task CameraSensor RGB; in-memory stage time range/light '
+                                  'receipt; one bounded synchronous zero-delta Replicator capture; owned host copy'
+                                  if task else 'CameraSensor RGB; Replicator wait_for_render; owned host copy'),
+                      'sensor_owner': ('task-camera-sensor' if task else
+                                       'observer-camera-sensor'),
+                      'rendered_camera_prim': path,
                       'color': color_settings,
                       'stage_time_range': self._observer_stage_time_range_receipt,
-                      'render_light': self._observer_render_light_receipt}
+                      'render_light': self._observer_render_light_receipt,
+                      'task_renderer_stage_preparation': getattr(
+                          self, '_task_renderer_stage_preparation', None
+                      )}
         capability_hash = hashlib.sha256(json.dumps(capability, sort_keys=True,
                                                   separators=(',', ':')).encode()).hexdigest()
         identity = CameraCaptureIdentityV1(
@@ -3367,7 +3769,8 @@ class IsaacSimNativeRuntimeIOV1:
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *,
                                   dg04_native_input=None, f06_pickcube_input=None,
-                                  g05_effort=False, observer_render_request=None):
+                                  g05_effort=False, observer_render_request=None,
+                                  task_render_requested=False):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
     dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
@@ -3405,8 +3808,11 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                 or f06_pickcube_input.execution.identity_hash != execution.identity_hash
                 or f06_pickcube_input.runtime_source is not source):
             raise ValueError('F06 Isaac adapter input differs from the exact artifact/execution/source')
-    launch_profile = (V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 if observer_render_request is not None
-                      else F06_ISAAC_APP_LAUNCH_PROFILE_V1 if f06_pickcube else None)
+    launch_profile = _isaac_app_launch_profile_id(
+        f06_pickcube=f06_pickcube,
+        observer_render_request=observer_render_request,
+        task_render_requested=task_render_requested,
+    )
     owner = _process_app_owner(launch_profile_id=launch_profile)
     lease = source.scene_source.acquire_snapshot()
     try:

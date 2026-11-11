@@ -9,7 +9,6 @@ class InitialStateResult:
     typed_publication: object | None = None
     feedback: object | None = None
     materialization_receipt: object | None = None
-    publishes_position: bool = False
 
 
 @dataclass(frozen=True)
@@ -29,8 +28,9 @@ class PositionInitialState:
         validate_initial_state_publication(session, publication, state)
         for capability in self.controllers:
             capability.initialize(publication, self.control_plan)
-        return InitialStateResult(publication, None,
-            self.declaration.initial_materialization_receipt(session), True)
+        return InitialStateResult(
+            publication, None, self.declaration.initial_materialization_receipt(session),
+        )
 
 
 @dataclass(frozen=True)

@@ -61,6 +61,54 @@ def selected_reference_observation_spaces(env):
     return observation_spaces
 
 
+def selected_reference_observation_schema(env, observation=None):
+    """Describe the exact selected Env projection and any fixed task camera."""
+    from ..environment.types import ObservationFieldSpec, ObservationSchema
+
+    spaces = env.observation_space.spaces
+    fields = []
+    declared_only = object()
+    root_names = list(observation.keys()) if isinstance(observation, Mapping) else list(spaces)
+    if getattr(env, '_task_rgb_config', None) is not None and 'task_rgb' not in root_names:
+        root_names.append('task_rgb')
+    if set(root_names) != set(spaces):
+        raise ValueError('selected observation projection differs from its declared top-level space')
+
+    def visit(path, value, space):
+        nested = getattr(space, 'spaces', None)
+        if isinstance(value, Mapping):
+            if nested is None or set(value) != set(nested):
+                raise ValueError(f'selected observation mapping {path!r} differs from its declared space')
+            for name, item in value.items():
+                visit(f'{path}.{name}' if path else str(name), item, nested[name])
+            return
+        if nested is not None and value is not declared_only:
+            raise ValueError(f'selected observation leaf {path!r} is missing its declared mapping')
+        if not hasattr(space, 'shape') or not hasattr(space, 'dtype'):
+            raise TypeError(f'selected observation space leaf {path!r} has no typed shape/dtype')
+        if value is not declared_only:
+            array = np.asarray(value)
+            if array.shape != tuple(space.shape) or np.dtype(array.dtype) != np.dtype(space.dtype):
+                raise ValueError(f'selected observation leaf {path!r} differs from its declared shape/dtype')
+        if path == 'task_rgb':
+            semantic, unit, frame = ('synchronized task RGB image', 'normalized RGB [0,1]', 'camera pixel grid')
+        elif path.endswith('ee_pose') or path.endswith('hand_pose'):
+            semantic, unit, frame = ('measured pose [x,y,z,qw,qx,qy,qz]', 'm + unit quaternion', 'world')
+        elif path.endswith('boundary_identity_sha256'):
+            semantic, unit, frame = ('state boundary identity digest', 'uint8[0,255]', 'identity')
+        else:
+            semantic, unit, frame = (f'task-declared observation leaf {path}', 'task-defined', 'task-defined')
+        fields.append(ObservationFieldSpec(
+            path, tuple(space.shape), str(np.dtype(space.dtype)), semantic, unit, frame,
+        ))
+
+    for group in root_names:
+        value = observation[group] if isinstance(observation, Mapping) and group in observation else declared_only
+        visit(str(group), value, spaces[group])
+    return ObservationSchema('selected-reference-observation-v1', tuple(fields),
+                             groups=tuple(str(name) for name in root_names))
+
+
 def selected_observation_binding():
     """Expose the existing selected observation space and state projection."""
     return {'observation_space_factory': selected_reference_observation_spaces,
