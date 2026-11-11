@@ -9,7 +9,7 @@ from ..environment.task_source import compile_existing_subject_effort_task, comp
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
-from ..robots.two_wheel_balance import TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
+from ..robots.two_wheel_balance import TWO_WHEEL_ACTION_CONTRACT
 
 from ..runtime.sessions.declared_effort_source import (
     declared_effort_scene, compile_declared_effort_source,
@@ -69,10 +69,10 @@ def reset_metadata(sample):
         'wheel_position_range_rad': [-.02, .02], 'wheel_rate_range_rad_s': [-.30, .30]}
 
 
-def task_binding(config, *, provider, backend, source_delivery_manifest=None):
+def task_binding(config, *, provider, backend, robot_uid, source_delivery_manifest=None):
     """Declare balance-task semantics for the common Robot construction path."""
     task = ExistingSubjectEffortTask(
-        robot_factory=TwoWheelBalanceEntity, compile_declaration=_declaration, reset_plan=_reset_plan,
+        robot_uid=robot_uid, compile_declaration=_declaration, reset_plan=_reset_plan,
         composition=TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID,
                                         success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION),
         construction_id='two-wheel-shared-physical-v1', source_revision='two-wheel-inline-v1',

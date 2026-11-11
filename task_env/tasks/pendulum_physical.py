@@ -10,7 +10,7 @@ from ..environment.task_source import compile_existing_subject_effort_task, comp
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
-from ..robots.pendulum import PendulumEntity, PENDULUM_ACTION_CONTRACT
+from ..robots.pendulum import PENDULUM_ACTION_CONTRACT
 
 from ..runtime.sessions.declared_effort_source import (
     declared_effort_scene, compile_declared_effort_source,
@@ -57,10 +57,10 @@ def reset_metadata(sample):
         'theta_dot_rad_s': sample.joint_velocity[JOINT]}
 
 
-def task_binding(config, *, provider, backend, source_delivery_manifest=None):
+def task_binding(config, *, provider, backend, robot_uid, source_delivery_manifest=None):
     """Declare Pendulum semantics for the common Robot construction path."""
     task = ExistingSubjectEffortTask(
-        robot_factory=PendulumEntity, compile_declaration=_declaration, reset_plan=_reset_plan,
+        robot_uid=robot_uid, compile_declaration=_declaration, reset_plan=_reset_plan,
         composition=TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                                         success_definition=PENDULUM_SUCCESS_DEFINITION),
         construction_id='pendulum-shared-physical-v1', source_revision='pendulum-inline-v1',

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 
 from .environment.protocols import (
-    AgentComponent,
+    RobotComponent,
     SceneBuilderComponent,
     TaskEnvironmentComponent,
     TaskObjectComponent,
@@ -107,7 +107,7 @@ class ComponentRegistry(Generic[T]):
 
 
 ENV_REGISTRY = ComponentRegistry("environment", TaskEnvironmentComponent)
-AGENT_REGISTRY = ComponentRegistry("agent", AgentComponent)
+AGENT_REGISTRY = ComponentRegistry("agent", RobotComponent)
 OBJECT_REGISTRY = ComponentRegistry("object", TaskObjectComponent)
 SCENE_REGISTRY = ComponentRegistry("scene", SceneBuilderComponent)
 
@@ -205,7 +205,7 @@ def make_env(
     ))
 
 
-def make_agent(uid: str, **kwargs) -> AgentComponent:
+def make_agent(uid: str, **kwargs) -> RobotComponent:
     import importlib
 
     importlib.import_module("task_env.robots")

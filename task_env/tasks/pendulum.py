@@ -659,6 +659,7 @@ class PendulumEnv(BaseTaskEnv):
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
     selected_supports_isaac = True
+    selected_robot_uids = frozenset(('pendulum-v1',))
     controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
     observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
@@ -675,6 +676,7 @@ class PendulumEnv(BaseTaskEnv):
         from .pendulum_physical import task_binding
         return task_binding(config.environment, provider=config.physics_provider,
                             backend=config.environment.runtime.backend,
+                            robot_uid=config.robot_uid or 'pendulum-v1',
                             source_delivery_manifest=config.source_delivery_manifest)
 
     uid = PENDULUM_ENV_ID

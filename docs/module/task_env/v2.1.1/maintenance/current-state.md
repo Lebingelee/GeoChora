@@ -89,3 +89,5 @@ Pendulum 与双轮车现在通过共同 Task Source 编译器从 Robot／Scene �
 Pendulum／双轮车的 Task 采样结果现在经共同 joint-effort reset 合同编译；两任务 MuJoCo CPU 的 reset、RNG 序列和短程已对照通过。tabletop reset 和完整生命周期仍须继续收敛，见[实施记录 6.36](../planning/post-5c-optimization-execution.md#636-简单主体-joint-effort-reset-合同归并)。
 
 Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、Artifact、source 和 Controller，Task 只提供各自声明及语义；MuJoCo CPU direct／阻尼和 GeoPhys CPU direct 短程通过。tabletop 的主体构建仍须继续收敛，见[实施记录 6.37](../planning/post-5c-optimization-execution.md#637-简单主体共同-taskrobot-构建编排)。
+
+四个正式任务现在可通过同一 registry 和 `robot.uid` 选择实际 Robot；Pendulum／双轮车不再由 Task 直接实例化具体主体，且不需伪造 Panda 专属能力。显式主体选择的五条 MuJoCo CPU 短程通过；source／Controller 的全部共同构建仍待完成。见[实施记录 6.38](../planning/post-5c-optimization-execution.md#638-四任务-robot-身份与实例创建入口)。

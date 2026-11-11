@@ -164,3 +164,26 @@ def test_formal_registry_rejects_retired_physical_diagnostic_uids(uid):
     importlib.import_module('task_env.tasks')
     with pytest.raises(KeyError):
         ENV_REGISTRY.get(uid)
+
+
+@pytest.mark.parametrize(('task_uid', 'robot_uid'), [
+    ('pick-cube-p16-reference-v1', 'panda-v1'),
+    ('nut-assembly-outcome-reference-v1', 'panda-v1'),
+    ('pendulum-v1', 'pendulum-v1'),
+    ('two-wheel-balance-v1', 'two-wheel-balance-v1'),
+])
+def test_formal_tasks_resolve_robot_through_shared_registry(task_uid, robot_uid):
+    from task_env import make_agent
+    from task_env.environment.protocols import RobotComponent
+    importlib.import_module('task_env.tasks')
+    robot = make_agent(robot_uid)
+    assert isinstance(robot, RobotComponent) and robot.uid == robot_uid
+    config = resolve_task_env_config(ENV_REGISTRY.get(task_uid), {'robot': {'uid': robot_uid}})
+    assert config.robot_uid == robot_uid
+    assert resolve_task_env_config(ENV_REGISTRY.get(task_uid), config) == config
+
+
+def test_robot_choice_rejects_a_different_task_subject():
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='does not admit'):
+        resolve_task_env_config(ENV_REGISTRY.get('pendulum-v1'), {'robot': {'uid': 'panda-v1'}})

@@ -14,7 +14,8 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
-from ..environment.protocols import DefaultCanonicalControllerMixin
+from ..environment.protocols import RobotComponent
+from ..registry import register_agent
 
 
 TWO_WHEEL_ACTION_SCHEMA_ID = "task-env.two-wheel-balance.wheel-torque.v1"
@@ -88,8 +89,9 @@ TWO_WHEEL_BALANCE_MJCF_XML = """
 </mujoco>
 """.strip()
 
+@register_agent("two-wheel-balance-v1")
 @dataclass(frozen=True)
-class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
+class TwoWheelBalanceEntity(RobotComponent):
     """Stable body/joint/actuator names for the two-wheel topology."""
 
     uid: str = "two-wheel-balance-v1"

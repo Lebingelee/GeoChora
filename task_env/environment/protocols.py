@@ -37,13 +37,15 @@ class DefaultCanonicalControllerMixin:
         return DefaultCanonicalController()
 
 
-class AgentComponent(DefaultCanonicalControllerMixin, ABC):
-    """机器人组件的纯描述基类。"""
+class RobotComponent(DefaultCanonicalControllerMixin, ABC):
+    """Shared Robot identity; concrete capabilities are declared by each Robot."""
 
     uid: ClassVar[str]
-    # Static component planning can inspect this declaration without creating
-    # a Robot or a provider. Selected-runtime capabilities remain separate.
     component_controller_kinds: ClassVar[tuple[str, ...]] = ()
+
+
+class AgentComponent(RobotComponent):
+    """Legacy source-component capabilities for Robots that provide them."""
 
     @abstractmethod
     def asset_manifest(self) -> AssetManifest:

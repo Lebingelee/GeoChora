@@ -547,6 +547,7 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
     selected_supports_isaac = True
+    selected_robot_uids = frozenset(('two-wheel-balance-v1',))
     controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
     observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
@@ -563,6 +564,7 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
         from .two_wheel_physical import task_binding
         return task_binding(config.environment, provider=config.physics_provider,
                             backend=config.environment.runtime.backend,
+                            robot_uid=config.robot_uid or 'two-wheel-balance-v1',
                             source_delivery_manifest=config.source_delivery_manifest)
 
     uid = TWO_WHEEL_BALANCE_ENV_ID

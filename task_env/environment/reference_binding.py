@@ -622,7 +622,7 @@ class ReferenceTaskBinding:
 @dataclass(frozen=True)
 class ExistingSubjectEffortTask:
     """Task declarations consumed by the shared existing-subject construction path."""
-    robot_factory: Callable
+    robot_uid: str
     compile_declaration: Callable
     reset_plan: Callable
     composition: object
@@ -646,7 +646,8 @@ class ExistingSubjectEffortTask:
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
         def build(seed, sampled=None):
-            robot = self.robot_factory()
+            from ..registry import make_agent
+            robot = make_agent(self.robot_uid)
             scene = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
             task_source, artifact = self.compile_declaration(scene, robot)

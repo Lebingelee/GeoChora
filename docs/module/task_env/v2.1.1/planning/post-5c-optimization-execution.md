@@ -550,3 +550,11 @@ native 验证后只将共同函数及两个调用点改名，明确其 effort �
 生产修改 3 文件 +110／−130，净减 20 行；共同编排涉及职责重写迁移，非整文件搬迁；版本诊断未改，实施和当前状态文档 2 文件修改。无新增、删除或迁移文件，tracked 文件数不变。source／provider 的原有校验和 Runtime 物化仍由已有 adapter 执行，renderer、clock 和动作提交代码未改。
 
 MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、非零 action、同 seed 重置、无 seed RNG 续采和 close，共 100 个可观测子步；同 seed 原路线的 Robot／Controller、reset sample、RNG 序列和单步奖励一致。GeoPhys CPU 两任务 direct 路线同样完成短程并与前次对应身份及结果一致，内部子步未观测，各保守预留 50。32 项版本纯合同通过。Isaac 和 renderer 本批未重跑；计划、冻结 diff 和对照在 ignored `workspace/maintenance/v211_shared_effort_build_20261112_001/`。E01～E04 仍未完成。
+
+### 6.38 四任务 Robot 身份与实例创建入口
+
+输入 `1e1f7b81`。引入只要求主体身份及实际声明能力的共同 `RobotComponent`，原有 AgentComponent 保留其旧 source-component 能力合同；Pendulum 与双轮车注册进现有 Robot／agent registry。两个简单任务不再持有并直接调用具体 Robot class factory，而是按 `robot.uid` 使用与 Panda 相同的 registry 创建实际 Robot。正式配置允许各简单任务显式选择自己的 Robot UID，并按 Task 声明拒绝不同主体；默认选择保持原有行为。简单主体无需伪造 Panda 的 asset manifest、gripper 或末端接口。
+
+生产修改 9 文件 +30／−19，净增 11 行；版本诊断修改 2 文件 +26／−1；实施和当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。入口统一发生在实际 Robot 实例创建；Position 与 effort 的 source 编译和 Controller 绑定仍各有能力合同，不据此声称四任务构建全部统一。provider／renderer adapter、clock、提交和 native 映射未修改。
+
+37 项版本纯合同通过，覆盖四任务显式 Robot UID、registry 创建、配置重解析及跨任务主体拒绝。四任务及装配 Panda 均以显式 `robot.uid` 在 MuJoCo CPU 完成构造、reset、非零 action 或 Nut 单个 Solution interval、第二次 reset 和 close，共 65 个可观测子步；同 seed 与此前默认选择的主体／Controller、reset、可用的 Scene 或 Artifact／source identity 及单步奖励一致。GeoPhys、Isaac 和 renderer 本批未重跑，旧有界证据不扩大；计划、冻结 diff 和对照在 ignored `workspace/maintenance/v211_robot_registry_20261112_001/`。E01～E04 仍未完成。

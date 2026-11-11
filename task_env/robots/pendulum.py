@@ -18,7 +18,8 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import ControlCommand, ExternalActionContract, RuntimeSnapshot
-from ..environment.protocols import DefaultCanonicalControllerMixin
+from ..environment.protocols import RobotComponent
+from ..registry import register_agent
 
 
 PENDULUM_ACTION_SCHEMA_ID = "task-env.pendulum.torque.v1"
@@ -71,8 +72,9 @@ PENDULUM_MJCF_XML = """
 </mujoco>
 """.strip()
 
+@register_agent("pendulum-v1")
 @dataclass(frozen=True)
-class PendulumEntity(DefaultCanonicalControllerMixin):
+class PendulumEntity(RobotComponent):
     """Stable scene names used by the Pendulum task and adapter."""
 
     uid: str = "pendulum-v1"
