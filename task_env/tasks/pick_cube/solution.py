@@ -65,6 +65,11 @@ _MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
 # converging toward the command would otherwise wind the correction up and
 # drag the command past the target.
 _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO = 0.05
+# A servo offset the bounded correction can close is at most the correction
+# limit.  A larger error is a transient (the TCP momentarily static at the top
+# of a joint-space overshoot), and integrating it drives the command through
+# the target, e.g. down onto the cube after a descend.
+_MEASURED_TCP_HOLD_INTEGRATE_MAX_ERROR_M = _MEASURED_TCP_HOLD_MAX_CORRECTION_M
 # The descend stage ends on a measured grasp-height interlock: a TCP that settles
 # above the planned grasp height leaves only the pad tips on the cube top edge.
 _GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
@@ -1097,7 +1102,8 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 _MEASURED_TCP_HOLD_SETTLED_STEP_M,
                 _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO * float(np.linalg.norm(error)),
             )
-            if settled and np.isfinite(error).all():
+            if (settled and np.isfinite(error).all()
+                    and float(np.linalg.norm(error)) <= _MEASURED_TCP_HOLD_INTEGRATE_MAX_ERROR_M):
                 self._measured_tcp_hold_correction = np.clip(
                     self._measured_tcp_hold_correction
                     + _MEASURED_TCP_HOLD_INTEGRAL_GAIN * error.astype(np.float32),
