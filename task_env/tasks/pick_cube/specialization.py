@@ -442,6 +442,10 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                 arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
                 entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
             )
+            position_plan, _subject_identity, position_subjects = robot.compile_position_subjects(
+                runtime_input.runtime_source, artifact=runtime_input.artifact,
+                controller=controller, entity_id='panda-v1', end_frame_id='ee')
+            controller._validate_plan(position_plan)
         else:
             physical = controller_builder(robot, runtime_input, panda_xml, action_config)
             from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
@@ -516,7 +520,8 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
             "resolved_configuration": resolved,
             "execution_spec_v1": runtime_input.execution,
             "reset_plan": runtime_input.reset_plan,
-            "controller_binding_plan": None,
+            "controller_binding_plan": position_plan if physical is None else None,
+            **({'position_subjects': position_subjects} if physical is None else {}),
             "f06_pickcube_isaac_input": runtime_input,
             "session_admission_input": runtime_input,
             "f06_delivery_manifest_path": str(manifest_path),

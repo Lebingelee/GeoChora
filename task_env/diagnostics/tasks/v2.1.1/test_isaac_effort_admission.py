@@ -79,6 +79,32 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
     assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
 
 
+def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
+    from pathlib import Path
+    from task_env.robots.runtime import RobotRuntime
+    from task_env.runtime.sessions.control import bind_selected_controller, prepare_position_control_materialization
+    from task_env.tasks.pick_cube.specialization import build_isaac_reference, make_reference_binding
+
+    root = Path(__file__).resolve().parents[4]
+    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    if not manifest.is_file():
+        pytest.skip('verified Isaac source delivery is unavailable')
+    value = build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
+    binding = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
+    selected = bind_selected_controller(value, binding=binding, provider='isaacsim', backend='cuda')
+    robot = RobotRuntime.from_selected(value, selected)
+    plan, _, _, _ = prepare_position_control_materialization(
+        source=value['source'], artifact=value['artifact'], profiles=selected.position_profiles,
+        leaf_position=False, plan=value['controller_binding_plan'],
+        select_binding=binding.position_control_binding, value=value,
+        capabilities=selected.position_capabilities)
+    assert robot.uid == 'panda-v1'
+    assert robot.subjects == value['position_subjects']
+    assert robot.controller is value['controller']
+    assert plan is value['controller_binding_plan']
+    assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
+
+
 def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
     from task_env.runtime.sessions.api import _session_admission_input_route
     from task_env.runtime.sessions.source import UsdRuntimeInputV1

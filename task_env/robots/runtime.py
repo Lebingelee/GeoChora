@@ -107,7 +107,7 @@ class RobotRuntime:
                            else physical.controllers)
         else:
             binding = getattr(source, 'position_subject_binding', None)
-            subjects = () if binding is None else binding.subjects
+            subjects = value.get('position_subjects', ()) if binding is None else binding.subjects
             declare = getattr(selected.controller, 'position_binding_requirements', None)
             controllers = (tuple(row[0] for row in declare()) if callable(declare)
                            else (selected.controller,))

@@ -128,6 +128,17 @@ class PandaAgent(BaseAgent):
         return compile_reference_position_source(
             self, source, artifact=artifact, controller=controller, entity_id=entity_id, recipe=recipe)
 
+    def compile_position_subjects(self, source, *, artifact, controller, entity_id, end_frame_id):
+        """Compile a source-bound Panda and its selected Position Controller."""
+        from .panda_position_binding import compile_panda_position_subjects
+        return compile_panda_position_subjects(
+            source_scene=source.scene_definition,
+            components=((entity_id, 'link0', self.physical_joint_names(), None),),
+            site_entity=entity_id, site_name=end_frame_id,
+            groups=((entity_id, 'arm'), (entity_id, 'gripper')),
+            source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
+            task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
+
     @staticmethod
     def physical_joint_names():
         return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')

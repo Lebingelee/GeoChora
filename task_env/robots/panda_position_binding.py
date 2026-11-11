@@ -132,6 +132,13 @@ def compile_panda_position_subjects(*, source_scene, components, site_entity, si
         if sorted(used_groups) != list(range(len(groups))):
             raise ValueError('Controller position declarations must cover every group exactly once')
         bindings = tuple(bindings)
+    elif callable(getattr(controller, 'controller_binding', None)):
+        if len(components) != 1:
+            raise ValueError('one Controller binding requires one Panda subject')
+        binding = controller.controller_binding()
+        bindings = (binding,)
+        grants = []
+        subject_writers = {components[0][0]: binding.writer_id}
     else:
         grants = []
         requirements = StateRequirements('state-requirements-v1', 'controller', writer, fields)

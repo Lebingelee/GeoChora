@@ -896,3 +896,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产范围 8 文件：修改 7、删除 1，+29／−476，净减 447 行；无整文件迁移。版本诊断代码未修改；任务 API 文档修改 2 文件 +4／−12，本文及当前状态文档另修改 2 文件。项目 tracked 文件从 1358 减至 1357。本批移除了正式 Env 构造中一条历史诊断分流；四任务现有构建入口、provider／renderer 的 source、状态、clock 和提交合同未因此扩展。
 
 114 项版本检查通过。最终代码的四个正式任务 MuJoCo 短程完成 reset、step、再次 reset 和关闭，分别观察 5、5、25、25 个 native 子步；NutAssembly GeoPhys CPU 同样完成上述生命周期，控制时间从 0 推进至 0.01 秒，native 子步未在此探针计数。NutAssembly 只验证 Solution 单步，完整 Solution 及 Isaac 未重跑。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_nut_final_20261112_q4fcwqw_/`；E01～E04 仍未接收。
+
+### 6.81 USD Position 使用 Panda 主体和实际 Controller plan
+
+输入 `5346ccd9`。Isaac Position 路线原有 source-bound Controller，但没有通过 Panda 共同机制编译主体，`env.robot` 无主体。现在 Panda 对实际 USD Scene、source、Artifact 和 Controller 编译同一 Assembly／主体及 Controller plan；共同 Runtime 物化使用该 plan，RobotRuntime 暴露已编译的主体与实际 Controller。source 自身仍没有与 MJCF 相同的 position subject binding，native Position 适配与剩余 source 组合尚待继续收敛。
+
+生产修改 4 文件 +25／−2，净增 23 行；版本诊断修改 1 文件 +26／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。新 plan 在构造与物化时核对 Scene、Artifact、source、writer 和资源；provider 的原有 native 映射及 renderer、clock、提交机制未改。
+
+115 项版本检查通过，包括本机已验证 USD delivery 的实际主体／Controller／物化 plan 合同；未提供该 delivery 时对应检查跳过。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回、Env／App 关闭；主体 writer 和 plan 与实际 Controller 一致，匹配检查全部通过。观察到 41 次 physics callback，订阅前启动推进未知；callback 取消订阅报告 AttributeError，SDK 日志保留渲染预热和只读目录错误，进程及独立读回成功。MuJoCo 一体 Panda、装配 Panda 和 NutAssembly 短程均通过，各观测 5 个 native 子步。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、资源预算及证据位于 ignored `workspace/maintenance/v211_usd_robot_position_20261112_7u90vfp_/` 与 `workspace/maintenance/v211_panda_position_20261112_cmzuogv9/`；E01～E04 仍未接收。
