@@ -1169,7 +1169,6 @@ def materialize_control(
     controller_binding_plan: ControlBindingPlanV1 | None = None,
     controller_profile=None,
     leaf_plan=None,
-    diagnostic_profile=None,
     session_admission_input=None,
     native_feedback_profile=None,
     selected_controller=None,
@@ -1205,7 +1204,7 @@ def materialize_control(
         _validate_f05_geophys_native_position_input(
             f05_native_input, artifact, declared_execution, source,
         )
-        if (manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+        if (manifest is not None or leaf_plan is not None
                 or type(declared_execution) is not ExecutionSpecV1):
             raise ValueError('F05 native exact-cell admission cannot combine with caller manifests or diagnostics')
         if declared_execution.physics_profile != F05_GEOPHYS_NATIVE_POSITION_PROFILE:
@@ -1232,7 +1231,7 @@ def materialize_control(
         _validate_f05_dg02_geophys_usd_input(
             f05_dg02_geophys_input, artifact, declared_execution, source,
         )
-        if (manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+        if (manifest is not None or leaf_plan is not None
                 or type(declared_execution) is not ExecutionSpecV1):
             raise ValueError('DG02 exact-cell admission cannot combine with caller manifests or diagnostics')
         if declared_execution.physics_profile != F05_DG02_GEOPHYS_USD_PROFILE:
@@ -1263,7 +1262,7 @@ def materialize_control(
             f05_dg04_isaac_native_input, artifact, declared_execution, source,
         )
         if (type(declared_execution) is not ExecutionSpecV1
-                or manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+                or manifest is not None or leaf_plan is not None
                 or declared_execution.physics_profile != F05_DG04_ISAAC_NATIVE_PROFILE):
             raise ValueError('DG04 exact-cell admission requires its exact input without alternate authorities')
         execution = ExecutionSpec(
@@ -1284,7 +1283,7 @@ def materialize_control(
             f06_pickcube_isaac_input, artifact, declared_execution, source,
         )
         if (type(declared_execution) is not ExecutionSpecV1
-                or manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+                or manifest is not None or leaf_plan is not None
                 or declared_execution.physics_profile != F06_PICKCUBE_ISAAC_PROFILE):
             raise ValueError('F06 exact-cell admission requires its exact input without alternate authorities')
         execution = ExecutionSpec(
@@ -1298,7 +1297,7 @@ def materialize_control(
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
 
         _validate_f04_isaac_position_source(artifact, declared_execution, source)
-        if manifest is not None or diagnostic_profile is not None or leaf_plan is not None:
+        if manifest is not None or leaf_plan is not None:
             raise ValueError('F04 Isaac control admission cannot combine with other admission authorities')
         execution = ExecutionSpec(
             declared_execution.physics_provider, declared_execution.physics_profile,
@@ -1331,7 +1330,7 @@ def materialize_control(
         from .provenance import provider_build_identity
         if (type(leaf_plan) is not EffectiveLeafPlanV1 or leaf_plan._compiled is not True
                 or controller_binding_plan is not None or controller_profile is not None
-                or diagnostic_profile is not None):
+               ):
             raise TypeError('R02c leaf materialization requires one compiled plan without legacy Controllers')
         if (execution.physics_provider, execution.backend, execution.render_provider) != ('mujoco', 'cpu', 'none'):
             raise ValueError('R02c leaf materialization is limited to MuJoCo CPU with no renderer')
@@ -1383,8 +1382,6 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if diagnostic_profile is not None and native_feedback_profile is not None:
-        raise ValueError('diagnostic and normal native-feedback admissions are mutually exclusive')
     if native_feedback_profile is not None:
         from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
         from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
@@ -1446,11 +1443,6 @@ def materialize_control(
         actual_manifest = _r05b_native_feedback_manifest(
             artifact, execution, source, native_feedback_profile,
         )
-    elif diagnostic_profile is not None:
-        from .api import _diagnostic_manifest
-        if manifest is not None:
-            raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
-        actual_manifest = _diagnostic_manifest(artifact, execution, source, diagnostic_profile)
     elif not (f04_native or f05_native or f05_dg02_native
               or f05_dg04_native or f06_pickcube_isaac):
         actual_manifest = provider_manifest(execution.physics_provider)
@@ -1617,7 +1609,6 @@ def materialize_control(
         artifact, declared_execution, source=source,
         manifest=None if f04_native else admission_manifest,
         _materialization_authority=materialization_authority,
-        _diagnostic_profile=diagnostic_profile,
         _session_admission_input=session_admission_input,
         _native_feedback_profile=native_feedback_profile,
         _observer_render_request=observer_render_request,

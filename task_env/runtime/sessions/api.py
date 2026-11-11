@@ -147,8 +147,6 @@ _F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc
 _F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
 _F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
-_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
-_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
 _F05_DG04_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
     'task_env_f05_dg04_s1_native_io_context', default=None,
 )
@@ -570,52 +568,6 @@ def _f06_pickcube_isaac_capability_manifest(artifact):
 
 
 
-def _diagnostic_manifest(artifact, execution, source, profile_id):
-    """Return a process-local admission view for one non-capability diagnostic.
-
-    This does not change ``provider_manifest`` or any production registry. It
-    is deliberately tied to the frozen NutAssembly v0 source and the exact
-    GeoPhys CUDA cadence experiment requested for C05c.
-    """
-    from dataclasses import replace
-
-    if profile_id != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE:
-        raise ValueError('unknown RuntimeSession diagnostic admission profile')
-    if not isinstance(artifact, TaskArtifact):
-        raise ValueError('NutAssembly cadence diagnostic requires the frozen TaskArtifact v0')
-    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
-            or artifact.task_id != 'nut-assembly-square-v1'
-            or artifact.timebase.physics_dt != 0.002
-            or artifact.timebase.control_dt != 0.01
-            or artifact.timebase.control_substeps != 5
-            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
-        raise ValueError('diagnostic admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
-    if (execution.physics_provider != 'geophys' or execution.backend != 'cuda'
-            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
-            or execution.determinism_mode != 'strict'):
-        raise ValueError('diagnostic admission is limited to GeoPhys CUDA with the existing scalar profile')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or source.scene_source.source_id !=
-            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
-            or source.config.runtime.backend != 'cuda'
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 5
-            or source.config.render.camera_obs
-            or len(source.joint_targets) != 7
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('diagnostic admission source does not match the exact NutAssembly R3 execution source')
-    build = provider_build_identity('geophys')
-    if build['repository_revision'] != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION:
-        raise ValueError('diagnostic admission requires the fixed GeoPhys a53a8cf repair baseline')
-    cpu_manifest = provider_manifest('geophys')
-    return replace(
-        cpu_manifest,
-        adapter_version='task-env-c05c-geophys-cuda-cadence-diagnostic-v1',
-        backend='cuda',
-        evidence_reference='diagnostic-only-no-capability-or-qualification',
-    )
-
-
 def _session_admission_input_route(input_v1) -> str | None:
     """Classify one exact task-owned input for a versioned Session route."""
     if input_v1 is None:
@@ -884,7 +836,7 @@ def _mixed_actuator_manifest(artifact, execution, source):
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *,
                 source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
-                _materialization_authority=None, _diagnostic_profile=None,
+                _materialization_authority=None,
                 _session_admission_input=None, _native_feedback_profile=None,
                 _observer_render_request=None, _task_render_requested=False,
                 _legacy_observer_requested=False,
@@ -929,7 +881,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         )
         expected_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
         if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
-                or _materialization_authority is not None or _diagnostic_profile is not None):
+                or _materialization_authority is not None):
             raise ValueError('F06 exact admission requires the Core-generated source-bound manifest only')
         projected_execution = ExecutionSpec(
             'isaacsim', F06_PICKCUBE_ISAAC_PROFILE, 'none', 'cuda',
@@ -973,7 +925,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             artifact, synthetic_s1=scope is not None,
         )
         if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
-                or _materialization_authority is not None or _diagnostic_profile is not None):
+                or _materialization_authority is not None):
             raise ValueError('DG04 exact admission requires the Core-generated source-bound manifest only')
         projected_execution = ExecutionSpec(
             'isaacsim', F05_DG04_ISAAC_NATIVE_PROFILE, 'none', 'cuda',
@@ -1033,7 +985,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         _validate_f05_dg02_geophys_usd_input(
             _f05_dg02_geophys_input, artifact, declared_execution, source,
         )
-        if manifest is None or _materialization_authority is not None or _diagnostic_profile is not None:
+        if manifest is None or _materialization_authority is not None:
             raise ValueError('DG02 exact admission requires its Core-generated capability manifest only')
         projected_execution = ExecutionSpec(
             'geophys', F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'cpu',
@@ -1080,7 +1032,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             _validate_f05_geophys_native_position_input(
                 _f05_native_input, artifact, declared_execution, source,
             )
-            if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+            if manifest is not None or _materialization_authority is not None:
                 raise ValueError('F05 native exact-cell admission cannot combine with caller manifests or diagnostics')
             from .geophys_native_io import create_f05_geophys_native_io
             from .native_io import UsdCoreRuntimeSession
@@ -1108,7 +1060,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
         if not declared_execution.physics_provider == 'isaacsim':
             raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
-        if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+        if manifest is not None or _materialization_authority is not None:
             raise ValueError('F04 Isaac materialization does not accept caller-supplied admission authorities')
         from .isaac_native_io import create_isaac_native_runtime_io
         from .native_io import UsdCoreRuntimeSession
@@ -1149,14 +1101,9 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
         return session
     execution = legacy_execution_projection(execution)
-    active_profiles = tuple(profile for profile in (
-        _diagnostic_profile, _native_feedback_profile,
-    ) if profile is not None)
-    if len(active_profiles) > 1 or (active_profiles and source.mixed_actuator_plan is not None):
+    if _native_feedback_profile is not None and source.mixed_actuator_plan is not None:
         raise ValueError('RuntimeSession process-local admissions are mutually exclusive')
-    if _diagnostic_profile is not None:
-        actual = _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
-    elif _native_feedback_profile is not None:
+    if _native_feedback_profile is not None:
         actual = _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
     elif source.mixed_actuator_plan is not None:
         actual = _mixed_actuator_manifest(artifact, execution, source)
@@ -1164,7 +1111,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         actual = provider_manifest(execution.physics_provider)
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
-        if active_profiles or source.mixed_actuator_plan is not None:
+        if _native_feedback_profile is not None or source.mixed_actuator_plan is not None:
             raise ValueError('bounded process-local admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)

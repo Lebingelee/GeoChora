@@ -694,3 +694,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +4／−14，净减 10 行；诊断、测试代码无变更；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。普通 Env 的构造、reset 与物理提交不再有该诊断条件，renderer 和时钟实现未改。
 
 72 项版本检查通过。MuJoCo 四任务短程通过，观测 60 个 native 子步；两个 tabletop MuJoCo 隔离 worker 通过 reset、step、二次 reset 和 close，内部子步未观测、各保守预留 50。GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。四任务同 seed 的 Robot／Controller 视图和单步奖励与先前证据一致。计划原列 GeoPhys Pendulum，实际选择受影响的 tabletop scalar materialization 路线，已在证据补充记录中更正；Isaac、renderer 和完整 Solution 本批未重跑。冻结 diff、计划、补充说明及运行收据位于 ignored `workspace/maintenance/v211_retire_diagnostic_env_20261112_001/`。E01～E04 仍未接收。
+
+### 6.56 退休 C05c 历史 Runtime 准入
+
+输入 `ddb653ae`。上一批已移除正式 Env 对 `diagnostic_profile` 的分流；本批进一步删除只针对历史 NutAssembly／GeoPhys CUDA cadence 实验的临时 capability manifest、两个 materialization 参数及相关互斥分支。普通 provider manifest、native-feedback 与混合控制的既有准入和互斥检查仍保留；历史 C05c 证据不改变其原有结论，也不再作为正式入口的兼容目标。
+
+生产修改 2 文件 +15／−77，净减 62 行；诊断／测试代码无变更；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1366。正式 Runtime 的 source、clock、提交和 renderer 数据路径未改；清除的是诊断专属 admission authority。
+
+72 项版本检查通过。四任务 MuJoCo 短程通过，观测 60 个 native 子步。Isaac PickCube joint effort／CUDA／同步 RGB 实际完成两次 reset、一次非零 step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，订阅前启动推进未知。GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。CPU 原计划仅列四个 MuJoCo case，后补 GeoPhys 一次并记录；按原每次 50 的全部保守预留合计为 250，高于计划中原列的 200，实际四个已观测 MuJoCo 子步加 GeoPhys 保守预留为 110。完整 Solution 本批未重跑。冻结 diff、计划、补充说明、独立读回及收据位于 ignored `workspace/maintenance/v211_retire_c05c_admission_20261112_001/`。E01～E04 仍未接收。
