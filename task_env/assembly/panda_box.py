@@ -56,7 +56,7 @@ class PandaBoxDeclaration:
             raise ValueError('task semantics must reference the declared box Entity')
 
 
-def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
+def _panda_box_reference_declaration(declaration: PandaBoxDeclaration, *, robot=None):
     """Project the Panda box task data onto the shared Core construction API."""
     d = declaration
     center = (tuple(float(value) for value in np.asarray(d.reset_center_xy, dtype=np.float32))
@@ -69,7 +69,7 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
         for axis, value in zip(('x', 'y'), center, strict=True)
     ) if extent else ()
     from ..registry import make_agent
-    robot = make_agent('panda-v1')
+    robot = make_agent('panda-v1') if robot is None else robot
     joints = {f'{robot.uid}/{name}': value for name, value in robot.initial_state_spec().joint_positions}
     entities = (
         EntityDefinition('tabletop-v1', 'static', 'tabletop-v1/task-local',
@@ -131,14 +131,16 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
         table_center_xy=d.table_center_xy, cube_world_pos=d.source_box_position,
         cube_world_quat=d.source_box_quaternion_wxyz,
     )
-    reference = _panda_box_reference_declaration(d)
+    from ..registry import make_agent
+    robot = make_agent('panda-v1')
+    reference = _panda_box_reference_declaration(d, robot=robot)
     if artifact is not None:
         expected = reference.artifact.compile()
         if artifact.identity_hash != expected.identity_hash:
             raise ValueError("selected Artifact does not match the Panda box declaration")
     compiled = reference.compile(
         scene_source=composer.build_source_description(), config=config,
-        controller_factory=controller_factory,
+        controller_factory=controller_factory, agents=(robot,),
     )
     return replace(compiled, source_owners=(
         PickCubeSceneComposer, PandaAgent, PandaBoxDeclaration,

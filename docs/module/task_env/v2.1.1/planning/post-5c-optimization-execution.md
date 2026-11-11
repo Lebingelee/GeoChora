@@ -596,3 +596,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 8 文件 +64／−73，净减 9 行；其中控制生命周期分支去除一层缩进，属于代码改写，不计为文件迁移。版本诊断修改 2 文件 +29／−1；本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1364。Task 少三处 physical execution 接线，Runtime 统一读取声明；未修改 provider 原生映射、renderer、clock 或实际物理推进算法，Position 与 physical 不同的控制语义保留。
 
 46 项版本纯合同通过，包括缺失／伪造 physical execution 的编译拒绝。MuJoCo CPU 的四任务，以及固定 joint、direct effort 和 reset-scoped joint／r3 切换均完成短程，后者含 H5 记录读回；另外两次 direct effort 序列验证均推进 5 子步，最终检查生命周期 dispatch、一个已确认提交和 Controller 身份。累计 MuJoCo 实测 90 子步。GeoPhys CPU 的 Panda joint effort 与 Pendulum 短程通过，内部子步未观测，各按 50 保守预留。Isaac USD source、已编译动作合同和 Position 状态绑定完成静态检查，未启动 SDK；第一次检查因调用环境缺少 GeoPhys `scene` 模块路径而失败，补足 PYTHONPATH 后通过。Isaac／renderer 真实运行及完整 Solution 本批未复验。计划、冻结 diff 和结果位于 ignored `workspace/maintenance/v211_physical_execution_declaration_20261112_001/`；E01～E04 仍未接收。
+
+### 6.44 tabletop Artifact 与 RuntimeSource 使用同一个 Robot 实例
+
+输入 `2330f1c5`。PickCube 与 NutAssembly 的实际 reference 构建不再为 Artifact 的 Robot 声明和 RuntimeSource 分别从 registry 创建不同对象：构建时选择一次 Robot，该实例先提供 Artifact 主体声明，再进入 source 组件组合。共同 source compiler 能逐项接收已有组件并解析缺少的组件，部分提供时核对身份与 Task composition；完整提供的 benchmark 组件仍使用其原合同。简单主体的构建此前已将同一个 Robot 传给 Artifact 和 source 编译，此处没有宣称 tabletop 的 source／Controller 算法已与简单主体完全相同；装配 Panda 仍在 source 组合阶段替换默认 Panda。
+
+生产修改 3 文件 +38／−21，净增 17 行，主要是共同 source 编译的部分组件解析与身份校验，以及在 tabletop 构建中传递同一实例；无整文件迁移。版本诊断新增 1 文件 +38／−0；本文与当前状态文档修改 2 文件。项目 tracked 文件数 1364 → 1365，净增 1，无文件删除。source 编译接口改变，provider 原生映射、clock、控制提交与 renderer 未改。
+
+49 项版本检查通过，其中新增 3 项会读取真实 tabletop source 资产，核对 Artifact 声明使用的 Robot 与 RuntimeSource 的 Robot 为同一对象，并拒绝 foreign Robot；其余 46 项为既有版本合同。MuJoCo CPU 四任务、装配 Panda 和 PickCube direct effort 均完成短程，共观测 70 子步；与 6.42 同 seed 比较，主体、reset、可用 Artifact／Scene／source 身份及单步奖励相同，Nut Controller 身份按其源码绑定合同变化，其他比较路线 Controller 身份相同。GeoPhys CPU 的 PickCube／NutAssembly 短程通过，内部子步未观测，各保守预留 50。Isaac、renderer、完整 Solution 本批未重跑；计划、冻结 diff、身份对照及结果在 ignored `workspace/maintenance/v211_robot_source_instance_20261112_001/`。E01～E04 仍未接收。

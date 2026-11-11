@@ -190,13 +190,15 @@ def _recipe():
     return _configuration()["recipe"]
 
 
-def _artifact_declaration(*, lift_height_m=None, task_config=None) -> TaskArtifactDeclarationV1:
+def _artifact_declaration(*, lift_height_m=None, task_config=None, robot=None) -> TaskArtifactDeclarationV1:
     recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, reset, asset = recipe["scene"], recipe["reset"], recipe["asset"]
     robot_uids = tuple(recipe['agent_uids'])
     if len(robot_uids) != 1:
         raise ValueError('NutAssembly requires one declared Robot')
-    robot = make_agent(robot_uids[0])
+    robot = make_agent(robot_uids[0]) if robot is None else robot
+    if robot.uid != robot_uids[0]:
+        raise ValueError('Robot differs from NutAssembly task declaration')
     initialization = {"nut_pose": reset["nut_pose"], "joint_position": reset["joint_position"]}
     mass = float(asset["nut_mass_kg"])
     inertia = tuple(float(v) for v in asset["nut_diagonal_inertia_kg_m2"])
@@ -228,9 +230,9 @@ def _artifact_declaration(*, lift_height_m=None, task_config=None) -> TaskArtifa
         capabilities=tuple(recipe["required_capabilities"]))
 
 
-def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
-    """Compatibility entry backed by the shared declaration compiler."""
-    return _artifact_declaration(lift_height_m=lift_height_m, task_config=task_config).compile()
+def build_artifact(*, lift_height_m=None, task_config=None, robot=None) -> TaskArtifact:
+    """Compile the task declaration for the selected Robot."""
+    return _artifact_declaration(lift_height_m=lift_height_m, task_config=task_config, robot=robot).compile()
 
 
 def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_profile=False, task_config=None):
@@ -317,9 +319,10 @@ def _r05b_execution_source(source):
 
 def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu',
                          _diagnostic=False, _native_feedback_profile=False, resolved_config=None,
-                         lift_height_m=None, task_config=None):
+                         lift_height_m=None, task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
-    if artifact.to_mapping() != build_artifact(lift_height_m=lift_height_m, task_config=task_config).to_mapping():
+    robot = make_agent(task_config['recipe']['agent_uids'][0]) if robot is None else robot
+    if artifact.to_mapping() != build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot).to_mapping():
         raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
@@ -362,7 +365,7 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
     runtime_source = ReferenceTaskDeclarationV1(
-        artifact=_artifact_declaration(lift_height_m=lift_height_m, task_config=task_config),
+        artifact=_artifact_declaration(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         composition=composition,
         bodies={"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
                 "round-peg-v1": "peg2", "panda-v1/base": "link0"},
@@ -374,7 +377,7 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         artifact,
         scene_source=TaskSceneSource(scene_xml, base,
             "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
-        config=config,
+        config=config, agents=(robot,),
     )
     if _native_feedback_profile:
         if provider != 'geophys':
@@ -424,11 +427,12 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
     from ...controllers.canonical.contracts import digest
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
-    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
+    robot = make_agent(recipe['agent_uids'][0])
+    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot)
     source, contact_profile = build_runtime_source(
         artifact, provider, backend=backend, _diagnostic=diagnostic,
         _native_feedback_profile=native_feedback_profile, resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config,
+        lift_height_m=lift_height_m, task_config=task_config, robot=robot,
     )
     dynamic = load_r3_dynamic_profile()
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)

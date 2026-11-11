@@ -439,12 +439,23 @@ def compile_reference_source(*, artifact, scene_source, composition, config,
     if joints is None:
         joints = {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position}
     supplied = tuple(value is not _UNSET_COMPONENT for value in (scene, agents, objects))
-    if any(supplied) and not all(supplied):
-        raise ValueError("explicit source components must be supplied together")
-    if not any(supplied):
-        scene = make_scene(composition.scene_uid)
-        agents = tuple(make_agent(uid) for uid in composition.agent_uids)
-        objects = tuple(make_object(uid) for uid in composition.object_uids)
+    if not all(supplied):
+        if scene is _UNSET_COMPONENT:
+            scene = make_scene(composition.scene_uid)
+        elif getattr(scene, 'uid', None) != composition.scene_uid:
+            raise ValueError('supplied Scene differs from the task composition')
+        if agents is _UNSET_COMPONENT:
+            agents = tuple(make_agent(uid) for uid in composition.agent_uids)
+        else:
+            agents = tuple(agents)
+            if tuple(getattr(agent, 'uid', None) for agent in agents) != composition.agent_uids:
+                raise ValueError('supplied Robots differ from the task composition')
+        if objects is _UNSET_COMPONENT:
+            objects = tuple(make_object(uid) for uid in composition.object_uids)
+        else:
+            objects = tuple(objects)
+            if tuple(getattr(item, 'uid', None) for item in objects) != composition.object_uids:
+                raise ValueError('supplied objects differ from the task composition')
     return RuntimeSource(
         task_artifact_hash=artifact.identity_hash, scene_source=scene_source,
         joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,
