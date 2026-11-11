@@ -43,8 +43,13 @@ def _write_optional_preflight(run_root: Path, *, provider: str, status: str, rea
 def _run_harness(args):
     if args.controller_profile != "r3_continuous_v1":
         raise ValueError("the F06 built-in Harness route is frozen to r3_continuous_v1")
-    if args.horizon != 1000 or args.seed not in (31, 32, 33):
-        raise ValueError("the F06 built-in Harness route requires horizon 1000 and seed 31/32/33")
+    if args.horizon != 1000:
+        raise ValueError("the F06 built-in Harness route requires horizon 1000")
+    if args.seed not in (31, 32, 33) and not args.diagnostic_seed:
+        raise ValueError("the F06 built-in Harness route requires seed 31/32/33; "
+                         "pass --diagnostic-seed to run another seed as a labeled diagnostic")
+    if args.diagnostic_seed and not 0 <= args.seed < 2 ** 31:
+        raise ValueError("--diagnostic-seed requires a non-negative 31-bit seed")
     if args.provider == "isaacsim" and args.source_delivery_manifest is None:
         raise ValueError("--source-delivery-manifest is required for the F06 Isaac route")
     if args.recording is not None:
@@ -93,6 +98,8 @@ def _run_harness(args):
             if args.provider == "isaacsim" else None
         ),
     })
+    if args.seed not in spec_data["seeds"]:
+        spec_data["seeds"] = [*spec_data["seeds"], args.seed]
     spec_path = inputs / "example_spec.json"
     spec_path.write_text(json.dumps(BuiltinPickCubeExampleV1.from_dict(spec_data).to_dict(),
                                     indent=2, ensure_ascii=False) + "\n")
@@ -134,6 +141,9 @@ def main(argv=None) -> int:
                         help="exact versioned F06 PickCube USD manifest for Isaac Sim")
     parser.add_argument("--harness-output-dir", type=Path,
                         help="fresh supervised Harness output directory for Isaac Sim")
+    parser.add_argument("--diagnostic-seed", action="store_true",
+                        help="allow the Harness route to run a seed outside the fixed F06 set "
+                             "31/32/33; the run is recorded as an extra diagnostic seed")
     parser.add_argument("--time-limit-s", type=int, default=420)
     parser.add_argument(
         "--address-space-limit-mb", "--memory-limit-mb", dest="memory_limit_mb",

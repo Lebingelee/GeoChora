@@ -60,6 +60,11 @@ _OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
 _MEASURED_TCP_HOLD_INTEGRAL_GAIN = 0.10
 _MEASURED_TCP_HOLD_MAX_CORRECTION_M = 0.040
 _MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
+# The descend stage ends on a measured grasp-height interlock: a TCP that settles
+# above the planned grasp height leaves only the pad tips on the cube top edge.
+_GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
+_GRASP_HEIGHT_UPPER_TOLERANCE = 0.005
+_GRASP_HORIZONTAL_TOLERANCE = 0.005
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -87,6 +92,7 @@ class MeasuredTcpGate:
     after_actions: int
     minimum_height_above_cube_top_m: float
     max_horizontal_error_m: float | None = None
+    maximum_height_above_cube_top_m: float | None = None
 
     def __post_init__(self) -> None:
         if not self.name or type(self.after_actions) is not int or self.after_actions < 0:
@@ -98,6 +104,11 @@ class MeasuredTcpGate:
                 and (not np.isfinite(self.max_horizontal_error_m)
                      or self.max_horizontal_error_m <= 0.0)):
             raise ValueError("measured TCP gate horizontal error must be finite and positive")
+        if (self.maximum_height_above_cube_top_m is not None
+                and (not np.isfinite(self.maximum_height_above_cube_top_m)
+                     or self.maximum_height_above_cube_top_m
+                     <= self.minimum_height_above_cube_top_m)):
+            raise ValueError("measured TCP gate height band must be finite and nonempty")
 
 
 @dataclass(frozen=True)
@@ -476,12 +487,25 @@ class PickCubeSolution:
             ],
             dtype=np.float32,
         )
-        return SegmentPlan(
-            actions=self._planner.plan_translation_only(
-                current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0
-            ),
-            target_pose=target,
+        actions = self._planner.plan_translation_only(
+            current_pose=start, target_position=target[:3], gripper=1.0, settle_steps=0
         )
+        gates = ()
+        if getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False):
+            gates = (
+                MeasuredTcpGate(
+                    "grasp_height",
+                    len(actions),
+                    minimum_height_above_cube_top_m=(
+                        _GRASP_CLEARANCE_ABOVE_CUBE_TOP - _GRASP_HEIGHT_LOWER_TOLERANCE
+                    ),
+                    max_horizontal_error_m=_GRASP_HORIZONTAL_TOLERANCE,
+                    maximum_height_above_cube_top_m=(
+                        _GRASP_CLEARANCE_ABOVE_CUBE_TOP + _GRASP_HEIGHT_UPPER_TOLERANCE
+                    ),
+                ),
+            )
+        return SegmentPlan(actions=actions, target_pose=target, measured_tcp_gates=gates)
 
     def _plan_close(self, observation, info: Mapping[str, object]) -> SegmentPlan:
         del info
@@ -624,7 +648,7 @@ class PickCubeReadinessConfig:
     @property
     def global_safety_cap(self):
         gate_holds = (
-            2 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
+            3 * self.policies[0].hold_ticks if self.measured_tcp_clearance_gate else 0
         )
         return self.base.action_budget + sum(policy.hold_ticks for policy in self.policies) + gate_holds
 
@@ -721,7 +745,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             if not self._done:
                 self._refresh_current_segment(observation, info)
         if (self.readiness_config.measured_tcp_clearance_gate
-                and not self.done and not self.failed and self.stage == "move_above_cube"):
+                and not self.done and not self.failed):
             self._advance_measured_tcp_gates(observation)
 
     def act(self, observation=None, info=None):
@@ -853,7 +877,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if truncated or terminated or info.get("task_failure", False):
             self._fail("episode_truncated" if truncated else "environment_terminated")
             return
-        if self.readiness_config.measured_tcp_clearance_gate and self._segment_index == 0:
+        if self.readiness_config.measured_tcp_clearance_gate:
             self._advance_measured_tcp_gates(observation)
             gate = self._pending_measured_tcp_gate(self._segments[self._segment_index])
             if gate is not None and self._action_index >= gate.after_actions:
@@ -872,6 +896,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._segment_index += 1
             self._action_index = 0
             self._wait_count = 0
+            self._reset_measured_tcp_gate_state()
             self._refresh_current_segment(observation, info)
         elif self._wait_count >= policy.hold_ticks:
             self._fail(policy.failure_reason)
@@ -992,6 +1017,12 @@ class PickCubeReadinessSolution(PickCubeSolution):
         gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
         return gate if self._action_index >= gate.after_actions else None
 
+    def _reset_measured_tcp_gate_state(self):
+        self._measured_tcp_gate_index = 0
+        self._measured_tcp_gate_wait_ticks = 0
+        self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
+        self._measured_tcp_hold_previous_tcp = None
+
     def _corrected_gate_hold_action(self, planned_action):
         action = np.array(planned_action, dtype=np.float32, copy=True)
         observation = self._last_public_observation
@@ -1024,6 +1055,8 @@ class PickCubeReadinessSolution(PickCubeSolution):
         ready = height >= gate.minimum_height_above_cube_top_m
         if gate.max_horizontal_error_m is not None:
             ready = ready and horizontal_error <= gate.max_horizontal_error_m
+        if gate.maximum_height_above_cube_top_m is not None:
+            ready = ready and height <= gate.maximum_height_above_cube_top_m
         return {
             "ready": bool(ready),
             "height_above_cube_top_m": height,
@@ -1050,6 +1083,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 "required_height_above_cube_top_m": gate.minimum_height_above_cube_top_m,
                 "horizontal_error_m": metrics["horizontal_error_m"],
                 "max_horizontal_error_m": gate.max_horizontal_error_m,
+                "max_height_above_cube_top_m": gate.maximum_height_above_cube_top_m,
                 "tcp_pose": metrics["tcp_pose"].tolist(),
                 "cube_position": metrics["cube_position"].tolist(),
                 "wait_ticks": self._measured_tcp_gate_wait_ticks,

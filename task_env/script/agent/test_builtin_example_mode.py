@@ -460,3 +460,20 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
     assert row['errors'][0]['phase'] == 'compile'
     assert row['runtime_valid'] is False
     assert not (tmp_path / 'isaac-run' / 'episode.h5').exists()
+
+
+def test_extra_diagnostic_seed_keeps_fixed_f06_prefix():
+    import pytest
+    from builtin_example_schema import BuiltinPickCubeExampleV1
+    base = {
+        'schema_version': 'harness-builtin-pickcube-example-v1',
+        'example_id': 'pickcube-harness-example-v1',
+        'task_uid': 'pick-cube-p16-reference-v1', 'provider': 'mujoco',
+        'backend': 'cpu', 'device': 'cpu', 'controller_profile': 'r3_continuous_v1',
+        'horizon_control_ticks': 1000, 'physics_dt_s': 0.002, 'control_substeps': 5,
+        'source_delivery_manifest': None,
+    }
+    assert BuiltinPickCubeExampleV1.from_dict({**base, 'seeds': [31, 32, 33, 0]}).seeds == (31, 32, 33, 0)
+    for seeds in ([0, 31, 32, 33], [31, 32, 33, 31], [31, 32, 33, -1], [31, 32]):
+        with pytest.raises(ValueError):
+            BuiltinPickCubeExampleV1.from_dict({**base, 'seeds': seeds})
