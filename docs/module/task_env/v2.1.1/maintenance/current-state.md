@@ -193,3 +193,5 @@ Position Controller 选择与物化现在核对 source 持有的真实主体、w
 旧 mixed-actuator candidate 的 Env 专属生命周期已退出；四任务 MuJoCo、NutAssembly GeoPhys 和 Isaac Position 短程复验通过。详见[实施记录 6.88](../planning/post-5c-optimization-execution.md#688-退出旧-mixed-actuator-candidate-的-env-生命周期)。
 
 Isaac Position 现在直接准备 Task source，不再构造并丢弃 MJCF 参考 Controller；USD 主体／Controller plan 和原生短程已复验。详见[实施记录 6.89](../planning/post-5c-optimization-execution.md#689-usd-position-直接准备-task-source)。
+
+native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定仍由 source 准入核验；Isaac PickCube 短程及错误映射拒绝已复验。详见[实施记录 6.90](../planning/post-5c-optimization-execution.md#690-native-position-按-controller-声明核对关节)。

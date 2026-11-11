@@ -112,6 +112,14 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     assert value['controller'].source is value['source'] is value['session_admission_input'].runtime_source
     assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
     assert selected.selection_matches[0].subject_ids == (robot.subjects[0].subject_id,)
+    from task_env.runtime.sessions.api import _validate_usd_task_policy, _F06_TASK_POLICY_SHA256_V1
+    input_v1 = value['session_admission_input']
+    changed_targets = dict(value['source'].joint_targets)
+    changed_targets[next(iter(changed_targets))] = 'foreign-native-joint'
+    changed_source = replace(value['source'], joint_targets=changed_targets)
+    with pytest.raises(ValueError, match='exact task binding map'):
+        _validate_usd_task_policy(replace(input_v1, runtime_source=changed_source),
+                                  _F06_TASK_POLICY_SHA256_V1)
     without_subjects = {**value, 'source': replace(value['source'], position_subject_plan=None)}
     with pytest.raises(ValueError, match='requires source-owned subjects'):
         bind_selected_controller(without_subjects, binding=binding, provider='isaacsim', backend='cuda')

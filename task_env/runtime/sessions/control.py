@@ -1035,23 +1035,17 @@ def materialize_control(
                 profile._validate_source(source)
                 expected_targets.update(profile._target_bindings)
                 expected_open.append(profile.open_actuator)
-            if f04_native:
+            if f04_native or f06_pickcube_isaac:
+                # Native Position drives are verified after materialization;
+                # source-specific mapping and identity were admitted above.
+                joint_ids = {f'{profile.entity_id}/{joint}' for profile in profiles
+                             for joint in profile._source_joint_ids}
                 if (len(profiles) != 1 or profiles[0].open_actuator is not None
                         or profiles[0].native_drive_receipt is not None
-                        or set(source.joint_targets) != set(source.joints)
-                        or len(set(source.joint_targets.values())) != 9):
-                    raise ValueError('F04 Position requires one deferred native receipt and exact nine-name source bindings')
-            elif f06_pickcube_isaac:
-                expected_joint_map = {
-                    **{f'panda-v1/joint{index}': f'joint{index}' for index in range(1, 8)},
-                    'panda-v1/finger_joint1': 'finger_joint1',
-                    'panda-v1/finger_joint2': 'finger_joint2',
-                }
-                if (len(profiles) != 1 or profiles[0].open_actuator is not None
-                        or profiles[0].native_drive_receipt is not None
-                        or dict(source.joints) != expected_joint_map
-                        or dict(source.joint_targets) != expected_joint_map):
-                    raise ValueError('F06 Position requires its exact nine-joint source map and deferred native receipt')
+                        or set(source.joints) != joint_ids
+                        or set(source.joint_targets) != joint_ids
+                        or len(set(source.joint_targets.values())) != len(joint_ids)):
+                    raise ValueError('native Position requires complete unique Joint bindings and a deferred drive receipt')
             elif dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
             if binding.gripper_semantic_id != profiles[0].gripper_semantic_id:

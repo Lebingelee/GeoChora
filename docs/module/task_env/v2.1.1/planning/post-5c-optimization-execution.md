@@ -968,3 +968,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +12／−16，净减 4 行，其中既有 effort 分支的大部分代码迁到共同准备路径；版本诊断修改 1 文件 +5／−1，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。减少一次不参与执行的 Controller 构造；四任务的共同配置入口、Runtime 控制提交和 renderer 合同未改变，不将此局部变化视作 E02 完成。
 
 115 项版本检查通过，其中 USD Position 的真实 source 构造明确禁止创建旧 MJCF 参考 Controller，同时核对实际 Robot、source 和 Controller plan。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和独立读回成功。MuJoCo、GeoPhys、Isaac effort 和完整 Solution 本批未重跑，其旧证据只证明具体受测版本与路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_usd_position_task_source_20261112_vncixp28/`；E01～E04 仍未接收。
+
+### 6.90 native Position 按 Controller 声明核对关节
+
+输入 `02c508df`。共同控制物化此前在已完成 USD source 准入后，又在 F06 分支写死 PickCube 的九个 Joint／native 名称；F04 则有另一套覆盖检查。现在两条 native Position 物化共用检查：按实际 Controller 声明核对完整 Joint 集合、唯一 native target 及延迟 drive receipt。F06 原有 source 准入仍校验带固定身份的完整绑定表、Artifact、Scene、交付和执行身份；此次没有放宽该准入或将 F06 提升为通用 USD 支持。
+
+生产修改 1 文件 +9／−15，净减 6 行；版本诊断修改 1 文件 +8／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。共同控制物化减少具体任务关节名称和重复分支，任务专属 USD 准入仍在 Runtime 的既有位置，尚需继续归位；renderer、clock 和提交 owner 未改。
+
+115 项版本检查通过，包含对篡改的 USD native target 映射在 source 准入处的拒绝。Isaac CUDA PickCube Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和独立读回成功。F04、MuJoCo、GeoPhys 和完整 Solution 本批未重跑；不能将 F06 的结果扩展到这些路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_native_position_binding_20261112_yh9ip87m/`；E01～E04 仍未接收。
