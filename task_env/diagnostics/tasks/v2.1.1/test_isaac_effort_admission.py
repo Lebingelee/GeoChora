@@ -98,7 +98,7 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
     robot = RobotRuntime.from_selected(value, selected)
     plan, _, _, _ = prepare_position_control_materialization(
         source=value['source'], artifact=value['artifact'], profiles=selected.position_profiles,
-        leaf_position=False, plan=None,
+        plan=None,
         select_binding=binding.position_control_binding, value=value,
         capabilities=selected.position_capabilities)
     assert robot.uid == 'panda-v1'

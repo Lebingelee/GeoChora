@@ -936,3 +936,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +18／−582，净减 564 行；版本诊断修改 1 文件 +1／−0，用于选择正式 PickCube Controller；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。删除的是独立的旧诊断准入和施控分支，不改变正式任务的构建协议、renderer、clock 或推进 owner。
 
 115 项版本检查通过。MuJoCo 下 PickCube R1、R3、装配 Panda、NutAssembly、Pendulum 与双轮车短程均通过，共观察 70 个 native 子步；PickCube R1 和 NutAssembly 的 H5 读回通过。NutAssembly GeoPhys CPU 完成 reset、Solution 单步、再次 reset 和关闭，控制时间从 0 推进至 0.01 秒，native 子步未计数。完整 Solution 和 Isaac 本批未重跑；旧 Isaac 证据只证明当时源码，F06 Position 的正式 source／Controller 物化路径未因本批旧 R1 分支删除而改变。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_c02b_r1_20261112_dtv9qnzj/`；E01～E04 仍未接收。
+
+### 6.86 退出旧 leaf 专属物化与 actuator 旁路
+
+输入 `1f2fc8a1`。共同 Runtime 曾为旧 leaf 诊断单独物化 plan、维护 interval／writer 状态并直接写 MuJoCo actuator；另有固定装配诊断直接写入口。四个正式任务没有使用这些入口，装配 Panda 的实际双 Controller 使用 source-owned 主体绑定与共同提交。现删除旧 leaf 的物化参数、专属 Provider 执行与直接写入，并简化 Position 物化合同；保留固定装配 source、原生映射及身份校验。历史 leaf codec／录像读回与其余历史辅助代码尚未在本批整理，不把历史证据转换成当前能力。
+
+生产修改 5 文件 +25／−697，净减 672 行，其中 Position 物化去掉旧分支后约 20 行为缩进迁移；版本诊断修改 1 文件 +1／−1，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。删去两条不经正式任务共同控制链的旧诊断入口；provider 的正式 source、状态、clock、资源身份和控制提交不因此放宽，renderer 未改。
+
+115 项版本检查通过。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。MuJoCo 的四个正式任务及装配 Panda 短程均通过，分别观察一体 Panda 5、装配 Panda 5、NutAssembly 5、Pendulum 25、双轮车 25 个 native 子步；装配 Panda 的两个实际 writer 均出现在同一 acknowledged 提交。GeoPhys 与完整 Solution 本批未重跑。冻结 diff、预算与收据位于 ignored `workspace/maintenance/v211_retire_leaf_isaac_20261112_h66im01g/` 和 `workspace/maintenance/v211_retire_leaf_cpu_20261112_j4st0en4/`；E01～E04 仍未接收。

@@ -1175,7 +1175,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                     raise ValueError('Position and physical port Controllers must have distinct identities')
                 plan, _, _, _ = prepare_position_control_materialization(
                     source=source, artifact=artifact, profiles=selected.position_profiles,
-                    leaf_position=False, plan=value.get('controller_binding_plan'),
+                    plan=value.get('controller_binding_plan'),
                     select_binding=binding.position_control_binding, value=value,
                     capabilities=selected.position_capabilities,
                 )
@@ -1186,7 +1186,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 declared_bindings = tuple(profile.controller_binding() for profile in selected.position_profiles)
             plan, _, _, _ = prepare_position_control_materialization(
                 source=source, artifact=artifact, profiles=selected.position_profiles,
-                leaf_position=False, plan=value.get('controller_binding_plan'),
+                plan=value.get('controller_binding_plan'),
                 select_binding=binding.position_control_binding, value=value,
             )
             projected_feedback = project_controller_feedback(plan)

@@ -185,3 +185,5 @@ USD Position 的主体和 Controller plan 已由 source 持有，Robot 与 Runti
 Position Controller 选择与物化现在核对 source 持有的真实主体、writer 和资源，不再用 profile 名称冒充主体；Isaac 及四任务 MuJoCo 短程通过。详见[实施记录 6.84](../planning/post-5c-optimization-execution.md#684-position-controller-匹配实际主体)。
 
 历史 C02b R1 typed-force 专属准入与独立施控旁路已退出；正式 native force 反馈保留，MuJoCo 与 NutAssembly GeoPhys 短程通过。详见[实施记录 6.85](../planning/post-5c-optimization-execution.md#685-退出历史-c02b-r1-typed-force-旁路)。
+
+旧 leaf 专属物化和直接 actuator 写入已退出；装配 Panda 的双 writer 共同提交及 Isaac Position 短程通过。详见[实施记录 6.86](../planning/post-5c-optimization-execution.md#686-退出旧-leaf-专属物化与-actuator-旁路)。

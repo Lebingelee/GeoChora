@@ -96,7 +96,7 @@ class PositionRuntimeBuilder:
         profiles = tuple(item.owner for item in self.capabilities)
         plan, joints, frames, position_binding = prepare_position_control_materialization(
             source=source, artifact=env.artifact, profiles=profiles,
-            leaf_position=False, plan=env.value.get('controller_binding_plan'),
+            plan=env.value.get('controller_binding_plan'),
             select_binding=selector, value=env.value, capabilities=self.capabilities)
         if self.selection_match_required:
             if len(self.selection_matches) != 1:

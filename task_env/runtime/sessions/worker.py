@@ -117,7 +117,7 @@ def _materialize_selected(payload):
         if selected.position:
             plan, joints, frames, control_binding = prepare_position_control_materialization(
                 source=source, artifact=artifact, profiles=selected.position_profiles,
-                leaf_position=False, plan=value.get('controller_binding_plan'),
+                plan=value.get('controller_binding_plan'),
                 select_binding=binding.position_control_binding, value=value,
             )
             session = materialize_control(

@@ -819,24 +819,6 @@ def project_controller_feedback(plan):
                  for requirement in binding.feedback_requirements.requirements)
 
 
-def project_leaf_feedback(scene, root, children, plan):
-    """Project a compiled leaf plan through the existing logical resolver."""
-    from ...artifacts.logical_assembly_resolution import resolve_logical_assembly
-    from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-    if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
-        raise ValueError('leaf feedback projection requires a compiled EffectiveLeafPlanV1')
-    resolved = resolve_logical_assembly(root, scene, children)
-    if (resolved.root_logical_content_sha256 != plan.root_logical_content_sha256
-            or resolved.scene_identity_sha256 != plan.scene_identity_sha256):
-        raise ValueError('leaf plan does not match the resolved logical Assembly and Scene')
-    paths = {leaf.full_path for leaf in resolved.leaves}
-    if any(entry.binding.member_path not in paths for entry in plan.leaves):
-        raise ValueError('leaf plan refers to an unresolved logical Assembly member')
-    return tuple((entry.binding.writer_id, requirement)
-                 for entry in plan.leaves
-                 for requirement in entry.binding.required_state.state_requirements.requirements)
-
-
 def _validate_feedback_requirements(scene, binding, entity_ids, *, frame_grants=()):
     joints = {
         (articulation.entity_id, joint.joint_id)
@@ -967,7 +949,7 @@ class ControlBinding:
 
 
 def prepare_position_control_materialization(
-    *, source, artifact, profiles, leaf_position, plan, select_binding, value,
+    *, source, artifact, profiles, plan, select_binding, value,
     capabilities=None,
 ):
     """Prepare the task's Position bindings before a provider is materialized."""
@@ -979,27 +961,23 @@ def prepare_position_control_materialization(
         if plan is not None and plan != subject_plan.plan:
             raise ValueError('Position plan differs from source-owned subjects')
         plan = subject_plan.plan
-    if leaf_position:
-        if plan is not None:
-            raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')
-    else:
-        if capabilities is not None and (len(capabilities) != len(profiles)
-                or any(type(capability) is not SelectedPositionCapabilityV1
-                       or capability.owner is not profile
-                       for capability, profile in zip(capabilities, profiles, strict=True))):
-            raise ValueError('Position construction capabilities differ from their selected Controllers')
-        owners = profiles if capabilities is None else capabilities
-        if plan is None:
-            plan = compile_control_binding_plan(
-                scene, tuple(owner.controller_binding() for owner in owners),
-            )
-        if not isinstance(plan, ControlBindingPlanV1):
-            raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
-        for owner in owners:
-            if capabilities is None:
-                owner._validate_plan(plan)
-            else:
-                owner.validate_plan(plan)
+    if capabilities is not None and (len(capabilities) != len(profiles)
+            or any(type(capability) is not SelectedPositionCapabilityV1
+                   or capability.owner is not profile
+                   for capability, profile in zip(capabilities, profiles, strict=True))):
+        raise ValueError('Position construction capabilities differ from their selected Controllers')
+    owners = profiles if capabilities is None else capabilities
+    if plan is None:
+        plan = compile_control_binding_plan(
+            scene, tuple(owner.controller_binding() for owner in owners),
+        )
+    if not isinstance(plan, ControlBindingPlanV1):
+        raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
+    for owner in owners:
+        if capabilities is None:
+            owner._validate_plan(plan)
+        else:
+            owner.validate_plan(plan)
     joint_bindings = position_joint_bindings_from_artifact(scene, artifact, source)
     frame_bindings = position_frame_bindings_from_artifact(artifact, source)
     if not callable(select_binding):
@@ -1019,7 +997,6 @@ def materialize_control(
     manifest=None,
     controller_binding_plan: ControlBindingPlanV1 | None = None,
     controller_profile=None,
-    leaf_plan=None,
     session_admission_input=None,
     selected_controller=None,
     observer_render_request=None,
@@ -1045,7 +1022,7 @@ def materialize_control(
             f06_pickcube_isaac_input, artifact, declared_execution, source,
         )
         if (type(declared_execution) is not ExecutionSpecV1
-                or manifest is not None or leaf_plan is not None
+                or manifest is not None
                 or declared_execution.physics_profile != F06_PICKCUBE_ISAAC_PROFILE):
             raise ValueError('F06 exact-cell admission requires its exact input without alternate authorities')
         execution = ExecutionSpec(
@@ -1059,7 +1036,7 @@ def materialize_control(
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
 
         _validate_f04_isaac_position_source(artifact, declared_execution, source)
-        if manifest is not None or leaf_plan is not None:
+        if manifest is not None:
             raise ValueError('F04 Isaac control admission cannot combine with other admission authorities')
         execution = ExecutionSpec(
             declared_execution.physics_provider, declared_execution.physics_profile,
@@ -1087,63 +1064,6 @@ def materialize_control(
         f04_native = True
     else:
         execution = legacy_execution_projection(execution)
-    if leaf_plan is not None:
-        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-        from .provenance import provider_build_identity
-        if (type(leaf_plan) is not EffectiveLeafPlanV1 or leaf_plan._compiled is not True
-                or controller_binding_plan is not None or controller_profile is not None
-               ):
-            raise TypeError('R02c leaf materialization requires one compiled plan without legacy Controllers')
-        if (execution.physics_provider, execution.backend, execution.render_provider) != ('mujoco', 'cpu', 'none'):
-            raise ValueError('R02c leaf materialization is limited to MuJoCo CPU with no renderer')
-        scene = getattr(source, 'scene_definition', None)
-        if (scene is None or scene.identity_hash != leaf_plan.scene_identity_sha256
-                or source.source_closure_digest != leaf_plan.source_closure_sha256
-                or source.task_artifact_hash != artifact.identity_hash):
-            raise ValueError('R02c leaf plan does not match the exact Artifact/Scene/source closure')
-        build_info = provider_build_identity('mujoco')
-        build_sha = __import__('hashlib').sha256(
-            __import__('json').dumps(build_info, sort_keys=True, separators=(',', ':'),
-                                     allow_nan=False).encode()
-        ).hexdigest()
-        if (leaf_plan.provider_name, leaf_plan.provider_version, leaf_plan.provider_build_sha256,
-                leaf_plan.backend, leaf_plan.physics_dt_s, leaf_plan.control_substeps) != (
-                'mujoco', str(build_info['package_version']), build_sha, 'cpu',
-                artifact.timebase.physics_dt, artifact.timebase.control_substeps):
-            raise ValueError('R02c leaf plan Provider/build/backend/timebase identity mismatch')
-        attachment_plan = getattr(source, 'fixed_attachment_plan', None)
-        if leaf_plan.fixed_attachment_plan_identity_sha256 is not None:
-            if (attachment_plan is None
-                    or attachment_plan.identity_hash != leaf_plan.fixed_attachment_plan_identity_sha256):
-                raise ValueError('attached leaf plan differs from the exact RuntimeSource Attachment plan')
-            expected_targets = {
-                f'{entry.binding.entity_id}/{ref.joint_id}': attachment_plan.native_actuator_names[
-                    f'{entry.binding.entity_id}/{actuator.actuator_id}'
-                ]
-                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
-                for ref, actuator in zip(entry.binding.joint_order,
-                                         tuple(pair.actuator for pair in entry.binding.joint_actuator_bindings),
-                                         strict=True)
-            }
-            expected_open = tuple(
-                attachment_plan.native_actuator_names[f'{entry.binding.entity_id}/{ref.actuator_id}']
-                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'hand_position'
-                for ref in entry.binding.actuator_order
-            )
-        else:
-            expected_targets = {f'{entry.binding.entity_id}/{ref.joint_id}': f'actuator{index}'
-                                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
-                                for index, ref in enumerate(entry.binding.joint_order, 1)}
-            expected_open = tuple(
-                ref.actuator_id for entry in leaf_plan.leaves
-                if entry.binding.profile_kind == 'hand_position' for ref in entry.binding.actuator_order
-            )
-        if dict(source.joint_targets) != expected_targets or tuple(source.open_actuators) != expected_open:
-            raise ValueError('R02c RuntimeSource actuator names differ from ordered leaf bindings')
-        if len(leaf_plan.leaves) != 2 or {entry.binding.profile_kind for entry in leaf_plan.leaves} != {
-            'arm_position', 'hand_position',
-        }:
-            raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if not (f04_native or f06_pickcube_isaac):
         actual_manifest = provider_manifest(execution.physics_provider)
     source_requirements = declared_source_capabilities(source)
@@ -1221,7 +1141,7 @@ def materialize_control(
                 raise ValueError('PositionServoV1 gripper semantic binding mismatch')
         else:
             raise TypeError('unsupported explicit Controller profile instance')
-    elif leaf_plan is None and (len(source.joint_targets) != 7 or len(source.open_actuators) != 1):
+    elif len(source.joint_targets) != 7 or len(source.open_actuators) != 1:
         raise ValueError('unsupported control source bindings')
 
     if controller_binding_plan is not None:
@@ -1322,20 +1242,6 @@ def materialize_control(
         )
         session._force_feedback_required = force_required
         session._control_binding_plan = controller_binding_plan
-    elif leaf_plan is not None:
-        session._force_feedback_required = False
-        session._control_binding_plan = None
-        try:
-            session.admit_leaf_control_plan(leaf_plan)
-        except BaseException as admission_error:
-            try:
-                session.close()
-            except BaseException as cleanup_error:
-                admission_error.add_note(
-                    f"RuntimeSession cleanup after leaf admission failure also failed: "
-                    f"{type(cleanup_error).__name__}: {cleanup_error}"
-                )
-            raise
     else:
         session._force_feedback_required = True
         session._control_binding_plan = None
