@@ -352,3 +352,9 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 输入 `296f1fe8`。PickCube 任务仍验证允许的 fixture ID、质量模型文件 SHA、schema 和 source closure，并选择其已受限的模型参数；实际 `MassMatrixEffortControllerV1`、已有 R3 reference wrapper、状态需求和新 physical execution 的组合移入现有 Controller 模块。源资产资格、R3 类型、帧、时间和模型适用范围均保留；没有声称模型适用于其他 Robot 或 source。
 
 本批生产 2 个文件 +35／−23，净增 12 行。跨文件匹配到 14 行连续原样 Controller 组装代码，其余包括参数接口重写；迁移单列、不计作删除整个功能或性能提升。没有新增／删除文件或新测试文件。双锁下 10 个 Controller／正式配置合同通过；MuJoCo CPU 正式 joint-mass、R3-mass 各完成 reset→非零 step→二次 reset→close，各观测 5 个 native 子步；与本窗口先前同 seed 短程记录相比，Artifact、source closure、Controller identity、动作、reward 和 clock 均相同，见 `mass-owner-011-identity-comparison.json`。累计监督 48 次，320 个已观测子步，另 7 次 worker 的内部子步未知；含历史保守计费共 970／2,000。`mass-owner-011-pure.log`、`cpu-run-plan-025.json`、`cpu-source-025.diff` 和 `cpu-025-mass-*` 记录输入与结果；不是完整 Solution 或跨 provider 资格；受影响的 Isaac 质量模型配置未在本批重新实跑。
+
+### 6.13 组件静态计划使用 Robot 控制能力
+
+输入 `76a05cbe`。`resolve_execution_plan` 不再按 `panda-v1` 名称决定是否检查 Controller；它读取 Robot 声明的 `component_controller_kinds`，再将已有 `robot.controller` 的 kind／reference 记入计划。Panda 的公开 `supported_controller_kinds()` 与静态声明共用同一组值；没有此组件能力的 Robot 保持原空选择。只有 UID 时可从已登记的 Robot 类型读取静态声明，无需实例化 Robot 或启动 provider；未知 UID 仍留给正常 registry 构造边界。实际 agent iterable 只消费一次。此机制让其他 Robot 可以声明相同的组件合同，但不扩大其 native、source 或多主体资格。
+
+本批生产 3 个文件 +27／−10，测试 1 个文件 +24；不新增／删除／迁移文件。4 项纯静态合同通过，覆盖另一名称的能力声明、不同 kind 拒绝、Panda 缺配置拒绝和多 agent 边界。另用真实 `PandaAgent` 声明与修改前执行计划作完整 mapping／identity 比较，结果相等；没有运行物理。证据为 `component-capability-012-pure.log` 和 `component-capability-012-comparison.json`。其余主体的实际 Runtime 构建和 native 能力仍按已有范围对账；E02／E04 未据此整体接收。

@@ -41,6 +41,9 @@ class AgentComponent(DefaultCanonicalControllerMixin, ABC):
     """机器人组件的纯描述基类。"""
 
     uid: ClassVar[str]
+    # Static component planning can inspect this declaration without creating
+    # a Robot or a provider. Selected-runtime capabilities remain separate.
+    component_controller_kinds: ClassVar[tuple[str, ...]] = ()
 
     @abstractmethod
     def asset_manifest(self) -> AssetManifest:

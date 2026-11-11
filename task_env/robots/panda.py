@@ -42,6 +42,7 @@ def panda_reference_control_binding():
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
+    component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
 
     @staticmethod
     def physical_joint_names():
@@ -168,11 +169,7 @@ class PandaAgent(BaseAgent):
         return ('r1', 'r3_continuous_v1', 'r3_continuous_v1_pose_path_x20')
 
     def supported_controller_kinds(self) -> tuple[str, ...]:
-        return (
-            "absolute_joint",
-            "absolute_pose",
-            "delta_pose",
-        )
+        return self.component_controller_kinds
 
     def bind_runtime(self, *, references, config, boundary):
         """Bind this robot's controller and named frames to a compiled runtime."""

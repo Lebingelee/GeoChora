@@ -150,6 +150,30 @@ def test_multi_agent_route_is_rejected_before_provider_bootstrap(monkeypatch):
         BaseTaskEnv(config=config, build_runtime=True)
 
 
+def test_component_controller_selection_follows_robot_capability():
+    from task_env.environment.configuration import resolve_env_config, resolve_execution_plan
+    from task_env.environment.types import StageUnavailableError
+
+    class FixtureEnv:
+        uid = 'fixture-env-v1'
+
+    robot = SimpleNamespace(uid='another-robot-v1', component_controller_kinds=('absolute_pose',))
+    config = resolve_env_config(task_uid='fixture-v1', scene_uid='tabletop-v1',
+        agent_uids=(robot.uid,), robot={'controller': {'kind': 'absolute_pose', 'reference': 'base'}})
+    plan = resolve_execution_plan(FixtureEnv, config, agents=iter((robot,)))
+    assert plan.controller_selections == ((robot.uid, 'absolute_pose', 'base'),)
+
+    wrong = resolve_env_config(task_uid='fixture-v1', scene_uid='tabletop-v1',
+        agent_uids=(robot.uid,), robot={'controller': {'kind': 'absolute_joint'}})
+    with pytest.raises(StageUnavailableError, match='unsupported robot controller'):
+        resolve_execution_plan(FixtureEnv, wrong, agents=(robot,))
+
+    panda = resolve_env_config(task_uid='fixture-v1', scene_uid='tabletop-v1',
+        agent_uids=('panda-v1',), robot={'controller': {'kind': 'absolute_joint'}})
+    assert resolve_execution_plan(FixtureEnv, panda).controller_selections == (
+        ('panda-v1', 'absolute_joint', None),)
+
+
 def test_missing_panda_controller_is_rejected_before_provider_bootstrap(monkeypatch):
     import task_env.tasks  # noqa: F401 - load the public component registrations
     import task_env.runtime as runtime_module

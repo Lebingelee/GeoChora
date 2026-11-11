@@ -764,6 +764,7 @@ def resolve_execution_plan(
 
     if not isinstance(config, ResolvedEnvConfig):
         raise TypeError("static execution planning requires a ResolvedEnvConfig")
+    agents = tuple(agents)
     agent_uids = tuple(
         str(getattr(agent, "uid", agent)) for agent in (agents or config.agents.agent_uids)
     )
@@ -776,7 +777,25 @@ def resolve_execution_plan(
         )
 
     controller_selections: tuple[tuple[str, str, str | None], ...] = ()
-    if "panda-v1" in agent_uids:
+    declared_agents = agents or agent_uids
+    if any(isinstance(agent, str) for agent in declared_agents):
+        import importlib
+        from ..registry import AGENT_REGISTRY
+        importlib.import_module('task_env.robots')
+        resolved_agents = []
+        for agent in declared_agents:
+            if isinstance(agent, str):
+                try:
+                    agent = AGENT_REGISTRY.get(agent)
+                except KeyError:
+                    # Leave unknown components to their registry boundary.
+                    pass
+            resolved_agents.append(agent)
+        declared_agents = tuple(resolved_agents)
+    for agent in declared_agents:
+        kinds = getattr(agent, 'component_controller_kinds', ())
+        if not kinds:
+            continue
         controller = config.robot.controller
         if controller is None:
             from .types import StageUnavailableError
@@ -784,15 +803,13 @@ def resolve_execution_plan(
             raise StageUnavailableError(
                 "robot TaskEnv requires an explicit robot.controller config"
             )
-        if controller.kind not in {"absolute_joint", "absolute_pose", "delta_pose"}:
+        if controller.kind not in kinds:
             from .types import StageUnavailableError
 
             raise StageUnavailableError(
                 f"unsupported robot controller kind {controller.kind!r}"
             )
-        controller_selections = (
-            ("panda-v1", controller.kind, controller.reference),
-        )
+        controller_selections += ((str(agent.uid), controller.kind, controller.reference),)
 
     if state_requirements is not None:
         from ..artifacts.state import StateRequirements
