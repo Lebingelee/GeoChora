@@ -123,3 +123,5 @@ USD 与 MJCF 的 Panda effort 现通过同一主体声明及 Runtime 构建；�
 Panda effort 的 Scene 声明与物理构造现由同一 Robot 实例承担；MuJoCo 受影响短程和 MJCF／USD source 构造对照通过。详见[实施记录 6.53](../planning/post-5c-optimization-execution.md#653-panda-effort-声明与构造共享-robot-实例)。
 
 简单主体的直接及阻尼 effort Controller 选择已归控制 owner，并共用 source／writer／单位检查；MuJoCo 两任务和 GeoPhys 已支持路线短程复验。详见[实施记录 6.54](../planning/post-5c-optimization-execution.md#654-简单主体的-effort-controller-归控制-owner)。
+
+共同 Env 已退休旧诊断 profile 的构造与 worker 分支；四任务 MuJoCo、tabletop 隔离 worker 和 GeoPhys 受影响短程通过。详见[实施记录 6.55](../planning/post-5c-optimization-execution.md#655-从共同-env-退休旧诊断-profile)。

@@ -443,7 +443,6 @@ class ReferenceTaskBinding:
     physical_terminate_on_success: bool = False
     physical_ignore_done: bool = False
     classify_position_input: Callable | None = None
-    diagnostic_profile: str | None = None
     build_receives_binding: bool = False
     compose_robot_source: Callable | None = None
 
@@ -524,9 +523,6 @@ class ReferenceTaskBinding:
             raise ValueError('legacy Position expert admission must be callable when supplied')
         if self.classify_position_input is not None and not callable(self.classify_position_input):
             raise ValueError('position input classifier must be callable when supplied')
-        if self.diagnostic_profile is not None and (
-                type(self.diagnostic_profile) is not str or not self.diagnostic_profile):
-            raise ValueError('diagnostic profile must be a nonempty explicit identifier')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:

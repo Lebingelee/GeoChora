@@ -1512,16 +1512,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..runtime.sessions.api import validate_selected_position_route
                 validate_selected_position_route(_execution_spec_v1)
             self._declared_execution_spec_v1 = _execution_spec_v1
-            diagnostic_profile = self.binding.diagnostic_profile
-            if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):
-                raise ValueError('selected diagnostic profile requires GeoPhys CPU/CUDA')
-            if sum((bool(_mixed_control_candidate), diagnostic_profile is not None,
-                    _native_feedback_request is not None)) > 1:
-                raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
-            self._diagnostic_profile = diagnostic_profile
+            if _mixed_control_candidate and _native_feedback_request is not None:
+                raise ValueError('native-feedback and mixed-control profiles are mutually exclusive')
             self._mixed_control_candidate = bool(_mixed_control_candidate)
             if not _mixed_control_candidate and _native_feedback_request is None:
-                if (diagnostic_profile is None and _execution_spec_v1 is None
+                if (_execution_spec_v1 is None
                         and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                     raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
@@ -1947,7 +1942,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                              source=preflight_value['source'],
                              controller=preflight_value.get('controller'), seed=seed)
                 if selection.deployment == 'isolated_worker':
-                    if (self._mixed_control_candidate or self.dual_entity_position or self._diagnostic_profile is not None
+                    if (self._mixed_control_candidate or self.dual_entity_position
                             or self._native_feedback_profile is not None):
                         receipt = describe_execution_selection(selection, **facts)
                         receipt['phase'] = 'static_preflight'

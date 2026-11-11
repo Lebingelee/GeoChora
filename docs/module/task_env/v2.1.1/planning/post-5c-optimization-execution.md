@@ -686,3 +686,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +81／−91，净减 10 行；其中约 75 行是把既有 Controller 选择算法移入控制模块并收敛重复校验。版本诊断修改 1 文件 +27／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1366。provider／renderer 的 native 适配、clock、提交及 source 构造未改。
 
 72 项版本检查通过，覆盖两个 profile 对异源主体的拒绝及默认直接 Controller 的身份。MuJoCo 的 Pendulum／双轮车各用 direct 与 velocity-damped 完成 reset、非零 step 和 close，合计观测 100 个 native 子步；direct 路线与既有同 seed 证据的 Robot／Controller、奖励及时间一致。GeoPhys Pendulum direct 短程通过，内部子步未观测、保守预留 50；尝试的 GeoPhys velocity-damped 在静态配置准入被拒绝，未启动物理，保持该能力限制。Isaac、renderer 和完整 Solution 本批未重跑。冻结 diff、补充说明和运行收据位于 ignored `workspace/maintenance/v211_subject_controller_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.55 从共同 Env 退休旧诊断 profile
+
+输入 `045ef0e8`。四个正式任务均不声明旧 `diagnostic_profile`，共同 Task binding 和 Env 仍以它绕过普通 provider 准入、改变 worker 预检并向 materialization 传参。本批移除该诊断专属字段和 Env 分支；provider 层原有 native 准入及其可独立调用的诊断 API 没有改变。混合控制与 native-feedback 的互斥约束保留；不将这些后续范围宣称完成。
+
+生产修改 3 文件 +4／−14，净减 10 行；诊断、测试代码无变更；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。普通 Env 的构造、reset 与物理提交不再有该诊断条件，renderer 和时钟实现未改。
+
+72 项版本检查通过。MuJoCo 四任务短程通过，观测 60 个 native 子步；两个 tabletop MuJoCo 隔离 worker 通过 reset、step、二次 reset 和 close，内部子步未观测、各保守预留 50。GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。四任务同 seed 的 Robot／Controller 视图和单步奖励与先前证据一致。计划原列 GeoPhys Pendulum，实际选择受影响的 tabletop scalar materialization 路线，已在证据补充记录中更正；Isaac、renderer 和完整 Solution 本批未重跑。冻结 diff、计划、补充说明及运行收据位于 ignored `workspace/maintenance/v211_retire_diagnostic_env_20261112_001/`。E01～E04 仍未接收。

@@ -178,7 +178,6 @@ class ScalarRuntimeBuilder:
             return RuntimeBuildResult(skip_gravity=env._physical_execution() is None)
         env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
             binding=self.binding,
-            diagnostic_profile=(env._diagnostic_profile if env.backend == 'cuda' else None),
             native_feedback_profile=env._native_feedback_profile,
             selected_controller=(env._selected_controller if env.binding.interval_mode == 'native'
                                  or env._native_feedback_profile is not None else None),
