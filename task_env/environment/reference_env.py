@@ -840,7 +840,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('selected reference admits no unsupported extra kwargs')
                 if render_mode is not None:
                     supports = getattr(cls, 'selected_supports_observer', None)
-                    if not callable(supports) or not supports(config):
+                    pair = (config.physics_provider, config.environment.runtime.backend)
+                    admitted = (supports(config) if callable(supports) else
+                                render_mode in getattr(cls, 'observer_physics_modes', {}).get(pair, ()))
+                    if not admitted:
                         raise ValueError('selected configuration admits state-only execution without observer rendering')
                     render_mode = normalize_render_mode(render_mode).value
                 provider, backend = config.physics_provider, config.environment.runtime.backend
@@ -883,8 +886,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             try:
                 if selected:
                     env.resolved_public_config = config
-                else:
                     env.config = environment
+                if binding.task_reset_sampler is not None:
                     env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
                         external_action=binding.external_action_contract,
                         physics_engine={'geophys': 'GeoPhys', 'mujoco': 'MuJoCo',

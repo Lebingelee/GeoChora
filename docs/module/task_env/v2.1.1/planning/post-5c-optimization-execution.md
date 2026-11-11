@@ -396,3 +396,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 本批生产 3 个文件修改、8 个 Python 文件删除，+105／−2479 行，净减 2374 行；Panda effort 相关代码经职责拆分和重写迁移，非整文件搬迁。新版本诊断增加 1 个测试文件，验证 Panda 力范围和手指传动篡改拒绝；2 份状态／实施文档修改。除以上变化，tracked 文件不变。构建协议中的两套解析和其余候选接线仍在，E01～E04 未完成；renderer、Runtime 时钟与推进实现本批未改。
 
 双锁下正式 PickCube MuJoCo CPU direct 和 reset-selection 分别完成 reset／step／重置／close，旧包删除后 direct 再次通过；共 20 个可观测物理子步。direct 的 Artifact、source closure、主体与 Controller identity 均与此前同 seed 记录相同。首次运行未设置 GeoPhys source 的 Python 搜索路径，在物理启动前失败、0 子步；修正环境后复验，失败记录保留。新版本纯合同 `test_panda_effort_source.py` 为 1 passed；检查只覆盖声明传动，不代表真实物理效果。计划、冻结 diff 和各次结果位于 ignored `workspace/maintenance/v211_e00_e04_direction_reset_20261112_001/`，不把本轮结果外推到其他 provider、完整 Solution 或 renderer。
+
+### 6.19 四正式任务配置解析收敛与 NutAssembly 主体缺口
+
+输入 `0fad2f83`。四个正式 Task 的普通 mapping／YAML 现在均由同一配置解析器生成 `ResolvedSelectedConfig`，并将 Controller profile、episode horizon／seed／ignore_done 写入共同环境配置；Pendulum 与双轮车的 binding 消费同一构建请求。通用能力检查按声明限制 velocity-damped Controller 的 provider，Runtime preflight 在实际 typed effort 与 source 校验通过后识别 torque 能力。为保全简单主体既有 Isaac USD 路线，将原 materialization 中的 G05 source 准入检查提取为同一检查，供 preflight 和 materialization 共用；没有运行 Isaac 或扩大该 source 资格。纯 component／batch 构造仍存在，且不属于四任务普通配置统一的完成证明。简单主体原通过 `make_env` 顶层 provider／backend kwargs 的用法应迁移到 `config.execution`；没有为旧诊断调用保留专用转换。
+
+本批生产 5 文件修改，+106／−41 行，净增 65 行；source 准入检查归位涉及重写迁移，未按整段删除计算。新增 3 个版本诊断文件（183 行）：正式 CPU 短程检查、四任务配置等价与能力拒绝检查、Isaac source 准入边界检查。无生产文件新增／删除；2 个实施状态文档更新。生产检查不再按 Task 判断选哪个配置 codec，但旧 component 工厂及其他未迁 caller 仍存在；Robot／Controller 真实构建链仍未统一，E01～E04 不关闭。
+
+版本诊断纯检查 8 passed。MuJoCo CPU 下 Pendulum、双轮车、PickCube 分别通过正式配置构造、reset、非零 step、二次 reset 与重复 close；最终源码对应运行共 55 个可观测子步。此前 Pendulum 首次两次 preflight 因共同 Runtime 能力表漏列已验证的 torque 绑定而拒绝，均为 0 子步；修复后复验通过，失败保留。NutAssembly 正式配置可解析、环境可构造，但短程检查在调用 `env.robot` 时发现现有 source 没有 Position subject binding，故在物理推进前失败、0 子步；不能将它记作四主体共同构建通过。需迁移 NutAssembly 实际 Robot 声明及控制绑定，而非为测试伪造 RobotRuntime。总计本批观察 110 个物理子步，全部锁释放；source/控制变动的 GeoPhys、Isaac 和 renderer 尚未复验，Isaac 仅纯准入边界检查。记录、失败回执、冻结 diff 和各次原始结果位于 ignored `workspace/maintenance/v211_formal_config_20261112_001/`。

@@ -37,6 +37,37 @@ F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 
 
+def _validate_g05_isaac_effort_source(artifact, execution, source):
+    """Validate the existing G05 USD effort route before native materialization."""
+    execution.validate()
+    source.validate()
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode,
+            execution.render_default.provider, execution.render_default.backend,
+            execution.render_default.profile, execution.render_default.device,
+            execution.camera_overrides) != (
+            'isaacsim', 'cuda', 'cuda:0', G05_ISAAC_EFFORT_PROFILE, 'best_effort',
+            'none', 'cpu', 'none', None, ()):
+        raise ValueError('G05 Isaac effort profile is state-only and requires cuda:0')
+    if (source.task_artifact.identity_hash != artifact.identity_hash
+            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
+        raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
+    delivery = source.scene_source.loaded_delivery
+    representation = source.scene_source.representation
+    if (representation.provider, representation.provider_build_identity,
+            representation.representation_format, representation.runtime_admitted,
+            delivery.locally_validated, delivery.source_verified) != (
+            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, True, False):
+        raise ValueError('G05 Isaac effort source representation is not the exact local 6.2 USD route')
+    if delivery.delivery.representation_id != 'isaacsim-6.2.0.0-g05-mjcf-v1':
+        raise ValueError('G05 Isaac effort source delivery is not the reviewed MJCF conversion')
+    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+            artifact.timebase.control_dt) != (0.002, 25, 0.05):
+        raise ValueError('G05 Isaac effort profile requires the task 2 ms / 25 substep timebase')
+    if set(source.joint_targets) != set(source.joints) or not source.joints:
+        raise ValueError('G05 Isaac effort source must expose an exact scalar joint target map')
+
+
 def close_session_and_runtime_owner(
     session, *, first_error=None, session_error_label, owner_error_label,
     capture_close_receipt=False,
@@ -1082,31 +1113,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         from .isaac_native_io import create_isaac_native_runtime_io
         from .native_io import UsdCoreRuntimeSession
         if declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE:
-            delivery = source.scene_source.loaded_delivery
-            representation = source.scene_source.representation
-            if (declared_execution.physics_backend, declared_execution.physics_device,
-                    declared_execution.determinism_mode,
-                    declared_execution.render_default.provider,
-                    declared_execution.render_default.backend,
-                    declared_execution.render_default.profile,
-                    declared_execution.render_default.device,
-                    declared_execution.camera_overrides) != (
-                    'cuda', 'cuda:0', 'best_effort',
-                    'none', 'cpu', 'none', None, ()):
-                raise ValueError('G05 Isaac effort profile is state-only and requires cuda:0')
-            if (representation.provider, representation.provider_build_identity,
-                    representation.representation_format, representation.runtime_admitted,
-                    delivery.locally_validated, delivery.source_verified) != (
-                    'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, True, False):
-                raise ValueError('G05 Isaac effort source representation is not the exact local 6.2 USD route')
-            if (source.scene_source.loaded_delivery.delivery.representation_id
-                    != 'isaacsim-6.2.0.0-g05-mjcf-v1'):
-                raise ValueError('G05 Isaac effort source delivery is not the reviewed MJCF conversion')
-            if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-                    artifact.timebase.control_dt) != (0.002, 25, 0.05):
-                raise ValueError('G05 Isaac effort profile requires the task 2 ms / 25 substep timebase')
-            if set(source.joint_targets) != set(source.joints) or not source.joints:
-                raise ValueError('G05 Isaac effort source must expose an exact scalar joint target map')
+            _validate_g05_isaac_effort_source(artifact, declared_execution, source)
             native_io = None
             try:
                 native_io = create_isaac_native_runtime_io(
@@ -1583,9 +1590,19 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 raise ValueError('versioned Scene source has no declared closure digest')
         elif selection.physics_provider == 'isaacsim':
             runtime_input = value.get('session_admission_input')
-            if type(runtime_input) is not UsdRuntimeInputV1:
-                raise TypeError('Isaac worker requires the exact F06 runtime input')
-            _validate_f06_pickcube_isaac_input(runtime_input, artifact, runtime_input.execution, source)
+            declared_execution = value.get('execution_spec_v1')
+            if type(runtime_input) is UsdRuntimeInputV1:
+                _validate_f06_pickcube_isaac_input(runtime_input, artifact, runtime_input.execution, source)
+            elif (type(declared_execution) is ExecutionSpecV1
+                  and declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE
+                  and type(source) is UsdRuntimeSourceV1):
+                if (declared_execution.physics_provider, declared_execution.physics_backend,
+                        declared_execution.physics_device) != (
+                        selection.physics_provider, selection.physics_backend, selection.physics_device):
+                    raise ValueError('USD execution differs from the requested provider selection')
+                _validate_g05_isaac_effort_source(artifact, declared_execution, source)
+            else:
+                raise TypeError('Isaac source requires an admitted runtime input or G05 effort declaration')
         else:
             raise ValueError('no selected adapter for provider')
     except (TypeError, ValueError, OSError, AttributeError) as error:
@@ -1647,6 +1664,10 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
                 source=source,
             )
+            if getattr(source, 'torque_actuators', None) and selection.physics_provider in {'mujoco', 'geophys'}:
+                # Typed effort execution and its source bindings were checked;
+                # the adapter still verifies native actuator names at build.
+                actual_capabilities.add('joint_torque_actuation')
             if position_owner:
                 if any(selected.controller is item or selected.controller.identity == item.identity
                        for item in physical.controllers):
@@ -1716,7 +1737,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         'free': 'resolve the named floating body and its valid pose/velocity state',
         'body': 'resolve the named body and its public pose mapping',
         'frame': 'resolve the named site or public frame view',
-        'actuator': 'resolve the named position target and its declared joint mapping',
+        'actuator': 'resolve the named actuator and its declared joint mapping',
     }
     for field, kind, capability in source_objects:
         for semantic, native in getattr(source, field, {}).items():

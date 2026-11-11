@@ -335,7 +335,8 @@ def _resolve_selected_config(environment_type, config):
                                 "physics_device": supplied.physics_device,
                                 "source_delivery_manifest": supplied.source_delivery_manifest,
                                 "render_default": supplied.render_default.to_mapping()},
-                  "episode": {"horizon": supplied.environment.episode.horizon, "seed": supplied.environment.episode.seed}}
+                  "episode": {"horizon": supplied.environment.episode.horizon, "seed": supplied.environment.episode.seed,
+                              "ignore_done": supplied.environment.episode.ignore_done}}
         if supplied.execution_spec_v2 is not None:
             selection = supplied.execution_spec_v2
             config["execution"].update({
@@ -418,7 +419,7 @@ def _resolve_selected_config(environment_type, config):
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
                       "deployment", "interpreter", "native_dt", "reset_profile", "source_workspace"},
-        "episode": {"horizon", "seed"},
+        "episode": {"horizon", "seed", "ignore_done"},
         "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
                 | set(environment_type.selected_parameter_limits),
     }
@@ -489,6 +490,9 @@ def _resolve_selected_config(environment_type, config):
     profile = sections["task"].get("controller_profile", default_profile)
     if profile is not None and profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
+    profile_routes = getattr(environment_type, 'controller_profile_routes', {})
+    if profile in profile_routes and (provider, backend) not in profile_routes[profile]:
+        raise ValueError(f'Controller profile {profile!r} is not admitted on {provider}/{backend}')
     reset_profile = execution_defaults.get('reset_profile')
     if reset_profile is not None and (
             reset_profile != 'pickcube-state-only-switch-v1'
@@ -523,8 +527,12 @@ def _resolve_selected_config(environment_type, config):
     horizon = sections["episode"].get("horizon", base.episode.horizon)
     if type(horizon) is not int or not 1 <= horizon <= 6000:
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
+    ignore_done = sections['episode'].get('ignore_done', base.episode.ignore_done)
+    if type(ignore_done) is not bool:
+        raise TypeError('episode.ignore_done must be a boolean')
     env = replace(base, runtime=replace(base.runtime, backend=backend),
-                  episode=replace(base.episode, horizon=horizon, seed=seed))
+                  control=replace(base.control, profile_id=profile),
+                  episode=replace(base.episode, horizon=horizon, seed=seed, ignore_done=ignore_done))
     task_configuration_json = None
     if task_configuration is not None:
         # Keep physics/render defaults in their resolved execution owner.  The
@@ -585,7 +593,8 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError("resolved selected configuration contains unsupported overrides")
     if supplied is not None and requested_json is not None:
         original = {"execution": json.loads(requested_json),
-                    "episode": {"horizon": result.environment.episode.horizon, "seed": result.environment.episode.seed},
+                    "episode": {"horizon": result.environment.episode.horizon, "seed": result.environment.episode.seed,
+                                "ignore_done": result.environment.episode.ignore_done},
                     "task": dict(result.task_parameters)}
         if result.robot_uid is not None:
             original["robot"] = {"uid": result.robot_uid}

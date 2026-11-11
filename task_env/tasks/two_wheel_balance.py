@@ -584,17 +584,33 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     """Source-bound articulated two-wheel balance environment."""
 
     uses_component_task_config = True
+    uses_selected_public_config = True
     physical_task_timebase = (.002, 25)
     selected_physical_controller_profiles = (
         'direct_joint_effort_v1',
         'velocity_damped_joint_effort_v1',
     )
+    selected_controller_profiles = frozenset(selected_physical_controller_profiles)
+    selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
+    selected_parameter_limits = {}
+    selected_supports_isaac = True
+    controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
+    observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
     @classmethod
-    def selected_binding(cls, config, *, provider, backend, source_delivery_manifest=None):
+    def selected_default_config(cls):
+        return cls.default_config()
+
+    @staticmethod
+    def selected_default_controller_profile():
+        return 'direct_joint_effort_v1'
+
+    @classmethod
+    def selected_binding(cls, config):
         from .two_wheel_physical import task_binding
-        return task_binding(config, provider=provider, backend=backend,
-                            source_delivery_manifest=source_delivery_manifest)
+        return task_binding(config.environment, provider=config.physics_provider,
+                            backend=config.environment.runtime.backend,
+                            source_delivery_manifest=config.source_delivery_manifest)
 
     uid = TWO_WHEEL_BALANCE_ENV_ID
     task_uid = TWO_WHEEL_BALANCE_TASK_UID
