@@ -526,3 +526,11 @@ MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller�
 生产修改 2 文件 +30／−41，净减 11 行；无文件新增、删除或迁移，tracked 文件数不变；版本诊断未改，实施和当前状态文档 2 文件修改。共享任务实体组装被重写复用，迁移行不作为删除成果；provider／renderer、clock 和控制提交代码未改。
 
 实际解析的 MJCF 与 Isaac 两种 Scene，新旧完整 mapping 和 identity 均一致；此项没有启动物理 SDK，但读取并解析了 Panda 源资产。MuJoCo CPU 的 direct effort 和 reset-scoped joint／r3 切换各完成真实短程，后者包含 H5 v3 单 interval 记录读回及切换后的实际推进；首版和仅调整共享函数 Robot 参数命名后的最终版各 15 子步，合计 30 个可观测子步。31 项版本纯合同在最终代码通过。Isaac 只核对 Scene 声明，未重跑其物理或 renderer，也不声称 source／adapter 全面统一。计划、diff、场景对照和结果在 ignored `workspace/maintenance/v211_pickcube_scene_20261112_001/`；E01～E04 仍未完成。
+
+### 6.35 简单主体 Task Artifact 共同编译
+
+输入 `484deadd`。Pendulum 与双轮车不再各自复制 Entity、初始化、joint-effort action 和 Artifact 编译接线；Task 提供自身身份、成功语义和 timebase，共同 Task Source 编译器从 Robot／Scene 读取真实实体、资产、frame 和 joint 顺序，并在编译前拒绝 Robot 与 Scene 的关节不一致。两任务仍各自负责 reset 和奖励语义；新入口目前覆盖这两种已有主体的 joint-effort 声明，不宣称 tabletop Task 已使用同一专用入口。顺带移除任务文件中不再使用的 Isaac source imports，实际 provider source 仍由 Runtime source owner 处理。
+
+生产修改 3 文件 +45／−42，净增 3 行；版本诊断修改 1 文件 +9／−1；实施和当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。32 项版本纯合同通过，包括 Robot／Scene 关节不一致拒绝。无 revision 和指定 revision 两种情况下，两任务的 Task Source identity、Artifact identity 和完整 mapping 与输入版本相同。
+
+两任务 MuJoCo CPU 均完成 reset、非零 action、第二次 reset 和 close，各观测 25 子步；与上轮同 seed 的 Robot、Scene、reset sample 身份及单步奖励一致。GeoPhys、Isaac、renderer 本批未重跑；两种 revision 的静态身份一致可作为评估旧有界证据的依据，不能替代本批 native 复验。计划、冻结 diff 和对照位于 ignored `workspace/maintenance/v211_simple_task_declaration_20261112_001/`。E01～E04 仍未完成。

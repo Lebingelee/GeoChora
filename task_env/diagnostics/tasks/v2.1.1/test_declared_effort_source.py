@@ -23,7 +23,7 @@ from task_env.tasks import pendulum_physical, two_wheel_physical
 ])
 def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodies, monkeypatch):
     scene = robot.scene_definition()
-    task_source, artifact = task._declaration(scene)
+    task_source, artifact = task._declaration(scene, robot)
     seen = {}
     def build_source(**kwargs):
         seen.update(kwargs)
@@ -43,3 +43,11 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
                                 state_joint_names=robot.state_joint_names)
     with pytest.raises(ValueError, match='transmission differs'):
         compile_declared_effort_source(robot=corrupted, **args)
+
+
+def test_task_compiler_rejects_robot_joint_declaration_mismatching_scene():
+    from dataclasses import replace
+    robot = PendulumEntity()
+    scene = robot.scene_definition()
+    with pytest.raises(ValueError, match='state joints differ'):
+        pendulum_physical._declaration(scene, replace(robot, joint_name='foreign_hinge'))

@@ -7,10 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
-    SemanticDefinition, Timebase)
+from ..artifacts import Timebase
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
-from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
+from ..environment.task_source import compile_existing_subject_effort_task
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
@@ -19,10 +18,7 @@ from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.declared_effort_source import (
     declared_effort_scene, compile_declared_effort_source,
 )
-from ..runtime.sessions.isaac_g05 import (
-    G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
-    ensure_g05_isaac_app_open, load_g05_isaac_delivery,
-)
+
 from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
                        PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS)
@@ -32,19 +28,10 @@ JOINT = f'{ENTITY}/pendulum_hinge'
 
 
 
-def _declaration(scene):
-    entity = EntityDefinition(ENTITY, 'embodiment', 'inline://task-env/pendulum',
-        ('pendulum-v1/pendulum_anchor', 'pendulum-v1/pendulum_link'), (JOINT,),
-        'source_owned', 'source_owned', {})
-    init = InitializationContract('initialization-v0', {}, {JOINT: 0.}, (), 'clear', 'source', 0)
-    semantics = SemanticDefinition('semantics-v0', 'pendulum-task-definition-v1', (), (JOINT,),
-                                   {}, PENDULUM_SUCCESS_DEFINITION)
-    decl = TaskArtifactDeclarationV1('pendulum-physical-v1', PENDULUM_TASK_UID, 'v1', (entity,),
-        ActionIntent('direct_joint_effort', None, 'none', 'joint_effort'), ('joint_state',),
-        init, semantics, Timebase(.002, 25, .05), ('articulated_robot', 'joint_state_query'))
-    source = TaskSourceV1(PENDULUM_TASK_UID, 'v1', scene.scene_id, (), None)
-    artifact = decl.compile_v1(source, scene)
-    return source, artifact
+def _declaration(scene, robot):
+    return compile_existing_subject_effort_task(scene=scene, robot=robot, task_id=PENDULUM_TASK_UID,
+        artifact_id='pendulum-physical-v1', semantic_id='pendulum-task-definition-v1',
+        success_definition=PENDULUM_SUCCESS_DEFINITION, timebase=Timebase(.002, 25, .05))
 
 
 def _reset_plan(artifact, source, seed, sampled=None):
@@ -70,7 +57,7 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
     robot = PendulumEntity()
     scene = declared_effort_scene(robot, provider=provider,
         source_delivery_manifest=source_delivery_manifest)
-    task_source, artifact = _declaration(scene)
+    task_source, artifact = _declaration(scene, robot)
     composition = TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                                       success_definition=PENDULUM_SUCCESS_DEFINITION)
     source, execution_spec, closure = compile_declared_effort_source(

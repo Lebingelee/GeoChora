@@ -6,10 +6,9 @@ import json
 from pathlib import Path
 import numpy as np
 
-from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
-    SemanticDefinition, Timebase)
+from ..artifacts import Timebase
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
-from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
+from ..environment.task_source import compile_existing_subject_effort_task
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
@@ -18,10 +17,7 @@ from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.declared_effort_source import (
     declared_effort_scene, compile_declared_effort_source,
 )
-from ..runtime.sessions.isaac_g05 import (
-    G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
-    ensure_g05_isaac_app_open, load_g05_isaac_delivery,
-)
+
 from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
     TWO_WHEEL_BALANCE_SCENE_UID, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
     TwoWheelBalanceTaskDefinition, TwoWheelBalanceObservationBuilder)
@@ -29,22 +25,13 @@ from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
 ENTITY = 'two-wheel-balance-v1'
 NAMES = ('chassis_pitch', 'left_wheel_hinge', 'right_wheel_hinge')
 JOINTS = tuple(f'{ENTITY}/{name}' for name in NAMES)
-FRAMES = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
-ACTUATORS = ('left_wheel_torque', 'right_wheel_torque')
 
 
 
-def _declaration(scene):
-    entity = EntityDefinition(ENTITY, 'embodiment', 'inline://task-env/two-wheel-balance',
-        tuple(f'{ENTITY}/{f}' for f in FRAMES), JOINTS, 'source_owned', 'source_owned', {})
-    init = InitializationContract('initialization-v0', {}, {j: 0. for j in JOINTS}, (), 'clear', 'source', 0)
-    semantics = SemanticDefinition('semantics-v0', 'two-wheel-task-definition-v1', (), JOINTS,
-                                   {}, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION)
-    decl = TaskArtifactDeclarationV1('two-wheel-physical-v1', TWO_WHEEL_BALANCE_TASK_UID, 'v1', (entity,),
-        ActionIntent('direct_joint_effort', None, 'none', 'joint_effort'), ('joint_state',), init, semantics,
-        Timebase(.002, 25, .05), ('articulated_robot', 'joint_state_query'))
-    task_source = TaskSourceV1(TWO_WHEEL_BALANCE_TASK_UID, 'v1', scene.scene_id, (), None)
-    return task_source, decl.compile_v1(task_source, scene)
+def _declaration(scene, robot):
+    return compile_existing_subject_effort_task(scene=scene, robot=robot, task_id=TWO_WHEEL_BALANCE_TASK_UID,
+        artifact_id='two-wheel-physical-v1', semantic_id='two-wheel-task-definition-v1',
+        success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION, timebase=Timebase(.002, 25, .05))
 
 
 def sample_reset(rng):
@@ -75,7 +62,7 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
     robot = TwoWheelBalanceEntity()
     scene = declared_effort_scene(robot, provider=provider,
         source_delivery_manifest=source_delivery_manifest)
-    task_source, artifact = _declaration(scene)
+    task_source, artifact = _declaration(scene, robot)
     composition = TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID,
                                       success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION)
     source, execution_spec, closure = compile_declared_effort_source(
