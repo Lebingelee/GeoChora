@@ -157,3 +157,5 @@ PickCube MJCF effort 的 Task source、Scene 和 Controller 构造现共享同�
 可切换 effort 的录像元数据现直接来自物理执行和 source，不再套用 Position 元数据；物理及装配 Position 的 MuJoCo H5 已复验。详见[实施记录 6.70](../planning/post-5c-optimization-execution.md#670-物理控制录像元数据归实际执行-owner)。
 
 PickCube MJCF reset 切换已改用活动物理 Controller 与 V2 状态，切换／H5 和 R3 Solution 单步通过；USD 仍待收敛。详见[实施记录 6.71](../planning/post-5c-optimization-execution.md#671-reset-切换使用实际物理状态与-controller)。
+
+PickCube USD effort 已由物理 Runtime 发布 V2 任务状态，Isaac 同步 RGB 与 MuJoCo 切换短程通过；构建时仍临时创建 Position 对象。详见[实施记录 6.72](../planning/post-5c-optimization-execution.md#672-usd-effort-使用物理状态与-source-准入)。

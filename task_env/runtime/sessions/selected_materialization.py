@@ -65,7 +65,10 @@ class PhysicalRuntimeBuilder:
         if _worker(selection):
             env.session = start_worker()
         else:
-            options = {'_observer_render_request': getattr(env, '_observer_render_request', None)}
+            options = {'_observer_render_request': getattr(env, '_observer_render_request', None),
+                       '_session_admission_input': env.value.get('session_admission_input'),
+                       '_task_render_requested': bool(getattr(env, 'render_mode', None) is not None
+                                                      or getattr(env, '_task_rgb_config', None) is not None)}
             if getattr(env, '_legacy_observer_requested', False):
                 options['_legacy_observer_requested'] = True
             if getattr(env, '_legacy_camera_observations', False):
@@ -224,8 +227,7 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
             raise StageUnavailableError('RuntimeSession does not expose a physical-control build port')
         bind(execution)
         capabilities.append(PhysicalInitialState(execution,
-            getattr(env.binding, 'physical_observation_binding', None) is None
-            and getattr(env, '_task_rgb_config', None) is None,
+            getattr(env.binding, 'physical_observation_binding', None) is None,
             declared is execution))
     if not capabilities:
         capabilities.append(LegacyFeedbackInitialState(env._selected_controller))

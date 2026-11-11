@@ -824,3 +824,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +48／−45，净增 3 行；版本诊断修改 2 文件 +35／−2，覆盖 R3 Solution 单步／录像和切换 Controller 身份；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。构建消除一个非执行 Position Controller，物理提交、V2 状态、clock 和 source 由同一 Runtime 执行合同承载；renderer 未改，其他任务仍走各自已声明的能力路径。
 
 91 项版本检查通过，包括 R3 Solution reset、一次真实提交、录像读回和停止；这不是完整 Solution 成功结论。四个正式任务 MuJoCo 短程及 joint→R3 切换／H5 读回通过，最终五次运行共观测 70 个 native 子步；随后装配 Position 录像和切换录像再次通过，分别观测 5 和 10 个子步。本批第一次切换探针完成 10 个子步后，因探针把初始声明误作活动 Controller 而失败；修正探针后通过，失败与重试收据保留。GeoPhys、Isaac 原生和完整 Solution 本批未重跑。冻结各轮 diff、计划与收据位于 ignored `workspace/maintenance/v211_switch_physical_final_20261112_9qFC7G/`；E01～E04 仍未接收。
+
+### 6.72 USD effort 使用物理状态与 source 准入
+
+输入 `417a15d7`。PickCube USD effort 原先选择 Position Controller 物化 Runtime 并发布 V1 观测；现在运行时选择实际 physical execution，任务观测消费其 V2 状态，renderer 继续独立消费同一边界的 source-bound 状态。USD 的 hand_pose 沿用该 source 声明的 ee frame 语义；resolved Controller identity 改为实际物理 Controller。共同 Runtime 将已有 versioned source 准入输入传给物化层，F06 的 Core 生成清单仍按 Artifact 核对。构建阶段仍临时创建 Position 对象以取得配置和运动学模型，尚待移除，不能将本批视为完整统一。
+
+生产修改 4 文件 +18／−8，净增 10 行；测试／诊断代码无修改；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。物理 Controller 的 V2 观测与 task RGB renderer 的 V1 状态分别核对 Runtime 边界，renderer 本身、clock 和物理提交 owner 未改变。
+
+91 项版本检查通过；MJCF／USD 五种 profile 共十组 source 和 physical Controller 合同对照一致。Isaac joint effort／CUDA／同步 RGB 完成两次 reset、一次 step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，采图期间无额外推进，订阅前启动推进未知。首次运行因物理构造未传入 F06 准入输入被拒，未观测物理推进、按 59 次保守预留；第二次修正后通过，窗口累计按 100 次记账。SDK 日志仍有只读目录提示、渲染预热错误及关闭时菜单扩展异常；callback 取消订阅接口也报告 AttributeError，进程和独立读回成功。MuJoCo joint→R3 切换／H5 读回通过、观测 10 个 native 子步；GeoPhys 和完整 Solution 本批未重跑。冻结各轮 diff、计划、对照及收据位于 ignored `workspace/maintenance/v211_usd_physical_state_20261112_VUQQP8/`。E01～E04 仍未接收。

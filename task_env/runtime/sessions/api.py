@@ -712,6 +712,8 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             _f06_pickcube_isaac_input, artifact, declared_execution, source,
         )
         expected_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
+        if manifest is None and _materialization_authority is None:
+            manifest = expected_manifest
         if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
                 or _materialization_authority is not None):
             raise ValueError('F06 exact admission requires the Core-generated source-bound manifest only')

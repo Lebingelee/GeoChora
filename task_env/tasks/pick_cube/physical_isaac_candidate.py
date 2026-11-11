@@ -1,5 +1,6 @@
 """Task binding for the existing Isaac physical source."""
 from dataclasses import replace
+from functools import partial
 
 
 def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode, control_kind):
@@ -16,7 +17,10 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         position = value['controller']
         physical = build_pickcube_effort_profile(physical, value['artifact'], value['source'],
             kind=control_kind, config=position.config, model=position.model, end_frame_id='ee')
-        return {**value, 'physical_execution': physical}
+        from ...controllers.canonical.contracts import digest
+        resolved = {**value['resolved_configuration'], 'controller_identity': physical.controllers[0].identity}
+        return {**value, 'controller': physical.controllers[0], 'physical_execution': physical,
+                'resolved_configuration': resolved, 'recipe_identity': digest(resolved)}
     base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
     def build(provider):
         if provider != 'isaacsim':
@@ -31,9 +35,11 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         if type(actual) is not int or actual != seed:
             raise ValueError('F06 physical candidate requires its frozen seed')
         return actual
-    from ...environment.reference_binding import legacy_position_physical_observation_binding
+    from .physical_candidate import _direct_physical_observation, _direct_physical_observation_spaces
     return replace(base, build=build, build_seeded=build_seeded, reset_seed=reset_seed,
         scalar_control_binding=None, action_space_factory=None,
-        physical_observation_binding=legacy_position_physical_observation_binding,
+        observation_space_factory=_direct_physical_observation_spaces,
+        observation_projection=partial(_direct_physical_observation, hand_frame_id='ee'),
+        physical_sequence_v2_observation=True,
         action_schema=None,
         recorder_mode='execution', interval_mode='grouped')

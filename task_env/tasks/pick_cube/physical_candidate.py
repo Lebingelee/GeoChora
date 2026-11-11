@@ -89,7 +89,7 @@ def _direct_physical_observation_spaces(env):
     ))
 
 
-def _direct_physical_observation(env, state):
+def _direct_physical_observation(env, state, *, hand_frame_id="hand"):
     """Project the physical publication without requiring a Position controller."""
     import numpy as np
     from ...artifacts import CanonicalStateView
@@ -98,7 +98,7 @@ def _direct_physical_observation(env, state):
     names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
     if any(name not in joints for name in names):
         raise ValueError('PickCube observation requires its named Panda joints')
-    hands = [v for v in view.frames if v.frame.entity_id == 'panda-v1' and v.frame.frame_id == 'hand']
+    hands = [v for v in view.frames if v.frame.entity_id == 'panda-v1' and v.frame.frame_id == hand_frame_id]
     if len(hands) != 1:
         raise ValueError('PickCube observation requires one hand frame')
     hand = hands[0].pose_world
