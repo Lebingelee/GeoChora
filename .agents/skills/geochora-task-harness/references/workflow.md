@@ -40,6 +40,14 @@ Unified findings have `check, category, locality, spec_path, observed, expected,
 
 If a diagnostic is needed, make an explicit separate spec and run `feasibility_probe.py --core-repo ... --spec ... --catalog ... --provider ... --seeds ... --output ...`. Diagnostic probes are evidence, not new accepted candidates. Isolate relevant variables using the failure's actual reset poses and stage; keep failed diagnostics. Do not count a one-seed diagnostic as the final 20-seed check.
 
+To prepare those diagnostics from a failed feasibility report:
+
+```sh
+"$PY" "$RT/diagnose_candidate.py" --report "$OUT/round1/feasibility.json" --spec "$OUT/round1/candidate.spec.json" --output-dir "$OUT/round1-diagnosis"
+```
+
+`summary.json` groups non-solved seeds by classification/phase/stage/reason, gives each seed's offset from the reset center, and lists every finding with its `finding_index`, whether the ledger permits a spec revision for it, and whether diagnostics are required. `source.report_sha256` is the value a revision cites. Each `fixed-pose-seed<N>.spec.json` pins the reset to that seed's recorded pose with zero extent; pass it to `feasibility_probe.py` yourself (`--seeds` restricts which are written). The tool reads JSON only: it runs nothing, decides nothing, and an offset pattern is a lead to test, not proof of infeasibility. Rows without a recorded start pose get no spec.
+
 For a supported repair, write a new spec and a revision JSON:
 
 ```json

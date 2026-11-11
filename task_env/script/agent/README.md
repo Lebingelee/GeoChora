@@ -53,6 +53,7 @@ runtime.
 | `feasibility_probe.py` | Separate solved/invalid/expert_failed/unknown outcomes |
 | `completion_facts.py` | Versioned raw completion facts and independent row/report validation |
 | `check_candidate.py` | One candidate's four checks, with real reports |
+| `diagnose_candidate.py` | Regroup a failed feasibility report by outcome and reset offset; write fixed-pose diagnostic specs. Descriptive only: no physics, no Core import, no revision decision |
 | `construction_ledger.py` | Hash-bound per-round contexts, v0 compatibility, owner-repair continuation, five-round budget and escalation |
 | `oracle_candidate.py` | Existing recorder, completion check and independent H5 inspection |
 | `judge_package.py` | Portable evidence index and pending-only verification |
