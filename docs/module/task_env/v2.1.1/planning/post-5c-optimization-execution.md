@@ -460,3 +460,11 @@ MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step
 生产配置及脚本修改 6 文件 +15／−38，净减 23 行；示例 2 文件 +4／−2；版本诊断 1 文件 +41；本记录和当前状态文档 2 文件修改。无文件新增、删除、迁移，tracked 文件数不变。27 项版本纯合同通过，覆盖旧字段拒绝、四任务示例配置以及 Harness 输出交给真实配置解析器；Harness 此处未实际执行完整运行。四任务 MuJoCo CPU 各完成 reset／单 interval／第二次 reset／close，共 60 个观测子步，Nut 为单个 Solution interval；结果、计划和冻结 diff 位于 ignored `workspace/maintenance/v211_formal_callers_20261112_001/`。运行后只对 `_bootstrap.py` 移除一个文件末尾空行，纯合同在最终内容上重跑通过；冻结 diff 保留运行时精确状态。
 
 本批未更改 provider／renderer、时钟或提交，其他 provider 和 renderer 未重跑。Pendulum 的旧 RGB 示例仍传入 component 的 `runtime`／`render` 配置，不能在当前正式配置入口使用；其渲染参数迁移留待渲染配置整理，不将它描述为已迁移。仍需审计其他正式 caller、component 结构和四主体共同构造，E01～E04 未完成。
+
+### 6.27 单层与嵌套已有主体的 effort Assembly 编译
+
+输入 `780a33bf`。Panda direct effort 与 Pendulum／双轮车的已有主体 effort 现在使用同一个 Assembly 编译入口：读取 Robot subject 和关节声明，按声明构造单层或嵌套 logical assembly，再交给共同的主体绑定编译器。Panda 的 tendon 力分配、原有嵌套身份及不同 Controller 语义保留；简单主体仍按各自通道声明处理。移除三个 Robot 上只由历史诊断调用的 `controlled_subject` 旧反向构造方法，正式路径使用先声明再编译。Position 的主体与控制编译没有改为该 effort 路径，四任务的完整主体机制仍未收口。
+
+生产修改 4 文件 +45／−79，净减 34 行；其中 Assembly 重写归并到 Runtime，删除的是重复构建及旧反向方法，不能把迁移行直接当作删除效果。版本诊断修改 1 文件 +4／−2，增加正式 PickCube Panda effort 短程选项；本记录及当前状态 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。renderer、时钟、Position 提交及 source adapter 未改。
+
+MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 reset／非零 action／第二次 reset／close，分别观测 5、25、25 子步；两个简单主体 GeoPhys CPU 同样通过，内部物理子步未观测，按各 50 预留。MuJoCo 新旧运行的两个简单主体 Scene、reset sample、Robot／Controller identity 相同；Panda effort 的 Scene 和 Controller identity 与此前直接路线相同。27 项版本纯合同通过；不声称本批验证了每个绑定 hash、完整 Solution、Isaac、renderer 或 Position 路线。冻结 diff、计划和结果在 ignored `workspace/maintenance/v211_subject_assembly_20261112_001/`；E01～E04 仍未完成。

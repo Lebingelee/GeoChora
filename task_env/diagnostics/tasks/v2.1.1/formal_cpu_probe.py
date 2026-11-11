@@ -24,13 +24,15 @@ try:
             return original_step(*params,**kwargs)
         mujoco.mj_step=counted_step
     from task_env import make_env
-    if args.case in {'panda-r3','panda-gravity','assembled-unreset','assembled-live','nut'}:
+    if args.case in {'panda-r3','panda-gravity','panda-effort','assembled-unreset','assembled-live','nut'}:
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
+        if args.case=='panda-effort':config['controller']={'profile_id':'panda-direct-effort-v1'}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
         env=make_env(uid,config=config)
-        action=np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
+        action=np.asarray([.2,0.,0.,0.,0.,0.,0.,0.] if args.case=='panda-effort' else
+                          [.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
     else:
         uid='pendulum-v1' if args.case=='pendulum' else 'two-wheel-balance-v1'
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu',

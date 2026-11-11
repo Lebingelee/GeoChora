@@ -121,21 +121,6 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
             self.actuator_name, self.actuator_name, 1., (-2., 2.), 'disabled')
         return subject, (joint,)
 
-    def controlled_subject(self, *, binding, entity_id, root_frame, controller_writer):
-        """Declare the source-owned hinge without constructing a second body."""
-        from ..artifacts import FrameReference
-        from ..runtime.sessions.physical_control import ControlledSubjectV1
-        channels = tuple(c for c in binding.channels if c.entity_id == entity_id)
-        if (len(channels) != 1 or channels[0].joint_id != self.joint_name
-                or channels[0].native_actuator != self.actuator_name
-                or channels[0].unit != 'N*m' or channels[0].effort_range != (-2., 2.)):
-            raise ValueError('Pendulum subject requires its declared hinge torque channel')
-        return ControlledSubjectV1(self.uid, entity_id, binding.source_id,
-            binding.source_closure_sha256, 'references_existing', 'fixed',
-            FrameReference(entity_id, root_frame), None,
-            (channels[0].component_path,), (controller_writer,),
-            supported_controller_profiles=('direct_joint_effort_v1',
-                                            'velocity_damped_joint_effort_v1'))
 
 
 class PendulumTorqueActionAdapter:

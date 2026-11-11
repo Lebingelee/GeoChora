@@ -202,11 +202,45 @@ class SubjectJointDeclarationV1:
     native_drive: str
 
 
-def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
-    """Compile an existing Robot's declaration into one source-bound effort execution."""
+def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
+                                      source_closure_sha256, subject, declarations,
+                                      assembly_id, nested_component_id=None):
+    """Compile one existing Robot's declared joints, including optional nested parts."""
     from ...artifacts import JointReference
     from ...artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
-        LogicalAssemblyEntityMemberV1, LogicalAssemblySubcomponentReferenceV1)
+        LogicalAssemblyEntityMemberV1, LogicalAssemblyNestedMemberV1,
+        LogicalAssemblySubcomponentReferenceV1)
+
+    entities = tuple(entity for entity in scene.entities if entity.entity_id == subject.entity_id)
+    if len(entities) != 1:
+        raise ValueError('Robot subject must refer to exactly one Scene entity')
+    entity = entities[0]
+    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
+                                    scene.schema_version, scene.identity_hash)
+    owner = LogicalAssemblyEntityMemberV1('entity_member', ('owner',), subject.entity_id,
+                                          entity.asset_id, entity.asset_version)
+    if nested_component_id is None:
+        refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
+            item.component_path, 'joint', JointReference(subject.entity_id, item.joint_id))
+            for item in declarations)
+        members, children = (owner, *refs), {}
+    else:
+        if any(len(item.component_path) < 2 or item.component_path[0] != 'robot' for item in declarations):
+            raise ValueError('nested Robot component paths must start with robot')
+        refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
+            item.component_path[1:], 'joint', JointReference(subject.entity_id, item.joint_id))
+            for item in declarations)
+        child = LogicalAssemblyV1('logical-assembly-v1', nested_component_id, 'v1', pin, refs)
+        members = (owner, LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',),
+            child.assembly_id, child.revision, child.logical_content_sha256))
+        children = {(child.assembly_id, child.revision): child}
+    assembly = LogicalAssemblyV1('logical-assembly-v1', assembly_id, 'v1', pin, members)
+    return compile_declared_subject_binding(scene, artifact_sha256, source_id,
+        source_closure_sha256, assembly, children, (subject,), declarations)
+
+
+def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
+    """Compile an existing Robot's declaration into one source-bound effort execution."""
     from ...artifacts.state import StateFieldRequirement, StateRequirements
 
     subject, declarations = robot.physical_subject_declaration(
@@ -214,19 +248,9 @@ def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id)
     if len(subject.controller_writers) != 1:
         raise ValueError('single-subject effort construction requires one declared writer')
     writer = subject.controller_writers[0]
-    entities = tuple(entity for entity in scene.entities if entity.entity_id == subject.entity_id)
-    if len(entities) != 1:
-        raise ValueError('Robot subject must refer to exactly one Scene entity')
-    entity = entities[0]
-    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
-                                    scene.schema_version, scene.identity_hash)
-    assembly = LogicalAssemblyV1('logical-assembly-v1', robot.assembly_id, 'v1', pin, (
-        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), subject.entity_id,
-                                      entity.asset_id, entity.asset_version),
-        *(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref', item.component_path,
-             'joint', JointReference(subject.entity_id, item.joint_id)) for item in declarations)))
-    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
-        source.source_closure_digest, assembly, {}, (subject,), declarations)
+    compiled = compile_existing_subject_assembly(scene=scene, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
+        subject=subject, declarations=declarations, assembly_id=robot.assembly_id)
     units = tuple(channel.unit for channel in compiled.binding.channels)
     controller = subject.select_effort_controller(compiled.binding, profile_id=profile_id,
         writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)

@@ -46,15 +46,10 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
     The source adapter supplies verified native ranges; this function does not
     parse or materialize a provider-specific source.
     """
-    from ..artifacts import JointReference
-    from ..artifacts.logical_assembly import (
-        LogicalAssemblyV1, LogicalAssemblyScenePinV1, LogicalAssemblyEntityMemberV1,
-        LogicalAssemblyNestedMemberV1, LogicalAssemblySubcomponentReferenceV1,
-    )
     from ..artifacts.state import StateFieldRequirement, StateRequirements
     from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
     from ..controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
-    from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
+    from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_existing_subject_assembly
 
     if native_drive not in {'position', 'disabled'}:
         raise ValueError('Panda effort profile requires a declared native drive mode')
@@ -67,20 +62,10 @@ def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
         entity_id=entity_id, source_id=source.source_id,
         source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
         native_drive=native_drive)
-    instance = next(x for x in scene.entities if x.entity_id == subject.entity_id)
-    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
-                                     scene.schema_version, scene.identity_hash)
-    refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
-        item.component_path[1:], 'joint', JointReference(subject.entity_id, item.joint_id))
-        for item in declarations)
-    child = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-components', 'v1', pin, refs)
-    logical = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-assembly', 'v1', pin, (
-        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), entity_id, instance.asset_id, instance.asset_version),
-        LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',), child.assembly_id,
-                                      child.revision, child.logical_content_sha256)))
-    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
-        source.source_closure_digest, logical, {(child.assembly_id, child.revision): child},
-        (subject,), declarations, ())
+    compiled = compile_existing_subject_assembly(scene=scene, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
+        subject=subject, declarations=declarations, assembly_id='panda-direct-effort-assembly',
+        nested_component_id='panda-direct-effort-components')
     writer = subject.controller_writers[0]
     keys = tuple(f'{entity_id}/{name}' for name in names)
     kinds = tuple(definitions[name].kind for name in names)
@@ -151,19 +136,6 @@ class PandaAgent(BaseAgent):
             1.0 if i < 7 else 0.5, native_ranges[i if i < 7 else 7], native_drive)
             for i, (name, path) in enumerate(zip(names, paths, strict=True)))
         return subject, declarations
-
-    @staticmethod
-    def controlled_subject(*, entity_id, source_id, source_closure_sha256, channels, writers):
-        """Declare this Panda's existing Scene entity for the shared physical owner."""
-        from ..runtime.sessions.physical_control import ControlledSubjectV1
-        names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
-        if tuple(channel.joint_id for channel in channels) != names:
-            raise ValueError('Panda subject requires its declared ordered arm and finger joints')
-        if any(channel.entity_id != entity_id for channel in channels):
-            raise ValueError('Panda subject channels must target its own entity')
-        return ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
-            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None,
-            tuple(channel.component_path for channel in channels), tuple(writers))
 
     def project_references(self, *, names, spec, qpos_adr, dof_adr, ctrl_range):
         """Project the established Panda layout without making the resolver identify robots."""

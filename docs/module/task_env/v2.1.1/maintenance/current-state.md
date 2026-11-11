@@ -67,3 +67,5 @@ Pendulum／双轮车的传动校验与 provider source 映射现由共同 source
 四个正式任务的 Controller 选择现直接使用 `controller.profile_id`；旧顶层、`task.controller_profile` 和 `control.profile_id` 选择位置已明确拒绝。四任务及装配 Panda 的 MuJoCo CPU 短程已复验，详细范围见[实施记录 6.25](../planning/post-5c-optimization-execution.md#625-controller-规范字段直达配置解析)。
 
 正式执行选择已收敛到 `execution`／`episode`，旧顶层选择字段被拒绝；Harness 和本批识别到的录制、轨迹及环境脚本已迁移。Pendulum 旧 RGB 示例的渲染配置仍待迁移；E01～E04 保持未完成。详见[实施记录 6.26](../planning/post-5c-optimization-execution.md#626-正式执行配置和直接-caller-迁移)。
+
+Panda direct effort 与两个简单主体现在共用已有主体 Assembly 编译，单层和嵌套结构均从声明进入共同绑定；Position 路线仍待进一步共同化。MuJoCo CPU 三条 effort 短程及两个简单主体 GeoPhys CPU 短程已通过，详见[实施记录 6.27](../planning/post-5c-optimization-execution.md#627-单层与嵌套已有主体的-effort-assembly-编译)。

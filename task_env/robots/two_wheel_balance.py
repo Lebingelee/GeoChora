@@ -148,21 +148,6 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
                 (self.left_actuator_name, self.right_actuator_name), strict=True))
         return subject, joints
 
-    def controlled_subject(self, *, binding, entity_id, root_frame, controller_writer):
-        """Declare ordered left/right channels on the existing task source."""
-        from ..artifacts import FrameReference
-        from ..runtime.sessions.physical_control import ControlledSubjectV1
-        channels = tuple(c for c in binding.channels if c.entity_id == entity_id)
-        if (tuple(c.joint_id for c in channels) != (self.left_wheel_joint_name, self.right_wheel_joint_name)
-                or tuple(c.native_actuator for c in channels) != (self.left_actuator_name, self.right_actuator_name)
-                or any(c.unit != 'N*m' or c.effort_range != (-1.5, 1.5) for c in channels)):
-            raise ValueError('two-wheel subject requires ordered left/right wheel torque channels')
-        return ControlledSubjectV1(self.uid, entity_id, binding.source_id,
-            binding.source_closure_sha256, 'references_existing', 'fixed',
-            FrameReference(entity_id, root_frame), None,
-            tuple(c.component_path for c in channels), (controller_writer,),
-            supported_controller_profiles=('direct_joint_effort_v1',
-                                            'velocity_damped_joint_effort_v1'))
 
 
 class TwoWheelTorqueActionAdapter:
