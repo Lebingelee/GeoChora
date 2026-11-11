@@ -66,7 +66,14 @@ def test_r3_safe_approach_reaches_both_measured_gates(seed):
     assert gate.minimum_height_above_cube_top_m == pytest.approx(.215)
     # No downward motion is requested until after the second measured gate.
     assert np.all(plan.actions[:gate.after_actions, 2] >= initial["state"]["ee_pose"][2] - 1e-6)
-    assert np.allclose(plan.target_pose[3:], initial["state"]["ee_pose"][3:], atol=1e-6)
+    # The grasp target keeps the start approach axis and yaws the finger closing
+    # axis (hand y) onto a cube face normal; the reset pose is yawed by joint1.
+    from task_env.utils.rotation import quat_wxyz_to_matrix
+    start_rotation = quat_wxyz_to_matrix(initial["state"]["ee_pose"][3:])
+    target_rotation = quat_wxyz_to_matrix(plan.target_pose[3:])
+    assert np.allclose(target_rotation[:, 2], start_rotation[:, 2], atol=1e-5)
+    assert max(abs(target_rotation[0, 1]), abs(target_rotation[1, 1])) == pytest.approx(
+        np.hypot(target_rotation[0, 1], target_rotation[1, 1]), abs=1e-5)
     rotations = np.vstack((initial["state"]["ee_pose"][3:], plan.actions[:, 3:7]))
     assert max(quat_angle_wxyz(a, b) for a, b in zip(rotations, rotations[1:])) <= .10 + 1e-6
     controller.reset(SimpleNamespace(control_step=0, joint_position=dict(zip(ARM, q))))

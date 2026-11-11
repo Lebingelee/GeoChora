@@ -93,6 +93,7 @@ class MeasuredTcpGate:
     minimum_height_above_cube_top_m: float
     max_horizontal_error_m: float | None = None
     maximum_height_above_cube_top_m: float | None = None
+    require_settled: bool = False
 
     def __post_init__(self) -> None:
         if not self.name or type(self.after_actions) is not int or self.after_actions < 0:
@@ -391,6 +392,34 @@ class PickCubeSolution:
         return np.asarray(observation["state"]["ee_pose"], dtype=np.float32).reshape(7)
 
     @staticmethod
+    def _face_aligned_orientation(hand_quaternion, cube_quaternion) -> np.ndarray:
+        """Yaw the hand about world z so the finger closing axis meets a cube face.
+
+        The finger pads close along the hand y axis. A pad axis that is yawed
+        against the cube face normals contacts the cube edges, and the squeeze
+        then rotates the cube out of the grasp. The smallest yaw (|delta| <= 45
+        degrees) that aligns the closing axis with a face normal is applied.
+        """
+        hand = quat_wxyz_to_matrix(np.asarray(hand_quaternion, dtype=np.float64))
+        cube = quat_wxyz_to_matrix(np.asarray(cube_quaternion, dtype=np.float64))
+        closing = hand[:, 1]
+        face = cube[:, 0]
+        if np.hypot(closing[0], closing[1]) < 1e-6 or np.hypot(face[0], face[1]) < 1e-6:
+            return np.asarray(hand_quaternion, dtype=np.float32)
+        delta = math.atan2(face[1], face[0]) - math.atan2(closing[1], closing[0])
+        delta = (delta + math.pi / 4.0) % (math.pi / 2.0) - math.pi / 4.0
+        return matrix_to_quat_wxyz(
+            rotvec_to_matrix(np.asarray([0.0, 0.0, delta])) @ hand
+        ).astype(np.float32)
+
+    @staticmethod
+    def _cube_quaternion(observation) -> np.ndarray:
+        return np.asarray(
+            observation["privileged_state"]["cube_v1_body_pose"][0, 3:7],
+            dtype=np.float64,
+        ).reshape(4)
+
+    @staticmethod
     def _cube_position(observation) -> np.ndarray:
         return np.asarray(
             observation["privileged_state"]["cube_v1_body_pose"][0, :3],
@@ -405,6 +434,10 @@ class PickCubeSolution:
         target[:3] = cube + np.array(
             [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32
         )
+        if getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False):
+            target[3:7] = self._face_aligned_orientation(
+                start[3:7], self._cube_quaternion(observation)
+            )
         clearance_headroom = (
             _MEASURED_CLEARANCE_COMMAND_HEADROOM
             if getattr(
@@ -503,6 +536,7 @@ class PickCubeSolution:
                     maximum_height_above_cube_top_m=(
                         _GRASP_CLEARANCE_ABOVE_CUBE_TOP + _GRASP_HEIGHT_UPPER_TOLERANCE
                     ),
+                    require_settled=True,
                 ),
             )
         return SegmentPlan(actions=actions, target_pose=target, measured_tcp_gates=gates)
@@ -1080,6 +1114,11 @@ class PickCubeReadinessSolution(PickCubeSolution):
             metrics = self._measured_tcp_gate_metrics(gate, observation)
             if not metrics["ready"]:
                 return
+            if gate.require_settled:
+                previous = self._measured_tcp_hold_previous_tcp
+                if previous is None or float(np.linalg.norm(
+                        metrics["tcp_pose"][:3] - previous)) > _MEASURED_TCP_HOLD_SETTLED_STEP_M:
+                    return
             self.completion_events.append({
                 "stage": segment.name,
                 "kind": "measured_tcp_clearance",
@@ -1090,13 +1129,15 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 "horizontal_error_m": metrics["horizontal_error_m"],
                 "max_horizontal_error_m": gate.max_horizontal_error_m,
                 "max_height_above_cube_top_m": gate.maximum_height_above_cube_top_m,
+                "require_settled": gate.require_settled,
                 "tcp_pose": metrics["tcp_pose"].tolist(),
                 "cube_position": metrics["cube_position"].tolist(),
                 "wait_ticks": self._measured_tcp_gate_wait_ticks,
             })
             self._measured_tcp_gate_index += 1
             self._measured_tcp_gate_wait_ticks = 0
-            self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
+            # The converged servo-offset correction stays for later holds in this
+            # segment; the settle reference restarts with the next hold.
             self._measured_tcp_hold_previous_tcp = None
 
 
