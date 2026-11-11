@@ -4182,7 +4182,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if self.binding.control_request_required:
                 failure_phase = 'controller_control_request_validation'
                 if proposal is None or proposal.control_request is None:
-                    raise ValueError('selected NutAssembly control requires its versioned arm execution request')
+                    raise ValueError('selected control requires its versioned arm execution request')
                 validate_request = getattr(self._selected_controller, 'validate_arm_execution_request', None)
                 if not callable(validate_request):
                     raise RuntimeError('selected Controller does not own the admitted arm execution request')

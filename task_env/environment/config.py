@@ -607,8 +607,10 @@ class ResolvedSelectedConfig:
             raise TypeError('Controller parameters must be a JSON object')
         if self.robot_uid is not None and (type(self.robot_uid) is not str or not self.robot_uid.strip() or self.robot_uid != self.robot_uid.strip()):
             raise ValueError("selected robot_uid must be a nonempty trimmed string")
-        if self.reset_profile not in (None, 'pickcube-state-only-switch-v1'):
-            raise ValueError('unsupported selected reset profile')
+        if self.reset_profile is not None and (
+                type(self.reset_profile) is not str or not self.reset_profile.strip()
+                or self.reset_profile != self.reset_profile.strip()):
+            raise ValueError('reset profile must be a nonempty trimmed string or None')
         if type(self.gravity_compensation) is not bool:
             raise TypeError('selected gravity_compensation must be a boolean')
         if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:

@@ -872,3 +872,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +14／−16，净减 2 行；版本诊断修改 2 文件 +63／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。本批消除物理路线的固定 seed 限制，未消除其余任务构造分流。
 
 104 项版本检查通过。MuJoCo joint 与可切换 R3 两种物理配置各完成不同 seed 的 reset 和 step、重复 seed 的采样一致性检查；R3 另完成使用新 seed 的外部 Solution reset。Isaac seeded builder 与共同 Solution 重建只做调用合同检查，本批未运行 Isaac 或 GeoPhys 原生路线，也未运行完整 Solution。首次测试错误地从动作空间随机采样，分别触发真实力限与动作代际检查；改用合法声明动作后通过。E01～E04 仍未接收。
+
+### 6.78 reset profile 准入归任务声明
+
+输入 `5d72d8d7`。共同配置类型只校验 reset profile 的字符串形式，配置解析器依据任务声明的 profile 集合准入；PickCube 自己检查该 profile 与 R3 Controller、重力补偿的组合。共同 Env 的控制请求错误信息也不再指定 NutAssembly。现有 profile 的任务特定 observation／reset 实现仍在，尚需继续整理或决定退出，本批不将它描述为通用能力。
+
+生产修改 4 文件 +14／−8，净增 6 行；版本诊断修改 1 文件 +23／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。共同配置与 Env 减少具体任务名称，四任务仍使用既有正式构建入口；provider／renderer 的 source、状态、clock、提交和资源合同未改变。
+
+109 项版本检查通过，覆盖受声明约束的任务 reset profile、PickCube 不支持的组合以及既有配置等价检查。四个正式任务的 MuJoCo 短程各完成 reset、step、再次 reset 和关闭，分别观察 PickCube 5、NutAssembly 5、Pendulum 25、双轮车 25 个 native 子步；其中 NutAssembly 为 Solution 单步，不代表完整成功。GeoPhys、Isaac 及完整 Solution 本批未重跑；历史证据只证明当时代码和具体路线。冻结 diff、计划与运行收据位于 ignored `workspace/maintenance/v211_formal_config_20261112_fv3hdj96/`；E01～E04 仍未接收。

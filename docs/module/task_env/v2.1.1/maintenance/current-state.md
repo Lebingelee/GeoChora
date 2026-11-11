@@ -169,3 +169,5 @@ USD 构造完成或在 source 准备之后失败时，借用的 MJCF Task 快照
 两个 tabletop 的 source 准备与 Controller 构造失败清理已进一步收敛；MuJoCo 短程及版本检查通过，GPU 未按本批代码重跑。详见[实施记录 6.76](../planning/post-5c-optimization-execution.md#676-task-source-失败前后资源归属)。
 
 PickCube 物理控制不再将 reset seed 冻结在构造时；MuJoCo 多 seed 短程和 Solution reset 已验证，Isaac 本批只验证重建调用合同。详见[实施记录 6.77](../planning/post-5c-optimization-execution.md#677-物理控制使用请求的-reset-seed)。
+
+共同配置不再写死 PickCube reset profile 的名称和 Controller 条件，由任务声明能力并验证组合；四任务 MuJoCo 短程通过。详见[实施记录 6.78](../planning/post-5c-optimization-execution.md#678-reset-profile-准入归任务声明)。

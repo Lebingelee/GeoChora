@@ -84,6 +84,29 @@ def test_reset_switch_preserves_canonical_controller_profile():
     assert candidate.task_seed == candidate.provider_seed == 17
 
 
+@pytest.mark.parametrize('uid', ['nut-assembly-outcome-reference-v1', 'pendulum-v1', 'two-wheel-balance-v1'])
+def test_task_rejects_an_undeclared_reset_profile(uid):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='unsupported task reset profile'):
+        resolve_task_env_config(ENV_REGISTRY.get(uid), {
+            'execution': {'physics_provider': 'mujoco', 'reset_profile': 'pickcube-state-only-switch-v1'},
+        })
+
+
+@pytest.mark.parametrize('controller', [
+    {'profile_id': 'r1'},
+    {'profile_id': 'r3_continuous_v1', 'gravity_compensation': True},
+])
+def test_pickcube_reset_profile_requires_its_declared_controller(controller):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='reset profile requires PickCube R3'):
+        resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), {
+            'execution': {'physics_provider': 'mujoco', 'reset_profile': 'pickcube-state-only-switch-v1',
+                          'deployment': 'in_process'},
+            'controller': controller,
+        })
+
+
 @pytest.mark.parametrize('key', ['provider', 'backend', 'horizon', 'source_delivery_manifest'])
 def test_retired_top_level_execution_inputs_are_rejected(key):
     importlib.import_module('task_env.tasks')

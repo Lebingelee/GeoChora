@@ -686,9 +686,13 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     panda_effort_profiles = PandaAgent.effort_controller_profiles()
     selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES) | frozenset(panda_effort_profiles)
     selected_controller_parameters = frozenset(('reset_selection', 'action_space_policy'))
+    selected_reset_profiles = frozenset(('pickcube-state-only-switch-v1',))
 
     @staticmethod
     def validate_selected_configuration(**options):
+        if (options['reset_profile'] is not None
+                and (options['profile'] != 'r3_continuous_v1' or options['gravity_compensation'])):
+            raise ValueError('reset profile requires PickCube R3 without gravity compensation')
         from .physical_candidate import validate_physical_configuration
         validate_physical_configuration(**options)
 

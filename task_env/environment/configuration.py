@@ -440,11 +440,11 @@ def _resolve_selected_config(environment_type, config):
     if profile in profile_routes and (provider, backend) not in profile_routes[profile]:
         raise ValueError(f'Controller profile {profile!r} is not admitted on {provider}/{backend}')
     reset_profile = execution_defaults.get('reset_profile')
-    if reset_profile is not None and (
-            reset_profile != 'pickcube-state-only-switch-v1'
-            or environment_type.uid != 'pick-cube-p16-reference-v1'
-            or profile != 'r3_continuous_v1' or gravity_compensation):
-        raise ValueError('reset profile requires PickCube R3 without gravity compensation')
+    if reset_profile is not None:
+        if type(reset_profile) is not str or not reset_profile.strip() or reset_profile != reset_profile.strip():
+            raise ValueError('reset profile must be a nonempty trimmed string')
+        if reset_profile not in getattr(environment_type, 'selected_reset_profiles', ()):
+            raise ValueError('unsupported task reset profile')
     params = []
     for key, (lower, upper) in environment_type.selected_parameter_limits.items():
         if key not in sections["task"]:
