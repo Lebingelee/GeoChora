@@ -695,10 +695,25 @@ def build_versioned_position_candidate(input_v1, *, horizon=8,
 def build_position_candidate(workspace, *, provider, horizon=6000,
                              environment_type=SelectedReferenceEnv,
                              camera_observation_config=None, physical_profile=None,
-                             task_probe_force_y_N=None):
+                             task_probe_force_y_N=None, close_task_resources=None):
     """Legacy result bundle; source compilation does not own Env lifecycle."""
     declared = declare_position_candidate(workspace, provider=provider, horizon=horizon,
         physical_profile=physical_profile, task_probe_force_y_N=task_probe_force_y_N)
+    if close_task_resources is not None:
+        prior = declared.binding.close_task_resources
+        def close_resources():
+            try:
+                if prior is not None:
+                    prior()
+            except BaseException as error:
+                try:
+                    close_task_resources()
+                except BaseException as cleanup_error:
+                    error.add_note(f'source workspace cleanup also failed: {cleanup_error!r}')
+                raise
+            else:
+                close_task_resources()
+        declared.binding = replace(declared.binding, close_task_resources=close_resources)
     env = environment_type.from_position_candidate(declared.binding, provider=provider,
         backend='cpu', horizon=horizon, camera_observation_config=camera_observation_config)
     return SimpleNamespace(env=env, **{key: value for key, value in vars(declared).items() if key != 'binding'})

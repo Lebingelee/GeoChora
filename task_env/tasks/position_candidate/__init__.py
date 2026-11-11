@@ -1,7 +1,6 @@
 """Explicit, state-only Position candidate registration; no native initialization."""
 
 from pathlib import Path
-import tempfile
 
 from ...registry import register_env
 from ...environment.reference_env import SelectedReferenceEnv
@@ -77,23 +76,33 @@ class PositionCandidateEnv(SelectedReferenceEnv):
             camera_config.validate_production_envelope()
             camera_config.capacity(horizon)
         workspace = values.get('source_workspace')
+        owner = None
         if workspace is None:
-            root = Path('workspace/tasks/phase-ii-c02b-position-servo/candidate-sources')
-            root.mkdir(parents=True, exist_ok=True)
-            workspace = tempfile.mkdtemp(prefix='source-', dir=root)
+            from ...runtime.sessions.source import owned_source_workspace
+            owner = owned_source_workspace()
+            workspace = owner.name
         elif not isinstance(workspace, (str, Path)) or not str(workspace):
             raise ValueError('source_workspace must be a nonempty path')
         elif Path(workspace).exists() and any(Path(workspace).iterdir()):
             raise ValueError('source_workspace must be fresh or empty; existing source bytes are preserved')
-        from .builder import build_position_candidate
-
-        options = {} if physical_profile is None else {'physical_profile': physical_profile}
-        if 'task_probe_force_y_N' in values:
-            options['task_probe_force_y_N'] = values['task_probe_force_y_N']
-        return build_position_candidate(
-            workspace, provider=provider, horizon=horizon, environment_type=cls,
-            camera_observation_config=camera_config, **options,
-        ).env
+        try:
+            from .builder import build_position_candidate
+            options = {} if physical_profile is None else {'physical_profile': physical_profile}
+            if 'task_probe_force_y_N' in values:
+                options['task_probe_force_y_N'] = values['task_probe_force_y_N']
+            if owner is not None:
+                options['close_task_resources'] = owner.cleanup
+            return build_position_candidate(
+                workspace, provider=provider, horizon=horizon, environment_type=cls,
+                camera_observation_config=camera_config, **options,
+            ).env
+        except BaseException as error:
+            if owner is not None:
+                try:
+                    owner.cleanup()
+                except BaseException as cleanup_error:
+                    error.add_note(f'source workspace cleanup also failed: {cleanup_error!r}')
+            raise
 
 
 __all__ = ['PositionCandidateEnv']

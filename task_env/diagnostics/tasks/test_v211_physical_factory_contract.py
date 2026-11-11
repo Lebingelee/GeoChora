@@ -6,6 +6,48 @@ Requires authorized dual-lock pure source parsing.
 import pytest
 
 
+def test_automatic_source_workspace_is_released_with_environment(monkeypatch):
+    from pathlib import Path
+    from task_env import make_env
+    from task_env.diagnostics.tasks.original_panda_test_source import install_physical_original_source
+    from task_env.runtime.sessions import source
+
+    install_physical_original_source(monkeypatch)
+    original_workspace = source.owned_source_workspace
+    owned_paths = []
+    def capture_workspace():
+        owner = original_workspace()
+        owned_paths.append(Path(owner.name))
+        return owner
+    monkeypatch.setattr(source, 'owned_source_workspace', capture_workspace)
+    env = make_env('panda-position-servo-candidate-v1', config={
+        'provider': 'geophys', 'backend': 'cpu', 'horizon': 8,
+        'physical_profile': 'panda-direct-effort-v1',
+    })
+    assert len(owned_paths) == 1 and owned_paths[0].exists()
+    env.close()
+    env.close()
+    assert not owned_paths[0].exists()
+
+
+def test_automatic_source_workspace_is_released_on_construction_failure(monkeypatch):
+    from pathlib import Path
+    from task_env import make_env
+    from task_env.tasks.position_candidate import builder
+
+    seen = []
+    def fail(workspace, **_kwargs):
+        path = Path(workspace)
+        seen.append(path)
+        (path / 'partial').write_text('owned')
+        raise ValueError('source compilation failed')
+
+    monkeypatch.setattr(builder, 'build_position_candidate', fail)
+    with pytest.raises(ValueError, match='source compilation failed'):
+        make_env('panda-position-servo-candidate-v1', config={'provider': 'geophys'})
+    assert len(seen) == 1 and not seen[0].exists()
+
+
 @pytest.mark.parametrize(('physical_profile', 'expected_body'), [
     ('panda-direct-effort-v1', 'single'),
     ('panda-direct-effort-wrench-v1', ('panda-main', 'hand')),
