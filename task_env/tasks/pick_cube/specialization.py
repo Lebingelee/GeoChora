@@ -42,6 +42,7 @@ from ...environment.configuration import (
 from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
 from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
+from ...robots.panda import PandaAgent
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import ControlBinding
 from ...robots.panda import PandaAgent, panda_reference_control_binding
@@ -615,8 +616,8 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
 
     uses_selected_public_config = True
-    from .physical_candidate import PICKCUBE_PHYSICAL_PROFILES
-    selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES) | frozenset(PICKCUBE_PHYSICAL_PROFILES)
+    panda_effort_profiles = PandaAgent.effort_controller_profiles()
+    selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES) | frozenset(panda_effort_profiles)
     selected_controller_parameters = frozenset(('reset_selection', 'action_space_policy'))
 
     @staticmethod
@@ -627,14 +628,14 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_supports_observer(cls, config):
         options = json.loads(config.controller_parameters_json)
-        kind = cls.PICKCUBE_PHYSICAL_PROFILES.get(config.controller_profile)
+        kind = cls.panda_effort_profiles.get(config.controller_profile)
         return ((config.physics_provider == 'isaacsim' and kind is not None)
                 or (config.physics_provider == 'mujoco' and options.get('reset_selection', False))
                 or (config.physics_provider == 'geophys' and kind == 'joint'
                     and not options.get('reset_selection', False)))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25), "cube_force_z_N": (-30., 30.)}
     selected_supports_isaac = True
-    selected_isaac_controller_profiles = frozenset(('r3_continuous_v1',)) | frozenset(PICKCUBE_PHYSICAL_PROFILES)
+    selected_isaac_controller_profiles = frozenset(('r3_continuous_v1',)) | frozenset(panda_effort_profiles)
     selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
     robot_source_roots = (('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube'))
     robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
@@ -660,7 +661,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config):
         profile = config.controller_profile
-        if profile in cls.PICKCUBE_PHYSICAL_PROFILES:
+        if profile in cls.panda_effort_profiles:
             from .physical_candidate import physical_binding_from_config
             return physical_binding_from_config(config)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')

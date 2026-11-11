@@ -6,13 +6,7 @@ from contextlib import ExitStack
 
 
 
-PICKCUBE_PHYSICAL_PROFILES = {
-    'panda-direct-effort-v1': 'direct',
-    'panda-joint-effort-reference-v1': 'joint',
-    'panda-r3-effort-reference-v1': 'r3-pose',
-    'panda-joint-mass-effort-v1': 'joint-mass',
-    'panda-r3-mass-effort-v1': 'r3-mass-pose',
-}
+from ...robots.panda import PandaAgent
 
 # This normalized closure was derived only after the original pinned receipt
 # and all of its referenced assets passed the historical source verification.
@@ -22,11 +16,12 @@ _PANDA_NORMALIZED_CLOSURE_SHA256 = 'cbb7c0a3a68a5e08161651933aef262d340659c04fef
 def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
                                     parameters, gravity_compensation, reset_profile,
                                     source_delivery_manifest, execution_spec, task_parameters, horizon):
-    if profile not in PICKCUBE_PHYSICAL_PROFILES:
+    profiles = PandaAgent.effort_controller_profiles()
+    if profile not in profiles:
         if native_drive is not None or parameters:
             raise ValueError('Robot/Controller/source options require a declared physical profile')
         return
-    kind = PICKCUBE_PHYSICAL_PROFILES[profile]
+    kind = profiles[profile]
     if execution_spec.deployment != 'in_process':
         raise ValueError('physical profile currently requires explicit in_process execution')
     if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
@@ -62,7 +57,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
 def physical_binding_from_config(config):
     import json
     options = json.loads(config.controller_parameters_json)
-    kind = PICKCUBE_PHYSICAL_PROFILES[config.controller_profile]
+    kind = PandaAgent.effort_controller_profiles()[config.controller_profile]
     drive = config.native_drive or ('position' if kind == 'direct' else 'disabled')
     if config.physics_provider == 'isaacsim':
         from .physical_isaac_candidate import make_isaac_physical_binding

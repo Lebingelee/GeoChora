@@ -1,11 +1,20 @@
 """Compose the existing R3 Cartesian reference with the shared effort servo."""
 from __future__ import annotations
 
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 import math
 
 from .contracts import digest, reference_pose_action
 from .effort_servo import JointReferenceEffortControllerV1
+
+
+PANDA_EFFORT_PROFILE_KINDS = MappingProxyType({
+    'panda-direct-effort-v1': 'direct',
+    'panda-joint-effort-reference-v1': 'joint',
+    'panda-r3-effort-reference-v1': 'r3-pose',
+    'panda-joint-mass-effort-v1': 'joint-mass',
+    'panda-r3-mass-effort-v1': 'r3-mass-pose',
+})
 
 
 class ConstrainedPairEffortControllerV1:

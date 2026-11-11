@@ -132,6 +132,12 @@ class PandaAgent(BaseAgent):
         return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
 
     @staticmethod
+    def effort_controller_profiles():
+        """Expose Controller kinds; source and provider still admit actual combinations."""
+        from ..controllers.canonical.r3_effort import PANDA_EFFORT_PROFILE_KINDS
+        return PANDA_EFFORT_PROFILE_KINDS
+
+    @staticmethod
     def physical_subject_declaration(*, entity_id, source_id, source_closure_sha256,
                                      native_ranges, native_drive, split=False,
                                      native_actuators=None, transmission_ids=None):

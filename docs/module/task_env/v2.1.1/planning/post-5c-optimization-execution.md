@@ -750,3 +750,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +33／−26，净增 7 行；控制模型创建逻辑集中到 Controller，新增行包含统一通道检查。版本诊断修改 1 文件 +21／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1358。provider／renderer、clock 与 native 提交路径未改。
 
 74 项版本检查通过，新增错误 writer 拒绝检查。MuJoCo Panda direct effort 与 joint→R3 reset 切换／H5 读回通过，共观测 15 个 native 子步。Isaac PickCube joint effort／CUDA／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，订阅前启动推进未知。GeoPhys、装配 Panda effort 和完整 Solution 本批未重跑；其他 provider 路径保持原有限定。冻结 diff、计划、十组 source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_controller_factory_20261112_001/`。E01～E04 仍未接收。
+
+### 6.63 Panda effort profile 语义归控制与 Robot owner
+
+输入 `13322cae`。Panda 的五种 effort profile 与输入 kind 原由 PickCube candidate 文件定义；现在 Controller owner 提供不可变语义表，Panda Robot 声明该表，PickCube 配置和构建消费同一对象。Task 的 source、provider 和 fixture 准入仍保持原有限定；这一移动没有扩大能力范围，也没有消除该 Task 内所有 source／profile 材料化分支。
+
+生产修改 4 文件 +27／−16，净增 11 行；五项原有 profile 映射从 Task 移至控制 owner，新增 Panda 声明与不可变约束。版本诊断修改 1 文件 +12／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer、native clock、提交和状态路径未改。
+
+75 项版本检查通过，新增检查验证 Task、Robot 和 Controller 消费同一不可变语义表。五种 profile 的 MJCF／USD 十组真实 source 前后对照中，subject、binding、Controller identity、状态需求和动作合同一致。MuJoCo direct effort、joint→R3 reset 切换与 H5 读回通过，观测 15 个 native 子步；Isaac joint effort／CUDA／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭，观测 41 次 callback，订阅前启动推进未知。GeoPhys 与完整 Solution 本批未重跑；旧证据按未受影响的已验证范围保留。冻结 diff、计划、source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_profile_owner_20261112_001/`。E01～E04 仍未接收。

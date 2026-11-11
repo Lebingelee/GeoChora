@@ -3,6 +3,18 @@
 import pytest
 
 
+def test_panda_declares_shared_immutable_effort_profiles():
+    from task_env.controllers.canonical.r3_effort import PANDA_EFFORT_PROFILE_KINDS
+    from task_env.robots.panda import PandaAgent
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    profiles = PandaAgent.effort_controller_profiles()
+    assert profiles is PANDA_EFFORT_PROFILE_KINDS is PickCubeReferenceEnv.panda_effort_profiles
+    assert profiles['panda-joint-effort-reference-v1'] == 'joint'
+    with pytest.raises(TypeError):
+        profiles['panda-joint-effort-reference-v1'] = 'direct'
+
+
 @pytest.mark.parametrize('profile,controller_type,dimension', [
     ('panda-joint-effort-reference-v1', 'ConstrainedPairEffortControllerV1', 8),
     ('panda-r3-effort-reference-v1', 'R3ReferenceEffortControllerV1', 8),
