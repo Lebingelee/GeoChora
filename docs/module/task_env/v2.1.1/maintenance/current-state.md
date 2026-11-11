@@ -42,7 +42,7 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## E00～E04 当前实施
 
-维护者已调整实施方向：四个正式任务统一配置和 Robot 构建链，不再兼容过时诊断；本版本诊断归 `task_env/diagnostics/tasks/v2.1.1/`。旧 `panda-position-servo-candidate-v1` 注册及其专属自动目录管理已退出正式入口；PickCube 仍暂时引用旧目录中的 Panda 控制实现，必须迁至实际 owner。原 Position 历史证据保留，旧入口退休不等于 Position 控制能力退休。配置两条解析路径和主体分别构造仍未收敛，E00～E04 没有因此完成；此前批次是历史执行记录。
+维护者已调整实施方向：四个正式任务统一配置和 Robot 构建链，不再兼容过时诊断；本版本诊断归 `task_env/diagnostics/tasks/v2.1.1/`。旧 `panda-position-servo-candidate-v1` 注册及其专属自动目录管理已退出正式入口；PickCube 使用的 Panda effort 绑定已从旧目录迁至 Robot，source 校验归 MuJoCo source adapter，旧 Position 诊断构建代码已退休。原 Position 历史证据保留，旧入口退休不等于 Position 控制能力退休。配置两条解析路径和主体分别构造仍未收敛，E00～E04 没有因此完成；此前批次是历史执行记录。
 
 维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。共同构造和旧物理 UID 翻译之后，正式 PickCube（含物理配置）／NutAssembly／Pendulum／双轮车已从本次 Artifact 构造 TaskDefinition，观察调用共同语义 lifecycle，reset 后重新绑定。数组与具名 canonical state 各保留真实表示；Gym typed info 保留，Solution callbacks 使用公共 metadata 值投影。已准入的普通 native 路线安装现有 live source／Controller interval binding，移除安装处的单一 R05c profile 名称分流，原严格准入仍保留。本批生产代码净增 122 行，累计净增 154 行；tracked 文件数不变。152 个不同纯合同节点及五条 MuJoCo CPU 交集通过；累计受监督 36 次／290 个可观测子步，加前序 150 保守计费为 440。四次本批失败和原始拒绝均保留，未称完整 Solution 成功。配置 codec、剩余主体／registry／reset／action／clock／部署审计继续；E00～E04 未完成。详细证据与限制见[实施记录第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收或启动 G06。
 

@@ -388,3 +388,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 本批生产 3 文件 +1／−115，净减 114 行；无新增、删除或迁移文件，无测试代码变更。当前记录和本页文档另计，不把文档当作生产代码。使用 `geochora` 环境 Python 做无 native 纯导入核对：四个正式 UID 均登记、旧 UID 从 registry 消失且 `make_env` 明确拒绝、PickCube 当前所需的 effort 实现仍可导入。此检查不运行构造／reset／step 或物理，既有真实运行证据的其他边界不变。
 
 构建协议仍有 selected／component 分流；Robot 仍未统一从声明构建；Position 旧 builder／公共 Env 的候选专用方法仍待按正式 caller 清理。本批没有修改 provider／renderer adapter、时钟或提交，没有完成 E01～E04。历史诊断的旧 UID 检查不作为本次验收；不执行历史测试矩阵。
+
+### 6.18 Panda effort 正式能力迁移与旧诊断退休
+
+输入 `04bb926b`。正式 PickCube 不再从旧 Position candidate 目录导入控制实现：MuJoCo source adapter 负责重新计算 source 闭包并核验 Panda MJCF 传动，Panda Robot 负责已声明通道与直接 effort 控制绑定；PickCube 保留其 10 N 夹爪策略的受限条件。仅迁出正式调用的单主体 direct effort 逻辑，旧的 wrench fixture／split fixture 接线不复制进正式构造。删除旧 Position 诊断构建包的 8 个 Python 文件，其历史资产原样保留；共同 Position、effort 和 wrench 命令及 Runtime 实现没有因该退休删除。旧目录内源码可通过 Git 历史定位，不声称其诊断入口仍可运行。
+
+本批生产 3 个文件修改、8 个 Python 文件删除，+105／−2479 行，净减 2374 行；Panda effort 相关代码经职责拆分和重写迁移，非整文件搬迁。新版本诊断增加 1 个测试文件，验证 Panda 力范围和手指传动篡改拒绝；2 份状态／实施文档修改。除以上变化，tracked 文件不变。构建协议中的两套解析和其余候选接线仍在，E01～E04 未完成；renderer、Runtime 时钟与推进实现本批未改。
+
+双锁下正式 PickCube MuJoCo CPU direct 和 reset-selection 分别完成 reset／step／重置／close，旧包删除后 direct 再次通过；共 20 个可观测物理子步。direct 的 Artifact、source closure、主体与 Controller identity 均与此前同 seed 记录相同。首次运行未设置 GeoPhys source 的 Python 搜索路径，在物理启动前失败、0 子步；修正环境后复验，失败记录保留。新版本纯合同 `test_panda_effort_source.py` 为 1 passed；检查只覆盖声明传动，不代表真实物理效果。计划、冻结 diff 和各次结果位于 ignored `workspace/maintenance/v211_e00_e04_direction_reset_20261112_001/`，不把本轮结果外推到其他 provider、完整 Solution 或 renderer。

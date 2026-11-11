@@ -235,7 +235,7 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
     from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
     from ...observations.selected_reference import selected_reference_observation_spaces
     from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
-    from ..position_candidate.physical_profile import build_panda_direct_effort_execution
+    from ...robots.panda import build_panda_direct_effort_execution
     from .specialization import _configuration, build_reference, evaluate
     from .task import PickCubeTaskDefinition
 
@@ -303,9 +303,17 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
                 raise ValueError('unsupported or invalid physical controller parameters')
             if parameters and not reset_switch:
                 raise ValueError('controller parameters require physical reset selection')
-            physical = build_panda_direct_effort_execution(scene, artifact, source, entity_id='panda-v1',
-                native_drive='disabled' if drive_mode == 'effort-only' else 'position',
-                gripper_force_limit=10. if reset_switch else None)
+            from ...runtime.sessions.mujoco_composition import checked_panda_effort_source_limits
+            native_drive = 'disabled' if drive_mode == 'effort-only' else 'position'
+            limits = checked_panda_effort_source_limits(source, scene)
+            if reset_switch:
+                if (artifact.artifact_id != 'pickcube-mjcf-physical-effort-task-v1'
+                        or native_drive != 'disabled' or limits[7] != (-5., 5.)):
+                    raise ValueError('task gripper force override requires its exact source and isolated fixture')
+                limits[7] = (-10., 10.)
+            physical = build_panda_direct_effort_execution(
+                scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
+                native_ranges=tuple(limits))
             if kind != 'direct':
                 from ...controllers.canonical.r3_effort import build_reference_effort_execution
                 reference = None

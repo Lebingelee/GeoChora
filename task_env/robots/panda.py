@@ -39,6 +39,84 @@ def panda_reference_control_binding():
     return ControlBinding('panda-v1/gripper', 0.08)
 
 
+def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
+                                        native_drive, native_ranges):
+    """Bind Panda's declared channels to a direct-effort Controller execution.
+
+    The source adapter supplies verified native ranges; this function does not
+    parse or materialize a provider-specific source.
+    """
+    from ..artifacts import JointReference
+    from ..artifacts.logical_assembly import (
+        LogicalAssemblyV1, LogicalAssemblyScenePinV1, LogicalAssemblyEntityMemberV1,
+        LogicalAssemblyNestedMemberV1, LogicalAssemblySubcomponentReferenceV1,
+    )
+    from ..artifacts.state import StateFieldRequirement, StateRequirements
+    from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+    from ..controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+    from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
+
+    if native_drive not in {'position', 'disabled'}:
+        raise ValueError('Panda effort profile requires a declared native drive mode')
+    names = PandaAgent.physical_joint_names()
+    definitions = {j.joint_id: j for a in scene.articulations or ()
+                   if a.entity_id == entity_id for j in a.joints}
+    if any(name not in definitions or source.joints.get(f'{entity_id}/{name}') != name for name in names):
+        raise ValueError('Panda effort profile requires the exact nine named source joints')
+    subject, declarations = PandaAgent.physical_subject_declaration(
+        entity_id=entity_id, source_id=source.source_id,
+        source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
+        native_drive=native_drive)
+    instance = next(x for x in scene.entities if x.entity_id == subject.entity_id)
+    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
+                                     scene.schema_version, scene.identity_hash)
+    refs = tuple(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref',
+        item.component_path[1:], 'joint', JointReference(subject.entity_id, item.joint_id))
+        for item in declarations)
+    child = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-components', 'v1', pin, refs)
+    logical = LogicalAssemblyV1('logical-assembly-v1', 'panda-direct-effort-assembly', 'v1', pin, (
+        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), entity_id, instance.asset_id, instance.asset_version),
+        LogicalAssemblyNestedMemberV1('nested_assembly', ('robot',), child.assembly_id,
+                                      child.revision, child.logical_content_sha256)))
+    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
+        source.source_closure_digest, logical, {(child.assembly_id, child.revision): child},
+        (subject,), declarations, ())
+    writer = subject.controller_writers[0]
+    keys = tuple(f'{entity_id}/{name}' for name in names)
+    kinds = tuple(definitions[name].kind for name in names)
+    requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
+        'direct-effort-zero-bias-v1', 'geochora', 'v1', 'stdlib', source.source_id,
+        source.source_closure_digest, keys,
+        tuple('rad' if kind == 'revolute' else 'm' for kind in kinds), 'joint_bias',
+        tuple('N*m' if kind == 'revolute' else 'N' for kind in kinds),
+        'joint-axis', 'evaluation_boundary', artifact.timebase.control_dt,
+        0., 'pure_no_physics_step', writer, 'none', 'required')
+    zero = (0.,) * len(names)
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
+    action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + ('finger-tendon-effort',)
+    matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
+                         for j in range(8)) for i in range(len(names)))
+    profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, action_names, keys, matrix, requirement)
+    controller = LinearEffortControllerV1(profile, compiled.binding, model)
+    fields = tuple(StateFieldRequirement('state-field-requirement-v1', field, 'joint', entity_id, name,
+        'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
+        for name in names for field in ('joint_position', 'joint_velocity'))
+    requirements = StateRequirements('state-requirements-v1', 'controller', 'panda-direct-effort', fields)
+    definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
+                             for j in a.joints if j.kind != 'fixed'}
+    joint_bindings = {semantic: definitions_by_native[native]
+                      for semantic, native in (*source.joints.items(), *source.free_joints.items())}
+    frame_bindings = {name: (artifact.legacy_frame_bindings[name]
+                             if name in artifact.legacy_frame_bindings
+                             else FrameReference(*name.split('/', 1)))
+                      for name in (*source.bodies, *source.frames)}
+    execution = PhysicalControlExecutionV1(compiled, (controller,), scene, joint_bindings,
+                                            frame_bindings, requirements, 1, (subject,))
+    execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+    return execution
+
+
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
