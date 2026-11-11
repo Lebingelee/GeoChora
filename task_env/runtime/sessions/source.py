@@ -184,7 +184,6 @@ def matches_relocated_source_closure(receipt, actual_digest, *, asset_root, norm
     Only the single declared asset-root occurrence is normalized; the receipt
     and every actual source byte remain unchanged.
     """
-    from ...assembly.assets import _source_closure_digest
     if receipt is None or actual_digest != receipt.source_closure_digest:
         return False
     receipt.validate_snapshot()
