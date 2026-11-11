@@ -173,3 +173,5 @@ PickCube 物理控制不再将 reset seed 冻结在构造时；MuJoCo 多 seed �
 共同配置不再写死 PickCube reset profile 的名称和 Controller 条件，由任务声明能力并验证组合；四任务 MuJoCo 短程通过。详见[实施记录 6.78](../planning/post-5c-optimization-execution.md#678-reset-profile-准入归任务声明)。
 
 统一配置按实际 Robot 的声明准入位置驱动重力补偿；两个 tabletop 的 MuJoCo 短程通过。详见[实施记录 6.79](../planning/post-5c-optimization-execution.md#679-robot-声明位置驱动重力补偿能力)。
+
+NutAssembly 的 R05b／R05c 历史诊断专属构造与 Runtime 准入已退出；四任务 MuJoCo 和 NutAssembly GeoPhys 短程通过，历史资格边界保留。详见[实施记录 6.80](../planning/post-5c-optimization-execution.md#680-退出-nutassembly-历史诊断构建分支)。

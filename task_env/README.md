@@ -26,19 +26,11 @@ The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
 Construct them through `from task_env import make_env`. The NutAssembly and
 PickCube examples use a caller-owned Solution and `act → step(action) → observe`.
-The advanced R05b profile below also supports caller-owned Solution actions; its
-legacy Env-driven Solution route remains transitional. Its new caller route has
-provider-free tests only.
 Task success and Expert lifecycle completion remain separate.
 
-An advanced bounded GeoPhys native-feedback profile is available through
-`NutAssemblyReferenceEnv.for_native_feedback_profile(backend="cpu"|"cuda",
-gripper_control_hz=100|500)`; it uses the selected NutAssembly source and
-normal Core admission with a versioned source-closure receipt. R05b attempt001
-completed focused provider-free S1 plus two-outer CPU and CUDA native S2 with
-independent H5 readback, pending Sol review. This does not qualify the full
-100/500 Hz campaign, task/Expert completion, other sources or Providers, or
-Formal Qualification. See the [R05 execution record](../docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29) and [public API contract](../docs/module/task_env/v2.1.0/api/public-api.md).
+The historical R05b-specific construction entry has been retired. Its
+[execution record](../docs/module/task_env/v2.1.0/history/phase_ii_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29)
+remains historical evidence; use the formal task configuration for current execution.
 
 ## Current developer workflows
 

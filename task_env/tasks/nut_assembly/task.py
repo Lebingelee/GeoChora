@@ -161,17 +161,11 @@ def _reset_seed(seed):
     return 19 if seed is None else seed
 
 
-# Existing imports remain a thin bridge while repository callers migrate.
 from .specialization import (
-    NutAssemblyReferenceEnv, REFERENCE_ENV_ID, R05B_NATIVE_FEEDBACK_PROFILE,
-    _configuration, _recipe, build_artifact, build_reference, build_runtime_source,
-    build_outcome_solution, build_gripper_cadence_diagnostic_reference,
-    build_gripper_cadence_diagnostic_solution, build_native_feedback_reference,
-    build_native_feedback_solution,
+    NutAssemblyReferenceEnv, REFERENCE_ENV_ID, _configuration, _recipe,
+    build_artifact, build_reference, build_runtime_source, build_outcome_solution,
 )
 
 __all__ = ["NutAssemblyTaskDefinition", "NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
            "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
-           "sample_reset", "semantic_definition", "build_gripper_cadence_diagnostic_reference",
-           "build_gripper_cadence_diagnostic_solution", "build_native_feedback_reference",
-           "build_native_feedback_solution", "R05B_NATIVE_FEEDBACK_PROFILE"]
+           "sample_reset", "semantic_definition"]

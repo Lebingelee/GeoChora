@@ -1170,9 +1170,7 @@ def materialize_control(
     controller_profile=None,
     leaf_plan=None,
     session_admission_input=None,
-    native_feedback_profile=None,
     selected_controller=None,
-    native_feedback_gripper_control_hz=None,
     observer_render_request=None,
     task_render_requested=False,
 ):
@@ -1185,8 +1183,6 @@ def materialize_control(
     admission_route = _session_admission_input_route(session_admission_input)
     f06_pickcube_isaac_input = session_admission_input if admission_route == 'f06_pickcube' else None
     f06_pickcube_isaac = admission_route == 'f06_pickcube'
-    if native_feedback_profile is not None and admission_route is not None:
-        raise ValueError('R05b native feedback admission cannot combine with an exact F task input')
     if f06_pickcube_isaac:
         from .api import (
             F06_PICKCUBE_ISAAC_PROFILE, _f06_pickcube_isaac_capability_manifest,
@@ -1297,68 +1293,7 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if native_feedback_profile is not None:
-        from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
-        from ...controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
-        from ...controllers.canonical.gripper_execution import EqualRateGripperServo, NativeRateGripperServo
-        from ...controllers.canonical.contracts import digest
-        from .r05c_v211_candidate import PROFILE_ID as candidate_profile, CONTROLLER_IDENTITY as candidate_identity
-        historical_controller_identity = {
-            # Pin the post-refactor source-bound identities. The independent
-            # field, source, provider and resource checks remain mandatory.
-            100: '94c148b14915a0637bfaf572c101ba2980b93b43c88b0a3a9ccd39785a1d679d',
-            500: '7cdf5c3c91ab3ec78dc3fa740fce1cbca7c229a0bf36b1d13c5da3a9c75cc4ec',
-        }
-        if native_feedback_profile == candidate_profile:
-            if execution.physics_provider != 'geophys' or execution.backend != 'cpu':
-                raise ValueError('v2.1.1 R05c diagnostic candidate requires GeoPhys CPU')
-            expected_controller_identity = {100: candidate_identity}
-        elif native_feedback_profile == 'nutassembly-native-feedback-v1':
-            expected_controller_identity = historical_controller_identity
-        else:
-            raise ValueError('unknown normal native-feedback admission profile')
-        expected_inner_type = {
-            100: EqualRateGripperServo,
-            500: NativeRateGripperServo,
-        }
-        actual_controller = getattr(getattr(selected_controller, 'hold', None), 'controller', None)
-        if (type(native_feedback_gripper_control_hz) is not int
-                or native_feedback_gripper_control_hz not in expected_controller_identity
-                or type(selected_controller) is not ReferenceExecutionController
-                or type(selected_controller.hold) is not StableArmTargetHold
-                or type(actual_controller) is not ProductionCanonicalPandaControllerR3
-                or selected_controller.gripper_rate_hz != native_feedback_gripper_control_hz
-                or selected_controller.identity != expected_controller_identity[native_feedback_gripper_control_hz]
-                or type(selected_controller.inner) is not expected_inner_type[native_feedback_gripper_control_hz]
-                or selected_controller.inner.rate_hz != native_feedback_gripper_control_hz
-                or selected_controller.inner.outer_dt_s != 0.01
-                or selected_controller.inner.controller is not actual_controller
-                or digest(asdict(actual_controller.config)) !=
-                    '46e7a5aa81005a48f04f4183ff6a790a0b17716418de6b277404a234b5aa905b'
-                or digest(asdict(actual_controller.gripper_config)) !=
-                    '322155ae1e86c0410cbf3a096f92b1d2f243719f19f5310431c2ab83b1ad907d'
-                or digest(actual_controller.physical_profile) !=
-                    '0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c'
-                or (actual_controller.feedforward_gain, actual_controller.position_feedback_s,
-                    actual_controller.rotation_feedback_s, actual_controller.joint_velocity_limit_rad_s,
-                    actual_controller.reference_lead_limit_rad, actual_controller.inner_physics_dt_s,
-                    actual_controller.dls_damping, actual_controller.rotation_row_weight) !=
-                    (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
-                or actual_controller.gripper_config.force_limit_N != 10.0):
-            raise ValueError(
-                'R05b normal profile requires the exact admitted R3 Controller, 10 N cap, '
-                'and selected 100/500 Hz law'
-            )
-        if source.config.runtime.backend != execution.backend:
-            raise ValueError('R05b selected Controller/source backend mismatch')
-    if native_feedback_profile is not None:
-        from .api import _r05b_native_feedback_manifest
-        if manifest is not None:
-            raise CapabilityAdmissionError('R05b native feedback admission does not accept a custom manifest')
-        actual_manifest = _r05b_native_feedback_manifest(
-            artifact, execution, source, native_feedback_profile,
-        )
-    elif not (f04_native or f06_pickcube_isaac):
+    if not (f04_native or f06_pickcube_isaac):
         actual_manifest = provider_manifest(execution.physics_provider)
     source_requirements = declared_source_capabilities(source)
     if manifest is not None:
@@ -1491,7 +1426,6 @@ def materialize_control(
         manifest=None if f04_native else admission_manifest,
         _materialization_authority=materialization_authority,
         _session_admission_input=session_admission_input,
-        _native_feedback_profile=native_feedback_profile,
         _observer_render_request=observer_render_request,
         _task_render_requested=task_render_requested,
     )

@@ -138,8 +138,6 @@ _F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc
 _F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
 _F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
-_GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
-_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
 
 
 class RuntimeSession(Protocol):
@@ -461,133 +459,6 @@ def _close_failed_native_materialization(
             )
 
 
-def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
-    """Admit one exact normal NutAssembly GeoPhys force-feedback profile."""
-    from dataclasses import replace
-    import hashlib
-    import json
-    from pathlib import Path
-    from dataclasses import asdict
-    from ...assembly.assets import _source_closure_digest, _source_closure_manifest
-    from ...controllers.canonical.contracts import digest
-
-    from .r05c_v211_candidate import PROFILE_ID as candidate_profile, PROVIDER_REVISION as candidate_revision
-    if profile_id not in (_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE, candidate_profile):
-        raise ValueError('unknown normal native-feedback admission profile')
-    if profile_id == candidate_profile and execution.backend != 'cpu':
-        raise ValueError('v2.1.1 R05c diagnostic candidate requires GeoPhys CPU')
-    if not isinstance(artifact, TaskArtifact):
-        raise ValueError('R05b native feedback requires the frozen NutAssembly TaskArtifact v0')
-    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
-            or artifact.task_id != 'nut-assembly-square-v1'
-            or artifact.identity_hash != '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
-            or artifact.timebase.physics_dt != 0.002
-            or artifact.timebase.control_dt != 0.01
-            or artifact.timebase.control_substeps != 5
-            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
-        raise ValueError('R05b admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
-    if (execution.physics_provider != 'geophys' or execution.backend not in {'cpu', 'cuda'}
-            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
-            or execution.determinism_mode != 'strict'):
-        raise ValueError('R05b admission requires strict GeoPhys CPU/CUDA scalar execution without rendering')
-    receipt = getattr(source, 'execution_source_receipt', None)
-    if receipt is None:
-        raise ValueError('R05b admission requires the versioned immutable execution source receipt')
-    receipt.validate_snapshot()
-    trusted_path = (
-        Path(__file__).resolve().parents[2] / 'assembly'
-        / 'r05b_trusted_execution_source_manifest.json'
-    )
-    trusted = json.loads(trusted_path.read_text(encoding='utf-8'))
-    if trusted.get('schema_version') != 'r05b-trusted-execution-source-manifest-v1':
-        raise ValueError('R05b trusted source manifest has an unsupported schema')
-    actual_files = list(_source_closure_manifest(receipt.closure_files))
-    if (actual_files != trusted['files']
-            or receipt.source_closure_digest != trusted['source_closure_digest']
-            or _source_closure_digest(receipt.closure_files) != trusted['source_closure_digest']):
-        raise ValueError('R05b source receipt differs from the trusted full source closure')
-    canonical_bytes = receipt.closure_files.get('canonical-source.xml')
-    importer_bytes = receipt.importer_xml
-    expected_importer_bytes = receipt.closure_files.get('scene.xml')
-    if (not isinstance(canonical_bytes, bytes)
-            or hashlib.sha256(canonical_bytes).hexdigest() != trusted['canonical_xml_sha256']
-            or not isinstance(expected_importer_bytes, bytes)
-            or importer_bytes != expected_importer_bytes
-            or hashlib.sha256(importer_bytes).hexdigest() != trusted['importer_xml_sha256']
-            or source.scene_source.xml.encode('utf-8') != canonical_bytes
-            or Path(source.scene_source.base_dir).resolve() != Path(receipt.snapshot_root).resolve()):
-        raise ValueError('R05b canonical/importer source bytes differ from the trusted snapshot')
-    expected_joints = {
-        **{f'panda-v1/joint{index}': f'joint{index}' for index in range(1, 8)},
-        'panda-v1/finger_joint1': 'finger_joint1',
-        'panda-v1/finger_joint2': 'finger_joint2',
-    }
-    expected_bodies = {
-        'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
-        'round-peg-v1': 'peg2', 'panda-v1/base': 'link0',
-    }
-    if (receipt.source_id != trusted['source_id']
-            or source.joints != expected_joints
-            or source.bodies != expected_bodies
-            or source.frames != {'panda-v1/ee': 'nutassembly_ee_site'}
-            or source.free_joints != {'square-nut-v1': 'SquareNut_joint'}
-            or source.joint_targets != {
-                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
-            }
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('R05b source semantic and actuator mappings differ from the exact allowlist')
-    expected_config_digest = {
-        'cpu': '64e9a4d05abe80c20141a16aa1abf1a3de366ac6e75e2740b6d7313839e537d1',
-        'cuda': '52e2e14a51492a8e534ee0ba88cc7ec9597d6a31816eaba89f1a7a3094baece9',
-    }[execution.backend]
-    if digest(asdict(source.config)) != expected_config_digest:
-        raise ValueError('R05b source configuration differs from exact allowlist')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or source.scene_source.source_id !=
-            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
-            or receipt.canonical_xml_sha256 !=
-            '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
-            or receipt.canonical_xml_sha256 != trusted['canonical_xml_sha256']
-            or source.config.runtime.backend != execution.backend
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 5
-            or source.config.runtime.integrator != 'implicitfast'
-            or source.config.render.camera_obs
-            or len(source.joint_targets) != 7
-            or dict(source.joint_targets) != {
-                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
-            }
-            or tuple(source.open_actuators) != ('actuator8',)):
-        raise ValueError('R05b source/receipt/controller actuator mapping differs from the exact allowlist')
-    build = provider_build_identity('geophys')
-    expected_origin = (Path(__file__).resolve().parents[3] / 'GeoPhys/src/geophys/__init__.py').resolve()
-    required_revision = (candidate_revision if profile_id == candidate_profile
-                         else _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION)
-    if (build['repository_revision'] != required_revision
-            or build['dirty_build_sha256'] is not None
-            or Path(build['import_origin']).resolve() != expected_origin):
-        raise ValueError('R05b admission requires the clean committed GeoPhys build from this worktree')
-    cpu_manifest = provider_manifest('geophys')
-    evidence = (
-        f'{profile_id}/artifact={artifact.identity_hash}/'
-        f'canonical_xml={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}/'
-        f'provider={build["repository_revision"]}/origin={hashlib.sha256(expected_origin.read_bytes()).hexdigest()}/'
-        f'backend={execution.backend}'
-    )
-    return replace(
-        cpu_manifest,
-        adapter_version=('task-env-r05c-v211-cpu100-diagnostic-v1'
-                         if profile_id == candidate_profile
-                         else 'task-env-r05b-geophys-native-feedback-v1'),
-        backend=execution.backend,
-        capabilities=tuple(cpu_manifest.capabilities) + (
-            CapabilityClaim('actuator_force_query',
-                'implemented' if profile_id == candidate_profile else 'tested', evidence),
-        ),
-        evidence_reference=evidence,
-    )
-
-
 def _mixed_actuator_manifest(artifact, execution, source):
     """Admit the bounded, typed source-bound mixed actuator route."""
     from dataclasses import replace
@@ -672,7 +543,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None,
-                _session_admission_input=None, _native_feedback_profile=None,
+                _session_admission_input=None,
                 _observer_render_request=None, _task_render_requested=False,
                 _legacy_observer_requested=False,
                 _legacy_camera_observations=False) -> RuntimeSession:
@@ -801,23 +672,16 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
         return session
     execution = legacy_execution_projection(execution)
-    if _native_feedback_profile is not None and source.mixed_actuator_plan is not None:
-        raise ValueError('RuntimeSession process-local admissions are mutually exclusive')
-    if _native_feedback_profile is not None:
-        actual = _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
-    elif source.mixed_actuator_plan is not None:
+    if source.mixed_actuator_plan is not None:
         actual = _mixed_actuator_manifest(artifact, execution, source)
     else:
         actual = provider_manifest(execution.physics_provider)
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
-        if _native_feedback_profile is not None or source.mixed_actuator_plan is not None:
+        if source.mixed_actuator_plan is not None:
             raise ValueError('bounded process-local admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
-    if _native_feedback_profile is not None:
-        from ...artifacts import RequiredCapabilitySet
-        admit_capabilities(RequiredCapabilitySet(('actuator_force_query',)), actual, execution)
     if source.mixed_actuator_plan is not None and source.contact_geom_groups:
         from ...artifacts import RequiredCapabilitySet
         admit_capabilities(RequiredCapabilitySet(('contact_detection',)), actual, execution)

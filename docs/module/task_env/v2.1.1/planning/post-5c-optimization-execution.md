@@ -888,3 +888,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +11／−0；版本诊断修改 2 文件 +27／−1，其中 probe 增加正式配置选项；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。四任务继续使用共同配置解析，减少的是不支持 Robot 的无效构建；renderer、状态、clock 和控制提交合同未改。
 
 114 项版本检查通过，包含不支持 Robot 的静态拒绝和两个 tabletop 的能力准入。MuJoCo 下 PickCube 与 NutAssembly 均以重力补偿完成 reset、step、再次 reset 和关闭，各观察 5 个 native 子步；NutAssembly 的 Solution 只验证单步。GeoPhys、Isaac、完整 Solution 本批未重跑，历史证据仅证明当时代码和具体路线。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_robot_gravity_20261112_h1qsas2z/`；E01～E04 仍未接收。
+
+### 6.80 退出 NutAssembly 历史诊断构建分支
+
+输入 `328a3dde`。删除只服务 R05b／gripper cadence 历史诊断的任务构造、专属 source 快照、Solution 入口和公共 Env 的专属 reset 策略；同时删除仅供旧 R05b／R05c 诊断调用的 Runtime 固定身份准入及诊断常量文件。正式 NutAssembly 的 Controller、native feedback 样本、ExpertAction、共同控制提交、source 和 capability 准入保持。R05c 资格限制及已有历史证据不因删除入口而改变；当前能力以正式路线的实际证据为准。
+
+生产范围 8 文件：修改 7、删除 1，+29／−476，净减 447 行；无整文件迁移。版本诊断代码未修改；任务 API 文档修改 2 文件 +4／−12，本文及当前状态文档另修改 2 文件。项目 tracked 文件从 1358 减至 1357。本批移除了正式 Env 构造中一条历史诊断分流；四任务现有构建入口、provider／renderer 的 source、状态、clock 和提交合同未因此扩展。
+
+114 项版本检查通过。最终代码的四个正式任务 MuJoCo 短程完成 reset、step、再次 reset 和关闭，分别观察 5、5、25、25 个 native 子步；NutAssembly GeoPhys CPU 同样完成上述生命周期，控制时间从 0 推进至 0.01 秒，native 子步未在此探针计数。NutAssembly 只验证 Solution 单步，完整 Solution 及 Isaac 未重跑。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_nut_final_20261112_q4fcwqw_/`；E01～E04 仍未接收。

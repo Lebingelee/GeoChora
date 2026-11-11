@@ -47,7 +47,7 @@ from ...observations.selected_reference import build_selected_observation, selec
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import panda_reference_control_binding
 from ...robots.panda import PandaAgent
-from ...runtime.sessions.source import RuntimeSource, ExecutionSourceReceiptV1
+from ...runtime.sessions.source import RuntimeSource
 from ...utils.rotation import quat_wxyz_to_matrix
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
@@ -64,12 +64,6 @@ NUT = "square-nut-v1"
 PEG = "square-peg-v1"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 SUCCESS = "nut_on_square_peg_canonical_state_v0"
-R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
-R05B_CANONICAL_MENAGERIE_ASSET_ROOT = Path(
-    '/home/lly/Program_Files/Geochora/asset/external/mujoco_menagerie/'
-    'franka_emika_panda/assets'
-)
-R05B_CANONICAL_XML_SHA256 = '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
 
 
 from .task import (NutAssemblyTaskDefinition, semantic_definition, evaluate, sample_reset, _reset_seed)
@@ -235,90 +229,22 @@ def build_artifact(*, lift_height_m=None, task_config=None, robot=None) -> TaskA
     return _artifact_declaration(lift_height_m=lift_height_m, task_config=task_config, robot=robot).compile()
 
 
-def _environment_config(*, backend='cpu', diagnostic=False, native_feedback_profile=False, task_config=None):
+def _environment_config(*, backend='cpu', task_config=None):
+    if backend != 'cpu':
+        raise ValueError('NutAssembly reference source requires CPU')
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
     base = resolve_env_config(task_uid=recipe["task_uid"], scene_uid=recipe["scene_uid"],
         agent_uids=tuple(recipe["agent_uids"]), object_uids=tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
     config = overlay_public_env_config(base, task_config["environment"])
-    if backend != 'cpu' and not ((diagnostic or native_feedback_profile)
-                                  and backend == 'cuda'):
-        raise ValueError('NutAssembly CUDA requires its explicit cadence or native-feedback profile')
-    # R05b and the cadence experiment bind a frozen source configuration whose
-    # episode value is 1000; the environment's selected horizon remains separate.
-    source_episode = replace(config.episode, horizon=1000) if (diagnostic or native_feedback_profile) else config.episode
     return replace(config, runtime=replace(config.runtime, backend=backend, prewarm=False,
         physics_dt=float(recipe["physics_dt"]), control_substeps=int(recipe["control_substeps"])),
-        render=replace(config.render, camera_obs=False), episode=source_episode)
-
-
-def _r05b_execution_source(source):
-    """Freeze canonical XML and every referenced asset into one importer snapshot."""
-    xml = source.scene_source.xml
-    root = ET.fromstring(xml)
-    compiler = root.find('compiler')
-    if compiler is None:
-        raise ValueError('R05b source requires the existing NutAssembly compiler element')
-    current_meshdir = compiler.get('meshdir', '')
-    current_root = Path(current_meshdir).resolve()
-    checkout = Path(__file__).resolve().parents[3]
-    expected_asset_root = (checkout / 'asset/external/mujoco_menagerie/'
-                           'franka_emika_panda/assets').resolve()
-    if current_root != expected_asset_root:
-        raise ValueError('R05b Panda meshdir does not resolve to the pinned Menagerie asset owner')
-    canonical_meshdir = R05B_CANONICAL_MENAGERIE_ASSET_ROOT.as_posix()
-    canonical_xml = xml.replace(current_meshdir, canonical_meshdir)
-    canonical_bytes = canonical_xml.encode('utf-8')
-    if hashlib.sha256(canonical_bytes).hexdigest() != R05B_CANONICAL_XML_SHA256:
-        raise ValueError('R05b canonical source XML differs from its frozen source identity')
-    importer_xml = canonical_xml.replace(canonical_meshdir, 'assets')
-    importer_bytes = importer_xml.encode('utf-8')
-    asset_files = {}
-    for node in root.iter():
-        raw_path = node.get('file')
-        if raw_path is None:
-            continue
-        if node.tag == 'include':
-            raise ValueError('R05b NutAssembly source unexpectedly contains MJCF includes')
-        if node.tag not in {'mesh', 'skin'}:
-            raise ValueError(f'R05b NutAssembly source has an unaudited external asset kind: {node.tag}')
-        if Path(raw_path).is_absolute() or '\\' in raw_path:
-            raise ValueError(f'R05b source asset reference must be relative: {raw_path!r}')
-        logical = Path(raw_path)
-        if any(part in {'', '.', '..'} for part in logical.parts):
-            raise ValueError(f'R05b source asset reference escapes its root: {raw_path!r}')
-        resolved = (current_root / logical).resolve()
-        try:
-            resolved.relative_to(current_root)
-        except ValueError as exc:
-            raise ValueError('R05b source asset escaped the pinned Menagerie tree') from exc
-        if not resolved.is_file():
-            raise ValueError(f'R05b source asset is missing: {logical.as_posix()}')
-        key = (Path('assets') / logical).as_posix()
-        if key in asset_files:
-            raise ValueError(f'R05b source contains a duplicate asset path: {key}')
-        asset_files[key] = resolved.read_bytes()
-    if not asset_files:
-        raise ValueError('R05b source closure must include the Panda mesh dependencies')
-    receipt = ExecutionSourceReceiptV1.create(
-        source_id=source.scene_source.source_id,
-        canonical_xml=canonical_bytes,
-        importer_xml=importer_bytes,
-        closure_files={'canonical-source.xml': canonical_bytes, **asset_files},
-        expected_canonical_xml_sha256=R05B_CANONICAL_XML_SHA256,
-    )
-    from dataclasses import replace as dataclass_replace
-    canonical_source = TaskSceneSource(
-        canonical_xml, receipt.snapshot_root, source.scene_source.source_id,
-    )
-    return dataclass_replace(
-        source, scene_source=canonical_source, execution_source_receipt=receipt,
-    )
+        render=replace(config.render, camera_obs=False))
 
 
 def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu',
-                         _diagnostic=False, _native_feedback_profile=False, resolved_config=None,
+                         resolved_config=None,
                          lift_height_m=None, task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
     robot = make_agent(task_config['recipe']['agent_uids'][0]) if robot is None else robot
@@ -326,13 +252,11 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
-    if backend != 'cpu' and not ((_diagnostic or _native_feedback_profile)
-                                 and provider == 'geophys' and backend == 'cuda'):
-        raise ValueError('selected NutAssembly CUDA source requires an explicit GeoPhys profile')
+    if backend != 'cpu':
+        raise ValueError('NutAssembly reference source requires CPU')
     recipe = task_config["recipe"]
     source_config = recipe["controller"]
-    config = (_environment_config(backend=backend, diagnostic=_diagnostic,
-                                  native_feedback_profile=_native_feedback_profile, task_config=task_config)
+    config = (_environment_config(backend=backend, task_config=task_config)
               if resolved_config is None else resolved_config)
     config = replace(config,
         action=replace(config.action, **source_config["action_overrides"]),
@@ -379,13 +303,8 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
             "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
         config=config, agents=(robot,),
     )
-    if _native_feedback_profile:
-        if provider != 'geophys':
-            raise ValueError('R05b native feedback profile is GeoPhys-only')
-        runtime_source = _r05b_execution_source(runtime_source)
-    else:
-        from ...runtime.sessions.source import snapshot_legacy_mjcf_source
-        runtime_source = snapshot_legacy_mjcf_source(runtime_source)
+    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
+    runtime_source = snapshot_legacy_mjcf_source(runtime_source)
     return runtime_source, contact_profile
 
 
@@ -421,8 +340,7 @@ def _source_identity_files():
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
-def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
-                     diagnostic, native_feedback_profile=False, resolved_config=None, lift_height_m=None, task_config=None):
+def _build_reference(*, provider, include_solution, resolved_config=None, lift_height_m=None, task_config=None):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
     task_config = _configuration() if task_config is None else task_config
@@ -430,15 +348,14 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
     robot = make_agent(recipe['agent_uids'][0])
     artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot)
     source, contact_profile = build_runtime_source(
-        artifact, provider, backend=backend, _diagnostic=diagnostic,
-        _native_feedback_profile=native_feedback_profile, resolved_config=resolved_config,
+        artifact, provider, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=robot,
     )
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
         dynamic = load_r3_dynamic_profile()
         execution_controller = ReferenceExecutionController.from_source(
-            artifact, source, profile=dynamic, gripper_rate_hz=gripper_control_hz,
+            artifact, source, profile=dynamic, gripper_rate_hz=500,
             force_limit_N=recipe['controller']['force_cap_N'])
         controller = execution_controller.hold.controller
         settings = dict(recipe["solution"]["config"])
@@ -465,16 +382,9 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
             "solution_identity": description["identity"],
             "construction_source_sha256": source_files["task_env/tasks/nut_assembly/specialization.py"],
             "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
-            "cadence": ("native-gripper-500hz-v1" if gripper_control_hz == 500
-                        else "equal-gripper-100hz-v1"),
+            "cadence": "native-gripper-500hz-v1",
             "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
             "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
-        if diagnostic:
-            controller_identity.update({
-                'diagnostic_experiment': 'nutassembly-gripper-cadence-v1',
-                'physics_backend': backend,
-                'gripper_control_hz': gripper_control_hz,
-            })
         controller.identity = digest(controller_identity)
         root = Path(__file__).resolve().parents[3]
         revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
@@ -501,12 +411,8 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
             "completion_policy": "on_expert_terminal_stage",
             "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
             "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
-            "gripper_control_hz": gripper_control_hz,
+            "gripper_control_hz": 500,
             "gripper_feedback_hz": 500,
-            **({"diagnostic_experiment": "nutassembly-gripper-cadence-v1",
-                "physics_backend": backend} if diagnostic else {}),
-            **({"native_feedback_profile": R05B_NATIVE_FEEDBACK_PROFILE}
-               if native_feedback_profile else {}),
             "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
             "provider_contact_profile": contact_profile,
             "source_revision": revision, "source_sha256": source_files,
@@ -534,55 +440,14 @@ def build_reference(*, provider="mujoco", include_solution=True, resolved_config
     """Build the unchanged selected 100 Hz/500 Hz reference route."""
     return _build_reference(
         provider=provider, include_solution=include_solution,
-        backend='cpu', gripper_control_hz=500, diagnostic=False, resolved_config=resolved_config,
+        resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config,
-    )
-
-
-def build_gripper_cadence_diagnostic_reference(
-    *, backend, gripper_control_hz, include_solution=True,
-):
-    """Build the exact GeoPhys CPU/CUDA R3 cadence experiment, not a capability."""
-    if backend not in {'cpu', 'cuda'}:
-        raise ValueError('GeoPhys cadence diagnostic backend must be cpu or cuda')
-    if gripper_control_hz not in {100, 500}:
-        raise ValueError('GeoPhys cadence diagnostic gripper cadence must be 100 or 500 Hz')
-    return _build_reference(
-        provider='geophys', include_solution=include_solution,
-        backend=backend, gripper_control_hz=gripper_control_hz, diagnostic=True,
-    )
-
-
-def build_native_feedback_reference(*, backend, gripper_control_hz=500, include_solution=True):
-    """Build the bounded normal GeoPhys force-feedback profile admitted by R05b."""
-    if backend not in {'cpu', 'cuda'}:
-        raise ValueError('R05b native feedback backend must be cpu or cuda')
-    if gripper_control_hz not in {100, 500}:
-        raise ValueError('R05b native feedback law cadence must be 100 or 500 Hz')
-    return _build_reference(
-        provider='geophys', include_solution=include_solution,
-        backend=backend, gripper_control_hz=gripper_control_hz, diagnostic=False,
-        native_feedback_profile=True,
     )
 
 
 def build_outcome_solution(*, provider="mujoco"):
     """Build the task-owned external Solution for its matching selected source."""
     return build_reference(provider=provider)["solution"]
-
-
-def build_gripper_cadence_diagnostic_solution(*, backend, gripper_control_hz):
-    """Build the task-owned Solution instance bound to one diagnostic cadence."""
-    return build_gripper_cadence_diagnostic_reference(
-        backend=backend, gripper_control_hz=gripper_control_hz,
-    )["solution"]
-
-
-def build_native_feedback_solution(*, backend, gripper_control_hz=500):
-    """Build the task-owned Solution for the admitted normal R05b profile."""
-    return build_native_feedback_reference(
-        backend=backend, gripper_control_hz=gripper_control_hz,
-    )["solution"]
 
 
 def _validate_external_solution(value, solution):
@@ -597,35 +462,12 @@ def _validate_external_solution(value, solution):
         "source_xml_sha256": hashlib.sha256(value["source"].scene_source.xml.encode()).hexdigest(),
         "base_controller_identity": value["recipe"]["base_controller_identity"],
     }
-    native_profile = value["recipe"].get("native_feedback_profile") is not None
-    if native_profile:
-        from ...controllers.canonical.contracts import digest
-        if type(solution) is not NutAssemblyOutcomeSolutionV1:
-            raise TypeError("NutAssembly native feedback requires the exact Outcome Solution V1")
-        if (solution.identity != 'ce2527c0798630663511d8ed6998f1bb5638b13ecb3be4b5f966b84c8539c59b'
-                or digest(asdict(solution.config)) !=
-                    '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
-                or solution.base_controller_identity !=
-                    '6571627a613f60a0e9d221e5ef1557899b4aa793b81d4d7c0202abc1ee075184'
-                or solution.control_dt != 0.01 or solution.physics_dt_s != 0.002
-                or solution.source_closure_digest is not None):
-            raise ValueError("NutAssembly external Solution identity does not match the frozen native profile")
     if (solution.require_native_feedback_contract is not True
             or solution.config != value["solution_config"]
             or solution.control_dt != value["artifact"].timebase.control_dt
             or solution.physics_dt_s != value["artifact"].timebase.physics_dt
             or any(getattr(solution, name) != expected_value for name, expected_value in expected.items())):
         raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
-
-
-def _admit_native_feedback_profile(provider, backend, gripper_control_hz):
-    if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
-            or type(gripper_control_hz) is not int or gripper_control_hz not in {100, 500}):
-        raise ValueError(
-            'normal native-feedback profile requires the opted-in GeoPhys NutAssembly binding, '
-            'CPU/CUDA, and 100/500 Hz'
-        )
-    return R05B_NATIVE_FEEDBACK_PROFILE
 
 
 def _binding(resolved_config=None, lift_height_m=None, task_config=None):
@@ -654,12 +496,6 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
         build_external=lambda provider: build_reference(provider=provider, include_solution=False,
                                                         resolved_config=resolved_config,
                                                         lift_height_m=lift_height_m, task_config=task_config),
-        build_native_feedback_profile=lambda provider, backend, gripper_control_hz, include_solution:
-            build_native_feedback_reference(
-                backend=backend, gripper_control_hz=gripper_control_hz,
-                include_solution=include_solution,
-            ),
-        admit_native_feedback_profile=_admit_native_feedback_profile,
         validate_external_solution=_validate_external_solution,
         control_request_required=True,
         external_solution_actions=True,
@@ -702,9 +538,3 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     def selected_binding(cls, config):
         return _binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
                         json.loads(config.task_configuration_json))
-
-    @classmethod
-    def for_native_feedback_profile(cls, *, backend, gripper_control_hz=500, horizon=6000):
-        """Create the explicit normal R05b GeoPhys native-feedback route."""
-        return cls(provider='geophys', backend=backend, horizon=horizon,
-                   _binding=_binding(), _native_feedback_request=gripper_control_hz)

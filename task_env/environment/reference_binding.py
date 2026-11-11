@@ -159,34 +159,6 @@ class _MixedResetReconstruction(_ResetReconstruction):
         return artifact, self.binding.reset_seed(seed), solution
 
 
-class _NativeFeedbackResetReconstruction(_ResetReconstruction):
-    def __init__(self, binding, provider, backend, horizon, request):
-        super().__init__(binding, provider, backend, horizon)
-        if binding.admit_native_feedback_profile is None:
-            raise ValueError('normal native-feedback profile requires an opted-in task binding')
-        self.profile = binding.admit_native_feedback_profile(provider, backend, request)
-        if type(self.profile) is not str or not self.profile:
-            raise ValueError('native-feedback admission must return a nonempty profile identifier')
-        self.request = request
-
-    def initial(self, *, seed=31):
-        return self.binding.build_native_feedback_profile(self.provider, self.backend, self.request, False)
-
-    def build_reset(self, current, seed, external_solution):
-        return self.initial()
-
-    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
-        if value['artifact'] != artifact:
-            raise ValueError('selected Artifact changed between construction and reset')
-        if external_solution is not None:
-            self.binding.validate_external_solution(value, external_solution)
-        set_phase('reset_seed')
-        solution = value.get('solution')
-        if solution is not None:
-            self.binding.validate_external_solution(value, solution)
-        return artifact, seed, solution
-
-
 def legacy_position_physical_observation_binding(env):
     """Compatibility projection for selected callers that still publish V1 state."""
     return (env.position_scene, env.position_joint_bindings,
@@ -399,8 +371,6 @@ class ReferenceTaskBinding:
     task_observation_schema: object | None = None
     external_action_contract: object | None = None
     observation_metadata: dict | None = None
-    build_native_feedback_profile: Callable | None = None
-    admit_native_feedback_profile: Callable | None = None
     build_mixed_control_profile: Callable | None = None
     reset_sample_with_options: Callable | None = None
     prepare_mixed_control: Callable | None = None
@@ -483,11 +453,6 @@ class ReferenceTaskBinding:
             raise ValueError('position execution info requires a callable and nonempty result key')
         if (self.build_external is None) != (self.validate_external_solution is None):
             raise ValueError('external Solution construction and validation must be supplied together')
-        if ((self.build_native_feedback_profile is None) != (self.admit_native_feedback_profile is None)
-                or (self.build_native_feedback_profile is not None
-                    and (not callable(self.build_native_feedback_profile)
-                         or not callable(self.admit_native_feedback_profile)))):
-            raise ValueError('native feedback construction and admission must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.reset_runtime_input is not None and not callable(self.reset_runtime_input):
@@ -554,16 +519,12 @@ class ReferenceTaskBinding:
 
         return cls(build=build, build_receives_binding=True, **binding_fields)
 
-    def reset_reconstruction_strategy(self, provider, backend, horizon, *, mixed=False, native_request=None):
+    def reset_reconstruction_strategy(self, provider, backend, horizon, *, mixed=False):
         """Select task-owned reconstruction once when a configuration is admitted."""
-        if mixed and native_request is not None:
-            raise ValueError('mixed and native-feedback reconstruction are mutually exclusive')
         if mixed:
             if not callable(self.build_mixed_control_profile):
                 raise ValueError('mixed-control candidate requires its task reconstruction binding')
             return _MixedResetReconstruction(self, provider, backend, horizon)
-        if native_request is not None:
-            return _NativeFeedbackResetReconstruction(self, provider, backend, horizon, native_request)
         return _StandardResetReconstruction(self, provider, backend, horizon)
 
     def build_for_provider(self, provider):

@@ -1457,7 +1457,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
-                 _native_feedback_request=None,
                  camera_observation_config=None, _execution_spec_v1=None,
                  _mixed_control_candidate=False,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
@@ -1512,18 +1511,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..runtime.sessions.api import validate_selected_position_route
                 validate_selected_position_route(_execution_spec_v1)
             self._declared_execution_spec_v1 = _execution_spec_v1
-            if _mixed_control_candidate and _native_feedback_request is not None:
-                raise ValueError('native-feedback and mixed-control profiles are mutually exclusive')
             self._mixed_control_candidate = bool(_mixed_control_candidate)
-            if not _mixed_control_candidate and _native_feedback_request is None:
+            if not _mixed_control_candidate:
                 if (_execution_spec_v1 is None
                         and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                     raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
-                provider, backend, horizon, mixed=bool(_mixed_control_candidate),
-                native_request=_native_feedback_request)
-            self._native_feedback_profile = getattr(self._reset_reconstruction, 'profile', None)
-            self._native_feedback_request = _native_feedback_request
+                provider, backend, horizon, mixed=bool(_mixed_control_candidate))
             self.provider, self.backend, self.horizon = provider, backend, horizon
             self._execution_fault = None
             if _initial_value is not None:
@@ -1943,8 +1937,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                              source=preflight_value['source'],
                              controller=preflight_value.get('controller'), seed=seed)
                 if selection.deployment == 'isolated_worker':
-                    if (self._mixed_control_candidate or self.dual_entity_position
-                            or self._native_feedback_profile is not None):
+                    if self._mixed_control_candidate or self.dual_entity_position:
                         receipt = describe_execution_selection(selection, **facts)
                         receipt['phase'] = 'static_preflight'
                         raise DeploymentPreflightError('worker_profile_not_implemented', receipt)
@@ -3987,8 +3980,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 solution = factory()
                 if getattr(solution, 'identity', None) != self.value.get('solution_identity'):
                     raise ValueError('constructed Solution identity differs from compiled task')
-                if self._native_feedback_profile is not None:
-                    self.binding.validate_external_solution(self.value, solution)
                 solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
                                **self.binding.reset_expert_kwargs(self))
             except BaseException as error:
