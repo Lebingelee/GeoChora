@@ -525,85 +525,20 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
     from ...assembly.source_composition import (
         CompositionAttachmentV2, CompositionRuntimeInputV1, CompositionSourceV1,
         CompositionSourceV2, PositionSubjectControlBindingV1,
-        SourceCompositionIntentV1, SourceCompositionPlanV1, SourceCompositionRequestV2,
+        SourceCompositionPlanV1, SourceCompositionRequestV2,
     )
-    from ...robots.source_recipe import RobotSourceRecipeV1
-    from .source import RuntimeSource
 
-    recipe_method = getattr(robot, 'source_recipe', None)
-    profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
-    recipe = (profile_recipe(controller_profile) if controller_profile is not None and callable(profile_recipe)
-              else recipe_method() if callable(recipe_method) else None)
-    if robot_recipe is not None and robot_recipe != recipe:
-        raise ValueError('provider Robot recipe differs from the selected profile declaration')
-    if type(recipe) is not RobotSourceRecipeV1:
-        raise TypeError('Robot composition requires a provider-neutral source recipe')
-    if type(composition_intent) is not SourceCompositionIntentV1:
-        raise TypeError('MuJoCo adapter requires a frozen provider-neutral composition intent')
-    if type(source) is not RuntimeSource or source.execution_source_receipt is None:
-        raise TypeError('MuJoCo composition requires a verified RuntimeSource receipt')
-    if (type(task_entities) is not tuple or type(task_body_names) is not tuple
-            or type(task_site_transfers) is not tuple):
-        raise TypeError('Task entity, root, and frame declarations must be immutable tuples')
-    if set(dict(task_body_names)) != set(task_entities):
-        raise ValueError('Task entity roots must cover the declared Task entities')
-    expected_mode = {'reference-task-source': 'reference',
-                     'replace-task-subtree': 'replace', 'add-source': 'add'}[recipe.mode]
-    if (composition_intent.task_source_id != source.source_id
-            or composition_intent.task_source_closure_sha256 != source.source_closure_digest
-            or composition_intent.task_entity_ids != task_entities
-            or composition_intent.existing_robot_entity_ids != (existing_robot_entity,)
-            or composition_intent.robot_uid != robot.uid
-            or composition_intent.robot_recipe_sha256 != recipe.identity_hash
-            or composition_intent.mode != expected_mode
-            or composition_intent.task_site_transfers != task_site_transfers):
-        raise ValueError('provider-neutral composition intent differs from selected Task/Robot declarations')
-    source.execution_source_receipt.validate_snapshot()
+    from .source_composition_adapters import validate_robot_source_request
+    recipe = validate_robot_source_request(source, robot=robot, composition_intent=composition_intent,
+        task_entities=task_entities, existing_robot_entity=existing_robot_entity,
+        task_body_names=task_body_names, task_site_transfers=task_site_transfers,
+        robot_recipe=robot_recipe, controller_profile=controller_profile)
 
     if recipe.mode == 'reference-task-source':
-        if (existing_robot_entity != robot.uid or not recipe.sources
-                or any(item.entity_ids != (existing_robot_entity,) for item in recipe.sources)):
-            raise ValueError('Panda reference recipe does not identify the existing Task Robot')
-        from ...artifacts import FrameReference
-        from ...assembly.source_composition import PositionSubjectControlBindingV1
-        from ...robots.panda_position_binding import compile_panda_position_subjects
-        scene = declare_panda_scene(robot, entity_id=existing_robot_entity,
-                                    scene_id='integrated-panda-position')
-        joints = tuple(recipe.controlled_joints)
-        plan, subject_identity, subjects = compile_panda_position_subjects(
-            source_scene=scene, components=((existing_robot_entity, 'link0', joints, None),),
-            site_entity=existing_robot_entity, site_name='nutassembly_ee_site',
-            groups=((existing_robot_entity, 'arm'), (existing_robot_entity, 'gripper')),
-            source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
-            task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
-        if source.open_actuators != ('actuator8',):
-            raise ValueError('integrated Panda source lacks its declared gripper actuator')
-        position = PositionSubjectControlBindingV1(plan, subject_identity,
-            tuple((entity, actuator, actuator) for entity, actuator, _ in plan.resource_writers),
-            tuple((f'{existing_robot_entity}/{name}', existing_robot_entity, name, name,
-                   f'actuator{i + 1}' if i < 7 else 'actuator8')
-                  for i, name in enumerate(joints)), subjects=subjects)
-        legacy_task = CompositionSourceV1(source.source_id, source.source_closure_digest,
-                                          (*task_entities, existing_robot_entity))
-        legacy_robot = CompositionSourceV1(source.source_id, source.source_closure_digest,
-                                           (existing_robot_entity,))
-        legacy = SourceCompositionPlanV1(legacy_task, task_entities, (existing_robot_entity,),
-            robot.uid, (legacy_robot,), 'reference', plan.assembly_identity_hash, None, (),
-            plan.identity_hash, subject_identity, position_binding_identity_sha256=position.identity_hash)
-        request = SourceCompositionRequestV2('source-composition-request-v2',
-            CompositionSourceV2(source.source_id, source.source_closure_digest,
-                                 (*task_entities, existing_robot_entity)),
-            task_entities, (existing_robot_entity,), robot.uid,
-            (CompositionSourceV2(source.source_id, source.source_closure_digest,
-                                 (existing_robot_entity,)),), 'reference',
-            plan.assembly_identity_hash,
-            resource_writers=tuple(plan.resource_writers),
-            intent_identity_sha256=composition_intent.identity_hash)
-        if set(recipe.resource_writers) != set(request.resource_writers):
-            raise ValueError('resolved Panda resource writers differ from its pre-parse recipe')
-        return replace(source, position_subject_binding=position,
-                       source_reference_plan=legacy, source_composition_request=request,
-                       source_composition_intent=composition_intent)
+        from .source_composition_adapters import _compose_checked_reference_source
+        return _compose_checked_reference_source(source, robot=robot, recipe=recipe,
+            composition_intent=composition_intent, artifact=artifact, controller=controller,
+            task_entities=task_entities, existing_robot_entity=existing_robot_entity)
 
     if recipe.mode != 'replace-task-subtree':
         raise ValueError('MuJoCo adapter does not admit this Robot recipe mode')

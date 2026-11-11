@@ -412,3 +412,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 本批生产 7 文件修改，+117／−105 行，净增 12 行；原 PickCube 组合逻辑按职责重写迁移，非整文件搬运。版本诊断修改 1 文件（+17／−3），新增 1 个隔离 worker 诊断文件（45 行）；2 个状态／实施文档修改，无生产文件新增或删除。NutAssembly 的 MuJoCo source 实际带 Position subject binding，Env Robot 和 Runtime source 使用同一绑定；不是仅补 facade。当前仅 MuJoCo CPU 有此 source 组合 adapter，GeoPhys／Isaac 的对应主体声明和四任务完整共同构造仍待实现；renderer 未改，E01～E04 不提前结案。
 
 MuJoCo CPU 下 NutAssembly 单个 caller-owned Solution interval、PickCube R3、一体及装配主体、二次 reset 和 close 均通过；检查验证 Env Robot 的 subject 与 Runtime source binding 相同。NutAssembly 首轮在已推进 5 子步后，由检查脚本错误传入 seed 31 导致第二次 reset 拒绝；改为该任务固定 seed 19 后通过，失败和原始输出保留。总计本批进程内观察 30 个物理子步；PickCube 和 NutAssembly 隔离 worker 各完成 reset／一个 interval／二次 reset／close，worker 内部子步未直接观测，各保守预留 50，所有锁释放。新版本纯检查 8 passed。此结果不是完整 Solution 成功，也不外推 GeoPhys／Isaac／renderer。冻结 diff、计划和原始结果在 ignored `workspace/maintenance/v211_robot_composition_20261112_001/`。
+
+### 6.21 GeoPhys 与 MuJoCo 共享已有 Robot 引用声明
+
+输入 `987afe84`。将一体 Panda 的已有 source 引用组合从 MuJoCo 专属 composer 拆到共享 source 组合 owner；Robot 自己编译 Panda subject 与 Controller binding，MuJoCo 及 GeoPhys 共同校验 source、recipe 和 intent。GeoPhys adapter 基于实际已解析的关节／actuator 映射核对资源归属并发布 source reference build receipt；不将合成声明当作 native 映射证据。装配 Panda 的 source 替换仍只在已支持的 MuJoCo adapter，Isaac source 仍待迁移；E01～E04 未接收。
+
+生产 5 文件修改，+156／−76 行，净增 80 行；部分代码从 MuJoCo composer 重写迁至共享 source 和 Robot owner，迁移单列，不按整体删除计算。版本诊断 1 文件 +7／−1，2 个状态／实施文档修改；无文件新增、删除。adapter 不再因 GeoPhys CPU 缺少一体 Robot composer 退回无主体路线，但其他未支持组合没有扩大。
+
+最终源码下，PickCube 与 NutAssembly 在 GeoPhys CPU 和 MuJoCo CPU 的隔离 worker 各完成 reset、一个控制 interval、第二次 reset 和 close，NutAssembly 使用 caller-owned Solution；四条受测路线均有 Robot subject binding，所有锁释放。另有先前一轮相同四条成功，以及首个 GeoPhys 构建后因缺少 reference receipt 而在 reset 阶段失败；worker 内部物理子步均未直接观测，9 次运行每次保守计费 50 子步，不以计费值冒充观测。第一次 MuJoCo 对照误沿用了标注 GeoPhys 的计划文件；其输入身份和实际 provider 见独立结果，后续已按 MuJoCo 专用计划及最终计划重跑。版本纯检查 8 passed；没有运行完整 Solution、Isaac 或 renderer。冻结 diff、计划及原始结果在 ignored `workspace/maintenance/v211_geophys_subject_20261112_001/`。

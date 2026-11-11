@@ -4,6 +4,31 @@ from __future__ import annotations
 from dataclasses import replace
 
 
+def compile_reference_position_source(robot, source, *, artifact, controller, entity_id, recipe):
+    """Compile the source-owned Panda position subject and its native mapping."""
+    from ..assembly.source_composition import PositionSubjectControlBindingV1
+    from ..runtime.sessions.source_scene_import import declare_panda_scene
+
+    if entity_id != robot.uid or not recipe.sources or any(
+            item.entity_ids != (entity_id,) for item in recipe.sources):
+        raise ValueError('Panda reference recipe does not identify the existing Task Robot')
+    scene = declare_panda_scene(robot, entity_id=entity_id, scene_id='integrated-panda-position')
+    joints = tuple(recipe.controlled_joints)
+    plan, subject_identity, subjects = compile_panda_position_subjects(
+        source_scene=scene, components=((entity_id, 'link0', joints, None),),
+        site_entity=entity_id, site_name='nutassembly_ee_site',
+        groups=((entity_id, 'arm'), (entity_id, 'gripper')),
+        source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
+        task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
+    if source.open_actuators != ('actuator8',):
+        raise ValueError('integrated Panda source lacks its declared gripper actuator')
+    return PositionSubjectControlBindingV1(plan, subject_identity,
+        tuple((entity, actuator, actuator) for entity, actuator, _ in plan.resource_writers),
+        tuple((f'{entity_id}/{name}', entity_id, name, name,
+               f'actuator{i + 1}' if i < 7 else 'actuator8')
+              for i, name in enumerate(joints)), subjects=subjects)
+
+
 def compile_panda_position_subjects(*, source_scene, components, site_entity, site_name,
                                      groups, source_id, robot_closure_sha256,
                                      task_closure_sha256, artifact, controller, attachment=None):

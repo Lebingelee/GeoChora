@@ -24,6 +24,11 @@ class SourceCompositionAdapterV1:
 
 
 _ROBOT_SOURCE_ADAPTERS = {
+    ('geophys', 'cpu'): SourceCompositionAdapterV1(
+        'geophys', 'cpu', 'reference-robot-source-composition-v1',
+        'task_env.runtime.sessions.source_composition_adapters',
+        'compose_reference_robot_source',
+    ),
     ('mujoco', 'cpu'): SourceCompositionAdapterV1(
         'mujoco', 'cpu', 'robot-source-composition-v1',
         'task_env.runtime.sessions.mujoco_composition',
@@ -71,3 +76,87 @@ def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, 
             task_site_transfers=task_site_transfers)
 
     return compose
+
+
+
+def validate_robot_source_request(source, *, robot, composition_intent, task_entities,
+                                  existing_robot_entity, task_body_names, task_site_transfers,
+                                  robot_recipe, controller_profile):
+    """Check the selected source, intent, and Robot recipe before composition."""
+    from ...assembly.source_composition import SourceCompositionIntentV1
+    from ...robots.source_recipe import RobotSourceRecipeV1
+    from .source import RuntimeSource
+
+    recipe_method = getattr(robot, 'source_recipe', None)
+    profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
+    recipe = (profile_recipe(controller_profile) if controller_profile is not None and callable(profile_recipe)
+              else recipe_method() if callable(recipe_method) else None)
+    if type(recipe) is not RobotSourceRecipeV1 or (robot_recipe is not None and robot_recipe != recipe):
+        raise ValueError('Robot composition requires the selected provider-neutral recipe')
+    if type(composition_intent) is not SourceCompositionIntentV1:
+        raise TypeError('Robot source requires a frozen composition intent')
+    if type(source) is not RuntimeSource or source.execution_source_receipt is None:
+        raise TypeError('Robot composition requires a verified RuntimeSource receipt')
+    if (type(task_entities) is not tuple or type(task_body_names) is not tuple
+            or type(task_site_transfers) is not tuple or set(dict(task_body_names)) != set(task_entities)):
+        raise ValueError('Task source roots must cover immutable Task entities')
+    expected_mode = {'reference-task-source': 'reference',
+                     'replace-task-subtree': 'replace', 'add-source': 'add'}[recipe.mode]
+    if (composition_intent.task_source_id != source.source_id
+            or composition_intent.task_source_closure_sha256 != source.source_closure_digest
+            or composition_intent.task_entity_ids != task_entities
+            or composition_intent.existing_robot_entity_ids != (existing_robot_entity,)
+            or composition_intent.robot_uid != robot.uid
+            or composition_intent.robot_recipe_sha256 != recipe.identity_hash
+            or composition_intent.mode != expected_mode
+            or composition_intent.task_site_transfers != task_site_transfers):
+        raise ValueError('composition intent differs from Task/Robot declarations')
+    source.execution_source_receipt.validate_snapshot()
+    return recipe
+
+
+def compose_reference_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,
+                                   existing_robot_entity, task_body_names, task_site_transfers,
+                                   robot_recipe=None, controller_profile=None):
+    """Bind an existing Robot source with the shared source and Controller contract."""
+    recipe = validate_robot_source_request(source, robot=robot, composition_intent=composition_intent,
+        task_entities=task_entities, existing_robot_entity=existing_robot_entity,
+        task_body_names=task_body_names, task_site_transfers=task_site_transfers,
+        robot_recipe=robot_recipe, controller_profile=controller_profile)
+    if recipe.mode != 'reference-task-source':
+        raise ValueError('reference source requires the selected Robot reference recipe')
+    return _compose_checked_reference_source(source, robot=robot, recipe=recipe,
+        composition_intent=composition_intent, artifact=artifact, controller=controller,
+        task_entities=task_entities, existing_robot_entity=existing_robot_entity)
+
+
+def _compose_checked_reference_source(source, *, robot, recipe, composition_intent, artifact,
+                                      controller, task_entities, existing_robot_entity):
+    from dataclasses import replace
+    from ...assembly.source_composition import (CompositionSourceV1, CompositionSourceV2,
+        SourceCompositionPlanV1, SourceCompositionRequestV2)
+    position = robot.compile_reference_position_source(
+        source, artifact=artifact, controller=controller,
+        entity_id=existing_robot_entity, recipe=recipe)
+    plan, subject_identity = position.plan, position.subject_identity_sha256
+    legacy_task = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                      (*task_entities, existing_robot_entity))
+    legacy_robot = CompositionSourceV1(source.source_id, source.source_closure_digest,
+                                       (existing_robot_entity,))
+    legacy = SourceCompositionPlanV1(legacy_task, task_entities, (existing_robot_entity,),
+        robot.uid, (legacy_robot,), 'reference', plan.assembly_identity_hash, None, (),
+        plan.identity_hash, subject_identity, position_binding_identity_sha256=position.identity_hash)
+    request = SourceCompositionRequestV2('source-composition-request-v2',
+        CompositionSourceV2(source.source_id, source.source_closure_digest,
+                             (*task_entities, existing_robot_entity)),
+        task_entities, (existing_robot_entity,), robot.uid,
+        (CompositionSourceV2(source.source_id, source.source_closure_digest,
+                             (existing_robot_entity,)),), 'reference',
+        plan.assembly_identity_hash,
+        resource_writers=tuple(plan.resource_writers),
+        intent_identity_sha256=composition_intent.identity_hash)
+    if set(recipe.resource_writers) != set(request.resource_writers):
+        raise ValueError('resolved Robot resource writers differ from its pre-parse recipe')
+    return replace(source, position_subject_binding=position,
+                   source_reference_plan=legacy, source_composition_request=request,
+                   source_composition_intent=composition_intent)

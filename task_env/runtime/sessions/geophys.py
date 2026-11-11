@@ -341,6 +341,31 @@ class _GeoPhysSession(_SessionValues):
                 'physical_model': _geophys_model_facts(compiled),
                 'effective_physical_model': _geophys_effective_model_facts(
                     self._boundary.read_model_snapshot(), names)}
+            if source.source_reference_plan is not None:
+                plan = source.source_reference_plan
+                position = source.position_subject_binding
+                if (position is None or plan.task_source.source_id != source.source_id
+                        or plan.task_source.closure_sha256 != source.source_closure_digest
+                        or plan.position_binding_identity_sha256 != position.identity_hash):
+                    raise ValueError('GeoPhys Robot reference differs from its checked source or binding')
+                native_resources = {native for _, _, native in position.resource_native_names}
+                checked_resources = {row['native'] for row in checked['actuators'].values()}
+                if native_resources != checked_resources:
+                    raise ValueError('GeoPhys Robot reference writers differ from checked native actuators')
+                self._build_layout_facts['source_reference'] = {
+                    'schema_version': 'source-composition-materialization-receipt-v1',
+                    'plan_sha256': plan.identity_hash,
+                    'composition_intent_sha256': getattr(source.source_composition_intent, 'identity_hash', None),
+                    'composition_request_v2_sha256': getattr(source.source_composition_request, 'identity_hash', None),
+                    'materialization_id': self.provider_materialization_id,
+                    'task_source_id': plan.task_source.source_id,
+                    'task_closure_sha256': plan.task_source.closure_sha256,
+                    'robot_entities': list(plan.existing_robot_entity_ids),
+                    'objects': checked, 'physical_model': self._build_layout_facts['physical_model'],
+                    'controller_binding_sha256': position.plan.identity_hash,
+                    'subject_binding_sha256': position.subject_identity_sha256,
+                    'resource_writers': list(position.plan.resource_writers),
+                }
             if observer_render_request is not None:
                 self._observer_com_bodies = self._build_layout_facts['physical_model']['bodies']
                 self._observer_com_ids = {str(name): int(index) for name, index in names.bodies.items()}

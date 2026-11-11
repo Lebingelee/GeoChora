@@ -5,6 +5,9 @@ plan=json.loads(Path(sys.argv[1]).read_text())
 case=sys.argv[2] if len(sys.argv)>2 else 'pickcube'
 if case not in {'pickcube','nut'}:
  raise ValueError('case must be pickcube or nut')
+provider=sys.argv[3] if len(sys.argv)>3 else 'mujoco'
+if provider not in {'mujoco','geophys'}:
+ raise ValueError('provider must be mujoco or geophys')
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
 resource.setrlimit(resource.RLIMIT_CPU,(120,125))
 row={'status':'RUNNING','observed_native_substeps':None,'conservative_substep_charge':50}; locks=[]; env=None; start=time.monotonic()
@@ -13,8 +16,11 @@ try:
   fd=open(path,'r+'); fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB); locks.append(fd)
  import numpy as np
  from task_env import make_env
- config={'execution':{'physics_provider':'mujoco','deployment':'isolated_worker','interpreter':sys.executable},'episode':{'horizon':8}}
+ config={'execution':{'physics_provider':provider,'deployment':'isolated_worker','interpreter':sys.executable},'episode':{'horizon':8}}
  env=make_env('nut-assembly-outcome-reference-v1' if case=='nut' else 'pick-cube-p16-reference-v1',config=config)
+ binding=env.value['source'].position_subject_binding
+ assert binding is not None and env.robot.subjects == binding.subjects
+ row['robot_binding']=binding.identity_hash
  if case=='nut':
   solution=env.value['solution_factory']()
   obs,info=env.reset_for_solution(solution,seed=19)

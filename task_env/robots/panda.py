@@ -122,6 +122,12 @@ class PandaAgent(BaseAgent):
     uid = "panda-v1"
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
 
+    def compile_reference_position_source(self, source, *, artifact, controller, entity_id, recipe):
+        """Bind the Panda already present in a checked task source."""
+        from .panda_position_binding import compile_reference_position_source
+        return compile_reference_position_source(
+            self, source, artifact=artifact, controller=controller, entity_id=entity_id, recipe=recipe)
+
     @staticmethod
     def physical_joint_names():
         return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
