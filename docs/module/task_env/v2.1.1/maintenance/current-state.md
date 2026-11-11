@@ -187,3 +187,5 @@ Position Controller 选择与物化现在核对 source 持有的真实主体、w
 历史 C02b R1 typed-force 专属准入与独立施控旁路已退出；正式 native force 反馈保留，MuJoCo 与 NutAssembly GeoPhys 短程通过。详见[实施记录 6.85](../planning/post-5c-optimization-execution.md#685-退出历史-c02b-r1-typed-force-旁路)。
 
 旧 leaf 专属物化和直接 actuator 写入已退出；装配 Panda 的双 writer 共同提交及 Isaac Position 短程通过。详见[实施记录 6.86](../planning/post-5c-optimization-execution.md#686-退出旧-leaf-专属物化与-actuator-旁路)。
+
+旧 leaf dispatcher 和专属提交入口已退出；共同提交、装配双 writer、Isaac Position 及历史 H5 解码分别复验。详见[实施记录 6.87](../planning/post-5c-optimization-execution.md#687-退出旧-leaf-控制提交与-dispatcher)。

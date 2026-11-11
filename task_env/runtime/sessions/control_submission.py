@@ -490,72 +490,6 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
         None, None, None, dt, count, contributions)
 
 
-def prepare_leaf_scene_interval(*, plan, materialization, batch, source_id,
-                                artifact_sha256, boundary, sample_clock):
-    """Bind selected leaf contributions to the already admitted plan and receipt.
-
-    Leaf V1 has neither a row number nor Controller generation. Keep those as
-    None and bind the actual plan, leaf binding, and configuration revision;
-    do not invent identities that the old commands do not carry.
-    """
-    from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
-    from .leaf_control import LeafMaterializationReceiptV1, LeafPreparedBatchV1
-    if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
-        raise TypeError('scene leaf interval requires its compiled binding plan')
-    if type(materialization) is not LeafMaterializationReceiptV1 or type(batch) is not LeafPreparedBatchV1:
-        raise TypeError('scene leaf interval requires typed materialization and batch')
-    batch.validate()
-    _token(source_id, 'scene source')
-    _digest(artifact_sha256, 'scene artifact')
-    if (boundary.scene_identity_hash != plan.scene_identity_sha256
-            or boundary.provider_materialization_id != materialization.materialization_id
-            or sample_clock.sample_index != boundary.control_step
-            or sample_clock.clock_domain != 'evaluation_boundary'
-            or materialization.scene_identity_sha256 != plan.scene_identity_sha256
-            or materialization.source_closure_sha256 != plan.source_closure_sha256
-            or materialization.effective_plan_identity_sha256 != plan.identity_sha256):
-        raise ValueError('scene leaf interval differs from its source-bound materialization')
-    entries = {item.binding.writer_id: item for item in plan.leaves}
-    authority = tuple((writer, tuple(sorted(f'{entity}/{actuator}'
-        for entity, actuator, owner in plan.resource_writers if owner == writer)))
-        for writer in sorted(entries))
-    contributions = []
-    for item in batch.commands:
-        entry = entries.get(item.writer_id)
-        if (entry is None or item.state_boundary != boundary
-                or item.binding_identity_sha256 != entry.binding.identity_hash
-                or item.effective_configuration_identity_sha256 != entry.effective_configuration_identity_sha256
-                or item.effective_plan_identity_sha256 != plan.identity_sha256
-                or item.materialization_identity_sha256 != materialization.identity_sha256
-                or item.state_configuration_revision != materialization.configuration_revision
-                or item.target.sample_clock != sample_clock
-                or item.target.source_closure_sha256 != plan.source_closure_sha256
-                or item.target.scene_identity_hash != plan.scene_identity_sha256):
-            raise ValueError('scene leaf contribution differs from its bound command')
-        resources = tuple(sorted(f'{slot.actuator.entity_id}/{slot.actuator.actuator_id}'
-                                 for slot in item.slot_values))
-        if resources != dict(authority)[item.writer_id]:
-            raise ValueError('scene leaf contribution does not cover its bound resources')
-        units = ('rad',) if item.profile_kind == 'arm_position' else ('m',)
-        contributions.append(SceneCommandContributionV1('robot-controller', 'position-target', units,
-            'exclusive', None, item.writer_id,
-            item.binding_identity_sha256, None, item.command_identity_sha256,
-            resources, 0, plan.control_substeps))
-    if {item.writer_id for item in contributions} != set(entries):
-        raise ValueError('scene leaf interval does not cover its bound writers')
-    claims = tuple((item.writer_id, resource, item.start_substep, item.end_substep)
-                   for item in contributions for resource in item.resources)
-    _validate_resource_intervals(claims, writer_resources=authority, substeps=plan.control_substeps)
-    if (not math.isfinite(plan.physics_dt_s) or plan.physics_dt_s <= 0
-            or not math.isfinite(sample_clock.simulation_time_s)):
-        raise ValueError('scene leaf interval clock is invalid')
-    return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
-        plan.source_closure_sha256, artifact_sha256, boundary, sample_clock,
-        plan.identity_sha256, materialization.configuration_revision,
-        materialization.identity_sha256, None, plan.physics_dt_s,
-        plan.control_substeps, tuple(contributions))
-
-
 @dataclass(frozen=True)
 class PositionControlBatchV1:
     """Complete, source-bound set of position writers for one outer interval."""
@@ -807,13 +741,11 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     """
     from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
     from .physical_control import ResolvedPhysicalBatchV1, ResolvedPhysicalSequenceV1
-    from .leaf_control import LeafPreparedBatchV1
     is_position_batch = type(command) is PositionControlBatchV1
     is_position_sequence = type(command) is PositionControlSequenceV1
-    is_leaf_batch = type(command) is LeafPreparedBatchV1
 
     if command_kind == 'position-target':
-        if is_position_batch or is_position_sequence or is_leaf_batch:
+        if is_position_batch or is_position_sequence:
             command.validate()
         elif type(command) not in {PositionControlTargetV1, CanonicalControlTarget}:
             raise TypeError('position lifecycle requires a typed canonical position target')
@@ -881,7 +813,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
                     or context.boundary != boundary or context.clock != sample_clock
                     or context.generation != controller_generation):
                 raise ValueError('physical batch context differs from the control submission')
-    elif not is_leaf_batch:
+    else:
         targets = command.targets if is_position_batch or is_position_sequence else (command,)
         for item in targets:
             if type(item) is PositionControlTargetV1:
@@ -972,14 +904,12 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
                 or len(flattened_resources) != len(set(flattened_resources))
                 or set(flattened_resources) != set(resource_ids)):
             raise ValueError('resource ownership conflicts or does not cover the complete batch')
-    elif is_position_batch or is_leaf_batch:
+    elif is_position_batch:
         raise ValueError('multi-writer Position batch requires explicit resource ownership')
     if is_position_batch:
         target_writers = tuple(target.writer_id for target in command.targets)
         if target_writers != writer_ids:
             raise ValueError('position batch targets differ from the submitted writer set')
-    if is_leaf_batch and tuple(item.writer_id for item in command.commands) != writer_ids:
-        raise ValueError('leaf batch commands differ from the submitted writer set')
     if command_kind in {'physical-effort-batch', 'physical-effort-sequence'}:
         resolved_items = ((command,) if command_kind == 'physical-effort-batch'
                           else tuple(item for _, _, item in command.slices))
@@ -996,7 +926,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
     # For typed Position profiles the materialized session retains the
     # compiled source-bound plan. Caller-supplied ownership metadata must be
     # a projection of that plan, not merely a self-consistent list of names.
-    if command_kind == 'position-target' and not is_leaf_batch:
+    if command_kind == 'position-target':
         typed_targets = command.targets if is_position_batch or is_position_sequence else (command,)
         if all(type(item) is PositionControlTargetV1 for item in typed_targets):
             plan = getattr(session, '_control_binding_plan', None)
@@ -1079,8 +1009,7 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
                            boundary, sample_clock, controller_generation,
                            controller_identities, writer_ids, resource_ids, units,
                            lowering, lower, resource_owners=None,
-                           submission_progress=None, scene_interval=None,
-                           scene_plan=None, scene_materialization=None,
+                           submission_progress=None,
                            subject_execution_mode=None):
     """Commit one previously typed command under the existing replay key."""
     payload, identity, lifecycle = _preflight_control_command(
@@ -1090,71 +1019,49 @@ def submit_control_command(session, command, *, command_kind, command_sha256,
         controller_generation=controller_generation, controller_identities=controller_identities,
         writer_ids=writer_ids, resource_ids=resource_ids, units=units, lowering=lowering,
         lower=lower, resource_owners=resource_owners, submission_progress=submission_progress)
-    if scene_interval is not None:
-        if type(scene_interval) is not SceneCommandIntervalV1:
-            raise TypeError('scene submission requires SceneCommandIntervalV1')
-        if getattr(session, 'active_leaf_plan_identity', None) not in (None, getattr(scene_plan, 'identity_sha256', None)):
-            raise ValueError('scene interval plan is not active in the RuntimeSession')
-        check_materialization = getattr(session, 'validate_leaf_materialization', None)
-        if not callable(check_materialization):
-            raise ValueError('scene interval requires RuntimeSession materialization validation')
-        check_materialization(scene_materialization, scene_plan)
-        expected = prepare_leaf_scene_interval(plan=scene_plan, materialization=scene_materialization,
-            batch=command, source_id=source_id, artifact_sha256=artifact_sha256,
-            boundary=boundary, sample_clock=sample_clock)
-        if scene_interval != expected:
-            raise ValueError('scene interval differs from its bound inner commands')
-        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
-        if timebase is not None and (timebase.control_substeps != scene_interval.substeps
-                or not math.isclose(timebase.physics_dt, scene_interval.physics_dt_s, rel_tol=0, abs_tol=1e-12)
-                or not math.isclose(timebase.control_dt, scene_interval.physics_dt_s * scene_interval.substeps,
-                                    rel_tol=1e-12, abs_tol=1e-12)):
-            raise ValueError('scene interval differs from the RuntimeSession timebase')
-    elif scene_plan is not None or scene_materialization is not None:
-        raise ValueError('scene binding and materialization require an interval')
-    else:
-        # Existing source-bound Position calls enter the same scene envelope
-        # after the established preflight. Legacy canonical targets lack this
-        # binding and remain on their existing route until explicitly bound.
-        from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
-        typed_position = (type(command) is PositionControlTargetV1
-                          or type(command) is PositionControlBatchV1
-                          or type(command) is PositionControlSequenceV1)
-        plan = getattr(session, '_control_binding_plan', None)
-        timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
-        if typed_position and plan is not None and timebase is not None:
-            scene_interval = prepare_position_scene_interval(session=session, plan=plan, command=command,
-                source_id=source_id, source_closure_sha256=source_closure_sha256,
-                artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
-                resource_owners=payload['resource_owners'])
-        elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
-            scene_interval = prepare_physical_scene_interval(session=session,
-                execution=session._physical_port.execution, resolved=command)
-        elif command_kind == 'physical-effort-sequence' and getattr(session, '_physical_port', None) is not None:
-            parts = tuple((start, end, prepare_physical_scene_interval(session=session,
-                execution=session._physical_port.execution, resolved=resolved))
-                for start, end, resolved in command.slices)
-            base = parts[0][2]
-            if any(replace(part, contributions=()) != replace(base, contributions=())
-                   for _, _, part in parts[1:]):
-                raise ValueError('physical sequence slices do not share one scene interval')
-            scene_interval = replace(base, contributions=tuple(
-                replace(item, start_substep=start, end_substep=end)
-                for start, end, part in parts for item in part.contributions))
-        elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
-              and getattr(getattr(session, '_source', None), 'position_subject_binding', None) is not None):
-            scene_interval = prepare_subject_position_scene_interval(session=session, target=command,
-                source_id=source_id, source_closure_sha256=source_closure_sha256,
-                artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
-                resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
-        elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
-              and getattr(session, '_legacy_native_feedback_binding', None) is not None):
-            if subject_execution_mode != 'native-feedback':
-                raise ValueError('legacy native feedback requires its actual execution mode')
-            scene_interval = prepare_legacy_native_feedback_scene_interval(session=session, target=command,
-                source_id=source_id, source_closure_sha256=source_closure_sha256,
-                artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
-                resource_owners=payload['resource_owners'])
+    scene_interval = None
+    # Existing source-bound Position calls enter the same scene envelope
+    # after the established preflight. Legacy canonical targets lack this
+    # binding and remain on their existing route until explicitly bound.
+    from ...controllers.canonical.contracts import CanonicalControlTarget, PositionControlTargetV1
+    typed_position = (type(command) is PositionControlTargetV1
+                      or type(command) is PositionControlBatchV1
+                      or type(command) is PositionControlSequenceV1)
+    plan = getattr(session, '_control_binding_plan', None)
+    timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
+    if typed_position and plan is not None and timebase is not None:
+        scene_interval = prepare_position_scene_interval(session=session, plan=plan, command=command,
+            source_id=source_id, source_closure_sha256=source_closure_sha256,
+            artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+            resource_owners=payload['resource_owners'])
+    elif command_kind == 'physical-effort-batch' and getattr(session, '_physical_port', None) is not None:
+        scene_interval = prepare_physical_scene_interval(session=session,
+            execution=session._physical_port.execution, resolved=command)
+    elif command_kind == 'physical-effort-sequence' and getattr(session, '_physical_port', None) is not None:
+        parts = tuple((start, end, prepare_physical_scene_interval(session=session,
+            execution=session._physical_port.execution, resolved=resolved))
+            for start, end, resolved in command.slices)
+        base = parts[0][2]
+        if any(replace(part, contributions=()) != replace(base, contributions=())
+               for _, _, part in parts[1:]):
+            raise ValueError('physical sequence slices do not share one scene interval')
+        scene_interval = replace(base, contributions=tuple(
+            replace(item, start_substep=start, end_substep=end)
+            for start, end, part in parts for item in part.contributions))
+    elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
+          and getattr(getattr(session, '_source', None), 'position_subject_binding', None) is not None):
+        scene_interval = prepare_subject_position_scene_interval(session=session, target=command,
+            source_id=source_id, source_closure_sha256=source_closure_sha256,
+            artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+            resource_owners=payload['resource_owners'], execution_mode=subject_execution_mode)
+    elif (command_kind == 'position-target' and type(command) is CanonicalControlTarget
+          and getattr(session, '_legacy_native_feedback_binding', None) is not None):
+        if subject_execution_mode != 'native-feedback':
+            raise ValueError('legacy native feedback requires its actual execution mode')
+        scene_interval = prepare_legacy_native_feedback_scene_interval(session=session, target=command,
+            source_id=source_id, source_closure_sha256=source_closure_sha256,
+            artifact_sha256=artifact_sha256, boundary=boundary, sample_clock=sample_clock,
+            resource_owners=payload['resource_owners'])
     if scene_interval is None and (lifecycle is not None or command_kind == 'physical-effort-sequence'):
         # A selected lifecycle is a production dispatch, not the historical
         # standalone submission interface.  Do not consume its replay key or
