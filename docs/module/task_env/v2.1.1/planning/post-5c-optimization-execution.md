@@ -742,3 +742,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +63／−460，净减 397 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1358。Runtime 对正式 source、clock、提交和 native feedback 的合同保持；旧 DG04 输入不再是 native adapter 的构造选项。
 
 73 项版本检查通过。Isaac PickCube Position 与 joint effort 的 CUDA／同步 RGB 路线均完成两次 reset、非零 step、三帧独立读回、重复 Env close 和 App close，各观测 41 次 physics callback；订阅前启动推进未知。Position H5 独立检查确认 native Ack、5 个推进收据、两个 typed-state 样本以及各收据的 F06 mimic／5 N actuation 语义。两次关闭日志均有 Isaac 菜单扩展访问已关闭 USD context 的异常，但应用与进程关闭收据均成功；该日志不当作物理故障或被忽略。简单主体 Isaac、MuJoCo、GeoPhys 和完整 Solution 本批未重跑；其他 provider 代码未变，先前证据按原范围保留。冻结 diff、计划、两次 native 收据与 H5 检查位于 ignored `workspace/maintenance/v211_retire_dg04_isaac_20261112_001/`。E01～E04 仍未接收。
+
+### 6.62 Panda 零偏置 effort Controller 归控制 owner
+
+输入 `a1789db2`。一体与装配 Panda 原先分别创建同一类零偏置模型、Controller requirement 和线性 effort profile；现在 Controller 自己从已编译 source-bound 通道构造该模型，Robot 只提供自身通道、writer 和动作映射。新增统一的 writer／通道校验；一体 Panda 的 MJCF／USD 五种 profile 前后对照中，subject、binding、Controller identity、状态需求和动作合同均一致。装配 Panda 的 effort 构造也调用同一 owner，但目前没有正式 task caller，本批未对其宣称原生验证。
+
+生产修改 3 文件 +33／−26，净增 7 行；控制模型创建逻辑集中到 Controller，新增行包含统一通道检查。版本诊断修改 1 文件 +21／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1358。provider／renderer、clock 与 native 提交路径未改。
+
+74 项版本检查通过，新增错误 writer 拒绝检查。MuJoCo Panda direct effort 与 joint→R3 reset 切换／H5 读回通过，共观测 15 个 native 子步。Isaac PickCube joint effort／CUDA／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭，观测 41 次 physics callback，订阅前启动推进未知。GeoPhys、装配 Panda effort 和完整 Solution 本批未重跑；其他 provider 路径保持原有限定。冻结 diff、计划、十组 source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_controller_factory_20261112_001/`。E01～E04 仍未接收。

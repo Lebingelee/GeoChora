@@ -75,6 +75,31 @@ class LinearEffortProfileV1(Contract):
 class LinearEffortControllerV1:
     """Compute named contributions using an injected, source-bound pure model."""
 
+    @classmethod
+    def zero_bias(cls, binding, *, writer_id, channel_keys, action_names,
+                  action_to_effort, cadence_s, model_id):
+        """Construct a source-bound linear Controller for declared channels."""
+        from .model import AffineJointBiasModelV1
+
+        if type(binding) is not PhysicalControlBindingV1:
+            raise TypeError('zero-bias Controller requires a typed physical binding')
+        by_key = {f'{channel.entity_id}/{channel.joint_id}': channel for channel in binding.channels}
+        if (not channel_keys or len(set(channel_keys)) != len(channel_keys)
+                or any(key not in by_key or writer_id not in by_key[key].owner_ids for key in channel_keys)):
+            raise ValueError('zero-bias Controller channels differ from its writer binding')
+        channels = tuple(by_key[key] for key in channel_keys)
+        requirement = ControllerModelRequirementV1(
+            'controller-model-requirement-v1', model_id, 'geochora', 'v1', 'stdlib',
+            binding.source_id, binding.source_closure_sha256, tuple(channel_keys),
+            tuple('rad' if channel.kind == 'revolute' else 'm' for channel in channels),
+            'joint_bias', tuple(channel.unit for channel in channels), 'joint-axis',
+            'evaluation_boundary', cadence_s, 0., 'pure_no_physics_step', writer_id, 'none', 'required')
+        zero = (0.,) * len(channels)
+        model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
+        profile = LinearEffortProfileV1('linear-effort-profile-v1', writer_id,
+            tuple(action_names), tuple(channel_keys), tuple(action_to_effort), requirement)
+        return cls(profile, binding, model)
+
     def __init__(self, profile: LinearEffortProfileV1, binding: PhysicalControlBindingV1, model):
         if type(profile) is not LinearEffortProfileV1 or type(binding) is not PhysicalControlBindingV1:
             raise TypeError('effort Controller requires typed profile and binding')

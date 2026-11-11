@@ -63,8 +63,7 @@ class PandaAgent(BaseAgent):
         The source adapter supplies verified native ranges; this function does not
         parse or materialize a provider-specific source.
         """
-        from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
-        from ..controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+        from ..controllers.canonical.physical_controller import LinearEffortControllerV1
         from ..runtime.sessions.physical_control import build_declared_effort_execution
 
         if native_drive not in {'position', 'disabled'}:
@@ -89,21 +88,12 @@ class PandaAgent(BaseAgent):
             transmission_ids=layout.transmission_ids)
         def make_controller(binding, writer):
             keys = tuple(f'{entity_id}/{name}' for name in names)
-            kinds = tuple(definitions[name].kind for name in names)
-            requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
-                layout.model_id, 'geochora', 'v1', 'stdlib', source.source_id,
-                source.source_closure_digest, keys,
-                tuple('rad' if kind == 'revolute' else 'm' for kind in kinds), 'joint_bias',
-                tuple('N*m' if kind == 'revolute' else 'N' for kind in kinds),
-                'joint-axis', 'evaluation_boundary', artifact.timebase.control_dt,
-                0., 'pure_no_physics_step', writer, 'none', 'required')
-            zero = (0.,) * len(names)
-            model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
             action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + (layout.finger_action_id,)
             matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
                                  for j in range(8)) for i in range(len(names)))
-            profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, action_names, keys, matrix, requirement)
-            return LinearEffortControllerV1(profile, binding, model)
+            return LinearEffortControllerV1.zero_bias(binding, writer_id=writer,
+                channel_keys=keys, action_names=action_names, action_to_effort=matrix,
+                cadence_s=artifact.timebase.control_dt, model_id=layout.model_id)
         definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
                                  for j in a.joints if j.kind != 'fixed'}
         if joint_bindings is None:

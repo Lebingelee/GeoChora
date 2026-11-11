@@ -150,8 +150,7 @@ class AssembledPandaAgent(BaseAgent):
     def build_effort_execution(self, declaration, *, artifact, source, native_ranges):
         """Build a source-bound arm/hand physical profile without allocating a solver."""
         from ..artifacts.state import StateFieldRequirement, StateRequirements
-        from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
-        from ..controllers.canonical.physical_controller import LinearEffortControllerV1, LinearEffortProfileV1
+        from ..controllers.canonical.physical_controller import LinearEffortControllerV1
         from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
         if (source.scene_definition.identity_hash != declaration.scene.identity_hash
                 or source.source_closure_digest != declaration.attachment_plan.source_closure_sha256):
@@ -168,16 +167,9 @@ class AssembledPandaAgent(BaseAgent):
             actions = tuple(f'arm-effort-{i}' for i in range(1, 8)) if is_arm else ('finger-tendon-effort',)
             matrix = tuple(tuple((1. if index == column else 0.) if is_arm else .5
                                  for column in range(len(actions))) for index in range(len(channels)))
-            requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
-                'direct-effort-zero-bias-v1', 'geochora', 'v1', 'stdlib', source.source_id,
-                source.source_closure_digest, keys,
-                tuple('rad' if c.kind == 'revolute' else 'm' for c in channels), 'joint_bias',
-                tuple(c.unit for c in channels), 'joint-axis', 'evaluation_boundary',
-                artifact.timebase.control_dt, 0., 'pure_no_physics_step', writer, 'none', 'required')
-            zeros = (0.,) * len(channels)
-            model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zeros, zeros, zeros)
-            profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, actions, keys, matrix, requirement)
-            controllers.append(LinearEffortControllerV1(profile, compiled.binding, model))
+            controllers.append(LinearEffortControllerV1.zero_bias(compiled.binding,
+                writer_id=writer, channel_keys=keys, action_names=actions, action_to_effort=matrix,
+                cadence_s=artifact.timebase.control_dt, model_id='direct-effort-zero-bias-v1'))
         joints = {f'{a.entity_id}/{j.joint_id}': j for a in declaration.scene.articulations or () for j in a.joints}
         frames = {name: FrameReference(*name.split('/', 1)) for name in (*source.bodies, *source.frames)}
         requirements = StateRequirements('state-requirements-v1', 'controller', 'panda-assembled-effort', tuple(

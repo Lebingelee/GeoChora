@@ -137,3 +137,5 @@ F05 孤立输入类型与专属 GeoPhys/USD native adapter 两个无生产调用
 旧 Position candidate 六个仅供历史诊断的资产已退休，Git blob 与 SHA-256 已记录；正式 PickCube 两条受影响 MuJoCo 短程通过。详见[实施记录 6.60](../planning/post-5c-optimization-execution.md#660-退休孤立-position-candidate-资产)。
 
 Isaac adapter 已退休旧 DG04 专用构造和 witness，正式 F06 Position／effort、RGB、关闭及 Position H5 native 收据已复验；关闭日志的扩展异常保留。详见[实施记录 6.61](../planning/post-5c-optimization-execution.md#661-退休-isaac-adapter-的-dg04-专用分支)。
+
+一体和装配 Panda 的零偏置 effort Controller 创建已归共同控制 owner；正式一体 Panda 的 MuJoCo／Isaac 路线复验，装配 effort 尚无正式 caller。详见[实施记录 6.62](../planning/post-5c-optimization-execution.md#662-panda-零偏置-effort-controller-归控制-owner)。

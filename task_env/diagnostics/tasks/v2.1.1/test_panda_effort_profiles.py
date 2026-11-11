@@ -71,3 +71,24 @@ def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
         assert used[0][1] is used[1][1]
     finally:
         binding.close_task_resources()
+
+
+def test_panda_effort_controller_rejects_foreign_writer():
+    from task_env.controllers.canonical.physical_controller import LinearEffortControllerV1
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'}, 'episode': {'horizon': 8},
+    })
+    task_binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        execution = task_binding.build('mujoco')['physical_execution']
+        profile = execution.controllers[0].profile
+        with pytest.raises(ValueError, match='writer binding'):
+            LinearEffortControllerV1.zero_bias(execution.compiled.binding, writer_id='foreign',
+                channel_keys=profile.channel_keys, action_names=profile.action_names,
+                action_to_effort=profile.action_to_effort, cadence_s=.01, model_id='foreign')
+    finally:
+        task_binding.close_task_resources()
