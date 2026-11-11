@@ -1875,7 +1875,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                    else self._physical_execution())
         if profile is not None:
             declared_physical = self.value.get('physical_execution')
-            if declared_physical is not None and profile is not declared_physical:
+            if (declared_physical is not None and profile is not declared_physical
+                    and (physical_selection is None or declared_physical is not physical_selection.declaration)):
                 raise ValueError('physical execution differs from the selected declaration')
             profile.preflight(provider=self.provider, backend=self.backend,
                               artifact=self.artifact, source=self.value['source'])
@@ -2072,7 +2073,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
             previous_action_schema = self.binding.action_schema
-            self.binding = self.binding.bind_compiled_control(self.value)
+            if physical_selection is None:
+                self.binding = self.binding.bind_compiled_control(self.value)
             if self.binding.action_schema != previous_action_schema:
                 self.metadata['action_schema'] = dict(self.binding.action_schema)
                 self.action_space = self.binding.action_space_factory()
@@ -2338,6 +2340,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if physical_candidate is not None:
                     self._position_reset_info['physical_action_spec_v1'] = physical_selection.describe()
                 self.info.update(self._position_reset_info)
+                self._publish_task_position_execution_info(self.info)
+                if previous_episode_end is not None:
+                    self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
+            elif physical_candidate is not None:
+                self.info['physical_action_spec_v1'] = physical_selection.describe()
                 self._publish_task_position_execution_info(self.info)
                 if previous_episode_end is not None:
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
@@ -4624,8 +4631,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
             def create_end():
                 from ..trajectory.canonical.episode import make_episode_end_v1
+                selection = getattr(self, '_physical_reset_selection', None)
+                solution = self._external_solution_owner
+                if selection is not None and reason in {'solution_completed', 'solution_failed'}:
+                    if solution is None or (reason == 'solution_completed' and not solution.done) or (
+                            reason == 'solution_failed' and not solution.failed):
+                        raise ValueError('physical Solution stop reason differs from its actual outcome')
                 end_reason, terminated, truncated, bootstrap_allowed = state.stop_outcome(
-                    reason, selected_reasons=False)
+                    reason, selected_reasons=selection is not None)
                 published = self._physical_published_state
                 boundary = self._physical_published_typed_state.view.boundary
                 if boundary.control_step != published.control_step:
@@ -4635,7 +4648,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                            'simulation_time_s': float(published.simulation_time),
                            'source_id': self.value['source'].source_id,
                            'source_closure_digest': self.value['source'].source_closure_digest,
-                           'controller_identities': [c.identity for c in self.value['physical_execution'].controllers]}
+                           'controller_identities': [c.identity for c in self._physical_execution().controllers]}
                 if self._execution_fault is not None:
                     payload['fault'] = self._execution_fault.to_mapping()
                 self._last_episode_end = make_episode_end_v1(
@@ -4643,7 +4656,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     end_reason=end_reason, terminated=terminated, truncated=truncated,
                     bootstrap_allowed=bootstrap_allowed,
                     source='task_env.selected_reference.physical_control_v1', payload=payload,
-                    event_sequence=0, task_success=bool(evaluation.success), solution_completed=None)
+                    event_sequence=(self.recorder.next_boundary_event_sequence(int(published.control_step))
+                                    if self.recorder is not None and getattr(self.recorder, 'active', False) else 0),
+                    task_success=bool(evaluation.success),
+                    solution_completed=(bool(solution.done) if solution is not None else None))
                 return self._last_episode_end
 
             return dict(closed_message='cannot stop a closed selected environment',
@@ -4821,6 +4837,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 or self._stopped or self._position_episode_end is not None
                 or self._mixed_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
+        if getattr(self, '_physical_reset_selection', None) is not None:
+            from ..recorders.recorder import begin_structured_recording
+            from ..recorders.physical_metadata import physical_record_metadata
+            self.recording_path, self.recorder = begin_structured_recording(
+                path, horizon=self.horizon, observation=self.obs, reset_info=self.info,
+                metadata_factory=lambda: physical_record_metadata(self),
+            )
+            return
         if getattr(self, 'mixed_control_profile', False):
             from ..recorders.recorder import begin_structured_recording
             self.recording_path, self.recorder = begin_structured_recording(
@@ -4832,9 +4856,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             from ..recorders.recorder import begin_structured_recording
             from ..recorders.position_metadata import position_control_binding_provenance
             def metadata_factory():
-                if getattr(self, '_physical_reset_selection', None) is not None:
-                    from ..recorders.physical_metadata import physical_record_metadata
-                    return physical_record_metadata(self)
                 record_metadata = self._position_record_metadata()
                 record_metadata['resolved_config']['position_control_binding_provenance'] = (
                     position_control_binding_provenance(
@@ -4900,6 +4921,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def finish_recording(self, reason):
+        if getattr(self, '_physical_reset_selection', None) is not None:
+            from ..recorders.recorder import finalize_structured_recording
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active recording')
+            if self._last_episode_end is None:
+                self.stop(str(reason))
+            return finalize_structured_recording(
+                self.recorder, self.recording_path, self._last_episode_end, reason, position=True,
+            )
         if getattr(self, 'mixed_control_profile', False):
             from ..recorders.recorder import finalize_structured_recording
 

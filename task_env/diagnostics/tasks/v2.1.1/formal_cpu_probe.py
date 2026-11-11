@@ -69,7 +69,7 @@ try:
     else:
         assert robot.controller is env.controller
     physical_execution = env.value.get('physical_execution')
-    if physical_execution is not None:
+    if physical_execution is not None and not (args.case=='panda-joint' and args.record):
         assert env.controller is robot.controller is physical_execution.controllers[0]
         assert robot.controllers == physical_execution.controllers
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
@@ -180,7 +180,9 @@ try:
         assert env.robot.controller is env.controller
         physical_execution = env.value.get('physical_execution')
         if physical_execution is not None:
-            assert env.controller is physical_execution.controllers[0]
+            active = (env._physical_reset_selection.current.execution
+                      if getattr(env, '_physical_reset_selection', None) is not None else physical_execution)
+            assert env.controller is active.controllers[0]
         result['robot_rebound_after_reset']=True
         if args.case in {'pendulum','two-wheel'}:
             assert info['reset_parameters']==first_reset_parameters

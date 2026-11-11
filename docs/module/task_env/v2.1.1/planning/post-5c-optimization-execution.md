@@ -816,3 +816,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +55／−33，净增 22 行；版本诊断修改 1 文件 +30／−0，验证 physical 录像不调用 Position 元数据并绑定实际身份；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。本批只改变录像元数据构造，provider／renderer 的 source、状态、clock、控制提交与资源没有改变；reset 切换执行仍需 Position 观测，尚未消除。
 
 90 项版本检查通过。MuJoCo joint→R3 reset 切换的 physical H5 写入、结构化读回与关闭通过，观测 10 个 native 子步；独立 h5py／YAML 读回核对物理 binding、scene 和 Controller 身份，确认不含 Position binding provenance。装配 Panda Position 双 Controller 录像及结构化读回通过，观测 5 个 native 子步。GeoPhys、Isaac 和完整 Solution 本批未重跑，先前执行证据按未受影响范围保留。冻结 diff、计划、两次运行和独立检查位于 ignored `workspace/maintenance/v211_physical_record_metadata_20261112_1794433545/`。这只完成录像依赖的一部分，不表示 E10 或 E01～E04 接收。
+
+### 6.71 reset 切换使用实际物理状态与 Controller
+
+输入 `157e3758`。PickCube MJCF 的 reset 切换此前仅为 V1 状态和录像构造 Position Controller；现在声明物理 execution，由共同 Runtime 以当前提交的物理 Controller 物化、初始化并发布 V2 状态。reset 保存动作规格和任务执行信息，停止与结构化录像读取实际活动 Controller 身份；Position Controller 和专用观测投影从该路线移除。选择准备、generation、source／Artifact preflight、故障与失败清理检查保留。USD effort 仍有 Position 状态依赖，本批未处理。
+
+生产修改 3 文件 +48／−45，净增 3 行；版本诊断修改 2 文件 +35／−2，覆盖 R3 Solution 单步／录像和切换 Controller 身份；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。构建消除一个非执行 Position Controller，物理提交、V2 状态、clock 和 source 由同一 Runtime 执行合同承载；renderer 未改，其他任务仍走各自已声明的能力路径。
+
+91 项版本检查通过，包括 R3 Solution reset、一次真实提交、录像读回和停止；这不是完整 Solution 成功结论。四个正式任务 MuJoCo 短程及 joint→R3 切换／H5 读回通过，最终五次运行共观测 70 个 native 子步；随后装配 Position 录像和切换录像再次通过，分别观测 5 和 10 个子步。本批第一次切换探针完成 10 个子步后，因探针把初始声明误作活动 Controller 而失败；修正探针后通过，失败与重试收据保留。GeoPhys、Isaac 原生和完整 Solution 本批未重跑。冻结各轮 diff、计划与收据位于 ignored `workspace/maintenance/v211_switch_physical_final_20261112_9qFC7G/`；E01～E04 仍未接收。

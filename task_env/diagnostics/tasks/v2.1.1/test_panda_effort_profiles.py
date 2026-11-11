@@ -162,3 +162,34 @@ def test_switchable_effort_recording_uses_physical_owner_metadata(monkeypatch, t
         assert 'position_control_binding_provenance' not in metadata['resolved_config']
     finally:
         env.close()
+
+
+def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path):
+    import sys
+    from task_env import make_env
+    from task_env.artifacts.state import CanonicalStatePublicationV2
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
+                      'interpreter': sys.executable},
+        'episode': {'horizon': 8},
+        'controller': {'profile_id': 'panda-r3-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+    })
+    try:
+        solution = env.value['solution_factory']()
+        _, info = env.reset_for_solution(solution, seed=31)
+        assert isinstance(env.typed_state, CanonicalStatePublicationV2)
+        assert not env.position_profile
+        assert 'pickcube_position_execution_info_v1' in info
+        env.start_recording(tmp_path / 'solution.h5')
+        before = env.state.control_step
+        env.step_with_solution(solution)
+        assert env.state.control_step == before + 1
+        assert env.controller is env._physical_reset_selection.current.execution.controllers[0]
+        assert env.session._last_control_submission['status'] == 'acknowledged'
+        receipt = env.finish_recording('external_stop')
+        assert receipt['transition_count'] == 1
+        assert receipt['observation_count'] == 2
+    finally:
+        env.close()

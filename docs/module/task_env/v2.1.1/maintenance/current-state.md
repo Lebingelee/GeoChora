@@ -155,3 +155,5 @@ PickCube 固定 MJCF effort profile 已直接消费 source action 配置并使�
 PickCube MJCF effort 的 Task source、Scene 和 Controller 构造现共享同一 Panda；切换到纯物理 V2 的尝试因录像仍依赖 Position 生命周期而撤回。详见[实施记录 6.69](../planning/post-5c-optimization-execution.md#669-mjcf-panda-source-与物理构造共享-robot)。
 
 可切换 effort 的录像元数据现直接来自物理执行和 source，不再套用 Position 元数据；物理及装配 Position 的 MuJoCo H5 已复验。详见[实施记录 6.70](../planning/post-5c-optimization-execution.md#670-物理控制录像元数据归实际执行-owner)。
+
+PickCube MJCF reset 切换已改用活动物理 Controller 与 V2 状态，切换／H5 和 R3 Solution 单步通过；USD 仍待收敛。详见[实施记录 6.71](../planning/post-5c-optimization-execution.md#671-reset-切换使用实际物理状态与-controller)。

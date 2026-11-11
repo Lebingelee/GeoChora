@@ -73,20 +73,6 @@ def physical_binding_from_config(config):
         cube_force_z_N=force)
 
 
-def _physical_pickcube_observation(env, state):
-    """Keep the task's source EE site distinct from the Panda hand-origin frame."""
-    import numpy as np
-    from ...observations.selected_reference import build_selected_observation
-    obs, info, _ = build_selected_observation(env, state)
-    ee = state.pose_world['panda-v1/ee']
-    obs['state']['ee_pose'] = np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)
-    from ...environment.reference_binding import evaluate_task_definition
-    evaluation = evaluate_task_definition(env, state)
-    info.update(is_success=bool(evaluation.success), task_failure=bool(evaluation.failure),
-                task_metrics=dict(evaluation.metrics))
-    return obs, info, evaluation
-
-
 def _direct_physical_observation_spaces(env):
     """PickCube's existing single-Panda state shape, declared by the task."""
     from collections import OrderedDict
@@ -161,13 +147,10 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                           reset_switch=False, space_policy='dynamic', cube_force_z_N=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...artifacts import FrameReference
-    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
     from ...environment.task_definition import as_task_state_view
-    from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
-    from ...observations.selected_reference import selected_reference_observation_spaces
-    from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
+    from ...environment.reference_binding import ReferenceTaskBinding
     from .specialization import _configuration, build_reference, evaluate
     from .task import PickCubeTaskDefinition
 
@@ -220,13 +203,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
             scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
         reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
-        # Fixed effort Controllers publish their own physical state. Only the
-        # reset-scoped reference route still uses Position task observations.
-        direct_physical = not reset_switch
-        position = (None if direct_physical else
-                    PandaPositionServoProfileV1.from_source(artifact, source, entity_id='panda-v1'))
-        plan = (None if direct_physical else
-                compile_control_binding_plan(scene, (position.controller_binding(),)))
         def build_physical(kind, **parameters):
             if (set(parameters) - {'kp', 'kd', 'finger_kp', 'finger_kd'}
                     or any(type(value) not in (int, float) or not 0. < value <= 5000.
@@ -257,12 +233,11 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         physical = build_physical(control_kind)
         def build(_provider):
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
-                'controller': physical.controllers[0] if direct_physical else position,
+                'controller': physical.controllers[0],
                 'solution': None, 'reset_plan': reset_plan,
                 **({'solution_factory': base['solution_factory'], 'solution_identity': base['solution_identity'],
                     'readiness': base['readiness']} if reset_switch else {}),
-                **({} if reset_switch else {'physical_execution': physical}),
-                **({} if direct_physical else {'controller_binding_plan': plan}),
+                'physical_execution': physical,
                 'construction_id': 'pickcube-mjcf-physical-candidate-v1',
                 'source_revision': base['source_revision'], 'source_sha256': {
                     'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
@@ -316,13 +291,10 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
             task_com_wrench_factory=task_com_factory,
             recorder_mode='execution', reset_seed=fixed_seed, close_task_resources=owned_resources.close,
-            position_control_binding=lambda _value: ControlBinding('panda-v1/gripper', 0.08),
             action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,
-            observation_space_factory=(_direct_physical_observation_spaces if direct_physical
-                                       else selected_reference_observation_spaces),
-            observation_projection=(_direct_physical_observation if direct_physical else
-                                    _physical_pickcube_observation),
+            observation_space_factory=_direct_physical_observation_spaces,
+            observation_projection=_direct_physical_observation,
             build_external=build if reset_switch else None,
             validate_external_solution=_validate_external_readiness_solution if reset_switch else None,
             position_execution_info=physical_execution_info if reset_switch else None,
@@ -333,7 +305,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 declaration=physical))
                 if reset_switch else None,
             physical_action_observer=observe_physical_action if reset_switch else None,
-            physical_observation_binding=None if direct_physical else legacy_position_physical_observation_binding,
-            physical_sequence_v2_observation=direct_physical)
+            physical_sequence_v2_observation=True)
         owned_resources.callback(resources.pop_all().close)
         return binding

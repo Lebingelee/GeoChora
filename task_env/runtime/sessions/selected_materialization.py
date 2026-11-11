@@ -189,7 +189,7 @@ class ScalarRuntimeBuilder:
 def build_selected_runtime(env, selected, selection, start_worker, materialize, materialize_control):
     """Execute one admitted builder, then compose declared physical/state capabilities."""
     source = env.value['source']
-    providers = (env.value.get('physical_execution'),
+    providers = (env._physical_execution(),
                  *selected.position_capabilities[:1], getattr(source, 'mixed_actuator_plan', None),
                  getattr(env.binding, 'scalar_control_binding', None))
     candidates = []
@@ -215,7 +215,9 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
     execution = env._physical_execution()
     if execution is not None:
         declared = env.value.get('physical_execution')
-        if declared is not None and execution is not declared:
+        reset_selection = getattr(env, '_physical_reset_selection', None)
+        if (declared is not None and execution is not declared
+                and (reset_selection is None or declared is not reset_selection.declaration)):
             raise ValueError('physical execution changed after selected preflight')
         bind = getattr(env.session, 'bind_physical_control', None)
         if not callable(bind):
