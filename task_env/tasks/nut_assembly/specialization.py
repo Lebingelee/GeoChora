@@ -10,6 +10,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 import numpy as np
+from ...environment.task_definition import as_task_state_view
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
@@ -635,6 +636,9 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=declaration.sample_reset,
         evaluate=declaration.evaluate,
+        task_definition_factory=lambda artifact: NutAssemblyTaskDefinition.from_artifact(
+            artifact, task_config['recipe']['reset']),
+        task_state_projection=as_task_state_view,
         object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
         external_actions=False, interval_mode="native", recorder_mode="execution",
         external_action_error="selected NutAssembly requires a source-bound ExpertAction; unguarded external actions are not admitted",

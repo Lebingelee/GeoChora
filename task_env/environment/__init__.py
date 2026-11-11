@@ -29,6 +29,7 @@ from .lifecycle import (
 )
 from .task_definition import (
     BatchTaskStateView,
+    CanonicalTaskStateView,
     EpisodeTerminationPolicyV1,
     ScalarTaskStateView,
     TaskBatchEvaluation,
@@ -37,6 +38,7 @@ from .task_definition import (
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
     TaskStateView,
+    TaskStateInput,
     TemporalPredicateRuleV1,
     as_task_state_view,
 )
@@ -154,6 +156,8 @@ __all__ = [
     "SingleTaskResetResult",
     "SingleTaskStepResult",
     "TaskStateView",
+    "TaskStateInput",
+    "CanonicalTaskStateView",
     "TaskBatchEvaluation",
     "BatchTaskStateView",
     "ScalarTaskStateView",

@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 
 import numpy as np
+from ...environment.task_definition import as_task_state_view
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
@@ -82,7 +83,7 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "postclose_hold_s": 0.1,
 }
 
-from .task import semantic_definition, evaluate, sample_reset
+from .task import PickCubeTaskDefinition, semantic_definition, evaluate, sample_reset
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -630,6 +631,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         validate_external_solution=_validate_external_readiness_solution,
         reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
         evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
+        task_definition_factory=PickCubeTaskDefinition.from_artifact,
+        task_state_projection=as_task_state_view,
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True,
         external_solution_actions=True,

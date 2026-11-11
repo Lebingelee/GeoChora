@@ -218,3 +218,34 @@ E01 仍缺 Isaac candidate 与 Position advanced 输入的共同声明／构造�
 | E04 | 新 Position 构造保留共同 interval、双 Controller 与 clock | 其余 action／model／clock 分流审计及 adapter 对账 |
 
 G05 功能接收保持；代码优化和项目优化尚未接收，E00～E04 未完成，不启动 G06。
+
+### 6.4 第五批：正式 TaskDefinition、Solution info 与普通 native interval
+
+输入 `4b0a413a`，继续原目标与单 writer。本批推进 E02 语义构造，并修复实测暴露的 E03／E04 接线；不是将 E00～E04 缩为 TaskDefinition 一项。
+
+- 正式 PickCube（含五种物理配置）、NutAssembly、Pendulum、双轮车都通过现有 `ReferenceTaskBinding.task_definition_factory(artifact)`，在同一 Env 构造 TaskDefinition，观察调用 `TaskLifecycleAdapter`。reset 重建后按当前 binding／Artifact 重新绑定，避免保留旧语义对象。两个简单任务的实际 factory 已迁移一参合同。record metadata 改以真实 external action contract 选择格式，不再以“存在 TaskDefinition”误判成简单任务。
+- 现有 `as_task_state_view` 增加 `CanonicalTaskStateView`，直接引用具名 canonical state；不生成虚构 qpos／body／site 索引，不复制物理状态。数组 consumer 保留原投影。PickCube 的 legacy component 仍使用原 compiled references／scalar admission；canonical 模式由 Artifact 声明，Nut 也继承已有 TaskDefinitionBase。未开启 named batch 或 G06。原 evaluator 兼容函数与新 TaskDefinition 共用同一 `_evaluate_bound`／数值函数；保留 Python tuple／scalar 顺序。
+- 公共 Gym info 中的 `ObservationSchema`／只读 mappings 会被原 Nut Solution 的有限性检查拒绝。已有 metadata owner 现在将它们投影为 callback 值 payload，覆盖 reset／act／observe 的 10 个实际调用点；Gym info 仍保留原类型，字段和数值不删改。Solution guard 未改，NaN 仍被拒绝。
+- 普通已准入 native Source 过去没有安装 live scene interval binding，Nut 因而在施控前被共同提交 owner 拒绝。现在 ScalarRuntimeBuilder 提交实际 native Controller，既有 Runtime adapter 在原 admission 之后安装同一个 legacy source／Controller binding；source 的已声明 closure 必须匹配实际 receipt。安装处不再依据单个 R05c profile 名称分流。原 R05c／R05b exact admission block 按源字节核对未变，source、Artifact、writer、资源、Controller、时钟及重放验证保留；没有删除“缺 live interval 拒绝”的检查，也没有制造 SceneDefinition 或第二个 Runtime。
+
+本批 tracked 变更范围 25 个既有文件，25→25；生产 Python 18 个文件 +204／−82，净 **增加 122 行**；测试 1 个文件 +90；tracked 非测试诊断 0。本窗口累计生产 37 个修改文件 +1,484／−1,330，净 **增加 154 行**。项目 tracked 路径仍 1,365→1,365，新增／删除／迁移均 0。原样跨文件迁移 0 行；同文件抽取 4 行 canonical 输入／评价操作供两个接口共用，不能当作项目行数减少。新增状态适配和两个真实接线修复有成本，不报告性能提升或代码净减。文档与 ignored probe／维护脚本单列于 `implementation-metrics-005.json`。
+
+验证与证据：
+
+- 152 个不同的纯合同节点通过：`task-definition-005-complete.log` 组合通过 152 项，其中 148 项覆盖构造／旧输入／predicate／temporal／shared submission／lifecycle，另有 4 项 source／Task 构造失败清理；最后 `task-definition-005-oracle-final.log` 的 7 项复核包含这些 4 项和已计数的 3 项新语义 oracle，不重复计数。3 条正式构造下的 21 个 canonical 状态逐个比较 reward 浮点位、success／failure、metrics、reward terms，与原 evaluator 一致；正式 observation 的旧 evaluate callback 注入拒绝，证明实际进入新 lifecycle。旧数组 predicate／temporal 检查保持。
+- 五个真实 MuJoCo 3.8.1 CPU 交集通过：Panda R3、装配 Panda R1 split、Pendulum、双轮车、NutAssembly。各 reset→一个非零 interval→第二次 reset→重复 close，核对实际 TaskDefinition owner、重绑、原 record metadata、公共 boundary／clock 与 mj_step 计数。Nut 使用正式 `reset_for_solution`／`step_with_solution`，只执行一个 interval。最终五格共 65 子步，不声称完整 Solution、任务成功或力测量。
+- 本批 10 次锁内 CPU run，含 4 次失败：`cpu-010-nut` typed info 拒绝；`cpu-011-nut` 同问题的字段／身份读回；`cpu-012-nut` 在施控前缺 live scene interval；`cpu-013-nut` 编辑缩进导致 import 失败，观测零子步。修复后 `cpu-014-nut` 通过；`cpu-015-nut` 进一步验证 step 后 Solution failed=False、原 strict receipt 的 requested／completed／samples 均为 5，通过，所有原始失败保留，未关闭原 guard。probe 的私有 `_validate(raw Gym info)` 诊断仍会报告 typed 字段不受旧 Solution 接受；它不是框架 callback，最终 callback 已使用值 payload，raw 中 failed=False／done=False 并完成实际 interval，reader 明确区分。
+- 一个旧 GeoPhys fake-consumer 节点因未配置隔离 interpreter，在 materialization 前失败，未列入通过结论；四个同次 cleanup 节点通过并已复核。该旧 fixture 的配置入口迁移仍需后续处理，不用 fake 结果代替真实 GeoPhys。现有 R05c exact admission block 的输入／当前 SHA 相等由 reader 核对，不据此声称该路线新 native 复跑。
+- 累计受监督 CPU 36 次、290 个可观测子步，含 8 次已保留失败；加前批未锁 pytest 的 150 保守计费为 440／2,000。受监督 native wall_s 合计约 57.97 秒，另计前批 pytest 9.91 秒，小于 900 秒。单次 180 秒、双锁、双线程、8GiB 地址空间、无 GPU／GUI限制不变。没有新 GeoPhys／Isaac、RGB 或完整 Solution 实测。
+
+原始计划 `cpu-run-plan-010.json`～`015.json`、对应 `cpu-010-*`～`cpu-015-*`、最终纯日志、`native-inputs-005-final.json`、`cpu-independent-readback-005.json` 及度量均在同一 ignored 包。reader 只读同次结果，并保存 checkpoint 对应的 36 个输入，不将后续新 run 混入旧统计；不是第二次物理测量。最后共享 canonical 函数抽取／Protocol annotation 不改变受测数值和有效运行路径，按 source diff 与 21 状态 oracle 复用上述运行。
+
+| 事件 | 本批具体成效 | 剩余工作 |
+| --- | --- | --- |
+| E00 | 累计行数、文件数、成功与失败、独立读回继续维护 | 最终完整退出审计与度量 |
+| E01 | 保留共同构造与两个旧 UID 翻译成果 | execution／codec、Isaac 首次重复准备及新 factory native、剩余 Position 输入与 source 管理 |
+| E02 | 正式四类 Task 共用 TaskDefinition 构造／语义 lifecycle，实际 caller 已迁移 | 其余主体／Controller／registry 构建合同逐项对账；advanced diagnostics 不冒充完成 |
+| E03 | reset 语义重绑，typed Gym info 与 Solution payload 职责分明 | 其余 reset／profile／fault／close 审计 |
+| E04 | 普通已准入 native 的真实 source／Controller interval 已接通 | 其余 action／model／clock／部署与 worker adapter 对账，含受影响 GeoPhys／Isaac 范围 |
+
+G05 功能接收保持；优化和 E00～E04 整体仍未接收，不启动 G06，不 merge／push／发布。

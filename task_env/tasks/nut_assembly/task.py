@@ -7,6 +7,7 @@ import numpy as np
 
 from ...artifacts import CanonicalStateView, SemanticDefinition, TaskArtifact
 from ...artifacts.execution import ResetSample
+from ...environment.task_definition import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
 from ...objects.nut_assembly import NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X
 from ...utils.rotation import quat_wxyz_to_matrix
 
@@ -107,7 +108,7 @@ def sample_reset(artifact: TaskArtifact, task_seed: int = 19, *, lift_height_m=N
 
 
 @dataclass(frozen=True)
-class NutAssemblyTaskDefinition:
+class NutAssemblyTaskDefinition(TaskDefinitionBase):
     """Immutable selected reset and evaluation contract bound to an Artifact."""
 
     artifact_hash: str
@@ -117,6 +118,7 @@ class NutAssemblyTaskDefinition:
     velocity_policy: str
     control_policy: str
     settle_steps: int
+    uses_unified_state_view = True
 
     @classmethod
     def from_artifact(cls, artifact: TaskArtifact, reset: dict):
@@ -126,10 +128,17 @@ class NutAssemblyTaskDefinition:
                    reset['sampler_version'], reset['inherited_state_policy'],
                    reset['control_policy'], int(reset['settle_steps']))
 
-    def evaluate(self, state, semantics):
-        if not isinstance(state, CanonicalStateView) or semantics != self.semantics:
+    def reset(self, state, reset_mask=None):
+        return self.evaluate(state)
+
+    def evaluate(self, state, semantics=None, *, action=None, elapsed_steps=None, previous_state=None):
+        view = as_task_state_view(state)
+        if not isinstance(view, CanonicalTaskStateView):
+            raise ValueError('NutAssembly semantics require named canonical state')
+        semantics = self.semantics if semantics is None else semantics
+        if semantics != self.semantics:
             raise ValueError('unsupported canonical NutAssembly state/semantics')
-        return _evaluate_bound(state, semantics)
+        return _evaluate_bound(view.canonical_state, semantics)
 
     def sample_reset(self, artifact, task_seed):
         if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != self.artifact_hash:

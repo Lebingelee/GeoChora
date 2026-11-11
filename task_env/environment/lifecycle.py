@@ -29,6 +29,7 @@ from .task_definition import (
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
     TaskStateView,
+    TaskStateInput,
     TemporalPredicateRuleV1,
     as_task_state_view,
 )
@@ -547,7 +548,7 @@ class TaskLifecycleAdapter:
     def reset_task(
         self,
         *,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         reset_mask: np.ndarray | None = None,
         legacy_snapshot: RuntimeSnapshot | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation:
@@ -585,10 +586,10 @@ class TaskLifecycleAdapter:
     def evaluate_task(
         self,
         *,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         action: Any,
         elapsed_steps: int | np.ndarray,
-        previous_state: RuntimeSnapshot | TaskStateView | None = None,
+        previous_state: TaskStateInput | None = None,
         legacy_previous_snapshot: RuntimeSnapshot | None = None,
         legacy_current_snapshot: RuntimeSnapshot | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation:
@@ -701,7 +702,7 @@ class TaskLifecycleAdapter:
 
     def build_observation(
         self,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
         *,
         fallback: Callable[[], Any] | None = None,
     ) -> Any:
@@ -729,7 +730,7 @@ class TaskLifecycleAdapter:
     def normalize_evaluation(
         self,
         evaluation: Any,
-        state: RuntimeSnapshot | TaskStateView,
+        state: TaskStateInput,
     ) -> TaskEvaluation | TaskBatchEvaluation:
         """Validate and normalize a task result against the state cardinality."""
 

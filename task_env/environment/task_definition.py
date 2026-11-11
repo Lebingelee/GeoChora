@@ -1,9 +1,9 @@
 """Framework-owned task-definition and state-view contracts.
 
 Task definitions describe semantics.  They do not own the scalar or batch
-episode lifecycle.  ``TaskStateView`` is the common value-facing boundary used
-by both runtime paths; scalar and batch implementations differ only in the
-leading batch dimension of their arrays.
+episode lifecycle. Array views retain their scalar/batch dimensions; canonical
+views retain their named joints and Frames. The lifecycle normalizes either
+representation without inventing native indices or copying physical state.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any, ClassVar, Protocol, Sequence, runtime_checkable
 
 import numpy as np
 
-from ..artifacts.contracts import Timebase
+from ..artifacts.contracts import CanonicalStateView, Timebase
 from ..artifacts.state import (
     NativeIntervalEvidence,
     StateBoundaryIdentity,
@@ -55,6 +55,32 @@ class TaskStateView(Protocol):
 
     def get(self, name: str) -> np.ndarray:
         ...
+
+
+@dataclass(frozen=True)
+class CanonicalTaskStateView:
+    """Scalar semantic view of an existing named Runtime state publication.
+
+    Indexed fields are absent. Tasks consuming this representation read its
+    canonical names; array consumers retain their declared projection.
+    """
+
+    canonical_state: CanonicalStateView
+
+    def __post_init__(self):
+        if not isinstance(self.canonical_state, CanonicalStateView):
+            raise TypeError('canonical task view requires CanonicalStateView')
+
+    @property
+    def batch_size(self):
+        return 1
+
+    @property
+    def is_batch(self):
+        return False
+
+
+TaskStateInput = RuntimeSnapshot | TaskStateView | CanonicalTaskStateView | CanonicalStateView
 
 
 @dataclass(frozen=True)
@@ -158,12 +184,12 @@ class TaskEvaluationContextV1:
     or commit task memory.
     """
 
-    state: RuntimeSnapshot | TaskStateView
+    state: TaskStateInput
     requested_action: Any = None
     action_schema_id: str | None = None
     applied_control: AppliedControl | None = None
     elapsed_steps: int | np.ndarray = 0
-    previous_state: RuntimeSnapshot | TaskStateView | None = None
+    previous_state: TaskStateInput | None = None
     timebase: Timebase | None = None
     native_interval: NativeIntervalEvidence | None = None
     boundary_identity: StateBoundaryIdentity | None = None
@@ -571,9 +597,13 @@ class BatchTaskStateView:
         return self._field(str(name))
 
 
-def as_task_state_view(state: RuntimeSnapshot | TaskStateView) -> TaskStateView:
-    """Normalize a scalar runtime snapshot without copying batch state."""
+def as_task_state_view(state: TaskStateInput) -> TaskStateView | CanonicalTaskStateView:
+    """Normalize public Runtime representations without copying their state."""
 
+    if isinstance(state, CanonicalStateView):
+        return CanonicalTaskStateView(state)
+    if isinstance(state, CanonicalTaskStateView):
+        return state
     if isinstance(state, RuntimeSnapshot):
         return ScalarTaskStateView(state)
     if hasattr(state, "arrays") and hasattr(state, "num_envs"):
@@ -589,9 +619,10 @@ class TaskDefinitionBase:
     A task definition may specialize the native action adapter or observation
     builder after compiled references are available.  The environment class
     itself does not need task-specific binding hooks.  A unified task
-    definition sets ``uses_unified_state_view = True`` and implements one
-    ``reset`` plus one ``evaluate`` method that consume ``TaskStateView``;
-    those methods are called for both scalar and batch execution.
+    definition declares ``uses_unified_state_view = True`` for its bound state
+    representation and implements ``reset`` plus ``evaluate``. Array consumers
+    receive TaskStateView; named consumers receive CanonicalTaskStateView.
+    Batch semantics still require a task's explicit implementation/admission.
     """
 
     uses_unified_state_view = False

@@ -1725,21 +1725,20 @@ def materialize_control(
                     f'{type(cleanup_error).__name__}: {cleanup_error}'
                 )
             raise
-    if native_feedback_profile is not None:
-        from .r05c_v211_candidate import PROFILE_ID as candidate_profile
-        if native_feedback_profile == candidate_profile:
+    if (selected_controller is not None
+            and getattr(source, 'position_subject_binding', None) is None):
+        try:
+            from .legacy_native_feedback_binding import install_admitted_binding
+            install_admitted_binding(session, source=source, artifact=artifact,
+                                     controller=selected_controller)
+        except BaseException as admission_error:
             try:
-                from .legacy_native_feedback_binding import install_admitted_binding
-                install_admitted_binding(session, source=source, artifact=artifact,
-                                         controller=selected_controller)
-            except BaseException as admission_error:
-                try:
-                    session.close()
-                except BaseException as cleanup_error:
-                    admission_error.add_note(
-                        f'legacy native feedback cleanup after binding failure also failed: {cleanup_error!r}'
-                    )
-                raise
+                session.close()
+            except BaseException as cleanup_error:
+                admission_error.add_note(
+                    f'legacy native feedback cleanup after binding failure also failed: {cleanup_error!r}'
+                )
+            raise
     session._control_binding = binding
     if controller_binding_plan is not None:
         force_required = any(

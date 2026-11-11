@@ -2090,7 +2090,7 @@
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
     "current_step": "E00-E04",
-    "next_step": "Canonical execution/configuration and Panda/Nut TaskDefinition migration; affected Isaac native verification and remaining E03/E04 audits",
+    "next_step": "Canonical execution/configuration, remaining subject/registry and reset/control/deployment audit; duplicate Isaac initial compilation and affected native factory verification",
     "implementation_attempt_count": 1,
     "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
     "implementation_package_dispatched": false,
@@ -2105,25 +2105,29 @@
     "events": {
       "E00": "BASELINE_RECORDED",
       "E01": "IMPLEMENTING_COMMON_DECLARED_CONSTRUCTION_AND_TWO_LEGACY_UIDS_MIGRATED",
-      "E02": "IMPLEMENTING_FOUR_SUBJECT_VIEW_AND_SIMPLE_TASK_LIFECYCLE_VERIFIED",
-      "E03": "IMPLEMENTING_SINGLE_CONSTRUCTION_FAILURE_OWNER_VERIFIED",
-      "E04": "IMPLEMENTING_PORT_ASSESSMENT_AND_MODEL_CAPABILITY_VERIFIED"
+      "E02": "IMPLEMENTING_FORMAL_TASKDEFINITION_COMMON_OWNER_AND_FOUR_SUBJECT_VIEW_VERIFIED",
+      "E03": "IMPLEMENTING_TYPED_INFO_SOLUTION_PAYLOAD_AND_RESET_SEMANTIC_REBIND_VERIFIED",
+      "E04": "IMPLEMENTING_ORDINARY_NATIVE_LIVE_SOURCE_CONTROLLER_INTERVAL_VERIFIED"
     },
     "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
     "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
-    "event_native_cpu_runs": 26,
-    "event_native_substeps": 220,
+    "event_native_cpu_runs": 36,
+    "event_native_substeps": 290,
     "event_implementation_complete": false,
-    "event_native_cpu_failed_runs": 4,
-    "event_native_failure_reason": "Four preserved failures across the window: sampler oracle precision, constructor/port assessment, nominal R3 model capability, stale-action probe recovery contract. Repairs and final passing evidence are in execution section 6.",
-    "latest_increment_input_head": "a382cf96d2b0ddcd7b4b43b66b8ae8d083bfda14",
-    "latest_increment_pure_unique_nodes": 127,
-    "latest_increment_evidence": "implementation-metrics-004.json; cpu-independent-readback-004.json",
+    "event_native_cpu_failed_runs": 8,
+    "event_native_failure_reason": "Eight preserved failures across the CPU window; the latest four are typed info rejected by Solution at reset (twice, including readback), ordinary native route lacking a live interval binding, and a zero-step edited-module indentation/import failure. Final affected intersections pass; no full Solution claim.",
+    "latest_increment_input_head": "4b0a413a13016463baa06e91c846925816442260",
+    "latest_increment_pure_unique_nodes": 152,
+    "latest_increment_evidence": "implementation-metrics-005.json; cpu-independent-readback-005.json",
     "event_native_failure_summaries": [
       "cpu-002-pendulum: independent oracle float64 vs declared float32; production sampler unchanged",
       "cpu-004-joint: assessment did not compose Position constructor owner with physical port; owner checks repaired",
       "cpu-005-pose: R3 wrapper incorrectly exposed dynamic-model binding for nominal servo; capability forwarding repaired",
-      "cpu-006-reset-selection: probe continued after deliberate stale-action fault; explicit-reset oracle recovery corrected, production fault behavior unchanged"
+      "cpu-006-reset-selection: probe continued after deliberate stale-action fault; explicit-reset oracle recovery corrected, production fault behavior unchanged",
+      "cpu-010-nut: public typed info rejected by original Solution finite guard before step",
+      "cpu-011-nut: exact input type/identity readback confirms typed info rejection",
+      "cpu-012-nut: ordinary admitted native source lacks live scene interval binding; actual Controller/source installation repaired",
+      "cpu-013-nut: edited control module indentation/import failure, observed zero native steps; AST repair before cpu-014 pass"
     ],
     "event_unlocked_pytest_reset_exception": {
       "failed_nodes": 3,
@@ -2132,6 +2136,6 @@
       "raw_log": "shared-binding-004.log",
       "scope": "One mistakenly selected real MuJoCo pytest process; failed before normal step. Not passing evidence; corrected through supervised locked probes."
     },
-    "event_cumulative_physics_budget_charge_substeps": 370
+    "event_cumulative_physics_budget_charge_substeps": 440
   }
 }

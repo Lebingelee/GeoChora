@@ -10,7 +10,7 @@ from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...environment import (RuntimeSnapshot, TaskEvaluation, TaskEvaluationContextV1,
                             TaskPredicateEvaluationV1, TaskPredicateResultV1)
-from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
+from ...environment.task_definition import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
 from ...objects.pick_cube import CUBE_HALF_SIZE
 
 EEF = "panda-v1/ee"
@@ -68,6 +68,11 @@ def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = N
     semantics = expected if semantics is None else semantics
     if semantics != expected:
         raise ValueError("unsupported PickCube semantic definition")
+    return _evaluate_bound(state, semantics)
+
+
+def _evaluate_bound(state, semantics):
+    """Evaluate canonical task inputs in their historical scalar order."""
     semantics.require_state(state)
     gripper_opening = sum(state.joint_position[name] for name in FINGERS)
     return _evaluate_values(state.pose_world["cube-v1"].position,
@@ -78,26 +83,45 @@ def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = N
 class PickCubeTaskDefinition(TaskDefinitionBase):
     """Core Task Definition using the same measured lift predicate as the Artifact."""
 
-    references: TaskReferences
+    references: TaskReferences | None = None
     success_definition: str = "cube_lifted_v1"
+    semantics: SemanticDefinition | None = None
+    @property
+    def uses_unified_state_view(self):
+        return self.semantics is not None
+
+    @classmethod
+    def from_artifact(cls, artifact):
+        if artifact.semantics.evaluator != 'pick_cube_lift_v0':
+            raise ValueError('PickCube TaskDefinition requires its semantic Artifact')
+        return cls(success_definition=artifact.semantics.success_definition, semantics=artifact.semantics)
 
     def __post_init__(self):
         if self.success_definition != _recipe()["success_definition"]:
             raise ValueError("unsupported PickCube success definition")
-        if "panda-v1" not in self.references.agents or "cube-v1" not in self.references.objects:
+        if self.references is None:
+            if self.semantics is None or self.semantics.evaluator != 'pick_cube_lift_v0':
+                raise ValueError('named PickCube TaskDefinition requires its Artifact semantics')
+        elif "panda-v1" not in self.references.agents or "cube-v1" not in self.references.objects:
             raise KeyError("PickCube Task Definition requires panda-v1 and cube-v1 references")
 
-    def reset(self, snapshot: RuntimeSnapshot) -> TaskEvaluation:
-        return self._evaluate_snapshot(snapshot)
+    def reset(self, state, reset_mask=None) -> TaskEvaluation:
+        return self._evaluate_snapshot(state)
 
-    def evaluate(self, previous_snapshot, action, current_snapshot) -> TaskEvaluation:
-        del previous_snapshot, action
-        return self._evaluate_snapshot(current_snapshot)
+    def evaluate(self, previous_snapshot=None, action=None, current_snapshot=None, *,
+                 state=None, elapsed_steps=None, previous_state=None) -> TaskEvaluation:
+        return self._evaluate_snapshot(current_snapshot if state is None else state)
 
     def _evaluate_snapshot(self, snapshot):
         return self._evaluate_state_view(as_task_state_view(snapshot))
 
     def _evaluate_state_view(self, state, *, batch_index=None):
+        if isinstance(state, CanonicalTaskStateView):
+            if self.semantics is None:
+                raise ValueError('named PickCube state requires Artifact-bound semantics')
+            return _evaluate_bound(state.canonical_state, self.semantics)
+        if self.references is None:
+            raise ValueError('indexed PickCube state requires compiled TaskReferences')
         panda = self.references.agents["panda-v1"]
         cube_ref = self.references.objects["cube-v1"]
         if state.site_xpos is None or state.body_xpos is None:
@@ -122,7 +146,14 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         if not isinstance(context, TaskEvaluationContextV1):
             raise TypeError("PickCube predicates require TaskEvaluationContextV1")
         state = context.state
-        if state.body_xpos is None or state.site_xpos is None:
+        if isinstance(state, CanonicalTaskStateView):
+            canonical = state.canonical_state
+            unavailable = (self.semantics is None
+                or not set(self.semantics.required_poses) <= set(canonical.pose_world)
+                or not set(self.semantics.required_joints) <= set(canonical.joint_position))
+        else:
+            unavailable = state.body_xpos is None or state.site_xpos is None
+        if unavailable:
             return TaskPredicateEvaluationV1.available(
                 {
                     "cube_lifted": TaskPredicateResultV1.unavailable(

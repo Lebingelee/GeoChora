@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Protocol
 
 import numpy as np
 
-from .task_definition import TaskBatchEvaluation, TaskStateView
+from .task_definition import CanonicalTaskStateView, TaskBatchEvaluation, TaskStateView
 from .types import (
     AppliedControl,
     AssetManifest,
@@ -149,7 +149,7 @@ class SensorProvider(Protocol):
 
 
 class TaskDefinition(Protocol):
-    """任务语义边界；同时消费 scalar/batch ``TaskStateView``。"""
+    """任务语义边界；消费声明的索引数组或具名 canonical state view。"""
 
     uses_unified_state_view: bool
     device_state_required_fields: tuple[str, ...]
@@ -158,15 +158,15 @@ class TaskDefinition(Protocol):
     def reset(
         self,
         *,
-        state: TaskStateView,
+        state: TaskStateView | CanonicalTaskStateView,
         reset_mask: np.ndarray | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation: ...
 
     def evaluate(
         self,
         *,
-        state: TaskStateView,
+        state: TaskStateView | CanonicalTaskStateView,
         action: Any,
         elapsed_steps: int | np.ndarray,
-        previous_state: TaskStateView | None = None,
+        previous_state: TaskStateView | CanonicalTaskStateView | None = None,
     ) -> TaskEvaluation | TaskBatchEvaluation: ...

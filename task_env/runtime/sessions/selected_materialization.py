@@ -205,7 +205,8 @@ class ScalarRuntimeBuilder:
             binding=self.binding,
             diagnostic_profile=(env._diagnostic_profile if env.backend == 'cuda' else None),
             native_feedback_profile=env._native_feedback_profile,
-            selected_controller=(env.controller if env._native_feedback_profile is not None else None),
+            selected_controller=(env.controller if env.binding.interval_mode == 'native'
+                                 or env._native_feedback_profile is not None else None),
             native_feedback_gripper_control_hz=(env.value['resolved_configuration'].get('gripper_control_hz')
                 if env._native_feedback_profile is not None else None))
         return RuntimeBuildResult()

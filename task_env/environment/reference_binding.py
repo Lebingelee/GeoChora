@@ -312,13 +312,20 @@ def validate_initial_state_publication(session, publication, state):
     return publication
 
 
+def evaluate_task_definition(env, state, *, action=None, task_state=None):
+    """Evaluate a declared TaskDefinition through the common semantic lifecycle."""
+    if env.binding.task_definition_factory is None:
+        return env.binding.evaluate(state, env.artifact.semantics)
+    snapshot = env.binding.task_state_projection(state) if task_state is None else task_state
+    lifecycle = env._task_lifecycle
+    return (lifecycle.reset_task(state=snapshot) if state.control_step == 0
+            else lifecycle.evaluate_task(state=snapshot, action=action, elapsed_steps=state.control_step))
+
+
 def observe_task_definition(env, state):
     """Project public Runtime state into the existing TaskDefinition lifecycle."""
     snapshot = env.binding.task_state_projection(state)
-    lifecycle = env._task_lifecycle
-    evaluation = (lifecycle.reset_task(state=snapshot) if state.control_step == 0
-                  else lifecycle.evaluate_task(state=snapshot, action=env.controller.last_action,
-                                               elapsed_steps=state.control_step))
+    evaluation = evaluate_task_definition(env, state, action=env.controller.last_action, task_state=snapshot)
     observation = env._task_definition.build_observation(snapshot)
     return observation, {
         'is_success': evaluation.success, 'task_failure': evaluation.failure,
@@ -410,9 +417,8 @@ class ReferenceTaskBinding:
         if any(value is not None for value in sampling) and not all(map(callable, sampling)):
             raise ValueError('sampled reset requires construction, RNG sampler and metadata projection')
         semantics = (self.task_definition_factory, self.task_state_projection)
-        if any(value is not None for value in semantics) and (
-                not all(map(callable, semantics)) or self.task_observation_schema is None):
-            raise ValueError('TaskDefinition requires construction, state projection and observation schema')
+        if any(value is not None for value in semantics) and not all(map(callable, semantics)):
+            raise ValueError('TaskDefinition requires construction and state projection')
         if self.task_com_wrench_factory is not None and not callable(self.task_com_wrench_factory):
             raise TypeError('Task COM wrench factory must be callable')
         if type(self.physical_direct_effort_feedback) is not bool:

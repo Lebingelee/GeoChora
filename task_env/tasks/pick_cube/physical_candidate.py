@@ -116,7 +116,8 @@ def _physical_pickcube_observation(env, state):
     obs, info, _ = build_selected_observation(env, state)
     ee = state.pose_world['panda-v1/ee']
     obs['state']['ee_pose'] = np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)
-    evaluation = env.binding.evaluate(state, env.artifact.semantics)
+    from ...environment.reference_binding import evaluate_task_definition
+    evaluation = evaluate_task_definition(env, state)
     info.update(is_success=bool(evaluation.success), task_failure=bool(evaluation.failure),
                 task_metrics=dict(evaluation.metrics))
     return obs, info, evaluation
@@ -158,7 +159,8 @@ def _direct_physical_observation(env, state):
         joint_velocity={**state.joint_velocity, **{f'panda-v1/{n}': float(joints[n].velocity[0]) for n in names}},
         pose_world=dict(state.pose_world),
     )
-    evaluation = env.binding.evaluate(adapted, env.artifact.semantics)
+    from ...environment.reference_binding import evaluate_task_definition
+    evaluation = evaluate_task_definition(env, adapted)
     site = state.pose_world['panda-v1/ee']
     pose = np.asarray((*site.position, *site.quaternion_wxyz), dtype=np.float32)
     hand_pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
@@ -253,11 +255,13 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
     from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
+    from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
     from ...observations.selected_reference import selected_reference_observation_spaces
     from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
     from ..position_candidate.physical_profile import build_panda_direct_effort_execution
     from .specialization import _configuration, build_reference, evaluate
+    from .task import PickCubeTaskDefinition
 
     task_config = _configuration()
     base = build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
@@ -405,6 +409,8 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
         owned_resources = ExitStack()
         binding = ReferenceTaskBinding(build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
             evaluate=lambda state, semantics: evaluate(state, semantics),
+            task_definition_factory=PickCubeTaskDefinition.from_artifact,
+            task_state_projection=as_task_state_view,
             object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
             task_com_wrench_factory=task_com_factory,
             recorder_mode='execution', reset_seed=fixed_seed, close_task_resources=owned_resources.close,

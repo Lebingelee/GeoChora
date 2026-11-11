@@ -13,6 +13,96 @@ from task_env.runtime.sessions.physical_control import (
 )
 
 
+def test_solution_info_payload_preserves_typed_gym_schema_and_nonfinite_rejection():
+    from types import MappingProxyType
+    from task_env.environment import ObservationSchema, ObservationFieldSpec
+    from task_env.environment.metadata import task_info_for_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+    schema = ObservationSchema('task-state-v1', (
+        ObservationFieldSpec('state.angle', (1,), 'float32'),))
+    info = {'observation_schema': schema,
+            'task_metrics': MappingProxyType({'height_m': .3}),
+            'reward_terms': MappingProxyType({'reach': .1})}
+    payload = task_info_for_solution(info)
+    assert info['observation_schema'] is schema
+    assert isinstance(info['task_metrics'], MappingProxyType)
+    assert payload['observation_schema']['version'] == schema.version
+    assert payload['task_metrics'] == {'height_m': .3}
+    assert NutAssemblyOutcomeSolutionV1._finite(payload)
+    invalid = {**info, 'task_metrics': MappingProxyType({'height_m': float('nan')})}
+    assert not NutAssemblyOutcomeSolutionV1._finite(task_info_for_solution(invalid))
+
+
+def test_admitted_legacy_interval_binds_declared_snapshot_and_rejects_wrong_closure():
+    from task_env import make_env
+    from task_env.runtime.sessions.legacy_native_feedback_binding import install_admitted_binding
+    env = make_env('nut-assembly-outcome-reference-v1', config={'provider': 'mujoco'})
+    try:
+        source = env.value['source']
+        session = SimpleNamespace(_source=source, _artifact=env.artifact,
+                                  provider_materialization_id='test-materialization')
+        install_admitted_binding(session, source=source, artifact=env.artifact, controller=env.controller)
+        bound = session._legacy_native_feedback_binding
+        assert bound.source_closure_sha256 == source.source_closure_digest
+        assert bound._source is source and bound._controller is env.controller
+        bound.validate_live(session)
+        bad_source = SimpleNamespace(**{**vars(source), 'source_closure_digest': 'f' * 64})
+        bad_session = SimpleNamespace(_source=bad_source, _artifact=env.artifact,
+                                      provider_materialization_id='test-materialization')
+        with pytest.raises(ValueError, match='admitted source receipt'):
+            install_admitted_binding(bad_session, source=bad_source,
+                                     artifact=env.artifact, controller=env.controller)
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('uid,config', [
+    ('pick-cube-p16-reference-v1', {'controller': {'profile_id': 'r1'}}),
+    ('pick-cube-p16-reference-v1', {'controller': {'profile_id': 'r3_continuous_v1'},
+                                  'task': {'lift_height_m': .08}}),
+    ('nut-assembly-outcome-reference-v1', {'task': {'lift_height_m': .07}})])
+def test_formal_task_definition_owns_evaluation_with_exact_reward_oracle(uid, config):
+    from task_env import make_env
+    from task_env.artifacts import CanonicalStateView, PoseWorld
+    from task_env.environment import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
+    from task_env.tasks.pick_cube import task as pick
+    from task_env.tasks.nut_assembly import task as nut
+    env = make_env(uid, config={'provider': 'mujoco', **config})
+    try:
+        definition = env._task_definition
+        assert isinstance(definition, TaskDefinitionBase)
+        assert env._task_lifecycle.task_definition is definition
+        assert definition.semantics is env.artifact.semantics
+        module = pick if uid.startswith('pick-cube') else nut
+        joints = dict(env.artifact.initialization.joint_position)
+        poses = {name: env.artifact.initialization.poses_world.get(
+            name, PoseWorld((.51, .02, .43), (1., 0., 0., 0.)))
+            for name in env.artifact.semantics.required_poses}
+        def forbidden_legacy_evaluator(*_args):
+            raise AssertionError('formal observation bypassed TaskDefinition lifecycle')
+        env.binding = replace(env.binding, evaluate=forbidden_legacy_evaluator)
+        for index in range(7):
+            joints['panda-v1/finger_joint1'] = .003 + index * .005
+            joints['panda-v1/finger_joint2'] = .004 + index * .004
+            state = CanonicalStateView('canonical-state-v0', 'SI_right_handed_z_up_wxyz',
+                index, index * env.artifact.timebase.control_dt, dict(joints),
+                {name: 0. for name in joints}, poses)
+            view = as_task_state_view(state)
+            assert isinstance(view, CanonicalTaskStateView) and view.canonical_state is state
+            assert as_task_state_view(view) is view and not hasattr(view, 'qpos')
+            expected = module.evaluate(state, env.artifact.semantics,
+                lift_height_m=config.get('task', {}).get('lift_height_m'))
+            _obs, _info, actual = env.observation(state)
+            assert actual.reward.hex() == expected.reward.hex()
+            assert actual.success == expected.success and actual.failure == expected.failure
+            assert dict(actual.metrics) == dict(expected.metrics)
+            assert dict(actual.reward_terms) == dict(expected.reward_terms)
+        metadata = env.get_record_metadata()
+        assert 'universal_action_schema' not in metadata
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('early_failure', [False, True])
 def test_common_construction_compiles_once_with_declared_seed_and_cleans_failure(early_failure):
     from task_env.environment.reference_env import SelectedReferenceEnv

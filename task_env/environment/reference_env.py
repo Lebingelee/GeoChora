@@ -27,6 +27,7 @@ from .protocols import TaskEnvironmentComponent
 from .gym_compat import GymEnvBase
 from .configuration import resolve_env_config, resolve_execution_plan
 from .config import ResolvedEnvConfig
+from .metadata import task_info_for_solution
 from .metadata import TaskEnvMetadata, build_stage0_metadata, gym_metadata_dict, validate_task_info
 from ..registry import AGENT_REGISTRY, OBJECT_REGISTRY, SCENE_REGISTRY
 from .reference_binding import ReferenceTaskBinding
@@ -1450,6 +1451,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._build_runtime_with_rollback()
 
 
+    def _bind_selected_task_definition(self):
+        """Bind semantics to the current Artifact at construction or reset."""
+        factory = self.binding.task_definition_factory
+        self._task_definition = None if factory is None else factory(self.artifact)
+        self._task_lifecycle = (None if factory is None else TaskLifecycleAdapter(
+            task_definition=self._task_definition, horizon=self.horizon,
+            ignore_done=self.binding.physical_ignore_done))
+
     def _initialize_selected_value(self, *, mixed_control_candidate, camera_observation_config):
         """Initialize task-declared metadata before the selected Env is published."""
         self.artifact = self.value['artifact']
@@ -1457,10 +1466,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self.binding.physical_reset_selection_factory is not None:
             self._physical_reset_selection = self.binding.physical_reset_selection_factory()
         self._bind_selected_controller(self.value)
-        if self.binding.task_definition_factory is not None:
-            self._task_definition = self.binding.task_definition_factory()
-            self._task_lifecycle = TaskLifecycleAdapter(task_definition=self._task_definition,
-                horizon=self.horizon, ignore_done=self.binding.physical_ignore_done)
+        self._bind_selected_task_definition()
         self.dual_entity_position = len(self.position_profiles) == 2
         if (not self.position_profile and not mixed_control_candidate
                 and self.binding.physical_control_profile is None):
@@ -2159,6 +2165,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
+            self._bind_selected_task_definition()
             if deployment_receipt is not None:
                 from ..runtime.sessions.api import assess_selected_request
                 from ..runtime.sessions.provenance import describe_execution_selection
@@ -2433,7 +2440,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             reset_solution = external_solution if external_solution is not None else self.solution
             if reset_solution is not None and not defer_task_rgb:
                 failure_phase = 'solution_reset'
-                reset_solution.reset(self.obs, self.info, self.metadata,
+                reset_solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
             return self.obs
 
@@ -2493,7 +2500,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             validate_task_info(self.info, phase='reset')
             if reset_solution is not None:
                 failure_phase = 'solution_reset'
-                reset_solution.reset(self.obs, self.info, self.metadata,
+                reset_solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
                                      **self.binding.reset_expert_kwargs(self))
             return self.obs, self.info
 
@@ -3389,7 +3396,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._episode_mode = 'external_solution' if proposal is not None else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
             if proposal is not None:
-                observer_solution.observe(self.obs, float(self.evaluation.reward), terminated, truncated, self.info)
+                observer_solution.observe(self.obs, float(self.evaluation.reward), terminated, truncated, task_info_for_solution(self.info))
                 self.info.update(selected_policy_execution_complete=bool(observer_solution.done),
                                  selected_policy_execution_failed=bool(observer_solution.failed),
                                  expert_failure_reason=observer_solution.failure_reason)
@@ -3574,7 +3581,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise TypeError('mixed Solution observation kwargs must be a mapping')
                 observer_solution.observe(
                     self.obs, float(self.evaluation.reward), bool(self.evaluation.failure),
-                    bool(self.state.control_step >= self.horizon), self.info, **dict(extra),
+                    bool(self.state.control_step >= self.horizon), task_info_for_solution(self.info), **dict(extra),
                 )
                 if hasattr(observer_solution, 'outcome_report'):
                     report = observer_solution.outcome_report()
@@ -3673,7 +3680,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise ValueError('the selected Solution requires the R3 pose input spec')
             from ..planners.contracts import ExpertAction, validate_caller_solution_action
             try:
-                proposal = solution.act(self.obs, self.info)
+                proposal = solution.act(self.obs, task_info_for_solution(self.info))
                 if type(proposal) is not ExpertAction:
                     raise TypeError('physical external Solution must return ExpertAction')
                 validate_caller_solution_action(proposal,
@@ -3690,7 +3697,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self._episode_execution_state().execute_interval(**operations)
         if getattr(self, 'mixed_control_profile', False):
             try:
-                proposal = solution.act(self.obs, self.info)
+                proposal = solution.act(self.obs, task_info_for_solution(self.info))
                 from ..planners.contracts import ExpertAction
                 if type(proposal) is not ExpertAction:
                     raise TypeError('mixed external Solution act() must return ExpertAction')
@@ -3713,7 +3720,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._latch_fault('public_execution_readiness', error, before_state=self.state)
             raise
         try:
-            proposal = solution.act(self.obs, self.info)
+            proposal = solution.act(self.obs, task_info_for_solution(self.info))
             from ..planners.contracts import ExpertAction
             if not isinstance(proposal, ExpertAction):
                 raise TypeError('external Solution act() must return ExpertAction')
@@ -4201,7 +4208,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('constructed Solution identity differs from compiled task')
                 if self._native_feedback_profile is not None:
                     self.binding.validate_external_solution(self.value, solution)
-                solution.reset(self.obs, self.info, self.metadata,
+                solution.reset(self.obs, task_info_for_solution(self.info), self.metadata,
                                **self.binding.reset_expert_kwargs(self))
             except BaseException as error:
                 self._latch_fault('solution_reset', error, before_state=self.state)
@@ -4233,7 +4240,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self._latch_fault('public_execution_readiness', error, before_state=self.state)
                 raise
         try:
-            proposal = (self.solution.act(self.obs, self.info)
+            proposal = (self.solution.act(self.obs, task_info_for_solution(self.info))
                         if self.binding.expert_uses_public_observation
                         else self.solution.act())
         except BaseException as error:
@@ -4524,7 +4531,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                          if interval_receipt is not None
                          else self.binding.observe_expert_kwargs(self, native_samples))
                 observer_solution.observe(
-                    self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra,
+                    self.obs, self.evaluation.reward, terminated, truncated, task_info_for_solution(self.info), **extra,
                 )
                 if hasattr(observer_solution, 'outcome_report'):
                     self.info.update(observer_solution.outcome_report())
@@ -5162,7 +5169,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Return the task-owned JSON-safe metadata for the mixed-control Recorder."""
         if self._has_component_assembly():
             return {**self._component_record_metadata(), 'execution_configuration_v1': self.get_execution_receipt()}
-        if self.binding.task_definition_factory is not None:
+        if self.binding.external_action_contract is not None:
             schema = {key: value for key, value in self.binding.action_schema.items()
                       if key not in {'low', 'high'}}
             return {'env_metadata': {**self.metadata, 'action_schema': schema},

@@ -56,6 +56,8 @@ finally:
 
 旧 `pickcube-physical-candidate-v1` 仍接收原字段，但只翻译到上述正式配置，并返回 `PickCubeReferenceEnv`／正式 `env.uid`；不再保证返回旧 candidate 类。原显式 `source_workspace` 是高级兼容输入，其 `source-snapshot` 继续 caller-owned；普通构造自动管理并在 close／失败时释放自有快照。历史 construction_id／Artifact／source identity 不因入口迁移而被改名。旧 `pickcube-isaac-physical-candidate-v1` 也只翻译原字段到正式 PickCube factory；五种 physical profile 的声明可使用 `execution.physics_provider="isaacsim"`／`physics_backend="cuda"`／`physics_device="cuda:0"` 与原显式 `source_delivery_manifest`，仍限 in-process、原 drive fixture 和 1～1000 horizon，未开启 reset selection／MJCF source workspace。App 准备由 Runtime 执行。本轮验证输入和清理合同，尚未为新正式 Isaac factory 取得原生复验结论。Position 的中性／typed source 编译器返回 binding 声明，旧结果 bundle 经共同 Env 构造，保留原 Artifact、UID 及能力边界；它不会被替换成 PickCube Task。详见[实施记录 6.3](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 
+正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录 6.4](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 
 公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `task.controller_profile="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。

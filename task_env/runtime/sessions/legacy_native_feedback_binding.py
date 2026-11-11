@@ -1,7 +1,7 @@
 """Admitted legacy native-feedback source and Controller ownership.
 
-This binding is installed only after the existing exact native-feedback
-admission. It does not turn a legacy Artifact into a SceneDefinition.
+This binding is installed after the existing scalar/native-feedback admission.
+It does not turn a legacy Artifact into a SceneDefinition or grant admission.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -60,7 +60,7 @@ def install_admitted_binding(session, *, source, artifact, controller):
     from .source import ExecutionSourceReceiptV1
     receipt = source.execution_source_receipt
     if (type(receipt) is not ExecutionSourceReceiptV1 or session._source is not source
-            or source.source_closure_digest is not None
+            or source.source_closure_digest not in (None, receipt.source_closure_digest)
             or receipt.source_id != source.source_id
             or source.task_artifact_hash != artifact.identity_hash
             or not source.joint_targets or not source.open_actuators):

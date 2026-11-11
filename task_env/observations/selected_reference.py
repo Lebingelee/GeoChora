@@ -7,6 +7,7 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..artifacts import CanonicalStateView
+from ..environment.reference_binding import evaluate_task_definition
 
 
 def switch_observation_space():
@@ -199,7 +200,7 @@ def build_selected_observation(self, state):
         return dict(obs), dict(info), evaluation
     if getattr(self, 'position_profile', False):
         if getattr(self, 'leaf_position_profile', False):
-            evaluation = self.binding.evaluate(state, self.artifact.semantics)
+            evaluation = evaluate_task_definition(self, state)
             frame_values = {
                 (item.frame.entity_id, item.frame.frame_id): item
                 for item in self.typed_state.view.frames
@@ -212,10 +213,10 @@ def build_selected_observation(self, state):
         else:
             adapted = self.controller._adapt_publication(self.typed_state)
             evaluation_state = _position_task_evaluation_state(state, adapted)
-            evaluation = self.binding.evaluate(evaluation_state, self.artifact.semantics)
+            evaluation = evaluate_task_definition(self, evaluation_state)
             ee = adapted.pose_world['panda-v1/ee']
     else:
-        evaluation = self.binding.evaluate(state, self.artifact.semantics)
+        evaluation = evaluate_task_definition(self, state)
         ee = state.pose_world['panda-v1/ee']
     state_obs = {'ee_pose': np.array((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)}
     obs = {'state': state_obs, 'privileged_state': {}}

@@ -221,7 +221,7 @@ def task_binding(config, *, provider, backend, source_delivery_manifest=None):
     def space():
         return Dict({'torque': Box(-2., 2., (1,), dtype=np.float32)})
     sample_reset = PENDULUM_TASK_SEMANTICS.sample_reset
-    task_definition = lambda: PendulumTaskDefinition(qpos_id=0, qvel_id=0)
+    task_definition = lambda _artifact: PendulumTaskDefinition(qpos_id=0, qvel_id=0)
     observation_schema = PendulumObservationBuilder(qpos_id=0, qvel_id=0).schema
     return ReferenceTaskBinding(build=lambda _provider: _build(
         config, 31, provider=provider, source_delivery_manifest=source_delivery_manifest),

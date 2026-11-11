@@ -226,7 +226,7 @@ def task_binding(config, *, provider, backend, source_delivery_manifest=None):
         if type(seed) is not int or seed < 0:
             raise ValueError('seed must be a nonnegative integer')
         return seed
-    task_definition = lambda: TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2)
+    task_definition = lambda _artifact: TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2)
     observation_schema = TwoWheelBalanceObservationBuilder(
         joint_ids={'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}).schema
     return ReferenceTaskBinding(build=lambda _provider: _build(
