@@ -534,3 +534,11 @@ MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller�
 生产修改 3 文件 +45／−42，净增 3 行；版本诊断修改 1 文件 +9／−1；实施和当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。32 项版本纯合同通过，包括 Robot／Scene 关节不一致拒绝。无 revision 和指定 revision 两种情况下，两任务的 Task Source identity、Artifact identity 和完整 mapping 与输入版本相同。
 
 两任务 MuJoCo CPU 均完成 reset、非零 action、第二次 reset 和 close，各观测 25 子步；与上轮同 seed 的 Robot、Scene、reset sample 身份及单步奖励一致。GeoPhys、Isaac、renderer 本批未重跑；两种 revision 的静态身份一致可作为评估旧有界证据的依据，不能替代本批 native 复验。计划、冻结 diff 和对照位于 ignored `workspace/maintenance/v211_simple_task_declaration_20261112_001/`。E01～E04 仍未完成。
+
+### 6.36 简单主体 joint-effort reset 合同归并
+
+输入 `0607109d`。Pendulum／双轮车继续各自定义采样分布和 joint 值，Task Source owner 统一将这些值编译为 source-bound joint-effort ResetSample／ResetPlan，包括随机样本 identity、初始化顺序和物理控制策略。两个 Task 文件不再分别复制相同 reset 合同；该入口明确限定 joint-effort，不声称已经替代 tabletop 的 reset 语义或全部 Env 生命周期。
+
+生产修改 3 文件 +28／−33，净减 5 行；版本诊断无改动，实施和当前状态文档 2 文件修改；无新增、删除或迁移文件，tracked 文件数不变。相同显式采样输入下，两任务的完整 reset plan mapping 与 identity 均与输入版本一致。MuJoCo CPU 两任务均完成 reset、非零 action、重复同 seed reset、无 seed RNG 续采和 close，各观测 25 子步；样本 identity、RNG 序列、Robot identity 和单步奖励与前次相同。32 项版本纯合同通过。
+
+native 验证后只将共同函数及两个调用点改名，明确其 effort 范围；最终代码重新通过纯合同及两任务 reset plan 完整 mapping／identity 对照，未重复物理运行。GeoPhys、Isaac 和 renderer 本批未重跑；provider source、clock 和提交未改。计划、运行时冻结 diff 和对照在 ignored `workspace/maintenance/v211_joint_reset_20261112_001/`；E01～E04 仍未完成。

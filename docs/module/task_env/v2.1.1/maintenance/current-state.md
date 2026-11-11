@@ -85,3 +85,5 @@ PickCube reset-scoped 物理选择现在在 reset 前暴露已编译 Robot subje
 PickCube MJCF 场景现直接将 Robot 声明与任务实体组合，不再先构造并改写 Isaac 场景；两路线的场景 mapping／identity 保持一致，受影响 MuJoCo CPU 物理短程通过。Isaac 仅做声明对照，完整 source 和控制归属仍待整理。详见[实施记录 6.34](../planning/post-5c-optimization-execution.md#634-pickcube-任务场景直接组合-robot-声明)。
 
 Pendulum 与双轮车现在通过共同 Task Source 编译器从 Robot／Scene 声明生成 joint-effort Artifact；两种 source revision 的 Artifact 与先前身份一致，MuJoCo CPU 两条短程通过。tabletop 尚未使用此专用编译入口，四任务完整共同构造仍未收口；见[实施记录 6.35](../planning/post-5c-optimization-execution.md#635-简单主体-task-artifact-共同编译)。
+
+Pendulum／双轮车的 Task 采样结果现在经共同 joint-effort reset 合同编译；两任务 MuJoCo CPU 的 reset、RNG 序列和短程已对照通过。tabletop reset 和完整生命周期仍须继续收敛，见[实施记录 6.36](../planning/post-5c-optimization-execution.md#636-简单主体-joint-effort-reset-合同归并)。
