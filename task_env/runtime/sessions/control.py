@@ -961,6 +961,11 @@ def prepare_position_control_materialization(
     from .source import position_frame_bindings_from_artifact, position_joint_bindings_from_artifact
 
     scene = source.scene_definition
+    subject_plan = getattr(source, 'position_subject_plan', None)
+    if subject_plan is not None:
+        if plan is not None and plan != subject_plan.plan:
+            raise ValueError('Position plan differs from source-owned subjects')
+        plan = subject_plan.plan
     if leaf_position:
         if plan is not None:
             raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')

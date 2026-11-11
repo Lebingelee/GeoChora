@@ -80,9 +80,12 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
 
 
 def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
+    from dataclasses import replace
     from pathlib import Path
     from task_env.robots.runtime import RobotRuntime
-    from task_env.runtime.sessions.control import bind_selected_controller, prepare_position_control_materialization
+    from task_env.runtime.sessions.control import (bind_selected_controller,
+        position_subject_identity, prepare_position_control_materialization)
+    from task_env.runtime.sessions.source import PositionSubjectPlanV1
     from task_env.tasks.pick_cube.specialization import build_isaac_reference, make_reference_binding
 
     root = Path(__file__).resolve().parents[4]
@@ -95,14 +98,19 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
     robot = RobotRuntime.from_selected(value, selected)
     plan, _, _, _ = prepare_position_control_materialization(
         source=value['source'], artifact=value['artifact'], profiles=selected.position_profiles,
-        leaf_position=False, plan=value['controller_binding_plan'],
+        leaf_position=False, plan=None,
         select_binding=binding.position_control_binding, value=value,
         capabilities=selected.position_capabilities)
     assert robot.uid == 'panda-v1'
-    assert robot.subjects == value['position_subjects']
+    assert robot.subjects == value['source'].position_subject_plan.subjects
     assert robot.controller is value['controller']
-    assert plan is value['controller_binding_plan']
+    assert plan is value['source'].position_subject_plan.plan
+    assert value['controller'].source is value['source'] is value['session_admission_input'].runtime_source
     assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
+    foreign_subjects = (replace(robot.subjects[0], source_id='foreign-source'),)
+    foreign_plan = PositionSubjectPlanV1(plan, position_subject_identity(plan, foreign_subjects), foreign_subjects)
+    with pytest.raises(ValueError, match='differ from their Scene, Artifact or source'):
+        replace(value['source'], position_subject_plan=foreign_plan)
 
 
 def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():

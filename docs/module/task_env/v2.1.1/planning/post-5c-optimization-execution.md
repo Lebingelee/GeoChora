@@ -912,3 +912,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +4／−406，净减 402 行；版本诊断修改 1 文件 +7／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。共同生命周期不再容纳与 G04 相悖的 episode 内替换旁路；Runtime 的正常 source／状态／clock／提交和 renderer 合同未改。
 
 115 项版本检查通过，包括真实 reset 后拒绝 episode 内更换且保持 Controller 与状态边界、随后可正常 step。MuJoCo 下 joint→R3 reset 切换和 H5 读回通过，观察 10 个 native 子步；参考 Position 录像短程另观察 5 个子步。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅报告 AttributeError，SDK 关闭日志有异常但进程和独立读回成功。GeoPhys、完整 Solution 本批未重跑。冻结 diff、预算与收据位于 ignored `workspace/maintenance/v211_position_reset_only_20261112_18r1w8rp/` 和 `workspace/maintenance/v211_reset_only_cpu_20261112_cnchvs06/`；E01～E04 仍未接收。
+
+### 6.83 USD Position 主体和 plan 由 source 持有
+
+输入 `f6010606`。上批 USD Position 将主体及编译 plan 放在 Task 构造结果的单独字段；现在 USD RuntimeSource 持有带身份的主体／Controller plan，RobotRuntime 与 Position 物化从同一个 source 读取，Task 结果不再另存这两份信息。source 校验 plan 与 Scene、Artifact、source closure、主体身份一致，Runtime 拒绝与 source 不一致的 plan。MJCF source 通过同一主体 plan 接口暴露已有绑定；USD 的两个手指 native 目标和 MJCF 单 actuator 映射仍由各自 adapter 负责，不伪造相同映射。
+
+生产修改 4 文件 +52／−5，净增 47 行；版本诊断修改 1 文件 +12／−4，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。新增类型承载实际编译 plan 和受控主体的身份，并参与 Runtime 物化；并非另建 Env。其他任务构造分流仍需处理；renderer、clock 和物理提交 owner 未改。
+
+115 项版本检查通过，包括真实 USD source 的主体／Controller plan 同源，以及外来 source 主体拒绝。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，Scene、Artifact、source、writer 与资源匹配检查全部通过；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅报告 AttributeError，SDK 日志仍有只读目录、渲染预热及关闭异常，进程和独立读回成功。MuJoCo 一体 Panda、装配 Panda、NutAssembly、Pendulum 和双轮车短程均通过，分别观察 5、5、5、25、25 个 native 子步。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_usd_source_subject_20261112_1t8_kquu/` 和 `workspace/maintenance/v211_source_subject_cpu_20261112_8e7_3qjc/`；E01～E04 仍未接收。

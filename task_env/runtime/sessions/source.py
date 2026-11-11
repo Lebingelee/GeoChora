@@ -441,6 +441,11 @@ class RuntimeSource:
         """Expose the canonical TaskSceneSource identity used by Core receipts."""
         return self.scene_source.source_id
 
+    @property
+    def position_subject_plan(self):
+        """Expose the source-owned Position plan independently of native mapping."""
+        return self.position_subject_binding
+
     def __post_init__(self):
         if self.source_composition_request is not None:
             from ...assembly.source_composition import (
@@ -644,6 +649,26 @@ class RuntimeSource:
 
 
 @dataclass(frozen=True)
+class PositionSubjectPlanV1:
+    """Source-bound Position subjects and their compiled Controller plan."""
+
+    plan: object
+    subject_identity_sha256: str
+    subjects: tuple
+
+    def __post_init__(self):
+        from .control import ControlBindingPlanV1, position_subject_identity
+        from .physical_control import ControlledSubjectV1
+        if type(self.plan) is not ControlBindingPlanV1 or not self.plan._compiled:
+            raise TypeError('Position subjects require a compiled Controller plan')
+        if (type(self.subjects) is not tuple or not self.subjects
+                or any(type(subject) is not ControlledSubjectV1 for subject in self.subjects)):
+            raise TypeError('Position plan requires declared controlled subjects')
+        if position_subject_identity(self.plan, self.subjects) != self.subject_identity_sha256:
+            raise ValueError('Position subjects differ from their compiled identity')
+
+
+@dataclass(frozen=True)
 class UsdRuntimeSourceV1:
     """Provider-neutral, versioned construction input for a verified USD delivery.
 
@@ -661,6 +686,7 @@ class UsdRuntimeSourceV1:
     frames: Mapping[str, str]
     free_joints: Mapping[str, str]
     joint_targets: Mapping[str, str]
+    position_subject_plan: PositionSubjectPlanV1 | None = None
 
     def __post_init__(self):
         if self.schema_version != 'usd-runtime-source-v1':
@@ -703,6 +729,18 @@ class UsdRuntimeSourceV1:
         self.scene_definition.validate()
         self.scene_source.validate()
         self.task_artifact.validate_scene(self.scene_definition)
+        if self.position_subject_plan is not None:
+            binding = self.position_subject_plan
+            if type(binding) is not PositionSubjectPlanV1:
+                raise TypeError('USD Position subjects require a typed source plan')
+            plan = binding.plan
+            if (plan.scene_identity_hash != self.scene_definition.identity_hash
+                    or plan.artifact_identity_hash != self.task_artifact.identity_hash
+                    or plan.source_closure_digest != self.source_closure_digest
+                    or any(subject.source_id != self.source_id
+                           or subject.source_closure_sha256 != self.source_closure_digest
+                           for subject in binding.subjects)):
+                raise ValueError('USD Position subjects differ from their Scene, Artifact or source')
         if self.scene_source.scene_identity_sha256 != self.scene_definition.identity_hash:
             raise ValueError('USD RuntimeSource does not bind the exact SceneDefinition')
         if self.scene_source.task_source_identity_sha256 != self.task_artifact.task_source_identity_hash:

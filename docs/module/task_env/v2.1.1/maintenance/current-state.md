@@ -179,3 +179,5 @@ NutAssembly 的 R05b／R05c 历史诊断专属构造与 Runtime 准入已退出�
 Isaac Position 已通过 Panda 共同主体编译生成实际 Controller plan，并完成原生短程与三帧读回；USD source 自身的 Position binding 仍待收敛。详见[实施记录 6.81](../planning/post-5c-optimization-execution.md#681-usd-position-使用-panda-主体和实际-controller-plan)。
 
 Controller 变更限定于 reset；旧 episode 内 Position 替换及其专属状态、录像分支已退出，MuJoCo reset 切换和 Isaac 录像短程通过。详见[实施记录 6.82](../planning/post-5c-optimization-execution.md#682-controller-切换限定于-reset)。
+
+USD Position 的主体和 Controller plan 已由 source 持有，Robot 与 Runtime 从同一 source 消费；Isaac 原生短程及四任务 MuJoCo 短程通过。详见[实施记录 6.83](../planning/post-5c-optimization-execution.md#683-usd-position-主体和-plan-由-source-持有)。
