@@ -211,7 +211,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
             scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
-        reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
         def build_physical(kind, **parameters):
             if (set(parameters) - {'kp', 'kd', 'finger_kp', 'finger_kd'}
                     or any(type(value) not in (int, float) or not 0. < value <= 5000.
@@ -240,7 +239,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 dynamic_parameters=parameters if reset_switch else None)
 
         physical = build_physical(control_kind)
-        def build(_provider):
+        def build_seeded(_provider, _backend, actual_seed, _horizon):
+            reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0],
                 'solution': None, 'reset_plan': reset_plan,
@@ -258,10 +258,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                        if cube_force_z_N is not None else {}),
                     'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
                     'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
-        def fixed_seed(value):
-            if type(value) is not int or value != seed:
-                raise ValueError('PickCube physical candidate requires its frozen seed')
-            return value
+        def build(_provider):
+            return build_seeded(_provider, 'cpu', seed, horizon)
         def physical_execution_info(env):
             from .solution import PickCubePositionExecutionInfoV1
             state = env.state
@@ -293,13 +291,15 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                             if cube_force_z_N is not None else None)
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         owned_resources = ExitStack()
-        binding = ReferenceTaskBinding(build=build, reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
+        binding = ReferenceTaskBinding(build=build, build_seeded=build_seeded,
+            reset_sample=lambda _artifact, actual_seed: sample_episode_reset_plan(
+                task_source, scene, artifact, task_seed=actual_seed).reset_sample,
             evaluate=lambda state, semantics: evaluate(state, semantics),
             task_definition_factory=PickCubeTaskDefinition.from_artifact,
             task_state_projection=as_task_state_view,
             object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
             task_com_wrench_factory=task_com_factory,
-            recorder_mode='execution', reset_seed=fixed_seed, close_task_resources=owned_resources.close,
+            recorder_mode='execution', close_task_resources=owned_resources.close,
             action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,
             observation_space_factory=_direct_physical_observation_spaces,

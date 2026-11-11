@@ -53,6 +53,32 @@ def test_usd_effort_binding_does_not_request_position_source_composition():
     assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding
 
 
+def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
+
+    calls = []
+    monkeypatch.setattr(specialization, 'build_isaac_reference',
+                        lambda **kwargs: calls.append(kwargs) or kwargs)
+    binding = make_isaac_physical_binding(delivery_manifest='declared', seed=31,
+        horizon=8, drive_mode='effort-only', control_kind='joint')
+    result = binding.build_seeded('isaacsim', 'cuda', 42, 8)
+    assert result['task_seed'] == 42
+    assert result['horizon'] == 8
+    with pytest.raises(ValueError, match='Isaac CUDA'):
+        binding.build_seeded('mujoco', 'cpu', 42, 8)
+
+
+def test_solution_reconstruction_uses_seeded_builder_when_available():
+    from task_env.environment.reference_binding import _StandardResetReconstruction
+
+    binding = SimpleNamespace(compose_robot_source=None,
+        build_seeded=lambda provider, backend, seed, horizon: (provider, backend, seed, horizon),
+        build_external=lambda provider: pytest.fail('seedless builder used for a seeded Solution'))
+    strategy = _StandardResetReconstruction(binding, 'isaacsim', 'cuda', 8)
+    assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
+
+
 def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
     from task_env.runtime.sessions.api import _session_admission_input_route
     from task_env.runtime.sessions.source import UsdRuntimeInputV1

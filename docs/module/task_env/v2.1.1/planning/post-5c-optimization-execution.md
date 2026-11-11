@@ -864,3 +864,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +226／−201，净增 25 行，其中约 200 行增删来自将现有构造主体缩进到资源保护范围；版本诊断修改 1 文件 +114／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。本批没有消除新的配置或任务构建分流；Runtime source 取得失败时的资源清理归于共同机制，provider／renderer 的状态、clock 和提交合同未改变。
 
 100 项版本检查通过，新增检查覆盖 readiness、两个 tabletop Controller、USD 身份准备、physical 早期构造及清理异常。MJCF／USD 五种 profile 共十组 source 和 Controller 合同对照一致。PickCube 参考、NutAssembly 及 PickCube physical reset 切换／H5 读回的 MuJoCo 短程通过，共观测 20 个 native 子步；参考 Solution 仅验证单步。Isaac 和 GeoPhys 本批未重跑：6.75 的 Isaac 原生证据可说明当时代码的行为，但不能视为当前代码已完成 GPU 复验。完整 Solution 未运行。冻结 diff、合同对照及运行收据位于 ignored `workspace/maintenance/v211_task_source_failure_20261112_8RhmP8/`；E01～E04 仍未接收。
+
+### 6.77 物理控制使用请求的 reset seed
+
+输入 `a2764cbe`。PickCube MJCF／USD 物理 Controller 原先把 reset seed 限制在构造时的值，沿用了诊断用固定执行条件。MJCF 现在按请求 seed 编译 EpisodeResetPlan；USD 构造也接收实际 reset seed 和 horizon。外部 Solution 的共同重建流程在任务提供 seeded builder 时使用它，避免丢失请求的 seed；没有 seeded builder 的任务继续使用原外部 Solution builder。Runtime 仍核对 reset plan、Artifact 和 source 身份，物理提交、clock 与 renderer 未修改。
+
+生产修改 3 文件 +14／−16，净减 2 行；版本诊断修改 2 文件 +63／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。本批消除物理路线的固定 seed 限制，未消除其余任务构造分流。
+
+104 项版本检查通过。MuJoCo joint 与可切换 R3 两种物理配置各完成不同 seed 的 reset 和 step、重复 seed 的采样一致性检查；R3 另完成使用新 seed 的外部 Solution reset。Isaac seeded builder 与共同 Solution 重建只做调用合同检查，本批未运行 Isaac 或 GeoPhys 原生路线，也未运行完整 Solution。首次测试错误地从动作空间随机采样，分别触发真实力限与动作代际检查；改用合法声明动作后通过。E01～E04 仍未接收。

@@ -164,6 +164,43 @@ def test_switchable_effort_recording_uses_physical_owner_metadata(monkeypatch, t
         env.close()
 
 
+@pytest.mark.parametrize('switchable', [False, True])
+def test_effort_reset_rebuilds_plan_for_requested_seed(switchable):
+    import sys
+    import numpy as np
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
+                      'interpreter': sys.executable},
+        'episode': {'horizon': 8, 'seed': 31},
+        'controller': {'profile_id': ('panda-r3-effort-reference-v1' if switchable
+                                     else 'panda-joint-effort-reference-v1'),
+                       'parameters': {'reset_selection': switchable}},
+    })
+    try:
+        q = env.artifact.initialization.joint_position
+        action = (np.asarray([.4, 0., .4, 1., 0., 0., 0., 1.], dtype=np.float32)
+                  if switchable else np.asarray(
+                      [q[f'panda-v1/joint{i}'] + (.002 if i == 1 else 0.)
+                       for i in range(1, 8)] + [.04], dtype=np.float32))
+        env.reset(seed=37)
+        first = env.sample
+        assert first.task_seed == 37
+        env.step(env.bind_physical_action(action) if switchable else action)
+        env.reset(seed=42)
+        assert env.sample.task_seed == 42
+        env.step(env.bind_physical_action(action) if switchable else action)
+        env.reset(seed=37)
+        assert env.sample == first
+        if switchable:
+            solution = env.value['solution_factory']()
+            env.reset_for_solution(solution, seed=43)
+            assert env.sample.task_seed == 43
+    finally:
+        env.close()
+
+
 def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path):
     import sys
     from task_env import make_env

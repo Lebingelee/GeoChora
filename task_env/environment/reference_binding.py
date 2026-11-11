@@ -118,6 +118,8 @@ class _StandardResetReconstruction(_ResetReconstruction):
 
     def build_reset(self, current, seed, external_solution):
         if external_solution is not None:
+            if self.binding.build_seeded is not None:
+                return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
             return self._compose(self.binding.build_external(self.provider))
         if self.binding.build_sampled is not None:
             return self._compose(self.binding.build_sampled(

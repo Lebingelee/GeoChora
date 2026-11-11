@@ -25,17 +25,13 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
             raise ValueError('F06 physical candidate requires Isaac')
         return build_seeded(provider, 'cuda', seed, horizon)
     def build_seeded(provider, backend, actual_seed, actual_horizon):
-        if (provider, backend, actual_seed, actual_horizon) != ('isaacsim', 'cuda', seed, horizon):
-            raise ValueError('F06 physical candidate requires its frozen execution')
-        return build_isaac_reference(delivery_manifest=manifest, task_seed=seed, horizon=horizon,
+        if (provider, backend) != ('isaacsim', 'cuda'):
+            raise ValueError('Isaac physical control requires Isaac CUDA')
+        return build_isaac_reference(delivery_manifest=manifest, task_seed=actual_seed, horizon=actual_horizon,
                                      include_solution=False, physical_fixture=drive_mode,
                                      controller_builder=build_controller)
-    def reset_seed(actual):
-        if type(actual) is not int or actual != seed:
-            raise ValueError('F06 physical candidate requires its frozen seed')
-        return actual
     from .physical_candidate import _direct_physical_observation, _direct_physical_observation_spaces
-    return replace(base, build=build, build_seeded=build_seeded, reset_seed=reset_seed,
+    return replace(base, build=build, build_seeded=build_seeded,
         scalar_control_binding=None, action_space_factory=None,
         observation_space_factory=_direct_physical_observation_spaces,
         observation_projection=partial(_direct_physical_observation, hand_frame_id='ee'),
