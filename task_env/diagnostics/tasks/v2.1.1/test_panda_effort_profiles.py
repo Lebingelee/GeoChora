@@ -39,3 +39,35 @@ def test_panda_subject_rejects_incomplete_native_transmission_declaration():
             entity_id='panda-v1', source_id='test-source', source_closure_sha256='a' * 64,
             native_ranges=((-5., 5.),) * 8, native_drive='disabled',
             native_actuators=('joint1',), transmission_ids=('drive1',))
+
+
+def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.robots.panda import PandaAgent
+    from task_env.runtime.sessions import source_scene_import
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    used = []
+    declare = source_scene_import.declare_panda_scene
+    build = PandaAgent.build_direct_effort_execution
+
+    def capture_declaration(robot, *args, **kwargs):
+        used.append(('scene', robot))
+        return declare(robot, *args, **kwargs)
+
+    def capture_execution(robot, *args, **kwargs):
+        used.append(('execution', robot))
+        return build(robot, *args, **kwargs)
+
+    monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture_declaration)
+    monkeypatch.setattr(PandaAgent, 'build_direct_effort_execution', capture_execution)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        assert [kind for kind, _ in used] == ['scene', 'execution']
+        assert used[0][1] is used[1][1]
+    finally:
+        binding.close_task_resources()

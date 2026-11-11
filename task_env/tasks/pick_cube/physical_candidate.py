@@ -150,13 +150,12 @@ def _direct_physical_observation(env, state):
     return obs, info, evaluation
 
 
-def _pickcube_mjcf_scene(task_config):
+def _pickcube_mjcf_scene(task_config, robot):
     """Compose the Task scene using the declared MJCF Robot and frame names."""
-    from ...registry import AGENT_REGISTRY
     from ...runtime.sessions.source_scene_import import declare_panda_scene
     from .specialization import build_pickcube_scene
 
-    panda = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
+    panda = declare_panda_scene(robot,
         entity_id='panda-v1', scene_id=str(task_config['recipe']['scene_uid']))
     return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
         ee_frame='nutassembly_ee_site', cube_frame='PickCube',
@@ -174,7 +173,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
     from ...environment.reference_binding import ReferenceTaskBinding, legacy_position_physical_observation_binding
     from ...observations.selected_reference import selected_reference_observation_spaces
     from ...runtime.sessions.control import ControlBinding, compile_control_binding_plan
-    from ...robots.panda import build_panda_direct_effort_execution
+    from ...registry import make_agent
     from .specialization import _configuration, build_reference, evaluate
     from .task import PickCubeTaskDefinition
 
@@ -205,7 +204,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 asset_root=MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets',
                 normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
-        scene = _pickcube_mjcf_scene(task_config)
+        robot = make_agent('panda-v1')
+        scene = _pickcube_mjcf_scene(task_config, robot)
         task_source = adapt_legacy_recipe_task_source({'recipe': task_config['recipe'], 'environment': task_config['environment']})
         artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact, frame_bindings={
             'panda-v1/base': FrameReference('panda-v1', 'link0'),
@@ -248,7 +248,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                         or native_drive != 'disabled' or limits[7] != (-5., 5.)):
                     raise ValueError('task gripper force override requires its exact source and isolated fixture')
                 limits[7] = (-10., 10.)
-            physical = build_panda_direct_effort_execution(
+            physical = robot.build_direct_effort_execution(
                 scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
                 native_ranges=tuple(limits))
             if kind != 'direct':

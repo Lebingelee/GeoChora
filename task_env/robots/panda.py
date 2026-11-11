@@ -50,75 +50,74 @@ class PandaEffortSourceLayout:
     finger_action_id: str
 
 
-def build_panda_direct_effort_execution(scene, artifact, source, *, entity_id,
-                                        native_drive, native_ranges, layout=None,
-                                        joint_bindings=None, frame_bindings=None):
-    """Bind Panda's declared channels to a direct-effort Controller execution.
-
-    The source adapter supplies verified native ranges; this function does not
-    parse or materialize a provider-specific source.
-    """
-    from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
-    from ..controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
-    from ..runtime.sessions.physical_control import build_declared_effort_execution
-
-    if native_drive not in {'position', 'disabled'}:
-        raise ValueError('Panda effort profile requires a declared native drive mode')
-    names = PandaAgent.physical_joint_names()
-    definitions = {j.joint_id: j for a in scene.articulations or ()
-                   if a.entity_id == entity_id for j in a.joints}
-    if any(name not in definitions or source.joints.get(f'{entity_id}/{name}') != name for name in names):
-        raise ValueError('Panda effort profile requires the exact nine named source joints')
-    if layout is None:
-        layout = PandaEffortSourceLayout(
-            tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9)),
-            tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9)),
-            'panda-direct-effort-assembly', 'panda-direct-effort-components',
-            'direct-effort-zero-bias-v1', 'finger-tendon-effort')
-    if not isinstance(layout, PandaEffortSourceLayout):
-        raise TypeError('Panda effort construction requires a source layout')
-    subject, declarations = PandaAgent.physical_subject_declaration(
-        entity_id=entity_id, source_id=source.source_id,
-        source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
-        native_drive=native_drive, native_actuators=layout.native_actuators,
-        transmission_ids=layout.transmission_ids)
-    def make_controller(binding, writer):
-        keys = tuple(f'{entity_id}/{name}' for name in names)
-        kinds = tuple(definitions[name].kind for name in names)
-        requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
-            layout.model_id, 'geochora', 'v1', 'stdlib', source.source_id,
-            source.source_closure_digest, keys,
-            tuple('rad' if kind == 'revolute' else 'm' for kind in kinds), 'joint_bias',
-            tuple('N*m' if kind == 'revolute' else 'N' for kind in kinds),
-            'joint-axis', 'evaluation_boundary', artifact.timebase.control_dt,
-            0., 'pure_no_physics_step', writer, 'none', 'required')
-        zero = (0.,) * len(names)
-        model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
-        action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + (layout.finger_action_id,)
-        matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
-                             for j in range(8)) for i in range(len(names)))
-        profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, action_names, keys, matrix, requirement)
-        return LinearEffortControllerV1(profile, binding, model)
-    definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
-                             for j in a.joints if j.kind != 'fixed'}
-    if joint_bindings is None:
-        joint_bindings = {semantic: definitions_by_native[native]
-                          for semantic, native in (*source.joints.items(), *source.free_joints.items())}
-    if frame_bindings is None:
-        frame_bindings = {name: (artifact.legacy_frame_bindings[name]
-                                 if name in artifact.legacy_frame_bindings
-                                 else FrameReference(*name.split('/', 1)))
-                          for name in (*source.bodies, *source.frames)}
-    return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
-        subject=subject, declarations=declarations, assembly_id=layout.assembly_id,
-        nested_component_id=layout.nested_component_id, controller_factory=make_controller,
-        state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings)
-
-
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
+
+    def build_direct_effort_execution(self, scene, artifact, source, *, entity_id,
+                                            native_drive, native_ranges, layout=None,
+                                            joint_bindings=None, frame_bindings=None):
+        """Bind Panda's declared channels to a direct-effort Controller execution.
+
+        The source adapter supplies verified native ranges; this function does not
+        parse or materialize a provider-specific source.
+        """
+        from ..controllers.canonical.model import ControllerModelRequirementV1, AffineJointBiasModelV1
+        from ..controllers.canonical.physical_controller import LinearEffortProfileV1, LinearEffortControllerV1
+        from ..runtime.sessions.physical_control import build_declared_effort_execution
+
+        if native_drive not in {'position', 'disabled'}:
+            raise ValueError('Panda effort profile requires a declared native drive mode')
+        names = self.physical_joint_names()
+        definitions = {j.joint_id: j for a in scene.articulations or ()
+                       if a.entity_id == entity_id for j in a.joints}
+        if any(name not in definitions or source.joints.get(f'{entity_id}/{name}') != name for name in names):
+            raise ValueError('Panda effort profile requires the exact nine named source joints')
+        if layout is None:
+            layout = PandaEffortSourceLayout(
+                tuple(f'actuator{i+1}' if i < 7 else 'actuator8' for i in range(9)),
+                tuple(f'arm-transmission-{i+1}' if i < 7 else 'split-transmission' for i in range(9)),
+                'panda-direct-effort-assembly', 'panda-direct-effort-components',
+                'direct-effort-zero-bias-v1', 'finger-tendon-effort')
+        if not isinstance(layout, PandaEffortSourceLayout):
+            raise TypeError('Panda effort construction requires a source layout')
+        subject, declarations = self.physical_subject_declaration(
+            entity_id=entity_id, source_id=source.source_id,
+            source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
+            native_drive=native_drive, native_actuators=layout.native_actuators,
+            transmission_ids=layout.transmission_ids)
+        def make_controller(binding, writer):
+            keys = tuple(f'{entity_id}/{name}' for name in names)
+            kinds = tuple(definitions[name].kind for name in names)
+            requirement = ControllerModelRequirementV1('controller-model-requirement-v1',
+                layout.model_id, 'geochora', 'v1', 'stdlib', source.source_id,
+                source.source_closure_digest, keys,
+                tuple('rad' if kind == 'revolute' else 'm' for kind in kinds), 'joint_bias',
+                tuple('N*m' if kind == 'revolute' else 'N' for kind in kinds),
+                'joint-axis', 'evaluation_boundary', artifact.timebase.control_dt,
+                0., 'pure_no_physics_step', writer, 'none', 'required')
+            zero = (0.,) * len(names)
+            model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
+            action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + (layout.finger_action_id,)
+            matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
+                                 for j in range(8)) for i in range(len(names)))
+            profile = LinearEffortProfileV1('linear-effort-profile-v1', writer, action_names, keys, matrix, requirement)
+            return LinearEffortControllerV1(profile, binding, model)
+        definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
+                                 for j in a.joints if j.kind != 'fixed'}
+        if joint_bindings is None:
+            joint_bindings = {semantic: definitions_by_native[native]
+                              for semantic, native in (*source.joints.items(), *source.free_joints.items())}
+        if frame_bindings is None:
+            frame_bindings = {name: (artifact.legacy_frame_bindings[name]
+                                     if name in artifact.legacy_frame_bindings
+                                     else FrameReference(*name.split('/', 1)))
+                              for name in (*source.bodies, *source.frames)}
+        return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
+            subject=subject, declarations=declarations, assembly_id=layout.assembly_id,
+            nested_component_id=layout.nested_component_id, controller_factory=make_controller,
+            state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings)
 
     def artifact_entity(self, scene=None):
         """Declare the canonical Panda identity consumed by Task Artifacts."""

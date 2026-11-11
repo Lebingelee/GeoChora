@@ -670,3 +670,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 首次真实 Isaac 检查发现既有正式入口错误：USD physical binding 仍带 Position scalar 标记，导致实际 `make_env` 误选 Position source composer 并拒绝 effort profile。已清除此标记，新增检查覆盖该边界；同一次失败的 Isaac 清理还发生 SDK 菜单异常和退出时段错误，原始日志与收据保留。第二次实际运行正常完成两次 reset、非零 step、三帧同步 RGB、独立帧读回、重复 Env close 和 App close；观测 41 次 callback，订阅之前的启动推进未知。首次失败未能观测推进，按预留 59 次保守计入；两次累计记账 100 次。
 
 生产修改 3 文件 +64／−88，净减 24 行；版本诊断修改 2 文件 +21／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1366。69 项版本检查通过；MuJoCo direct effort 与 joint→R3 reset 切换、记录读回和 close 短程通过，共观测 15 个 native 子步。GeoPhys 与完整 Solution 本批未重跑，原 evidence 的复用限于未受影响行为；Isaac 的本次结果仅覆盖指定 USD、joint effort、CUDA 和同步 RGB 组合。计划、两次冻结 diff、实际前后 source 对照和全部运行收据位于 ignored `workspace/maintenance/v211_usd_robot_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.53 Panda effort 声明与构造共享 Robot 实例
+
+输入 `26cce90b`。Panda direct effort 的原模块函数改为 Robot 实例方法；PickCube MJCF 路线通过注册表取得一个 Panda 实例，并把该实例同时用于 Scene 声明和后续真实 subject／Controller execution 构造。USD source 路线同样取得注册的 Panda 实例来构造 execution。方法仍调用共同 Runtime 编译，source admission 与 Controller 算法不变；这消除了实际构建时绕过 Robot 实例的路径，不意味着全部 Task 的 source 组合已统一。
+
+生产修改 3 文件 +75／−74，净增 1 行；其中 Panda 文件约 60 行为函数移动到类内及缩进，不是新增算法。版本诊断修改 1 文件 +32／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1366。版本检查直接确认正式 MJCF Scene 和 execution 收到同一个 Robot 对象。
+
+70 项版本检查通过。MuJoCo direct effort、joint→R3 reset 切换、H5 读回和 close 短程通过，共观测 15 个 native 子步；五种 Controller 的 MJCF／USD 真实 source 前后对照显示主体、绑定、Controller action schema、状态需求及 joint／frame 映射均未改变。Isaac 和 GeoPhys 本批没有重跑；上一批 Isaac 原生验证仅可作为输入相同的历史证据，不能代替本批原生复验。renderer 和完整 Solution 未受本批验证。冻结 diff、构造对照及 MuJoCo 结果位于 ignored `workspace/maintenance/v211_panda_instance_owner_20261112_001/`。E01～E04 仍未接收。
