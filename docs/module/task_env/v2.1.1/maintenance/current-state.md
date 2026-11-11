@@ -115,3 +115,5 @@ Panda direct effort 与两个简单主体现通过共同 Runtime 入口构建单
 装配 Panda 中无调用者的旧 leaf 诊断配置生成逻辑已移除；正式双 Controller 在一次 MuJoCo interval 中的两个 writer 与资源归属已复验。详见[实施记录 6.49](../planning/post-5c-optimization-execution.md#649-清除装配-panda-的无调用-leaf-诊断探针)。
 
 四个正式任务的 mapping／YAML 构造现只调用一次配置解析器，外部已解析对象仍执行一致性检查；MuJoCo、隔离 worker 与 GeoPhys 的受影响短程已复验。详见[实施记录 6.50](../planning/post-5c-optimization-execution.md#650-正式公共配置只解析一次)。
+
+Panda 参考 effort 的普通、动态和质量矩阵 Controller 组合已归共同控制 owner，MJCF／USD 各自保留 source、TCP 和 frame 的声明与校验。MuJoCo reset 切换短程及 USD source 构造检查通过；详见[实施记录 6.51](../planning/post-5c-optimization-execution.md#651-panda-参考-effort-controller-组合归控制-owner)。

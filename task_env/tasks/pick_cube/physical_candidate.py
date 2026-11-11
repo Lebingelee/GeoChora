@@ -252,30 +252,22 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
                 native_ranges=tuple(limits))
             if kind != 'direct':
-                from ...controllers.canonical.r3_effort import build_reference_effort_execution
-                reference = None
+                from ...controllers.canonical.r3_effort import build_panda_effort_profile
+                model = r3_profile = velocity_limit = mass_model = None
                 if kind in {'r3-pose', 'r3-mass-pose'}:
                     from ...controllers.canonical.kinematics import PandaKinematics, PANDA_PICKCUBE_EE_TCP_V1
-                    from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
                     from .specialization import _r3_dynamic_profile, PICKCUBE_R3_CONTINUOUS_PROFILE_V1
                     model = PandaKinematics(projected, tcp_profile=PANDA_PICKCUBE_EE_TCP_V1)
                     r3_profile, _ = _r3_dynamic_profile()
-                    reference = ProductionCanonicalPandaControllerR3.create_arm_reference(
-                        model, artifact_hash=artifact.identity_hash, config=position.config,
-                        control_dt=artifact.timebase.control_dt, profile=r3_profile,
-                        joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'])
-                if reset_switch:
-                    from ...controllers.canonical.r3_effort import build_dynamic_reference_effort_execution
-                    physical = build_dynamic_reference_effort_execution(physical, reference_kind=kind,
-                        cadence_s=artifact.timebase.control_dt, r3_reference=reference,
-                        end_frame_id='nutassembly_ee_site', **parameters)
-                elif kind in {'joint-mass', 'r3-mass-pose'}:
-                    from .physical_mass_profile import build_pickcube_mass_effort_execution
-                    physical = build_pickcube_mass_effort_execution(physical, artifact, source, kind=kind,
-                        r3_reference=reference, end_frame_id='nutassembly_ee_site')
-                else:
-                    physical = build_reference_effort_execution(physical, reference_kind=kind,
-                        r3_reference=reference, end_frame_id='nutassembly_ee_site')
+                    velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
+                if kind in {'joint-mass', 'r3-mass-pose'}:
+                    from .physical_mass_profile import load_pickcube_mass_effort_model
+                    mass_model = load_pickcube_mass_effort_model(artifact, source, kind=kind)
+                physical = build_panda_effort_profile(physical, kind=kind,
+                    cadence_s=artifact.timebase.control_dt, end_frame_id='nutassembly_ee_site',
+                    model=model, config=position.config, artifact_hash=artifact.identity_hash,
+                    r3_profile=r3_profile, joint_velocity_limit_rad_s=velocity_limit,
+                    mass_model=mass_model, dynamic_parameters=parameters if reset_switch else None)
             return physical
 
         physical = build_physical(control_kind)

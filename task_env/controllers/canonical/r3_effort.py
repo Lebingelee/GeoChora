@@ -127,6 +127,40 @@ class R3ReferenceEffortControllerV1:
         return self.servo.compute(refs, state, context)
 
 
+def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_id,
+                               model=None, config=None, artifact_hash=None, r3_profile=None,
+                               joint_velocity_limit_rad_s=None, mass_model=None,
+                               dynamic_parameters=None):
+    """Compose a Panda effort profile from source-admitted controller inputs."""
+    if kind == 'direct':
+        return direct_execution
+    if kind not in {'joint', 'r3-pose', 'joint-mass', 'r3-mass-pose'}:
+        raise ValueError('unknown Panda effort profile')
+    reference = None
+    if kind in {'r3-pose', 'r3-mass-pose'}:
+        from .production_r3 import ProductionCanonicalPandaControllerR3
+        reference = ProductionCanonicalPandaControllerR3.create_arm_reference(
+            model, artifact_hash=artifact_hash, config=config, control_dt=cadence_s,
+            profile=r3_profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+    if dynamic_parameters is not None:
+        if mass_model is not None or kind not in {'joint', 'r3-pose'}:
+            raise ValueError('dynamic effort profile requires a joint or pose reference')
+        return build_dynamic_reference_effort_execution(
+            direct_execution, reference_kind=kind, cadence_s=cadence_s,
+            r3_reference=reference, end_frame_id=end_frame_id, **dynamic_parameters)
+    if kind in {'joint-mass', 'r3-mass-pose'}:
+        if mass_model is None:
+            raise ValueError('mass effort profile requires a source-admitted model')
+        from .mass_matrix_effort import build_mass_effort_execution
+        return build_mass_effort_execution(
+            direct_execution, **mass_model, use_pose_reference=kind == 'r3-mass-pose',
+            r3_reference=reference, end_frame_id=end_frame_id)
+    if mass_model is not None:
+        raise ValueError('mass model supplied to non-mass effort profile')
+    return build_reference_effort_execution(
+        direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id)
+
+
 def build_reference_effort_execution(direct_execution, *, reference_kind, r3_reference=None,
                                      end_frame_id='ee', opening_range_m=.08,
                                      kp=(20., 20., 20., 20., 10., 10., 10., 50., 50.),
