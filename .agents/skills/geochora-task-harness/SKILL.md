@@ -62,7 +62,9 @@ the earlier ledger history and findings. Use `continue-owner-repair` only after
 the owner has supplied hashed diagnosis, source diff/commit and input
 before/after identities. The continuation reserves the next existing round;
 it does not reset the five-round budget, erase an earlier failure, or clear an
-open issue merely because a later round passes. Ordinary task-local revisions
+open issue merely because a later round passes. Use `export-issues` to hand
+issues to owners and `resolve-issue` to append their cited resolution; neither
+rewrites `open_issues` or reopens a stopped ledger. Ordinary task-local revisions
 remain available through `begin`; a v1 revision whose Core/catalog/input
 identity changes must provide its own context.
 

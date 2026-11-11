@@ -90,6 +90,24 @@ open issues; issue resolution needs its own cited evidence. Ordinary v0
 the current context only when the external asset identity is unchanged;
 changing Core/catalog/input identity requires an explicit `--context` JSON.
 
+### Issue escalation and resolution
+
+Every `execution_fault` and every `asset`/`harness`/`core`/`provider` finding is recorded in the ledger's `open_issues`. Hand them to their owners with:
+
+```sh
+"$PY" "$RT/construction_ledger.py" export-issues --ledger "$OUT/construction.json" --output-dir "$OUT/issues"
+```
+
+This writes `issues.json` and one `issue-<NN>.escalation.json` per issue (finding, report ref, round, spec, Core commit, provider, and a `resolution_template`). It never modifies the ledger. `owner_hint` is the reported locality; `unknown` means ownership is not established.
+
+When the owner returns evidence, complete the template (`disposition`: `owner_fixed` or `not_reproduced`; `owner`: `asset`, `core`, `provider` or `harness`; a `reason`; absolute `evidence` file paths) and record it:
+
+```sh
+"$PY" "$RT/construction_ledger.py" resolve-issue --ledger "$OUT/construction.json" --issue-index 0 --resolution "$OUT/issue-00.resolution.json"
+```
+
+The resolution must cite that issue's exact report hash and finding index, and its evidence must be files other than the failing report. It is appended to `issue_events`; `open_issues`, rounds, state and the five-round budget are unchanged, and an issue takes one resolution. Evidence files are hash-bound: editing one later invalidates the ledger. A recorded resolution is the owner's claim for Human review, carried into the Stage-1 package manifest; it is not approval, and accepting a limitation is the Human Judge's decision, not a disposition. A stopped ledger still continues only through `continue-owner-repair`. Ledger commands print `unresolved_issues` beside the unchanged `open_issues` count.
+
 ## D. Oracle Candidate
 
 ```sh
