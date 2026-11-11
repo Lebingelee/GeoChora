@@ -984,3 +984,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产范围 8 文件：修改 7、删除 1，+7／−203，净减 196 行，无整文件迁移；版本诊断修改 1 文件 +9／−0，本文与当前状态文档修改 2 文件。项目 tracked 文件由 1357 减至 1356。本批移除旧诊断旁路而使正式 native feedback 依赖真实主体，不表示全部任务构造和 adapter 的职责已经收敛。
 
 116 项版本检查通过，包括缺少 source 主体时在物化前拒绝。MuJoCo 四任务与装配 Panda 的进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube 与 NutAssembly 的 MuJoCo 隔离 worker 均完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_native_subject_only_20261112_yhysmfg5/` 和 `workspace/maintenance/v211_native_subject_isaac_20261112_krix37zp/`；E01～E04 仍未接收。
+
+### 6.92 正式构造要求真实 Robot 主体
+
+输入 `eb76c1e2`。共同构造此前允许 Controller 选择后没有已编译主体的结果进入 Env，直到访问 Robot 或执行控制时才暴露问题。现在共同 Env 构造要求 source／物理执行提供实际 Robot 主体，缺失时立即失败，并沿既有构造失败路径释放 source；该检查覆盖 grouped 和 native 控制，不创建虚构主体或额外 Controller。
+
+生产修改 1 文件 +2／−0；版本诊断修改 1 文件 +25／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务继续使用现有共同配置入口及各自已编译主体；新增准入不改变 provider／renderer 的 source、clock、状态或提交合同。该约束不能单独证明四任务的全部构造职责已经统一。
+
+118 项版本检查通过，其中两个 tabletop 在移除主体绑定时均于正式构造失败并释放已准备的 source。四个正式任务及装配 Panda 的 MuJoCo 短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。此前 Isaac 原生短程明确记录了实际 Robot 主体、Controller 和 source plan，本批仅新增非空构造准入且 USD 构造合同检查通过，但未按本批源码重跑 Isaac；GeoPhys、worker 与完整 Solution 同样未重跑。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_require_constructed_robot_20261112_bzvetg39/`；E01～E04 仍未接收。

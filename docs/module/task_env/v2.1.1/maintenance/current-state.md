@@ -197,3 +197,5 @@ Isaac Position 现在直接准备 Task source，不再构造并丢弃 MJCF 参�
 native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定仍由 source 准入核验；Isaac PickCube 短程及错误映射拒绝已复验。详见[实施记录 6.90](../planning/post-5c-optimization-execution.md#690-native-position-按-controller-声明核对关节)。
 
 旧 native-feedback 专属绑定与提交旁路已退出，native 控制缺少 source 主体时在物化前拒绝；进程内、隔离 worker 和 Isaac 受影响短程已复验。详见[实施记录 6.91](../planning/post-5c-optimization-execution.md#691-native-feedback-只消费-source-owned-主体绑定)。
+
+共同 Env 构造现在要求真实 Robot 主体；缺失绑定时拒绝并清理 source，四任务 MuJoCo 短程通过。详见[实施记录 6.92](../planning/post-5c-optimization-execution.md#692-正式构造要求真实-robot-主体)。

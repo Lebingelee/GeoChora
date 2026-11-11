@@ -319,3 +319,28 @@ def test_native_feedback_requires_source_owned_subject_before_materialization():
     source = SimpleNamespace(position_subject_binding=None)
     with pytest.raises(ValueError, match='source-owned subject binding'):
         materialize_control(None, None, source=source, binding=None, selected_controller=object())
+
+
+@pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
+def test_formal_construction_rejects_missing_robot_subject_and_cleans_source(uid, monkeypatch):
+    import sys
+    from task_env import make_env
+    from task_env.registry import ENV_REGISTRY
+    from task_env.runtime.sessions import source as source_module
+    import task_env.tasks  # register the formal tasks
+
+    receipts = []
+    snapshot = source_module.snapshot_legacy_mjcf_source
+    def capture(*args, **kwargs):
+        result = snapshot(*args, **kwargs)
+        receipts.append(result.execution_source_receipt)
+        return result
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    cls = ENV_REGISTRY.get(uid)
+    monkeypatch.setattr(cls, '_bind_robot_source_composer',
+                        classmethod(lambda cls, binding, config: binding))
+    config = {'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
+                            'interpreter': sys.executable}, 'episode': {'horizon': 8}}
+    with pytest.raises(ValueError, match='source-owned Robot subject binding'):
+        make_env(uid, config=config)
+    assert receipts and all(not receipt.snapshot_root.exists() for receipt in receipts)
