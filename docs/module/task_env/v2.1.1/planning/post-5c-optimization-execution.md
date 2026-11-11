@@ -512,3 +512,9 @@ MuJoCo CPU 的 PickCube、一体与装配 Panda、NutAssembly、Pendulum 和双�
 生产修改 4 文件 +23／−6，净增 17 行；版本诊断修改 1 文件 +38／−15；本记录与当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。provider、renderer、source、时钟和提交接口未改；29 项版本纯合同通过。
 
 MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller，第一次 reset 后以实际 joint Controller 非零推进并完成 H5 v3 记录读回；错误 Controller 选择保持原 Robot 和 spec，第二次 reset 切换至 r3-pose 后，新 Robot 指向新 Controller 并实际非零推进。该最终运行观测 10 子步。先前版本完成相同选择／记录但仅对切换后的身份做检查（5 子步）；四正式任务和装配 Panda 的五条普通短程另通过（65 子步），本批共 80 观测子步。计划、冻结 diff 和结果在 ignored `workspace/maintenance/v211_reset_robot_20261112_001/`。GeoPhys、Isaac、renderer 未在本批重跑；E01～E04 仍未完成。
+
+### 6.33 退休 PickCube 物理诊断 UID
+
+输入 `43892ba1`。移除 `pickcube-physical-candidate-v1` 和 `pickcube-isaac-physical-candidate-v1` 的注册、导出及各自旧输入翻译器；不再为旧 `source_workspace`、`drive_mode`、`control_kind` 等诊断配置维护两套构造入口。正式 `pick-cube-p16-reference-v1` 继续使用实际物理 binding、source 和 Controller 能力；实现文件目前仍含候选命名及任务内 source／profile 职责，不能称为已完成 E09 或四主体完整统一。
+
+生产修改 3 文件 +1／−85，净减 84 行；版本诊断 1 文件 +7，实施和当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。31 项版本纯合同通过，确认旧 UID 不再注册；MuJoCo CPU 正式 PickCube 的 Position、direct effort 和 reset-scoped joint／r3 切换路线通过短程，合计 20 个观测子步；后者包括 H5 v3 单 interval 写入读回与切换后实际推进。正式 Isaac 物理 binding 工厂仅做纯导入检查，未启动 Isaac；本批未改 provider／renderer、clock 或提交，不外推其他 provider 或完整 Solution。计划和结果在 ignored `workspace/maintenance/v211_retire_pickcube_uid_20261112_001/`。`env.controller` 与实际 reset-scoped physical Controller 的职责仍待继续收敛，E01～E04 未完成。

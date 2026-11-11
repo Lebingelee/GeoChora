@@ -1,44 +1,5 @@
-"""Compatibility input and task binding for the existing Isaac physical source."""
+"""Task binding for the existing Isaac physical source."""
 from dataclasses import replace
-from pathlib import Path
-
-from ...registry import register_env
-from ...environment.reference_env import SelectedReferenceEnv
-
-
-@register_env()
-class PickCubeIsaacPhysicalCandidateEnv(SelectedReferenceEnv):
-    """Legacy input translated to the formal PickCube construction."""
-    uid = 'pickcube-isaac-physical-candidate-v1'
-    task_rgb_factory_prepares_runtime = True
-
-    @classmethod
-    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
-        from .specialization import PickCubeReferenceEnv
-        from .physical_candidate import PICKCUBE_PHYSICAL_PROFILES
-        from ...render.base.contracts import validate_camera_declarations
-        validate_camera_declarations(render_mode=render_mode, **kwargs)
-        values = {} if config is None else dict(config)
-        if set(values) - {'delivery_manifest', 'seed', 'horizon', 'drive_mode', 'control_kind'}:
-            raise ValueError('Isaac physical compatibility input rejects unsupported configuration')
-        profiles = {kind: profile for profile, kind in PICKCUBE_PHYSICAL_PROFILES.items()}
-        drive, kind = values.get('drive_mode', 'coexist'), values.get('control_kind', 'direct')
-        if drive not in {'coexist', 'effort-only'} or kind not in profiles:
-            raise ValueError('unsupported physical drive or controller mode')
-        manifest = values.get('delivery_manifest')
-        if not isinstance(manifest, (str, Path)) or not str(manifest):
-            raise ValueError('Isaac physical source requires its delivery manifest')
-        seed, horizon = values.get('seed', 31), values.get('horizon', 8)
-        if type(seed) is not int or seed < 0 or type(horizon) is not int or not 1 <= horizon <= 1000:
-            raise ValueError('Isaac physical compatibility input requires a valid frozen seed and horizon')
-        import sys
-        public = {'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
-                    'physics_device': 'cuda:0', 'source_delivery_manifest': str(manifest),
-                    'deployment': 'in_process', 'interpreter': sys.executable},
-                  'episode': {'seed': seed, 'horizon': horizon},
-                  'robot': {'native_drive': 'position' if drive == 'coexist' else 'disabled'},
-                  'controller': {'profile_id': profiles[kind]}}
-        return PickCubeReferenceEnv.from_reference_config(public, render_mode=render_mode, **kwargs)
 
 
 def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode, control_kind):

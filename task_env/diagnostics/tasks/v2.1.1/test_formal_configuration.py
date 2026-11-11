@@ -157,3 +157,10 @@ def test_recording_coordinator_serializes_typed_observation_schema():
     assert outcome['observation_schema']['version'] == schema.version
     assert outcome['observation_schema']['fields'][0]['name'] == 'state.joint'
     assert len(receipt['integrity_hash']) == 64
+
+
+@pytest.mark.parametrize('uid', ['pickcube-physical-candidate-v1', 'pickcube-isaac-physical-candidate-v1'])
+def test_formal_registry_rejects_retired_physical_diagnostic_uids(uid):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(KeyError):
+        ENV_REGISTRY.get(uid)

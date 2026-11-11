@@ -5,8 +5,6 @@ from dataclasses import replace
 from pathlib import Path
 from contextlib import ExitStack
 
-from ...registry import register_env
-from ...environment.reference_env import SelectedReferenceEnv
 
 
 PICKCUBE_PHYSICAL_PROFILES = {
@@ -155,45 +153,6 @@ def _direct_physical_observation(env, state):
             'state_boundary_identity': boundary.to_mapping(), 'state_boundary_id': boundary.boundary_id,
             'state_sample_clock': view.sample_clock.to_mapping()}
     return obs, info, evaluation
-
-
-@register_env()
-class PickCubePhysicalCandidateEnv(SelectedReferenceEnv):
-    """Position compatibility plus typed physical control for PickCube MJCF."""
-    uid = 'pickcube-physical-candidate-v1'
-    task_rgb_factory_prepares_runtime = True
-
-    @classmethod
-    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
-        """Translate the historical UID/input; only the formal factory builds Env."""
-        from .specialization import PickCubeReferenceEnv
-        from ...render.base.contracts import validate_camera_declarations
-        validate_camera_declarations(render_mode=render_mode, **{
-            name: kwargs.get(name) for name in ('observer_camera', 'task_camera', 'task_rgb_camera', 'task_renderer')})
-        values = {} if config is None else dict(config)
-        allowed = {'provider', 'backend', 'horizon', 'source_workspace', 'seed', 'drive_mode',
-                   'control_kind', 'reset_switch', 'action_space_policy', 'cube_force_z_N'}
-        if set(values) - allowed:
-            raise ValueError('PickCube physical candidate rejects unsupported configuration')
-        workspace = values.get('source_workspace')
-        if not isinstance(workspace, (str, Path)) or not str(workspace):
-            raise ValueError('legacy physical candidate requires a fresh source_workspace')
-        drive = values.get('drive_mode', 'coexist')
-        profiles = {kind: profile for profile, kind in PICKCUBE_PHYSICAL_PROFILES.items()}
-        if drive not in {'coexist', 'effort-only'} or values.get('control_kind', 'direct') not in profiles:
-            raise ValueError('unsupported physical drive or controller mode')
-        import sys
-        provider, backend = values.get('provider', 'mujoco'), values.get('backend', 'cpu')
-        task = {} if 'cube_force_z_N' not in values else {'cube_force_z_N': values['cube_force_z_N']}
-        public = {'execution': {'physics_provider': provider, 'physics_backend': backend,
-                               'physics_device': 'cpu', 'source_workspace': str(workspace),
-                               'deployment': 'in_process', 'interpreter': sys.executable},
-                  'episode': {'horizon': values.get('horizon', 8), 'seed': values.get('seed', 31)},
-                  'controller': {'profile_id': profiles[values.get('control_kind', 'direct')],
-                      'parameters': {'reset_selection': values.get('reset_switch', False),
-                                     'action_space_policy': values.get('action_space_policy', 'dynamic')}},
-                  'robot': {'native_drive': 'position' if drive == 'coexist' else 'disabled'}, 'task': task}
-        return PickCubeReferenceEnv.from_reference_config(public, render_mode=render_mode, **kwargs)
 
 
 def _pickcube_mjcf_scene(task_config):
