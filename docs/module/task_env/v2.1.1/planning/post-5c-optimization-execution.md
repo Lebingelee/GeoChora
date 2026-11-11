@@ -305,3 +305,11 @@ G05 继续有界接收，E00～E04 和项目优化尚未整体接收；不进入
 15 项按节点选择的配置纯合同和 1 项公开 factory 消费合同通过；不运行物理，也不把解析测试写成 native 证据。`config-controller-008.log`、`config-factory-008.log` 留存。PickCube 与两个简单任务的既有真实构造使用同一解析结果，本次复用相关 native 证据；后续其他 codec／输入仍需对账。
 
 本批 1 个生产文件 +14／−7、净增 7 行，1 个测试文件 +1 行；累计生产 +1,585／−1,350，净增 235 行，累计测试 +693／−8；无文件新增、删除或迁移。逐文件和文档度量见 `implementation-metrics-008.json`。E01 的共同输入归一化进一步收敛，E00～E04 仍未整体完成，G05 保持原有界接收。
+
+### 6.8 第九批：registry 不再反射判断构造方法覆盖
+
+输入 `05d6e075`。`registry.make_env` 不再比较 `from_reference_config.__func__` 是否等于基类实现来猜测构造协议，而是调用类实际提供的工厂。既有基类工厂在无 class binding 时，负责解析组件配置、检查单环境 batch layout 并构造组件；有 class binding 的旧 scalar caller 及显式覆盖工厂继续按原合同执行。已经迁移的正式 selected／component factory 仍走原共同 `from_resolved_config`；没有扩大旧候选资产／renderer 能力。
+
+本批生产 2 个文件 +11／−9，净增 2 行；未新增测试代码或文件，没有文件迁移。自 `21577d32` 累计生产 +1,595／−1,358，净增 237 行；不能将本批抽取解释为项目净删除。逐文件度量见 `implementation-metrics-009.json`。4 项已有 caller 合同在双锁下通过：未带 marker 的自定义组件、无声明子类纯构造、旧 class binding 以及正式 factory 消费解析结果。检查未 reset／step，也不声明 native 结果；`registry-009-pure.log` 保留。正式生产任务在 registry 前置共同工厂分支未变，本批旧组件与 binding caller 的影响已由对应检查覆盖。
+
+E01 仍需对剩余配置 codec／Position 输入对账；E02～E04 的剩余审计和整体接收尚未完成，G05 保持原有界接收。

@@ -185,16 +185,10 @@ def make_env(
                 raise
         return env
 
-    from .environment.reference_env import SelectedReferenceEnv
-
     reference_config = getattr(environment_type, 'from_reference_config', None)
-    inherited_default = (
-        getattr(reference_config, '__func__', None)
-        is SelectedReferenceEnv.from_reference_config.__func__
-    )
-    uses_reference_binding = getattr(environment_type, 'binding', None) is not None
-    if reference_config is not None and (uses_reference_binding or not inherited_default):
-        # Other selected candidates retain their bounded compatibility route.
+    if callable(reference_config):
+        # The factory owns its configuration protocol, including inherited
+        # component and legacy-binding construction.
         return finish(environment_type.from_reference_config(config, render_mode=render_mode, **kwargs))
     resolved_config = resolve_task_env_config(environment_type, config)
     if resolved_config.runtime.batch_physics_layout != "merged_scene":

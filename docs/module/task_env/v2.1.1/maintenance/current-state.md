@@ -49,3 +49,5 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 第七批修复隔离 worker 的 source-bound 控制提交：正式 PickCube 在 MuJoCo CPU 和 GeoPhys CPU 两条受测路线均完成 reset／单 interval／第二次 reset／close。失败、未观测子步的保守计费和一次无锁资产解析的偏差保留；累计生产净增 228 行、tracked 文件数不变。见[第七批记录](../planning/post-5c-optimization-execution.md#66-第七批隔离-worker-的状态边界与控制归属)。
 
 第八批将 Controller selector 在两类配置 codec 之前统一归一化；PickCube 也接受 `control.profile_id`，原输入、身份与能力限制保持。累计生产净增 235 行，详细证据见[第八批记录](../planning/post-5c-optimization-execution.md#67-第八批共同-controller-selector-的配置入口)。
+
+第九批移除 registry 对构造方法覆盖的反射判断，基类工厂处理既有组件配置和旧 binding，四个实际 caller 合同通过。累计生产净增 237 行；E00～E04 仍在实施。见[第九批记录](../planning/post-5c-optimization-execution.md#68-第九批registry-不再反射判断构造方法覆盖)。

@@ -794,6 +794,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             from .configuration import resolve_task_env_config
             return cls.from_resolved_config(resolve_task_env_config(cls, config),
                                             render_mode=render_mode, **kwargs)
+        if getattr(cls, 'binding', None) is None:
+            from .configuration import resolve_task_env_config
+            resolved = resolve_task_env_config(cls, config)
+            if resolved.runtime.batch_physics_layout != 'merged_scene':
+                raise StageUnavailableError(
+                    'batch_physics_layout is only valid for make_parallel_env(); '
+                    'single TaskEnv construction requires merged_scene')
+            return cls(config=resolved, render_mode=render_mode, **kwargs)
         values = {} if config is None else dict(config)
         if kwargs or render_mode is not None or set(values) - {'provider', 'backend', 'horizon'}:
             raise ValueError('legacy class binding admits state-only provider/backend/horizon only')
