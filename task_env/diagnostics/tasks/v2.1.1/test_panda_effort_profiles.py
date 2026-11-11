@@ -132,3 +132,33 @@ def test_fixed_effort_does_not_construct_position_controller(provider, profile, 
         assert binding.physical_sequence_v2_observation is True
     finally:
         binding.close_task_resources()
+
+
+def test_switchable_effort_recording_uses_physical_owner_metadata(monkeypatch, tmp_path):
+    import sys
+    from task_env import make_env
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    def reject_position_metadata(_env):
+        raise AssertionError('physical recording must not use Position metadata')
+
+    monkeypatch.setattr(SelectedReferenceEnv, '_position_record_metadata', reject_position_metadata)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
+                      'interpreter': sys.executable},
+        'episode': {'horizon': 8},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+    })
+    try:
+        env.reset(seed=31)
+        env.start_recording(tmp_path / 'episode.h5')
+        metadata = env.recorder._record_metadata
+        profile = metadata['env_metadata']['reference_profile']
+        execution = env._physical_reset_selection.current.execution
+        assert profile['physical_binding_sha256'] == execution.compiled.binding.identity_hash
+        assert profile['scene_identity_hash'] == execution.scene.identity_hash
+        assert profile['source_closure_digest'] == env.value['source'].source_closure_digest
+        assert 'position_control_binding_provenance' not in metadata['resolved_config']
+    finally:
+        env.close()

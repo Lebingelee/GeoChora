@@ -4832,6 +4832,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             from ..recorders.recorder import begin_structured_recording
             from ..recorders.position_metadata import position_control_binding_provenance
             def metadata_factory():
+                if getattr(self, '_physical_reset_selection', None) is not None:
+                    from ..recorders.physical_metadata import physical_record_metadata
+                    return physical_record_metadata(self)
                 record_metadata = self._position_record_metadata()
                 record_metadata['resolved_config']['position_control_binding_provenance'] = (
                     position_control_binding_provenance(
@@ -4839,9 +4842,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         self._materialized_position_control_selector,
                     )
                 )
-                if getattr(self, '_physical_reset_selection', None) is not None:
-                    from ..recorders.physical_metadata import physical_record_metadata
-                    record_metadata = physical_record_metadata(self, record_metadata)
                 return record_metadata
             self.recording_path, self.recorder = begin_structured_recording(
                 path, horizon=self.horizon, observation=self.obs,

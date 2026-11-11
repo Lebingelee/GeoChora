@@ -4,41 +4,63 @@ from __future__ import annotations
 import numpy as np
 
 
-def physical_record_metadata(env, metadata):
-    """Replace Position action identity with the actually selected physical input."""
+def physical_record_metadata(env):
+    """Describe the committed physical Controller and its source-bound state."""
+    from ..observations.selected_reference import selected_reference_observation_schema
+
+    selection = env._physical_reset_selection.current
+    execution = selection.execution
     spec = env.physical_action_spec()
     kind = spec['kind']
     components = (('x', 'y', 'z', 'qw', 'qx', 'qy', 'qz', 'gripper') if kind == 'r3-pose'
                   else tuple(f'joint{i}' for i in range(1, 8)) + ('opening',))
-    result = dict(metadata)
-    env_meta = dict(result['env_metadata'])
-    env_meta['env_name'] = 'SelectedReferenceEnv.PhysicalControlV1'
-    env_meta['action_schema'] = {'schema_id': 'physical-' + spec['spec_id'], 'schema_version': 'physical-reset-action-spec-v1',
-                                  'controller_kind': kind, 'components': components}
-    observation_schema = dict(env_meta['observation_schema'])
-    observation_schema['leaf_specs'] = [
-        ({**field, 'semantic': 'source-bound PickCube end-effector site pose'}
-         if field.get('path') == 'state.ee_pose' else field)
-        for field in observation_schema['leaf_specs']]
-    env_meta['observation_schema'] = observation_schema
-    env_meta['reference_profile'] = {
-        'schema_version': 'physical-control-recording-profile-v1',
-        'physical_action_spec_v1': spec,
-        'task_artifact_identity_hash': env.artifact.identity_hash,
-        'scene_identity_hash': env.position_scene.identity_hash,
-        'source_closure_digest': env.value['source'].source_closure_digest,
-        'reset_plan_identity_hash': env.value['reset_plan'].identity_hash,
-        'reset_sample_id': env.value['reset_plan'].reset_sample.sample_id,
-        'provider': env.provider, 'backend': env.backend,
-        'solution_identity': env.value.get('solution_identity'),
-        'physical_binding_sha256': env._physical_reset_selection.current.execution.compiled.binding.identity_hash,
-        'feedback': 'independent force measurement unavailable',
+    schema = selected_reference_observation_schema(env, env.obs)
+    leaf_specs = [dict(path=item.name, shape=item.shape, dtype=item.dtype,
+                       semantic=item.semantic, unit=item.unit, frame=item.frame,
+                       time_reference=item.time_reference) for item in schema.fields]
+    for field in leaf_specs:
+        if field['path'] == 'state.ee_pose':
+            field['semantic'] = 'source-bound PickCube end-effector site pose'
+    source = env.value['source']
+    reset_plan = env.value['reset_plan']
+    artifact = env.artifact
+    env_metadata = {
+        'env_name': 'SelectedReferenceEnv.PhysicalControlV1',
+        'task_name': artifact.task_id, 'task_version': artifact.artifact_version,
+        'scene_uid': execution.scene.scene_id,
+        'agent_uids': tuple(subject.entity_id for subject in execution.subjects),
+        'physics_dt': artifact.timebase.physics_dt,
+        'control_substeps': artifact.timebase.control_substeps,
+        'control_frequency': 1.0 / artifact.timebase.control_dt,
+        'action_schema': {'schema_id': 'physical-' + spec['spec_id'],
+                          'schema_version': 'physical-reset-action-spec-v1',
+                          'controller_kind': kind, 'components': components},
+        'observation_schema': {'leaf_specs': leaf_specs},
+        'reference_profile': {
+            'schema_version': 'physical-control-recording-profile-v1',
+            'physical_action_spec_v1': spec,
+            'task_artifact_identity_hash': artifact.identity_hash,
+            'scene_identity_hash': execution.scene.identity_hash,
+            'source_closure_digest': source.source_closure_digest,
+            'reset_plan_identity_hash': reset_plan.identity_hash,
+            'reset_sample_id': reset_plan.reset_sample.sample_id,
+            'provider': env.provider, 'backend': env.backend,
+            'solution_identity': env.value.get('solution_identity'),
+            'physical_binding_sha256': execution.compiled.binding.identity_hash,
+            'feedback': 'independent force measurement unavailable',
+        },
     }
-    result['env_metadata'] = env_meta
-    result['universal_action_schema'] = {'version': 'physical-reset-action-v1', 'dimension': 8,
-                                         'components': components}
-    result['resolved_config'] = {**result['resolved_config'], 'physical_action_spec_v1': spec}
-    return result
+    return {
+        'env_metadata': env_metadata,
+        'universal_action_schema': {'version': 'physical-reset-action-v1', 'dimension': 8,
+                                    'components': components},
+        'resolved_config': {'provider': env.provider, 'backend': env.backend,
+                            'horizon': env.horizon, 'physical_action_spec_v1': spec},
+        'candidate_identity': {'task_artifact_identity_hash': artifact.identity_hash,
+                               'source_closure_digest': source.source_closure_digest,
+                               'reset_plan_identity_hash': reset_plan.identity_hash},
+        'execution_configuration_v1': env.get_execution_receipt(),
+    }
 
 
 def record_physical_transition(env, action, batch, resolved, ack, *, terminated, truncated):

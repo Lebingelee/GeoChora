@@ -808,3 +808,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 89 项版本检查通过；MJCF／USD 五种 profile 共十组 source／Controller 合同对照与输入基线一致。MuJoCo direct effort 与 joint→R3 reset 切换、H5 读回和关闭通过，共观测 15 个 native 子步。GeoPhys、Isaac 原生及完整 Solution 本批未重跑；旧证据按未受影响的路线和 source 身份范围保留。冻结 diff、对照、计划及收据位于 ignored `workspace/maintenance/v211_mjcf_robot_owner_20261112_p5iHyo/`。
 
 本批另尝试让 reset 切换直接使用物理 V2 状态：首次在静态准入因缺少声明被拒，调整后 reset 通过，但录像开始时依赖 Position 专属边界和元数据而失败。该尝试已从生产 diff 撤回，失败收据保留于 ignored `workspace/maintenance/v211_switch_physical_state_20261112_J4EKMr/`；后续需要先迁移录像和 Solution 生命周期，不能仅删除 Position 对象。E01～E04 仍未接收。
+
+### 6.70 物理控制录像元数据归实际执行 owner
+
+输入 `ce1ca466`。reset 可切换 effort 的录像原先先调用 Position Controller 的元数据构造，再覆盖为物理 profile，导致物理录像依赖不参与 effort 的 Position controller、scene 和 binding 来源。现在直接从已提交的物理 execution、实际观测 schema、Task Artifact、source 与 reset plan 生成录像元数据；Position 录像仍由原 Position owner 生成。移除物理录像中无关的 Position binding provenance，保留物理 binding、Controller、source closure、scene、reset 和执行选择身份。
+
+生产修改 2 文件 +55／−33，净增 22 行；版本诊断修改 1 文件 +30／−0，验证 physical 录像不调用 Position 元数据并绑定实际身份；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。本批只改变录像元数据构造，provider／renderer 的 source、状态、clock、控制提交与资源没有改变；reset 切换执行仍需 Position 观测，尚未消除。
+
+90 项版本检查通过。MuJoCo joint→R3 reset 切换的 physical H5 写入、结构化读回与关闭通过，观测 10 个 native 子步；独立 h5py／YAML 读回核对物理 binding、scene 和 Controller 身份，确认不含 Position binding provenance。装配 Panda Position 双 Controller 录像及结构化读回通过，观测 5 个 native 子步。GeoPhys、Isaac 和完整 Solution 本批未重跑，先前执行证据按未受影响范围保留。冻结 diff、计划、两次运行和独立检查位于 ignored `workspace/maintenance/v211_physical_record_metadata_20261112_1794433545/`。这只完成录像依赖的一部分，不表示 E10 或 E01～E04 接收。
