@@ -808,6 +808,25 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return cls(**values)
 
     @classmethod
+    def _bind_robot_source_composer(cls, binding, config):
+        roots = getattr(cls, 'robot_source_roots', None)
+        if roots is None or binding.scalar_control_binding is None:
+            return binding
+        from ..runtime.sessions.source_composition_adapters import (
+            SourceCompositionCapabilityUnavailable, declared_robot_source_composer,
+        )
+        try:
+            composer = declared_robot_source_composer(config,
+                robot_uid=config.robot_uid or cls.default_robot_source_uid,
+                existing_robot_entity=cls.default_robot_source_uid, task_body_names=roots,
+                task_site_transfers=cls.robot_source_site_transfers)
+        except SourceCompositionCapabilityUnavailable:
+            if config.robot_uid is not None:
+                raise
+            return binding
+        return replace(binding, compose_robot_source=composer)
+
+    @classmethod
     def from_resolved_config(cls, config, *, render_mode=None,
                              task_rgb_camera=None, task_renderer=None,
                              observer_camera=None, task_camera=None, **kwargs):
@@ -859,7 +878,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     from ..runtime.sessions.isaac_native_io import prepare_isaac_source
                     preparation.enter_context(prepare_isaac_source(
                         rendering=render_mode is not None or camera is not None))
-                binding = cls.selected_binding(config)
+                binding = cls._bind_robot_source_composer(cls.selected_binding(config), config)
             else:
                 provider = kwargs.pop('provider', 'geophys')
                 backend = kwargs.pop('backend', config.runtime.backend)
@@ -2010,7 +2029,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('reset physics selection is incompatible with the fixed task RGB renderer')
             seed = switch_candidate.task_seed
             options, mixed_reset_plan, mixed_reset_sample = {}, None, None
-            candidate_binding = type(self).selected_binding(switch_candidate.config)
+            candidate_binding = type(self)._bind_robot_source_composer(
+                type(self).selected_binding(switch_candidate.config), switch_candidate.config)
             candidate_reconstruction = candidate_binding.reset_reconstruction_strategy(
                 switch_candidate.config.physics_provider,
                 switch_candidate.config.environment.runtime.backend, self.horizon)

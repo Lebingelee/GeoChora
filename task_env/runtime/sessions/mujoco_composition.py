@@ -511,10 +511,10 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
     return replace(declaration, attachment_plan=derived)
 
 
-def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,
+def compose_robot_source(source, *, robot, composition_intent, artifact, controller, task_entities,
                                   existing_robot_entity, task_body_names, task_site_transfers,
                                   robot_recipe=None, controller_profile=None):
-    """Provider-owned PickCube adapter for neutral Robot source recipes.
+    """Provider-owned adapter for neutral Task and Robot source recipes.
 
     Robot classes expose only a ``RobotSourceRecipeV1``. This adapter owns
     RuntimeSource checks, source parsing, native mappings, and MuJoCo-specific
@@ -606,7 +606,7 @@ def compose_pickcube_robot_source(source, *, robot, composition_intent, artifact
                        source_composition_intent=composition_intent)
 
     if recipe.mode != 'replace-task-subtree':
-        raise ValueError('MuJoCo PickCube adapter does not admit this Robot recipe mode')
+        raise ValueError('MuJoCo adapter does not admit this Robot recipe mode')
     if len(task_site_transfers) != 1:
         raise ValueError('assembled Panda requires one declared Task end-effector site')
     task_hand, _site, source_hand = task_site_transfers[0]

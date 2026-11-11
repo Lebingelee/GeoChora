@@ -520,7 +520,7 @@ def position_execution_info(state, last_position_transition):
 
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
-                           interval_provider=None, robot_source_adapter=None,
+                           interval_provider=None,
                            cube_force_z_N=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
@@ -532,40 +532,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             resolved['task_com_force_v1'] = {'cube_force_z_N': cube_force_z_N}
             value['resolved_configuration'] = resolved
             value['recipe_identity'] = digest(resolved)
-        if robot_source_adapter is None:
-            return value
-        original_source = value['source']
-        try:
-            adapted_source = robot_source_adapter(original_source, artifact=value['artifact'],
-                                                   controller=value['controller'])
-            # Bind the Robot source and compatibility projection to construction identity.
-            from ...assembly.compiler import reference_task_identity_fields
-            from ...controllers.canonical.contracts import digest
-            value = dict(value)
-            value['source'] = adapted_source
-            resolved = dict(value['resolved_configuration'])
-            resolved.update(reference_task_identity_fields(value['artifact'], adapted_source, value['controller']))
-            composition = adapted_source.composition_runtime_input
-            reference = adapted_source.source_reference_plan
-            resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
-                                                         else reference.identity_hash)
-            request = adapted_source.source_composition_request
-            if request is not None:
-                resolved['source_composition_request_v2_sha256'] = request.identity_hash
-            intent = adapted_source.source_composition_intent
-            if intent is not None:
-                resolved['source_composition_intent_v1_sha256'] = intent.identity_hash
-            value['resolved_configuration'] = resolved
-            value['recipe_identity'] = digest(resolved)
-            return value
-        except BaseException as error:
-            receipt = getattr(original_source, 'execution_source_receipt', None)
-            if receipt is not None:
-                try:
-                    receipt.close()
-                except BaseException as cleanup_error:
-                    error.add_note(f'Robot source cleanup also failed: {cleanup_error!r}')
-            raise
+        return value
 
     def build(provider):
         if provider == "isaacsim":
@@ -681,6 +648,9 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     selected_supports_isaac = True
     selected_isaac_controller_profiles = frozenset(('r3_continuous_v1',)) | frozenset(PICKCUBE_PHYSICAL_PROFILES)
     selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
+    robot_source_roots = (('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube'))
+    robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
+    default_robot_source_uid = 'panda-v1'
     selected_execution_defaults = {
         "physics_provider": "geophys",
         "physics_backend": "cpu",
@@ -718,50 +688,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             raise ValueError('PickCube Task COM force requires the MuJoCo CPU R1 grouped interval')
         if profile == 'r1_split' and config.robot_uid is None:
             raise ValueError('split Position Controllers require an explicitly selected Robot source recipe')
-        adapter = None
-        # The legacy PickCube source already contains this Robot.  On the
-        # admitted MuJoCo route, resolve its existing reference recipe even
-        # when the caller omitted the optional Robot selector, so ordinary
-        # selected actions have the same source-owned subject binding.
-        robot_uid = config.robot_uid
-        if (robot_uid is None and config.physics_provider == 'mujoco'
-                and config.environment.runtime.backend == 'cpu'):
-            robot_uid = 'panda-v1'
-        if robot_uid is not None:
-            from ...registry import AGENT_REGISTRY
-            robot = AGENT_REGISTRY.create(robot_uid)
-            recipe_factory = getattr(robot, 'source_recipe', None)
-            if callable(recipe_factory):
-                select_recipe = getattr(robot, 'source_recipe_for_profile', None)
-                recipe = select_recipe(profile) if callable(select_recipe) else recipe_factory()
-                profiles = recipe.control_profiles
-                if profile not in profiles:
-                    raise ValueError('selected Robot does not declare this Controller profile')
-                from ...runtime.sessions.source_composition_adapters import (
-                    resolve_pickcube_robot_source_adapter,
-                )
-                provider_adapter = resolve_pickcube_robot_source_adapter(
-                    config.physics_provider, config.environment.runtime.backend)
-                from ...assembly.source_composition import build_source_composition_intent_v1
-                task_entities = ('tabletop-v1', 'cube-v1')
-                existing_robot_entity = 'panda-v1'
-                task_body_names = (('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube'))
-                task_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
-
-                def adapt_robot_source(source, **owners):
-                    # The selected, provider-neutral layer freezes ownership and
-                    # pinned Robot declarations before the provider reads assets.
-                    intent = build_source_composition_intent_v1(
-                        task_source=source, task_entity_ids=task_entities,
-                        existing_robot_entity_ids=(existing_robot_entity,),
-                        robot_recipe=recipe, task_site_transfers=task_site_transfers)
-                    return provider_adapter.compose_pickcube_robot_source(
-                        source, robot=robot, composition_intent=intent, **owners,
-                        robot_recipe=recipe, controller_profile=profile,
-                        task_entities=task_entities, existing_robot_entity=existing_robot_entity,
-                        task_body_names=task_body_names, task_site_transfers=task_site_transfers)
-
-                adapter = adapt_robot_source
         environment = (_nut_aligned_environment_config(config.environment)
                        if profile in _PICKCUBE_R3_PROFILES else config.environment)
         binding = make_reference_binding(
@@ -770,7 +696,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             lift_height_m=dict(config.task_parameters).get("lift_height_m"),
             task_config=json.loads(config.task_configuration_json),
             interval_provider=config.physics_provider,
-            robot_source_adapter=adapter,
             cube_force_z_N=cube_force_z_N,
         )
 

@@ -404,3 +404,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 本批生产 5 文件修改，+106／−41 行，净增 65 行；source 准入检查归位涉及重写迁移，未按整段删除计算。新增 3 个版本诊断文件（183 行）：正式 CPU 短程检查、四任务配置等价与能力拒绝检查、Isaac source 准入边界检查。无生产文件新增／删除；2 个实施状态文档更新。生产检查不再按 Task 判断选哪个配置 codec，但旧 component 工厂及其他未迁 caller 仍存在；Robot／Controller 真实构建链仍未统一，E01～E04 不关闭。
 
 版本诊断纯检查 8 passed。MuJoCo CPU 下 Pendulum、双轮车、PickCube 分别通过正式配置构造、reset、非零 step、二次 reset 与重复 close；最终源码对应运行共 55 个可观测子步。此前 Pendulum 首次两次 preflight 因共同 Runtime 能力表漏列已验证的 torque 绑定而拒绝，均为 0 子步；修复后复验通过，失败保留。NutAssembly 正式配置可解析、环境可构造，但短程检查在调用 `env.robot` 时发现现有 source 没有 Position subject binding，故在物理推进前失败、0 子步；不能将它记作四主体共同构建通过。需迁移 NutAssembly 实际 Robot 声明及控制绑定，而非为测试伪造 RobotRuntime。总计本批观察 110 个物理子步，全部锁释放；source/控制变动的 GeoPhys、Isaac 和 renderer 尚未复验，Isaac 仅纯准入边界检查。记录、失败回执、冻结 diff 和各次原始结果位于 ignored `workspace/maintenance/v211_formal_config_20261112_001/`。
+
+### 6.20 NutAssembly 进入共同 Robot source 编译
+
+输入 `e521c5de`。将 PickCube 原有 Robot source 组合流程从任务专有接线移到共同声明、source composer 和 reconstruction owner；NutAssembly 声明自己的桌面／nut／peg 实体及 Panda 默认选择，MuJoCo CPU 通过同一个 composer 编译真实 Panda subject、Controller 绑定和 resource writers。构造、普通 reset、执行切换重建及隔离 worker 使用同一组合入口；失败时释放新 source receipt。PickCube 原任务中的组合闭包和重复身份写入已删除。MuJoCo source adapter 的名称和分派不再依赖 PickCube，但替换装配仍保留其当前受支持能力范围。
+
+本批生产 7 文件修改，+117／−105 行，净增 12 行；原 PickCube 组合逻辑按职责重写迁移，非整文件搬运。版本诊断修改 1 文件（+17／−3），新增 1 个隔离 worker 诊断文件（45 行）；2 个状态／实施文档修改，无生产文件新增或删除。NutAssembly 的 MuJoCo source 实际带 Position subject binding，Env Robot 和 Runtime source 使用同一绑定；不是仅补 facade。当前仅 MuJoCo CPU 有此 source 组合 adapter，GeoPhys／Isaac 的对应主体声明和四任务完整共同构造仍待实现；renderer 未改，E01～E04 不提前结案。
+
+MuJoCo CPU 下 NutAssembly 单个 caller-owned Solution interval、PickCube R3、一体及装配主体、二次 reset 和 close 均通过；检查验证 Env Robot 的 subject 与 Runtime source binding 相同。NutAssembly 首轮在已推进 5 子步后，由检查脚本错误传入 seed 31 导致第二次 reset 拒绝；改为该任务固定 seed 19 后通过，失败和原始输出保留。总计本批进程内观察 30 个物理子步；PickCube 和 NutAssembly 隔离 worker 各完成 reset／一个 interval／二次 reset／close，worker 内部子步未直接观测，各保守预留 50，所有锁释放。新版本纯检查 8 passed。此结果不是完整 Solution 成功，也不外推 GeoPhys／Isaac／renderer。冻结 diff、计划和原始结果在 ignored `workspace/maintenance/v211_robot_composition_20261112_001/`。

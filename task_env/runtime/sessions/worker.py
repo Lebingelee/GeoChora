@@ -69,13 +69,10 @@ def _materialize_selected(payload):
         raise ValueError('worker dependency facts differ from admissible preflight')
     if not callable(getattr(cls, 'selected_binding', None)):
         raise ValueError('selected task has no reconstructible binding')
-    binding = cls.selected_binding(config)
+    binding = cls._bind_robot_source_composer(cls.selected_binding(config), config)
     provider, backend = config.physics_provider, config.environment.runtime.backend
     seed, horizon = payload['seed'], config.environment.episode.horizon
-    if binding.build_seeded is not None:
-        value = binding.build_seeded(provider, backend, seed, horizon)
-    else:
-        value = binding.build_for_provider(provider)
+    value = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
     source = value['source']
     try:
         artifact = value['artifact']

@@ -39,25 +39,39 @@ try:
         'parents':[s.parent_subject_id for s in robot.subjects],
         'controller_identities':[str(c.identity) for c in robot.controllers]}
     assert robot.controller is env.controller
+    subject_binding=getattr(env.value['source'],'position_subject_binding',None)
+    if args.case in {'nut','panda-r3','assembled-live'}:
+        assert subject_binding is not None and robot.subjects == subject_binding.subjects
+        result['robot']['binding_identity']=subject_binding.identity_hash
+        result['robot']['resource_writers']=list(subject_binding.plan.resource_writers)
 
     receipt=getattr(env.value['source'],'execution_source_receipt',None)
     snapshot=None if receipt is None else str(receipt.snapshot_root)
     result['source_snapshot']=snapshot
     if args.case!='assembled-unreset':
-        observation,info=env.reset(seed=31)
+        if args.case=='nut':
+            solution=env.value['solution_factory']()
+            observation,info=env.reset_for_solution(solution,seed=19)
+        else:
+            observation,info=env.reset(seed=31)
         first=env.session.state_boundary_identity().to_mapping()
+        if subject_binding is not None:
+            live_binding=env.session._source.position_subject_binding
+            assert live_binding.identity_hash==env.value['source'].position_subject_binding.identity_hash
         if args.case in {'pendulum','two-wheel'}:
             first_reset_parameters=dict(info['reset_parameters'])
             first_observation=np.asarray(observation['state']['proprioception']).copy()
 
         time_before=float(env.state.simulation_time)
-        stepped=env.step(action)
+        stepped=env.step_with_solution(solution) if args.case=='nut' else env.step(action)
+        if args.case=='nut':
+            assert not solution.failed
         second=env.session.state_boundary_identity().to_mapping()
         time_after=float(env.state.simulation_time)
         result['steps'].append({'before':first,'after':second,'time_before':time_before,'time_after':time_after,'reward':float(stepped[1]),'terminated':bool(stepped[2]),'truncated':bool(stepped[3])})
         assert time_after>time_before
         assert abs(time_after-time_before-env.artifact.timebase.control_dt)<1e-9
-        observation,info=env.reset(seed=31)
+        observation,info=env.reset(seed=19 if args.case=='nut' else 31)
         reset=env.session.state_boundary_identity().to_mapping()
         assert reset['episode_id']!=first['episode_id']
         result['second_reset']=reset

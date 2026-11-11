@@ -34,7 +34,41 @@ class _ResetReconstruction:
     def build_switch_candidate(self, seed):
         if self.binding.build_seeded is None:
             raise ValueError('configuration switch requires a seeded task builder')
-        return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
+        return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
+
+    def _compose(self, value):
+        """Attach the declared Robot source before the value enters the Env."""
+        compose = self.binding.compose_robot_source
+        if compose is None:
+            return value
+        source = value['source']
+        try:
+            adapted = compose(source, artifact=value['artifact'], controller=value['controller'])
+            from ..assembly.compiler import reference_task_identity_fields
+            from ..controllers.canonical.contracts import digest
+            result = dict(value)
+            result['source'] = adapted
+            resolved = dict(value['resolved_configuration'])
+            resolved.update(reference_task_identity_fields(value['artifact'], adapted, value['controller']))
+            composition = adapted.composition_runtime_input
+            reference = adapted.source_reference_plan
+            resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
+                                                         else reference.identity_hash)
+            if adapted.source_composition_request is not None:
+                resolved['source_composition_request_v2_sha256'] = adapted.source_composition_request.identity_hash
+            if adapted.source_composition_intent is not None:
+                resolved['source_composition_intent_v1_sha256'] = adapted.source_composition_intent.identity_hash
+            result['resolved_configuration'] = resolved
+            result['recipe_identity'] = digest(resolved)
+            return result
+        except BaseException as error:
+            receipt = getattr(source, 'execution_source_receipt', None)
+            if receipt is not None:
+                try:
+                    receipt.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'Robot source cleanup also failed: {cleanup_error!r}')
+            raise
 
     def use_binding(self, binding):
         """Use the Env's currently admitted task binding without changing policy."""
@@ -79,18 +113,18 @@ class _ResetReconstruction:
 class _StandardResetReconstruction(_ResetReconstruction):
     def initial(self, *, seed=31):
         if self.binding.build_seeded is not None:
-            return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
-        return self.binding.build_for_provider(self.provider)
+            return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
+        return self._compose(self.binding.build_for_provider(self.provider))
 
     def build_reset(self, current, seed, external_solution):
         if external_solution is not None:
-            return self.binding.build_external(self.provider)
+            return self._compose(self.binding.build_external(self.provider))
         if self.binding.build_sampled is not None:
-            return self.binding.build_sampled(
-                self.provider, self.backend, seed, self.horizon, self.sampled_reset)
+            return self._compose(self.binding.build_sampled(
+                self.provider, self.backend, seed, self.horizon, self.sampled_reset))
         if self.binding.build_seeded is not None:
-            return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
-        return self.binding.build_for_provider(self.provider)
+            return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
+        return self._compose(self.binding.build_for_provider(self.provider))
 
     def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
         selector = getattr(self.binding, 'reset_runtime_input', None)
@@ -412,8 +446,11 @@ class ReferenceTaskBinding:
     classify_position_input: Callable | None = None
     diagnostic_profile: str | None = None
     build_receives_binding: bool = False
+    compose_robot_source: Callable | None = None
 
     def __post_init__(self):
+        if self.compose_robot_source is not None and not callable(self.compose_robot_source):
+            raise TypeError('Robot source composer must be callable')
         sampling = (self.build_sampled, self.task_reset_sampler, self.task_reset_metadata)
         if any(value is not None for value in sampling) and not all(map(callable, sampling)):
             raise ValueError('sampled reset requires construction, RNG sampler and metadata projection')

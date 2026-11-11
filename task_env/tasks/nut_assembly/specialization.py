@@ -670,6 +670,11 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     selected_controller_profiles = frozenset()
     selected_parameter_limits = {"lift_height_m": (0.01, 0.15)}
     selected_supports_isaac = False
+    selected_robot_uids = frozenset(('panda-v1',))
+    robot_source_roots = (('tabletop-v1', 'grasp_table'), ('square-nut-v1', 'SquareNut'),
+                          ('square-peg-v1', 'peg1'), ('round-peg-v1', 'peg2'))
+    robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
+    default_robot_source_uid = 'panda-v1'
     selected_execution_defaults = {
         "physics_provider": "geophys",
         "physics_backend": "cpu",
