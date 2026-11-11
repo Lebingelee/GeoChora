@@ -172,6 +172,8 @@ def test_component_controller_selection_follows_robot_capability():
         agent_uids=('panda-v1',), robot={'controller': {'kind': 'absolute_joint'}})
     assert resolve_execution_plan(FixtureEnv, panda).controller_selections == (
         ('panda-v1', 'absolute_joint', None),)
+    assert resolve_execution_plan(FixtureEnv, panda, agents=None).controller_selections == (
+        ('panda-v1', 'absolute_joint', None),)
 
 
 def test_missing_panda_controller_is_rejected_before_provider_bootstrap(monkeypatch):

@@ -764,7 +764,7 @@ def resolve_execution_plan(
 
     if not isinstance(config, ResolvedEnvConfig):
         raise TypeError("static execution planning requires a ResolvedEnvConfig")
-    agents = tuple(agents)
+    agents = tuple(agents or ())
     agent_uids = tuple(
         str(getattr(agent, "uid", agent)) for agent in (agents or config.agents.agent_uids)
     )
