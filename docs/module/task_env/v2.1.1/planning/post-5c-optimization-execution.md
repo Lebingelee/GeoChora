@@ -588,3 +588,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 6 文件 +44／−34，净增 10 行；其中既有主体声明及验证职责重写迁到 Robot 合同，非整文件迁移；版本诊断修改 1 文件 +30／−0；本文和当前状态文档修改 2 文件。没有文件新增、删除或整文件迁移，项目 tracked 文件数保持 1364。provider／renderer 的 source、native 映射、clock 和提交接口未更改。四个 Task Artifact 的完整 mapping 与 identity 在相同输入下均与输入版本相同；代码来源身份发生变化，不能仅凭 Artifact 一致扩大旧运行证据。
 
 45 项版本纯合同最终通过，包含四任务主体合同及 Robot／Scene 关节不匹配拒绝。新增测试首版将简单任务的 TaskArtifactV1 当成旧版 Artifact 读取，导致 2 项 AttributeError；改为检查 V1 的 Scene identity、关节绑定和初始化后通过。MuJoCo CPU 的 PickCube、NutAssembly、Pendulum、双轮车及装配 Panda 完成真实短程，共观测 65 子步。GeoPhys CPU 的 PickCube、NutAssembly 和 Pendulum 也完成短程，内部子步未观测，按每条 50 保守预留。Isaac、renderer 和完整 Solution 未重跑；历史有界结果只按具体代码与来源影响参考。计划、冻结 diff、前后 Artifact 对照及运行结果在 ignored `workspace/maintenance/v211_robot_artifact_20261112_001/`；E01～E04 仍未接收。
+
+### 6.43 Runtime 直接消费 physical execution 声明
+
+输入 `3f7ba60b`。移除 `ReferenceTaskBinding.physical_control_profile` 及 PickCube MJCF／USD、简单主体各自提供的取值回调；Env 从已编译 `physical_execution` 或 reset 已提交选择获取同一个对象，Runtime materialization、reset preflight、physical／sequence 提交及混合控制检查均消费这一声明。source、Controller、资源及 native 映射的既有准入检查保留；延迟获得动作合同的 binding 必须在编译后提供真实 `PhysicalControlExecutionV1`。构造 horizon 不再为旧物理回调例外放开超过 6000 的内部入口；四个正式配置在本次之前已限制为至多 6000。旧诊断直接传入该回调不再作为兼容目标。
+
+生产修改 8 文件 +64／−73，净减 9 行；其中控制生命周期分支去除一层缩进，属于代码改写，不计为文件迁移。版本诊断修改 2 文件 +29／−1；本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1364。Task 少三处 physical execution 接线，Runtime 统一读取声明；未修改 provider 原生映射、renderer、clock 或实际物理推进算法，Position 与 physical 不同的控制语义保留。
+
+46 项版本纯合同通过，包括缺失／伪造 physical execution 的编译拒绝。MuJoCo CPU 的四任务，以及固定 joint、direct effort 和 reset-scoped joint／r3 切换均完成短程，后者含 H5 记录读回；另外两次 direct effort 序列验证均推进 5 子步，最终检查生命周期 dispatch、一个已确认提交和 Controller 身份。累计 MuJoCo 实测 90 子步。GeoPhys CPU 的 Panda joint effort 与 Pendulum 短程通过，内部子步未观测，各按 50 保守预留。Isaac USD source、已编译动作合同和 Position 状态绑定完成静态检查，未启动 SDK；第一次检查因调用环境缺少 GeoPhys `scene` 模块路径而失败，补足 PYTHONPATH 后通过。Isaac／renderer 真实运行及完整 Solution 本批未复验。计划、冻结 diff 和结果位于 ignored `workspace/maintenance/v211_physical_execution_declaration_20261112_001/`；E01～E04 仍未接收。

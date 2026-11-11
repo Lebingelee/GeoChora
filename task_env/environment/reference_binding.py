@@ -432,7 +432,6 @@ class ReferenceTaskBinding:
     legacy_position_expert_admission: Callable | None = None
     reset_runtime_input: Callable | None = None
     position_control_binding: Callable | None = None
-    physical_control_profile: Callable | None = None
     physical_observation_binding: Callable | None = None
     physical_sequence_v2_observation: bool = False
     position_physical_mixed: bool = False
@@ -467,8 +466,7 @@ class ReferenceTaskBinding:
             raise TypeError('physical ignore_done policy must be a boolean')
         if type(self.build_receives_binding) is not bool:
             raise TypeError('build_receives_binding must be a boolean')
-        compiled_physical_action = (self.action_schema is None and self.action_space_factory is None
-                                    and callable(self.physical_control_profile))
+        compiled_physical_action = self.action_schema is None and self.action_space_factory is None
         if self.build_mixed_control_profile is None and (
                 not callable(self.prepare_action) or (not compiled_physical_action and (
                     not callable(self.action_space_factory)
@@ -509,8 +507,6 @@ class ReferenceTaskBinding:
             raise ValueError('reset runtime input selector must be callable when supplied')
         if self.position_control_binding is not None and not callable(self.position_control_binding):
             raise ValueError('position control binding selector must be callable when supplied')
-        if self.physical_control_profile is not None and not callable(self.physical_control_profile):
-            raise ValueError('physical control profile selector must be callable when supplied')
         if type(self.position_physical_mixed) is not bool:
             raise TypeError('Position/physical mixed capability must be bool')
         if type(self.physical_sequence_v2_observation) is not bool:
@@ -693,6 +689,5 @@ class ExistingSubjectEffortTask:
                                                              (action.dimension,), dtype=np.float32)}),
             prepare_action=lambda value: value, observation_space_factory=self.observation_space_factory,
             observation_projection=observe_task_definition,
-            physical_control_profile=lambda env: env.value['physical_execution'],
             physical_direct_effort_feedback=(config.control.profile_id in (None, 'direct_joint_effort_v1')),
             physical_terminate_on_success=True, physical_ignore_done=config.episode.ignore_done)

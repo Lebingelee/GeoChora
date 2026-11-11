@@ -30,3 +30,14 @@ def test_g05_effort_rejects_foreign_delivery_and_timebase():
     artifact.timebase.control_substeps = 24
     with pytest.raises(ValueError, match='25 substep'):
         _validate_g05_isaac_effort_source(artifact, execution, source)
+
+
+def test_compiled_action_contract_requires_a_real_physical_execution():
+    from dataclasses import replace
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
+
+    binding = replace(make_reference_binding(), action_schema=None, action_space_factory=None)
+    with pytest.raises(ValueError, match='requires its execution'):
+        binding.bind_compiled_control({})
+    with pytest.raises(TypeError, match='requires PhysicalControlExecutionV1'):
+        binding.bind_compiled_control({'physical_execution': object()})

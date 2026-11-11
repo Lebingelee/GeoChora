@@ -99,3 +99,5 @@ Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、A
 固定 physical execution 与 Position 投影并存时，Env／Robot 也公开实际 physical Controller，避免同一动作有两个对外身份；验证及范围见[实施记录 6.41](../planning/post-5c-optimization-execution.md#641-固定-physical-controller-的公开归属)。
 
 四任务的 Artifact 主体现从注册 Robot 的共同声明合同产生；公共 Assembly compiler 不再硬编码 Panda 主体。MuJoCo 四任务／装配 Panda 与 GeoPhys 三条受影响路线短程通过；完整四任务构建链尚未合流。详见[实施记录 6.42](../planning/post-5c-optimization-execution.md#642-robot-提供-task-artifact-主体声明)。
+
+Runtime 现直接消费已声明或 reset 已提交的 physical execution；正式物理任务不再分别提供取回该对象的 binding 回调。MuJoCo 四任务／物理序列与 GeoPhys 两条受影响路线通过短程；Isaac 仅完成静态构建合同检查。详见[实施记录 6.43](../planning/post-5c-optimization-execution.md#643-runtime-直接消费-physical-execution-声明)。

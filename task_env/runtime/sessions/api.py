@@ -1643,8 +1643,7 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                               and callable(binding.physical_observation_binding)
                               and (selection.physics_provider, selection.physics_backend)
                                   in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')})
-            if (binding.physical_control_profile is None
-                    or type(physical) is not PhysicalControlExecutionV1
+            if (type(physical) is not PhysicalControlExecutionV1
                     or (not position_owner
                         and not any(selected.controller is item for item in physical.controllers))):
                 raise ValueError('physical Controller is not bound to the selected execution')

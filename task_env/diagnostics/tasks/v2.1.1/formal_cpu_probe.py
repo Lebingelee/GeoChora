@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');args=parser.parse_args()
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -100,11 +100,28 @@ try:
             first_reset_parameters=dict(info['reset_parameters'])
             first_observation=np.asarray(observation['state']['proprioception']).copy()
 
+        if args.sequence:
+            from task_env.controllers.canonical.physical_sequence import PhysicalActionSequenceV1, PhysicalActionSliceV1
+            spec=env.physical_sequence_spec()
+            assert len(spec['controllers']) == 1 and spec['control_substeps'] >= 2
+            identity=spec['controllers'][0]['identity']; midpoint=spec['control_substeps']//2
+            values=tuple(float(x) for x in action)
+            action=PhysicalActionSequenceV1((
+                PhysicalActionSliceV1(0,midpoint,((identity,values),)),
+                PhysicalActionSliceV1(midpoint,spec['control_substeps'],((identity,tuple(-v for v in values)),))))
+            result['physical_sequence_spec']=spec
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
         stepped=env.step_with_solution(solution) if args.case=='nut' else env.step(action)
         if args.case=='nut':
             assert not solution.failed
+        if args.sequence:
+            dispatch=env.session._control_lifecycle_dispatch
+            receipt=env.session._last_control_submission
+            assert dispatch.command_kind == 'physical-effort-sequence' and dispatch.stage == 'committed'
+            assert receipt['command_kind'] == dispatch.command_kind and receipt['status'] == 'acknowledged'
+            assert receipt['controller_identities'] == list(dispatch.controller_identities) or tuple(receipt['controller_identities']) == dispatch.controller_identities
+            result['physical_sequence_submission']=receipt
         second=env.session.state_boundary_identity().to_mapping()
         time_after=float(env.state.simulation_time)
         result['steps'].append({'before':first,'after':second,'time_before':time_before,'time_after':time_after,'reward':float(stepped[1]),'terminated':bool(stepped[2]),'truncated':bool(stepped[3])})

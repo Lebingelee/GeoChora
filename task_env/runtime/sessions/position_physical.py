@@ -78,7 +78,7 @@ def prepare_mixed_position(env, action):
     from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
     session = env.session
     profiles = tuple(getattr(env, 'position_profiles', ()))
-    physical = env.binding.physical_control_profile(env)
+    physical = env._physical_execution()
     if (type(action) is not PositionPhysicalActionV1 or type(session) is not _MuJoCoSession
             or len(profiles) != 1 or type(profiles[0]) is not PandaPositionServoProfileV1
             or type(physical) is not PhysicalControlExecutionV1

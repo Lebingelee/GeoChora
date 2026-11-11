@@ -39,8 +39,7 @@ class PhysicalRuntimeBuilder:
     def create(self, env, selection, start_worker, materialize, _materialize_control):
         from .physical_control import PhysicalControlExecutionV1
         if (type(self.execution) is not PhysicalControlExecutionV1
-                or env.value.get('physical_execution') is not self.execution
-                or not callable(getattr(env.binding, 'physical_control_profile', None))):
+                or env._physical_execution() is not self.execution):
             raise TypeError('physical construction requires its admitted execution and Task binding')
         if env.value.get('selected_controller_profile_id') is not None:
             if len(self.selection_matches) != 1:
@@ -176,7 +175,7 @@ class ScalarRuntimeBuilder:
                 from .legacy_native_feedback_binding import install_admitted_binding
                 install_admitted_binding(env.session, source=env.value['source'],
                                          artifact=env.artifact, controller=env._selected_controller)
-            return RuntimeBuildResult(skip_gravity=env.binding.physical_control_profile is None)
+            return RuntimeBuildResult(skip_gravity=env._physical_execution() is None)
         env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
             binding=self.binding,
             diagnostic_profile=(env._diagnostic_profile if env.backend == 'cuda' else None),
@@ -214,9 +213,8 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
         raise ValueError('selected runtime has conflicting construction capabilities')
     result = builders[0].create(env, selection, start_worker, materialize, materialize_control)
     capabilities = list(result.initial_capabilities)
-    physical_factory = getattr(env.binding, 'physical_control_profile', None)
-    if physical_factory is not None:
-        execution = physical_factory(env)
+    execution = env._physical_execution()
+    if execution is not None:
         declared = env.value.get('physical_execution')
         if declared is not None and execution is not declared:
             raise ValueError('physical execution changed after selected preflight')

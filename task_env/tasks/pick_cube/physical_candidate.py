@@ -358,8 +358,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 if reset_switch else None,
             physical_action_observer=observe_physical_action if reset_switch else None,
             physical_observation_binding=None if direct_physical else legacy_position_physical_observation_binding,
-            physical_sequence_v2_observation=direct_physical,
-            physical_control_profile=(lambda env: env._physical_reset_selection.current.execution)
-                                     if reset_switch else (lambda _env: physical))
+            physical_sequence_v2_observation=direct_physical)
         owned_resources.callback(resources.pop_all().close)
         return binding

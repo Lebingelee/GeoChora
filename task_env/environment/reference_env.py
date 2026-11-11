@@ -88,6 +88,14 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     action_space = None
     observation_space = None
 
+    def _physical_execution(self):
+        """Return the physical execution declared or committed for this Env."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            committed = selection.committed
+            return selection.declaration if committed is None else committed.execution
+        return getattr(self, 'value', {}).get('physical_execution')
+
     @property
     def controller(self):
         """The Controller currently admitted to submit actions for this Env."""
@@ -1427,7 +1435,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._bind_selected_task_definition()
         self.dual_entity_position = len(self.position_profiles) == 2
         if (not self.position_profile and not mixed_control_candidate
-                and self.binding.physical_control_profile is None):
+                and self._physical_execution() is None):
             if type(self.binding.scalar_control_binding) is not ControlBinding:
                 raise TypeError('selected scalar control requires its declared ControlBinding')
         if camera_observation_config is not None and not self.position_profile:
@@ -1516,8 +1524,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise ValueError("selected task RGB is configured through the public make_env factory")
             if render_mode is not None or build_runtime is not True:
                 raise ValueError('selected reference rendering and component runtime options require a component task')
-            if (type(horizon) is not int or horizon < 1
-                    or (horizon > 6000 and getattr(_binding, 'physical_control_profile', None) is None)):
+            if type(horizon) is not int or not 1 <= horizon <= 6000:
                 raise ValueError('selected reference horizon is outside its admitted range')
             if camera_observation_config is not None:
                 from ..observations.canonical_camera.consumer import CameraObservationConfigV1
@@ -1864,11 +1871,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._require_execution_healthy()
         if self.session is None or self._stopped:
             raise RuntimeError('reset required before querying physical sequence capability')
-        select = getattr(getattr(self, 'binding', None), 'physical_control_profile', None)
-        if not callable(select):
-            raise StageUnavailableError('this route has no physical control capability')
         from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
-        profile = select(self)
+        profile = self._physical_execution()
         if type(profile) is not PhysicalControlExecutionV1:
             raise StageUnavailableError('this route has no admitted physical execution')
         from ..runtime.sessions.physical_sequence import describe_physical_sequence_capability
@@ -1915,9 +1919,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             requested_controller = None if options is None else options.get('controller')
             physical_candidate = physical_selection.prepare(requested_controller)
             options = None
-        if self.binding.physical_control_profile is not None:
-            profile = (physical_candidate.execution if physical_candidate is not None
-                       else self.binding.physical_control_profile(self))
+        profile = (physical_candidate.execution if physical_candidate is not None
+                   else self._physical_execution())
+        if profile is not None:
             declared_physical = self.value.get('physical_execution')
             if declared_physical is not None and profile is not declared_physical:
                 raise ValueError('physical execution differs from the selected declaration')
@@ -2371,7 +2375,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     self.binding.mixed_record_metadata(self),
                 )
             if (not self.position_profile and not self.mixed_control_profile
-                    and self.binding.physical_control_profile is None):
+                    and self._physical_execution() is None):
                 self._publish_execution_info(self.info)
             self._last_position_terminated = False
             self._last_position_truncated = False
@@ -3129,7 +3133,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if (self.recorder is not None and getattr(self.recorder, 'active', False)
                 and getattr(self, '_physical_reset_selection', None) is None):
             raise StageUnavailableError('physical-control recording requires reset-scoped selection')
-        profile = self.binding.physical_control_profile(self)
+        profile = self._physical_execution()
         if type(profile) is not PhysicalControlExecutionV1:
             raise TypeError('selected physical route requires an admitted physical execution profile')
         plan = profile.compiled.binding
@@ -3707,7 +3711,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         computes, applies, steps or appends a transition; the next ordinary
         ``step`` is the first opportunity for the new instance to control.
         """
-        if getattr(getattr(self, 'binding', None), 'physical_control_profile', None) is not None:
+        if self._physical_execution() is not None:
             raise StageUnavailableError('physical Controllers can only change at reset')
         if self._closed:
             raise RuntimeError('cannot switch a closed selected environment')
