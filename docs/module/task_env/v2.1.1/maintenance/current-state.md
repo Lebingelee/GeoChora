@@ -53,3 +53,5 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 第九批移除 registry 对构造方法覆盖的反射判断，基类工厂处理既有组件配置和旧 binding，四个实际 caller 合同通过。累计生产净增 237 行；E00～E04 仍在实施。见[第九批记录](../planning/post-5c-optimization-execution.md#68-第九批registry-不再反射判断构造方法覆盖)。
 
 后续职责整理将 Panda MJCF 传动检查归入 MuJoCo source adapter，将质量模型执行组合归入 Controller owner。MuJoCo direct、joint-mass、R3-mass 真实短程复验通过；Isaac 质量模型未在本批重跑。见[职责整理记录](../planning/post-5c-optimization-execution.md#611-panda-mjcf-source-检查归属)。
+
+最近的增量让 reset 策略由任务 binding 声明，并移除 Panda source 检查中的历史 checkout 绝对路径；Position 旧入口自动创建的 source 目录现在在 Env 关闭或构造失败时回收。MuJoCo 受影响短程和故障合同已复验，见[实施记录](../planning/post-5c-optimization-execution.md#614-reset-重建能力归属)。
