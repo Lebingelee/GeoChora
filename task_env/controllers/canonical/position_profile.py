@@ -244,14 +244,10 @@ class PandaPositionServoProfileV1:
         self._constructed_algorithm_identity = self._algorithm.identity
         self._preview_constructed_target_limits = tuple(
             tuple(float(value) for value in row) for row in self._algorithm.arm_target_limits)
-        self._constructed_arm_reference_identity = (
-            None if self._arm_reference is None else self._arm_reference.identity
-        )
         self._plan_identity_hash = None
         self._episode_id = None
         self._reset_sample_id = None
         self._next_control_step = None
-        self._activation_boundary_id = None
 
     def _validate_source(self, source):
         from ...runtime.sessions.source import UsdRuntimeSourceV1
@@ -647,7 +643,6 @@ class PandaPositionServoProfileV1:
         self._episode_id = boundary.episode_id
         self._reset_sample_id = boundary.reset_sample_id
         self._next_control_step = 0
-        self._activation_boundary_id = boundary.boundary_id
         q_reference = [
             state.joint_position[f'panda-v1/joint{index}']
             for index in range(1, 8)
@@ -657,62 +652,6 @@ class PandaPositionServoProfileV1:
         if self._arm_reference is not None:
             self._arm_reference.reset(state)
         return boundary.boundary_id
-
-    def _prepare_switch_activation(self, publication, plan):
-        """Prepare fresh instance memory for a live, already-complete boundary.
-
-        This deliberately does not call ``reset()``: reset remains an episode
-        initialization contract and continues to accept only the step-zero
-        publication. The returned tuple is inert until the selected lifecycle
-        commits this instance as the active writer.
-        """
-        if any(value is not None for value in (
-            self._plan_identity_hash, self._episode_id, self._reset_sample_id,
-            self._next_control_step, self._activation_boundary_id,
-        )):
-            raise ValueError('PositionServoV1 switch candidate must be a fresh instance')
-        if (self.identity != self._constructed_identity
-                or self.config != self._constructed_config
-                or self._algorithm.identity != self._constructed_algorithm_identity
-                or self._algorithm.config != self._constructed_config
-                or (None if self._arm_reference is None else self._arm_reference.identity)
-                    != self._constructed_arm_reference_identity):
-            raise ValueError('PositionServoV1 candidate identity or algorithm parameters changed after construction')
-        self._validate_source(self.source)
-        plan_identity = self._validate_plan(plan)
-        state = self._adapt_publication(publication)
-        boundary = publication.view.boundary
-        clock = publication.view.sample_clock
-        if (clock.clock_domain != 'evaluation_boundary'
-                or clock.sample_index != boundary.control_step
-                or boundary.control_step < 0):
-            raise ValueError('PositionServoV1 switch requires a complete evaluation boundary')
-        return (
-            self.identity, plan_identity, boundary.episode_id,
-            boundary.reset_sample_id, boundary.control_step, boundary.boundary_id,
-            [state.joint_position[f'panda-v1/joint{index}'] for index in range(1, 8)],
-        )
-
-    def _activate_switch_memory(self, prepared):
-        """Install prevalidated mid-episode cursor state on this fresh instance."""
-        identity, plan_identity, episode_id, reset_sample_id, control_step, boundary_id, q_reference = prepared
-        if identity != self.identity or self._next_control_step is not None:
-            raise ValueError('PositionServoV1 prepared switch activation no longer matches this instance')
-        self._plan_identity_hash, self._episode_id, self._reset_sample_id = (
-            plan_identity, episode_id, reset_sample_id,
-        )
-        self._next_control_step = control_step
-        self._activation_boundary_id = boundary_id
-        self._algorithm.set_nullspace_reference(q_reference)
-        self._algorithm.reset_pose_target_memory(q_reference)
-        if self._arm_reference is not None:
-            self._arm_reference.reset(SimpleNamespace(
-                control_step=control_step,
-                joint_position={
-                    f'panda-v1/joint{index}': q_reference[index - 1]
-                    for index in range(1, 8)
-                },
-            ))
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)

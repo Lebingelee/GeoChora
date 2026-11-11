@@ -1550,8 +1550,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._published_position_obs = None
             self._published_position_info = None
             self._published_position_evaluation = None
-            self._position_controller_switch_fault_receipt = None
-            self._pending_position_switch = None
             self.recorder = None
             self.recording_path = None
 
@@ -1972,8 +1970,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         # Controller that produced it. Every reset starts with empty publication
         # and switch slots, including resets that change selected capabilities.
         self._position_episode_end = None
-        self._position_controller_switch_fault_receipt = None
-        self._pending_position_switch = None
         self._published_position_state = None
         self._published_position_typed_state = None
         self._published_position_obs = None
@@ -3656,126 +3652,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._step(proposal.action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):
-        """Replace the single Panda Position instance at the current real boundary.
-
-        The existing Generic H5 v3 Recorder is required so the preparation,
-        effective identity and boundary are observable. This operation never
-        computes, applies, steps or appends a transition; the next ordinary
-        ``step`` is the first opportunity for the new instance to control.
-        """
-        if self._physical_execution() is not None:
-            raise StageUnavailableError('physical Controllers can only change at reset')
-        if self._closed:
-            raise RuntimeError('cannot switch a closed selected environment')
-        if self._execution_fault is not None:
-            raise RuntimeError('cannot switch a faulted selected environment; reset() is required')
-        if not getattr(self, 'position_profile', False) or self.dual_entity_position:
-            raise RuntimeError('Controller instance switching is limited to the single Panda Position candidate')
-        if self._stopped or self._position_episode_end is not None:
-            raise RuntimeError('Controller switching requires a live, nonterminal episode')
-        if getattr(self, '_pending_position_switch', None) is not None:
-            raise RuntimeError('the current Controller switch must be applied by one complete step before another switch')
-        if self.session is None or self._published_position_typed_state is None:
-            raise RuntimeError('Controller switching requires a completed reset boundary')
-        if self.state.control_step >= self.horizon:
-            raise RuntimeError('Controller switching is not allowed at or beyond the horizon')
-
-        recorder = self.recorder
-        if (recorder is None or not recorder.active
-                or recorder.config.schema_version != 'v3'):
-            raise RuntimeError('Controller switching requires an active Generic H5 v3 recording')
-        boundary = self._published_position_typed_state.view.boundary
-        clock = self._published_position_typed_state.view.sample_clock
-        if (self.typed_state is None
-                or self.typed_state.view.boundary.boundary_id != boundary.boundary_id
-                or self.state.control_step != boundary.control_step
-                or self._published_position_state is None
-                or self._published_position_state.control_step != boundary.control_step
-                or self._published_position_state.simulation_time != self.state.simulation_time
-                or clock.clock_domain != 'evaluation_boundary'
-                or clock.sample_index != boundary.control_step
-                or getattr(self.session, '_inner_interval_active', False)
-                or getattr(self.session, '_position_target_in_flight', None) is not None):
-            raise RuntimeError('Controller switching requires the last complete public control boundary')
-        if (recorder.transition_count != boundary.control_step
-                or recorder.observation_count != recorder.transition_count + 1
-                or getattr(recorder, 'pending', None) is not None):
-            raise RuntimeError('Controller switching requires a complete recorded T/T+1 boundary')
-
-        current = self.position_profiles[0]
-        from ..runtime.sessions.control import (
-            _commit_position_profile_replacement,
-            _prepare_position_profile_replacement,
-        )
-
-        prepared = _prepare_position_profile_replacement(
-            self.session, current, candidate, self.position_plan, self.typed_state,
-            scene=self.position_scene,
-            joint_bindings=self.position_joint_bindings,
-            frame_bindings=self.position_frame_bindings,
-        )
-        from ..recorders.position_metadata import position_switch_event
-
-        switch_id = uuid4().hex
-        event = position_switch_event(
-            switch_id=switch_id, boundary=boundary, clock=clock,
-            transition_count=recorder.transition_count,
-            sequence=recorder.next_boundary_event_sequence(recorder.transition_count),
-            current=current, candidate=candidate,
-            binding_identity=self.position_plan.identity_hash,
-            source_closure=self.value['source'].source_closure_digest,
-        )
-        event.validate()
-        recorder.validate_boundary_event(event)
-
-        before_state = self.state
-        committed = False
-        try:
-            _commit_position_profile_replacement(self.session, prepared)
-            committed = True
-            self.position_profiles = (candidate,)
-            self._selected_controller = candidate
-            self.value['controller'] = candidate
-            recorder.add_boundary_event(event)
-            self._pending_position_switch = {
-                'switch_id': switch_id,
-                'controller_identity': candidate.identity,
-                'effective_boundary_id': boundary.boundary_id,
-                'effective_control_step': boundary.control_step,
-            }
-        except BaseException as error:
-            admitted_profiles = getattr(self.session, '_position_profiles_by_writer', None)
-            if (not committed and isinstance(admitted_profiles, dict)
-                    and admitted_profiles.get(candidate.writer_id) is candidate):
-                committed = True
-            if not committed:
-                raise
-            # If a later pointer projection failed after RuntimeSession admitted
-            # the candidate, keep the Env and session owners aligned before latching.
-            self.position_profiles = (candidate,)
-            self._selected_controller = candidate
-            self.value['controller'] = candidate
-            after_state = None
-            readback_error = None
-            try:
-                after_state = self.session.snapshot()
-                self.state = after_state
-            except BaseException as snapshot_error:
-                readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
-            fault = self._latch_fault(
-                'position_controller_switch_record', error,
-                before_state=before_state, after_state=after_state,
-                interval_attempted=False, interval_completed=False,
-                transition_status='not_assessed', readback_error=readback_error,
-            )
-            from ..recorders.position_metadata import position_switch_fault_receipt
-            self._position_controller_switch_fault_receipt = position_switch_fault_receipt(
-                switch_id=switch_id, boundary=boundary, clock=clock,
-                current=current, candidate=candidate,
-                active_controller_identity=self._selected_controller.identity, fault=fault,
-            )
-            raise
-        return event
+        """Controller changes are admitted only while resetting an episode."""
+        raise StageUnavailableError('Controller switching is only supported at reset')
 
     def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
@@ -4561,11 +4439,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             source_closure_digest=self.value['source'].source_closure_digest,
             controller=self._selected_controller,
             position_profiles=self.position_profiles if self.dual_entity_position else None,
-            switch_fault_receipt=self._position_controller_switch_fault_receipt,
-            pending_switch=self._pending_position_switch,
-            execution_fault=self._execution_fault if self._pending_position_switch is not None else None,
-            last_transition=getattr(self, 'last_position_transition', None),
-            runtime_step=lambda: self.state.control_step, payload=payload,
+            payload=payload,
         )
         selection = getattr(self, '_physical_reset_selection', None)
         if selection is not None:

@@ -904,3 +904,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +25／−2，净增 23 行；版本诊断修改 1 文件 +26／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。新 plan 在构造与物化时核对 Scene、Artifact、source、writer 和资源；provider 的原有 native 映射及 renderer、clock、提交机制未改。
 
 115 项版本检查通过，包括本机已验证 USD delivery 的实际主体／Controller／物化 plan 合同；未提供该 delivery 时对应检查跳过。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回、Env／App 关闭；主体 writer 和 plan 与实际 Controller 一致，匹配检查全部通过。观察到 41 次 physics callback，订阅前启动推进未知；callback 取消订阅报告 AttributeError，SDK 日志保留渲染预热和只读目录错误，进程及独立读回成功。MuJoCo 一体 Panda、装配 Panda 和 NutAssembly 短程均通过，各观测 5 个 native 子步。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、资源预算及证据位于 ignored `workspace/maintenance/v211_usd_robot_position_20261112_7u90vfp_/` 与 `workspace/maintenance/v211_panda_position_20261112_cmzuogv9/`；E01～E04 仍未接收。
+
+### 6.82 Controller 切换限定于 reset
+
+输入 `86c887f4`。G04 明确要求拒绝 episode 内切换，旧的 `switch_position_controller` 却可在运行中替换实例，并依赖专属的状态迁移、Runtime 提交和录像事件。该入口现在明确拒绝并指向 reset；删除只服务它的 Controller 激活、提交和 pending 录像状态。按 reset 选择 Controller 的正式能力保留，历史录像格式和已接收证据不因此改写。
+
+生产修改 4 文件 +4／−406，净减 402 行；版本诊断修改 1 文件 +7／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。共同生命周期不再容纳与 G04 相悖的 episode 内替换旁路；Runtime 的正常 source／状态／clock／提交和 renderer 合同未改。
+
+115 项版本检查通过，包括真实 reset 后拒绝 episode 内更换且保持 Controller 与状态边界、随后可正常 step。MuJoCo 下 joint→R3 reset 切换和 H5 读回通过，观察 10 个 native 子步；参考 Position 录像短程另观察 5 个子步。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅报告 AttributeError，SDK 关闭日志有异常但进程和独立读回成功。GeoPhys、完整 Solution 本批未重跑。冻结 diff、预算与收据位于 ignored `workspace/maintenance/v211_position_reset_only_20261112_18r1w8rp/` 和 `workspace/maintenance/v211_reset_only_cpu_20261112_cnchvs06/`；E01～E04 仍未接收。

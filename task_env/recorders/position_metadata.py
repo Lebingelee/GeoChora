@@ -8,9 +8,7 @@ import numpy as np
 
 def position_episode_end_payload(*, state, boundary, source_closure_digest,
                                  controller=None,
-                                 position_profiles=None, switch_fault_receipt=None,
-                                 pending_switch=None, execution_fault=None,
-                                 last_transition=None, runtime_step=None, payload=None):
+                                 position_profiles=None, payload=None):
     """Project the last published Position boundary and control facts for recording."""
     details = {
         'control_step': int(state.control_step),
@@ -26,14 +24,6 @@ def position_episode_end_payload(*, state, boundary, source_closure_digest,
             'writer_id': profile.writer_id,
             'controller_identity': profile.identity,
         } for profile in position_profiles)
-    if switch_fault_receipt is not None:
-        details['controller_switch_fault_receipt'] = dict(switch_fault_receipt)
-    if pending_switch is not None:
-        details['pending_controller_switch_application'] = pending_controller_switch_receipt(
-            pending_switch, published_step=state.control_step,
-            execution_fault=execution_fault, last_transition=last_transition,
-            runtime_step=runtime_step,
-        )
     details.update(dict(payload or {}))
     return details
 
@@ -45,88 +35,6 @@ def position_control_binding_provenance(binding, selector):
         'binding': asdict(binding),
         'selector_source_sha256': callable_source_snapshot(selector),
     }
-
-
-def _switch_controller_payload(controller, *, requested=False):
-    prefix = 'requested_' if requested else ''
-    return {
-        f'{prefix}profile_id': controller.profile_id,
-        f'{prefix}writer_id': controller.writer_id,
-        f'{prefix}controller_identity': controller.identity,
-        'action_config': asdict(controller.config),
-    }
-
-
-def position_switch_event(*, switch_id, boundary, clock, transition_count, sequence,
-                          current, candidate, binding_identity, source_closure):
-    """Build the recorded switch event without changing runtime or recorder state."""
-    from ..trajectory.canonical.episode import BoundaryEventV1
-
-    return BoundaryEventV1(
-        'boundary-event-v1', boundary.episode_id, transition_count, sequence,
-        f'controller-switch-{switch_id}', 'controller_instance_switch',
-        'task_env.selected_reference.position_servo_v1',
-        {
-            'switch_id': switch_id,
-            'request': {'operation': 'replace_position_controller_instance',
-                        **_switch_controller_payload(candidate, requested=True)},
-            'previous_controller': _switch_controller_payload(current),
-            'effective_controller': _switch_controller_payload(candidate),
-            'result': {'preparation': 'validated', 'switch': 'effective',
-                       'first_control_application': 'pending_next_step'},
-            'effective_boundary': {**boundary.to_mapping(), 'boundary_id': boundary.boundary_id},
-            'effective_clock': clock.to_mapping(),
-            'binding_identity_hash': binding_identity,
-            'source_closure_digest': source_closure,
-        },
-    )
-
-
-def position_switch_fault_receipt(*, switch_id, boundary, clock, current, candidate,
-                                  active_controller_identity, fault):
-    """Describe a committed switch whose effective event could not be recorded."""
-    return {
-        'switch_id': switch_id,
-        'result': 'committed_but_effective_event_record_failed',
-        'request': {'operation': 'replace_position_controller_instance',
-                    **_switch_controller_payload(candidate, requested=True)},
-        'previous_controller': _switch_controller_payload(current),
-        'effective_controller': _switch_controller_payload(candidate),
-        'previous_controller_identity': current.identity,
-        'active_controller_identity': active_controller_identity,
-        'effective_boundary': {**boundary.to_mapping(), 'boundary_id': boundary.boundary_id},
-        'effective_clock': clock.to_mapping(),
-        'preparation_succeeded': True,
-        'switch_effective': True,
-        'effective_event_recorded': False,
-        'first_control_application': 'not_attempted',
-        'execution_fault': fault.to_mapping(),
-    }
-
-
-def pending_controller_switch_receipt(pending, *, published_step, execution_fault,
-                                      last_transition, runtime_step):
-    """Project a pending switch without treating an unrecorded ack as a transition."""
-    receipt = dict(pending)
-    receipt['status'] = (
-        'not_attempted_before_episode_end'
-        if execution_fault is None and int(published_step) == pending['effective_control_step']
-        else 'not_confirmed_in_complete_transition'
-    )
-    if (isinstance(last_transition, tuple) and len(last_transition) == 3
-            and getattr(last_transition[1], 'controller_identity', None)
-            == pending['controller_identity']
-            and getattr(last_transition[1].source_boundary, 'boundary_id', None)
-            == pending['effective_boundary_id']
-            and getattr(last_transition[2], 'target_hash', None)
-            == last_transition[1].target.identity_hash):
-        receipt.update({
-            'status': 'target_ack_observed_but_transition_not_recorded',
-            'target_identity_hash': last_transition[1].target.identity_hash,
-            'applied_target_hash': last_transition[2].target_hash,
-            'observed_runtime_boundary': int(runtime_step()),
-        })
-    return receipt
 
 
 def position_record_metadata(self):
@@ -313,19 +221,6 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
         'position_target_v1': target.to_mapping(),
         'position_target_identity_hash': target.identity_hash,
     }
-    pending_switch = self._pending_position_switch
-    if pending_switch is not None:
-        if (target.controller_identity != pending_switch['controller_identity']
-                or target.source_boundary.boundary_id != pending_switch['effective_boundary_id']):
-            raise ValueError('first post-switch target does not match the committed Controller/boundary')
-        canonical_action['controller_switch_application'] = {
-            'switch_id': pending_switch['switch_id'],
-            'status': 'target_and_applied_ack_recorded',
-            'controller_identity': target.controller_identity,
-            'effective_boundary_id': pending_switch['effective_boundary_id'],
-            'target_identity_hash': target.target.identity_hash,
-            'applied_target_hash': applied.target_hash,
-        }
     control = StructuredControlTransitionV1(
         'structured-control-transition-v1', request, ({
             'writer_id': self.position_profiles[0].writer_id,
@@ -355,8 +250,6 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
         bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
         structured_control=control,
     )
-    if pending_switch is not None:
-        self._pending_position_switch = None
 
 def record_dual_position_transition(self, request, position_records, *, terminated, truncated):
     """Store both Entity writers in the existing Generic H5 v3 transition."""

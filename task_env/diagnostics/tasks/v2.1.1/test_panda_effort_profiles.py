@@ -187,6 +187,13 @@ def test_effort_reset_rebuilds_plan_for_requested_seed(switchable):
         env.reset(seed=37)
         first = env.sample
         assert first.task_seed == 37
+        if switchable:
+            from task_env.environment.types import StageUnavailableError
+            controller, boundary = env.controller, env.session.state_boundary_identity()
+            with pytest.raises(StageUnavailableError, match='only supported at reset'):
+                env.switch_position_controller(object())
+            assert env.controller is controller
+            assert env.session.state_boundary_identity() == boundary
         env.step(env.bind_physical_action(action) if switchable else action)
         env.reset(seed=42)
         assert env.sample.task_seed == 42

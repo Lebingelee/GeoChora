@@ -177,3 +177,5 @@ PickCube 物理控制不再将 reset seed 冻结在构造时；MuJoCo 多 seed �
 NutAssembly 的 R05b／R05c 历史诊断专属构造与 Runtime 准入已退出；四任务 MuJoCo 和 NutAssembly GeoPhys 短程通过，历史资格边界保留。详见[实施记录 6.80](../planning/post-5c-optimization-execution.md#680-退出-nutassembly-历史诊断构建分支)。
 
 Isaac Position 已通过 Panda 共同主体编译生成实际 Controller plan，并完成原生短程与三帧读回；USD source 自身的 Position binding 仍待收敛。详见[实施记录 6.81](../planning/post-5c-optimization-execution.md#681-usd-position-使用-panda-主体和实际-controller-plan)。
+
+Controller 变更限定于 reset；旧 episode 内 Position 替换及其专属状态、录像分支已退出，MuJoCo reset 切换和 Isaac 录像短程通过。详见[实施记录 6.82](../planning/post-5c-optimization-execution.md#682-controller-切换限定于-reset)。
