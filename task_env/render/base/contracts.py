@@ -38,7 +38,7 @@ def validate_camera_declarations(*, render_mode=None, observer_camera=None, task
         if not camera.rgb or camera.depth or camera.rgb_layout != 'HWC' or camera.rgb_dtype != 'float32':
             raise ValueError('camera output requires HWC float32 RGB without depth')
     if task_camera is not None and getattr(task_camera, 'parent_frame', 'world') != 'world':
-        raise ValueError('task camera requires a world mount')
+        raise ValueError('task camera supports world mounts only')
     if task_camera is not None and render_mode is None:
         raise ValueError('task camera requires an observer-enabled scene')
     if render_mode is None and observer_camera is not None:

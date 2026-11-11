@@ -54,7 +54,7 @@ finally:
 
 相机可用世界 CameraSpec 声明，在编译后生成绑定几何；底层 advanced CameraGeometry 仍校验 Artifact。observer／task camera 身份必须不同，输出限原 HWC float32 RGB，renderer／physics pairing 和历史观察路线限制继续拒绝。本批只验证声明与生命周期合同，未新增真实 RGB 结论。
 
-旧 `pickcube-physical-candidate-v1` 仍接收原字段，但只翻译到上述正式配置，并返回 `PickCubeReferenceEnv`／正式 `env.uid`；不再保证返回旧 candidate 类。原显式 `source_workspace` 是高级兼容输入，其 `source-snapshot` 继续 caller-owned；普通构造自动管理并在 close／失败时释放自有快照。历史 construction_id／Artifact／source identity 不因入口迁移而被改名。Isaac candidate 与 Position advanced 输入尚待归并，详见[实施记录 6.2](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+旧 `pickcube-physical-candidate-v1` 仍接收原字段，但只翻译到上述正式配置，并返回 `PickCubeReferenceEnv`／正式 `env.uid`；不再保证返回旧 candidate 类。原显式 `source_workspace` 是高级兼容输入，其 `source-snapshot` 继续 caller-owned；普通构造自动管理并在 close／失败时释放自有快照。历史 construction_id／Artifact／source identity 不因入口迁移而被改名。旧 `pickcube-isaac-physical-candidate-v1` 也只翻译原字段到正式 PickCube factory；五种 physical profile 的声明可使用 `execution.physics_provider="isaacsim"`／`physics_backend="cuda"`／`physics_device="cuda:0"` 与原显式 `source_delivery_manifest`，仍限 in-process、原 drive fixture 和 1～1000 horizon，未开启 reset selection／MJCF source workspace。App 准备由 Runtime 执行。本轮验证输入和清理合同，尚未为新正式 Isaac factory 取得原生复验结论。Position 的中性／typed source 编译器返回 binding 声明，旧结果 bundle 经共同 Env 构造，保留原 Artifact、UID 及能力边界；它不会被替换成 PickCube Task。详见[实施记录 6.3](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 

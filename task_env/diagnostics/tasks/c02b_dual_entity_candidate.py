@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
+from task_env.environment.types import TaskEvaluation
 
 from task_env.artifacts import SceneDefinition, Timebase
 from task_env.controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
@@ -267,7 +268,7 @@ def build_dual_entity_position_candidate(
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
-        evaluate=lambda _state, _semantics: SimpleNamespace(
+        evaluate=lambda _state, _semantics: TaskEvaluation(
             reward=0.0, success=False, failure=False, metrics={},
         ),
         object_poses=(('square-peg-instance/peg1', 'target'),),

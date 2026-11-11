@@ -25,6 +25,7 @@ def setup_binding():
         events.append((name, *args))
         return value(name, **kwargs)
     binding = SimpleNamespace(
+        build_sampled=None,
         build_for_provider=lambda provider: build('normal', provider),
         build_seeded=lambda provider, backend, seed, horizon: build('seeded', provider, backend, seed, horizon),
         build_external=lambda provider: build('external', provider),

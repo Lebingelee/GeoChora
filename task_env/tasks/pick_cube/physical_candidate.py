@@ -20,7 +20,7 @@ PICKCUBE_PHYSICAL_PROFILES = {
 
 def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
                                     parameters, workspace, gravity_compensation, reset_profile,
-                                    source_delivery_manifest, execution_spec, task_parameters):
+                                    source_delivery_manifest, execution_spec, task_parameters, horizon):
     if profile not in PICKCUBE_PHYSICAL_PROFILES:
         if native_drive is not None or parameters or workspace is not None:
             raise ValueError('Robot/Controller/source options require a declared physical profile')
@@ -28,11 +28,16 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
     kind = PICKCUBE_PHYSICAL_PROFILES[profile]
     if execution_spec.deployment != 'in_process':
         raise ValueError('physical profile currently requires explicit in_process execution')
-    if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu')}:
-        raise ValueError('MJCF physical control requires MuJoCo or GeoPhys CPU')
+    if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
+        raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
     if robot_uid not in (None, 'panda-v1') or gravity_compensation or reset_profile is not None:
         raise ValueError('physical profile requires its declared Panda source without Position-only options')
-    if source_delivery_manifest is not None:
+    if provider == 'isaacsim':
+        if source_delivery_manifest is None or parameters or workspace is not None or task_parameters:
+            raise ValueError('Isaac physical control requires its USD delivery without MJCF-only options')
+        if horizon > 1000:
+            raise ValueError('Isaac physical source horizon must be in [1, 1000]')
+    elif source_delivery_manifest is not None:
         raise ValueError('MJCF physical profile does not consume a USD source delivery')
     drive = native_drive or ('position' if kind == 'direct' else 'disabled')
     if kind != 'direct' and drive != 'disabled':
@@ -62,6 +67,12 @@ def physical_binding_from_config(config):
     options = json.loads(config.controller_parameters_json)
     kind = PICKCUBE_PHYSICAL_PROFILES[config.controller_profile]
     drive = config.native_drive or ('position' if kind == 'direct' else 'disabled')
+    if config.physics_provider == 'isaacsim':
+        from .physical_isaac_candidate import make_isaac_physical_binding
+        return make_isaac_physical_binding(delivery_manifest=config.source_delivery_manifest,
+            seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
+            horizon=config.environment.episode.horizon,
+            drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(root=config.source_workspace, provider=config.physics_provider,
         horizon=config.environment.episode.horizon, seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,

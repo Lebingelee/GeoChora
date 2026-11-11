@@ -42,4 +42,4 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## E00～E04 当前实施
 
-维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。首批 reset／close／Solution 修复及四主体视图后，正式 PickCube 已能表达五种原有 MJCF 物理配置；旧 MJCF candidate UID 转向同一正式 factory，正常路径自动管理 source 快照。当前累计生产 Python 净增 28 行（前两批曾净减 126 行；本批补齐正式配置和共享校验后如实重算），项目文件数不变。本批 163 个不同的定向纯合同节点、八条最终 MuJoCo CPU 检查通过，包含 Controller 切换／故障恢复；整个窗口累计 22 次 native run／200 子步，含四次已保留的失败记录。E01～E04 仍实施中，Isaac／Position 高级输入、配置 codec、Panda／Nut 语义接口及其余职责尚未完成。详细变化、度量、复用和限制见[实施记录第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收或启动 G06。
+维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。普通配置和 Position 高级输入已进入共同 `from_task_binding`；旧 MJCF／Isaac 物理 UID 翻译到正式 PickCube 配置，Isaac App 准备和失败回收由 Runtime 拥有。中性 Position 使用正式 TaskEvaluation，编译／构造失败各只有一个清理 owner。本轮生产 Python 净增 4 行，累计净增 32 行，tracked 文件数不变；新增收益是生命周期和 caller 归并，不报告行数净减。127 个不同的定向纯／fake-IO 合同和四条 MuJoCo CPU 检查通过，累计受监督 native 26 次／220 个可观测子步；另一次误选 native pytest 节点的未锁 reset 失败按 150 子步保守计费，详见实施记录。Isaac 新正式 factory 尚未原生复验，配置 codec、Panda／Nut 语义接口和其余 E03／E04 审计仍待完成。详细变化、度量、执行偏差及复用见[实施记录第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收或启动 G06。

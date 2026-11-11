@@ -7,6 +7,7 @@ RuntimeSession continues to own reset, control, clock projection and faults.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import contextmanager
 import copy
 from importlib import metadata as importlib_metadata
 import hashlib
@@ -495,6 +496,29 @@ def _process_app_owner(*, launch_profile_id: str | None = None) -> IsaacSimAppOw
         if _PROCESS_APP_OWNER._closed:
             raise RuntimeError("the process Isaac App was already closed")
         return _PROCESS_APP_OWNER
+
+
+@contextmanager
+def prepare_isaac_source(*, rendering):
+    """Prepare SDK source inspection with the process App's rendering profile.
+
+    A successful construction transfers App lifetime to the normal Runtime
+    leases. Failure closes only an App opened by this preparation.
+    """
+    owner, opened_here = None, False
+    try:
+        if rendering:
+            owner = _process_app_owner(launch_profile_id=V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1)
+            opened_here = owner.app is None
+            owner.open(f06_compatibility=True)
+        yield
+    except BaseException as error:
+        if opened_here:
+            try:
+                owner.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac App construction cleanup failed: {cleanup_error!r}')
+        raise
 
 
 def _tensor_rows(value, *, width: int, label: str) -> tuple[tuple[float, ...], ...]:

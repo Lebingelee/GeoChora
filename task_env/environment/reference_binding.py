@@ -77,9 +77,9 @@ class _ResetReconstruction:
 
 
 class _StandardResetReconstruction(_ResetReconstruction):
-    def initial(self):
+    def initial(self, *, seed=31):
         if self.binding.build_seeded is not None:
-            return self.binding.build_seeded(self.provider, self.backend, 31, self.horizon)
+            return self.binding.build_seeded(self.provider, self.backend, seed, self.horizon)
         return self.binding.build_for_provider(self.provider)
 
     def build_reset(self, current, seed, external_solution):
@@ -106,7 +106,7 @@ class _MixedResetReconstruction(_ResetReconstruction):
         super().__init__(*args)
         self._initial_pending = True
 
-    def initial(self):
+    def initial(self, *, seed=31):
         return self.binding.build_mixed_control_profile(self.provider, self.backend)
 
     def build_reset(self, current, seed, external_solution):
@@ -133,7 +133,7 @@ class _NativeFeedbackResetReconstruction(_ResetReconstruction):
             raise ValueError('native-feedback admission must return a nonempty profile identifier')
         self.request = request
 
-    def initial(self):
+    def initial(self, *, seed=31):
         return self.binding.build_native_feedback_profile(self.provider, self.backend, self.request, False)
 
     def build_reset(self, current, seed, external_solution):

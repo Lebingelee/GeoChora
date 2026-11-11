@@ -13,6 +13,100 @@ from task_env.runtime.sessions.physical_control import (
 )
 
 
+@pytest.mark.parametrize('early_failure', [False, True])
+def test_common_construction_compiles_once_with_declared_seed_and_cleans_failure(early_failure):
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.environment.reference_binding import ReferenceTaskBinding
+    calls = []
+    receipt = SimpleNamespace(close=lambda: calls.append('source-close'))
+    value = {'execution_spec_v1': None, 'source': SimpleNamespace(execution_source_receipt=receipt)}
+    def compile_seeded(provider, backend, seed, horizon):
+        calls.append((provider, backend, seed, horizon))
+        return value
+    class DeclaredEnv(SelectedReferenceEnv):
+        def _initialize_selected_value(self, **kwargs):
+            calls.append(self.value)
+            raise RuntimeError('constructor rejected declaration')
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    binding = replace(PickCubeReferenceEnv.binding, build=lambda _: value, build_seeded=compile_seeded,
+        close_task_resources=lambda: calls.append('task-close'))
+    horizon = 0 if early_failure else 8
+    with pytest.raises(ValueError if early_failure else RuntimeError,
+                       match='horizon' if early_failure else 'constructor rejected'):
+        DeclaredEnv.from_task_binding(binding, provider='mujoco', backend='cpu', horizon=horizon, seed=47)
+    expected = [('mujoco', 'cpu', 47, horizon)] + ([] if early_failure else [value])
+    assert calls == [*expected, 'source-close', 'task-close']
+
+
+@pytest.mark.parametrize('kind', ['direct', 'joint', 'r3-pose', 'joint-mass', 'r3-mass-pose'])
+def test_legacy_isaac_input_translates_to_formal_owner(monkeypatch, kind):
+    from task_env.tasks.pick_cube.physical_isaac_candidate import PickCubeIsaacPhysicalCandidateEnv
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube.physical_candidate import PICKCUBE_PHYSICAL_PROFILES
+    captured = []
+    monkeypatch.setattr(PickCubeReferenceEnv, 'from_reference_config',
+        classmethod(lambda cls, config, **kwargs: captured.append((cls, config, kwargs)) or 'formal-env'))
+    assert PickCubeIsaacPhysicalCandidateEnv.from_reference_config({
+        'delivery_manifest': '/explicit/source.json', 'control_kind': kind,
+        'drive_mode': 'effort-only', 'seed': 47}) == 'formal-env'
+    cls, config, kwargs = captured.pop()
+    assert cls is PickCubeReferenceEnv and kwargs == {'render_mode': None}
+    assert PICKCUBE_PHYSICAL_PROFILES[config['controller']['profile_id']] == kind
+    assert config['episode'] == {'seed': 47, 'horizon': 8}
+    assert config['robot']['native_drive'] == 'disabled'
+    assert config['execution']['source_delivery_manifest'] == '/explicit/source.json'
+
+
+@pytest.mark.parametrize('already_open', [False, True])
+def test_isaac_preparation_preserves_existing_app_and_primary_failure(monkeypatch, already_open):
+    from task_env.runtime.sessions import isaac_native_io as native
+    calls = []
+    def close():
+        calls.append('close')
+        raise OSError('close failed')
+    owner = SimpleNamespace(app=object() if already_open else None,
+        open=lambda **kwargs: calls.append(('open', kwargs)), close=close)
+    monkeypatch.setattr(native, '_process_app_owner', lambda **kwargs: owner)
+    with pytest.raises(RuntimeError, match='source failed') as error:
+        with native.prepare_isaac_source(rendering=True):
+            calls.append('source')
+            raise RuntimeError('source failed')
+    assert calls[:2] == [('open', {'f06_compatibility': True}), 'source']
+    assert ('close' in calls) is not already_open
+    if not already_open:
+        assert 'close failed' in error.value.__notes__[0]
+
+
+@pytest.mark.parametrize('seed', [None, True])
+def test_legacy_isaac_preserves_strict_frozen_seed_rejection(seed):
+    from task_env.tasks.pick_cube.physical_isaac_candidate import PickCubeIsaacPhysicalCandidateEnv
+    with pytest.raises(ValueError, match='frozen seed'):
+        PickCubeIsaacPhysicalCandidateEnv.from_reference_config({
+            'delivery_manifest': '/explicit/source.json', 'seed': seed})
+
+
+@pytest.mark.parametrize('profile', [
+    'panda-direct-effort-v1', 'panda-joint-effort-reference-v1', 'panda-r3-effort-reference-v1',
+    'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
+def test_isaac_physical_configuration_roundtrip_and_source_limits(profile):
+    import sys
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    config = {'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+        'physics_device': 'cuda:0', 'source_delivery_manifest': '/explicit/source.json',
+        'deployment': 'in_process', 'interpreter': sys.executable},
+        'controller': {'profile_id': profile}, 'episode': {'seed': 47, 'horizon': 8}}
+    resolved = resolve_task_env_config(PickCubeReferenceEnv, config)
+    assert resolved == resolve_task_env_config(PickCubeReferenceEnv, resolved)
+    assert resolved.environment.episode.seed == 47
+    assert resolved.controller_profile == profile
+    for invalid in ({'episode': {'horizon': 1001}},
+                    {'controller': {'profile_id': profile, 'parameters': {'reset_selection': True}}},
+                    {'execution': {**config['execution'], 'source_workspace': '/unused'}}):
+        with pytest.raises(ValueError, match='Isaac physical'):
+            resolve_task_env_config(PickCubeReferenceEnv, {**config, **invalid})
+
+
 @pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
 def test_formal_task_config_uses_shared_construction_and_owned_definition(monkeypatch, tmp_path, uid):
     import yaml

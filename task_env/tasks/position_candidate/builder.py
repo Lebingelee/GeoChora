@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
+from task_env.environment.types import TaskEvaluation
 import hashlib
 
 from task_env.artifacts import Timebase
@@ -271,11 +272,9 @@ def _versioned_position_candidate_kind(input_v1):
         raise TypeError('versioned Position value requires an exact supported candidate input') from error
 
 
-def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
-                                       environment_type=SelectedReferenceEnv,
-                                       camera_observation_config=None,
+def declare_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
                                        controller_config=None, physical_execution=None):
-    """Build through the existing binding and SelectedReferenceEnv owners."""
+    """Compile a typed source into task declarations, without constructing Env."""
     if type(input_v1) not in (F04PositionCandidateInputV1,
                               F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
@@ -404,7 +403,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         if type(input_v1) not in (
                 F05Dg02GeoPhysUsdCandidateInputV1,
                 F05Dg04IsaacNativeCandidateInputV1):
-            return SimpleNamespace(reward=0.0, success=False, failure=False, metrics={})
+            return TaskEvaluation(reward=0.0, success=False, failure=False, metrics={})
         pose_name = 'free-cube/free_cube'
         cube_pose = state.pose_world.get(pose_name)
         if cube_pose is None:
@@ -412,7 +411,7 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         threshold_m = float(semantics.parameters_si['lift_threshold_z_m'])
         center_z_m = float(cube_pose.position[2])
         raw_lift_predicate = center_z_m >= threshold_m
-        return SimpleNamespace(
+        return TaskEvaluation(
             reward=1.0 if raw_lift_predicate else 0.0,
             success=raw_lift_predicate,
             failure=False,
@@ -453,14 +452,9 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
         physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
         physical_observation_binding=(None if physical_execution is None else legacy_position_physical_observation_binding),
     )
-    env = environment_type.from_position_candidate(
-        binding, provider=input_v1.execution.physics_provider,
-        backend=input_v1.execution.physics_backend, horizon=horizon,
-        camera_observation_config=camera_observation_config,
-        execution_spec=input_v1.execution,
-    )
+
     return SimpleNamespace(
-        env=env, scene=scene, task_source=input_v1.task_source,
+        binding=binding, scene=scene, task_source=input_v1.task_source,
         artifact=artifact, reset_plan=input_v1.reset_plan,
         source=source, controller_binding_plan=plan,
         execution=input_v1.execution,
@@ -469,11 +463,10 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
     )
 
 
-def build_position_candidate(workspace: Path | str, *, provider: str, horizon: int = 6000,
-                             environment_type=SelectedReferenceEnv,
-                             camera_observation_config=None, physical_profile=None,
+def declare_position_candidate(workspace: Path | str, *, provider: str, horizon: int = 6000,
+                             physical_profile=None,
                              task_probe_force_y_N=None):
-    """Build one source-identified candidate through SelectedReferenceEnv's existing binding."""
+    """Compile source, Robot and Controller declarations for the neutral fixture."""
     import importlib
     if task_probe_force_y_N is not None:
         import math
@@ -670,7 +663,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
         reset_sample=lambda _artifact, _seed: reset_plan.reset_sample,
-        evaluate=lambda _state, _semantics: SimpleNamespace(
+        evaluate=lambda _state, _semantics: TaskEvaluation(
             reward=0.0, success=False, failure=False, metrics={},
         ),
         object_poses=(('square-peg-instance/peg1', 'target'),),
@@ -681,16 +674,39 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
         physical_control_profile=(None if physical_execution is None else lambda _env: physical_execution),
         physical_observation_binding=(None if physical_execution is None else legacy_position_physical_observation_binding),
     )
-    env = environment_type.from_position_candidate(
-        binding, provider=provider, backend='cpu', horizon=horizon,
-        camera_observation_config=camera_observation_config,
-    )
+
     return SimpleNamespace(
-        env=env, scene=scene, task_source=task_source, artifact=artifact,
+        binding=binding, scene=scene, task_source=task_source, artifact=artifact,
         reset_plan=reset_plan, source=source, controller_binding_plan=plan,
         panda_closure_digest=panda_digest, panda_file_count=panda_file_count,
         provider=provider,
     )
+
+
+def build_versioned_position_candidate(input_v1, *, horizon=8,
+                                       environment_type=SelectedReferenceEnv,
+                                       camera_observation_config=None,
+                                       controller_config=None, physical_execution=None):
+    """Legacy result bundle over the shared declaration construction boundary."""
+    declared = declare_versioned_position_candidate(input_v1, horizon=horizon,
+        controller_config=controller_config, physical_execution=physical_execution)
+    env = environment_type.from_position_candidate(declared.binding,
+        provider=input_v1.execution.physics_provider, backend=input_v1.execution.physics_backend,
+        horizon=horizon, camera_observation_config=camera_observation_config,
+        execution_spec=input_v1.execution)
+    return SimpleNamespace(env=env, **{key: value for key, value in vars(declared).items() if key != 'binding'})
+
+
+def build_position_candidate(workspace, *, provider, horizon=6000,
+                             environment_type=SelectedReferenceEnv,
+                             camera_observation_config=None, physical_profile=None,
+                             task_probe_force_y_N=None):
+    """Legacy result bundle; source compilation does not own Env lifecycle."""
+    declared = declare_position_candidate(workspace, provider=provider, horizon=horizon,
+        physical_profile=physical_profile, task_probe_force_y_N=task_probe_force_y_N)
+    env = environment_type.from_position_candidate(declared.binding, provider=provider,
+        backend='cpu', horizon=horizon, camera_observation_config=camera_observation_config)
+    return SimpleNamespace(env=env, **{key: value for key, value in vars(declared).items() if key != 'binding'})
 
 
 

@@ -498,8 +498,9 @@ def _resolve_selected_config(environment_type, config):
     if provider == "isaacsim" and params:
         raise ValueError("task parameter overrides are not yet admitted by the Isaac source")
     if provider == "isaacsim":
-        if not environment_type.selected_supports_isaac or manifest is None or profile != "r3_continuous_v1":
-            raise ValueError("Isaac PickCube requires R3 and an explicit source delivery manifest")
+        profiles = getattr(environment_type, 'selected_isaac_controller_profiles', frozenset())
+        if not environment_type.selected_supports_isaac or manifest is None or profile not in profiles:
+            raise ValueError("Isaac requires a declared Controller profile and an explicit source delivery manifest")
     elif manifest is not None:
         raise ValueError("source_delivery_manifest requires the supported Isaac route")
     seed = sections['episode'].get('seed', base.episode.seed)
@@ -547,7 +548,8 @@ def _resolve_selected_config(environment_type, config):
         validate(provider=provider, backend=backend, profile=profile, robot_uid=robot_uid,
                  native_drive=native_drive, parameters=dict(parameters), workspace=workspace,
                  gravity_compensation=gravity_compensation, reset_profile=reset_profile,
-                 source_delivery_manifest=manifest, execution_spec=selection, task_parameters=dict(params))
+                 source_delivery_manifest=manifest, execution_spec=selection, task_parameters=dict(params),
+                 horizon=horizon)
     elif native_drive is not None or parameters or workspace is not None:
         raise ValueError('task does not declare these Robot/Controller/source options')
     result = ResolvedSelectedConfig(

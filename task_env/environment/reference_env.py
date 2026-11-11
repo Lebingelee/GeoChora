@@ -824,107 +824,138 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         camera, renderer = task_rgb_camera, task_renderer
         if (camera is None) != (renderer is None):
             raise ValueError('task RGB camera and fixed renderer must be declared together')
-        if selected:
-            if kwargs:
-                raise ValueError('selected reference admits no unsupported extra kwargs')
-            if render_mode is not None:
-                supports = getattr(cls, 'selected_supports_observer', None)
-                if not callable(supports) or not supports(config):
-                    raise ValueError('selected configuration admits state-only execution without observer rendering')
-                render_mode = normalize_render_mode(render_mode).value
-            provider, backend = config.physics_provider, config.environment.runtime.backend
-            if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
-                raise ValueError('unsupported fixed task RGB renderer and physics pairing')
-            environment = config.environment
-            import json
-            from ..runtime.sessions.provenance import preflight_selected_source
-            preflight_selected_source(config.execution_spec_v2,
-                requested=(None if config.requested_execution_json is None
-                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
-            binding = cls.selected_binding(config)
-        else:
-            provider = kwargs.pop('provider', 'geophys')
-            backend = kwargs.pop('backend', config.runtime.backend)
-            build_runtime = kwargs.pop('build_runtime', True)
-            manifest = kwargs.pop('source_delivery_manifest', None)
-            if kwargs:
-                raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
-            if type(build_runtime) is not bool:
-                raise TypeError('build_runtime must be a boolean')
-            if not build_runtime or not callable(getattr(cls, 'selected_binding', None)):
-                if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
-                    raise ValueError('component construction uses its configured GeoPhys route')
-                if config.runtime.batch_physics_layout != 'merged_scene':
-                    raise StageUnavailableError('single TaskEnv construction requires merged_scene')
-                return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
-                           task_rgb_camera=camera, task_renderer=renderer)
-            cls._validate_physical_task_config(config, provider, backend, render_mode, camera, renderer, manifest)
-            environment = config
-            binding = cls.selected_binding(config, provider=provider, backend=backend,
-                                           source_delivery_manifest=manifest)
-        horizon = environment.episode.horizon
-        try:
-            initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial()
-        except BaseException as error:
-            if binding.close_task_resources is not None:
-                try:
-                    binding.close_task_resources()
-                except BaseException as cleanup_error:
-                    error.add_note(f'source compilation cleanup also failed: {cleanup_error!r}')
-            raise
-        env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
-                  _execution_spec_v1=initial.get('execution_spec_v1'), _initial_value=initial)
-        try:
+        from contextlib import ExitStack
+        with ExitStack() as preparation:
             if selected:
-                env.resolved_public_config = config
-            else:
-                env.config = environment
-                env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
-                    external_action=binding.external_action_contract,
-                    physics_engine={'geophys': 'GeoPhys', 'mujoco': 'MuJoCo',
-                                    'isaacsim': 'Isaac Sim PhysX'}[provider],
-                    camera_specs=(camera,) if camera is not None else environment.render.cameras)
-                env.metadata['reference_profile'] = env.reference_profile()
-                env._legacy_camera_observations = bool(environment.render.camera_obs)
+                if kwargs:
+                    raise ValueError('selected reference admits no unsupported extra kwargs')
                 if render_mode is not None:
-                    env.render_mode = render_mode
-                    env._human_display_unavailable = True
-                    env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
-                        render_mode=render_mode, human_display_available=False)
-                    if render_mode == 'rgb_array':
-                        env._legacy_observer_requested = True
-                        env.metadata.update(render_backend=environment.render.backend,
-                            render_resolution=(environment.render.width, environment.render.height))
-            if camera is not None:
-                from .config import CameraSpec
-                from ..observations.canonical_camera import CameraGeometry
-                geometry = (CameraGeometry.from_camera_spec(camera, task_artifact_hash=env.artifact.identity_hash)
-                            if type(camera) is CameraSpec else camera)
-                env._configure_task_rgb(geometry, renderer)
-                if type(camera) is CameraSpec:
-                    env._task_camera_spec = camera
-            if task_camera is not None:
-                import copy
-                from ..observations.canonical_camera import CameraGeometry
-                from .config import CameraSpec
-                geometry = (CameraGeometry.from_camera_spec(task_camera, task_artifact_hash=env.artifact.identity_hash)
-                            if type(task_camera) is CameraSpec else task_camera)
-                if geometry.task_artifact_hash != env.artifact.identity_hash:
-                    raise ValueError('task camera TaskArtifact linkage mismatch')
-                env._declared_task_camera = copy.deepcopy(geometry)
-            if observer_camera is not None:
-                from ..observations.canonical_camera import CameraGeometry
-                from .config import CameraSpec
-                geometry = (CameraGeometry.from_camera_spec(observer_camera, task_artifact_hash=env.artifact.identity_hash)
-                            if type(observer_camera) is CameraSpec else observer_camera)
-                env._configure_selected_observer(render_mode, geometry)
-        except BaseException as error:
+                    supports = getattr(cls, 'selected_supports_observer', None)
+                    if not callable(supports) or not supports(config):
+                        raise ValueError('selected configuration admits state-only execution without observer rendering')
+                    render_mode = normalize_render_mode(render_mode).value
+                provider, backend = config.physics_provider, config.environment.runtime.backend
+                if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
+                    raise ValueError('unsupported fixed task RGB renderer and physics pairing')
+                environment = config.environment
+                import json
+                from ..runtime.sessions.provenance import preflight_selected_source
+                preflight_selected_source(config.execution_spec_v2,
+                    requested=(None if config.requested_execution_json is None
+                               else json.loads(config.requested_execution_json)), task_uid=cls.uid)
+                if provider == 'isaacsim':
+                    from ..runtime.sessions.isaac_native_io import prepare_isaac_source
+                    preparation.enter_context(prepare_isaac_source(
+                        rendering=render_mode is not None or camera is not None))
+                binding = cls.selected_binding(config)
+            else:
+                provider = kwargs.pop('provider', 'geophys')
+                backend = kwargs.pop('backend', config.runtime.backend)
+                build_runtime = kwargs.pop('build_runtime', True)
+                manifest = kwargs.pop('source_delivery_manifest', None)
+                if kwargs:
+                    raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
+                if type(build_runtime) is not bool:
+                    raise TypeError('build_runtime must be a boolean')
+                if not build_runtime or not callable(getattr(cls, 'selected_binding', None)):
+                    if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
+                        raise ValueError('component construction uses its configured GeoPhys route')
+                    if config.runtime.batch_physics_layout != 'merged_scene':
+                        raise StageUnavailableError('single TaskEnv construction requires merged_scene')
+                    return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
+                               task_rgb_camera=camera, task_renderer=renderer)
+                cls._validate_physical_task_config(config, provider, backend, render_mode, camera, renderer, manifest)
+                environment = config
+                binding = cls.selected_binding(config, provider=provider, backend=backend,
+                                               source_delivery_manifest=manifest)
+            horizon = environment.episode.horizon
+            env = cls.from_task_binding(binding, provider=provider, backend=backend, horizon=horizon,
+                seed=environment.episode.seed if environment.episode.seed is not None else 31)
             try:
-                env.close()
-            except BaseException as cleanup_error:
-                error.add_note(f'environment construction cleanup also failed: {cleanup_error!r}')
+                if selected:
+                    env.resolved_public_config = config
+                else:
+                    env.config = environment
+                    env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
+                        external_action=binding.external_action_contract,
+                        physics_engine={'geophys': 'GeoPhys', 'mujoco': 'MuJoCo',
+                                        'isaacsim': 'Isaac Sim PhysX'}[provider],
+                        camera_specs=(camera,) if camera is not None else environment.render.cameras)
+                    env.metadata['reference_profile'] = env.reference_profile()
+                    env._legacy_camera_observations = bool(environment.render.camera_obs)
+                    if render_mode is not None:
+                        env.render_mode = render_mode
+                        env._human_display_unavailable = True
+                        env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
+                            render_mode=render_mode, human_display_available=False)
+                        if render_mode == 'rgb_array':
+                            env._legacy_observer_requested = True
+                            env.metadata.update(render_backend=environment.render.backend,
+                                render_resolution=(environment.render.width, environment.render.height))
+                if camera is not None:
+                    from .config import CameraSpec
+                    from ..observations.canonical_camera import CameraGeometry
+                    geometry = (CameraGeometry.from_camera_spec(camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(camera) is CameraSpec else camera)
+                    env._configure_task_rgb(geometry, renderer)
+                    if type(camera) is CameraSpec:
+                        env._task_camera_spec = camera
+                if task_camera is not None:
+                    import copy
+                    from ..observations.canonical_camera import CameraGeometry
+                    from .config import CameraSpec
+                    geometry = (CameraGeometry.from_camera_spec(task_camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(task_camera) is CameraSpec else task_camera)
+                    if geometry.task_artifact_hash != env.artifact.identity_hash:
+                        raise ValueError('task camera TaskArtifact linkage mismatch')
+                    env._declared_task_camera = copy.deepcopy(geometry)
+                if observer_camera is not None:
+                    from ..observations.canonical_camera import CameraGeometry
+                    from .config import CameraSpec
+                    geometry = (CameraGeometry.from_camera_spec(observer_camera, task_artifact_hash=env.artifact.identity_hash)
+                                if type(observer_camera) is CameraSpec else observer_camera)
+                    env._configure_selected_observer(render_mode, geometry)
+            except BaseException as error:
+                try:
+                    env.close()
+                except BaseException as cleanup_error:
+                    error.add_note(f'environment construction cleanup also failed: {cleanup_error!r}')
+                raise
+            return env
+
+    @classmethod
+    def from_task_binding(cls, binding, *, provider, backend, horizon,
+                          camera_observation_config=None, execution_spec=None, seed=31):
+        """Compile a declared task and construct its single environment owner.
+
+        Public configurations and typed advanced inputs share this boundary;
+        their input decoders retain responsibility for capability admission.
+        """
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('task construction requires ReferenceTaskBinding')
+        initial = None
+        try:
+            initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
+            declared = initial.get('execution_spec_v1')
+            if execution_spec is not None and declared != execution_spec:
+                raise ValueError('compiled task differs from its declared execution specification')
+        except BaseException as error:
+            cls._release_failed_task_construction(initial, binding, error)
             raise
-        return env
+        return cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
+                   camera_observation_config=camera_observation_config,
+                   _execution_spec_v1=declared, _initial_value=initial)
+
+    @staticmethod
+    def _release_failed_task_construction(value, binding, error):
+        source = value.get('source') if isinstance(value, Mapping) else None
+        receipt = getattr(source, 'execution_source_receipt', None)
+        for cleanup in (getattr(receipt, 'close', None), getattr(binding, 'close_task_resources', None)):
+            if callable(cleanup):
+                try:
+                    cleanup()
+                except BaseException as cleanup_error:
+                    error.add_note(f'task construction cleanup also failed: {cleanup_error!r}')
 
     @classmethod
     def _validate_physical_task_config(cls, config, provider, backend, render_mode, camera, renderer, manifest):
@@ -980,10 +1011,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if (provider, backend) != (
                     execution_spec.physics_provider, execution_spec.physics_backend):
                 raise ValueError('Position candidate provider/backend differs from ExecutionSpecV1')
-        env = candidate_type(
-            provider=provider, backend=backend, horizon=horizon, _binding=binding,
+        env = candidate_type.from_task_binding(
+            binding, provider=provider, backend=backend, horizon=horizon,
             camera_observation_config=camera_observation_config,
-            _execution_spec_v1=execution_spec,
+            execution_spec=execution_spec,
         )
         profiles = env.position_profiles
         if not is_admitted_position_profile_set(profiles):
@@ -1517,68 +1548,68 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 task_renderer=task_renderer,
             )
             return
-        if task_rgb_camera is not None or task_renderer is not None:
-            raise ValueError("selected task RGB is configured through the public make_env factory")
-        if render_mode is not None or build_runtime is not True:
-            raise ValueError('selected reference rendering and component runtime options require a component task')
-        if (type(horizon) is not int or horizon < 1
-                or (horizon > 6000 and getattr(_binding, 'physical_control_profile', None) is None)):
-            raise ValueError('selected reference horizon is outside its admitted range')
-        if camera_observation_config is not None:
-            from ..observations.canonical_camera.consumer import CameraObservationConfigV1
-
-            if not isinstance(camera_observation_config, CameraObservationConfigV1):
-                raise TypeError('camera observation opt-in requires CameraObservationConfigV1')
-            camera_observation_config.validate_production_envelope()
-            camera_observation_config.capacity(horizon)
-        if _binding is not None:
-            if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
-                raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
-            self.binding = _binding
-        self.leaf_position_profile = False
-        self.fixed_attachment_leaf_position_profile = bool(_fixed_attachment_leaf_position_candidate)
-        if _leaf_position_candidate and (provider, backend) != ('mujoco', 'cpu'):
-            raise ValueError('leaf Position candidate admits MuJoCo CPU only')
-        if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
-            raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
-        if _mixed_control_candidate and (
-            (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
-            or self.binding.build_mixed_control_profile is None
-        ):
-            raise ValueError('mixed-control candidate requires its scalar CPU task binding')
-        if not isinstance(self.binding, ReferenceTaskBinding):
-            raise TypeError('selected reference requires an explicit task binding')
-        if _execution_spec_v1 is not None:
-            from ..artifacts import ExecutionSpecV1
-            if type(_execution_spec_v1) is not ExecutionSpecV1:
-                raise TypeError('versioned selected construction requires ExecutionSpecV1')
-            _execution_spec_v1.validate()
-            if (provider, backend) != (
-                    _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
-                raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
-            from ..runtime.sessions.api import validate_selected_position_route
-            validate_selected_position_route(_execution_spec_v1)
-        self._declared_execution_spec_v1 = _execution_spec_v1
-        diagnostic_profile = self.binding.diagnostic_profile
-        if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):
-            raise ValueError('selected diagnostic profile requires GeoPhys CPU/CUDA')
-        if sum((bool(_mixed_control_candidate), diagnostic_profile is not None,
-                _native_feedback_request is not None)) > 1:
-            raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
-        self._diagnostic_profile = diagnostic_profile
-        self._mixed_control_candidate = bool(_mixed_control_candidate)
-        if not _mixed_control_candidate and _native_feedback_request is None:
-            if (diagnostic_profile is None and _execution_spec_v1 is None
-                    and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
-                raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
-        self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
-            provider, backend, horizon, mixed=bool(_mixed_control_candidate),
-            native_request=_native_feedback_request)
-        self._native_feedback_profile = getattr(self._reset_reconstruction, 'profile', None)
-        self._native_feedback_request = _native_feedback_request
-        self.provider, self.backend, self.horizon = provider, backend, horizon
-        self._execution_fault = None
         try:
+            if task_rgb_camera is not None or task_renderer is not None:
+                raise ValueError("selected task RGB is configured through the public make_env factory")
+            if render_mode is not None or build_runtime is not True:
+                raise ValueError('selected reference rendering and component runtime options require a component task')
+            if (type(horizon) is not int or horizon < 1
+                    or (horizon > 6000 and getattr(_binding, 'physical_control_profile', None) is None)):
+                raise ValueError('selected reference horizon is outside its admitted range')
+            if camera_observation_config is not None:
+                from ..observations.canonical_camera.consumer import CameraObservationConfigV1
+
+                if not isinstance(camera_observation_config, CameraObservationConfigV1):
+                    raise TypeError('camera observation opt-in requires CameraObservationConfigV1')
+                camera_observation_config.validate_production_envelope()
+                camera_observation_config.capacity(horizon)
+            if _binding is not None:
+                if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
+                    raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
+                self.binding = _binding
+            self.leaf_position_profile = False
+            self.fixed_attachment_leaf_position_profile = bool(_fixed_attachment_leaf_position_candidate)
+            if _leaf_position_candidate and (provider, backend) != ('mujoco', 'cpu'):
+                raise ValueError('leaf Position candidate admits MuJoCo CPU only')
+            if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
+                raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
+            if _mixed_control_candidate and (
+                (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
+                or self.binding.build_mixed_control_profile is None
+            ):
+                raise ValueError('mixed-control candidate requires its scalar CPU task binding')
+            if not isinstance(self.binding, ReferenceTaskBinding):
+                raise TypeError('selected reference requires an explicit task binding')
+            if _execution_spec_v1 is not None:
+                from ..artifacts import ExecutionSpecV1
+                if type(_execution_spec_v1) is not ExecutionSpecV1:
+                    raise TypeError('versioned selected construction requires ExecutionSpecV1')
+                _execution_spec_v1.validate()
+                if (provider, backend) != (
+                        _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
+                    raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
+                from ..runtime.sessions.api import validate_selected_position_route
+                validate_selected_position_route(_execution_spec_v1)
+            self._declared_execution_spec_v1 = _execution_spec_v1
+            diagnostic_profile = self.binding.diagnostic_profile
+            if diagnostic_profile is not None and (provider != 'geophys' or backend not in {'cpu', 'cuda'}):
+                raise ValueError('selected diagnostic profile requires GeoPhys CPU/CUDA')
+            if sum((bool(_mixed_control_candidate), diagnostic_profile is not None,
+                    _native_feedback_request is not None)) > 1:
+                raise ValueError('diagnostic, native-feedback, and mixed-control profiles are mutually exclusive')
+            self._diagnostic_profile = diagnostic_profile
+            self._mixed_control_candidate = bool(_mixed_control_candidate)
+            if not _mixed_control_candidate and _native_feedback_request is None:
+                if (diagnostic_profile is None and _execution_spec_v1 is None
+                        and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
+                    raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
+            self._reset_reconstruction = self.binding.reset_reconstruction_strategy(
+                provider, backend, horizon, mixed=bool(_mixed_control_candidate),
+                native_request=_native_feedback_request)
+            self._native_feedback_profile = getattr(self._reset_reconstruction, 'profile', None)
+            self._native_feedback_request = _native_feedback_request
+            self.provider, self.backend, self.horizon = provider, backend, horizon
+            self._execution_fault = None
             if _initial_value is not None:
                 if (not isinstance(_initial_value, dict)
                         or _initial_value.get('execution_spec_v1') != _execution_spec_v1):
@@ -1586,61 +1617,41 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.value = _initial_value
             else:
                 self.value = self._reset_reconstruction.initial()
-        except BaseException as error:
-            fault = ExecutionFaultV1.from_exception(
-                'selected_construction', error
-            )
-            self._execution_fault = fault
-            attach_execution_fault(error, fault)
-            raise
-        try:
             self._initialize_selected_value(
                 mixed_control_candidate=_mixed_control_candidate,
                 camera_observation_config=camera_observation_config,
             )
-        except BaseException as error:
-            def close_source():
-                source = self.value.get('source') if isinstance(self.value, Mapping) else None
-                receipt = getattr(source, 'execution_source_receipt', None)
-                if receipt is not None:
-                    receipt.close()
+            self.session = None
+            self._external_solution_owner = None
+            self._active_native_interval_receipt = None
+            self._closed = False
+            self._episode_mode = None
+            self._stopped = True
+            self._position_episode_end = None
+            self._mixed_episode_end = None
+            self._mixed_close_receipt = None
+            self._mixed_reset_context = None
+            self._mixed_record_metadata = None
+            self._mixed_reset_plan = None
+            self._compiled_layout_pre_reset = None
+            self._compiled_layout_post_reset = None
+            self._published_position_state = None
+            self._published_position_typed_state = None
+            self._published_position_obs = None
+            self._published_position_info = None
+            self._published_position_evaluation = None
+            self._position_controller_switch_fault_receipt = None
+            self._pending_position_switch = None
+            self.recorder = None
+            self.recording_path = None
 
-            for label, cleanup in (
-                ('source', close_source),
-                ('task resource', self.binding.close_task_resources),
-            ):
-                if callable(cleanup):
-                    try:
-                        cleanup()
-                    except BaseException as cleanup_error:
-                        error.add_note(f'{label} cleanup after selected construction failed: {cleanup_error!r}')
+        except BaseException as error:
+            self._release_failed_task_construction(
+                getattr(self, 'value', _initial_value), _binding or self.binding, error)
             fault = ExecutionFaultV1.from_exception('selected_construction', error)
             self._execution_fault = fault
             attach_execution_fault(error, fault)
             raise
-        self.session = None
-        self._external_solution_owner = None
-        self._active_native_interval_receipt = None
-        self._closed = False
-        self._episode_mode = None
-        self._stopped = True
-        self._position_episode_end = None
-        self._mixed_episode_end = None
-        self._mixed_close_receipt = None
-        self._mixed_reset_context = None
-        self._mixed_record_metadata = None
-        self._mixed_reset_plan = None
-        self._compiled_layout_pre_reset = None
-        self._compiled_layout_post_reset = None
-        self._published_position_state = None
-        self._published_position_typed_state = None
-        self._published_position_obs = None
-        self._published_position_info = None
-        self._published_position_evaluation = None
-        self._position_controller_switch_fault_receipt = None
-        self._pending_position_switch = None
-        self.recorder = None
-        self.recording_path = None
 
     @property
     def execution_fault(self):

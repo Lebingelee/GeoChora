@@ -670,11 +670,13 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     def selected_supports_observer(cls, config):
         options = json.loads(config.controller_parameters_json)
         kind = cls.PICKCUBE_PHYSICAL_PROFILES.get(config.controller_profile)
-        return ((config.physics_provider == 'mujoco' and options.get('reset_selection', False))
+        return ((config.physics_provider == 'isaacsim' and kind is not None)
+                or (config.physics_provider == 'mujoco' and options.get('reset_selection', False))
                 or (config.physics_provider == 'geophys' and kind == 'joint'
                     and not options.get('reset_selection', False)))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25), "cube_force_z_N": (-30., 30.)}
     selected_supports_isaac = True
+    selected_isaac_controller_profiles = frozenset(('r3_continuous_v1',)) | frozenset(PICKCUBE_PHYSICAL_PROFILES)
     selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
     selected_execution_defaults = {
         "physics_provider": "geophys",
