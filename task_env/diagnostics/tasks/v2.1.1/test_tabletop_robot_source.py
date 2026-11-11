@@ -196,3 +196,117 @@ def test_usd_build_failure_preserves_error_when_source_cleanup_fails(monkeypatch
         specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
     assert raised.value is failure
     assert any('cleanup failed' in note for note in raised.value.__notes__)
+
+
+def test_readiness_failure_does_not_create_a_source_snapshot(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
+
+    failure = RuntimeError('readiness failed')
+    def fail_readiness(*args, **kwargs):
+        raise failure
+    def unexpected_snapshot(*args, **kwargs):
+        raise AssertionError('snapshot must not be created before readiness succeeds')
+    monkeypatch.setattr(PickCubeReadinessConfig, 'from_source', fail_readiness)
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
+    with pytest.raises(RuntimeError) as raised:
+        specialization._prepare_reference_source(controller_profile='r3_continuous_v1')
+    assert raised.value is failure
+
+
+@pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
+def test_reference_controller_failure_releases_task_source(task_name, monkeypatch):
+    from task_env.controllers.canonical.execution import ReferenceExecutionController
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization as pickcube
+    from task_env.tasks.nut_assembly import specialization as nut
+
+    receipts = []
+    original = source_module.snapshot_legacy_mjcf_source
+    failure = RuntimeError('Controller construction failed')
+    def capture(*args, **kwargs):
+        source = original(*args, **kwargs)
+        receipts.append(source.execution_source_receipt)
+        return source
+    def fail_controller(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(ReferenceExecutionController, 'from_source', fail_controller)
+    with pytest.raises(RuntimeError) as raised:
+        if task_name == 'pickcube':
+            pickcube.build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+        else:
+            nut.build_reference(provider='mujoco', include_solution=False)
+    assert raised.value is failure
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_usd_source_identity_failure_releases_task_source(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    receipts = []
+    original = source_module.snapshot_legacy_mjcf_source
+    failure = RuntimeError('source identity failed')
+    def capture(*args, **kwargs):
+        source = original(*args, **kwargs)
+        receipts.append(source.execution_source_receipt)
+        return source
+    def fail_identity(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(specialization, '_source_identity_files', fail_identity)
+    with pytest.raises(RuntimeError) as raised:
+        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False,
+                                              controller_builder=lambda *args: None)
+    assert raised.value is failure
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_failed_controller_cleanup_preserves_original_error(monkeypatch):
+    from task_env.controllers.canonical.execution import ReferenceExecutionController
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+    from task_env.tasks.pick_cube import specialization
+
+    original_close = ExecutionSourceReceiptV1.close
+    failure = RuntimeError('Controller construction failed')
+    def fail_controller(*args, **kwargs):
+        raise failure
+    def fail_close(receipt):
+        original_close(receipt)
+        raise OSError('cleanup failed')
+    monkeypatch.setattr(ReferenceExecutionController, 'from_source', fail_controller)
+    monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_close)
+    with pytest.raises(RuntimeError) as raised:
+        specialization.build_reference(backend='cpu', include_solution=False,
+                                       controller_profile='r3_continuous_v1')
+    assert raised.value is failure
+    assert any('cleanup failed' in note for note in raised.value.__notes__)
+
+
+def test_physical_early_failure_releases_prepared_task_source(monkeypatch):
+    import subprocess
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    receipts = []
+    original = source_module.snapshot_legacy_mjcf_source
+    failure = RuntimeError('revision lookup failed')
+    def capture(*args, **kwargs):
+        source = original(*args, **kwargs)
+        receipts.append(source.execution_source_receipt)
+        return source
+    def fail_revision(*args, **kwargs):
+        raise failure
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+    })
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(subprocess, 'check_output', fail_revision)
+    with pytest.raises(RuntimeError) as raised:
+        PickCubeReferenceEnv.selected_binding(config)
+    assert raised.value is failure
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()

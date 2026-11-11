@@ -249,8 +249,7 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
     if is_r3_profile:
         config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
-    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
-    artifact, source = compiled.artifact, snapshot_legacy_mjcf_source(compiled.source)
+    artifact, source = compiled.artifact, compiled.source
     posture_path_profile = (
         _PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP
         if controller_profile == "r3_continuous_v1_pose_path_x20"
@@ -284,6 +283,8 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
             ))) if is_r3_profile else 0
         ),
     )
+    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
+    source = snapshot_legacy_mjcf_source(source)
     return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,
         profile_source, artifact, source, posture_path_profile, readiness)
 
@@ -298,89 +299,91 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
      artifact, source, posture_path_profile, readiness) = _prepare_reference_source(
         backend=backend, controller_profile=controller_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config)
-    if controller_profile == "r1":
-        controller = ProductionCanonicalPandaController.from_source(artifact, source)
-    elif controller_profile == "r1_split":
-        from ...controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
-        controller = SplitPandaPositionControllerV1(artifact, source)
-    else:
-        execution_controller = ReferenceExecutionController.from_source(
-            artifact, source, profile=dynamic_profile, force_limit_N=10.0,
-            joint_velocity_limit_rad_s=(
-                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
-            ),
-        )
-        controller = execution_controller.hold.controller
-    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
-    base_controller_identity = None
-    execution_profile = None
-    if is_r3_profile:
-        base_controller_identity = controller.identity
-        execution_support_sha256 = {
-            "arm_and_execution_wrapper": hashlib.sha256(
-                Path(inspect.getsourcefile(type(execution_controller.hold))).read_bytes()
-            ).hexdigest(),
-            "execution_controller": hashlib.sha256(
-                Path(inspect.getsourcefile(ReferenceExecutionController)).read_bytes()
-            ).hexdigest(),
-            "gripper_servo": hashlib.sha256(
-                Path(inspect.getsourcefile(type(execution_controller.inner))).read_bytes()
-            ).hexdigest(),
+    from ...runtime.sessions.source import close_execution_source_on_failure
+    with close_execution_source_on_failure(source):
+        if controller_profile == "r1":
+            controller = ProductionCanonicalPandaController.from_source(artifact, source)
+        elif controller_profile == "r1_split":
+            from ...controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
+            controller = SplitPandaPositionControllerV1(artifact, source)
+        else:
+            execution_controller = ReferenceExecutionController.from_source(
+                artifact, source, profile=dynamic_profile, force_limit_N=10.0,
+                joint_velocity_limit_rad_s=(
+                    PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
+                ),
+            )
+            controller = execution_controller.hold.controller
+        solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+        solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
+        base_controller_identity = None
+        execution_profile = None
+        if is_r3_profile:
+            base_controller_identity = controller.identity
+            execution_support_sha256 = {
+                "arm_and_execution_wrapper": hashlib.sha256(
+                    Path(inspect.getsourcefile(type(execution_controller.hold))).read_bytes()
+                ).hexdigest(),
+                "execution_controller": hashlib.sha256(
+                    Path(inspect.getsourcefile(ReferenceExecutionController)).read_bytes()
+                ).hexdigest(),
+                "gripper_servo": hashlib.sha256(
+                    Path(inspect.getsourcefile(type(execution_controller.inner))).read_bytes()
+                ).hexdigest(),
+            }
+            execution_profile = {
+                "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+                "arm_execution_request_profile": "pickcube-r3-hold-ramp-v1",
+                "gripper_cadence": "native-gripper-500hz-v1",
+                "gripper_control_hz": 500,
+                "gripper_feedback_hz": 500,
+                "outer_controller_hz": 100,
+                "execution_support_sha256": execution_support_sha256,
+            }
+            controller.identity = digest({
+                "construction_id": recipe["construction_id"],
+                "base_controller_identity": base_controller_identity,
+                **execution_profile,
+            })
+            controller = execution_controller
+        root = Path(__file__).resolve().parents[3]
+        revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+        source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
+        construction_identity = reference_task_identity_fields(artifact, source, controller)
+        resolved = {
+            "construction_id": recipe["construction_id"], "task_recipe": task_config,
+            "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
+            "artifact": artifact.to_mapping(), **construction_identity,
+            "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
+            "resolved_controller_gripper": asdict(controller.gripper_config),
+            "solution_identity": solution_identity,
+            "source_revision": revision, "source_sha256": source_ids,
+            "qualification": "NOT_REQUALIFIED",
         }
-        execution_profile = {
-            "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
-            "arm_execution_request_profile": "pickcube-r3-hold-ramp-v1",
-            "gripper_cadence": "native-gripper-500hz-v1",
-            "gripper_control_hz": 500,
-            "gripper_feedback_hz": 500,
-            "outer_controller_hz": 100,
-            "execution_support_sha256": execution_support_sha256,
+        if is_r3_profile:
+            resolved["base_controller_identity"] = base_controller_identity
+            resolved.update(execution_profile)
+            resolved["controller_identity"] = controller.identity
+        if is_r3_profile:
+            resolved["controller_profile"] = controller_profile
+            resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
+            resolved["task_controller_profile"]["posture_path_profile"] = posture_path_profile
+            resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
+        elif controller_profile == 'r1_split':
+            resolved['controller_profile'] = controller_profile
+            resolved['controller_owners'] = (
+                {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
+                {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
+            )
+        return {
+            "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
+            "readiness": readiness, "controller": controller,
+            "solution": solution,
+            "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
+            "solution_identity": solution_identity,
+            "source_revision": revision, "source_sha256": source_ids,
+            "recipe_identity": digest(resolved), "resolved_configuration": resolved,
         }
-        controller.identity = digest({
-            "construction_id": recipe["construction_id"],
-            "base_controller_identity": base_controller_identity,
-            **execution_profile,
-        })
-        controller = execution_controller
-    root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
-    construction_identity = reference_task_identity_fields(artifact, source, controller)
-    resolved = {
-        "construction_id": recipe["construction_id"], "task_recipe": task_config,
-        "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
-        "artifact": artifact.to_mapping(), **construction_identity,
-        "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
-        "resolved_controller_gripper": asdict(controller.gripper_config),
-        "solution_identity": solution_identity,
-        "source_revision": revision, "source_sha256": source_ids,
-        "qualification": "NOT_REQUALIFIED",
-    }
-    if is_r3_profile:
-        resolved["base_controller_identity"] = base_controller_identity
-        resolved.update(execution_profile)
-        resolved["controller_identity"] = controller.identity
-    if is_r3_profile:
-        resolved["controller_profile"] = controller_profile
-        resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
-        resolved["task_controller_profile"]["posture_path_profile"] = posture_path_profile
-        resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
-    elif controller_profile == 'r1_split':
-        resolved['controller_profile'] = controller_profile
-        resolved['controller_owners'] = (
-            {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
-            {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
-        )
-    return {
-        "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
-        "readiness": readiness, "controller": controller,
-        "solution": solution,
-        "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
-        "solution_identity": solution_identity,
-        "source_revision": revision, "source_sha256": source_ids,
-        "recipe_identity": digest(resolved), "resolved_configuration": resolved,
-    }
 
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
@@ -402,12 +405,14 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     else:
         prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
                                              resolved_config=resolved_config, task_config=task_config)
-        source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
-        legacy = {"source": prepared.source, "artifact": prepared.artifact, "readiness": prepared.readiness,
-                  "source_sha256": source_ids,
-                  "resolved_configuration": {"runtime_config": asdict(prepared.config),
-                                              "task_recipe": prepared.task_config,
-                                              "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
+        from ...runtime.sessions.source import close_execution_source_on_failure
+        with close_execution_source_on_failure(prepared.source):
+            source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
+            legacy = {"source": prepared.source, "artifact": prepared.artifact, "readiness": prepared.readiness,
+                      "source_sha256": source_ids,
+                      "resolved_configuration": {"runtime_config": asdict(prepared.config),
+                                                  "task_recipe": prepared.task_config,
+                                                  "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
     # USD owns an independent source; the temporary MJCF snapshot only serves
     # Task/readiness preparation and must not outlive construction.
     receipt = legacy["source"].execution_source_receipt

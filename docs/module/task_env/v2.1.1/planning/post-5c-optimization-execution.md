@@ -856,3 +856,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +116／−104，净增 12 行，其中原有 USD 构造主体约 104 行仅缩进迁移以纳入失败清理范围；版本诊断修改 1 文件 +51／−0，覆盖 Position／effort 构造失败及清理异常；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。构建入口与 provider／renderer 的 source、状态、clock 和提交合同未改，减少的是失去 owner 的临时目录。
 
 修改前的实际 USD effort 构造留下一个仍存在的快照；修改后实际 effort、Position 和缺失 manifest 三次构造各自的快照均在返回或抛错后消失。94 项版本检查通过。Isaac effort／Position 的 CUDA／同步 RGB 各完成两次 reset、step、三帧独立读回与 Env／App 关闭，各观测 41 个 physics callback，采图期间无额外推进，订阅前启动推进未知；Position H5 读回含一条 transition。两次 callback 取消订阅均报告 AttributeError，SDK 日志中的预热和关闭信息保留，进程及读回成功。MuJoCo、GeoPhys 与完整 Solution 本批未重跑，旧证据按不受临时 USD 准备快照生命周期影响的范围保留。前后快照检查、冻结 diff、计划和运行收据位于 ignored `workspace/maintenance/v211_usd_source_lease_20261112_oUDbRb/`；E01～E04 仍未接收。
+
+### 6.76 Task source 失败前后资源归属
+
+输入 `57b3b7ca`。PickCube 在创建快照之前先计算 readiness，失败时不再产生待回收的临时目录。共同 source 失败清理机制覆盖 PickCube 和 NutAssembly 参考 Controller 构造、USD source 身份准备以及 PickCube physical 早期构造；成功时资源继续交给原 owner，失败时释放已取得的 source，清理也失败时保留原异常并附加说明。既有物理绑定之后的资源归属保持原合同；这不代表全部生命周期问题均已解决。
+
+生产修改 4 文件 +226／−201，净增 25 行，其中约 200 行增删来自将现有构造主体缩进到资源保护范围；版本诊断修改 1 文件 +114／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。本批没有消除新的配置或任务构建分流；Runtime source 取得失败时的资源清理归于共同机制，provider／renderer 的状态、clock 和提交合同未改变。
+
+100 项版本检查通过，新增检查覆盖 readiness、两个 tabletop Controller、USD 身份准备、physical 早期构造及清理异常。MJCF／USD 五种 profile 共十组 source 和 Controller 合同对照一致。PickCube 参考、NutAssembly 及 PickCube physical reset 切换／H5 读回的 MuJoCo 短程通过，共观测 20 个 native 子步；参考 Solution 仅验证单步。Isaac 和 GeoPhys 本批未重跑：6.75 的 Isaac 原生证据可说明当时代码的行为，但不能视为当前代码已完成 GPU 复验。完整 Solution 未运行。冻结 diff、合同对照及运行收据位于 ignored `workspace/maintenance/v211_task_source_failure_20261112_8RhmP8/`；E01～E04 仍未接收。

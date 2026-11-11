@@ -159,26 +159,28 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config)
     legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
-    from .solution import PickCubeReadinessSolution
-    import subprocess
-    revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
-                                        'rev-parse', 'HEAD'], text=True).strip()
-    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    # The force-observation fixture starts inside the paired finger limits;
-    # it retains PickCube semantics and is a distinct Artifact identity.
-    if not reset_switch:
-        joint_initial = dict(legacy_artifact.initialization.joint_position)
-        joint_initial.update({'panda-v1/finger_joint1': 0.02, 'panda-v1/finger_joint2': 0.02})
-        legacy_artifact = replace(legacy_artifact,
-            initialization=replace(legacy_artifact.initialization, joint_position=joint_initial))
-    if drive_mode == 'effort-only':
-        legacy_artifact = replace(legacy_artifact,
-            artifact_id=('pickcube-mjcf-physical-effort-task-v1' if reset_switch
-                         else 'pickcube-mjcf-physical-effort-no-drive-v1'),
-            initialization=replace(legacy_artifact.initialization,
-                                   reset_validity=('mjcf-physical-effort-task-v1' if reset_switch
-                                                   else 'mjcf-physical-effort-no-drive-v1')))
-    receipt = original.execution_source_receipt
+    from ...runtime.sessions.source import close_execution_source_on_failure
+    with close_execution_source_on_failure(original):
+        from .solution import PickCubeReadinessSolution
+        import subprocess
+        revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
+                                            'rev-parse', 'HEAD'], text=True).strip()
+        solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+        # The force-observation fixture starts inside the paired finger limits;
+        # it retains PickCube semantics and is a distinct Artifact identity.
+        if not reset_switch:
+            joint_initial = dict(legacy_artifact.initialization.joint_position)
+            joint_initial.update({'panda-v1/finger_joint1': 0.02, 'panda-v1/finger_joint2': 0.02})
+            legacy_artifact = replace(legacy_artifact,
+                initialization=replace(legacy_artifact.initialization, joint_position=joint_initial))
+        if drive_mode == 'effort-only':
+            legacy_artifact = replace(legacy_artifact,
+                artifact_id=('pickcube-mjcf-physical-effort-task-v1' if reset_switch
+                             else 'pickcube-mjcf-physical-effort-no-drive-v1'),
+                initialization=replace(legacy_artifact.initialization,
+                                       reset_validity=('mjcf-physical-effort-task-v1' if reset_switch
+                                                       else 'mjcf-physical-effort-no-drive-v1')))
+        receipt = original.execution_source_receipt
     with ExitStack() as resources:
         resources.callback(receipt.close)
         from ...runtime.sessions.source import matches_relocated_source_closure

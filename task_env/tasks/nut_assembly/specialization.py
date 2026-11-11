@@ -434,98 +434,100 @@ def _build_reference(*, provider, include_solution, backend, gripper_control_hz,
         _native_feedback_profile=native_feedback_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=robot,
     )
-    dynamic = load_r3_dynamic_profile()
-    execution_controller = ReferenceExecutionController.from_source(
-        artifact, source, profile=dynamic, gripper_rate_hz=gripper_control_hz,
-        force_limit_N=recipe['controller']['force_cap_N'])
-    controller = execution_controller.hold.controller
-    settings = dict(recipe["solution"]["config"])
-    settings["grasp_offset"] = tuple(settings["grasp_offset"])
-    settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
-    settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
-    solution_config = NutAssemblySolutionConfig(**settings)
-    base_controller_identity = controller.identity
-    solution_arguments = dict(config=solution_config,
-        control_dt=artifact.timebase.control_dt, physics_dt_s=artifact.timebase.physics_dt,
-        provider=provider, task_artifact_hash=artifact.identity_hash,
-        source_id=source.scene_source.source_id,
-        source_closure_digest=source.source_closure_digest,
-        source_xml_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
-        base_controller_identity=base_controller_identity,
-        require_native_feedback_contract=True)
-    description = NutAssemblyOutcomeSolutionV1.describe(**solution_arguments)
-    solution = NutAssemblyOutcomeSolutionV1(**solution_arguments) if include_solution else None
-    solution_type = NutAssemblyOutcomeSolutionV1
-    source_files = _source_identity_files()
-    construction_id = recipe["construction_id"]
-    controller_identity = {"construction_id": construction_id,
-        "base_controller_identity": base_controller_identity,
-        "solution_identity": description["identity"],
-        "construction_source_sha256": source_files["task_env/tasks/nut_assembly/specialization.py"],
-        "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
-        "cadence": ("native-gripper-500hz-v1" if gripper_control_hz == 500
-                    else "equal-gripper-100hz-v1"),
-        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
-        "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
-    if diagnostic:
-        controller_identity.update({
-            'diagnostic_experiment': 'nutassembly-gripper-cadence-v1',
-            'physics_backend': backend,
-            'gripper_control_hz': gripper_control_hz,
-        })
-    controller.identity = digest(controller_identity)
-    root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    construction_identity = reference_task_identity_fields(
-        artifact, source, controller, include_runtime_config_sha256=False,
-    )
-    resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
-        **construction_identity, "solution_config": asdict(solution_config),
-        "solution_parameters": {name: getattr(solution_type, name) for name in (
-            "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
-            "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
-            "postclose_hold_s", "servo_height_compensation_m", "stable_height_tolerance_m")},
-        "task_recipe": task_config,
-        "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
-        "dynamic_profile": dynamic,
-        "physical_profile": controller.physical_profile,
-        "resolved_controller_action": asdict(controller.config),
-        "resolved_controller_gripper": asdict(controller.gripper_config),
-        "base_controller_identity": base_controller_identity,
-        "solution_identity": description["identity"], "guard_policy": description["policy_mapping"],
-        "guard_policy_identity": description["policy_identity"],
-        "outcome_policy": description["outcome_policy_mapping"],
-        "outcome_policy_identity": description["outcome_policy_identity"],
-        "completion_policy": "on_expert_terminal_stage",
-        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
-        "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
-        "gripper_control_hz": gripper_control_hz,
-        "gripper_feedback_hz": 500,
-        **({"diagnostic_experiment": "nutassembly-gripper-cadence-v1",
-            "physics_backend": backend} if diagnostic else {}),
-        **({"native_feedback_profile": R05B_NATIVE_FEEDBACK_PROFILE}
-           if native_feedback_profile else {}),
-        "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
-        "provider_contact_profile": contact_profile,
-        "source_revision": revision, "source_sha256": source_files,
-        "qualification": "NOT_REQUALIFIED",
-        }
-    return {"construction_id": construction_id, "artifact": artifact, "source": source,
-        "controller": execution_controller,
-        "controller_identity": controller.identity,
-        "solution": solution,
-        "solution_factory": lambda: solution_type(**solution_arguments),
-        "solution_identity": description["identity"], "solution_config": solution_config,
-        "recipe": resolved, "resolved_configuration": resolved,
-        "recipe_identity": digest(resolved), "close_authorization_policy": {
-            **description["policy_mapping"], "identity": description["policy_identity"]},
-        "allowed_close_authorization_guards": [solution_type.primary_guard_id, solution_type.alternative_guard_id],
-        "execution_policy": {"policy_id": OUTCOME_POLICY_ID,
-            "diagnostic_continuation": False, "strict_expert_gate": "preserved-with-bounded-readiness-warning",
-            "grants_full_expert_pass": False, "outcome_completion": True},
-        "source_revision": revision, "source_sha256": source_files,
-        "_execution_provider": provider,
-        "_contact_profile": contact_profile}
+    from ...runtime.sessions.source import close_execution_source_on_failure
+    with close_execution_source_on_failure(source):
+        dynamic = load_r3_dynamic_profile()
+        execution_controller = ReferenceExecutionController.from_source(
+            artifact, source, profile=dynamic, gripper_rate_hz=gripper_control_hz,
+            force_limit_N=recipe['controller']['force_cap_N'])
+        controller = execution_controller.hold.controller
+        settings = dict(recipe["solution"]["config"])
+        settings["grasp_offset"] = tuple(settings["grasp_offset"])
+        settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
+        settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
+        solution_config = NutAssemblySolutionConfig(**settings)
+        base_controller_identity = controller.identity
+        solution_arguments = dict(config=solution_config,
+            control_dt=artifact.timebase.control_dt, physics_dt_s=artifact.timebase.physics_dt,
+            provider=provider, task_artifact_hash=artifact.identity_hash,
+            source_id=source.scene_source.source_id,
+            source_closure_digest=source.source_closure_digest,
+            source_xml_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+            base_controller_identity=base_controller_identity,
+            require_native_feedback_contract=True)
+        description = NutAssemblyOutcomeSolutionV1.describe(**solution_arguments)
+        solution = NutAssemblyOutcomeSolutionV1(**solution_arguments) if include_solution else None
+        solution_type = NutAssemblyOutcomeSolutionV1
+        source_files = _source_identity_files()
+        construction_id = recipe["construction_id"]
+        controller_identity = {"construction_id": construction_id,
+            "base_controller_identity": base_controller_identity,
+            "solution_identity": description["identity"],
+            "construction_source_sha256": source_files["task_env/tasks/nut_assembly/specialization.py"],
+            "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
+            "cadence": ("native-gripper-500hz-v1" if gripper_control_hz == 500
+                        else "equal-gripper-100hz-v1"),
+            "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+            "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
+        if diagnostic:
+            controller_identity.update({
+                'diagnostic_experiment': 'nutassembly-gripper-cadence-v1',
+                'physics_backend': backend,
+                'gripper_control_hz': gripper_control_hz,
+            })
+        controller.identity = digest(controller_identity)
+        root = Path(__file__).resolve().parents[3]
+        revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+        construction_identity = reference_task_identity_fields(
+            artifact, source, controller, include_runtime_config_sha256=False,
+        )
+        resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
+            **construction_identity, "solution_config": asdict(solution_config),
+            "solution_parameters": {name: getattr(solution_type, name) for name in (
+                "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
+                "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
+                "postclose_hold_s", "servo_height_compensation_m", "stable_height_tolerance_m")},
+            "task_recipe": task_config,
+            "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
+            "dynamic_profile": dynamic,
+            "physical_profile": controller.physical_profile,
+            "resolved_controller_action": asdict(controller.config),
+            "resolved_controller_gripper": asdict(controller.gripper_config),
+            "base_controller_identity": base_controller_identity,
+            "solution_identity": description["identity"], "guard_policy": description["policy_mapping"],
+            "guard_policy_identity": description["policy_identity"],
+            "outcome_policy": description["outcome_policy_mapping"],
+            "outcome_policy_identity": description["outcome_policy_identity"],
+            "completion_policy": "on_expert_terminal_stage",
+            "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+            "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
+            "gripper_control_hz": gripper_control_hz,
+            "gripper_feedback_hz": 500,
+            **({"diagnostic_experiment": "nutassembly-gripper-cadence-v1",
+                "physics_backend": backend} if diagnostic else {}),
+            **({"native_feedback_profile": R05B_NATIVE_FEEDBACK_PROFILE}
+               if native_feedback_profile else {}),
+            "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
+            "provider_contact_profile": contact_profile,
+            "source_revision": revision, "source_sha256": source_files,
+            "qualification": "NOT_REQUALIFIED",
+            }
+        return {"construction_id": construction_id, "artifact": artifact, "source": source,
+            "controller": execution_controller,
+            "controller_identity": controller.identity,
+            "solution": solution,
+            "solution_factory": lambda: solution_type(**solution_arguments),
+            "solution_identity": description["identity"], "solution_config": solution_config,
+            "recipe": resolved, "resolved_configuration": resolved,
+            "recipe_identity": digest(resolved), "close_authorization_policy": {
+                **description["policy_mapping"], "identity": description["policy_identity"]},
+            "allowed_close_authorization_guards": [solution_type.primary_guard_id, solution_type.alternative_guard_id],
+            "execution_policy": {"policy_id": OUTCOME_POLICY_ID,
+                "diagnostic_continuation": False, "strict_expert_gate": "preserved-with-bounded-readiness-warning",
+                "grants_full_expert_pass": False, "outcome_completion": True},
+            "source_revision": revision, "source_sha256": source_files,
+            "_execution_provider": provider,
+            "_contact_profile": contact_profile}
 
 
 def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None, task_config=None):

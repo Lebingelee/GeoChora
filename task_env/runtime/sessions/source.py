@@ -1,5 +1,6 @@
 """Advanced Phase-I source bridge. Semantic names map to source names, never IDs."""
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from collections.abc import Mapping
 from types import MappingProxyType
 from pathlib import Path
@@ -14,6 +15,21 @@ import xml.etree.ElementTree as ET
 from ...artifacts import FrameReference, SceneDefinition, TaskArtifactV1
 from ...assembly.source import TaskSceneSource, UsdTaskSceneSourceV1
 from ...assembly.assets import _source_closure_digest
+
+
+@contextmanager
+def close_execution_source_on_failure(source):
+    """Keep a source lease on success; release it if its owner cannot be built."""
+    try:
+        yield source
+    except BaseException as error:
+        receipt = getattr(source, 'execution_source_receipt', None)
+        if receipt is not None:
+            try:
+                receipt.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'execution source cleanup also failed: {cleanup_error!r}')
+        raise
 
 
 def position_frame_bindings_from_artifact(artifact, source):
