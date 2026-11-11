@@ -408,111 +408,123 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                   "resolved_configuration": {"runtime_config": asdict(prepared.config),
                                               "task_recipe": prepared.task_config,
                                               "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
-    robot = legacy["source"].agents[0]
-    runtime_input = build_pickcube_isaac_runtime_input_v1(
-        delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
-        physical_fixture=physical_fixture, robot=robot,
-    )
-    manifest_path = Path(delivery_manifest).resolve(strict=True)
-    panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
-    panda_xml = panda_xml_path.read_text()
-    from ...assembly.usd_delivery import load_usd_asset_delivery
-    loaded = load_usd_asset_delivery(manifest_path)
-    if hashlib.sha256(panda_xml.encode("utf-8")).hexdigest() != loaded.delivery.source_entry_sha256:
-        raise ValueError("F06 kinematics Panda XML differs from the frozen source-entry bytes")
-    action_config = legacy["source"].config.action
-    physical = None
-    if controller_builder is None:
-        from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
-        dynamic_profile, _profile_source = _r3_dynamic_profile()
-        controller = PandaPositionServoProfileV1.from_usd_source(
-            runtime_input.artifact, runtime_input.runtime_source,
-            execution=runtime_input.execution, kinematics_source_xml=panda_xml,
-            config=action_config, pose_target_method="achieved_state_dls_v1",
-            arm_tracking_method="production_r3_continuous_v1", arm_tracking_profile=dynamic_profile,
-            arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
-            entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
+    # USD owns an independent source; the temporary MJCF snapshot only serves
+    # Task/readiness preparation and must not outlive construction.
+    receipt = legacy["source"].execution_source_receipt
+    try:
+        robot = legacy["source"].agents[0]
+        runtime_input = build_pickcube_isaac_runtime_input_v1(
+            delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
+            physical_fixture=physical_fixture, robot=robot,
         )
-    else:
-        physical = controller_builder(robot, runtime_input, panda_xml, action_config)
-        from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
-        if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
-            raise TypeError('USD Controller builder must return one physical execution')
-        controller = physical.controllers[0]
-    readiness = legacy["readiness"]
-    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
-    source_ids = dict(legacy["source_sha256"])
-    if physical is not None:
-        source_ids.pop("task_env/controllers/canonical/position_profile.py", None)
-    identity_paths = (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
-                      Path(__file__).parents[2] / "runtime/sessions/api.py",
-                      Path(__file__).parents[2] / "controllers/canonical/kinematics.py")
-    if physical is None:
-        identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
-    for path in identity_paths:
-        source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
-            path.read_bytes()
-        ).hexdigest()
-    source_ids["f06_delivery_source_entry_sha256"] = loaded.delivery.source_entry_sha256
-    source_ids["f06_delivery_manifest_sha256"] = loaded.manifest_bytes_sha256
-    root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
-                                       text=True).strip()
-    effective_config = (legacy["resolved_configuration"]["runtime_config"]
-                        if resolved_config is None else asdict(resolved_config))
-    # Keep historical F06 source/configuration identity when the additive
-    # gravity option is disabled; F06 does not yet admit the enabled route.
-    if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
-        effective_config.pop('gravity_compensation', None)
-    effective_config_sha = hashlib.sha256(json.dumps(
-        effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    resolved = {
-        "construction_id": "pickcube-p16-reference-construction-v2",
-        "task_recipe": legacy["resolved_configuration"]["task_recipe"],
-        "artifact": runtime_input.artifact.to_mapping(),
-        "artifact_sha256": runtime_input.artifact.identity_hash,
-        "runtime_config": effective_config,
-        "runtime_config_sha256": effective_config_sha,
-        "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
-        "resolved_controller_gripper": legacy["resolved_configuration"]["resolved_controller_gripper"],
-        "controller_identity": controller.identity,
-        "solution_identity": solution_identity,
-        "source_revision": revision,
-        "source_sha256": source_ids,
-        "runtime_source_id": runtime_input.runtime_source.source_id,
-        "runtime_source_closure_sha256": runtime_input.runtime_source.source_closure_digest,
-        "runtime_source_bindings": {name: dict(getattr(runtime_input.runtime_source, name))
-            for name in ("joints", "bodies", "frames", "free_joints", "joint_targets")},
-        "execution_spec_v1": runtime_input.execution.to_mapping(),
-        "reset_plan_identity_sha256": runtime_input.reset_plan.identity_hash,
-        "f06_delivery_manifest_sha256": runtime_input.delivery_manifest_sha256,
-        "tcp_profile": PANDA_PICKCUBE_EE_TCP_V1.to_mapping(),
-        "qualification": "NOT_REQUALIFIED",
-    }
-    return {
-        "construction_id": resolved["construction_id"],
-        "robot": robot,
-        "artifact": runtime_input.artifact,
-        "source": runtime_input.runtime_source,
-        "readiness": readiness,
-        "controller": controller,
-        **({} if physical is None else {"physical_execution": physical}),
-        "solution": solution,
-        "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
-        "solution_identity": solution_identity,
-        "source_revision": revision,
-        "source_sha256": source_ids,
-        "recipe_identity": digest(resolved),
-        "resolved_configuration": resolved,
-        "execution_spec_v1": runtime_input.execution,
-        "reset_plan": runtime_input.reset_plan,
-        "controller_binding_plan": None,
-        "f06_pickcube_isaac_input": runtime_input,
-        "session_admission_input": runtime_input,
-        "f06_delivery_manifest_path": str(manifest_path),
-        "kinematics_source_xml": panda_xml,
-    }
+        manifest_path = Path(delivery_manifest).resolve(strict=True)
+        panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
+        panda_xml = panda_xml_path.read_text()
+        from ...assembly.usd_delivery import load_usd_asset_delivery
+        loaded = load_usd_asset_delivery(manifest_path)
+        if hashlib.sha256(panda_xml.encode("utf-8")).hexdigest() != loaded.delivery.source_entry_sha256:
+            raise ValueError("F06 kinematics Panda XML differs from the frozen source-entry bytes")
+        action_config = legacy["source"].config.action
+        physical = None
+        if controller_builder is None:
+            from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+            dynamic_profile, _profile_source = _r3_dynamic_profile()
+            controller = PandaPositionServoProfileV1.from_usd_source(
+                runtime_input.artifact, runtime_input.runtime_source,
+                execution=runtime_input.execution, kinematics_source_xml=panda_xml,
+                config=action_config, pose_target_method="achieved_state_dls_v1",
+                arm_tracking_method="production_r3_continuous_v1", arm_tracking_profile=dynamic_profile,
+                arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
+                entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
+            )
+        else:
+            physical = controller_builder(robot, runtime_input, panda_xml, action_config)
+            from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
+            if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
+                raise TypeError('USD Controller builder must return one physical execution')
+            controller = physical.controllers[0]
+        readiness = legacy["readiness"]
+        solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+        solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
+        source_ids = dict(legacy["source_sha256"])
+        if physical is not None:
+            source_ids.pop("task_env/controllers/canonical/position_profile.py", None)
+        identity_paths = (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
+                          Path(__file__).parents[2] / "runtime/sessions/api.py",
+                          Path(__file__).parents[2] / "controllers/canonical/kinematics.py")
+        if physical is None:
+            identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
+        for path in identity_paths:
+            source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+        source_ids["f06_delivery_source_entry_sha256"] = loaded.delivery.source_entry_sha256
+        source_ids["f06_delivery_manifest_sha256"] = loaded.manifest_bytes_sha256
+        root = Path(__file__).resolve().parents[3]
+        revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
+                                           text=True).strip()
+        effective_config = (legacy["resolved_configuration"]["runtime_config"]
+                            if resolved_config is None else asdict(resolved_config))
+        # Keep historical F06 source/configuration identity when the additive
+        # gravity option is disabled; F06 does not yet admit the enabled route.
+        if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
+            effective_config.pop('gravity_compensation', None)
+        effective_config_sha = hashlib.sha256(json.dumps(
+            effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        resolved = {
+            "construction_id": "pickcube-p16-reference-construction-v2",
+            "task_recipe": legacy["resolved_configuration"]["task_recipe"],
+            "artifact": runtime_input.artifact.to_mapping(),
+            "artifact_sha256": runtime_input.artifact.identity_hash,
+            "runtime_config": effective_config,
+            "runtime_config_sha256": effective_config_sha,
+            "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
+            "resolved_controller_gripper": legacy["resolved_configuration"]["resolved_controller_gripper"],
+            "controller_identity": controller.identity,
+            "solution_identity": solution_identity,
+            "source_revision": revision,
+            "source_sha256": source_ids,
+            "runtime_source_id": runtime_input.runtime_source.source_id,
+            "runtime_source_closure_sha256": runtime_input.runtime_source.source_closure_digest,
+            "runtime_source_bindings": {name: dict(getattr(runtime_input.runtime_source, name))
+                for name in ("joints", "bodies", "frames", "free_joints", "joint_targets")},
+            "execution_spec_v1": runtime_input.execution.to_mapping(),
+            "reset_plan_identity_sha256": runtime_input.reset_plan.identity_hash,
+            "f06_delivery_manifest_sha256": runtime_input.delivery_manifest_sha256,
+            "tcp_profile": PANDA_PICKCUBE_EE_TCP_V1.to_mapping(),
+            "qualification": "NOT_REQUALIFIED",
+        }
+        result = {
+            "construction_id": resolved["construction_id"],
+            "robot": robot,
+            "artifact": runtime_input.artifact,
+            "source": runtime_input.runtime_source,
+            "readiness": readiness,
+            "controller": controller,
+            **({} if physical is None else {"physical_execution": physical}),
+            "solution": solution,
+            "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
+            "solution_identity": solution_identity,
+            "source_revision": revision,
+            "source_sha256": source_ids,
+            "recipe_identity": digest(resolved),
+            "resolved_configuration": resolved,
+            "execution_spec_v1": runtime_input.execution,
+            "reset_plan": runtime_input.reset_plan,
+            "controller_binding_plan": None,
+            "f06_pickcube_isaac_input": runtime_input,
+            "session_admission_input": runtime_input,
+            "f06_delivery_manifest_path": str(manifest_path),
+            "kinematics_source_xml": panda_xml,
+        }
+    except BaseException as error:
+        try:
+            receipt.close()
+        except BaseException as cleanup_error:
+            error.add_note(f'temporary Task source cleanup also failed: {cleanup_error!r}')
+        raise
+    receipt.close()
+    return result
 
 
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):

@@ -163,3 +163,5 @@ PickCube USD effort 已由物理 Runtime 发布 V2 任务状态，Isaac 同步 R
 USD effort 已直接构造物理 Controller，不再临时创建 USD PositionServo；参考 source 准备仍创建参考 Controller。Isaac effort／Position 短程均通过，详见[实施记录 6.73](../planning/post-5c-optimization-execution.md#673-usd-effort-直接构造物理-controller)。
 
 PickCube 的 Task source 与 readiness 准备已和参考 Controller 构造分开；MJCF／USD effort 不再创建参考 Controller，详见[实施记录 6.74](../planning/post-5c-optimization-execution.md#674-task-source-准备不再创建参考-controller)。
+
+USD 构造完成或在 source 准备之后失败时，借用的 MJCF Task 快照已由构造者释放；Isaac effort／Position 已复验。详见[实施记录 6.75](../planning/post-5c-optimization-execution.md#675-usd-构造释放临时-task-source-快照)。

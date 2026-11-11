@@ -848,3 +848,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +60／−14，净增 46 行，主要是具名准备结果和 USD effort 的真实身份／配置组合；版本诊断修改 1 文件 +8／−3，验证 MJCF source、Scene 和 Controller 复用 Robot 且不创建参考 Controller；本文及当前状态文档修改 2 文件。没有新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer、clock 和控制提交 owner 未改变；Task 的其余 source 专属构造仍待收敛。
 
 91 项版本检查通过。禁止参考 Controller 与 USD PositionServo 构造后，五种 MJCF／USD effort 的十组真实 source／Controller 合同对照一致。最终代码的 MuJoCo 参考 R3 短程与 joint→R3 切换／H5 读回通过，共观测 15 个 native 子步。Isaac joint effort／同步 RGB 在具名结果整理之前完成两次 reset、step、三帧独立读回和关闭，观测 41 次 physics callback，采图期间无额外推进、订阅前启动推进未知；最终具名化结果已做十组静态合同和版本检查，未再次重跑 GPU。Isaac 日志有只读目录、渲染预热及 callback 取消订阅异常，进程和读回成功。GeoPhys 与完整 Solution 本批未重跑。各轮 diff、计划、对照及收据位于 ignored `workspace/maintenance/v211_task_source_without_controller_20261112_eALPcy/`；E01～E04 仍未接收。
+
+### 6.75 USD 构造释放临时 Task source 快照
+
+输入 `d2c88d65`。USD 构造借用 MJCF 快照准备 Task／readiness，返回的 Runtime 却拥有独立 USD source，原临时快照在成功返回及后续构造异常时均无 owner 清理。现在 USD 构造结束时关闭借用快照；失败时先保留原异常，再记录可能发生的清理异常。Runtime 的 USD source 和其资源由原有 owner 管理。此保护从 Task source 已成功返回后开始；source 准备内部更早失败的清理仍待单独检查。
+
+生产修改 1 文件 +116／−104，净增 12 行，其中原有 USD 构造主体约 104 行仅缩进迁移以纳入失败清理范围；版本诊断修改 1 文件 +51／−0，覆盖 Position／effort 构造失败及清理异常；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。构建入口与 provider／renderer 的 source、状态、clock 和提交合同未改，减少的是失去 owner 的临时目录。
+
+修改前的实际 USD effort 构造留下一个仍存在的快照；修改后实际 effort、Position 和缺失 manifest 三次构造各自的快照均在返回或抛错后消失。94 项版本检查通过。Isaac effort／Position 的 CUDA／同步 RGB 各完成两次 reset、step、三帧独立读回与 Env／App 关闭，各观测 41 个 physics callback，采图期间无额外推进，订阅前启动推进未知；Position H5 读回含一条 transition。两次 callback 取消订阅均报告 AttributeError，SDK 日志中的预热和关闭信息保留，进程及读回成功。MuJoCo、GeoPhys 与完整 Solution 本批未重跑，旧证据按不受临时 USD 准备快照生命周期影响的范围保留。前后快照检查、冻结 diff、计划和运行收据位于 ignored `workspace/maintenance/v211_usd_source_lease_20261112_oUDbRb/`；E01～E04 仍未接收。

@@ -145,3 +145,54 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
         assert built[0] is declared[0] is bound[0]
     finally:
         binding.close_task_resources()
+
+
+@pytest.mark.parametrize('physical', [False, True])
+def test_usd_build_failure_releases_prepared_task_source(physical, monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    receipts = []
+    original = source_module.snapshot_legacy_mjcf_source
+    failure = RuntimeError('USD source preparation failed')
+
+    def capture(*args, **kwargs):
+        source = original(*args, **kwargs)
+        receipts.append(source.execution_source_receipt)
+        return source
+
+    def fail(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', fail)
+    with pytest.raises(RuntimeError) as raised:
+        specialization.build_isaac_reference(
+            delivery_manifest='unused', include_solution=False,
+            controller_builder=(lambda *args: None) if physical else None,
+        )
+    assert raised.value is failure
+    assert len(receipts) == 1
+    assert not receipts[0].snapshot_root.exists()
+
+
+def test_usd_build_failure_preserves_error_when_source_cleanup_fails(monkeypatch):
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+    from task_env.tasks.pick_cube import specialization
+
+    original_close = ExecutionSourceReceiptV1.close
+    failure = RuntimeError('USD source failed')
+
+    def fail_build(*args, **kwargs):
+        raise failure
+
+    def fail_close(receipt):
+        original_close(receipt)
+        raise OSError('cleanup failed')
+
+    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', fail_build)
+    monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_close)
+    with pytest.raises(RuntimeError) as raised:
+        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
+    assert raised.value is failure
+    assert any('cleanup failed' in note for note in raised.value.__notes__)
