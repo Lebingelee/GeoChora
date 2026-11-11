@@ -476,3 +476,11 @@ MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 rese
 生产修改 3 文件 +26／−26，净变化 0；成员构建代码经过重写归并，无新增、删除或迁移文件；诊断代码未改，文档修改 2 文件，tracked 文件数不变。provider source、renderer、时钟、动作提交未改。27 项版本纯合同通过；MuJoCo CPU 的 PickCube Panda effort／Position、装配 Panda、NutAssembly、Pendulum、双轮车分别完成 reset、非零 action 或单个 Nut Solution interval、再次 reset 和 close，共 70 个可观测子步。
 
 与先前对应同 seed 路线对照，六种运行的 Robot／Controller identity、reset sample 及各自可用的 Scene 或 Artifact／source identity 一致；三条 Position 路线中记录的 binding identity 和 resource writers 亦包含在 Robot 对照中。首次自动对账错误地假设 Position boundary 包含 `scene_identity_hash`，未启动物理；改为比较其实际提供的 Artifact 和 source 字段后通过。计划、冻结 diff、原始结果和对账在 ignored `workspace/maintenance/v211_common_members_20261112_001/`。GeoPhys、Isaac、renderer 本批未重跑，不外推完整 Solution 或后续事件接收。
+
+### 6.29 退休 Position 诊断构造旁路
+
+输入 `6c3db21d`。公共 Env 移除已无正式调用者的 `from_position_candidate`、`from_leaf_position_candidate`，以及仅由它们使用的 candidate 执行选择解析、临时动态类型和 leaf 构造开关；共同 Task binding 构造去掉只供这些入口使用的参数。Position Controller 与正式 PickCube／NutAssembly 的 Position 路线保留，LIBERO 仍实际调用的 mixed-control 构造也保留。旧 leaf 计划在控制／记录模块中的剩余内部逻辑还需继续审计，本批不声称整体删除。
+
+生产修改 2 文件 +5／−122，净减 117 行；无文件新增、删除或迁移，tracked 文件数不变；版本诊断未改，实施与当前状态 2 文档修改。生命周期更直接地由正式配置和共同 Task binding 进入；provider、renderer、clock 和控制提交代码未改。27 项版本纯合同通过。
+
+第一次冻结版本中，四任务的六条 MuJoCo CPU 短程通过（70 个可观测子步）；随后去掉共同构造上已无用途的两个候选专用参数，并按最终 diff 再次运行同六条路线，全部通过（再 70 个子步）。每条均完成 reset、非零 action 或 Nut 单个 Solution interval、再次 reset 和 close，两个版本合计 140 个观测子步。计划、两个冻结 diff 和各结果在 ignored `workspace/maintenance/v211_retire_position_constructor_20261112_001/`。GeoPhys、Isaac 和 renderer 未在本批复跑，E01～E04 未完成。

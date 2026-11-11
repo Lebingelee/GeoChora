@@ -71,3 +71,5 @@ Pendulum／双轮车的传动校验与 provider source 映射现由共同 source
 Panda direct effort 与两个简单主体现在共用已有主体 Assembly 编译，单层和嵌套结构均从声明进入共同绑定；Position 路线仍待进一步共同化。MuJoCo CPU 三条 effort 短程及两个简单主体 GeoPhys CPU 短程已通过，详见[实施记录 6.27](../planning/post-5c-optimization-execution.md#627-单层与嵌套已有主体的-effort-assembly-编译)。
 
 Position 与 effort 的已有实体及关节成员现由共同 Assembly owner 声明，保留各自控制合同；六条 MuJoCo CPU 短程及记录的主体／source 身份对照通过。完整四任务共同构造和 E01～E04 仍未收口，详见[实施记录 6.28](../planning/post-5c-optimization-execution.md#628-position-与-effort-共用已有主体成员声明)。
+
+Env 中无正式调用者的 Position／leaf Position 候选构造入口及其执行选择解析已退休；正式 Position 和仍有实际调用的 mixed-control 路径保留。旧 leaf 内部控制分支仍待审计。六条 MuJoCo CPU 短程在最终构造签名下通过，见[实施记录 6.29](../planning/post-5c-optimization-execution.md#629-退休-position-诊断构造旁路)。

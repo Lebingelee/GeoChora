@@ -955,8 +955,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return env
 
     @classmethod
-    def from_task_binding(cls, binding, *, provider, backend, horizon,
-                          camera_observation_config=None, execution_spec=None, seed=31):
+    def from_task_binding(cls, binding, *, provider, backend, horizon, seed=31):
         """Compile a declared task and construct its single environment owner.
 
         Public configurations and typed advanced inputs share this boundary;
@@ -968,14 +967,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         try:
             initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
             declared = initial.get('execution_spec_v1')
-            if execution_spec is not None and declared != execution_spec:
-                raise ValueError('compiled task differs from its declared execution specification')
             binding = binding.bind_compiled_control(initial)
         except BaseException as error:
             cls._release_failed_task_construction(initial, binding, error)
             raise
         return cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
-                   camera_observation_config=camera_observation_config,
                    _execution_spec_v1=declared, _initial_value=initial)
 
     @staticmethod
@@ -1019,91 +1015,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     or np.linalg.norm(camera.quaternion_wxyz) < 1e-12):
                 raise ValueError('task RGB requires a finite world CameraSpec with nonzero quaternion')
 
-    @classmethod
-    def from_position_candidate(
-        cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
-        camera_observation_config=None, execution_spec=None,
-    ):
-        """Explicitly construct a bounded Position profile through the selected binding."""
-        if not isinstance(binding, ReferenceTaskBinding):
-            raise TypeError('PositionServoV1 candidate requires the existing ReferenceTaskBinding')
-        from ..runtime.sessions.control import is_admitted_position_profile_set
-
-        candidate_type = cls
-        if getattr(cls, 'uid', None) == 'base-task-env':
-            candidate_type = type(
-                'PositionCandidateSelectedReferenceEnv', (cls,),
-                {'uid': 'c02b-position-servo-candidate-v1'},
-            )
-        if execution_spec is not None:
-            from ..artifacts import ExecutionSpecV1
-            if type(execution_spec) is not ExecutionSpecV1:
-                raise TypeError('versioned Position candidate requires ExecutionSpecV1')
-            execution_spec.validate()
-            if (provider, backend) != (
-                    execution_spec.physics_provider, execution_spec.physics_backend):
-                raise ValueError('Position candidate provider/backend differs from ExecutionSpecV1')
-        env = candidate_type.from_task_binding(
-            binding, provider=provider, backend=backend, horizon=horizon,
-            camera_observation_config=camera_observation_config,
-            execution_spec=execution_spec,
-        )
-        profiles = env.position_profiles
-        if not is_admitted_position_profile_set(profiles):
-            env.close()
-            raise TypeError('candidate binding did not construct one or two Entity-bound PositionServoV1 profiles')
-        if camera_observation_config is not None and len(profiles) != 1:
-            env.close()
-            raise ValueError('R04a camera observation is bounded to the existing single Panda Position source')
-        if (provider, backend) == ('mujoco', 'cpu') and camera_observation_config is None:
-            from .configuration import resolve_candidate_execution_selection
-            try:
-                env._candidate_execution_selection = resolve_candidate_execution_selection(
-                    provider=provider, backend=backend, source=env.value['source'], execution_spec=execution_spec)
-            except BaseException:
-                env.close()
-                raise
-        return env
-
-    @classmethod
-    def from_leaf_position_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=64,
-                                     fixed_attachment=False):
-        """Construct the explicitly opted-in R02c Arm/Hand leaf candidate."""
-        if not isinstance(binding, ReferenceTaskBinding):
-            raise TypeError('leaf Position candidate requires the existing ReferenceTaskBinding')
-        if provider != 'mujoco' or backend != 'cpu':
-            raise ValueError('R02c leaf Position candidate is limited to MuJoCo CPU')
-        if fixed_attachment:
-            candidate_type = type('AttachedLeafSelectedReferenceEnv', (cls,),
-                                  {'uid': 'r03c-attached-entity-leaf-candidate-v1'})
-        else:
-            candidate_type = cls
-        if not fixed_attachment and getattr(cls, 'uid', None) == 'base-task-env':
-            candidate_type = type('LeafPositionSelectedReferenceEnv', (cls,),
-                                  {'uid': 'r02c-independent-position-leaf-candidate-v1'})
-        env = candidate_type(provider=provider, backend=backend, horizon=horizon,
-                             _binding=binding, _leaf_position_candidate=True,
-                             _fixed_attachment_leaf_position_candidate=fixed_attachment)
-        if not getattr(env, 'leaf_position_profile', False):
-            env.close()
-            raise TypeError('leaf candidate binding did not provide an effective compiled leaf plan')
-        if bool(getattr(env, 'fixed_attachment_leaf_position_profile', False)) != bool(fixed_attachment):
-            env.close()
-            raise TypeError('leaf candidate attachment opt-in was not preserved by the selected environment')
-        from .configuration import resolve_candidate_execution_selection
-        try:
-            env._candidate_execution_selection = resolve_candidate_execution_selection(
-                provider=provider, backend=backend, source=env.value['source'])
-        except BaseException:
-            env.close()
-            raise
-        return env
-
     def _selected_execution_context(self):
         resolved = getattr(self, 'resolved_public_config', None)
         if resolved is not None:
             return resolved.execution_spec_v2, resolved.requested_execution_json
-        return getattr(self, '_candidate_execution_selection', None), None
+        return None, None
 
     @classmethod
     def from_mixed_control_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=6000):
@@ -1566,9 +1482,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
                  _native_feedback_request=None,
-                 camera_observation_config=None, _leaf_position_candidate=False,
-                 _fixed_attachment_leaf_position_candidate=False,
-                 _execution_spec_v1=None, _mixed_control_candidate=False,
+                 camera_observation_config=None, _execution_spec_v1=None,
+                 _mixed_control_candidate=False,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
         self._uses_component_assembly = bool(
             (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
@@ -1605,11 +1520,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
                 self.binding = _binding
             self.leaf_position_profile = False
-            self.fixed_attachment_leaf_position_profile = bool(_fixed_attachment_leaf_position_candidate)
-            if _leaf_position_candidate and (provider, backend) != ('mujoco', 'cpu'):
-                raise ValueError('leaf Position candidate admits MuJoCo CPU only')
-            if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
-                raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
+            self.fixed_attachment_leaf_position_profile = False
             if _mixed_control_candidate and (
                 (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
                 or self.binding.build_mixed_control_profile is None
