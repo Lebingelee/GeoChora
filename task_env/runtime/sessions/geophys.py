@@ -1105,59 +1105,12 @@ class _GeoPhysSession(_SessionValues):
         return native, measurement
 
     def _snapshot_typed_actuator_force_values(self, boundary, sample_clock, requirements):
-        from ...artifacts import TypedActuatorForceStateValue, UnavailableStateValue
-
-        if not getattr(self, '_r1_force_admitted', False):
-            return (), tuple(UnavailableStateValue(
-                'unavailable-state-value-v1', item.field_name, item.subject_kind,
-                item.entity_id, item.subject_id, item.sample_domain,
-                'GeoPhys typed actuator force is limited to the admitted Panda R1 source binding',
-            ) for item in requirements)
-        state = self.snapshot()
-        if (state.control_step != boundary.control_step
-                or float(state.simulation_time) != sample_clock.simulation_time_s):
-            raise ValueError('typed force readback boundary changed during state publication')
-        native, measurement = self._capture_actuator_force(state)
-        actuator_index = self._open_actuators[0]
-        values = []
-        for item in requirements:
-            if (item.entity_id, item.subject_id, item.unit) != (
-                'panda-main', self._source.open_actuators[0], 'N',
-            ):
-                missing_requirements = requirements[len(values):]
-                return tuple(values), tuple(UnavailableStateValue(
-                    'unavailable-state-value-v1', requirement.field_name,
-                    requirement.subject_kind, requirement.entity_id,
-                    requirement.subject_id, requirement.sample_domain,
-                    'GeoPhys bounded R1 force route only maps panda-main/actuator8 in N',
-                ) for requirement in missing_requirements)
-            values.append(TypedActuatorForceStateValue(
-                'typed-actuator-force-state-v1',
-                item.entity_id,
-                item.subject_id,
-                measurement.force_unit,
-                measurement.signed_force_N if measurement.valid else None,
-                measurement.actuator_ctrl if measurement.valid else None,
-                measurement.valid,
-                measurement.invalid_reason,
-                measurement.source_generation,
-                measurement.sample_sequence,
-                measurement.state_revision,
-                measurement.configuration_revision,
-                self._source.source_closure_digest,
-                self._provider_materialization_id,
-                measurement.phase,
-                measurement.native_step_index,
-                float(self._artifact.timebase.physics_dt),
-                float(measurement.native_sample_time_s or 0.0),
-                str(self._episode_id),
-                str(self._reset_sample_id),
-                boundary.boundary_id,
-                int(state.control_step),
-                float(state.simulation_time),
-            ))
-            self._last_typed_force_publication = values[-1]
-        return tuple(values), ()
+        from ...artifacts import UnavailableStateValue
+        return (), tuple(UnavailableStateValue(
+            'unavailable-state-value-v1', item.field_name, item.subject_kind,
+            item.entity_id, item.subject_id, item.sample_domain,
+            'GeoPhys typed actuator-force publication is not admitted for this source',
+        ) for item in requirements)
 
     def control_feedback(self, state, *, actuator_force=None):
         from .control import feedback_value
@@ -1166,8 +1119,8 @@ class _GeoPhysSession(_SessionValues):
             raise ValueError('control session admission required')
         if not getattr(self, '_force_feedback_required', False):
             raise ValueError('actuator-force feedback is not admitted for this Controller profile')
-        if getattr(self, '_r1_force_admitted', False) and actuator_force is None:
-            raise ValueError('plan-bound R1 feedback requires its current typed force publication')
+        if actuator_force is not None:
+            raise ValueError('external typed actuator-force injection is not admitted')
         native, measurement = self._capture_actuator_force(state)
         if not measurement.valid:
             raise ValueError(
@@ -1175,29 +1128,6 @@ class _GeoPhysSession(_SessionValues):
                 f'{measurement.invalid_reason or "unknown reason"}'
             )
         signed_force_N = float(measurement.signed_force_N)
-        if actuator_force is not None:
-            from ...artifacts import TypedActuatorForceStateValue
-            if not isinstance(actuator_force, TypedActuatorForceStateValue):
-                raise TypeError('typed Controller feedback requires TypedActuatorForceStateValue')
-            if actuator_force != getattr(self, '_last_typed_force_publication', None):
-                raise ValueError('typed actuator-force value is not the current RuntimeSession publication')
-            if (actuator_force.actuator_id != measurement.actuator_id
-                    or actuator_force.entity_id != 'panda-main'
-                    or actuator_force.unit != measurement.force_unit
-                    or actuator_force.signed_value != measurement.signed_force_N
-                    or actuator_force.actuator_control_value != measurement.actuator_ctrl
-                    or actuator_force.source_generation != measurement.source_generation
-                    or actuator_force.sample_sequence != measurement.sample_sequence
-                    or actuator_force.source_state_revision != measurement.state_revision
-                    or actuator_force.configuration_revision != measurement.configuration_revision
-                    or actuator_force.source_closure_digest != self._source.source_closure_digest
-                    or actuator_force.provider_materialization_id != self._provider_materialization_id
-                    or actuator_force.native_step_index != measurement.native_step_index
-                    or actuator_force.sample_phase != measurement.phase
-                    or actuator_force.episode_id != measurement.episode_id
-                    or actuator_force.reset_sample_id != measurement.reset_sample_id):
-                raise ValueError('typed actuator-force publication differs from the current Provider sample')
-            signed_force_N = float(actuator_force.signed_value)
         return feedback_value(self, state, signed_force_N)
 
     def bind_mixed_controller(self, controller_identity):

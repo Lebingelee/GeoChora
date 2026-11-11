@@ -1010,173 +1010,6 @@ def prepare_position_control_materialization(
     return plan, joint_bindings, frame_bindings, binding
 
 
-_C02B_R1_GEO_PHYS_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
-_C02B_R1_ARTIFACT_IDENTITY = '97e0f33d06bc58831a946e3a0cdf277f3f52efe5b2bcf801192a965631c90efd'
-_C02B_R1_SCENE_IDENTITY = '047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e'
-_C02B_R1_SOURCE_CLOSURE = 'aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47'
-_C02B_R1_CONTROLLER_IDENTITY = 'aa97e909925b397968ad1c45716ce6e3f22902d5e676d2a18a1f27b86a814c76'
-_C02B_R1_KINEMATICS_IDENTITY = '6ce5254cd92efaffbf52d72881d96a1ea6a35da0b27aefd0c4ac89f181ca5d14'
-_C02B_R1_PLAN_IDENTITY = 'b4838ab8c954f462066cdb07356e5a90ad3f9c521c9f9b53ce9c933ac2828c80'
-_C02B_R1_SOURCE_XML_SHA256 = '2521356a6c925e8756e8d5309d68532aabce497654a7bd410cabac8533312aa3'
-_C02B_R1_TCP_IDENTITY = 'b27be18d500ddaa548f7a588d61a3756ae7663679ca66b3272aa268183461ff8'
-_C02B_R1_TASK_ID = 'phase-ii-c02b-r1-typed-force'
-_C02B_R1_MUJOCO_PACKAGE_VERSION = '3.8.1'
-_C02B_R1_MUJOCO_RUNTIME_VERSION = '3.8.1'
-_C02B_R1_MUJOCO_PYTHON_ORIGIN_SHA256 = 'f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497'
-_C02B_R1_MUJOCO_BINDING_SHA256 = '9067239d3126392729430d12d077ab4b298c61d2ea1209c9333823be410359e3'
-_C02B_R1_MUJOCO_CORE_SHA256 = '8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592'
-
-
-def _mujoco_r1_build_identity():
-    """Return the installed Python package and native MuJoCo build identity."""
-    from importlib.util import find_spec
-    from pathlib import Path
-    import hashlib
-    import mujoco
-
-    build = dict(provider_build_identity('mujoco'))
-    runtime_version = str(mujoco.mj_versionString())
-    package_root = Path(mujoco.__file__).resolve().parent
-    binding_spec = find_spec('mujoco._functions')
-    binding_path = None if binding_spec is None or binding_spec.origin is None else Path(binding_spec.origin).resolve()
-    core_candidates = tuple(
-        path.resolve() for path in package_root.glob('libmujoco.*')
-        if path.is_file() and runtime_version in path.name
-    )
-    if binding_path is not None and binding_path.is_file():
-        build['native_binding_origin'] = str(binding_path)
-        build['native_binding_sha256'] = hashlib.sha256(binding_path.read_bytes()).hexdigest()
-    if len(core_candidates) == 1:
-        core_path = core_candidates[0]
-        build['native_core_origin'] = str(core_path)
-        build['native_core_sha256'] = hashlib.sha256(core_path.read_bytes()).hexdigest()
-    else:
-        build['native_core_origin'] = None
-        build['native_core_sha256'] = None
-    return build, runtime_version
-
-
-def _c02b_r1_force_capability_manifest(artifact, execution, source, plan, controller, binding):
-    """Build exact admission evidence for one audited Provider/source/Controller tuple."""
-    from ...controllers.canonical.production import ProductionCanonicalPandaController
-    from ...artifacts import TaskArtifactV1
-    import hashlib
-
-    if type(controller) is not ProductionCanonicalPandaController:
-        raise CapabilityAdmissionError('actuator_force_query requires the actual bounded R1 Controller instance')
-    if execution.backend != 'cpu':
-        raise CapabilityAdmissionError('typed R1 actuator force is limited to audited CPU Providers')
-    if (execution.render_provider != 'none' or execution.physics_profile != PROFILE
-            or execution.determinism_mode != 'strict'):
-        raise CapabilityAdmissionError('typed R1 actuator force execution profile is unsupported')
-    provider = execution.physics_provider
-    if provider == 'geophys':
-        build = provider_build_identity('geophys')
-        runtime_version = None
-        if (build.get('repository_revision') != _C02B_R1_GEO_PHYS_REVISION
-                or build.get('dirty_build_sha256') is not None):
-            raise CapabilityAdmissionError(
-                'typed R1 actuator force requires clean GeoPhys repair commit '
-                f'{_C02B_R1_GEO_PHYS_REVISION}'
-            )
-        provider_evidence = f'geophys=git:{_C02B_R1_GEO_PHYS_REVISION}'
-    elif provider == 'mujoco':
-        build, runtime_version = _mujoco_r1_build_identity()
-        if (build.get('package_version') != _C02B_R1_MUJOCO_PACKAGE_VERSION
-                or runtime_version != _C02B_R1_MUJOCO_RUNTIME_VERSION
-                or build.get('origin_sha256') != _C02B_R1_MUJOCO_PYTHON_ORIGIN_SHA256
-                or build.get('native_binding_sha256') != _C02B_R1_MUJOCO_BINDING_SHA256
-                or build.get('native_core_sha256') != _C02B_R1_MUJOCO_CORE_SHA256):
-            raise CapabilityAdmissionError(
-                'typed R1 actuator force requires the audited MuJoCo Python/native build '
-                f'{_C02B_R1_MUJOCO_PACKAGE_VERSION}'
-            )
-        provider_evidence = (
-            f'mujoco=package:{build["package_version"]}/runtime:{runtime_version}/'
-            f'python_origin_sha256:{build["origin_sha256"]}/'
-            f'native_binding_sha256:{build["native_binding_sha256"]}/'
-            f'native_core_sha256:{build["native_core_sha256"]}'
-        )
-    else:
-        raise CapabilityAdmissionError(
-            'typed R1 actuator force is limited to the audited GeoPhys and MuJoCo CPU intersections'
-        )
-    scene = getattr(source, 'scene_definition', None)
-    if not isinstance(scene, SceneDefinition) or scene.identity_hash != _C02B_R1_SCENE_IDENTITY:
-        raise CapabilityAdmissionError('typed R1 actuator force Scene identity is outside the audited candidate')
-    if not isinstance(artifact, TaskArtifactV1) or (
-        artifact.task_id != _C02B_R1_TASK_ID
-        or artifact.artifact_version != 'candidate-v1'
-        or artifact.identity_hash != _C02B_R1_ARTIFACT_IDENTITY
-    ):
-        raise CapabilityAdmissionError('typed R1 actuator force requires the exact versioned candidate Artifact')
-    if (source.task_artifact_hash != artifact.identity_hash
-            or artifact.scene_identity_hash != scene.identity_hash
-            or source.scene_source.source_id != f'{scene.schema_version}:{scene.identity_hash}'
-            or source.source_closure_digest != _C02B_R1_SOURCE_CLOSURE
-            or hashlib.sha256(source.scene_source.xml.encode('utf-8')).hexdigest()
-                != _C02B_R1_SOURCE_XML_SHA256):
-        raise CapabilityAdmissionError('typed R1 actuator force source/materialization identity mismatch')
-    if (artifact.timebase.physics_dt != 0.002 or artifact.timebase.control_substeps != 5
-            or artifact.timebase.control_dt != 0.01
-            or source.config.runtime.backend != 'cpu'
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 5):
-        raise CapabilityAdmissionError('typed R1 actuator force requires the audited 100 Hz / 5x2 ms candidate')
-    expected_targets = {
-        f'panda-main/joint{index}': f'actuator{index}' for index in range(1, 8)
-    }
-    if (dict(source.joint_targets) != expected_targets
-            or tuple(source.open_actuators) != ('actuator8',)
-            or controller.gripper_semantic_id != 'panda-main/gripper'
-            or binding.gripper_semantic_id != 'panda-main/gripper'
-            or binding.opening_range_m != 0.08):
-        raise CapabilityAdmissionError('typed R1 actuator/joint/gripper binding is outside the audited mapping')
-    kinematics_identity = controller.source_kinematics_identity
-    if (controller.identity != _C02B_R1_CONTROLLER_IDENTITY
-            or controller.source_artifact_hash != artifact.identity_hash
-            or controller.source_xml_sha256 != _C02B_R1_SOURCE_XML_SHA256
-            or controller.tcp_profile_identity != _C02B_R1_TCP_IDENTITY
-            or kinematics_identity != _C02B_R1_KINEMATICS_IDENTITY):
-        raise CapabilityAdmissionError('actual R1 Controller or hand-origin TCP differs from the bound candidate')
-    if (plan.identity_hash != _C02B_R1_PLAN_IDENTITY
-            or plan.scene_identity_hash != scene.identity_hash
-            or plan.artifact_identity_hash != artifact.identity_hash
-            or plan.source_closure_digest != source.source_closure_digest
-            or len(plan.controller_bindings) != 1):
-        raise CapabilityAdmissionError('ControlBindingPlan is not the exact R1 candidate plan')
-    controller_binding = plan.controller_bindings[0]
-    if (controller_binding.writer_id != 'panda-main/production-r1'
-            or controller_binding.controller_identity != controller.identity
-            or controller_binding.controller_kinematics_identity != kinematics_identity
-            or {group.key for group in controller_binding.groups} != {
-                ('panda-main', 'arm'), ('panda-main', 'gripper'),
-            }):
-        raise CapabilityAdmissionError('ControlBindingPlan does not identify the actual R1 Controller instance')
-    force_requirements = tuple(
-        item for item in controller_binding.feedback_requirements.requirements
-        if item.field_name == 'actuator_force' and item.requiredness == 'required'
-    )
-    if len(force_requirements) != 1 or (
-        force_requirements[0].entity_id, force_requirements[0].subject_id,
-        force_requirements[0].unit, force_requirements[0].sample_domain,
-    ) != ('panda-main', 'actuator8', 'N', 'evaluation_boundary'):
-        raise CapabilityAdmissionError('R1 Controller must require raw N force for panda-main/actuator8')
-    generic = provider_manifest(provider)
-    evidence = (
-        'C02b-R1-typed-force-v1/'
-        f'artifact={artifact.identity_hash}/scene={scene.identity_hash}/'
-        f'source={source.source_closure_digest}/controller={controller.identity}/plan={plan.identity_hash}/'
-        f'{provider_evidence}'
-    )
-    claim = CapabilityClaim('actuator_force_query', 'tested', evidence)
-    return ProviderCapabilityManifest(
-        'provider-capability-v0', provider, build['manifest_version'],
-        'task-env-c02b-r1-typed-force-v1', 'cpu', PROFILE, 'none', 'strict',
-        tuple(generic.capabilities) + (claim,), generic.known_unsupported, evidence,
-    )
-
-
 def materialize_control(
     artifact,
     execution,
@@ -1319,12 +1152,9 @@ def materialize_control(
     admit_capabilities(source_requirements, actual_manifest, execution)
     admission_manifest = actual_manifest if f06_pickcube_isaac else manifest
     profiles = ()
-    r1_controller = None
-    r1_manifest = None
 
     if controller_profile is not None:
         from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
-        from ...controllers.canonical.production import ProductionCanonicalPandaController
 
         if isinstance(controller_profile, PandaPositionServoProfileV1) or isinstance(
             controller_profile, (tuple, list),
@@ -1389,18 +1219,6 @@ def materialize_control(
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
             if binding.gripper_semantic_id != profiles[0].gripper_semantic_id:
                 raise ValueError('PositionServoV1 gripper semantic binding mismatch')
-        elif type(controller_profile) is ProductionCanonicalPandaController:
-            if controller_binding_plan is None or len(controller_binding_plan.controller_bindings) != 1:
-                raise ValueError('bounded plan-bound R1 requires one compiled ControllerBinding')
-            r1_controller = controller_profile
-            r1_manifest = _c02b_r1_force_capability_manifest(
-                artifact, execution, source, controller_binding_plan, r1_controller, binding,
-            )
-            if manifest is not None and manifest.identity_hash != r1_manifest.identity_hash:
-                raise CapabilityAdmissionError(
-                    'supplied manifest does not carry the exact R1 Provider/source provenance'
-                )
-            admission_manifest = r1_manifest
         else:
             raise TypeError('unsupported explicit Controller profile instance')
     elif leaf_plan is None and (len(source.joint_targets) != 7 or len(source.open_actuators) != 1):
@@ -1423,7 +1241,7 @@ def materialize_control(
             claim.name for claim in effective_manifest.capabilities
             if claim.status in SUPPORTED_STATUSES
         }
-        if manifest is not None and r1_manifest is None:
+        if manifest is not None:
             supported &= {
                 claim.name for claim in manifest.capabilities
                 if claim.status in SUPPORTED_STATUSES
@@ -1521,14 +1339,6 @@ def materialize_control(
     else:
         session._force_feedback_required = True
         session._control_binding_plan = None
-    if r1_controller is not None:
-        session._r1_force_admitted = True
-        session._r1_controller_identity = r1_controller.identity
-        session._r1_binding_identity_hash = controller_binding_plan.identity_hash
-        session._r1_source_closure_digest = source.source_closure_digest
-        session._r1_admitted_manifest = r1_manifest
-        session._r1_applied_boundary_ids = set()
-        session._r1_target_in_flight = None
     if profiles:
         session._position_profiles_by_writer = {profile.writer_id: profile for profile in profiles}
         session._position_profile_identities = {profile.writer_id: profile.identity for profile in profiles}
@@ -1654,14 +1464,6 @@ def validate_target(session,target):
         if (getattr(session, '_position_target_in_flight', None) != target.identity_hash
                 or target.controller_identity != session._position_profile_identity):
             raise ValueError('PositionServoV1 target must pass source-bound boundary validation')
-    elif hasattr(session, '_r1_controller_identity'):
-        expected = getattr(session, '_r1_target_in_flight', None)
-        if (not isinstance(expected, tuple) or len(expected) != 4
-                or expected[0] != target.identity_hash
-                or expected[2] != target.controller_identity
-                or expected[2] != session._r1_controller_identity
-                or expected[3] != session._r1_binding_identity_hash):
-            raise ValueError('R1 target must pass source-, Controller- and boundary-bound validation')
     if (target.task_artifact_hash != session._artifact.identity_hash
             or len(target.arm_joint_order) != 7
             or not set(target.arm_joint_order).issubset(session._target_actuators)):
@@ -1690,16 +1492,6 @@ def feedback_value(session, state, native_force):
     positions = state.joint_position
     if all(name in positions for name in FINGERS):
         finger_names = FINGERS
-    elif getattr(session, '_r1_force_admitted', False):
-        matches = {}
-        for suffix in ('finger_joint1', 'finger_joint2'):
-            found = [name for name in positions if name.endswith('/' + suffix)]
-            if len(found) != 1:
-                raise ValueError('R1 feedback requires one Entity-qualified finger Joint pair')
-            matches[suffix] = found[0]
-        if matches['finger_joint1'].rsplit('/', 1)[0] != matches['finger_joint2'].rsplit('/', 1)[0]:
-            raise ValueError('R1 feedback finger Joints belong to different Entities')
-        finger_names = (matches['finger_joint1'], matches['finger_joint2'])
     else:
         raise ValueError('canonical gripper feedback lacks its declared finger Joint state')
     # Both supported sources bind positive native actuator output to opening.
@@ -2082,174 +1874,6 @@ def _execute_position_action_sequence(session, profile, plan, action, publicatio
     finally:
         if getattr(session, '_prepared_position_sequence', None) is sequence:
             session._prepared_position_sequence = None
-
-
-def _r1_controller_state_from_publication(publication, scene):
-    from ...artifacts import CanonicalStateView
-
-    view = publication.view
-    view.validate_against_scene(scene)
-    entity_id = 'panda-main'
-    joint_values = {
-        value.joint_id: value for value in view.joints if value.entity_id == entity_id
-    }
-    arm_joint_ids = tuple(f'joint{index}' for index in range(1, 8))
-    finger_joint_ids = ('finger_joint1', 'finger_joint2')
-    expected_ids = set(arm_joint_ids + finger_joint_ids)
-    if set(joint_values) != expected_ids:
-        raise ValueError('R1 typed Controller input requires exactly its seven arm and two finger Joints')
-    positions = {}
-    velocities = {}
-    for joint_id, value in joint_values.items():
-        if len(value.position) != 1 or len(value.velocity) != 1:
-            raise ValueError(f'R1 scalar Joint has an unsupported typed layout: {joint_id}')
-        positions[f'panda-v1/{joint_id}'] = float(value.position[0])
-        velocities[f'panda-v1/{joint_id}'] = float(value.velocity[0])
-    hand_frames = [
-        value for value in view.frames
-        if value.frame.entity_id == entity_id and value.frame.frame_id == 'hand'
-    ]
-    if len(hand_frames) != 1:
-        raise ValueError('R1 typed Controller input requires one panda-main/hand Frame')
-    return CanonicalStateView(
-        'canonical-state-v0', view.convention, view.boundary.control_step,
-        view.sample_clock.simulation_time_s, positions, velocities,
-        {'panda-v1/ee': hand_frames[0].pose_world},
-    )
-
-
-def execute_plan_bound_r1_control_interval(
-    session,
-    controller,
-    plan,
-    request,
-    publication,
-    *,
-    scene,
-    joint_bindings,
-    frame_bindings,
-):
-    """Run one exact single-Entity R1 interval through existing Core owners.
-
-    This bounded route consumes the actual typed raw force publication, lets
-    the existing Provider session perform the canonical feedback projection,
-    computes one real R1 target, applies it through the admitted session, and
-    returns the next typed state publication.
-    """
-    from ...artifacts import CanonicalStatePublicationV2
-    from ...controllers.canonical.production import ProductionCanonicalPandaController
-    from ...controllers.canonical.contracts import CanonicalControlTarget
-    from dataclasses import replace
-
-    if type(controller) is not ProductionCanonicalPandaController:
-        raise TypeError('bounded R1 dispatch requires its actual ProductionCanonicalPandaController')
-    if not isinstance(publication, CanonicalStatePublicationV2):
-        raise TypeError('bounded R1 dispatch requires CanonicalStatePublicationV2')
-    if (getattr(session, '_r1_controller_identity', None) != controller.identity
-            or getattr(session, '_r1_binding_identity_hash', None) != plan.identity_hash
-            or getattr(session, '_r1_source_closure_digest', None) != getattr(session._source, 'source_closure_digest', None)):
-        raise ValueError('RuntimeSession/Controller/plan/source identity mismatch')
-    if len(plan.controller_bindings) != 1:
-        raise ValueError('R1 plan must contain exactly one Controller binding')
-    binding = plan.controller_bindings[0]
-    if (binding.controller_identity != controller.identity
-            or binding.writer_id != 'panda-main/production-r1'):
-        raise ValueError('R1 Controller instance does not match the one-writer plan')
-    prepared = prepare_structured_action(plan, request)
-    if len(prepared) != 1 or prepared[0][0] != binding.writer_id:
-        raise ValueError('R1 structured action must cover its exact bound writer')
-    publication.validate()
-    publication.view.validate_requirements(binding.feedback_requirements)
-    if publication.view.boundary.scene_identity_hash != plan.scene_identity_hash:
-        raise ValueError('R1 typed state publication and ControlBindingPlan Scene differ')
-    if publication.view.boundary.provider_materialization_id != session._provider_materialization_id:
-        raise ValueError('R1 typed state publication belongs to another Provider materialization')
-    state = _r1_controller_state_from_publication(publication, scene)
-    if state.control_step != publication.view.boundary.control_step:
-        raise ValueError('R1 Controller input step differs from typed state boundary')
-    native_state = session.snapshot()
-    if (native_state.control_step != state.control_step
-            or native_state.simulation_time != state.simulation_time):
-        raise ValueError('R1 typed Joint/Frame input is stale for the RuntimeSession')
-
-    fresh = session.snapshot_v2(
-        scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
-        requirements=binding.feedback_requirements,
-    )
-    if (fresh.view.identity_hash != publication.view.identity_hash
-            or fresh.view.boundary.boundary_id != publication.view.boundary.boundary_id):
-        raise ValueError('R1 typed state publication is stale for the live RuntimeSession boundary')
-    forces = [
-        value for value in publication.view.actuator_forces
-        if value.entity_id == 'panda-main' and value.actuator_id == 'actuator8'
-    ]
-    if len(forces) != 1 or not forces[0].valid:
-        raise ValueError('R1 required raw actuator force is absent or invalid')
-    force_value = forces[0]
-    if force_value.unit != 'N':
-        raise ValueError('bounded Panda tendon force must remain signed in N')
-    if (force_value.source_closure_digest != session._r1_source_closure_digest
-            or force_value.provider_materialization_id != session._provider_materialization_id):
-        raise ValueError('R1 typed force sample source/materialization identity mismatch')
-    feedback = session.control_feedback(native_state, actuator_force=force_value)
-
-    boundary_id = publication.view.boundary.boundary_id
-    consumed = session._r1_applied_boundary_ids
-    if boundary_id in consumed:
-        raise ValueError('R1 target for this state boundary was already applied')
-    if getattr(session, '_r1_controller_episode_id', None) != publication.view.boundary.episode_id:
-        controller.reset(state, feedback)
-        session._r1_controller_episode_id = publication.view.boundary.episode_id
-    elif controller.expected_control_step != state.control_step:
-        raise ValueError('R1 Controller memory is not at the published evaluation boundary')
-
-    canonical, legacy_target = controller.compute(state, feedback, prepared[0][1])
-    source_joint_order = tuple(
-        f'panda-main/{name.rsplit("/", 1)[-1]}' for name in legacy_target.arm_joint_order
-    )
-    if len(source_joint_order) != 7 or len(set(source_joint_order)) != 7:
-        raise ValueError('R1 target does not contain the seven exact Panda arm Joints')
-    if legacy_target.gripper.semantic_id != 'panda-main/gripper':
-        raise ValueError('R1 target gripper semantic identity does not match its bound Entity')
-    target = replace(
-        legacy_target,
-        arm_joint_order=source_joint_order,
-        arm_position={
-            source: legacy_target.arm_position[legacy]
-            for source, legacy in zip(source_joint_order, legacy_target.arm_joint_order, strict=True)
-        },
-        arm_servo_position={
-            source: legacy_target.arm_servo_position[legacy]
-            for source, legacy in zip(source_joint_order, legacy_target.arm_joint_order, strict=True)
-        },
-    )
-    if not isinstance(target, CanonicalControlTarget):
-        raise TypeError('R1 source adapter must preserve the existing canonical target contract')
-    target.validate()
-    consumed.add(boundary_id)
-    session._r1_target_in_flight = (
-        target.identity_hash, boundary_id, controller.identity, plan.identity_hash,
-    )
-    try:
-        acknowledgement = session.apply_control(target)
-    finally:
-        session._r1_target_in_flight = None
-    if acknowledgement.target_hash != target.identity_hash:
-        raise ValueError('R1 Provider acknowledgement does not match its applied canonical target')
-    stepped_state = session.step()
-    next_publication = session.snapshot_v2(
-        scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
-        requirements=binding.feedback_requirements,
-    )
-    expected_step = state.control_step + 1
-    expected_time = state.simulation_time + 0.01
-    if (stepped_state.control_step != expected_step
-            or abs(stepped_state.simulation_time - expected_time) > 1.0e-12
-            or next_publication.view.boundary.control_step != expected_step
-            or abs(next_publication.view.sample_clock.simulation_time_s - expected_time) > 1.0e-12):
-        raise ValueError('R1 interval did not complete exactly one 100 Hz control boundary')
-    next_publication.view.validate_requirements(binding.feedback_requirements)
-    return canonical, target, acknowledgement, stepped_state, next_publication, feedback
 
 
 def validate_position_control_subjects(*, scene, root, children, subjects, plan, attachment_scene=None):

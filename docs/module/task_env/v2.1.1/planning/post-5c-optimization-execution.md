@@ -928,3 +928,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +21／−1，净增 20 行；版本诊断修改 1 文件 +7／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。此修改使 Position 选择使用真实已编译主体，未完成四任务全部构造分流的收敛。
 
 115 项版本检查通过，覆盖实际 subject ID、缺少 source 主体及错误 writer 的拒绝。Isaac CUDA Position／同步 RGB 最终代码完成两次 reset、一次非零 step、三帧独立读回和关闭，实际主体、writer、资源匹配通过；观察 41 次 physics callback，订阅前启动推进未知。此前宽松回退版本也做过一次原生运行并观察 41 次 callback，两个独立窗口的证据均保留；最终结论以严格版本的运行结果为准。两次 callback 取消订阅均报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。MuJoCo 一体 Panda、装配 Panda、NutAssembly、Pendulum 和双轮车短程均通过，分别观察 5、5、5、25、25 个 native 子步。GeoPhys 与完整 Solution 本批未重跑。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_position_subject_match_20261112_a65b6cr0/`、`workspace/maintenance/v211_position_match_final_20261112_c85jc66z/` 和 `workspace/maintenance/v211_position_match_final_cpu_20261112_f8hx6xgr/`；E01～E04 仍未接收。
+
+### 6.85 退出历史 C02b R1 typed-force 旁路
+
+输入 `e7207128`。共同 Runtime 中仍有只接受历史 C02b 专属 TaskArtifact、固定源码和特定 Controller 身份的 typed actuator-force 准入及独立 interval 执行；四个正式任务没有调用它。删除该旁路及只供其使用的 MuJoCo／GeoPhys typed force 注入与投影分支。未准入的 typed actuator-force 请求继续明确返回 unavailable；正式任务使用的 native force 采样、有效性／边界检查、反馈及共同控制提交保留。此处不声称任意 source 的 typed actuator-force 发布已支持，历史 C02b 证据不改写。
+
+生产修改 3 文件 +18／−582，净减 564 行；版本诊断修改 1 文件 +1／−0，用于选择正式 PickCube Controller；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。删除的是独立的旧诊断准入和施控分支，不改变正式任务的构建协议、renderer、clock 或推进 owner。
+
+115 项版本检查通过。MuJoCo 下 PickCube R1、R3、装配 Panda、NutAssembly、Pendulum 与双轮车短程均通过，共观察 70 个 native 子步；PickCube R1 和 NutAssembly 的 H5 读回通过。NutAssembly GeoPhys CPU 完成 reset、Solution 单步、再次 reset 和关闭，控制时间从 0 推进至 0.01 秒，native 子步未计数。完整 Solution 和 Isaac 本批未重跑；旧 Isaac 证据只证明当时源码，F06 Position 的正式 source／Controller 物化路径未因本批旧 R1 分支删除而改变。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_c02b_r1_20261112_dtv9qnzj/`；E01～E04 仍未接收。

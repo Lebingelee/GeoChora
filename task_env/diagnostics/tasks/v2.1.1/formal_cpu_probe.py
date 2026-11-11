@@ -34,6 +34,7 @@ try:
     if args.case in {'panda-r3','panda-gravity','panda-effort','panda-joint','assembled-unreset','assembled-live','nut'}:
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
+        if args.case=='panda-r3' and args.profile:config['controller']={'profile_id':args.profile}
         if args.case=='panda-effort':config['controller']={'profile_id':'panda-direct-effort-v1'}
         if args.case=='panda-joint':
             config['controller']={'profile_id':args.profile or 'panda-joint-effort-reference-v1'}
