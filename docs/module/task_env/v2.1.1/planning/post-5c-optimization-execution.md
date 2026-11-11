@@ -444,3 +444,11 @@ MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step
 生产新增 1 个共同 source 编译器文件（93 行），修改 4 个文件 +23／−111，合计 +116／−111，净增 5 行；电机验证、provider 映射及闭包构造为重写迁移，不能将搬迁行计算为新增功能。新增 1 个版本诊断文件（45 行），修改 2 份文档；项目 tracked 文件净增 2，未删除或移动文件。共同构建去掉两个任务中的相同决策，但完整四任务 source 统一和 Panda 路线仍待后续，E01～E04 不因此关闭。
 
 两个任务分别在 MuJoCo CPU、GeoPhys CPU 完成 reset、非零 action、第二次 reset 和 close；MuJoCo 各观测 25 子步，GeoPhys 内部子步未观测，按计划各保守预留 50。MuJoCo 新旧结果中的 Scene identity、reset sample、Robot／Controller identity 和单步奖励一致。10 项纯合同通过，新增检查覆盖两任务 Isaac body／joint 映射与齿轮篡改拒绝，使用 stub，不代表 Isaac 实际运行；原有 Isaac 有界证据不自动扩展到本批代码。计划、生产冻结 diff 和运行结果在 ignored `workspace/maintenance/v211_declared_source_20261112_001/`；本批未实测 Isaac 或 renderer。
+
+### 6.25 Controller 规范字段直达配置解析
+
+输入 `1e651adb`。四个正式任务的普通配置直接从 `controller.profile_id` 解析 Controller 选择，不再先转换到 `control.profile_id`、再塞入 `task.controller_profile`。明确拒绝这两个旧位置及顶层 `controller_profile`；其他 Controller 参数仍由原有能力检查约束。Resolved 配置复解析和 PickCube reset 切换也使用同一规范字段。PickCube 示例和本版本装配 Panda 诊断已迁移；外部旧调用应把选择改写为 `controller: {profile_id: ...}`。component-only 构建仍有自己的内部 codec，其存在不能作为四任务完整构建统一的证据。
+
+生产配置与 reset 修改 2 文件 +12／−22，净减 10 行；示例 1 文件 +1／−1；版本诊断 2 文件 +45／−1；本记录及当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件净变化为 0。provider、renderer、时钟、提交与 source 不因本批改变；历史 controller 输入及其诊断不再作为兼容目标。
+
+四正式任务以及 PickCube 装配 Panda 在 MuJoCo CPU 完成构建、reset、非零动作／Nut 单个 Solution interval、再次 reset 和 close，依次观测 5、5、5、25、25 子步（合计 65）；其中装配 Panda 以 `controller.profile_id=r1_split` 指定选择。18 项版本纯合同通过，覆盖四任务 mapping／YAML／Resolved 配置一致、显式 profile、旧位置拒绝和 reset 切换候选；并非完整 Solution 验证。计划、冻结 diff 和结果在 ignored `workspace/maintenance/v211_controller_config_20261112_001/`。其他 provider、renderer 本批未重跑。E01 的其他旧别名与 component 结构仍须对账，E00～E04 均不以本批声明完成。

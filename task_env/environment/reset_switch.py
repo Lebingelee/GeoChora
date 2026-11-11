@@ -80,7 +80,8 @@ def prepare_switch_reset(environment_type, current, seed, rng_state, execution):
     config = resolve_task_env_config(environment_type, {
         'execution': target,
         'episode': {'horizon': current.environment.episode.horizon},
-        'task': {'controller_profile': current.controller_profile, **dict(current.task_parameters)},
+        'controller': {'profile_id': current.controller_profile},
+        'task': dict(current.task_parameters),
     })
     if seed is not None:
         if type(seed) is not int or seed < 0:

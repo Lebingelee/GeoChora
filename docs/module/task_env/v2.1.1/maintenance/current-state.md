@@ -63,3 +63,5 @@ Pendulum 和双轮车现由各自 Robot 声明受控关节、writer 和 source �
 最新简单主体职责整理进一步将 Pendulum／双轮车的内联资产和 Scene 拓扑声明移至 Robot；正式构建用同一个 Robot 实例声明场景及绑定控制。两个 MuJoCo CPU 短程通过、场景身份与原实现一致；GeoPhys、Isaac 和 renderer 未在此批重跑。Task 中的 source 编译及 provider 分流仍待进一步归位，E01～E04 未完成。详见[实施记录 6.23](../planning/post-5c-optimization-execution.md#623-简单主体-scene-声明归-robot)。
 
 Pendulum／双轮车的传动校验与 provider source 映射现由共同 source 编译器从 Robot 和 Scene 声明生成，Task 不再各自接线；MuJoCo CPU 和 GeoPhys CPU 的两任务短程均通过。Isaac 映射仅做不启动 SDK 的合同检查，完整四任务构建统一仍待完成。详见[实施记录 6.24](../planning/post-5c-optimization-execution.md#624-简单主体按声明共同编译-source)。
+
+四个正式任务的 Controller 选择现直接使用 `controller.profile_id`；旧顶层、`task.controller_profile` 和 `control.profile_id` 选择位置已明确拒绝。四任务及装配 Panda 的 MuJoCo CPU 短程已复验，详细范围见[实施记录 6.25](../planning/post-5c-optimization-execution.md#625-controller-规范字段直达配置解析)。

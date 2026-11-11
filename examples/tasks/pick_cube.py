@@ -174,7 +174,7 @@ def main(argv=None) -> int:
             env = make_env(ENV_ID, config={
                 "execution": {"physics_provider": args.provider, "physics_backend": "cpu"},
                 "episode": {"horizon": args.horizon},
-                "task": {"controller_profile": args.controller_profile},
+                "controller": {"profile_id": args.controller_profile},
             })
             construction_succeeded = True
             from task_env.tasks.pick_cube import build_readiness_solution

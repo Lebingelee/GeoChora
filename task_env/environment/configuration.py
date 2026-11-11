@@ -325,7 +325,7 @@ def resolve_candidate_execution_selection(*, provider, backend, source, executio
 
 
 def _resolve_selected_config(environment_type, config):
-    """Normalize selected legacy fields at the common configuration boundary."""
+    """Resolve the formal task configuration into one build request."""
     supplied = config if isinstance(config, ResolvedSelectedConfig) else None
     if supplied is not None:
         if supplied.task_uid != environment_type.uid:
@@ -356,7 +356,7 @@ def _resolve_selected_config(environment_type, config):
         if supplied.reset_profile is not None:
             config["execution"]["reset_profile"] = supplied.reset_profile
         if supplied.controller_profile is not None:
-            config["task"]["controller_profile"] = supplied.controller_profile
+            config['controller']['profile_id'] = supplied.controller_profile
         if supplied.robot_uid is not None:
             config.setdefault("robot", {})["uid"] = supplied.robot_uid
     if isinstance(config, (str, Path)):
@@ -366,8 +366,8 @@ def _resolve_selected_config(environment_type, config):
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "control", "controller", "provider", "backend", "horizon",
-               "controller_profile", "source_delivery_manifest", "robot"}
+    allowed = {"execution", "episode", "task", "controller", "provider", "backend", "horizon",
+               "source_delivery_manifest", "robot"}
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
@@ -390,7 +390,7 @@ def _resolve_selected_config(environment_type, config):
         from ..registry import AGENT_REGISTRY
         AGENT_REGISTRY.get(robot_uid)
     controller = values.get('controller', {})
-    if not isinstance(controller, Mapping) or set(controller) - {'gravity_compensation', 'parameters'}:
+    if not isinstance(controller, Mapping) or set(controller) - {'profile_id', 'gravity_compensation', 'parameters'}:
         raise ValueError('unsupported selected Controller fields')
     parameters = controller.get('parameters', {})
     if not isinstance(parameters, Mapping) or set(parameters) - set(getattr(environment_type, 'selected_controller_parameters', ())):
@@ -405,23 +405,13 @@ def _resolve_selected_config(environment_type, config):
         if not isinstance(section, Mapping):
             raise TypeError(f"{name} must be a mapping")
         sections[name] = dict(section)
-    control = values.get('control', {})
-    if not isinstance(control, Mapping) or set(control) - {'profile_id'}:
-        raise ValueError('selected control configuration supports profile_id only')
-    if 'profile_id' in control:
-        profile = control['profile_id']
-        previous = sections['task'].get('controller_profile', profile)
-        if previous != profile:
-            raise ValueError('control.profile_id conflicts with task.controller_profile')
-        sections['task']['controller_profile'] = profile
     allowed_sections = {
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
                       "deployment", "interpreter", "native_dt", "reset_profile", "source_workspace"},
         "episode": {"horizon", "seed", "ignore_done"},
-        "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
-                | set(environment_type.selected_parameter_limits),
+        "task": set(environment_type.selected_parameter_limits),
     }
     for name, section in sections.items():
         unknown = set(section) - allowed_sections[name]
@@ -430,7 +420,6 @@ def _resolve_selected_config(environment_type, config):
     aliases = {"provider": ("execution", "physics_provider"),
                "backend": ("execution", "physics_backend"),
                "horizon": ("episode", "horizon"),
-               "controller_profile": ("task", "controller_profile"),
                "source_delivery_manifest": ("execution", "source_delivery_manifest")}
     for old, (section, key) in aliases.items():
         if old not in values:
@@ -487,7 +476,7 @@ def _resolve_selected_config(environment_type, config):
         )
     default_profile = (environment_type.selected_default_controller_profile(task_configuration)
                        if configuration_loader is not None else environment_type.selected_default_controller_profile())
-    profile = sections["task"].get("controller_profile", default_profile)
+    profile = controller.get('profile_id', default_profile)
     if profile is not None and profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
     profile_routes = getattr(environment_type, 'controller_profile_routes', {})
@@ -606,7 +595,7 @@ def _resolve_selected_config(environment_type, config):
         if result.source_workspace is not None:
             original['execution']['source_workspace'] = result.source_workspace
         if result.controller_profile is not None:
-            original["task"]["controller_profile"] = result.controller_profile
+            original['controller']['profile_id'] = result.controller_profile
         reconstructed = _resolve_selected_config(environment_type, original)
         if (reconstructed.environment != result.environment
                 or reconstructed.execution_spec_v2 != result.execution_spec_v2
@@ -616,7 +605,7 @@ def _resolve_selected_config(environment_type, config):
 
 
 def _normalize_controller_selection(config):
-    """Decode the common Controller selector before either retained codec."""
+    """Decode the Controller selector for the retained component-only codec."""
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if not isinstance(config, Mapping):
@@ -652,9 +641,9 @@ def _resolve_task_env_config_impl(
     cannot replace task-owned scene, object, agent, or success-definition fields.
     """
 
-    config = _normalize_controller_selection(config)
     if getattr(environment_type, "uses_selected_public_config", False):
         return _resolve_selected_config(environment_type, config)
+    config = _normalize_controller_selection(config)
     if isinstance(config, ResolvedEnvConfig):
         resolved = config
     else:
