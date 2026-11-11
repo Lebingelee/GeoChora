@@ -26,9 +26,9 @@ Selected PickCube and NutAssembly references use one `SelectedReferenceEnv` life
 
 The v2.1 integration records a bounded intersection across the merged F/R implementation and GeoPhys P=`67da1165149486d3ae3e779c13ce31af49e17d50`. The current scope and evidence boundaries are described in the [v2.1.0 TaskEnv docs](../module/task_env/v2.1.0/README.md). The full phase history remains under that version’s `history/` and `maintenance/`; historical plans alone do not establish current capability.
 
-## v2.1.1 planning boundary
+## v2.1.1 current boundary
 
-The [v2.1.1 route](../module/task_env/v2.1.1/planning/roadmap.md) makes Core/physics/render protocols its first delivery. The proposed unified representation, provider translation, common effort, reset rebuilding, synchronized RGB and batch behavior are [draft contracts](../module/task_env/v2.1.1/README.md), not current capability. They extend the existing lifecycle and public provider boundaries; task semantics stay task-owned and shared native resources have a single owner. Protocol review and implementation evidence must precede any expanded support claim.
+G01–G05 have bounded acceptance in their exact reviewed intersections: shared controlled subjects and scene intervals, provider execution/reset, native and cross-render RGB. The maintainer has entered [post-5c code and project optimization](../module/task_env/v2.1.1/planning/post-5c-optimization-execution.md) before G06. Read the [current state](../module/task_env/v2.1.1/maintenance/current-state.md) for evidence, source restrictions and remaining formal-entry migration. G06 batch and G07 final integration remain unfinished; protocol approval and bounded route acceptance do not imply arbitrary composition. Task semantics remain task-owned and shared native resources retain a single owner.
 
 ## Evidence and task state
 

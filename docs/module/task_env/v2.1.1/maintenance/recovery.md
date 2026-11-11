@@ -1,18 +1,24 @@
-# 2026-11-08：5c attempt003 获批准
+# v2.1.1 恢复入口
+
+更新时间：2026-11-11。当前处于 **G01～G05 有界接收、5c 单元 1～9 收口后的代码与项目优化**。G06／G07 尚未开始。准确当前结论、输入与下一交付统一在[当前摘要](current-state.md)，工作包在[编排索引](orchestration.json)，优化步骤见[执行安排](../planning/post-5c-optimization-execution.md)。
+
+以下是各历史窗口的恢复记录，保留当时的待审、失败、授权及暂停状态；其中的“当前”“尚未开始”只指该记录时点，不覆盖上方唯一当前摘要。最新综合主审见[单元 9](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)。
+
+# 历史 2026-11-08：5c attempt003 获批准
 
 维护者批准已准备的 attempt003 范围与预算；工作包重新冻结后由其手工转发。执行尚未开始，普通 attempt count 仍为 2；第三次为最后一次普通窗口。详见 [执行规划](../planning/stage5-5c-attempt003-execution.md)。
 
-# 2026-11-08：5c attempt002 独立主审
+# 历史 2026-11-08：5c attempt002 独立主审
 
 [Sol 主审](reviews/20261108_5c_attempt002_sol_review.md)判定未接收：非 Position 发布状态和组件 task camera 光学绑定仍有缺口。普通 attempt 已执行 2 次，第三次前必须重评；现有有限成果和执行偏差均保留。不自动派发、进入阶段 6 或改写历史。
 
-# 2026-11-08：5c attempt002 准备
+# 历史 2026-11-08：5c attempt002 准备
 
 维护者接受保留 attempt001 已记录的执行偏差及未知项；技术返工仍必要。[attempt002 范围](../planning/stage5-5c-attempt002.md)已获维护者批准，增加统一 Env 渲染接线及受控主体／客观实体构建和生命周期收敛分析，待重新冻结后由维护者手动转交。当前 attempt count 仍为 1；不自动派发或进入阶段 6。
 
 # v2.1.1 恢复与当前状态
 
-## 当前：5c attempt001 已主审，需通用任务接线返工
+## 历史：5c attempt001 已主审，需通用任务接线返工
 
 [Sol 独立主审](reviews/20261108_5c_attempt001_sol_review.md)决定 `REWORK_REQUIRED_5C_GENERIC_PUBLIC_INTEGRATION`，普通 attempt count=1。四条指定 PickCube 真实路线结果有界保留；通用 task RGB 入口硬性要求特定 Position 控制 profile，GeoPhys task RGB 又继承固定追踪灯／headlight 假设，尚未满足维护者的通用场景要求。未事前预约物理步及包外 pytest 输出的过程偏差不可追补，记录保留；其本身不使其他有身份的真实结果失效。不自动派发 attempt002 或进入阶段6。
 
@@ -24,7 +30,7 @@
 
 2026-11-07：renderer 在 Env 创建时选择、维持至 close；同一 Env 的 renderer 切换延后到未排期的后续任务。5c 仍要求同步 RGB、一个真实跨组合和不依赖 PickCube 特判的通用实现，真实验证任务仍是 PickCube。详见[5c 调整后范围](../planning/stage5-5c-fixed-renderer-scope.md)。5c 为 PLANNED／attempt0，未准备或派发执行包；5b 有界接收和历史记录不变。
 
-## 当前：G05 5b 有界接收，5c 尚未开始
+## 历史：G05 5b 有界接收，5c 尚未开始
 
 [5b Sol 独立主审](reviews/20261107_5b_diagnostic_attempt003_sol_review.md)决定 `ACCEPTED_BOUNDED_5B_WINDOW_CAMERA_RGB`：指定 PickCube MuJoCo CPU、GeoPhys CPU rasterizer 与 Isaac Sim 6.2 路线有界窗口／RGB／相机隔离证据成立，所列颜色、挂载、设备和历史失败限制保留。普通 count=3、诊断窗口 count=4；5c 保持 PLANNED、attempt0，由维护者决定后续，不自动派包或进入阶段6。
 
@@ -98,7 +104,7 @@ Sol已作[002独立复审](reviews/20261106_3b_attempt002_sol_review.md)：整�
 
 3a接收和原attempt历史保持。维护者要求开始下一步；Sol已准备[3b attempt001完整安排](../planning/stage3-3b-execution.md)，覆盖消费级依赖修复、Isaac6.1/6.2共同部署与身份，以及三后端真实物性/readback闭环。维护者澄清GeoPhys原生solver不消费其MuJoCo求解路线依赖，本包修正准入范围，不改pin或升级环境。3b仍PLANNED／attempt0、active_packages为空；准确输入与预算在外部snapshot冻结，等待维护者手动转交单一Terra／Luna。Sol无native、source解析或自动消息，不启动3c。
 
-## 3a已由Sol接收，诊断001关闭
+## 历史：3a已由Sol接收，诊断001关闭
 
 诊断001输出6b11123e经[Sol独立复审](reviews/20261105_3a_diagnostic_attempt001_sol_review.md)决定 **ACCEPTED_3A_ROUTING_ADMISSION**，3a整体在配置／环境准入／已有声明与具体构建检查接线／同请求回执范围通过。真实Position和leaf生产来源consumer、required缺Frame拒绝、H5 metadata及最终PickCube31／Nut19 MuJoCo CPU短程均有证据；F06真实目标依赖不满足时已在加载USD前准确拒绝，source未评估明确保留。Sol核对215输出／10提交文件hash，独立5项guard离线通过，未解析来源或运行native。
 
@@ -134,7 +140,7 @@ Sol已完整核对交接及必读资料，实际Core输入与`develop@9d942d43`�
 
 原[交接检查点](20261105_stage3_sol_handoff.md)保留交接准备时事实。当前动作是等待维护者指定并转发完整3a包，完整报告与writer释放后Sol独立审阅，不自动进入3b或阶段4。下文旧“分支尚未创建”等描述按其历史时点理解。
 
-## 当前决定：前置核心收尾已有限接收
+## 历史决定：前置核心收尾已有限接收
 
 维护者最新安排：先落实[诊断与代码边界规范](../../../../global/diagnostics-and-code-boundaries.md)，本轮不再全面解耦。后续环境、Controller、provider和renderer开发从外部诊断，不向核心新增实验／测试分支；现存已确认耦合登记在[规划第2.6节](../planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)，在版本准备进入7a集成时集中处理，并在稳定源码上验证。有限接收不表示诊断完全隔离，规则更新也不表示代码已整改。规范已落地；目前G03只完成分支与首包准备，尚未启动实施。
 
@@ -150,7 +156,7 @@ Sol已完整核对交接及必读资料，实际Core输入与`develop@9d942d43`�
 
 两小时包含实现、必要验证、文档、提交与返包，到时无条件停止新工作并释放窗口；核心未过门就列具体阻塞，不自行延期，不自动接收或进入阶段3。包由维护者手动转发，Sol本次仅准备规划与prompt，未启动执行。
 
-## 状态
+## 历史状态
 
 - G01/1a–1d 和 G02/2a 的既有 Sol 决定保留。
 - G02/2b attempt_count仍为2。attempt002在原验收包中为G2 FAIL、G3 PARTIAL；维护者于完整报告/manifest提交前暂停，G5为`INCOMPLETE_USER_PAUSED`。2c整理不能倒填或改写这些历史。

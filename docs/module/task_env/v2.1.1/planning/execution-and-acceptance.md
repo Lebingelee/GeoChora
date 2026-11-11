@@ -1,10 +1,12 @@
 # v2.1.1 执行顺序与验收
 
-当前状态（2026-11-08）：G03 与 G04 的各子阶段、G05 5a/5b 按各自范围有界接收；原 N08 FAIL、6.1 close 超时及其他已列限制保留。5c 三次普通 attempt 已结束且未整体接收，现按维护者要求进行人工诊断，目标、具体工作单元与原证据边界见[5c 诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)及[003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)。同一 Env 的 renderer 切换继续延期；统一主体/Controller/Runtime、受影响核心诊断清理及 renderer-independent 状态在进入 G06 前按该路线收口。
+当前状态（2026-11-11）：G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口。维护者已确认进入[5c 后代码与项目优化](post-5c-optimization-execution.md)，范围及逐项退出条件由[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)冻结。当前摘要、工作包及历史分别见[当前状态](../maintenance/current-state.md)、[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)。
 
-[装配 Panda](stage4-assembled-panda.md)是版本附加集成用例，不新增为 4a–4c 或 G05 接收前置；完整两任务 Solution 用例由 7a 收口。下文旧状态和准备进度是历史时点；实时状态以[编排索引](../maintenance/orchestration.json)和[恢复页](../maintenance/recovery.md)为准。
+**G05 功能接收 → 本次代码优化／完整单 seed Solution 复验／人工接收 → 项目证据与 refs/worktree 整理及接收 → 决定进入 G06。** 本次优化是进入 6a 的必需前置，不增加第 23 个子阶段。G07 保留后续并行调用者和最终版本收口，7b 三 provider × 三 seed 目标不变；不得再以旧 7a 清理排期跳过本次优化。
 
-历史状态：G01/1a–1d已审阅并获维护者确认；G02阶段2已按原出口由Sol有界接收：2a归因、2b MuJoCo代表实现和2c成功参考冻结完成。原2b attempt002的G2 FAIL、G3 PARTIAL、G5 INCOMPLETE_USER_PAUSED历史保留；3a已由Sol按ACCEPTED_3A_ROUTING_ADMISSION接收；3b attempt002经[Sol复审](../maintenance/reviews/20261106_3b_attempt002_sol_review.md)为REWORK_REQUIRED_3B、attempt_count=2，已测TCP有界补偿及launcher／F06记录修复保留，整体未接收。[003前重评](stage3-3b-attempt003-reassessment.md)及[条件3c首包](stage3-3c-attempt001.md)已准备未派发；维护者授权两包一次转交、按[连续安排](stage3-3b003-3c001-sequential-execution.md)技术通过后顺序实施，Sol最后分别复审，3c及后续尚未开始。阶段 owner 入口见[源码映射](source-map-and-references.md)，协议正文在 contracts/，子阶段目标见对应 Goal。此页维护依赖和验收标准。
+同一 Env 的 renderer 创建时固定至 close。原 N08、COM 严格判据、R05c 资格和其他历史限制按原主审保留，不新增全矩阵／像素／轨迹一致门。装配 Panda 完整版本用例与各原 G04/G05 出口分列；本次优化两任务单 seed 调用验证和 G07 最终集成分别验收。
+
+下文有日期的接手／attempt 记录保留当时事实；阶段出口与工作包原则继续有效，实际进度只从当前摘要及编排索引恢复。
 
 ### 2026-11-04 G02/2b 中止与 2c 文档封存
 
@@ -20,7 +22,7 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 
 ### 后续开发的诊断与代码边界
 
-阶段3起的执行包引用[诊断开发与核心代码规范](../../../../global/diagnostics-and-code-boundaries.md)，说明新增诊断放在哪里、如何从外部观察或干预；不新增核心实验／测试if-else，不将正式feedback、fault或来源检查误删。既存耦合按[维护规划第2.6节](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记；2026-11-08维护者要求，在5c人工诊断中提前归位本轮触及且阻碍统一公共链的项，未涉及项仍按7a集中分类，见[诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)。七阶段编号、依赖和已有有限接收不变，本文更新不启动阶段3。
+阶段3起的执行包引用[诊断开发与核心代码规范](../../../../global/diagnostics-and-code-boundaries.md)，说明新增诊断放在哪里、如何从外部观察或干预；不新增核心实验／测试if-else，不将正式feedback、fault或来源检查误删。既存耦合按[维护规划第2.6节](pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记；2026-11-08 的提前归位决定见[诊断重构路线](stage5-5c-diagnostic-refactor-roadmap.md)；2026-11-11 起，本文优化台账范围内的剩余项必须在 G06 前处理，G07 只保留其后续新增和最终集成范围。七阶段编号、依赖和已有有限接收不变，本文更新不启动阶段3。
 
 默认按表逐项推进；依赖列描述技术前置。必要的协议跨页审阅不另算子阶段。
 
@@ -42,14 +44,14 @@ MuJoCo PickCube seed31 完整成功并独立读回；NutAssembly seed19 两次�
 | 5a | 1d、3c、4c | [05](../goals/05-rendering.md)：公开 scene data／原生绑定接入既有 renderer |
 | 5b | 5a | 首批路线窗口和离屏 RGB 分别验收，相机可配置，render 不推进物理 |
 | 5c | 5b | reset 首帧、step 同步图像、创建时固定 renderer 及一个真实跨组合成立 |
-| 6a | 3c、4c、5c | [06](../goals/06-parallel.md)：批量布局、reset mask、终止／首帧和 schema 接通 |
+| 6a | 3c、4c、5c，以及本次代码／项目优化人工接收 | [06](../goals/06-parallel.md)：批量布局、reset mask、终止／首帧和 schema 接通 |
 | 6b | 6a | 至少两个物理后端真实并行，至少一条 native batch，覆盖构建／reset／step／render／obs |
 | 6c | 6b | 支持路线部分 reset，切配置整批重建，故障、资源及环境隔离成立 |
 | 7a | 4c、5c、6c | [07](../goals/07-integration.md)：NutAssembly 已支持后端复用及受影响兼容 caller 检查 |
 | 7b | 7a | 冻结输入下 PickCube 三后端×三 seed 任务成功与独立记录检查；切换／render／batch 组合分别收口 |
 | 7c | 7b | API／指南／矩阵／Skills／恢复页与实际证据一致；版本未决项明确 |
 
-初建时全部22项为 `PLANNED`、attempt为0；现1a–1d、2a–2c及3a–3c均有相应有界接收，维护者已确认五协议实施基线；3a普通三次及诊断一次、3b三次、3c一次的历史分别保留。4a 已在第三普通attempt后有界接收，4b–7 尚未执行；原2b扩展包失败及中止记录不改写。实时状态只在[编排索引](../maintenance/orchestration.json)维护。Goal页面记录结果摘要，不复制第二套状态表。
+初建时22项均为 PLANNED；截至2026-11-11，G01～G05 各自范围已有界接收，G06／G07 尚未开始。各普通／诊断 attempt 历史及原2b扩展包失败／中止记录保留；实际计数在[编排索引](../maintenance/orchestration.json)，Goal 只记录对应接收摘要。
 
 附加版本用例安排与本表原主线分列，见[装配Panda用例](assembled-panda-use-case.json)。提前检查能发现共享能力缺陷时，修复归原G04 owner；用例专属新Robot／任务适配未完成单列到7a，不借此延长原包或增加影子attempt。7a最终用例未完成也不能冒称该用例或版本全部通过。
 

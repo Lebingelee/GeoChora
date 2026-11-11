@@ -77,8 +77,10 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   diagnostic subclasses or scoped test injection. Do not add experiment/test-name
   branches, probe switches or imports from diagnostics/tests to production paths.
 - Keep legitimate capability, validation, fault and lifecycle checks. Existing
-  diagnostic coupling is recorded for the v2.1.1 integration closeout; do not
-  begin a broad decoupling campaign or extend old diagnostic branches by default.
+  diagnostic coupling in the maintainer-approved post-5c optimization ledger
+  must close before G06; use the [current state](docs/module/task_env/v2.1.1/maintenance/current-state.md)
+  and [execution plan](docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md).
+  G07 retains later integration work; do not extend old diagnostic branches by default.
 - Subsequent execution packages reference this standard and identify the home
   of any new diagnostic code. Preserve one owner for state, stepping and teardown.
 

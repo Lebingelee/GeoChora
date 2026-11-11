@@ -1,6 +1,8 @@
 # v2.1.1 范围与实施路线
 
-状态：`ROUTE_CONFIRMED`，2026-11-03。确认的是路线和目标；五协议语义已由维护者确认，具体生产值映射在所属工作包冻结，实施与 native 执行由后续冻结工作包承接。
+当前进度（2026-11-11）：G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；先完成[代码与项目优化](post-5c-optimization-execution.md)及人工接收，再决定进入 G06。七阶段／二十二子阶段不变，G07 最终矩阵保留。接收范围和实际输入见[当前摘要](../maintenance/current-state.md)。
+
+路线确认基线：`ROUTE_CONFIRMED`，2026-11-03。五协议语义已由维护者确认，具体生产值映射及 native 执行由所属冻结工作包承接。
 
 ## 必达范围
 
@@ -13,7 +15,7 @@
 7. public Env 构建时选择执行组合和 renderer；已准入后端／Controller 可按 reset 能力切换，renderer 固定到 close，同一 Env 的 renderer 切换后移；不更换配置的部分 reset 按能力支持，换后端按原生批次重建。
 8. observation 构建后保持结构、shape、dtype、单位、坐标及字段语义；为非刚体表示和设备数据保留扩展边界。
 
-2026-11-06重新编排建议：[装配Panda](stage4-assembled-panda.md)是本版附加集成用例，原G04的typed命令、三后端effort／BodyWrench及Controller reset主线保持。建议4a作接口需求审阅，4b主能力稳定后早做空载／夹爪／补偿检查，4c有效PickCube参考复用，7a完成两任务原Solution在原／新机器人上的完整复用，7b仅按输入变化定向复核。新类仍置于`task_env/robots/`并由任务配置消费；不要求物性等价。排期已由维护者采纳，不增加子阶段或重开G03；当前未实施。
+2026-11-06重新编排建议：[装配Panda](stage4-assembled-panda.md)是本版附加集成用例，原G04的typed命令、三后端effort／BodyWrench及Controller reset主线保持。建议4a作接口需求审阅，4b主能力稳定后早做空载／夹爪／补偿检查，4c有效PickCube参考复用，7a完成两任务原Solution在原／新机器人上的完整复用，7b仅按输入变化定向复核。新类仍置于`task_env/robots/`并由任务配置消费；不要求物性等价。这是 2026-11-06 的排期决定；后续装配主体与双 Controller 的受测接收范围见当前摘要，完整版本用例仍由其集成门判断，不把旧“未实施”状态沿用到当前。
 
 ## 已确定的架构边界
 

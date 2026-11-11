@@ -513,5 +513,13 @@
     }
   ],
   "qualification_claim": false,
-  "publication_claim": false
+  "publication_claim": false,
+  "current_state_ref": "../maintenance/current-state.md",
+  "evidence_reconciliation": {
+    "status": "PENDING_POST_5C_OPTIMIZATION",
+    "date": "2026-11-11",
+    "planning_snapshot_date": "2026-11-03",
+    "execution_ref": "../planning/post-5c-optimization-execution.md",
+    "policy": "Existing target/cell statuses remain their recorded planning/evidence snapshots; latest bounded G01-G05 acceptance is resolved through current_state_ref until per-claim reconciliation. No bulk promotion or new Qualification."
+  }
 }

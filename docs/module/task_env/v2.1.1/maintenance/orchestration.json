@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-08",
-  "status": "G05_5C_MAINTAINER_LED_HUMAN_DIAGNOSIS_ACTIVE",
+  "updated_date": "2026-11-11",
+  "status": "POST_5C_CODE_AND_PROJECT_OPTIMIZATION_STARTED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -13,24 +13,16 @@
     "branch": "develop"
   },
   "branch_plan": {
+    "stage": "post_5c_optimization",
     "reuse_existing_checkout": true,
-    "additional_branches": 1,
+    "additional_branches": 0,
     "additional_worktrees": 0,
-    "reason": "One maintainer-authorized G03 topic branch created from local develop after fetch; preserve 236 local commits, reuse checkout for 3a-3c.",
-    "stage": "3",
-    "proposed_stage_branch": "codex/v211-stage3",
-    "creation_status": "CREATED",
-    "actual_stage_branch": "codex/v211-stage3",
-    "created_from_head": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
-    "develop_preserved_at": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
-    "remote_checked": "public/develop",
-    "remote_head": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
-    "ahead_at_creation": 236,
-    "behind_at_creation": 0
+    "actual_stage_branch": "codex/v211-stage5-diagnostic",
+    "reason": "Maintainer entered post-5c optimization; reuse current stage branch. Historical stage3 creation record retained in branch_plan_history. No ref cleanup before code acceptance and evidence preservation."
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Review staged 5c human-diagnostic refactor roadmap; prepare a bounded implementation package only after choosing the next increment, freezing real inputs and securing scope/resources authorization. Maintainer manually forwards; no automatic G06.",
+  "next_action": "Prepare O1 formal configuration/construction implementation package against actual HEAD; follow post-5c execution plan, preserve protected inputs and bound native scope separately. G06 remains not started.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -1595,11 +1587,11 @@
           "planning_anchor": "../goals/05-rendering.md#5c",
           "maintainer_scope_revision": "2026-11-07: renderer fixed from Env creation until close; same-Env renderer switching deferred to an unscheduled later task; synchronous task RGB, a real physics/renderer cross combination, and general task-driven production implementation remain required. PickCube is the real validation task.",
           "scope_planning_ref": "../planning/stage5-5c-fixed-renderer-scope.md",
-          "package_preparation_status": "ATTEMPT003_COMPLETED_REVIEWED_NOT_ACCEPTED",
+          "package_preparation_status": "DIAGNOSTIC_UNITS001_009_CLOSED_BOUNDED",
           "dependencies": [
             "5b"
           ],
-          "status": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
+          "status": "SOL_ACCEPTED_BOUNDED_5C",
           "attempt_count": 3,
           "attempts": [
             {
@@ -1635,41 +1627,38 @@
               "review_ref": "reviews/20261108_5c_attempt003_sol_review.md"
             }
           ],
-          "assigned_agent": "maintainer-designated manual implementation session; released",
-          "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt003",
-          "package_sha256": "83ee53f47c9bbe8bb8cbacb37713aa644e4e8e1c077b7cfc27768465196b6408",
-          "input_head": "958bbbd786e3dc5ff229cff1cdf4c914bc939faf",
-          "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
-          "expected_duration_minutes": "480-600",
-          "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
-          "last_observation": "2026-11-08 Sol review: component native optics and bounded non-Position controlled lifecycle progress; new unconditional DynamicCameraRenderSourceV2 binding rejects Isaac USD source during RGB reset. Third ordinary attempt not accepted; maintainer-led human diagnosis required.",
+          "assigned_agent": "No active execution package; Unit9 writer/native released.",
+          "package_path": "workspace/maintenance/v211_g05_5c_unit009_execution_20261111_001",
+          "input_head": "d6e9865a8ce8ff6924c9421a5d3d2d988c122187",
+          "output_head": "b23fb3cc5b1fdfd2699a177c9916019583d63b5c",
+          "last_observation": "2026-11-11: Unit9 independently accepted bounded 5c; maintainer confirmed function acceptance and entered post-5c optimization. Earlier blockers and budgets are archived under ordinary_attempt003_closeout; no native package is active.",
           "evidence_refs": [
             "reviews/20261108_5c_attempt001_sol_review.md",
             "workspace/maintenance/v211_g05_5c_attempt001/report.md",
             "workspace/maintenance/v211_g05_5c_attempt001/execution-exceptions.md",
             "reviews/20261108_5c_attempt002_sol_review.md",
-            "reviews/20261108_5c_attempt003_sol_review.md"
+            "reviews/20261108_5c_attempt003_sol_review.md",
+            "reviews/20261111_unit007_008_sol_review_a53bf19d.md",
+            "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md"
           ],
           "commits": [
             "9d7b14a47ea419d9d825bc18dadbc37eead95f74",
             "1c6b7e4f49107fe57e31e9be43e2729162ffaca1",
             "13111ca78f3c678a02da1d7ffb5a7c248447b036",
-            "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425"
+            "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
+            "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+            "b23fb3cc5b1fdfd2699a177c9916019583d63b5c"
           ],
-          "review_decision": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
-          "blockers": [
-            "Task RGB reset unconditionally constructs DynamicCameraRenderSourceV2 from UsdRuntimeSourceV1, which is not RuntimeSource; Isaac historical route cannot pass current code.",
-            "Maintainer clarified Pendulum and TwoWheelBalance must actually use a shared controlled-subject and Controller production flow, preserving direct torque semantics; implementation is missing."
-          ],
-          "next_candidate_package": {
-            "id": "V211_G05_5c_attempt003",
-            "status": "COMPLETED_REVIEWED_NOT_ACCEPTED",
-            "attempt_count_before_start": 2,
-            "plan_ref": "../planning/stage5-5c-attempt003-execution.md",
-            "manual_forward_only": true,
-            "last_ordinary_attempt": true,
-            "authorization_source": "Maintainer explicitly replied 目前批准 after reviewing proposed scope and budget."
+          "review_decision": {
+            "status": "SOL_ACCEPTED_BOUNDED_5C",
+            "date": "2026-11-11",
+            "reviewer": "Sol",
+            "review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
+            "maintainer_confirmed": true,
+            "qualification": false
           },
+          "blockers": [],
+          "next_candidate_package": null,
           "maintainer_exception_disposition": "Prior 001 deviations and unknowns remain disclosed; no additional retrospective investigation or re-run is required solely to reconstruct compliance. Not authorization for a new execution window.",
           "third_attempt_reassessment": {
             "status": "COMPLETED_PRIOR_TO_ATTEMPT003",
@@ -1691,17 +1680,61 @@
             "original_evidence_identity_preserved": true,
             "other_refs_rewritten": false
           },
-          "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation.",
+          "post_limit": "Original three ordinary attempts and outcomes preserved; maintainer-led diagnostic units 1-9 closed by Unit9 review. No fourth ordinary 5c attempt; optimization is separately tracked.",
           "human_diagnosis": {
-            "status": "MAINTAINER_DESIGNATED_BASELINE_ANALYSIS",
-            "reference": "../planning/stage5-5c-human-diagnosis-architecture-audit.md",
-            "new_execution_authorized": false,
+            "status": "CLOSED_BOUNDED_AFTER_UNITS001_009",
             "ordinary_attempts_completed": 3,
-            "baseline_ref": "../planning/stage5-5c-human-diagnosis-baseline.md",
-            "scope": "Maintainer-directed multi-window 5c refactor: unified single/nested subjects for integrated/assembled Panda, Pendulum, TwoWheel; Controller/canonical action; common Runtime/task semantics; renderer-independent state and Isaac USD; touched diagnostic coupling before G06.",
-            "unified_runtime_nested_control_audit": "../planning/stage5-5c-unified-runtime-control-audit.md",
+            "review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
             "roadmap": "../planning/stage5-5c-diagnostic-refactor-roadmap.md",
-            "diagnostic_attempts_started": 0
+            "scope": "Original bounded 5c functional exit plus maintainer unified-subject requirements; code/project optimization remains separately pending."
+          },
+          "ordinary_attempt003_closeout": {
+            "package_preparation_status": "ATTEMPT003_COMPLETED_REVIEWED_NOT_ACCEPTED",
+            "assigned_agent": "maintainer-designated manual implementation session; released",
+            "package_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G05_5c_attempt003",
+            "package_sha256": "83ee53f47c9bbe8bb8cbacb37713aa644e4e8e1c077b7cfc27768465196b6408",
+            "input_head": "958bbbd786e3dc5ff229cff1cdf4c914bc939faf",
+            "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
+            "expected_duration_minutes": "480-600",
+            "execution_budget": "Approved 12h wall; source/native each 14400s; worker 1200s; 12 GiB cgroup; 10000 controlled substep reservations; see package and exception",
+            "last_observation": "2026-11-08 Sol review: component native optics and bounded non-Position controlled lifecycle progress; new unconditional DynamicCameraRenderSourceV2 binding rejects Isaac USD source during RGB reset. Third ordinary attempt not accepted; maintainer-led human diagnosis required.",
+            "status": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
+            "review_decision": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
+            "blockers": [
+              "Task RGB reset unconditionally constructs DynamicCameraRenderSourceV2 from UsdRuntimeSourceV1, which is not RuntimeSource; Isaac historical route cannot pass current code.",
+              "Maintainer clarified Pendulum and TwoWheelBalance must actually use a shared controlled-subject and Controller production flow, preserving direct torque semantics; implementation is missing."
+            ],
+            "next_candidate_package": {
+              "id": "V211_G05_5c_attempt003",
+              "status": "COMPLETED_REVIEWED_NOT_ACCEPTED",
+              "attempt_count_before_start": 2,
+              "plan_ref": "../planning/stage5-5c-attempt003-execution.md",
+              "manual_forward_only": true,
+              "last_ordinary_attempt": true,
+              "authorization_source": "Maintainer explicitly replied 目前批准 after reviewing proposed scope and budget."
+            },
+            "post_limit": "Maintainer-led human diagnosis required before further work; no automatic fourth ordinary attempt, renamed successor or new conversation.",
+            "human_diagnosis": {
+              "status": "MAINTAINER_DESIGNATED_BASELINE_ANALYSIS",
+              "reference": "../planning/stage5-5c-human-diagnosis-architecture-audit.md",
+              "new_execution_authorized": false,
+              "ordinary_attempts_completed": 3,
+              "baseline_ref": "../planning/stage5-5c-human-diagnosis-baseline.md",
+              "scope": "Maintainer-directed multi-window 5c refactor: unified single/nested subjects for integrated/assembled Panda, Pendulum, TwoWheel; Controller/canonical action; common Runtime/task semantics; renderer-independent state and Isaac USD; touched diagnostic coupling before G06.",
+              "unified_runtime_nested_control_audit": "../planning/stage5-5c-unified-runtime-control-audit.md",
+              "roadmap": "../planning/stage5-5c-diagnostic-refactor-roadmap.md",
+              "diagnostic_attempts_started": 0
+            }
+          },
+          "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+          "sol_review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
+          "diagnostic_units_closeout": {
+            "units": "1-9",
+            "status": "CLOSED_BOUNDED",
+            "review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
+            "ordinary_attempts_preserved": true,
+            "code_optimization_accepted": false,
+            "project_optimization_accepted": false
           }
         }
       ]
@@ -1890,12 +1923,12 @@
     "native_checks_performed": false
   },
   "last_reviewed_package": {
-    "package_id": "V211_G05_5c_attempt003",
-    "status": "NOT_ACCEPTED_ISAAC_USD_TASK_RGB_REGRESSION",
-    "output_head": "9e6f2b0f9a42d70aa1add5382c30a42ea7a92425",
-    "provider_output": "c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7",
-    "sol_review_ref": "reviews/20261108_5c_attempt003_sol_review.md",
-    "note": "Third ordinary attempt not accepted; maintainer-led human diagnosis required."
+    "package_id": "V211_G05_5c_unit009",
+    "status": "SOL_ACCEPTED_BOUNDED_5C",
+    "output_head": "b23fb3cc5b1fdfd2699a177c9916019583d63b5c",
+    "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+    "sol_review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
+    "maintainer_confirmation": "2026-11-11 current conversation: bounded G01-G05 acceptance confirmed; enter post-5c optimization."
   },
   "last_attempt_policy": {
     "ordinary_attempt_limit": 3,
@@ -2028,5 +2061,46 @@
     "g04_attempts_started": 0,
     "sol_native_runs": 0,
     "new_execution_threads": 0
+  },
+  "current_state_ref": "current-state.md",
+  "branch_plan_history": [
+    {
+      "reuse_existing_checkout": true,
+      "additional_branches": 1,
+      "additional_worktrees": 0,
+      "reason": "One maintainer-authorized G03 topic branch created from local develop after fetch; preserve 236 local commits, reuse checkout for 3a-3c.",
+      "stage": "3",
+      "proposed_stage_branch": "codex/v211-stage3",
+      "creation_status": "CREATED",
+      "actual_stage_branch": "codex/v211-stage3",
+      "created_from_head": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+      "develop_preserved_at": "9d942d43a1cf3210d5bccca0f703c1be4ba45654",
+      "remote_checked": "public/develop",
+      "remote_head": "fd03817c9f6ef8ce9fd68c1db30125efda68e1c8",
+      "ahead_at_creation": 236,
+      "behind_at_creation": 0
+    }
+  ],
+  "post_5c_optimization": {
+    "status": "O0_BASELINE_RECORDED_O1_NEXT",
+    "date": "2026-11-11",
+    "authority": "Maintainer explicitly confirmed: 现在我们正式进入5c之后的优化阶段。",
+    "planning_ref": "../planning/post-5c-optimization-execution.md",
+    "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
+    "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
+    "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+    "current_step": "O0",
+    "next_step": "O1",
+    "implementation_attempt_count": 0,
+    "implementation_executor": null,
+    "implementation_package_dispatched": false,
+    "g05_function_accepted": true,
+    "code_optimization_accepted": false,
+    "project_optimization_accepted": false,
+    "g06_started": false,
+    "native_runs_this_kickoff": 0,
+    "deletions_this_kickoff": 0,
+    "snapshot_ref": "../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json",
+    "refs_reorganized_this_kickoff": false
   }
 }

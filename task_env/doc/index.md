@@ -1,6 +1,6 @@
 # TaskEnv 文档入口
 
-3b attempt001 已形成三路线短程证据，整体仍PARTIAL、待复审；具体失败和未测范围见[执行摘要](../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_3b_attempt001_execution.md)。
+当前（2026-11-11）：G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；现进入正式入口、代码职责及项目整理优化，完成并人工接收后再进入 G06。先读[当前摘要](../../docs/module/task_env/v2.1.1/maintenance/current-state.md)和[优化安排](../../docs/module/task_env/v2.1.1/planning/post-5c-optimization-execution.md)。旧 attempt 的失败／待审文字保留所属历史时点。
 
 ## v2.1.1 新手入口与当前范围
 
