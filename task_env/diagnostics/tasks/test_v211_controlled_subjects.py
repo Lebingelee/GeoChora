@@ -91,6 +91,130 @@ def test_legacy_class_binding_preserves_scalar_factory_input(monkeypatch):
         env.close()
 
 
+@pytest.mark.parametrize('profile', [
+    'panda-direct-effort-v1', 'panda-joint-effort-reference-v1', 'panda-r3-effort-reference-v1',
+    'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1',
+])
+def test_formal_physical_profiles_own_source_and_preserve_compiled_control(tmp_path, profile):
+    import yaml
+    from task_env import make_env
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    config = {'provider': 'mujoco', 'controller': {'profile_id': profile},
+              'episode': {'seed': 31, 'horizon': 8}}
+    path = tmp_path / 'physical.yaml'
+    path.write_text(yaml.safe_dump(config))
+    resolved = resolve_task_env_config(PickCubeReferenceEnv, config)
+    assert resolved == resolve_task_env_config(PickCubeReferenceEnv, path)
+    assert resolved == resolve_task_env_config(PickCubeReferenceEnv, resolved)
+    env = make_env(PickCubeReferenceEnv.uid, config=path)
+    root = env.value['source'].scene_source.base_dir
+    try:
+        execution = env.value['physical_execution']
+        assert env.robot.subjects is execution.subjects
+        assert env.robot.controllers is execution.controllers
+        assert env.binding.physical_control_profile(env) is execution
+        assert env.resolved_public_config == resolved
+        assert env.resolved_public_config.source_workspace is None
+        assert env.session is None and root.is_dir()
+        if profile in {'panda-r3-effort-reference-v1', 'panda-r3-mass-effort-v1'}:
+            assert not callable(getattr(execution.controllers[0], 'bind_model', None))
+        from task_env.runtime.sessions.api import assess_selected_request
+        arguments = dict(selection=resolved.execution_spec_v2, artifact=env.artifact,
+            source=env.value['source'], value=env.value, dependency_status='available',
+            request_identity='a' * 64)
+        assessment = assess_selected_request(binding=env.binding, **arguments)
+        assert assessment.decision != 'rejected', assessment.to_mapping()
+        refused = assess_selected_request(binding=replace(env.binding, physical_control_profile=None), **arguments)
+        assert refused.decision == 'rejected'
+    finally:
+        env.close()
+    assert not root.exists()
+
+
+def test_legacy_physical_uid_uses_formal_factory_and_preserves_caller_copy(tmp_path):
+    from task_env import make_env
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    root = tmp_path / 'explicit-source'
+    env = make_env('pickcube-physical-candidate-v1', config={'source_workspace': root})
+    try:
+        assert type(env) is PickCubeReferenceEnv
+        assert env.uid == PickCubeReferenceEnv.uid
+        assert env.value['source'].scene_source.base_dir == root / 'source-snapshot'
+        assert env.resolved_public_config.source_workspace == str(root)
+    finally:
+        env.close()
+    assert (root / 'source-snapshot').is_dir()
+
+
+def test_formal_physical_construction_failure_releases_owned_source(monkeypatch):
+    from task_env import make_env
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions import mujoco_composition
+    paths = []
+    original = mujoco_composition.bind_reference_scene_source
+    def capture_source(*args, **kwargs):
+        value = original(*args, **kwargs)
+        paths.append(value[0].scene_source.base_dir)
+        return value
+    def fail_initialization(*args, **kwargs):
+        raise RuntimeError('injected declaration initialization failure')
+    monkeypatch.setattr(mujoco_composition, 'bind_reference_scene_source', capture_source)
+    monkeypatch.setattr(SelectedReferenceEnv, '_initialize_selected_value', fail_initialization)
+    with pytest.raises(RuntimeError, match='declaration initialization failure'):
+        make_env('pick-cube-p16-reference-v1', config={
+            'provider': 'mujoco', 'controller': {'profile_id': 'panda-direct-effort-v1'}})
+    assert paths and all(not path.exists() for path in paths)
+
+
+def test_dynamic_r3_composition_keeps_its_source_model_binding():
+    from task_env import make_env
+    env = make_env('pick-cube-p16-reference-v1', config={'provider': 'mujoco',
+        'controller': {'profile_id': 'panda-r3-effort-reference-v1',
+                       'parameters': {'reset_selection': True}}})
+    try:
+        candidate = env._physical_reset_selection.prepare('r3-pose')
+        controller = candidate.execution.controllers[0]
+        assert callable(controller.bind_model)
+        assert controller.bind_model == controller.servo.bind_model
+        with pytest.raises(ValueError, match='missing or differs'):
+            controller.bind_model(SimpleNamespace(source_closure_sha256='foreign', evaluate=lambda: None))
+    finally:
+        env.close()
+
+
+def test_undeclared_subclass_does_not_infer_component_construction_from_factory_override(monkeypatch):
+    from task_env import make_env
+    from task_env.registry import ENV_REGISTRY
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    class Extension(SelectedReferenceEnv):
+        uid = 'explicit-component-configuration-test'
+    def forbidden_bootstrap(*args, **kwargs):
+        raise AssertionError('pure configuration unexpectedly bootstrapped a Runtime')
+    monkeypatch.setattr(SelectedReferenceEnv, '_build_runtime_with_rollback', forbidden_bootstrap)
+    with pytest.raises(TypeError, match='explicit task binding'):
+        Extension()
+    monkeypatch.setattr(ENV_REGISTRY, 'get', lambda _uid: Extension)
+    env = make_env(Extension.uid, build_runtime=False)
+    try:
+        assert env._has_component_assembly()
+        assert env._runtime is None
+    finally:
+        env.close()
+
+
+def test_physical_config_rejects_unconsumed_task_parameters_before_binding(monkeypatch):
+    from task_env import make_env
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    def forbidden_binding(*args, **kwargs):
+        raise AssertionError('unsupported Task parameter reached source construction')
+    monkeypatch.setattr(PickCubeReferenceEnv, 'selected_binding', forbidden_binding)
+    with pytest.raises(ValueError, match='unsupported override') as failure:
+        make_env(PickCubeReferenceEnv.uid, config={'provider': 'mujoco',
+            'controller': {'profile_id': 'panda-direct-effort-v1'}, 'task': {'lift_height_m': .05}})
+    assert failure.value.receipt['phase'] == 'static_config'
+
+
 @pytest.mark.parametrize('uid, config, options, subject_count, controller_count', [
     ('pendulum-v1', {}, {'provider': 'mujoco'}, 1, 1),
     ('two-wheel-balance-v1', {}, {'provider': 'mujoco'}, 1, 1),

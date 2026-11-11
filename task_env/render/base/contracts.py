@@ -9,6 +9,54 @@ from typing import Protocol
 import numpy as np
 
 
+TASK_RGB_PAIRINGS = frozenset({('mujoco', 'cpu', 'mujoco'), ('geophys', 'cpu', 'mujoco'),
+                               ('geophys', 'cpu', 'geophys'), ('isaacsim', 'cuda', 'isaacsim')})
+
+
+def validate_camera_declarations(*, render_mode=None, observer_camera=None, task_camera=None,
+                                 task_rgb_camera=None, task_renderer=None):
+    """Reject incompatible declarations before source or native preparation."""
+    from ...environment.config import CameraSpec
+    from ...observations.canonical_camera import CameraGeometry
+    if (task_rgb_camera is None) != (task_renderer is None):
+        raise ValueError('task RGB camera and fixed renderer must be declared together')
+    if task_camera is not None and task_rgb_camera is not None:
+        raise ValueError('declare either a task RGB camera or a legacy task camera binding')
+    for camera in (observer_camera, task_camera, task_rgb_camera):
+        if camera is None:
+            continue
+        if type(camera) is CameraGeometry:
+            camera.validate()
+        elif type(camera) is CameraSpec:
+            if (camera.frame != 'world' or not np.isfinite((*camera.position, *camera.quaternion_wxyz,
+                    camera.fov_y, camera.near, camera.far)).all()
+                    or np.linalg.norm(camera.quaternion_wxyz) < 1e-12
+                    or not 0 < camera.fov_y < np.pi):
+                raise ValueError('task RGB requires a finite world CameraSpec with nonzero quaternion')
+        else:
+            raise TypeError('camera must be CameraSpec or linked CameraGeometry')
+        if not camera.rgb or camera.depth or camera.rgb_layout != 'HWC' or camera.rgb_dtype != 'float32':
+            raise ValueError('camera output requires HWC float32 RGB without depth')
+    if task_camera is not None and getattr(task_camera, 'parent_frame', 'world') != 'world':
+        raise ValueError('task camera requires a world mount')
+    if task_camera is not None and render_mode is None:
+        raise ValueError('task camera requires an observer-enabled scene')
+    if render_mode is None and observer_camera is not None:
+        raise ValueError('observer camera requires a configured render mode')
+    if render_mode is not None:
+        normalize_render_mode(render_mode)
+        if observer_camera is None:
+            raise ValueError('rendering requires an explicit observer camera')
+    if observer_camera is not None:
+        identity = lambda camera: getattr(camera, 'camera_id', getattr(camera, 'name', None))
+        for camera in (task_camera, task_rgb_camera):
+            if camera is not None and identity(camera) == identity(observer_camera):
+                raise ValueError('task and observer cameras require distinct identities')
+        if (task_rgb_camera is not None and task_renderer == 'geophys'
+                and (task_rgb_camera.width, task_rgb_camera.height) != (observer_camera.width, observer_camera.height)):
+            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
+
+
 class RenderMode(str, Enum):
     """Stable modes accepted by the future :meth:`BaseTaskEnv.render` API."""
 

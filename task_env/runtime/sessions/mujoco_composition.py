@@ -11,6 +11,38 @@ import xml.etree.ElementTree as ET
 from .source_scene_import import declare_panda_scene
 
 
+def bind_reference_scene_source(source, *, artifact, scene, bodies, frames, workspace=None):
+    """Bind declared Scene names to a verified MJCF snapshot without native I/O.
+
+    Normal construction borrows its existing owned receipt. An advanced caller
+    may request the historical persistent copy; its directory stays caller-owned.
+    The caller retains the original receipt until the binding is retired.
+    """
+    from dataclasses import replace
+    from pathlib import Path
+    import shutil
+    from ...assembly.assets import _source_closure_digest
+    from ...assembly.source import TaskSceneSource
+    from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+    receipt = source.execution_source_receipt
+    receipt.validate_snapshot()
+    destination = receipt.snapshot_root
+    if workspace is not None:
+        root = Path(workspace).resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        destination = root / 'source-snapshot'
+        shutil.copytree(receipt.snapshot_root, destination)
+    xml = receipt.importer_xml.decode('utf-8')
+    projected = project_scene_definition_v3_to_mjcf(xml, scene)
+    closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),
+                                      **source_asset_bytes(destination, projected)})
+    bound = replace(source, task_artifact_hash=artifact.identity_hash,
+        scene_source=TaskSceneSource(xml, destination, f'scene-definition-v3:{scene.identity_hash}'),
+        scene_definition=scene, source_closure_digest=closure, execution_source_receipt=None,
+        bodies=bodies, frames=frames)
+    return bound, projected, closure
+
+
 def extract_task_world_mjcf(*, task_xml: str, expected_xml_sha256: str,
                             retained_roots: tuple[str, ...],
                             replaced_robot_roots: tuple[str, ...]) -> str:

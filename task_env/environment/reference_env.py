@@ -43,8 +43,7 @@ from ..runtime.sessions.source import (
 METADATA = {'action_schema': REFERENCE_POSE_ACTION_SCHEMA}
 _RESET_SEED_UNSET = object()
 _INFER_POSITION_TASK_SUCCESS = object()
-_TASK_RGB_PAIRS = frozenset({('mujoco', 'cpu', 'mujoco'), ('geophys', 'cpu', 'mujoco'),
-                             ('geophys', 'cpu', 'geophys'), ('isaacsim', 'cuda', 'isaacsim')})
+from ..render.base.contracts import TASK_RGB_PAIRINGS as _TASK_RGB_PAIRS
 
 
 def _artifact_for_reset(current_artifact, rebuilt_value, runtime_input=None):
@@ -801,7 +800,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     @classmethod
     def from_resolved_config(cls, config, *, render_mode=None,
-                             task_rgb_camera=None, task_renderer=None, **kwargs):
+                             task_rgb_camera=None, task_renderer=None,
+                             observer_camera=None, task_camera=None, **kwargs):
         """Compile declarations once, then construct the common Env owner.
 
         ResolvedSelectedConfig and ResolvedEnvConfig retain their existing input
@@ -814,21 +814,34 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise TypeError('selected construction requires its own resolved configuration')
         if not selected and type(config) is not ResolvedEnvConfig:
             raise TypeError('environment construction requires resolved configuration')
+        from ..render.base.contracts import validate_camera_declarations, normalize_render_mode
+        # Legacy component render_mode still means its existing display route;
+        # explicit observer declarations belong to the selected source contract.
+        if selected or observer_camera is not None or task_camera is not None:
+            validate_camera_declarations(render_mode=render_mode, observer_camera=observer_camera,
+                task_camera=task_camera, task_rgb_camera=task_rgb_camera, task_renderer=task_renderer)
         config = resolve_task_env_config(cls, config)
         camera, renderer = task_rgb_camera, task_renderer
         if (camera is None) != (renderer is None):
             raise ValueError('task RGB camera and fixed renderer must be declared together')
         if selected:
-            if kwargs or render_mode is not None:
-                raise ValueError('selected reference admits state-only execution without extra kwargs')
+            if kwargs:
+                raise ValueError('selected reference admits no unsupported extra kwargs')
+            if render_mode is not None:
+                supports = getattr(cls, 'selected_supports_observer', None)
+                if not callable(supports) or not supports(config):
+                    raise ValueError('selected configuration admits state-only execution without observer rendering')
+                render_mode = normalize_render_mode(render_mode).value
             provider, backend = config.physics_provider, config.environment.runtime.backend
+            if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
+                raise ValueError('unsupported fixed task RGB renderer and physics pairing')
             environment = config.environment
-            binding = cls.selected_binding(config)
             import json
             from ..runtime.sessions.provenance import preflight_selected_source
             preflight_selected_source(config.execution_spec_v2,
                 requested=(None if config.requested_execution_json is None
                            else json.loads(config.requested_execution_json)), task_uid=cls.uid)
+            binding = cls.selected_binding(config)
         else:
             provider = kwargs.pop('provider', 'geophys')
             backend = kwargs.pop('backend', config.runtime.backend)
@@ -850,7 +863,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             binding = cls.selected_binding(config, provider=provider, backend=backend,
                                            source_delivery_manifest=manifest)
         horizon = environment.episode.horizon
-        initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial()
+        try:
+            initial = binding.reset_reconstruction_strategy(provider, backend, horizon).initial()
+        except BaseException as error:
+            if binding.close_task_resources is not None:
+                try:
+                    binding.close_task_resources()
+                except BaseException as cleanup_error:
+                    error.add_note(f'source compilation cleanup also failed: {cleanup_error!r}')
+            raise
         env = cls(provider=provider, backend=backend, horizon=horizon, _binding=binding,
                   _execution_spec_v1=initial.get('execution_spec_v1'), _initial_value=initial)
         try:
@@ -882,6 +903,21 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 env._configure_task_rgb(geometry, renderer)
                 if type(camera) is CameraSpec:
                     env._task_camera_spec = camera
+            if task_camera is not None:
+                import copy
+                from ..observations.canonical_camera import CameraGeometry
+                from .config import CameraSpec
+                geometry = (CameraGeometry.from_camera_spec(task_camera, task_artifact_hash=env.artifact.identity_hash)
+                            if type(task_camera) is CameraSpec else task_camera)
+                if geometry.task_artifact_hash != env.artifact.identity_hash:
+                    raise ValueError('task camera TaskArtifact linkage mismatch')
+                env._declared_task_camera = copy.deepcopy(geometry)
+            if observer_camera is not None:
+                from ..observations.canonical_camera import CameraGeometry
+                from .config import CameraSpec
+                geometry = (CameraGeometry.from_camera_spec(observer_camera, task_artifact_hash=env.artifact.identity_hash)
+                            if type(observer_camera) is CameraSpec else observer_camera)
+                env._configure_selected_observer(render_mode, geometry)
         except BaseException as error:
             try:
                 env.close()
@@ -1387,6 +1423,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Initialize task-declared metadata before the selected Env is published."""
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
+        if self.binding.physical_reset_selection_factory is not None:
+            self._physical_reset_selection = self.binding.physical_reset_selection_factory()
         self._bind_selected_controller(self.value)
         if self.binding.task_definition_factory is not None:
             self._task_definition = self.binding.task_definition_factory()
@@ -1468,8 +1506,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
             or config is not None
             or (_binding is None and self.binding is None
-                and getattr(type(self).from_reference_config, '__func__', None)
-                is SelectedReferenceEnv.from_reference_config.__func__)
+                and type(self) is SelectedReferenceEnv)
         )
         if self._uses_component_assembly:
             self._initialize_components(
@@ -1818,6 +1855,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._format_component_reset(component_lifecycle, result, seed)
 
     def _reset_selected_task(self, *, seed, options, external_solution=None):
+        resolved = getattr(self, 'resolved_public_config', None)
+        environment = resolved.environment if resolved is not None else getattr(self, 'config', None)
+        configured_seed = None if environment is None else environment.episode.seed
+        if seed is _RESET_SEED_UNSET and configured_seed is not None:
+            seed = configured_seed
         requested_seed = seed
         sampled = self.binding.task_reset_sampler is not None
         if sampled:

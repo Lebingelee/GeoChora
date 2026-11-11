@@ -93,7 +93,7 @@ class RobotRuntime:
         Component-only Panda conveniences remain optional capabilities.
         """
         source = value['source']
-        physical = selected.physical_execution
+        physical = selected.physical_execution or value.get('physical_execution')
         if physical is not None:
             subjects, controllers = physical.subjects, physical.controllers
         else:

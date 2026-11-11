@@ -335,7 +335,7 @@ def _resolve_selected_config(environment_type, config):
                                 "physics_device": supplied.physics_device,
                                 "source_delivery_manifest": supplied.source_delivery_manifest,
                                 "render_default": supplied.render_default.to_mapping()},
-                  "episode": {"horizon": supplied.environment.episode.horizon}}
+                  "episode": {"horizon": supplied.environment.episode.horizon, "seed": supplied.environment.episode.seed}}
         if supplied.execution_spec_v2 is not None:
             selection = supplied.execution_spec_v2
             config["execution"].update({
@@ -345,14 +345,19 @@ def _resolve_selected_config(environment_type, config):
                 )
             })
         config["task"] = dict(supplied.task_parameters)
+        config['controller'] = {'parameters': json.loads(supplied.controller_parameters_json)}
         if supplied.gravity_compensation:
-            config["controller"] = {"gravity_compensation": True}
+            config['controller']['gravity_compensation'] = True
+        if supplied.source_workspace is not None:
+            config['execution']['source_workspace'] = supplied.source_workspace
+        if supplied.native_drive is not None:
+            config.setdefault('robot', {})['native_drive'] = supplied.native_drive
         if supplied.reset_profile is not None:
             config["execution"]["reset_profile"] = supplied.reset_profile
         if supplied.controller_profile is not None:
             config["task"]["controller_profile"] = supplied.controller_profile
         if supplied.robot_uid is not None:
-            config["robot"] = {"uid": supplied.robot_uid}
+            config.setdefault("robot", {})["uid"] = supplied.robot_uid
     if isinstance(config, (str, Path)):
         config = load_yaml_mapping(config)
     if config is None:
@@ -367,10 +372,15 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError(f"unsupported selected TaskEnv config fields: {sorted(unknown)}")
     robot_selection = values.get('robot')
     robot_uid = None
+    native_drive = None
     if robot_selection is not None:
-        if not isinstance(robot_selection, Mapping) or set(robot_selection) != {'uid'}:
-            raise ValueError('selected robot configuration requires exactly uid')
-        robot_uid = robot_selection['uid']
+        if not isinstance(robot_selection, Mapping) or set(robot_selection) - {'uid', 'native_drive'}:
+            raise ValueError('selected robot configuration supports uid and native_drive only')
+        native_drive = robot_selection.get('native_drive')
+        if native_drive not in (None, 'position', 'disabled'):
+            raise ValueError('unsupported Robot native drive selection')
+        robot_uid = robot_selection.get('uid')
+    if robot_uid is not None:
         if type(robot_uid) is not str or not robot_uid.strip() or robot_uid != robot_uid.strip():
             raise ValueError('selected robot uid must be a nonempty trimmed string')
         choices = getattr(environment_type, 'selected_robot_uids', ())
@@ -379,8 +389,12 @@ def _resolve_selected_config(environment_type, config):
         from ..registry import AGENT_REGISTRY
         AGENT_REGISTRY.get(robot_uid)
     controller = values.get('controller', {})
-    if not isinstance(controller, Mapping) or set(controller) - {'gravity_compensation'}:
-        raise ValueError('selected controller supports only gravity_compensation')
+    if not isinstance(controller, Mapping) or set(controller) - {'gravity_compensation', 'parameters'}:
+        raise ValueError('unsupported selected Controller fields')
+    parameters = controller.get('parameters', {})
+    if not isinstance(parameters, Mapping) or set(parameters) - set(getattr(environment_type, 'selected_controller_parameters', ())):
+        raise ValueError('unsupported selected Controller parameters')
+    controller_parameters_json = json.dumps(dict(parameters), sort_keys=True, separators=(',', ':'), allow_nan=False)
     gravity_compensation = controller.get('gravity_compensation', False)
     if type(gravity_compensation) is not bool:
         raise TypeError('controller.gravity_compensation must be a boolean')
@@ -394,8 +408,8 @@ def _resolve_selected_config(environment_type, config):
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
-                      "deployment", "interpreter", "native_dt", "reset_profile"},
-        "episode": {"horizon"},
+                      "deployment", "interpreter", "native_dt", "reset_profile", "source_workspace"},
+        "episode": {"horizon", "seed"},
         "task": ({"controller_profile"} if environment_type.selected_controller_profiles else set())
                 | set(environment_type.selected_parameter_limits),
     }
@@ -488,11 +502,19 @@ def _resolve_selected_config(environment_type, config):
             raise ValueError("Isaac PickCube requires R3 and an explicit source delivery manifest")
     elif manifest is not None:
         raise ValueError("source_delivery_manifest requires the supported Isaac route")
+    seed = sections['episode'].get('seed', base.episode.seed)
+    if seed is not None and (type(seed) is not int or seed < 0):
+        raise ValueError('episode.seed must be a nonnegative integer or None')
+    workspace = execution_defaults.get('source_workspace')
+    if workspace is not None:
+        if not isinstance(workspace, (str, Path)) or not str(workspace):
+            raise ValueError('execution.source_workspace must be a nonempty path')
+        workspace = str(Path(workspace).resolve())
     horizon = sections["episode"].get("horizon", base.episode.horizon)
     if type(horizon) is not int or not 1 <= horizon <= 6000:
         raise ValueError("selected reference horizon must be an integer in [1, 6000]")
     env = replace(base, runtime=replace(base.runtime, backend=backend),
-                  episode=replace(base.episode, horizon=horizon))
+                  episode=replace(base.episode, horizon=horizon, seed=seed))
     task_configuration_json = None
     if task_configuration is not None:
         # Keep physics/render defaults in their resolved execution owner.  The
@@ -520,6 +542,14 @@ def _resolve_selected_config(environment_type, config):
             raise ValueError("static_config: in-process deployment must use the current interpreter")
     if selection.native_dt is not None and selection.native_dt != env.runtime.physics_dt:
         raise ValueError("static_config: native dt differs from task timebase; no versioned mapping is implemented")
+    validate = getattr(environment_type, 'validate_selected_configuration', None)
+    if callable(validate):
+        validate(provider=provider, backend=backend, profile=profile, robot_uid=robot_uid,
+                 native_drive=native_drive, parameters=dict(parameters), workspace=workspace,
+                 gravity_compensation=gravity_compensation, reset_profile=reset_profile,
+                 source_delivery_manifest=manifest, execution_spec=selection, task_parameters=dict(params))
+    elif native_drive is not None or parameters or workspace is not None:
+        raise ValueError('task does not declare these Robot/Controller/source options')
     result = ResolvedSelectedConfig(
         environment=env,
         task_uid=environment_type.uid,
@@ -529,6 +559,8 @@ def _resolve_selected_config(environment_type, config):
         gravity_compensation=gravity_compensation,
         reset_profile=reset_profile,
         robot_uid=robot_uid,
+        native_drive=native_drive, controller_parameters_json=controller_parameters_json,
+        source_workspace=workspace,
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
@@ -542,12 +574,17 @@ def _resolve_selected_config(environment_type, config):
         raise ValueError("resolved selected configuration contains unsupported overrides")
     if supplied is not None and requested_json is not None:
         original = {"execution": json.loads(requested_json),
-                    "episode": {"horizon": result.environment.episode.horizon},
+                    "episode": {"horizon": result.environment.episode.horizon, "seed": result.environment.episode.seed},
                     "task": dict(result.task_parameters)}
         if result.robot_uid is not None:
             original["robot"] = {"uid": result.robot_uid}
+        original['controller'] = {'parameters': json.loads(result.controller_parameters_json)}
         if result.gravity_compensation:
-            original['controller'] = {'gravity_compensation': True}
+            original['controller']['gravity_compensation'] = True
+        if result.native_drive is not None:
+            original.setdefault('robot', {})['native_drive'] = result.native_drive
+        if result.source_workspace is not None:
+            original['execution']['source_workspace'] = result.source_workspace
         if result.controller_profile is not None:
             original["task"]["controller_profile"] = result.controller_profile
         reconstructed = _resolve_selected_config(environment_type, original)

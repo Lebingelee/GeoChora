@@ -42,4 +42,4 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## E00～E04 当前实施
 
-维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。首批 reset／close／mixed Solution 修复后，正式 Task caller 已进入共同构造 owner，四主体已暴露实际绑定的 Robot 视图，简单 TaskDefinition 使用既有 lifecycle。当前累计生产 Python 净减 126 行，项目文件数不变；124 个不同的定向纯合同节点通过。最新五个 MuJoCo CPU 交集通过，含装配 Panda 非零步与简单任务 RNG 序列；整个窗口累计 11 次 native run／150 子步（含一次检查器精度 oracle 失败，原记录保留）。E01～E04 仍实施中：高级 candidate 输入、execution 配置、Panda／Nut 语义接口及其余职责仍需对账。详细变化、度量、证据及限制统一见[执行安排第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收事件或启动 G06。
+维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。首批 reset／close／Solution 修复及四主体视图后，正式 PickCube 已能表达五种原有 MJCF 物理配置；旧 MJCF candidate UID 转向同一正式 factory，正常路径自动管理 source 快照。当前累计生产 Python 净增 28 行（前两批曾净减 126 行；本批补齐正式配置和共享校验后如实重算），项目文件数不变。本批 163 个不同的定向纯合同节点、八条最终 MuJoCo CPU 检查通过，包含 Controller 切换／故障恢复；整个窗口累计 22 次 native run／200 子步，含四次已保留的失败记录。E01～E04 仍实施中，Isaac／Position 高级输入、配置 codec、Panda／Nut 语义接口及其余职责尚未完成。详细变化、度量、复用和限制见[实施记录第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收或启动 G06。

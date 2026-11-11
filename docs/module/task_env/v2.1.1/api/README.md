@@ -18,6 +18,44 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 两个简单任务的 TaskDefinition 通过既有 TaskLifecycleAdapter 消费公开 Runtime 具名状态，Env 负责随机流、reset transaction 和资源生命周期；任务模块保留自己的采样范围、奖励、成功语义及状态投影。`build_runtime=False` 继续保留无 provider 构建的组件兼容合同，不代表 native batch。当前增量的真实复验为五条 MuJoCo CPU 短程路线及简单任务 RNG 序列，未新增 GeoPhys／Isaac、真实 RGB、完整 Solution 或任意跨组合的接收结论。
 
+### 正式 PickCube 的 MJCF 物理配置
+
+以下配置进入相同的正式 factory／Runtime owner；本批已在 MuJoCo 3.8.1 CPU 各完成非零 action、reset 重建和 close。它们仍限原 source／模型范围，未取得完整任务成功或任意 provider 组合的接收。physical profile 当前要求 `execution.deployment="in_process"`；GeoPhys 的具体交集仍由 adapter 判断，未在本批新增实测。
+
+| `controller.profile_id` | 输入与模型 | native drive 默认选择 |
+| --- | --- | --- |
+| `panda-direct-effort-v1` | 8 路直接输入：7 臂力矩与 paired tendon 力；零偏置不代表 Panda 动力学 | `position`，保留原 coexist 语义 |
+| `panda-joint-effort-reference-v1` | 7 关节参考与 paired opening，经过原 joint-reference servo 产生 effort | `disabled` |
+| `panda-r3-effort-reference-v1` | 原 R3 pose action 经过参考计算与 effort servo | `disabled` |
+| `panda-joint-mass-effort-v1` | 原受限 nominal mass model 的 joint reference | `disabled` |
+| `panda-r3-mass-effort-v1` | 原受限 nominal mass model 的 R3 pose reference | `disabled` |
+
+普通构造不再要求 source workspace 或内部 Artifact hash，例如：
+
+```python
+import numpy as np
+import sys
+from task_env import make_env
+
+env = make_env("pick-cube-p16-reference-v1", config={
+    "execution": {"physics_provider": "mujoco", "deployment": "in_process",
+                  "interpreter": sys.executable},
+    "controller": {"profile_id": "panda-direct-effort-v1"},
+    "episode": {"seed": 31, "horizon": 8},
+})
+try:
+    observation, info = env.reset()
+    result = env.step(np.asarray([.2, 0., 0., 0., 0., 0., 0., 0.], dtype=np.float32))
+finally:
+    env.close()
+```
+
+`robot.native_drive` 可显式选择 `position`／`disabled`，但 reference effort 仍要求隔离 drive，未支持的组合会拒绝。`controller.parameters={"reset_selection": True}` 仅适用于已有限定的 MuJoCo joint／R3 reference 路线，`action_space_policy` 保留 `dynamic`／`fixed_semantic`。这种路线沿用 `physical_action_spec()`／`bind_physical_action()` 的 generation 合同：切换通过 `reset(options={"controller": "r3-pose"})`；stale action 会拒绝并故障锁存，须显式 reset 后继续。未完成该 legacy 路线的 Robot convenience 视图迁移，使用其明确的 physical spec 查询当前 Controller。普通五 profile 的 subject／Controller 视图已验证；未新增完整 Solution 接收。
+
+相机可用世界 CameraSpec 声明，在编译后生成绑定几何；底层 advanced CameraGeometry 仍校验 Artifact。observer／task camera 身份必须不同，输出限原 HWC float32 RGB，renderer／physics pairing 和历史观察路线限制继续拒绝。本批只验证声明与生命周期合同，未新增真实 RGB 结论。
+
+旧 `pickcube-physical-candidate-v1` 仍接收原字段，但只翻译到上述正式配置，并返回 `PickCubeReferenceEnv`／正式 `env.uid`；不再保证返回旧 candidate 类。原显式 `source_workspace` 是高级兼容输入，其 `source-snapshot` 继续 caller-owned；普通构造自动管理并在 close／失败时释放自有快照。历史 construction_id／Artifact／source identity 不因入口迁移而被改名。Isaac candidate 与 Position advanced 输入尚待归并，详见[实施记录 6.2](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 
 公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `task.controller_profile="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。

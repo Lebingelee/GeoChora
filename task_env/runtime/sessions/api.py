@@ -1631,13 +1631,13 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
         elif value.get('physical_execution') is not None:
             from .physical_control import PhysicalControlExecutionV1
             physical = value['physical_execution']
-            mixed_position = (getattr(binding, 'position_physical_mixed', False) is True and selected.position
-                              and len(selected.position_capabilities) == 1
-                              and selection.physics_provider == 'mujoco'
-                              and selection.physics_backend == 'cpu')
+            position_owner = (selected.position and len(selected.position_capabilities) == 1
+                              and callable(binding.physical_observation_binding)
+                              and (selection.physics_provider, selection.physics_backend)
+                                  in {('mujoco', 'cpu'), ('geophys', 'cpu')})
             if (binding.physical_control_profile is None
                     or type(physical) is not PhysicalControlExecutionV1
-                    or (not mixed_position
+                    or (not position_owner
                         and not any(selected.controller is item for item in physical.controllers))):
                 raise ValueError('physical Controller is not bound to the selected execution')
             if selection.deployment == 'isolated_worker':
@@ -1647,10 +1647,10 @@ def assess_selected_request(*, selection, artifact, source, value, binding,
                 source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
                 source=source,
             )
-            if mixed_position:
+            if position_owner:
                 if any(selected.controller is item or selected.controller.identity == item.identity
                        for item in physical.controllers):
-                    raise ValueError('mixed Position and physical Controllers must have distinct identities')
+                    raise ValueError('Position and physical port Controllers must have distinct identities')
                 plan, _, _, _ = prepare_position_control_materialization(
                     source=source, artifact=artifact, profiles=selected.position_profiles,
                     leaf_position=False, plan=value.get('controller_binding_plan'),

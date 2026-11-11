@@ -2090,7 +2090,7 @@
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
     "current_step": "E00-E04",
-    "next_step": "E01 advanced candidate input/execution normalization and E02 TaskDefinition interface review",
+    "next_step": "Shared declared construction for Isaac/Position advanced inputs; canonical configuration and Panda/Nut TaskDefinition migration",
     "implementation_attempt_count": 1,
     "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
     "implementation_package_dispatched": false,
@@ -2104,20 +2104,26 @@
     "refs_reorganized_this_kickoff": false,
     "events": {
       "E00": "BASELINE_RECORDED",
-      "E01": "IMPLEMENTING_FORMAL_FACTORY_AND_CONTROLLER_SELECTOR_VERIFIED",
+      "E01": "IMPLEMENTING_FORMAL_PHYSICAL_PROFILES_AND_ONE_LEGACY_UID_MIGRATED",
       "E02": "IMPLEMENTING_FOUR_SUBJECT_VIEW_AND_SIMPLE_TASK_LIFECYCLE_VERIFIED",
-      "E03": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED",
-      "E04": "IMPLEMENTING_FIRST_SHARED_OWNER_FIXES_VERIFIED"
+      "E03": "IMPLEMENTING_OWNED_SOURCE_AND_EXPLICIT_CONSTRUCTION_VERIFIED",
+      "E04": "IMPLEMENTING_PORT_ASSESSMENT_AND_MODEL_CAPABILITY_VERIFIED"
     },
     "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
     "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
-    "event_native_cpu_runs": 11,
-    "event_native_substeps": 150,
+    "event_native_cpu_runs": 22,
+    "event_native_substeps": 200,
     "event_implementation_complete": false,
-    "event_native_cpu_failed_runs": 1,
-    "event_native_failure_reason": "Independent Pendulum oracle used float64 instead of declared float32; corrected oracle passed without production sampler changes.",
-    "latest_increment_input_head": "c4ce6df39e81bbd4b57b3611e8259f36cf9ab534",
-    "latest_increment_pure_unique_nodes": 124,
-    "latest_increment_evidence": "implementation-metrics-002.json; cpu-independent-readback-002.json"
+    "event_native_cpu_failed_runs": 4,
+    "event_native_failure_reason": "Four preserved failures across the window: sampler oracle precision, constructor/port assessment, nominal R3 model capability, stale-action probe recovery contract. Repairs and final passing evidence are in execution section 6.",
+    "latest_increment_input_head": "038eb10f16f77695f359e90507822a7636e9a8b6",
+    "latest_increment_pure_unique_nodes": 163,
+    "latest_increment_evidence": "implementation-metrics-003.json; cpu-independent-readback-003.json",
+    "event_native_failure_summaries": [
+      "cpu-002-pendulum: independent oracle float64 vs declared float32; production sampler unchanged",
+      "cpu-004-joint: assessment did not compose Position constructor owner with physical port; owner checks repaired",
+      "cpu-005-pose: R3 wrapper incorrectly exposed dynamic-model binding for nominal servo; capability forwarding repaired",
+      "cpu-006-reset-selection: probe continued after deliberate stale-action fault; explicit-reset oracle recovery corrected, production fault behavior unchanged"
+    ]
   }
 }

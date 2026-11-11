@@ -68,11 +68,13 @@ class R3ReferenceEffortControllerV1:
     def action_shape(self):
         return (8,)
 
-    def bind_model(self, model):
+    @property
+    def bind_model(self):
+        """Expose only the wrapped servo's actual source-model capability."""
         bind = getattr(self.servo, 'bind_model', None)
         if not callable(bind):
-            raise ValueError('this R3 effort servo does not accept a dynamic model')
-        bind(model)
+            raise AttributeError('this R3 effort servo does not accept a dynamic model')
+        return bind
 
     def reset_from_realized_state(self, state):
         """Initialize R3 memory at the actual newly published reset boundary."""

@@ -657,7 +657,22 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     binding = make_reference_binding()
 
     uses_selected_public_config = True
-    selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES)
+    from .physical_candidate import PICKCUBE_PHYSICAL_PROFILES
+    selected_controller_profiles = frozenset(PICKCUBE_CONTROLLER_PROFILES) | frozenset(PICKCUBE_PHYSICAL_PROFILES)
+    selected_controller_parameters = frozenset(('reset_selection', 'action_space_policy'))
+
+    @staticmethod
+    def validate_selected_configuration(**options):
+        from .physical_candidate import validate_physical_configuration
+        validate_physical_configuration(**options)
+
+    @classmethod
+    def selected_supports_observer(cls, config):
+        options = json.loads(config.controller_parameters_json)
+        kind = cls.PICKCUBE_PHYSICAL_PROFILES.get(config.controller_profile)
+        return ((config.physics_provider == 'mujoco' and options.get('reset_selection', False))
+                or (config.physics_provider == 'geophys' and kind == 'joint'
+                    and not options.get('reset_selection', False)))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25), "cube_force_z_N": (-30., 30.)}
     selected_supports_isaac = True
     selected_robot_uids = frozenset(("panda-v1", "panda-arm-hand-v1"))
@@ -689,6 +704,9 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @classmethod
     def selected_binding(cls, config):
         profile = config.controller_profile
+        if profile in cls.PICKCUBE_PHYSICAL_PROFILES:
+            from .physical_candidate import physical_binding_from_config
+            return physical_binding_from_config(config)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):
