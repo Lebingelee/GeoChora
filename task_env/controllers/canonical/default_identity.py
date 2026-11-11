@@ -1,4 +1,4 @@
-"""Subject-owned default for declared canonical joint-effort channels.
+"""Controller-owned default for declared canonical joint-effort channels.
 
 The unbound Controller cannot produce an action. Binding uses the existing
 source-bound physical owner; provider admission and coupled-transmission checks
@@ -23,8 +23,9 @@ class DefaultCanonicalController:
             raise TypeError('default Controller requires a declared controlled subject')
         # The existing owner checks source, writer, unit and ordered channels.
         # It does not promise that the provider admits a coupled transmission.
-        controller = subject.default_effort_controller(
-            binding, writer_id=writer_id, units=units, action_key=action_key)
+        from .physical_controller import bind_subject_direct_effort_controller
+        controller = bind_subject_direct_effort_controller(
+            subject, binding, writer_id=writer_id, units=units, action_key=action_key)
         self._controller = controller
         return self
 

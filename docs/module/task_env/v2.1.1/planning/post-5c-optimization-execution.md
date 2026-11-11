@@ -678,3 +678,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +75／−74，净增 1 行；其中 Panda 文件约 60 行为函数移动到类内及缩进，不是新增算法。版本诊断修改 1 文件 +32／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1366。版本检查直接确认正式 MJCF Scene 和 execution 收到同一个 Robot 对象。
 
 70 项版本检查通过。MuJoCo direct effort、joint→R3 reset 切换、H5 读回和 close 短程通过，共观测 15 个 native 子步；五种 Controller 的 MJCF／USD 真实 source 前后对照显示主体、绑定、Controller action schema、状态需求及 joint／frame 映射均未改变。Isaac 和 GeoPhys 本批没有重跑；上一批 Isaac 原生验证仅可作为输入相同的历史证据，不能代替本批原生复验。renderer 和完整 Solution 未受本批验证。冻结 diff、构造对照及 MuJoCo 结果位于 ignored `workspace/maintenance/v211_panda_instance_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.54 简单主体的 effort Controller 归控制 owner
+
+输入 `b587dca2`。Runtime 的 `ControlledSubjectV1` 只保留主体、source、通道、writer 和能力声明；直接力矩和速度阻尼 Controller 的构造与选择转到 Controller 模块。两种模式现在共用严格的主体 source、writer、单位和有序通道校验；速度阻尼此前未核对主体 source，本批补足。默认 Controller owner 也消费同一直接力矩构造，并保留它的已绑定身份。Panda 与简单主体仍有各自控制语义；本批没有宣称所有 Controller 的算法已合并。
+
+生产修改 3 文件 +81／−91，净减 10 行；其中约 75 行是把既有 Controller 选择算法移入控制模块并收敛重复校验。版本诊断修改 1 文件 +27／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1366。provider／renderer 的 native 适配、clock、提交及 source 构造未改。
+
+72 项版本检查通过，覆盖两个 profile 对异源主体的拒绝及默认直接 Controller 的身份。MuJoCo 的 Pendulum／双轮车各用 direct 与 velocity-damped 完成 reset、非零 step 和 close，合计观测 100 个 native 子步；direct 路线与既有同 seed 证据的 Robot／Controller、奖励及时间一致。GeoPhys Pendulum direct 短程通过，内部子步未观测、保守预留 50；尝试的 GeoPhys velocity-damped 在静态配置准入被拒绝，未启动物理，保持该能力限制。Isaac、renderer 和完整 Solution 本批未重跑。冻结 diff、补充说明和运行收据位于 ignored `workspace/maintenance/v211_subject_controller_owner_20261112_001/`。E01～E04 仍未接收。

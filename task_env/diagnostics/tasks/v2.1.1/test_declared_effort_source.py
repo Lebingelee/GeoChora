@@ -99,3 +99,30 @@ def test_two_wheel_state_requirements_include_passive_pitch():
         assert driven_joints < state_joints
     finally:
         env.close()
+
+
+@pytest.mark.parametrize('profile', ['direct_joint_effort_v1', 'velocity_damped_joint_effort_v1'])
+def test_effort_controller_rejects_foreign_subject_source(profile):
+    from dataclasses import replace
+    from task_env.controllers.canonical.default_identity import DefaultCanonicalController
+    from task_env.controllers.canonical.physical_controller import select_subject_effort_controller
+    from task_env.runtime.sessions.physical_control import compile_existing_subject_assembly
+
+    robot = PendulumEntity()
+    scene = robot.scene_definition()
+    _, artifact = pendulum_physical._declaration(scene, robot)
+    subject, declarations = robot.physical_subject_declaration(source_id='test-source',
+        source_closure_sha256='a' * 64)
+    compiled = compile_existing_subject_assembly(scene=scene, artifact_sha256=artifact.identity_hash,
+        source_id=subject.source_id, source_closure_sha256=subject.source_closure_sha256,
+        subject=subject, declarations=declarations, assembly_id=robot.assembly_id)
+    direct = select_subject_effort_controller(subject, compiled.binding,
+        profile_id='direct_joint_effort_v1', writer_id=subject.controller_writers[0],
+        units=('N*m',), cadence_s=.05)
+    default = DefaultCanonicalController().bind(subject, compiled.binding,
+        writer_id=subject.controller_writers[0], units=('N*m',))
+    assert default.is_bound and default.identity == direct.identity
+    foreign = replace(subject, source_closure_sha256='b' * 64)
+    with pytest.raises(ValueError, match='differs from subject source'):
+        select_subject_effort_controller(foreign, compiled.binding, profile_id=profile,
+            writer_id=subject.controller_writers[0], units=('N*m',), cadence_s=.05)

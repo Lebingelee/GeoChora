@@ -121,3 +121,5 @@ Panda 参考 effort 的普通、动态和质量矩阵 Controller 组合已归共
 USD 与 MJCF 的 Panda effort 现通过同一主体声明及 Runtime 构建；修复 USD 力矩 binding 被误认作 Position source 的错误。指定 Isaac CUDA／同步 RGB 路线及 MuJoCo 受影响短程已复验；首次失败及 SDK 清理异常保留。详见[实施记录 6.52](../planning/post-5c-optimization-execution.md#652-usd-panda-effort-使用共同主体构建)。
 
 Panda effort 的 Scene 声明与物理构造现由同一 Robot 实例承担；MuJoCo 受影响短程和 MJCF／USD source 构造对照通过。详见[实施记录 6.53](../planning/post-5c-optimization-execution.md#653-panda-effort-声明与构造共享-robot-实例)。
+
+简单主体的直接及阻尼 effort Controller 选择已归控制 owner，并共用 source／writer／单位检查；MuJoCo 两任务和 GeoPhys 已支持路线短程复验。详见[实施记录 6.54](../planning/post-5c-optimization-execution.md#654-简单主体的-effort-controller-归控制-owner)。

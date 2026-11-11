@@ -100,93 +100,6 @@ class ControlledSubjectV1:
             payload['supported_controller_profiles'] = self.supported_controller_profiles
         return digest(payload)
 
-    def default_effort_controller(self, binding, *, writer_id, units, action_key='torque'):
-        """Create a direct Controller for this subject's explicitly declared channels.
-
-        Channel order comes from the subject, and units must be specified by
-        the caller. The existing physical binding remains the authority for
-        ranges, transmissions and native admission.
-        """
-        from ...controllers.canonical.physical_controller import DirectJointEffortControllerV1
-
-        if type(binding) is not PhysicalControlBindingV1:
-            raise TypeError('default effort Controller requires a typed physical binding')
-        if (binding.source_id, binding.source_closure_sha256) != (
-                self.source_id, self.source_closure_sha256):
-            raise ValueError('default Controller binding differs from subject source')
-        if writer_id not in self.controller_writers:
-            raise ValueError('default Controller writer is not declared by subject')
-        if type(units) is not tuple or len(units) != len(self.channel_paths):
-            raise ValueError('default Controller requires one explicit unit per subject channel')
-        selected = []
-        for path, unit in zip(self.channel_paths, units, strict=True):
-            matches = tuple(channel for channel in binding.channels
-                            if channel.entity_id == self.entity_id and channel.component_path == path)
-            if len(matches) != 1:
-                raise ValueError('default Controller channel is missing or ambiguous')
-            channel = matches[0]
-            if writer_id not in channel.owner_ids or channel.unit != unit:
-                raise ValueError('default Controller channel writer or unit differs from declaration')
-            selected.append(f'{channel.entity_id}/{channel.joint_id}')
-        return DirectJointEffortControllerV1(binding, controller_id=writer_id,
-                                              channel_keys=tuple(selected), action_key=action_key)
-
-    def select_effort_controller(self, binding, *, profile_id, writer_id, units,
-                                 cadence_s, action_key='torque'):
-        """Select one subject-declared provider-neutral effort profile."""
-        if profile_id not in self.supported_controller_profiles:
-            raise ValueError('selected Controller profile is not declared by the subject')
-        if profile_id == 'direct_joint_effort_v1':
-            controller = self.default_effort_controller(
-                binding, writer_id=writer_id, units=units, action_key=action_key)
-            controller.profile_id = profile_id
-            return controller
-        if profile_id != 'velocity_damped_joint_effort_v1':
-            raise ValueError('subject does not implement the selected Controller profile')
-        if type(binding) is not PhysicalControlBindingV1:
-            raise TypeError('velocity-damped effort requires a typed physical binding')
-        from ...controllers.canonical.model import (
-            AffineJointBiasModelV1, ControllerModelRequirementV1,
-        )
-        from ...controllers.canonical.physical_controller import (
-            LinearEffortControllerV1, LinearEffortProfileV1,
-        )
-        channels = []
-        for path, unit in zip(self.channel_paths, units, strict=True):
-            matches = tuple(channel for channel in binding.channels
-                            if channel.entity_id == self.entity_id and channel.component_path == path)
-            if len(matches) != 1 or matches[0].unit != unit or writer_id not in matches[0].owner_ids:
-                raise ValueError('selected linear Controller channels differ from subject declaration')
-            channels.append(matches[0])
-        keys = tuple(f'{channel.entity_id}/{channel.joint_id}' for channel in channels)
-        if any(channel.kind != 'revolute' or channel.unit != 'N*m' for channel in channels):
-            raise ValueError('velocity-damped effort currently requires revolute torque channels')
-        if not math.isfinite(float(cadence_s)) or float(cadence_s) <= 0:
-            raise ValueError('velocity-damped effort requires a positive finite cadence')
-        damping = 0.25
-        requirement = ControllerModelRequirementV1(
-            'controller-model-requirement-v1',
-            f'{self.subject_id}-velocity-damped-effort-v1',
-            'geochora', 'v1', 'stdlib', binding.source_id,
-            binding.source_closure_sha256, keys, ('rad',) * len(keys),
-            'joint_bias', ('N*m',) * len(keys), 'joint-axis',
-            'evaluation_boundary', float(cadence_s), 0.0,
-            'pure_no_physics_step', writer_id, 'none', 'required')
-        profile = LinearEffortProfileV1(
-            'linear-effort-profile-v1', writer_id,
-            tuple(f'effort-{index}' for index in range(len(keys))), keys,
-            tuple(tuple(1.0 if row == column else 0.0
-                        for column in range(len(keys))) for row in range(len(keys))),
-            requirement, action_key=action_key,
-            action_low=tuple(channel.effort_range[0] for channel in channels),
-            action_high=tuple(channel.effort_range[1] for channel in channels),
-            selection_profile_id=profile_id)
-        model = AffineJointBiasModelV1(
-            'affine-joint-bias-model-v1', requirement,
-            (0.0,) * len(keys), (0.0,) * len(keys), (-damping,) * len(keys))
-        controller = LinearEffortControllerV1(profile, binding, model)
-        controller.profile_id = profile_id
-        return controller
 
 
 @dataclass(frozen=True)
@@ -268,7 +181,8 @@ def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id)
 
     def make_controller(binding, writer):
         units = tuple(channel.unit for channel in binding.channels)
-        return subject.select_effort_controller(binding, profile_id=profile_id,
+        from ...controllers.canonical.physical_controller import select_subject_effort_controller
+        return select_subject_effort_controller(subject, binding, profile_id=profile_id,
             writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)
 
     return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,

@@ -341,3 +341,78 @@ class DirectJointEffortControllerV1:
         result = PhysicalCommandBatchV1('physical-command-batch-v1', context, tuple(efforts), (), ())
         self.last_action = values.copy()
         return result
+
+
+def _subject_effort_channels(subject, binding, *, writer_id, units):
+    """Resolve exactly the subject's source-bound ordered writable channels."""
+    from ...runtime.sessions.physical_control import ControlledSubjectV1
+
+    if type(subject) is not ControlledSubjectV1 or type(binding) is not PhysicalControlBindingV1:
+        raise TypeError('effort Controller requires a typed subject and physical binding')
+    if (binding.source_id, binding.source_closure_sha256) != (subject.source_id, subject.source_closure_sha256):
+        raise ValueError('Controller binding differs from subject source')
+    if writer_id not in subject.controller_writers:
+        raise ValueError('Controller writer is not declared by subject')
+    if type(units) is not tuple or len(units) != len(subject.channel_paths):
+        raise ValueError('Controller requires one explicit unit per subject channel')
+    channels = []
+    for path, unit in zip(subject.channel_paths, units, strict=True):
+        matches = tuple(channel for channel in binding.channels
+                        if channel.entity_id == subject.entity_id and channel.component_path == path)
+        if len(matches) != 1:
+            raise ValueError('Controller channel is missing or ambiguous')
+        channel = matches[0]
+        if writer_id not in channel.owner_ids or channel.unit != unit:
+            raise ValueError('Controller channel writer or unit differs from declaration')
+        channels.append(channel)
+    return tuple(channels)
+
+
+def bind_subject_direct_effort_controller(subject, binding, *, writer_id, units, action_key='torque'):
+    """Bind the default direct effort Controller to a subject's declared channels."""
+    channels = _subject_effort_channels(subject, binding, writer_id=writer_id, units=units)
+    keys = tuple(f'{channel.entity_id}/{channel.joint_id}' for channel in channels)
+    return DirectJointEffortControllerV1(binding, controller_id=writer_id,
+                                          channel_keys=keys, action_key=action_key)
+
+
+def select_subject_effort_controller(subject, binding, *, profile_id, writer_id, units,
+                                     cadence_s, action_key='torque'):
+    """Construct the selected source-bound effort Controller for a declared subject."""
+    from ...runtime.sessions.physical_control import ControlledSubjectV1
+    from .model import AffineJointBiasModelV1
+
+    if type(subject) is not ControlledSubjectV1:
+        raise TypeError('effort Controller selection requires a typed subject')
+    if profile_id not in subject.supported_controller_profiles:
+        raise ValueError('selected Controller profile is not declared by the subject')
+    if profile_id == 'direct_joint_effort_v1':
+        controller = bind_subject_direct_effort_controller(
+            subject, binding, writer_id=writer_id, units=units, action_key=action_key)
+        controller.profile_id = profile_id
+        return controller
+    if profile_id != 'velocity_damped_joint_effort_v1':
+        raise ValueError('subject does not implement the selected Controller profile')
+    channels = _subject_effort_channels(subject, binding, writer_id=writer_id, units=units)
+    keys = tuple(f'{channel.entity_id}/{channel.joint_id}' for channel in channels)
+    if any(channel.kind != 'revolute' or channel.unit != 'N*m' for channel in channels):
+        raise ValueError('velocity-damped effort currently requires revolute torque channels')
+    if not math.isfinite(float(cadence_s)) or float(cadence_s) <= 0:
+        raise ValueError('velocity-damped effort requires a positive finite cadence')
+    requirement = ControllerModelRequirementV1(
+        'controller-model-requirement-v1', f'{subject.subject_id}-velocity-damped-effort-v1',
+        'geochora', 'v1', 'stdlib', binding.source_id, binding.source_closure_sha256,
+        keys, ('rad',) * len(keys), 'joint_bias', ('N*m',) * len(keys), 'joint-axis',
+        'evaluation_boundary', float(cadence_s), 0.0, 'pure_no_physics_step', writer_id, 'none', 'required')
+    profile = LinearEffortProfileV1(
+        'linear-effort-profile-v1', writer_id, tuple(f'effort-{i}' for i in range(len(keys))), keys,
+        tuple(tuple(1.0 if row == column else 0.0 for column in range(len(keys)))
+              for row in range(len(keys))), requirement, action_key=action_key,
+        action_low=tuple(channel.effort_range[0] for channel in channels),
+        action_high=tuple(channel.effort_range[1] for channel in channels),
+        selection_profile_id=profile_id)
+    model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement,
+        (0.0,) * len(keys), (0.0,) * len(keys), (-0.25,) * len(keys))
+    controller = LinearEffortControllerV1(profile, binding, model)
+    controller.profile_id = profile_id
+    return controller
