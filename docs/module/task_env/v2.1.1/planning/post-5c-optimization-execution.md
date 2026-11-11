@@ -364,3 +364,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 输入 `7143c476`。PickCube 在已有 reset profile 的任务 binding 中声明 `prepare_reset_switch`；共同 Env 依据此能力调用原 `prepare_switch_reset`，不再用 PickCube profile 字符串选择 reset 路径。该策略仍自行验证精确 profile、受限 provider 边和 seed；预检、固定 renderer 检查、候选 source 失败清理及 commit／fault 顺序保持。两类包含 PickCube 特定 schema／seed algorithm 的 receipt 构造归到现有 `reset_switch` owner，字段与值保持；不把不同 Task 的 reset 算法强行统一。
 
 本批生产 4 个文件 +45／−22，净增 23 行；测试 1 个文件 +3；无文件新增、删除或整文件迁移。receipt 字段经过缩进／接口重写归位，不作为生产净删除。17 个双锁下的 profile、RNG、source 清理和失败阶段合同通过；真实 MuJoCo CPU 正式 reset-switch 配置完成 reset→非零 step→第二次 reset→close，观测 5 个子步，公开 reset／execution receipt 的 seed 31、代次 1→2 和 topology generation 保留。目标 provider 边的纯准备检查通过，但本批没有跨 provider native 重跑。累计监督 49 次，325 个可观测子步、7 个 worker 的内部子步未知；含原保守计费为 975／2,000。证据为 `reset-capability-013-pure.log`、`cpu-run-plan-026.json`、`cpu-source-026.diff` 与 `cpu-026-reset-switch/result.json`；E03 仍须完成其他 profile／故障组合的影响对账。
+
+### 6.15 位置无关的受限 Panda source 身份
+
+输入 `5394232c`。旧任务代码为了验证同一 Panda source，将某个历史 checkout 的绝对 asset 路径写死并还原后比较旧 hash。现在 source receipt owner 的 `matches_relocated_source_closure` 先验证实际 receipt／snapshot，再仅把 canonical XML 中唯一声明的 asset 根替换为固定标记，对包括全部资产在内的 closure 与固定摘要比较；不改实际 source、snapshot、receipt 或公开 identity。新固定摘要 `cbb7c0a3…` 是在原历史摘要检查通过后，对该同一 69 文件 closure 做上述投影得到，并保留原始推导记录 `panda-normalized-014-final.log`。Task 仅持有其受限 source 的固定规范化摘要，不再包含旧 checkout 绝对路径。资产变化、foreign receipt、缺失／重复根路径继续拒绝；这不是允许任意 Panda 模型。
+
+本批生产 2 个文件 +31／−29，净增 2 行；其中 Task 文件 +10／−29、净减 19 行，source owner 新增 21 行；测试文件变更另计 +14／−13。旧验证逻辑按 source owner 重写，不能按整文件删除或原样迁移领取成效；项目文件无新增、删除、迁移。8 个双锁构造／篡改／失败清理合同通过；正式与旧 UID 的真实 MuJoCo CPU direct 各完成 reset→非零 step→第二次 reset→close，各观测 5 子步。与修改前各自短程记录对照，Artifact、source ID／closure、Controller identity 及 source copy 所有权相同；显式旧 caller 目录仍归 caller，普通自有快照关闭后释放。`panda-normalized-014-pure.log`、`panda-normalized-014-comparison.json`、`cpu-run-plan-027.json`、`cpu-source-027.diff` 和 `cpu-027-*` 留存；同一原始测量的读回不是第二次物理运行。
+
+累计监督 51 次，335 个可观测子步；7 次 worker 内部子步未知，按预留与历史无锁偏差累计计费 985／2,000。这里只覆盖受测原 source 和 direct 交集；不将规范化摘要用作其他资产的资格或改写历史原始 hash。

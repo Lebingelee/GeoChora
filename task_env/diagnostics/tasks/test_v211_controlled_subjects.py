@@ -687,31 +687,32 @@ def test_flat_and_nested_use_same_physical_resolver_and_subject_admission():
         validate_controlled_subjects(no_owner, (subject,), (controller,))
 
 
-def test_legacy_closure_relocation_preserves_receipt_and_rejects_other_changes(monkeypatch, tmp_path):
+def test_legacy_closure_relocation_preserves_receipt_and_rejects_other_changes(tmp_path):
     import task_env.assembly.assets as assets
-    import task_env.utils._paths as paths
-    from task_env.tasks.pick_cube.physical_candidate import _accept_original_panda_closure
+    from task_env.runtime.sessions.source import matches_relocated_source_closure
     root = tmp_path / 'menagerie'
-    monkeypatch.setattr(paths, 'MUJOCO_MENAGERIE_ROOT', root)
-    current = str((root / 'franka_emika_panda' / 'assets').resolve()).encode()
-    old = b'/home/lly/.codex/worktrees/v210-integration/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets'
+    asset_root = root / 'franka_emika_panda' / 'assets'
+    current = str(asset_root.resolve()).encode()
     original = {'canonical-source.xml': b'<compiler meshdir="' + current + b'"/>', 'assets/mesh.stl': b'original'}
-    expected_bytes = {'canonical-source.xml': b'<compiler meshdir="' + old + b'"/>', 'assets/mesh.stl': b'original'}
-    expected = '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d'
-    monkeypatch.setattr(assets, '_source_closure_digest', lambda values: expected if values == expected_bytes else 'different')
+    expected_bytes = {'canonical-source.xml': b'<compiler meshdir="${GEOCHORA_SOURCE_ASSET_ROOT}"/>',
+                      'assets/mesh.stl': b'original'}
+    expected = assets._source_closure_digest(expected_bytes)
     class Receipt:
         source_closure_digest = 'actual'
         closure_files = original
         def validate_snapshot(self):
             self.checked = True
     receipt = Receipt()
-    assert _accept_original_panda_closure(receipt, 'actual')
+    def matches(digest):
+        return matches_relocated_source_closure(receipt, digest, asset_root=asset_root,
+                                                normalized_digest=expected)
+    assert matches('actual')
     assert receipt.checked and receipt.closure_files == original
-    assert not _accept_original_panda_closure(receipt, 'foreign')
+    assert not matches('foreign')
     receipt.closure_files = dict(original, **{'assets/mesh.stl': b'modified'})
-    assert not _accept_original_panda_closure(receipt, 'actual')
+    assert not matches('actual')
     receipt.closure_files = dict(original, **{'canonical-source.xml': original['canonical-source.xml'] + current})
-    assert not _accept_original_panda_closure(receipt, 'actual')
+    assert not matches('actual')
 
 
 def test_third_subject_can_bind_and_submit_without_public_task_dispatch():

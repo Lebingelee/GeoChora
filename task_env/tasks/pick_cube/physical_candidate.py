@@ -17,6 +17,10 @@ PICKCUBE_PHYSICAL_PROFILES = {
     'panda-r3-mass-effort-v1': 'r3-mass-pose',
 }
 
+# This normalized closure was derived only after the original pinned receipt
+# and all of its referenced assets passed the historical source verification.
+_PANDA_NORMALIZED_CLOSURE_SHA256 = 'cbb7c0a3a68a5e08161651933aef262d340659c04fefc5825f3b8a4ff319e23f'
+
 
 def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
                                     parameters, workspace, gravity_compensation, reset_profile,
@@ -79,34 +83,6 @@ def physical_binding_from_config(config):
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
         cube_force_z_N=force)
-
-
-def _accept_original_panda_closure(receipt, actual_digest):
-    """Verify the exact historical input, allowing only checkout relocation.
-
-    The legacy receipt hashes the absolute asset directory inside canonical
-    XML. Keep that receipt and its actual hash intact; compare a temporary
-    relocation projection against the old identity, including every asset.
-    """
-    from ...assembly.assets import _source_closure_digest
-    from ...utils._paths import MUJOCO_MENAGERIE_ROOT
-
-    expected = '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d'
-    if receipt is None or actual_digest != receipt.source_closure_digest:
-        return False
-    receipt.validate_snapshot()
-    if actual_digest == expected:
-        return True
-    files = dict(receipt.closure_files)
-    canonical = files.get('canonical-source.xml')
-    if not isinstance(canonical, bytes):
-        return False
-    current = str((MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets').resolve()).encode()
-    old = b'/home/lly/.codex/worktrees/v210-integration/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets'
-    if canonical.count(current) != 1:
-        return False
-    files['canonical-source.xml'] = canonical.replace(current, old, 1)
-    return _source_closure_digest(files) == expected
 
 
 def _physical_pickcube_observation(env, state):
@@ -283,7 +259,12 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
     receipt = original.execution_source_receipt
     with ExitStack() as resources:
         resources.callback(receipt.close)
-        if not _accept_original_panda_closure(receipt, original.source_closure_digest):
+        from ...runtime.sessions.source import matches_relocated_source_closure
+        from ...utils._paths import MUJOCO_MENAGERIE_ROOT
+        if not matches_relocated_source_closure(
+                receipt, original.source_closure_digest,
+                asset_root=MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets',
+                normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
         scene = _pickcube_mjcf_scene(task_config)
         task_source = adapt_legacy_recipe_task_source({'recipe': task_config['recipe'], 'environment': task_config['environment']})
