@@ -156,31 +156,16 @@ def _direct_physical_observation(env, state):
 
 
 def _pickcube_mjcf_scene(task_config):
-    """Bind the authored MJCF names to the existing PickCube/Panda Scene owner."""
-    from ...artifacts import SceneDefinition
+    """Compose the Task scene using the declared MJCF Robot and frame names."""
     from ...registry import AGENT_REGISTRY
-    from ...runtime.sessions.mujoco_composition import declare_panda_scene
-    from .specialization import build_pickcube_isaac_scene
-    scene = build_pickcube_isaac_scene(task_config)
-    mapping = scene.to_mapping()
+    from ...runtime.sessions.source_scene_import import declare_panda_scene
+    from .specialization import build_pickcube_scene
+
     panda = declare_panda_scene(AGENT_REGISTRY.create('panda-v1'),
-                                entity_id='panda-v1', scene_id=scene.scene_id)
-    mapping['assets'] = [panda.assets[0].to_mapping()
-        if asset['asset_id'] == 'f05-dg03-menagerie-panda-source-preserving-isaac-usd' else asset
-        for asset in mapping['assets']]
-    for entity in mapping['entities']:
-        if entity['entity_id'] == 'panda-v1':
-            entity['asset_id'], entity['asset_version'] = panda.entities[0].asset_id, panda.entities[0].asset_version
-    for frame in mapping['frames']:
-        key = (frame['entity_id'], frame['frame_id'])
-        frame['frame_id'] = {('cube-v1', 'cube'): 'PickCube', ('tabletop-v1', 'top'): 'grasp_table',
-                             ('panda-v1', 'ee'): 'nutassembly_ee_site'}.get(key, frame['frame_id'])
-    for articulation in mapping['articulations']:
-        if articulation['entity_id'] == 'cube-v1':
-            articulation['link_frame_ids'] = ['world', 'PickCube']
-            joint = articulation['joints'][0]
-            joint['joint_id'], joint['child_frame']['frame_id'] = 'PickCube_joint', 'PickCube'
-    return SceneDefinition.from_mapping(mapping)
+        entity_id='panda-v1', scene_id=str(task_config['recipe']['scene_uid']))
+    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
+        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
+        cube_joint='PickCube_joint', table_frame='grasp_table')
 
 
 def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, control_kind,

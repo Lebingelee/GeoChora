@@ -756,11 +756,15 @@ def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
         source_content_sha256=source_asset.source_content_sha256,
         license_id="bsd-3-clause",
     )
-    panda_entity = replace(
-        panda_scene.entities[0],
-        asset_id=panda_asset.asset_id,
-        asset_version=panda_asset.asset_version,
-    )
+    return build_pickcube_scene(task_config, robot_scene=panda_scene, robot_asset=panda_asset,
+        ee_frame='ee', cube_frame='cube', cube_joint='cube_freejoint', table_frame='top')
+
+
+def build_pickcube_scene(task_config, *, robot_scene, robot_asset, ee_frame, cube_frame, cube_joint, table_frame):
+    """Compose Task entities with an already declared Robot and source frame names."""
+    scene_id = robot_scene.scene_id
+    robot_entity = replace(robot_scene.entities[0], asset_id=robot_asset.asset_id,
+                           asset_version=robot_asset.asset_version)
     recipe_digest = hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
     cube_asset = AssetDefinition(
         "asset-definition-v1", "pick-cube-cube-v1", "pick-cube-recipe-v1",
@@ -782,12 +786,12 @@ def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
         "articulation-definition-v1",
         "cube-v1",
         "world",
-        ("world", "cube"),
+        ("world", cube_frame),
         (JointDefinition(
             "joint-definition-v1",
-            "cube_freejoint",
+            cube_joint,
             FrameReference("cube-v1", "world"),
-            FrameReference("cube-v1", "cube"),
+            FrameReference("cube-v1", cube_frame),
             identity_pose,
             identity_pose,
             "floating",
@@ -801,19 +805,19 @@ def build_pickcube_isaac_scene(task_config: dict) -> SceneDefinition:
     return SceneDefinition(
         schema_version="scene-definition-v3",
         scene_id=scene_id,
-        assets=(panda_asset, cube_asset, tabletop_asset),
-        entities=(panda_entity, cube, tabletop),
+        assets=(robot_asset, cube_asset, tabletop_asset),
+        entities=(robot_entity, cube, tabletop),
         frames=(
-            *panda_scene.frames,
-            FrameDefinition("frame-definition-v1", "panda-v1", "ee", "runtime", None, None),
+            *robot_scene.frames,
+            FrameDefinition("frame-definition-v1", robot_entity.entity_id, ee_frame, "runtime", None, None),
             FrameDefinition("frame-definition-v1", "cube-v1", "world", "runtime", None, None),
-            FrameDefinition("frame-definition-v1", "cube-v1", "cube", "runtime", None, None),
-            FrameDefinition("frame-definition-v1", "tabletop-v1", "top", "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "cube-v1", cube_frame, "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "tabletop-v1", table_frame, "runtime", None, None),
         ),
-        articulations=(*panda_scene.articulations, cube_articulation),
-        robots=panda_scene.robots,
-        actuator_resources=panda_scene.actuator_resources,
-        control_groups=panda_scene.control_groups,
+        articulations=(*robot_scene.articulations, cube_articulation),
+        robots=robot_scene.robots,
+        actuator_resources=robot_scene.actuator_resources,
+        control_groups=robot_scene.control_groups,
     )
 
 

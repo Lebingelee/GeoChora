@@ -81,3 +81,5 @@ Env 中无正式调用者的 Position／leaf Position 候选构造入口及其�
 PickCube reset-scoped 物理选择现在在 reset 前暴露已编译 Robot subjects、无已提交 Controller；reset 后 Robot 指向实际提交的 physical Controller，错误切换保持原视图，有效切换后的 Controller 已实际推进。该路线的 `env.controller` 仍承担原 Position 兼容职责，完整统一仍待 E02／E04；详见[实施记录 6.32](../planning/post-5c-optimization-execution.md#632-reset-scoped-物理选择的-robot-声明与提交)。
 
 两个 PickCube 物理诊断 UID 和旧输入翻译已退休，正式 PickCube 的物理 binding 保留；MuJoCo CPU 受影响短程通过，Isaac 仅检查 binding 工厂可导入。物理实现仍有任务内 candidate 职责，后续需继续归位。详见[实施记录 6.33](../planning/post-5c-optimization-execution.md#633-退休-pickcube-物理诊断-uid)。
+
+PickCube MJCF 场景现直接将 Robot 声明与任务实体组合，不再先构造并改写 Isaac 场景；两路线的场景 mapping／identity 保持一致，受影响 MuJoCo CPU 物理短程通过。Isaac 仅做声明对照，完整 source 和控制归属仍待整理。详见[实施记录 6.34](../planning/post-5c-optimization-execution.md#634-pickcube-任务场景直接组合-robot-声明)。

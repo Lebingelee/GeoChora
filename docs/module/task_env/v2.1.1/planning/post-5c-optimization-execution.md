@@ -518,3 +518,11 @@ MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller�
 输入 `43892ba1`。移除 `pickcube-physical-candidate-v1` 和 `pickcube-isaac-physical-candidate-v1` 的注册、导出及各自旧输入翻译器；不再为旧 `source_workspace`、`drive_mode`、`control_kind` 等诊断配置维护两套构造入口。正式 `pick-cube-p16-reference-v1` 继续使用实际物理 binding、source 和 Controller 能力；实现文件目前仍含候选命名及任务内 source／profile 职责，不能称为已完成 E09 或四主体完整统一。
 
 生产修改 3 文件 +1／−85，净减 84 行；版本诊断 1 文件 +7，实施和当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。31 项版本纯合同通过，确认旧 UID 不再注册；MuJoCo CPU 正式 PickCube 的 Position、direct effort 和 reset-scoped joint／r3 切换路线通过短程，合计 20 个观测子步；后者包括 H5 v3 单 interval 写入读回与切换后实际推进。正式 Isaac 物理 binding 工厂仅做纯导入检查，未启动 Isaac；本批未改 provider／renderer、clock 或提交，不外推其他 provider 或完整 Solution。计划和结果在 ignored `workspace/maintenance/v211_retire_pickcube_uid_20261112_001/`。`env.controller` 与实际 reset-scoped physical Controller 的职责仍待继续收敛，E01～E04 未完成。
+
+### 6.34 PickCube 任务场景直接组合 Robot 声明
+
+输入 `c98f35c5`。PickCube MJCF 物理路径不再先构造 Isaac 专用场景、再通过映射和硬编码资产 ID 替换 Robot 与 frame；共同任务场景组合接收已声明的 Robot 场景、资产及 source frame／joint 名称，直接形成任务物体和主体组合。Isaac 路线继续传入原有特定 USD 资产声明，MJCF 路线传入自己的 Robot 声明。公共组合函数不选择 provider 或固定 Robot UID；具体 source 名称仍由调用方给出，完整 source lowering 和 adapter 整理属于后续工作。
+
+生产修改 2 文件 +30／−41，净减 11 行；无文件新增、删除或迁移，tracked 文件数不变；版本诊断未改，实施和当前状态文档 2 文件修改。共享任务实体组装被重写复用，迁移行不作为删除成果；provider／renderer、clock 和控制提交代码未改。
+
+实际解析的 MJCF 与 Isaac 两种 Scene，新旧完整 mapping 和 identity 均一致；此项没有启动物理 SDK，但读取并解析了 Panda 源资产。MuJoCo CPU 的 direct effort 和 reset-scoped joint／r3 切换各完成真实短程，后者包含 H5 v3 单 interval 记录读回及切换后的实际推进；首版和仅调整共享函数 Robot 参数命名后的最终版各 15 子步，合计 30 个可观测子步。31 项版本纯合同在最终代码通过。Isaac 只核对 Scene 声明，未重跑其物理或 renderer，也不声称 source／adapter 全面统一。计划、diff、场景对照和结果在 ignored `workspace/maintenance/v211_pickcube_scene_20261112_001/`；E01～E04 仍未完成。
