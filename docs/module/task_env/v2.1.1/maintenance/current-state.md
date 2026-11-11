@@ -95,3 +95,5 @@ Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、A
 可切换 physical Controller 现在由 `env.controller` 和 `env.robot.controller` 同时公开实际已提交对象，首次 reset 前为 `None`；Position 的状态投影与记录继续使用内部对象。MuJoCo 四任务、装配 Panda 及切换后实际推进已按影响复验；完整统一仍未完成。详见[实施记录 6.39](../planning/post-5c-optimization-execution.md#639-公开-controller-与实际提交者对齐)。
 
 正式配置已退休历史 `execution.source_workspace`，物理 source 快照由内部 owner 管理并在 close 后释放；MuJoCo 受影响路线和记录短程已复验。详见[实施记录 6.40](../planning/post-5c-optimization-execution.md#640-退休诊断-source_workspace-输入)。
+
+固定 physical execution 与 Position 投影并存时，Env／Robot 也公开实际 physical Controller，避免同一动作有两个对外身份；验证及范围见[实施记录 6.41](../planning/post-5c-optimization-execution.md#641-固定-physical-controller-的公开归属)。

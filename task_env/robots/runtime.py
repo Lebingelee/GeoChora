@@ -100,6 +100,8 @@ class RobotRuntime:
             physical = (physical_selection.declaration if committed is None else committed.execution)
             controller = None if committed is None else committed.execution.controllers[0]
         if physical is not None:
+            if physical_selection is None:
+                controller = physical.controllers[0]
             subjects = physical.subjects
             controllers = (() if physical_selection is not None and physical_selection.committed is None
                            else physical.controllers)

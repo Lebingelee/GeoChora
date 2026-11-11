@@ -574,3 +574,9 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 5 文件 +11／−42，净减 31 行；版本诊断修改 2 文件 +18／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1364；删除的复制分支不涉及整文件搬迁。移除一项正式配置特殊输入和一个 source adapter 分支，未改变 Runtime 物理推进、时钟、renderer 或通用构造协议。
 
 41 项版本纯合同通过，四个正式任务均拒绝旧字段。MuJoCo CPU 的 PickCube reset-scoped joint／r3 切换及 H5 记录读回、direct effort、普通 Position、Nut Solution 单 interval 均通过，共观测 25 物理子步；物理 source 在构造后存在、关闭后移除，重复关闭成功。GeoPhys、Isaac、renderer 和完整 Solution 本批未重跑，已有证据按具体影响保留；计划、冻结 diff 及结果在 ignored `workspace/maintenance/v211_retire_source_workspace_20261112_001/`。E01～E04 仍未接收。
+
+### 6.41 固定 physical Controller 的公开归属
+
+输入 `cc2526df`。上批对齐的是 reset-scoped 物理选择；再次审计发现固定物理 Controller 与 Position 投影并存时也会产生同样的公开身份偏差。现在 RobotRuntime 和 `env.controller` 对任何已声明 physical execution 均公开该 execution 的实际 Controller，Position 只保留内部状态投影角色；Position 单独控制路径仍公开原 Controller。此项修正已有实际 owner 的投影，不更换执行、clock 或控制提交机制。
+
+生产修改 2 文件 +5／−0；版本诊断修改 1 文件 +8／−2；实施和当前状态文档 2 文件修改。无文件新增、删除或整文件迁移，tracked 文件数保持 1364。41 项版本纯合同通过；MuJoCo CPU 的固定 joint effort、可切换 joint／r3（含 H5 记录读回）、direct effort、Pendulum、双轮车完成真实短程，断言 Env、Robot 和实际 physical execution 的 Controller 对象一致，累计观测 70 子步。普通 Position、Nut 和装配 Panda 本批未改其 Controller 语义，使用本轮 6.39／6.40 对应受测证据；GeoPhys、Isaac、renderer 和完整 Solution 本批未重跑。计划及冻结 diff 位于 ignored `workspace/maintenance/v211_fixed_physical_owner_20261112_001/`。E01～E04 仍未接收。

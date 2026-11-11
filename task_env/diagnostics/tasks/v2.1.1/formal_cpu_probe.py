@@ -59,6 +59,10 @@ try:
         result['robot_before_reset']='declared_without_committed_controller'
     else:
         assert robot.controller is env.controller
+    physical_execution = env.value.get('physical_execution')
+    if physical_execution is not None:
+        assert env.controller is robot.controller is physical_execution.controllers[0]
+        assert robot.controllers == physical_execution.controllers
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
     if args.case in {'nut','panda-r3','assembled-live'}:
         assert subject_binding is not None and robot.subjects == subject_binding.subjects
@@ -139,8 +143,10 @@ try:
         assert reset['episode_id']!=first['episode_id']
         result['second_reset']=reset
         assert env.robot is not robot
-        if args.case!='panda-joint' or not args.record:
-            assert env.robot.controller is env.controller
+        assert env.robot.controller is env.controller
+        physical_execution = env.value.get('physical_execution')
+        if physical_execution is not None:
+            assert env.controller is physical_execution.controllers[0]
         result['robot_rebound_after_reset']=True
         if args.case in {'pendulum','two-wheel'}:
             assert info['reset_parameters']==first_reset_parameters

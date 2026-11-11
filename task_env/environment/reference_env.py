@@ -95,6 +95,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if selection is not None:
             committed = selection.committed
             return None if committed is None else committed.execution.controllers[0]
+        physical = getattr(self, 'value', {}).get('physical_execution')
+        if physical is not None:
+            return physical.controllers[0]
         return getattr(self, '_selected_controller', None)
 
     @property
