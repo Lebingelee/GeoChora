@@ -12,21 +12,10 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
     def with_physical(value):
         physical = build_f06_direct_effort_execution(value['source'].scene_definition,
                                                       value['artifact'], value['source'])
-        if control_kind != 'direct':
-            from ...controllers.canonical.r3_effort import build_panda_effort_profile
-            r3_profile = velocity_limit = mass_model = None
-            if control_kind in {'r3-pose', 'r3-mass-pose'}:
-                from .specialization import _r3_dynamic_profile, PICKCUBE_R3_CONTINUOUS_PROFILE_V1
-                r3_profile, _ = _r3_dynamic_profile()
-                velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
-            if control_kind in {'joint-mass', 'r3-mass-pose'}:
-                from .physical_mass_profile import load_pickcube_mass_effort_model
-                mass_model = load_pickcube_mass_effort_model(value['artifact'], value['source'], kind=control_kind)
-            position = value['controller']
-            physical = build_panda_effort_profile(physical, kind=control_kind,
-                cadence_s=value['artifact'].timebase.control_dt, end_frame_id='ee',
-                model=position.model, config=position.config, artifact_hash=value['artifact'].identity_hash,
-                r3_profile=r3_profile, joint_velocity_limit_rad_s=velocity_limit, mass_model=mass_model)
+        from .physical_reference_profile import build_pickcube_effort_profile
+        position = value['controller']
+        physical = build_pickcube_effort_profile(physical, value['artifact'], value['source'],
+            kind=control_kind, position=position, model=position.model, end_frame_id='ee')
         return {**value, 'physical_execution': physical}
     base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
     def build(provider):

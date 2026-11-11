@@ -1,4 +1,4 @@
-"""Versioned source-specific nominal mass model for bounded PickCube fixtures."""
+"""Task-declared inputs for Panda reference effort Controllers."""
 from pathlib import Path
 import hashlib
 import json
@@ -26,3 +26,24 @@ def load_pickcube_mass_effort_model(artifact, source, *, kind):
         raise ValueError('nominal mass model source differs from selected fixture')
     return dict(matrix=model['matrices'][family], nominal_position=model['nominal_position'],
                 max_abs_deviation=model['max_abs_deviation'], model_sha256=_MODEL_SHA256)
+
+
+def build_pickcube_effort_profile(direct_execution, artifact, source, *, kind, position,
+                                 model, end_frame_id, dynamic_parameters=None):
+    """Supply the task's admitted reference inputs to the common Controller owner."""
+    from ...controllers.canonical.r3_effort import build_panda_effort_profile
+
+    if kind == 'direct':
+        return direct_execution
+    r3_profile = velocity_limit = mass_model = None
+    if kind in {'r3-pose', 'r3-mass-pose'}:
+        from .specialization import _r3_dynamic_profile, PICKCUBE_R3_CONTINUOUS_PROFILE_V1
+        r3_profile, _ = _r3_dynamic_profile()
+        velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
+    if kind in {'joint-mass', 'r3-mass-pose'}:
+        mass_model = load_pickcube_mass_effort_model(artifact, source, kind=kind)
+    return build_panda_effort_profile(direct_execution, kind=kind,
+        cadence_s=artifact.timebase.control_dt, end_frame_id=end_frame_id,
+        model=model, config=position.config, artifact_hash=artifact.identity_hash,
+        r3_profile=r3_profile, joint_velocity_limit_rad_s=velocity_limit,
+        mass_model=mass_model, dynamic_parameters=dynamic_parameters)

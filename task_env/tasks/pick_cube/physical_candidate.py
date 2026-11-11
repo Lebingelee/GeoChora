@@ -246,24 +246,14 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             physical = robot.build_direct_effort_execution(
                 scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
                 native_ranges=tuple(limits))
-            if kind != 'direct':
-                from ...controllers.canonical.r3_effort import build_panda_effort_profile
-                model = r3_profile = velocity_limit = mass_model = None
-                if kind in {'r3-pose', 'r3-mass-pose'}:
-                    from ...controllers.canonical.kinematics import PandaKinematics, PANDA_PICKCUBE_EE_TCP_V1
-                    from .specialization import _r3_dynamic_profile, PICKCUBE_R3_CONTINUOUS_PROFILE_V1
-                    model = PandaKinematics(projected, tcp_profile=PANDA_PICKCUBE_EE_TCP_V1)
-                    r3_profile, _ = _r3_dynamic_profile()
-                    velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
-                if kind in {'joint-mass', 'r3-mass-pose'}:
-                    from .physical_mass_profile import load_pickcube_mass_effort_model
-                    mass_model = load_pickcube_mass_effort_model(artifact, source, kind=kind)
-                physical = build_panda_effort_profile(physical, kind=kind,
-                    cadence_s=artifact.timebase.control_dt, end_frame_id='nutassembly_ee_site',
-                    model=model, config=position.config, artifact_hash=artifact.identity_hash,
-                    r3_profile=r3_profile, joint_velocity_limit_rad_s=velocity_limit,
-                    mass_model=mass_model, dynamic_parameters=parameters if reset_switch else None)
-            return physical
+            model = None
+            if kind in {'r3-pose', 'r3-mass-pose'}:
+                from ...controllers.canonical.kinematics import PandaKinematics, PANDA_PICKCUBE_EE_TCP_V1
+                model = PandaKinematics(projected, tcp_profile=PANDA_PICKCUBE_EE_TCP_V1)
+            from .physical_reference_profile import build_pickcube_effort_profile
+            return build_pickcube_effort_profile(physical, artifact, source, kind=kind,
+                position=position, model=model, end_frame_id='nutassembly_ee_site',
+                dynamic_parameters=parameters if reset_switch else None)
 
         physical = build_physical(control_kind)
         def build(_provider):

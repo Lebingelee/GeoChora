@@ -141,3 +141,5 @@ Isaac adapter 已退休旧 DG04 专用构造和 witness，正式 F06 Position／
 一体和装配 Panda 的零偏置 effort Controller 创建已归共同控制 owner；正式一体 Panda 的 MuJoCo／Isaac 路线复验，装配 effort 尚无正式 caller。详见[实施记录 6.62](../planning/post-5c-optimization-execution.md#662-panda-零偏置-effort-controller-归控制-owner)。
 
 Panda effort profile 语义已从 PickCube candidate 归控制与 Robot owner，Task 继续执行 source／provider 准入；受影响 MuJoCo／Isaac 路线已复验。详见[实施记录 6.63](../planning/post-5c-optimization-execution.md#663-panda-effort-profile-语义归控制与-robot-owner)。
+
+MJCF／USD 的 Panda effort 参考参数与质量模型准入已收敛为一份 Task 声明，受影响 MuJoCo reset 切换和 Isaac effort／RGB 已复验；Task 的 source 专属构建仍待收敛。详见[实施记录 6.64](../planning/post-5c-optimization-execution.md#664-收敛-panda-effort-参考参数的重复准备)。

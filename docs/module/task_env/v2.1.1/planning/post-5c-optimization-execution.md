@@ -758,3 +758,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +27／−16，净增 11 行；五项原有 profile 映射从 Task 移至控制 owner，新增 Panda 声明与不可变约束。版本诊断修改 1 文件 +12／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1358。provider／renderer、native clock、提交和状态路径未改。
 
 75 项版本检查通过，新增检查验证 Task、Robot 和 Controller 消费同一不可变语义表。五种 profile 的 MJCF／USD 十组真实 source 前后对照中，subject、binding、Controller identity、状态需求和动作合同一致。MuJoCo direct effort、joint→R3 reset 切换与 H5 读回通过，观测 15 个 native 子步；Isaac joint effort／CUDA／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭，观测 41 次 callback，订阅前启动推进未知。GeoPhys 与完整 Solution 本批未重跑；旧证据按未受影响的已验证范围保留。冻结 diff、计划、source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_profile_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.64 收敛 Panda effort 参考参数的重复准备
+
+输入 `cb815e06`。PickCube 的 MJCF 与 USD 两条 source 原先各自选择 R3 参数、速度限制和质量模型；现由 Task 的一份参考参数准备逻辑执行这些选择与 source-bound 模型准入，再交给共同 Controller owner 组合。MJCF 与 USD 仍分别提供各自的 kinematics 和 frame，模型身份、source closure 和 cadence 检查保留。这减少重复决定，但 PickCube 的 source 专属构建仍存在，四任务共同构造链尚未完成。
+
+生产修改 2 文件并重命名 1 文件，+34／−34，净变化 0；原质量模型文件的既有内容随重命名迁移，新增参数准备逻辑并删除两处重复逻辑。无生产文件新增或删除，tracked 文件数保持 1358；测试／诊断代码无修改，本文及当前状态文档修改 2 文件。provider／renderer 的 source、状态、clock、提交和资源合同未改变，不能将本批视为 adapter 全部对齐。
+
+75 项版本检查通过。MJCF／USD 五种 profile 共十组真实 source 的 subject、binding、Controller identity、状态需求及动作合同与输入版本一致。MuJoCo joint→R3 reset 切换和 H5 读回通过，观测 10 个 native 子步。Isaac joint effort／CUDA／同步 RGB 完成两次 reset、一次 step、三帧独立读回及 Env／App 关闭；采图阶段无额外物理推进，订阅前启动推进未知。渲染 warmup 日志有一次推进错误后继续取得图像；SDK 关闭日志仍有菜单扩展访问已关闭 USD context 的异常，关闭收据及进程退出成功。GeoPhys、完整 Solution 和其余 profile 的原生执行本批未重跑，先前证据按实际代码影响和原限定使用。冻结 diff、计划、source 对照及运行收据位于 ignored `workspace/maintenance/v211_panda_reference_inputs_20261112_001/`。E01～E04 仍未接收。
