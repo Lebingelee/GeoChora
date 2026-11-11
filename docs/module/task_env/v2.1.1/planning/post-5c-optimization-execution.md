@@ -726,3 +726,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产删除 2 文件、1084 行，新增和迁移均为 0；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。项目 tracked 文件数由 1366 减至 1364。正式 Runtime 构建、source、clock、提交与 renderer 路径未改；删除的是已无法由正式入口到达的旧 native 实现。
 
 73 项版本检查通过；MuJoCo PickCube R3 短程观测 5 个 native 子步，GeoPhys 同任务短程通过、内部子步未观测并保守预留 50。Isaac Position／effort、四任务及 H5 受影响行为可复用 6.58 已有证据：本批删除的两文件没有出现在正式生产导入链中，本批未重跑 Isaac 或完整 Solution。冻结 diff、计划和 CPU 收据位于 ignored `workspace/maintenance/v211_retire_f05_native_files_20261112_001/`。E01～E04 仍未接收。
+
+### 6.60 退休孤立 Position candidate 资产
+
+输入 `837379c7`。旧 Position candidate 的实现与 Session 准入已退休，资产目录仍保留六个仅由历史诊断使用的 scene、recipe、receipt 和 fixture。经检查正式任务、Runtime、benchmark、examples 的生产引用后删除这六个文件；正式 Panda、PickCube、NutAssembly 和简单主体实际使用的 source 不在其中。历史 planning manifest 对其中一次旧变更的文字记录保留，六个文件的 Git blob 与 SHA-256 已记入本批证据，可从输入提交恢复。Isaac adapter 内的 DG04／F06 共用 mimic 路径尚未清理，需分辨后继续。
+
+删除 6 个历史资产文件、24022 字节、869 个文本行；无生产 Python 代码、测试或诊断代码变化，无新增或迁移。本文和当前状态文档修改 2 文件；tracked 文件数由 1364 减至 1358。正式构建、provider／renderer、clock 和提交路径未改变。
+
+73 项版本检查通过；MuJoCo 正式 PickCube reference 与 physical joint→R3 reset 切换、H5 读回和 close 短程通过，共观测 15 个 native 子步。Isaac 与 GeoPhys 本批未重跑，6.58／6.59 的正式路线证据可在本批删除文件不属于其 source 输入或生产调用链的范围内复用；完整 Solution 未重跑。文件身份、冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_retire_position_legacy_assets_20261112_001/`。E01～E04 仍未接收。
