@@ -313,3 +313,17 @@ G05 继续有界接收，E00～E04 和项目优化尚未整体接收；不进入
 本批生产 2 个文件 +11／−9，净增 2 行；未新增测试代码或文件，没有文件迁移。自 `21577d32` 累计生产 +1,595／−1,358，净增 237 行；不能将本批抽取解释为项目净删除。逐文件度量见 `implementation-metrics-009.json`。4 项已有 caller 合同在双锁下通过：未带 marker 的自定义组件、无声明子类纯构造、旧 class binding 以及正式 factory 消费解析结果。检查未 reset／step，也不声明 native 结果；`registry-009-pure.log` 保留。正式生产任务在 registry 前置共同工厂分支未变，本批旧组件与 binding caller 的影响已由对应检查覆盖。
 
 E01 仍需对剩余配置 codec／Position 输入对账；E02～E04 的剩余审计和整体接收尚未完成，G05 保持原有界接收。
+
+### 6.9 E03 资源归属与失败边界核对
+
+以下是当前代码的所有权对账，不是对未运行组合的新增 PASS：
+
+| 资源或阶段 | 实际 owner 与关闭顺序 | 已有证据／待核边界 |
+| --- | --- | --- |
+| Task 编译、source 快照 | `from_task_binding` 在编译后失败时调用 `_release_failed_task_construction`；已构造 Env 的 `_close_reference_resources` 关闭 source receipt，再关闭 binding 声明的 Task 自有资源。`ExecutionSourceReceiptV1.close` 只清理其临时 owner；显式 caller source copy 不转为 Env 所有 | 既有编译／构造失败与旧 caller 拷贝检查；第三方自定义 receipt 的实现仍须按其合同验证 |
+| RuntimeSession 与 worker | Env 的 `_close_reference_resources` 委托 `close_session_and_runtime_owner`，分别关闭 session、读取需要的 close receipt、关闭实际 runtime owner；失败 reset 保留的不同 session 按对象身份去重关闭。`RemoteSession` 拥有 worker 和 socket，超时／协议错误终止其 worker | MuJoCo／GeoPhys worker 的 reset／step／reset／重复 close 已实测；不同 worker 方法和故障注入仍按各自影响检查 |
+| Isaac App 与 scene lease | Isaac Runtime 的进程 App owner 持有 App，scene 由实际 session 租用；进程 lifetime hold 存在时 close 请求延后。close receipt 区分 attempted／completed／failure；不可据 Env 已关闭推断 App 已完成关闭 | 第六批在受测 Isaac 路线取得 App close completed；SDK callback 退订诊断保留；不扩展到其他 SDK 版本 |
+| Task RGB、observer、独立 visual model | Env `_close_camera_consumer` 先脱离引用，再分别 close task consumer、observer consumer、visual session，保留首个异常并附加后续异常；visual 最后 close 状态和 fault 状态单列。GeoPhys／Isaac 摄像机借用现有 Runtime，MuJoCo renderer-only 使用独立 visual model | 第六批 Isaac 三帧及关闭；旧 5b／5c 和跨组合证据限原范围。失败后不能以旧帧视为当前有效帧 |
+| Recorder／episode | `EpisodeExecutionState.execute_close` 统一协调；reference 路线在健康时按实际发布和 recorder 状态 finalize，再释放相机与 session；component 路线由 lifecycle 关闭 runtime，lifecycle 尚未建立时由 Env 关闭已返回的 runtime | 既有 close／fault 合同及受测重复 close；不同记录格式与完整 Solution 属后续验证 |
+
+reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prepare、materialize、reset、read state、observe、publish；异常传给实际失败阶段的 `on_failure`。source／target 的预检拒绝可在旧 session 关闭前发生；替换及物理写入后的故障则不能把旧 publication 冒充新状态。具体历史故障测试和真实路线的边界见本节前述批次；未据此宣称所有 provider／renderer 组合已覆盖。此表为静态 owner 审计和既有证据索引，不是新的一轮 native 测量。
