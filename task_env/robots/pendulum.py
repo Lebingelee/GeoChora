@@ -44,19 +44,23 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
     uid: str = "pendulum-v1"
     joint_name: str = "pendulum_hinge"
     actuator_name: str = "pendulum_torque"
+    assembly_id = 'pendulum-source-assembly'
 
-    def physical_subject_declaration(self, *, source_id, source_closure_sha256,
-                                     entity_id, root_frame, controller_writer,
-                                     component_path):
+    @property
+    def state_joint_names(self):
+        return (self.joint_name,)
+
+    def physical_subject_declaration(self, *, source_id, source_closure_sha256):
         """Describe the task-owned hinge before constructing a control binding."""
         from ..artifacts import FrameReference
         from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
-        subject = ControlledSubjectV1(self.uid, entity_id, source_id, source_closure_sha256,
-            'references_existing', 'fixed', FrameReference(entity_id, root_frame), None,
-            (component_path,), (controller_writer,),
+        writer, component_path = 'pendulum-direct-effort', ('hinge',)
+        subject = ControlledSubjectV1(self.uid, self.uid, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(self.uid, 'pendulum_anchor'), None,
+            (component_path,), (writer,),
             supported_controller_profiles=('direct_joint_effort_v1',
                                             'velocity_damped_joint_effort_v1'))
-        joint = SubjectJointDeclarationV1(component_path, self.joint_name, (controller_writer,),
+        joint = SubjectJointDeclarationV1(component_path, self.joint_name, (writer,),
             self.actuator_name, self.actuator_name, 1., (-2., 2.), 'disabled')
         return subject, (joint,)
 

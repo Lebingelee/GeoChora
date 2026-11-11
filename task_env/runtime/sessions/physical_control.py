@@ -202,6 +202,50 @@ class SubjectJointDeclarationV1:
     native_drive: str
 
 
+def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
+    """Compile an existing Robot's declaration into one source-bound effort execution."""
+    from ...artifacts import JointReference
+    from ...artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
+        LogicalAssemblyEntityMemberV1, LogicalAssemblySubcomponentReferenceV1)
+    from ...artifacts.state import StateFieldRequirement, StateRequirements
+
+    subject, declarations = robot.physical_subject_declaration(
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest)
+    if len(subject.controller_writers) != 1:
+        raise ValueError('single-subject effort construction requires one declared writer')
+    writer = subject.controller_writers[0]
+    entities = tuple(entity for entity in scene.entities if entity.entity_id == subject.entity_id)
+    if len(entities) != 1:
+        raise ValueError('Robot subject must refer to exactly one Scene entity')
+    entity = entities[0]
+    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
+                                    scene.schema_version, scene.identity_hash)
+    assembly = LogicalAssemblyV1('logical-assembly-v1', robot.assembly_id, 'v1', pin, (
+        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), subject.entity_id,
+                                      entity.asset_id, entity.asset_version),
+        *(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref', item.component_path,
+             'joint', JointReference(subject.entity_id, item.joint_id)) for item in declarations)))
+    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
+        source.source_closure_digest, assembly, {}, (subject,), declarations)
+    units = tuple(channel.unit for channel in compiled.binding.channels)
+    controller = subject.select_effort_controller(compiled.binding, profile_id=profile_id,
+        writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)
+    names = tuple(robot.state_joint_names)
+    requirements = StateRequirements('state-requirements-v1', 'controller', writer, tuple(
+        StateFieldRequirement('state-field-requirement-v1', field, 'joint', subject.entity_id, name,
+            'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
+        for name in names for field in ('joint_position', 'joint_velocity')))
+    definitions = {joint.joint_id: joint for articulation in scene.articulations or ()
+                   if articulation.entity_id == subject.entity_id for joint in articulation.joints}
+    joint_bindings = {f'{subject.entity_id}/{name}': definitions[name] for name in names}
+    frame_bindings = {name: FrameReference(*name.split('/', 1)) for name in source.bodies}
+    execution = PhysicalControlExecutionV1(compiled, (controller,), scene,
+        joint_bindings, frame_bindings, requirements, 1, (subject,))
+    execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+    return execution
+
+
 def compile_declared_subject_binding(scene, artifact_sha256, source_id, source_closure_sha256,
                                      root, children, subjects, joint_declarations, bodies=()):
     """Build the existing physical binding from subjects, resolved joints and source facts.

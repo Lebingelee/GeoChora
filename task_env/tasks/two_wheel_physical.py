@@ -9,11 +9,8 @@ import numpy as np
 from ..artifacts import (ActionIntent, ActuatorReference, ActuatorResourceDefinition,
     ArticulationDefinition, AssetDefinition, ControlGroup, EntityDefinition,
     EntityInstance, FrameDefinition, FrameReference, InitializationContract,
-    JointDefinition, JointReference, PoseWorld, RobotInstance, SceneDefinition,
+    JointDefinition, PoseWorld, RobotInstance, SceneDefinition,
     SemanticDefinition, Timebase)
-from ..artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
-    LogicalAssemblyEntityMemberV1, LogicalAssemblySubcomponentReferenceV1)
-from ..artifacts.state import StateFieldRequirement, StateRequirements
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
 from ..artifacts import ExecutionSpecV1, RendererSelectionV1
 from ..assembly.assets import _source_closure_digest
@@ -24,7 +21,7 @@ from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
 from ..robots.two_wheel_balance import TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
-from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
+from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
@@ -37,7 +34,6 @@ from .two_wheel_balance import (TWO_WHEEL_BALANCE_MJCF_XML, TWO_WHEEL_BALANCE_TA
 ENTITY = 'two-wheel-balance-v1'
 NAMES = ('chassis_pitch', 'left_wheel_hinge', 'right_wheel_hinge')
 JOINTS = tuple(f'{ENTITY}/{name}' for name in NAMES)
-WRITER = 'two-wheel-direct-effort'
 FRAMES = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 ACTUATORS = ('left_wheel_torque', 'right_wheel_torque')
 USD_BODY_PATHS = {
@@ -155,31 +151,10 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
             torque_actuators=dict(zip(JOINTS[1:], ACTUATORS, strict=True)),
             actuator_units={a: 'N*m' for a in ACTUATORS})
         execution_spec = None
-    controlled_entity = TwoWheelBalanceEntity()
-    subject, declarations = controlled_entity.physical_subject_declaration(source_id=source.source_id,
-        source_closure_sha256=closure, entity_id=ENTITY, root_frame=FRAMES[0],
-        controller_writer=WRITER, component_paths=(('left',), ('right',)))
-    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id, scene.schema_version, scene.identity_hash)
-    assembly = LogicalAssemblyV1('logical-assembly-v1', 'two-wheel-source-assembly', 'v1', pin, (
-        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), ENTITY, 'two-wheel-inline', 'v1'),
-        *(LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref', path, 'joint', JointReference(ENTITY, name))
-          for path, name in zip((('left',), ('right',)), NAMES[1:], strict=True))))
-    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id, closure,
-                                                assembly, {}, (subject,), declarations)
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
-    controller = subject.select_effort_controller(
-        compiled.binding, profile_id=selected_profile_id, writer_id=WRITER,
-        units=('N*m', 'N*m'), cadence_s=artifact.timebase.control_dt)
-    requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
-        StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, name,
-            'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
-        for name in NAMES for field in ('joint_position', 'joint_velocity')))
-    physical = PhysicalControlExecutionV1(compiled, (controller,), scene,
-        dict(zip(JOINTS, scene.articulations[0].joints, strict=True)),
-        {name: FrameReference(ENTITY, name.split('/', 1)[1]) for name in source.bodies},
-        requirements, 1, (subject,))
-    physical.validate_source(scene=scene, artifact_sha256=artifact.identity_hash, source_id=source.source_id,
-                             source_closure_sha256=closure, source=source)
+    physical = build_existing_subject_effort(TwoWheelBalanceEntity(), scene=scene, artifact=artifact,
+        source=source, profile_id=selected_profile_id)
+    controller = physical.controllers[0]
     return {'artifact': artifact, 'task_source': task_source, 'source': source, 'controller': controller,
         'solution': None, 'physical_execution': physical,
         'reset_plan': _reset_plan(artifact, source, seed, sampled if sampled is not None else sample_reset(np.random.default_rng(seed))),

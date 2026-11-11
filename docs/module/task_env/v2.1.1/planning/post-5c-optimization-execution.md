@@ -420,3 +420,11 @@ MuJoCo CPU 下 NutAssembly 单个 caller-owned Solution interval、PickCube R3�
 生产 5 文件修改，+156／−76 行，净增 80 行；部分代码从 MuJoCo composer 重写迁至共享 source 和 Robot owner，迁移单列，不按整体删除计算。版本诊断 1 文件 +7／−1，2 个状态／实施文档修改；无文件新增、删除。adapter 不再因 GeoPhys CPU 缺少一体 Robot composer 退回无主体路线，但其他未支持组合没有扩大。
 
 最终源码下，PickCube 与 NutAssembly 在 GeoPhys CPU 和 MuJoCo CPU 的隔离 worker 各完成 reset、一个控制 interval、第二次 reset 和 close，NutAssembly 使用 caller-owned Solution；四条受测路线均有 Robot subject binding，所有锁释放。另有先前一轮相同四条成功，以及首个 GeoPhys 构建后因缺少 reference receipt 而在 reset 阶段失败；worker 内部物理子步均未直接观测，9 次运行每次保守计费 50 子步，不以计费值冒充观测。第一次 MuJoCo 对照误沿用了标注 GeoPhys 的计划文件；其输入身份和实际 provider 见独立结果，后续已按 MuJoCo 专用计划及最终计划重跑。版本纯检查 8 passed；没有运行完整 Solution、Isaac 或 renderer。冻结 diff、计划及原始结果在 ignored `workspace/maintenance/v211_geophys_subject_20261112_001/`。
+
+### 6.22 简单主体共享 effort 构建
+
+输入 `7c143ae9`。Pendulum、双轮车各自的 Robot 声明自身源内根、受控关节、writer、通道和完整状态关节顺序；共同 physical control owner 从声明和 Scene 编译 Assembly、选择 Controller、绑定状态要求并生成 `PhysicalControlExecutionV1`。两个任务的 source 构建不再各自重复创建 Assembly、Controller 和执行对象，Task 不再传入关节路径／writer 进行特定接线。关节力范围、左／右顺序、Controller 物理语义及 source／Artifact 身份检查保留。两任务仍各自构造 Scene 和 source，下一步须继续核对其 Robot／provider 职责，不能将本批当成四主体全部统一。
+
+生产 5 文件修改，+76／−77 行，净减 1 行，原有 Assembly／Controller 执行组装按声明重写到共同 owner；无生产文件新增、删除或整文件搬迁。版本诊断 1 文件 +19／−13，2 个状态／实施文档修改。共享构建器不按 Task、provider 或 renderer 名分流；adapter 的原生 source 映射和 renderer 未改。
+
+MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step、重复 reset 和 close，4 条运行共实测 100 个物理子步；direct 两条的 Robot subject 与 Controller identity 和上批同配置记录相同。GeoPhys CPU 的两主体 direct 路线也各完成相同行为；其内部物理子步未直接观测，各按 50 子步保守预留。首次 GeoPhys 命令未指定进程内解释器，preflight 拒绝、未启动物理；修正正式配置后复验通过，失败记录保留。版本纯检查 8 passed；所有锁释放。本批未实测 Isaac、renderer 或完整 Solution，保留原有界证据而不外推。计划、冻结 diff、原始结果在 ignored `workspace/maintenance/v211_subject_effort_20261112_001/`。

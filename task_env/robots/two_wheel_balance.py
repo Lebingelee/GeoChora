@@ -43,21 +43,23 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
     right_wheel_joint_name: str = "right_wheel_hinge"
     left_actuator_name: str = "left_wheel_torque"
     right_actuator_name: str = "right_wheel_torque"
+    assembly_id = 'two-wheel-source-assembly'
 
-    def physical_subject_declaration(self, *, source_id, source_closure_sha256,
-                                     entity_id, root_frame, controller_writer,
-                                     component_paths):
+    @property
+    def state_joint_names(self):
+        return (self.chassis_joint_name, self.left_wheel_joint_name, self.right_wheel_joint_name)
+
+    def physical_subject_declaration(self, *, source_id, source_closure_sha256):
         """Describe ordered wheel joints before constructing a control binding."""
         from ..artifacts import FrameReference
         from ..runtime.sessions.physical_control import ControlledSubjectV1, SubjectJointDeclarationV1
-        if type(component_paths) is not tuple or len(component_paths) != 2:
-            raise ValueError('two-wheel subject requires two ordered paths')
-        subject = ControlledSubjectV1(self.uid, entity_id, source_id, source_closure_sha256,
-            'references_existing', 'fixed', FrameReference(entity_id, root_frame), None,
-            component_paths, (controller_writer,),
+        writer, component_paths = 'two-wheel-direct-effort', (('left',), ('right',))
+        subject = ControlledSubjectV1(self.uid, self.uid, source_id, source_closure_sha256,
+            'references_existing', 'fixed', FrameReference(self.uid, 'balance_anchor'), None,
+            component_paths, (writer,),
             supported_controller_profiles=('direct_joint_effort_v1',
                                             'velocity_damped_joint_effort_v1'))
-        joints = tuple(SubjectJointDeclarationV1(path, name, (controller_writer,), actuator,
+        joints = tuple(SubjectJointDeclarationV1(path, name, (writer,), actuator,
             actuator, 1., (-1.5, 1.5), 'disabled') for path, name, actuator in zip(
                 component_paths, (self.left_wheel_joint_name, self.right_wheel_joint_name),
                 (self.left_actuator_name, self.right_actuator_name), strict=True))

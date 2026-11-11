@@ -9,11 +9,8 @@ import numpy as np
 
 from ..artifacts import (ActionIntent, ActuatorResourceDefinition, ArticulationDefinition,
     AssetDefinition, ControlGroup, EntityDefinition, EntityInstance, FrameDefinition,
-    FrameReference, InitializationContract, JointDefinition, JointReference, PoseWorld,
+    FrameReference, InitializationContract, JointDefinition, PoseWorld,
     RobotInstance, SceneDefinition, SemanticDefinition, Timebase)
-from ..artifacts.logical_assembly import (LogicalAssemblyV1, LogicalAssemblyScenePinV1,
-    LogicalAssemblyEntityMemberV1, LogicalAssemblySubcomponentReferenceV1)
-from ..artifacts.state import StateFieldRequirement, StateRequirements
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
 from ..artifacts import ExecutionSpecV1, RendererSelectionV1
 from ..assembly.assets import _source_closure_digest
@@ -24,7 +21,7 @@ from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
 from ..robots.pendulum import PendulumEntity, PENDULUM_ACTION_CONTRACT
-from ..runtime.sessions.physical_control import PhysicalControlExecutionV1, compile_declared_subject_binding
+from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
@@ -36,7 +33,6 @@ from .pendulum import (PENDULUM_MJCF_XML, PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
 
 ENTITY = 'pendulum-v1'
 JOINT = f'{ENTITY}/pendulum_hinge'
-WRITER = 'pendulum-direct-effort'
 
 
 def _scene(*, source_revision=None):
@@ -151,32 +147,10 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
             source_closure_digest=closure, torque_actuators={JOINT: 'pendulum_torque'},
             actuator_units={'pendulum_torque': 'N*m'})
         execution_spec = None
-    controlled_entity = PendulumEntity()
-    subject, declarations = controlled_entity.physical_subject_declaration(source_id=source.source_id,
-        source_closure_sha256=closure, entity_id=ENTITY, root_frame='pendulum_anchor',
-        controller_writer=WRITER, component_path=('hinge',))
-    pin = LogicalAssemblyScenePinV1('logical-assembly-scene-pin-v1', scene.scene_id,
-                                    scene.schema_version, scene.identity_hash)
-    assembly = LogicalAssemblyV1('logical-assembly-v1', 'pendulum-source-assembly', 'v1', pin, (
-        LogicalAssemblyEntityMemberV1('entity_member', ('owner',), ENTITY, 'pendulum-inline', 'v1'),
-        LogicalAssemblySubcomponentReferenceV1('existing_entity_subcomponent_ref', ('hinge',),
-                                               'joint', JointReference(ENTITY, 'pendulum_hinge'))))
-    compiled = compile_declared_subject_binding(scene, artifact.identity_hash, source.source_id,
-                                                closure, assembly, {}, (subject,), declarations)
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
-    controller = subject.select_effort_controller(
-        compiled.binding, profile_id=selected_profile_id, writer_id=WRITER,
-        units=('N*m',), cadence_s=artifact.timebase.control_dt)
-    requirements = StateRequirements('state-requirements-v1', 'controller', WRITER, tuple(
-        StateFieldRequirement('state-field-requirement-v1', field, 'joint', ENTITY, 'pendulum_hinge',
-            'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
-        for field in ('joint_position', 'joint_velocity')))
-    physical = PhysicalControlExecutionV1(compiled, (controller,), scene,
-        {JOINT: scene.articulations[0].joints[0]},
-        {name: FrameReference(ENTITY, name.split('/', 1)[1]) for name in source.bodies},
-        requirements, 1, (subject,))
-    physical.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
-        source_id=source.source_id, source_closure_sha256=closure, source=source)
+    physical = build_existing_subject_effort(PendulumEntity(), scene=scene, artifact=artifact,
+        source=source, profile_id=selected_profile_id)
+    controller = physical.controllers[0]
     return {'artifact': artifact, 'task_source': task_source, 'source': source,
         'controller': controller, 'solution': None, 'physical_execution': physical,
         'reset_plan': _reset_plan(artifact, source, seed, sampled), 'construction_id': 'pendulum-shared-physical-v1',

@@ -1,9 +1,11 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
-parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True);args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
+parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
+parser.add_argument('--profile',default=None);args=parser.parse_args()
 plan=json.loads(Path(args.plan).read_text())
-started=time.monotonic();locks=[];env=None;result={'case':args.case,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0}
+started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
 resource.setrlimit(resource.RLIMIT_CPU,(120,125))
 try:
@@ -11,18 +13,19 @@ try:
         handle=open(path,'r+');fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB);locks.append(handle)
     result['locks_acquired']=True
     import numpy as np
-    import mujoco
-    original_step=mujoco.mj_step
-    def counted_step(*params,**kwargs):
-        count=kwargs.get('nstep',params[2] if len(params)>2 else 1)
-        if result['native_substeps']+int(count)>plan['per_run_reserved_physics_substeps']:
-            raise RuntimeError('reserved physics substep limit exhausted')
-        result['native_substeps']+=int(count)
-        return original_step(*params,**kwargs)
-    mujoco.mj_step=counted_step
+    if args.provider=='mujoco':
+        import mujoco
+        original_step=mujoco.mj_step
+        def counted_step(*params,**kwargs):
+            count=kwargs.get('nstep',params[2] if len(params)>2 else 1)
+            if result['native_substeps']+int(count)>plan['per_run_reserved_physics_substeps']:
+                raise RuntimeError('reserved physics substep limit exhausted')
+            result['native_substeps']+=int(count)
+            return original_step(*params,**kwargs)
+        mujoco.mj_step=counted_step
     from task_env import make_env
     if args.case in {'panda-r3','panda-gravity','assembled-unreset','assembled-live','nut'}:
-        config={'execution':{'physics_provider':'mujoco','physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
+        config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},task={'controller_profile':'r1_split'})
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
@@ -30,7 +33,10 @@ try:
         action=np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
     else:
         uid='pendulum-v1' if args.case=='pendulum' else 'two-wheel-balance-v1'
-        env=make_env(uid,config={'execution':{'physics_provider':'mujoco','physics_backend':'cpu','physics_device':'cpu'},'episode':{'horizon':8}})
+        config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu',
+                             'deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
+        if args.profile is not None:config['controller']={'profile_id':args.profile}
+        env=make_env(uid,config=config)
         action={'torque':np.asarray([.25]if args.case=='pendulum'else[.25,-.2],dtype=np.float32)}
     result['uid']=env.uid
     result['constructed']=True
