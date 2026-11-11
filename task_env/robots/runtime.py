@@ -86,7 +86,7 @@ class RobotRuntime:
     controllers: tuple = ()
 
     @classmethod
-    def from_selected(cls, value, selected):
+    def from_selected(cls, value, selected, *, physical_selection=None):
         """Expose the admitted subjects and their actual Controller owners.
 
         No native resource, state copy, or Controller is created by this view.
@@ -94,8 +94,15 @@ class RobotRuntime:
         """
         source = value['source']
         physical = selected.physical_execution or value.get('physical_execution')
+        controller = selected.controller
+        if physical_selection is not None:
+            committed = physical_selection.committed
+            physical = (physical_selection.declaration if committed is None else committed.execution)
+            controller = None if committed is None else committed.execution.controllers[0]
         if physical is not None:
-            subjects, controllers = physical.subjects, physical.controllers
+            subjects = physical.subjects
+            controllers = (() if physical_selection is not None and physical_selection.committed is None
+                           else physical.controllers)
         else:
             binding = getattr(source, 'position_subject_binding', None)
             subjects = () if binding is None else binding.subjects
@@ -107,7 +114,7 @@ class RobotRuntime:
         roots = tuple(subject for subject in subjects if subject.parent_subject_id is None)
         request = getattr(source, 'source_composition_request', None)
         uid = request.robot_uid if request is not None else subjects[0].entity_id
-        return cls(uid=uid, controller=selected.controller, subjects=subjects,
+        return cls(uid=uid, controller=controller, subjects=subjects,
                    controllers=controllers, base=roots[0].root_frame if len(roots) == 1 else None,
                    world=RobotFrameReference('world', 'world', None, 'world'))
 

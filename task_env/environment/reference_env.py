@@ -1061,7 +1061,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.controller = selected.controller
         self._selected_controller_binding = selected
         from ..robots.runtime import RobotRuntime
-        self._robot = RobotRuntime.from_selected(value, selected)
+        self._robot = RobotRuntime.from_selected(
+            value, selected, physical_selection=getattr(self, '_physical_reset_selection', None))
 
     def _episode_execution_state(self):
         state = self.__dict__.get('_episode_state')

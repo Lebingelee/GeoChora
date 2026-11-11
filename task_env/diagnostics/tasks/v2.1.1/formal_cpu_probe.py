@@ -48,19 +48,14 @@ try:
         action={'torque':np.asarray([.25]if args.case=='pendulum'else[.25,-.2],dtype=np.float32)}
     result['uid']=env.uid
     result['constructed']=True
+    robot=env.robot
+    result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
+        'parents':[s.parent_subject_id for s in robot.subjects],
+        'controller_identities':[str(c.identity) for c in robot.controllers]}
     if args.case=='panda-joint' and args.record:
-        from task_env.environment.types import StageUnavailableError
-        try:
-            robot=env.robot
-        except StageUnavailableError:
-            robot=None
-            result['robot_before_reset']='unavailable'
+        assert robot.subjects and robot.controller is None and robot.controllers == ()
+        result['robot_before_reset']='declared_without_committed_controller'
     else:
-        robot=env.robot
-    if robot is not None:
-        result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
-            'parents':[s.parent_subject_id for s in robot.subjects],
-            'controller_identities':[str(c.identity) for c in robot.controllers]}
         assert robot.controller is env.controller
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
     if args.case in {'nut','panda-r3','assembled-live'}:
@@ -78,6 +73,13 @@ try:
         else:
             observation,info=env.reset(seed=31)
         assert env.observation_space.contains(observation)
+        if args.case=='panda-joint' and args.record:
+            active_robot=env.robot
+            committed=env._physical_reset_selection.current.execution
+            assert active_robot.subjects == committed.subjects
+            assert active_robot.controllers == committed.controllers
+            assert active_robot.controller is committed.controllers[0]
+            result['first_physical_controller']=active_robot.controller.identity
         if args.record:env.start_recording(Path('episode.h5').resolve())
         first=env.session.state_boundary_identity().to_mapping()
         if subject_binding is not None:
@@ -105,13 +107,34 @@ try:
             assert Path('episode.h5').is_file()
         assert time_after>time_before
         assert abs(time_after-time_before-env.artifact.timebase.control_dt)<1e-9
-        observation,info=env.reset(seed=19 if args.case=='nut' else 31)
+        if args.case=='panda-joint' and args.record:
+            prior_robot=env.robot; prior_spec=env.physical_action_spec()
+            try:env.reset(options={'controller':'unsupported'})
+            except ValueError:pass
+            else:raise AssertionError('invalid controller reset was accepted')
+            assert env.robot is prior_robot and env.physical_action_spec()==prior_spec
+            observation,info=env.reset(seed=31,options={'controller':'r3-pose'})
+            committed=env._physical_reset_selection.current.execution
+            assert env.robot.subjects == committed.subjects and env.robot.controllers == committed.controllers
+            assert env.robot.controller is committed.controllers[0] and env.robot is not prior_robot
+            assert env.robot.controller.identity != prior_robot.controller.identity
+            result['switched_physical_controller']=env.robot.controller.identity
+            result['invalid_reset_preserved_robot']=True
+            switched_before=float(env.state.simulation_time)
+            switched_action=env.bind_physical_action(np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32))
+            env.step(switched_action)
+            assert abs(float(env.state.simulation_time)-switched_before-env.artifact.timebase.control_dt)<1e-9
+            assert env.robot.controller is env._physical_reset_selection.current.execution.controllers[0]
+            result['switched_controller_advanced']=True
+        else:
+            observation,info=env.reset(seed=19 if args.case=='nut' else 31)
         reset=env.session.state_boundary_identity().to_mapping()
         assert reset['episode_id']!=first['episode_id']
         result['second_reset']=reset
-        if robot is not None:
-            assert env.robot is not robot and env.robot.controller is env.controller
-            result['robot_rebound_after_reset']=True
+        assert env.robot is not robot
+        if args.case!='panda-joint' or not args.record:
+            assert env.robot.controller is env.controller
+        result['robot_rebound_after_reset']=True
         if args.case in {'pendulum','two-wheel'}:
             assert info['reset_parameters']==first_reset_parameters
             np.testing.assert_allclose(observation['state']['proprioception'],first_observation,atol=1e-6)

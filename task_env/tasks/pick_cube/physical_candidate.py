@@ -416,7 +416,8 @@ def make_physical_binding(*, root=None, provider, horizon, seed, drive_mode, con
             position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
             physical_reset_action_schema=physical_action_schema if reset_switch else None,
             physical_reset_selection_factory=(lambda: PhysicalResetSelection(build_physical,
-                initial_kind=control_kind, allowed_kinds=('joint', 'r3-pose'), space_policy=space_policy))
+                initial_kind=control_kind, allowed_kinds=('joint', 'r3-pose'), space_policy=space_policy,
+                declaration=physical))
                 if reset_switch else None,
             physical_action_observer=observe_physical_action if reset_switch else None,
             physical_observation_binding=None if direct_physical else legacy_position_physical_observation_binding,

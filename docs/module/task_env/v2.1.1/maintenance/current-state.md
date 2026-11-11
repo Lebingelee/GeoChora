@@ -77,3 +77,5 @@ Env 中无正式调用者的 Position／leaf Position 候选构造入口及其�
 旧 leaf 诊断的 Env／Runtime 控制分派及预检入口已退休；装配 Panda 使用的主体配置声明保留。隔离 worker 测试发现的旧 Controller 配置投影已修复，PickCube／NutAssembly MuJoCo worker 均复验通过。底层 leaf 及观察／记录剩余分支待继续审计，E01～E04 未完成。详见[实施记录 6.30](../planning/post-5c-optimization-execution.md#630-退休-leaf-控制分派并修复-worker-配置投影)。
 
 已退休 leaf 路线的观察与记录分支已移除，历史 H5 reader 保留；实际短记录验证同时修复了 typed observation schema 的 JSON 投影。发现 PickCube reset-scoped 物理选择在 reset 前不暴露 `env.robot`，是 E02 待修复缺口，不能视为四主体构造统一已完成。详见[实施记录 6.31](../planning/post-5c-optimization-execution.md#631-退休-leaf-观察记录分支并修复记录投影)。
+
+PickCube reset-scoped 物理选择现在在 reset 前暴露已编译 Robot subjects、无已提交 Controller；reset 后 Robot 指向实际提交的 physical Controller，错误切换保持原视图，有效切换后的 Controller 已实际推进。该路线的 `env.controller` 仍承担原 Position 兼容职责，完整统一仍待 E02／E04；详见[实施记录 6.32](../planning/post-5c-optimization-execution.md#632-reset-scoped-物理选择的-robot-声明与提交)。

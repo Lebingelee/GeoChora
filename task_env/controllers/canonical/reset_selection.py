@@ -27,7 +27,7 @@ class PhysicalResetSelection:
     respect to the live Env.  A fixed-space consumer may pin the *semantic*
     identity, not merely an array shape.  This class does not run physics.
     """
-    def __init__(self, factory, *, initial_kind, allowed_kinds, space_policy='dynamic'):
+    def __init__(self, factory, *, initial_kind, allowed_kinds, space_policy='dynamic', declaration=None):
         if not callable(factory) or type(initial_kind) is not str or not initial_kind:
             raise ValueError('physical reset selection requires a factory and initial kind')
         if (type(allowed_kinds) is not tuple or not allowed_kinds
@@ -37,6 +37,9 @@ class PhysicalResetSelection:
             raise ValueError('physical reset selection requires distinct declared controller kinds')
         if space_policy not in {'dynamic', 'fixed_semantic'}:
             raise ValueError('unknown physical action-space policy')
+        if declaration is not None and type(declaration) is not PhysicalControlExecutionV1:
+            raise TypeError('physical selection declaration must be a physical execution')
+        self.declaration = declaration
         self._factory, self._allowed = factory, allowed_kinds
         self._initial_kind, self._policy = initial_kind, space_policy
         self._generation, self._current = 0, None
@@ -79,6 +82,11 @@ class PhysicalResetSelection:
             raise ValueError('physical reset selection is stale or foreign')
         self._generation += 1
         self._current = candidate
+
+    @property
+    def committed(self):
+        """Return the committed choice, or None before the first reset."""
+        return self._current
 
     @property
     def current(self):

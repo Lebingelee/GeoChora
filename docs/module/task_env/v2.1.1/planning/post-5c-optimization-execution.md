@@ -504,3 +504,11 @@ MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 rese
 MuJoCo CPU 的 PickCube、一体与装配 Panda、NutAssembly、Pendulum 和双轮车短程通过；其中一体与装配 Panda 和 NutAssembly 各完成单 interval 记录写入及读回（前两条 canonical mapping 精确、Nut streaming 字节精确），合计 65 可观测子步。PickCube reset-scoped joint effort 路线另完成 1 interval 的 H5 v3 结构化记录、1 transition／2 observations 读回及第二次 reset（5 子步）。这不是完整 Solution 或整段轨迹资格。纯测试在最后诊断变更后重跑；相关生产代码与前述成功运行相同。
 
 失败按原样保留：首次记录在首步前因 typed schema JSON 投影失败，修复后一次探针错误地对 legacy scalar route 调用不支持的 `stop`（5 子步），调整为正确的 `finish_recording` 后通过；物理记录首次未启用 reset-scoped selection 而被明确拒绝（0 子步），随后启用 selection 又发现 reset 前 `env.robot` 不可用（0 子步）。最终记录验证显式记录该 Robot 缺口，没有将其计作主体统一通过；此缺口属于 E02 后续工作。本批实际观测合计 75 子步。所有计划、冻结 diff、失败及成功结果位于 ignored `workspace/maintenance/v211_retire_leaf_observation_20261112_001/`。GeoPhys、Isaac 和 renderer 本批未重跑，E01～E04 仍未完成。
+
+### 6.32 reset-scoped 物理选择的 Robot 声明与提交
+
+输入 `71547bb2`。reset-scoped 选择 owner 接收已经编译的物理主体声明并暴露已提交选择；RobotRuntime 使用该声明在第一次 reset 前提供真实 subjects，此时 `controller=None`、`controllers=()`，不声称 Controller 已提交。成功 reset 后 Robot 使用实际提交的 physical execution subjects 和 Controller；无效选择在提交前拒绝，已提交 Robot 不变；成功切换后视图指向新提交 Controller。该实现消费原有真实声明和 reset 事务，不启动第二个 Runtime，也不在观察层伪造主体。当前此路线的 `env.controller` 仍是既有 Position 观察／兼容 owner，Robot 对外显示实际 physical Controller；两者职责与进一步收敛仍须 E02／E04 对账。
+
+生产修改 4 文件 +23／−6，净增 17 行；版本诊断修改 1 文件 +38／−15；本记录与当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。provider、renderer、source、时钟和提交接口未改；29 项版本纯合同通过。
+
+MuJoCo CPU 的 reset-scoped PickCube 先显示声明而无 committed Controller，第一次 reset 后以实际 joint Controller 非零推进并完成 H5 v3 记录读回；错误 Controller 选择保持原 Robot 和 spec，第二次 reset 切换至 r3-pose 后，新 Robot 指向新 Controller 并实际非零推进。该最终运行观测 10 子步。先前版本完成相同选择／记录但仅对切换后的身份做检查（5 子步）；四正式任务和装配 Panda 的五条普通短程另通过（65 子步），本批共 80 观测子步。计划、冻结 diff 和结果在 ignored `workspace/maintenance/v211_reset_robot_20261112_001/`。GeoPhys、Isaac、renderer 未在本批重跑；E01～E04 仍未完成。
