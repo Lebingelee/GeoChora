@@ -718,3 +718,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +5／−487，净减 482 行；版本诊断修改 1 文件 +14／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。Env 不再能经旧 F05 类型进入这些独立 Session 构建路径；Runtime 的正式 source、clock、提交和 renderer 合同未改变。
 
 73 项版本检查通过，新增检查覆盖正式 USD 输入类型／schema 及未知输入拒绝。MuJoCo 四任务短程通过，共观测 60 个 native 子步；GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。Isaac Position 与 joint effort 两条 CUDA／同步 RGB 路线分别完成两次 reset、step、三帧独立读回和关闭，各观测 41 次 physics callback，订阅前启动推进未知；Position 的 H5 独立核对保留 native Ack、5 条推进收据与两个 typed-state 样本。完整 Solution 本批未重跑。冻结 diff、计划、两条 Isaac 运行、GeoPhys 收据及 H5 检查位于 ignored `workspace/maintenance/v211_retire_f05_session_20261112_001/`。
+
+### 6.59 清除 F05 孤立 native 输入与 GeoPhys adapter
+
+输入 `cd77d708`。F05 的三个 Session 准入在 6.58 已退休；进一步检查四个正式任务、Runtime、benchmark 和 examples 的生产引用后，`position_admission.py` 的旧 F05 类型与 `geophys_native_io.py` 的 F05 专属 USD adapter 均无剩余生产调用者，遂删除这两个文件。正式 GeoPhys 的 MJCF adapter、F06 Isaac 的 native 实现及共享控制／状态合同没有删除；历史诊断对旧路径的引用不再作为兼容目标。Isaac adapter 内的其他历史专用条件仍待后续核对。
+
+生产删除 2 文件、1084 行，新增和迁移均为 0；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。项目 tracked 文件数由 1366 减至 1364。正式 Runtime 构建、source、clock、提交与 renderer 路径未改；删除的是已无法由正式入口到达的旧 native 实现。
+
+73 项版本检查通过；MuJoCo PickCube R3 短程观测 5 个 native 子步，GeoPhys 同任务短程通过、内部子步未观测并保守预留 50。Isaac Position／effort、四任务及 H5 受影响行为可复用 6.58 已有证据：本批删除的两文件没有出现在正式生产导入链中，本批未重跑 Isaac 或完整 Solution。冻结 diff、计划和 CPU 收据位于 ignored `workspace/maintenance/v211_retire_f05_native_files_20261112_001/`。E01～E04 仍未接收。

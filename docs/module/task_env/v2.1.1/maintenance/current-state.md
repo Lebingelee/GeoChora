@@ -131,3 +131,5 @@ Panda effort 的 Scene 声明与物理构造现由同一 Robot 实例承担；Mu
 退休 Position candidate 输入专属的 observation／录像写入分支已移除；MuJoCo 装配 Position 录像及 Isaac 正式 Position／RGB／H5 的 native 收据已复验。详见[实施记录 6.57](../planning/post-5c-optimization-execution.md#657-退休旧-position-输入的-observation-和录像-writer)。
 
 旧 F05 Position 的三条 Session 准入及材料化分支已退休；正式 MuJoCo 四任务、GeoPhys 和 Isaac Position／effort 受影响短程已复验。底层历史类型和相关诊断仍待后续清理。详见[实施记录 6.58](../planning/post-5c-optimization-execution.md#658-退休-f05-旧-position-session-入口)。
+
+F05 孤立输入类型与专属 GeoPhys/USD native adapter 两个无生产调用者的文件已删除；正式 MuJoCo／GeoPhys 短程通过。详见[实施记录 6.59](../planning/post-5c-optimization-execution.md#659-清除-f05-孤立-native-输入与-geophys-adapter)。
