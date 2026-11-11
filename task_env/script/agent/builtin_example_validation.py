@@ -493,7 +493,16 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             save_inputs / 'working_tree_scope.json', seed, run_dir, provider=spec.provider,
         )
         rows.append(row)
-        planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(rows)
+        # The F06 route gate only counts the fixed seeds; diagnostic seeds are
+        # reported separately and never supply the required evidence.
+        planned_action_count_total, planned_action_seed_ids = _planned_action_route_evidence(
+            [item for item in rows if item.get('seed') in spec.seeds[:3]]
+        )
+        diagnostic_planned_action_count, diagnostic_planned_action_seed_ids = (
+            _planned_action_route_evidence(
+                [item for item in rows if item.get('seed') not in spec.seeds[:3]]
+            )
+        )
         compiled_values = [item.get('compiled') for item in rows]
         compiled_consistent = bool(compiled_values and all(
             isinstance(value, dict) and value == compiled_values[0] for value in compiled_values
@@ -513,6 +522,8 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             'task_solved_count': sum(item.get('task_outcome') == 'SOLVED' for item in rows),
             'planned_action_count_total': planned_action_count_total,
             'planned_action_seed_ids': planned_action_seed_ids,
+            'diagnostic_planned_action_count': diagnostic_planned_action_count,
+            'diagnostic_planned_action_seed_ids': diagnostic_planned_action_seed_ids,
             'planned_action_route_gate': (
                 'PASS' if planned_action_count_total > 0 else 'MISSING_CORE_PLANNED_ACTION_EVIDENCE'
             ),

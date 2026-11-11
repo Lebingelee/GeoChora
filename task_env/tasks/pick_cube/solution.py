@@ -70,6 +70,9 @@ _MEASURED_TCP_HOLD_INTEGRATE_STEP_RATIO = 0.05
 # of a joint-space overshoot), and integrating it drives the command through
 # the target, e.g. down onto the cube after a descend.
 _MEASURED_TCP_HOLD_INTEGRATE_MAX_ERROR_M = _MEASURED_TCP_HOLD_MAX_CORRECTION_M
+# A settled gate needs this many consecutive in-band, low-motion observations,
+# so the turnaround of a joint-space overshoot inside the band does not pass it.
+_MEASURED_TCP_GATE_SETTLED_DWELL_TICKS = 3
 # The descend stage ends on a measured grasp-height interlock: a TCP that settles
 # above the planned grasp height leaves only the pad tips on the cube top edge.
 _GRASP_HEIGHT_LOWER_TOLERANCE = 0.003
@@ -739,6 +742,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._last_measured_tcp_gate_hold = False
         self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
         self._measured_tcp_hold_previous_tcp = None
+        self._measured_tcp_gate_settled_ticks = 0
         self._last_public_observation = None
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -786,6 +790,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._last_measured_tcp_gate_hold = False
         self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
         self._measured_tcp_hold_previous_tcp = None
+        self._measured_tcp_gate_settled_ticks = 0
         self._last_public_observation = observation
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -1087,6 +1092,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
         self._measured_tcp_hold_previous_tcp = None
+        self._measured_tcp_gate_settled_ticks = 0
 
     def _corrected_gate_hold_action(self, planned_action):
         action = np.array(planned_action, dtype=np.float32, copy=True)
@@ -1142,11 +1148,16 @@ class PickCubeReadinessSolution(PickCubeSolution):
                 return
             metrics = self._measured_tcp_gate_metrics(gate, observation)
             if not metrics["ready"]:
+                self._measured_tcp_gate_settled_ticks = 0
                 return
             if gate.require_settled:
                 previous = self._measured_tcp_hold_previous_tcp
                 if previous is None or float(np.linalg.norm(
                         metrics["tcp_pose"][:3] - previous)) > _MEASURED_TCP_HOLD_SETTLED_STEP_M:
+                    self._measured_tcp_gate_settled_ticks = 0
+                    return
+                self._measured_tcp_gate_settled_ticks += 1
+                if self._measured_tcp_gate_settled_ticks < _MEASURED_TCP_GATE_SETTLED_DWELL_TICKS:
                     return
             self.completion_events.append({
                 "stage": segment.name,
@@ -1169,6 +1180,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             # clearance gate would offset the later pose hold away from its target.
             self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
             self._measured_tcp_hold_previous_tcp = None
+        self._measured_tcp_gate_settled_ticks = 0
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
