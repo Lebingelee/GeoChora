@@ -51,3 +51,17 @@ def test_usd_effort_binding_does_not_request_position_source_composition():
         horizon=8, drive_mode='effort-only', control_kind='joint')
     assert binding.scalar_control_binding is None
     assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding
+
+
+def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
+    from task_env.runtime.sessions.api import _session_admission_input_route
+    from task_env.runtime.sessions.source import UsdRuntimeInputV1
+
+    value = object.__new__(UsdRuntimeInputV1)
+    object.__setattr__(value, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
+    assert _session_admission_input_route(value) == 'f06_pickcube'
+    object.__setattr__(value, 'schema_version', 'old-position-input-v1')
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(value)
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(object())

@@ -710,3 +710,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +11／−276，净减 265 行；测试／诊断代码无修改；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。正式构建路径不再检查无生产者的旧 Position 输入；Runtime clock、物理提交、adapter 和 renderer 未改。
 
 72 项版本检查通过。MuJoCo 装配 Panda Position 的双 writer 录像完成逻辑读回、physical joint→R3 切换录像完成 H5 读回，共观测 15 个 native 子步。Isaac 正式 R3 Position／同步 RGB 完成两次 reset、step、三帧独立读回及 Env／App 关闭；H5 独立读回包含一条 structured transition、native Position Ack、5 个 native 推进收据、两个 typed-state 样本，观测 41 次 callback，订阅前启动推进未知。首次 Isaac 运行因测试相机仍绑定旧 physical Artifact，被身份检查拒绝并在退出 SDK 时异常；第二次用当前 Position Artifact 绑定相机后通过。首次未观测推进按 59 次保守计入，累计记账 100 次。GeoPhys 和完整 Solution 本批未重跑。冻结 diff、计划、两次运行、H5 检查及收据位于 ignored `workspace/maintenance/v211_retire_position_input_writer_20261112_001/`。E01～E04 仍未接收。
+
+### 6.58 退休 F05 旧 Position Session 入口
+
+输入 `89e31e56`。F05 native、DG02 和 DG04 输入只由已退休诊断入口生产；共同 Runtime 仍维护三套材料化、专属 capability manifest、验证、S1 测试注入及 receipt 分流。本批从 Session 输入分类、选路和材料化中移除这些分支，并撤销它们的旧执行路线准入。正式 F06 Isaac Position 输入仍要求精确类型、schema、source、Artifact、provider 及 native receipt；普通 G05 effort 与其他正式 provider 的准入保持。F05 底层历史类型及仅由历史诊断引用的 adapter 代码仍在，尚待后续辨别和清理；不因此声明 E01～E04 完成。
+
+生产修改 2 文件 +5／−487，净减 482 行；版本诊断修改 1 文件 +14／−0；本文和当前状态文档修改 2 文件。无文件新增、删除或迁移，tracked 文件数保持 1366。Env 不再能经旧 F05 类型进入这些独立 Session 构建路径；Runtime 的正式 source、clock、提交和 renderer 合同未改变。
+
+73 项版本检查通过，新增检查覆盖正式 USD 输入类型／schema 及未知输入拒绝。MuJoCo 四任务短程通过，共观测 60 个 native 子步；GeoPhys PickCube R3 短程通过，内部子步未观测、保守预留 50。Isaac Position 与 joint effort 两条 CUDA／同步 RGB 路线分别完成两次 reset、step、三帧独立读回和关闭，各观测 41 次 physics callback，订阅前启动推进未知；Position 的 H5 独立核对保留 native Ack、5 条推进收据与两个 typed-state 样本。完整 Solution 本批未重跑。冻结 diff、计划、两条 Isaac 运行、GeoPhys 收据及 H5 检查位于 ignored `workspace/maintenance/v211_retire_f05_session_20261112_001/`。

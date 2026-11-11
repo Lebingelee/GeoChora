@@ -1,7 +1,5 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
 from collections.abc import Callable, Mapping
-from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import replace
 from typing import Protocol
 
@@ -30,9 +28,6 @@ CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
 F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
-F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
-F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
-F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 
@@ -118,10 +113,6 @@ def validate_selected_position_route(execution):
              execution.physics_profile)
     if route not in {
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE),
-        ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
-        ('geophys', 'cpu', 'cpu', 'best_effort', F05_GEOPHYS_NATIVE_POSITION_PROFILE),
-        ('geophys', 'cpu', 'cpu', 'best_effort', F05_DG02_GEOPHYS_USD_PROFILE),
-        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F05_DG04_ISAAC_NATIVE_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F06_PICKCUBE_ISAAC_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', G05_ISAAC_EFFORT_PROFILE),
     }:
@@ -147,51 +138,6 @@ _F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc
 _F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
 _F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
-_F05_DG04_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
-    'task_env_f05_dg04_s1_native_io_context', default=None,
-)
-
-
-class _F05Dg04S1NativeIOContext:
-    """Private S1 scope replacing only the exact DG04 native I/O port."""
-
-    def __init__(self, input_v1, factory):
-        _require_session_admission_input_route(
-            input_v1, 'f05_dg04', 'DG04 S1 requires its exact versioned source-bound candidate input',
-        )
-        input_v1.validate()
-        if not callable(factory):
-            raise TypeError('DG04 S1 factory must be callable')
-        source = input_v1.runtime_source
-        representation = source.scene_source.representation
-        if (source.scene_source.source_verified or not source.scene_source.locally_validated
-                or representation.runtime_admitted or representation.source_verified
-                or representation.provider != 'isaacsim'
-                or representation.provider_build_identity != 'isaacsim-6.2.0.0'):
-            raise ValueError('DG04 S1 cannot promote local validation to runtime admission')
-        self.input_v1, self.factory = input_v1, factory
-
-    def validate_call(self, artifact, execution, source):
-        declared = self.input_v1
-        if (artifact is not declared.artifact or source is not declared.runtime_source
-                or type(execution) is not ExecutionSpecV1
-                or execution.identity_hash != declared.execution.identity_hash):
-            raise ValueError('DG04 S1 factory differs from its exact candidate identities')
-        declared.validate()
-
-
-@contextmanager
-def _f05_dg04_s1_native_io_context(input_v1, factory):
-    scope = _F05Dg04S1NativeIOContext(input_v1, factory)
-    token = _F05_DG04_S1_NATIVE_IO_CONTEXT.set(scope)
-    try:
-        yield scope
-    finally:
-        _F05_DG04_S1_NATIVE_IO_CONTEXT.reset(token)
-
-
-def _current_f05_dg04_s1_native_io_context():
-    return _F05_DG04_S1_NATIVE_IO_CONTEXT.get()
 _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = '67da1165149486d3ae3e779c13ce31af49e17d50'
 _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
 
@@ -380,82 +326,6 @@ def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
         raise ValueError('F04 Isaac profile does not implement every TaskArtifact capability')
 
 
-def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the frozen local Menagerie/GeoPhys CPU Position cell."""
-    _require_session_admission_input_route(
-        input_v1, 'f05_native', 'F05 GeoPhys native materialization requires the exact versioned native input',
-    )
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'F05 GeoPhys native materialization differs from its exact candidate identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'geophys', 'cpu', 'cpu', F05_GEOPHYS_NATIVE_POSITION_PROFILE, 'best_effort'):
-        raise ValueError('unsupported GeoPhys USD native provider/backend/device/profile intersection')
-    if (source.scene_source.representation.provider,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted,
-            source.scene_source.locally_validated,
-            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
-        raise ValueError('F05 native production admission requires the exact locally validated USD source')
-    _validate_f04_source_family(source.scene_source.loaded_delivery.delivery)
-    if source.scene_source.loaded_delivery.delivery.asset_definition.source_reference != _F04_MENAGERIE_PANDA_SOURCE_REFERENCE:
-        raise ValueError('F05 native admission is limited to the frozen Menagerie Panda source')
-    if source.scene_source.representation.provider_build_identity != input_v1.host_model_producer_identity.requested_target_build_identity:
-        raise ValueError('F05 requested target build differs from the source Representation')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('F05 native Position cell is state-only and cannot create a renderer')
-
-
-def _validate_f05_dg02_geophys_usd_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the exact DG02 source-preserving USD/Core input contract."""
-    _require_session_admission_input_route(
-        input_v1, 'f05_dg02', 'DG02 GeoPhys/USD materialization requires the exact candidate input',
-    )
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'DG02 materialization differs from its exact Task/Scene/Execution identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'geophys', 'cpu', 'cpu', F05_DG02_GEOPHYS_USD_PROFILE, 'best_effort'):
-        raise ValueError('unsupported DG02 GeoPhys CPU/USD source intersection')
-    if (source.scene_source.representation.provider,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted,
-            source.scene_source.locally_validated,
-            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
-        raise ValueError('DG02 production admission requires its exact locally validated source-preserving USD')
-    if (source.scene_source.loaded_delivery.delivery.recipe_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.delivery.recipe_sha256):
-        raise ValueError('DG02 delivery recipe identity changed after candidate validation')
-
-
-def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source) -> None:
-    """Admit only the exact source-bound DG04 native PhysX mimic profile."""
-    _require_session_admission_input_route(
-        input_v1, 'f05_dg04', 'DG04 Isaac native materialization requires its exact candidate input',
-    )
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'DG04 materialization differs from its exact Task/Scene/Execution identities')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'isaacsim', 'cuda', 'cuda:0', F05_DG04_ISAAC_NATIVE_PROFILE, 'best_effort'):
-        raise ValueError('unsupported DG04 Isaac CUDA/native-mimic execution intersection')
-    representation = source.scene_source.representation
-    if (representation.provider, representation.provider_build_identity,
-            representation.representation_format, representation.runtime_admitted,
-            representation.source_verified, source.scene_source.locally_validated,
-            source.scene_source.source_verified) != (
-            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
-        raise ValueError('DG04 production admission requires its exact locally validated non-upstream USD')
-    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.manifest_bytes_sha256
-            or source.scene_source.loaded_delivery.delivery_sha256
-            != input_v1.runtime_source.scene_source.loaded_delivery.delivery_sha256
-            or dict(source.joints) != dict(source.joint_targets)):
-        raise ValueError('DG04 delivery or exact nine-joint source identity changed after candidate validation')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('DG04 Core cell is state-only and does not admit a renderer')
-
-
 def _validate_usd_task_policy(input_v1, expected_sha256):
     """Verify a pinned task declaration before trusting its binding and limits."""
     from ...controllers.canonical.contracts import digest
@@ -522,28 +392,6 @@ def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) ->
         raise ValueError('F06 Core cell is state-only and does not admit a renderer')
 
 
-def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
-    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
-
-    names = sorted(set(artifact.required_capabilities.names) | {
-        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
-        'body_pose_query', 'frame_pose_query',
-    })
-    status = 'tested' if synthetic_s1 else 'implemented'
-    evidence = (
-        'DG04-synthetic-S1-only-no-runtime-admission' if synthetic_s1
-        else 'F05-DG04-versioned-native-PhysX-mimic-Core-cell'
-    )
-    return ProviderCapabilityManifest(
-        'provider-capability-v0', 'isaacsim', '6.2.0.0',
-        'f05-dg04-native-mimic-core-v1', 'cuda', F05_DG04_ISAAC_NATIVE_PROFILE,
-        'none', 'best_effort',
-        tuple(CapabilityClaim(name, status, evidence) for name in names),
-        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
-        'bounded F05 DG04 source-bound native mimic cell; no provider-wide qualification',
-    )
-
-
 def _f06_pickcube_isaac_capability_manifest(artifact):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
     import os
@@ -575,19 +423,6 @@ def _session_admission_input_route(input_v1) -> str | None:
     if (type(input_v1) is UsdRuntimeInputV1
             and getattr(input_v1, 'schema_version', None) == 'pick-cube-isaac-runtime-input-v1'):
         return 'f06_pickcube'
-    from .position_admission import (
-        F05Dg02GeoPhysUsdCandidateInputV1,
-        F05Dg04IsaacNativeCandidateInputV1,
-        F05NativePositionCandidateInputV1,
-    )
-    routes = (
-        (F05NativePositionCandidateInputV1, 'f05_native'),
-        (F05Dg02GeoPhysUsdCandidateInputV1, 'f05_dg02'),
-        (F05Dg04IsaacNativeCandidateInputV1, 'f05_dg04'),
-    )
-    for input_type, route in routes:
-        if type(input_v1) is input_type:
-            return route
     raise TypeError('Session admission requires one exact supported task runtime input')
 
 
@@ -867,9 +702,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if (_observer_render_request is not None and _observer_render_request.provider == 'isaacsim'
             and admission_route != 'f06_pickcube'):
         raise ValueError('Isaac observer request requires the exact F06 input')
-    _f05_native_input = _session_admission_input if admission_route == 'f05_native' else None
-    _f05_dg02_geophys_input = _session_admission_input if admission_route == 'f05_dg02' else None
-    _f05_dg04_isaac_native_input = _session_admission_input if admission_route == 'f05_dg04' else None
     _f06_pickcube_isaac_input = _session_admission_input if admission_route == 'f06_pickcube' else None
     if (_f06_pickcube_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
@@ -912,112 +744,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
         return session
-    if (_f05_dg04_isaac_native_input is not None
-            or (type(execution) is ExecutionSpecV1
-                and execution.physics_profile == F05_DG04_ISAAC_NATIVE_PROFILE)):
-        if _f05_dg04_isaac_native_input is None:
-            raise ValueError('DG04 native PhysX profile requires its exact versioned candidate input')
-        _validate_f05_dg04_isaac_native_input(
-            _f05_dg04_isaac_native_input, artifact, declared_execution, source,
-        )
-        scope = _current_f05_dg04_s1_native_io_context()
-        expected_manifest = _f05_dg04_isaac_capability_manifest(
-            artifact, synthetic_s1=scope is not None,
-        )
-        if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
-                or _materialization_authority is not None):
-            raise ValueError('DG04 exact admission requires the Core-generated source-bound manifest only')
-        projected_execution = ExecutionSpec(
-            'isaacsim', F05_DG04_ISAAC_NATIVE_PROFILE, 'none', 'cuda',
-            declared_execution.provider_seed, 'best_effort',
-        )
-        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
-        if scope is not None:
-            scope.validate_call(artifact, declared_execution, source)
-            native_io = scope.factory(
-                artifact=artifact, execution=declared_execution, source=source,
-                input_v1=_f05_dg04_isaac_native_input,
-            )
-            required_methods = (
-                'metadata', 'write_reset', 'read_state', 'write_position_targets',
-                'advance', 'close',
-            )
-            if any(not callable(getattr(native_io, name, None)) for name in required_methods):
-                raise TypeError('DG04 S1 fixture must implement only the exact typed NativeRuntimeIO port')
-        else:
-            from .isaac_native_io import create_isaac_native_runtime_io
-
-            native_io = create_isaac_native_runtime_io(
-                artifact, declared_execution, source,
-                dg04_native_input=_f05_dg04_isaac_native_input,
-            )
-        from .leaf_control import IsaacNativeMimicPositionDriveReceiptV1
-        from .native_io import UsdCoreRuntimeSession
-
-        try:
-            receipt = getattr(native_io, 'drive_receipt', None)
-            expected_provenance = 'synthetic_fixture' if scope is not None else 'native_runtime'
-            if (type(receipt) is not IsaacNativeMimicPositionDriveReceiptV1
-                    or receipt.provenance_kind != expected_provenance
-                    or receipt.execution_identity_sha256 != declared_execution.identity_hash
-                    or receipt.source_closure_sha256 != source.source_closure_digest
-                    or receipt.scene_identity_sha256 != source.scene_definition.identity_hash
-                    or len(receipt.native_dof_names) != 9
-                    or set(receipt.native_dof_names) != set(source.joint_targets.values())):
-                raise ValueError('DG04 model-bound native mimic receipt differs from exact source/execution mapping')
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, receipt,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='DG04 native-I/O',
-                runtime_owner_label='DG04 Isaac App owner' if scope is None else None,
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
-    if (_f05_dg02_geophys_input is not None
-            or (type(execution) is ExecutionSpecV1
-                and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE)):
-        if _f05_dg02_geophys_input is None:
-            raise ValueError('DG02 GeoPhys/USD profile requires its exact versioned candidate input')
-        _validate_f05_dg02_geophys_usd_input(
-            _f05_dg02_geophys_input, artifact, declared_execution, source,
-        )
-        if manifest is None or _materialization_authority is not None:
-            raise ValueError('DG02 exact admission requires its Core-generated capability manifest only')
-        projected_execution = ExecutionSpec(
-            'geophys', F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'cpu',
-            declared_execution.provider_seed, 'best_effort',
-        )
-        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
-        from .geophys_native_io import create_f05_geophys_native_io
-        from .native_io import UsdCoreRuntimeSession
-
-        native_io = create_f05_geophys_native_io(
-            artifact=artifact, execution=declared_execution,
-            source=source, input_v1=_f05_dg02_geophys_input,
-        )
-        try:
-            receipt = native_io.drive_receipt
-            if receipt.identity_sha256 != _f05_dg02_geophys_input.native_drive_receipt.identity_sha256:
-                raise ValueError('DG02 runtime model receipt differs from the frozen public-model receipt')
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, receipt,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='DG02 native-I/O',
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
-    if (type(execution) is ExecutionSpecV1
-            and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE
-            and _f05_dg02_geophys_input is None):
-        raise ValueError('DG02 GeoPhys/USD profile cannot use generic v1 admission')
     if type(source) is UsdRuntimeSourceV1:
         if type(declared_execution) is not ExecutionSpecV1:
             raise TypeError('USD RuntimeSource requires an explicit ExecutionSpecV1')
@@ -1028,34 +754,6 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if (source.task_artifact.identity_hash != artifact.identity_hash
                 or source.scene_definition.identity_hash != artifact.scene_identity_hash):
             raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
-        if _f05_native_input is not None:
-            _validate_f05_geophys_native_position_input(
-                _f05_native_input, artifact, declared_execution, source,
-            )
-            if manifest is not None or _materialization_authority is not None:
-                raise ValueError('F05 native exact-cell admission cannot combine with caller manifests or diagnostics')
-            from .geophys_native_io import create_f05_geophys_native_io
-            from .native_io import UsdCoreRuntimeSession
-
-            native_io = create_f05_geophys_native_io(
-                artifact=artifact, execution=declared_execution,
-                source=source, input_v1=_f05_native_input,
-            )
-            try:
-                session = UsdCoreRuntimeSession(
-                    artifact, declared_execution, source, native_io,
-                    native_io.drive_receipt,
-                )
-            except BaseException as materialization_error:
-                _close_failed_native_materialization(
-                    materialization_error, native_io, io_label='F05 GeoPhys native-I/O',
-                )
-                raise
-            session._declared_execution_spec_v1 = declared_execution
-            session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-            return session
-        if declared_execution.physics_profile == F05_GEOPHYS_NATIVE_POSITION_PROFILE:
-            raise ValueError('F05 GeoPhys native profile requires its exact versioned source admission input')
         if not (source.scene_source.source_verified or source.scene_source.locally_validated):
             raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
         if not declared_execution.physics_provider == 'isaacsim':
