@@ -55,7 +55,7 @@ try:
         'parents':[s.parent_subject_id for s in robot.subjects],
         'controller_identities':[str(c.identity) for c in robot.controllers]}
     if args.case=='panda-joint' and args.record:
-        assert robot.subjects and robot.controller is None and robot.controllers == ()
+        assert robot.subjects and robot.controller is None and env.controller is None and robot.controllers == ()
         result['robot_before_reset']='declared_without_committed_controller'
     else:
         assert robot.controller is env.controller
@@ -80,7 +80,7 @@ try:
             committed=env._physical_reset_selection.current.execution
             assert active_robot.subjects == committed.subjects
             assert active_robot.controllers == committed.controllers
-            assert active_robot.controller is committed.controllers[0]
+            assert active_robot.controller is env.controller is committed.controllers[0]
             result['first_physical_controller']=active_robot.controller.identity
         if args.record:env.start_recording(Path('episode.h5').resolve())
         first=env.session.state_boundary_identity().to_mapping()
@@ -114,11 +114,11 @@ try:
             try:env.reset(options={'controller':'unsupported'})
             except ValueError:pass
             else:raise AssertionError('invalid controller reset was accepted')
-            assert env.robot is prior_robot and env.physical_action_spec()==prior_spec
+            assert env.robot is prior_robot and env.controller is prior_robot.controller and env.physical_action_spec()==prior_spec
             observation,info=env.reset(seed=31,options={'controller':'r3-pose'})
             committed=env._physical_reset_selection.current.execution
             assert env.robot.subjects == committed.subjects and env.robot.controllers == committed.controllers
-            assert env.robot.controller is committed.controllers[0] and env.robot is not prior_robot
+            assert env.robot.controller is env.controller is committed.controllers[0] and env.robot is not prior_robot
             assert env.robot.controller.identity != prior_robot.controller.identity
             result['switched_physical_controller']=env.robot.controller.identity
             result['invalid_reset_preserved_robot']=True
@@ -126,7 +126,7 @@ try:
             switched_action=env.bind_physical_action(np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32))
             env.step(switched_action)
             assert abs(float(env.state.simulation_time)-switched_before-env.artifact.timebase.control_dt)<1e-9
-            assert env.robot.controller is env._physical_reset_selection.current.execution.controllers[0]
+            assert env.robot.controller is env.controller is env._physical_reset_selection.current.execution.controllers[0]
             result['switched_controller_advanced']=True
         else:
             observation,info=env.reset(seed=19 if args.case=='nut' else 31)

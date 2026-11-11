@@ -558,3 +558,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 9 文件 +30／−19，净增 11 行；版本诊断修改 2 文件 +26／−1；实施和当前状态文档 2 文件修改。无文件新增、删除或迁移，tracked 文件数不变。入口统一发生在实际 Robot 实例创建；Position 与 effort 的 source 编译和 Controller 绑定仍各有能力合同，不据此声称四任务构建全部统一。provider／renderer adapter、clock、提交和 native 映射未修改。
 
 37 项版本纯合同通过，覆盖四任务显式 Robot UID、registry 创建、配置重解析及跨任务主体拒绝。四任务及装配 Panda 均以显式 `robot.uid` 在 MuJoCo CPU 完成构造、reset、非零 action 或 Nut 单个 Solution interval、第二次 reset 和 close，共 65 个可观测子步；同 seed 与此前默认选择的主体／Controller、reset、可用的 Scene 或 Artifact／source identity 及单步奖励一致。GeoPhys、Isaac 和 renderer 本批未重跑，旧有界证据不扩大；计划、冻结 diff 和对照在 ignored `workspace/maintenance/v211_robot_registry_20261112_001/`。E01～E04 仍未完成。
+
+### 6.39 公开 Controller 与实际提交者对齐
+
+输入 `533655f0`。对于 reset 时选择物理 Controller 的正式路径，`env.controller` 现在与 `env.robot.controller` 指向实际已提交的 physical Controller；首次 reset 前两者均为 `None`。无效选择不改变已提交对象，成功切换后两者同时指向新对象。用于 Position 状态投影、构造及历史记录格式的内部对象由内部选择和 `position_profiles` 明确引用，不再冒充公开的动作提交 Controller；本批未删除这些仍在用的投影能力。公开属性只读，避免外部赋值造成伪状态。
+
+生产代码修改 5 文件 +51／−42，净增 9 行；版本诊断修改 1 文件 +5／−5；本记录和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1364；代码改写中的引用迁移不计为文件删除或代码精简。配置解析、provider／renderer adapter、source、clock 与实际提交实现未改，四任务完整共同构造和内部 Position 投影进一步归位仍未完成。
+
+37 项版本纯合同通过。MuJoCo CPU 的四任务短程以及装配 Panda 通过；可切换 PickCube 在最终代码上完成实际 joint 动作、H5 写入读回、无效选择拒绝、切换至 r3-pose 后再次推进，确认 Env／Robot／已提交执行为同一 Controller。首轮四任务及可切换路线观测 70 子步；只移除可写 setter 后最终代码另观测 15 子步，合计 85。GeoPhys、Isaac 和 renderer 未在本批重跑，不外推完整 Solution 或其他 provider。运行计划、冻结 diff 与结果位于 ignored `workspace/maintenance/v211_controller_owner_20261112_001/`。E01～E04 仍未接收。

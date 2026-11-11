@@ -91,3 +91,5 @@ Pendulum／双轮车的 Task 采样结果现在经共同 joint-effort reset 合�
 Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、Artifact、source 和 Controller，Task 只提供各自声明及语义；MuJoCo CPU direct／阻尼和 GeoPhys CPU direct 短程通过。tabletop 的主体构建仍须继续收敛，见[实施记录 6.37](../planning/post-5c-optimization-execution.md#637-简单主体共同-taskrobot-构建编排)。
 
 四个正式任务现在可通过同一 registry 和 `robot.uid` 选择实际 Robot；Pendulum／双轮车不再由 Task 直接实例化具体主体，且不需伪造 Panda 专属能力。显式主体选择的五条 MuJoCo CPU 短程通过；source／Controller 的全部共同构建仍待完成。见[实施记录 6.38](../planning/post-5c-optimization-execution.md#638-四任务-robot-身份与实例创建入口)。
+
+可切换 physical Controller 现在由 `env.controller` 和 `env.robot.controller` 同时公开实际已提交对象，首次 reset 前为 `None`；Position 的状态投影与记录继续使用内部对象。MuJoCo 四任务、装配 Panda 及切换后实际推进已按影响复验；完整统一仍未完成。详见[实施记录 6.39](../planning/post-5c-optimization-execution.md#639-公开-controller-与实际提交者对齐)。

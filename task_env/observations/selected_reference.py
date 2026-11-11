@@ -188,7 +188,7 @@ def build_selected_observation(self, state):
                 raise ValueError('RuntimeSession contact summary is stale or belongs to another state revision')
         return dict(obs), dict(info), evaluation
     if getattr(self, 'position_profile', False):
-        adapted = self.controller._adapt_publication(self.typed_state)
+        adapted = self.position_profiles[0]._adapt_publication(self.typed_state)
         evaluation_state = _position_task_evaluation_state(state, adapted)
         evaluation = evaluate_task_definition(self, evaluation_state)
         ee = adapted.pose_world['panda-v1/ee']

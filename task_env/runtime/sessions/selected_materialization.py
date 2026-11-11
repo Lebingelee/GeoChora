@@ -147,11 +147,11 @@ class MixedRuntimeBuilder:
     def create(self, env, _selection, _start_worker, materialize, _materialize_control):
         env.position_profile = False
         env.session = materialize(env.artifact, env.execution, source=env.value['source'])
-        env.session.bind_mixed_controller(env.controller.identity)
+        env.session.bind_mixed_controller(env._selected_controller.identity)
         if env.binding.pre_reset_session_validator is None:
             raise ValueError('mixed-control candidate requires compiled-layout validation before reset')
         env._compiled_layout_pre_reset = env.binding.pre_reset_session_validator(env.session, env.value)
-        return RuntimeBuildResult((MixedInitialState(env.controller),))
+        return RuntimeBuildResult((MixedInitialState(env._selected_controller),))
 
 
 @dataclass(frozen=True)
@@ -175,13 +175,13 @@ class ScalarRuntimeBuilder:
                     and getattr(env.value['source'], 'position_subject_binding', None) is None):
                 from .legacy_native_feedback_binding import install_admitted_binding
                 install_admitted_binding(env.session, source=env.value['source'],
-                                         artifact=env.artifact, controller=env.controller)
+                                         artifact=env.artifact, controller=env._selected_controller)
             return RuntimeBuildResult(skip_gravity=env.binding.physical_control_profile is None)
         env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
             binding=self.binding,
             diagnostic_profile=(env._diagnostic_profile if env.backend == 'cuda' else None),
             native_feedback_profile=env._native_feedback_profile,
-            selected_controller=(env.controller if env.binding.interval_mode == 'native'
+            selected_controller=(env._selected_controller if env.binding.interval_mode == 'native'
                                  or env._native_feedback_profile is not None else None),
             native_feedback_gripper_control_hz=(env.value['resolved_configuration'].get('gripper_control_hz')
                 if env._native_feedback_profile is not None else None))
@@ -229,7 +229,7 @@ def build_selected_runtime(env, selected, selection, start_worker, materialize, 
             and getattr(env, '_task_rgb_config', None) is None,
             declared is execution))
     if not capabilities:
-        capabilities.append(LegacyFeedbackInitialState(env.controller))
+        capabilities.append(LegacyFeedbackInitialState(env._selected_controller))
     env._selected_state_capabilities = tuple(capabilities)
     env._selected_reset_stop_capability = any(getattr(item, 'supports_stop', False) for item in capabilities)
     return result

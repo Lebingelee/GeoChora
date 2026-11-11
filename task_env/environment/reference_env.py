@@ -89,6 +89,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     observation_space = None
 
     @property
+    def controller(self):
+        """The Controller currently admitted to submit actions for this Env."""
+        selection = getattr(self, '_physical_reset_selection', None)
+        if selection is not None:
+            committed = selection.committed
+            return None if committed is None else committed.execution.controllers[0]
+        return getattr(self, '_selected_controller', None)
+
+    @property
     def _last_episode_end(self):
         return self._episode_execution_state().episode_end
 
@@ -1058,7 +1067,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.mixed_control_profile = selected.mixed
         self.position_profiles = selected.position_profiles
         self.position_profile = selected.position
-        self.controller = selected.controller
+        self._selected_controller = selected.controller
         self._selected_controller_binding = selected
         from ..robots.runtime import RobotRuntime
         self._robot = RobotRuntime.from_selected(
@@ -2391,10 +2400,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             failure_phase = 'arm_schedule_reset'
             if self.mixed_control_profile:
                 self.arm_schedule = None
-            elif all(callable(getattr(self.controller, name, None))
+            elif all(callable(getattr(self._selected_controller, name, None))
                    for name in ('begin', 'target', 'applied')):
                 # The Controller itself owns acknowledged arm hold/ramp memory.
-                self.arm_schedule = self.controller
+                self.arm_schedule = self._selected_controller
             else:
                 self.arm_schedule = (self.binding.schedule_factory(self)
                                      if self.binding.schedule_factory is not None else None)
@@ -2533,7 +2542,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
         result = ExpertExecutionInfo(
             'expert-execution-info-v1', self._current_control_step(),
-            self.state.simulation_time, self.controller.readiness(self.state, self.feedback),
+            self.state.simulation_time, self._selected_controller.readiness(self.state, self.feedback),
         )
         result.validate()
         return result
@@ -2620,7 +2629,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             'source_xml_sha256': source_xml_sha256,
             'source_closure_digest': source.source_closure_digest,
             'provider_materialization_id': self.session.provider_materialization_id,
-            'controller_identity': self.controller.identity,
+            'controller_identity': self._selected_controller.identity,
             'solution_identity': self._active_solution_identity(),
             'reset_sample_id': self.sample.sample_id,
             'control_step': execution_info.control_step,
@@ -2645,7 +2654,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             request=request, canonical=canonical, target=target, applied=applied,
             request_boundary=request_boundary, read_evaluation_boundary=read_evaluation_boundary,
             artifact=self.artifact,
-            controller_identity=self.controller.identity, provider=self.provider,
+            controller_identity=self._selected_controller.identity, provider=self.provider,
             source_id=self.value['source'].scene_source.source_id,
             reset_sample_id=self.sample.sample_id,
         )
@@ -3766,7 +3775,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             _commit_position_profile_replacement(self.session, prepared)
             committed = True
             self.position_profiles = (candidate,)
-            self.controller = candidate
+            self._selected_controller = candidate
             self.value['controller'] = candidate
             recorder.add_boundary_event(event)
             self._pending_position_switch = {
@@ -3785,7 +3794,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             # If a later pointer projection failed after RuntimeSession admitted
             # the candidate, keep the Env and session owners aligned before latching.
             self.position_profiles = (candidate,)
-            self.controller = candidate
+            self._selected_controller = candidate
             self.value['controller'] = candidate
             after_state = None
             readback_error = None
@@ -3804,7 +3813,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._position_controller_switch_fault_receipt = position_switch_fault_receipt(
                 switch_id=switch_id, boundary=boundary, clock=clock,
                 current=current, candidate=candidate,
-                active_controller_identity=self.controller.identity, fault=fault,
+                active_controller_identity=self._selected_controller.identity, fault=fault,
             )
             raise
         return event
@@ -3853,12 +3862,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         def apply_control():
             nonlocal interval_attempted
             interval_attempted = True
-            profiles = tuple(getattr(self, 'position_profiles', (self.controller,)))
+            profiles = tuple(getattr(self, 'position_profiles', (self._selected_controller,)))
             controller_profiles = profiles if len(profiles) == 2 else profiles[0]
             requirements = (
                 self._position_requirements()
                 if hasattr(self, 'position_profiles')
-                else getattr(self.controller, 'requirements', None)
+                else getattr(self._selected_controller, 'requirements', None)
             )
             return execute_position_control_interval(
                 self.session, controller_profiles, self.position_plan, request, self.typed_state,
@@ -4164,7 +4173,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 resources = tuple(sorted(resource for _writer, owned in resource_owners
                                          for resource in owned))
             else:
-                writer = getattr(self.controller, 'control_submission_writer_id', None)
+                writer = getattr(self._selected_controller, 'control_submission_writer_id', None)
                 if type(writer) is not str or not writer:
                     raise ValueError('declared Position Controller lacks a stable writer identity')
                 resources = tuple(sorted((*target.arm_servo_position.keys(),
@@ -4208,12 +4217,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 failure_phase = 'controller_control_request_validation'
                 if proposal is None or proposal.control_request is None:
                     raise ValueError('selected NutAssembly control requires its versioned arm execution request')
-                validate_request = getattr(self.controller, 'validate_arm_execution_request', None)
+                validate_request = getattr(self._selected_controller, 'validate_arm_execution_request', None)
                 if not callable(validate_request):
                     raise RuntimeError('selected Controller does not own the admitted arm execution request')
                 validate_request(proposal.control_request)
             elif proposal is not None and getattr(proposal, 'control_request', None) is not None:
-                validate_request = getattr(self.controller, 'validate_arm_execution_request', None)
+                validate_request = getattr(self._selected_controller, 'validate_arm_execution_request', None)
                 if not callable(validate_request):
                     raise ValueError('selected Controller does not admit this Solution control request')
                 validate_request(proposal.control_request)
@@ -4223,9 +4232,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                                     self.artifact.timebase.control_substeps)
             if proposal is not None and getattr(proposal, 'control_request', None) is not None:
                 failure_phase = 'controller_control_request'
-                self.controller.request_arm_execution(proposal.control_request)
+                self._selected_controller.request_arm_execution(proposal.control_request)
             failure_phase = 'controller_compute'
-            canonical, target = self.controller.compute(self.state, self.feedback, request)
+            canonical, target = self._selected_controller.compute(self.state, self.feedback, request)
 
             def observe(index, state, feedback, effective, applied, diag,
                         provider_feedback_sample=None):
@@ -4248,9 +4257,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             from contextlib import nullcontext
             from ..runtime.sessions.control import position_subject_interval
             from ..runtime.sessions.legacy_native_feedback_binding import native_feedback_interval
-            subject_scope = (position_subject_interval(self.session, target, self.state, controller=self.controller)
+            subject_scope = (position_subject_interval(self.session, target, self.state, controller=self._selected_controller)
                              if getattr(self.value['source'], 'position_subject_binding', None) is not None
-                             else native_feedback_interval(self.session, target, self.state, controller=self.controller)
+                             else native_feedback_interval(self.session, target, self.state, controller=self._selected_controller)
                              if getattr(self.session, '_legacy_native_feedback_binding', None) is not None
                              else nullcontext())
             with subject_scope:
@@ -4260,7 +4269,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         failure_phase = 'physics_step'
                         interval_attempted = True
                         result = self.session.step_control_interval(
-                            target, self.controller, interval_observer=observe,
+                            target, self._selected_controller, interval_observer=observe,
                             arm_schedule=self.arm_schedule)
                         interval_completed = True
                         return result
@@ -4355,7 +4364,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 record_append_attempted = True
                 if 'gravity_compensation_v1' in self.info:
                     diagnostics = {**diagnostics, 'gravity_compensation_v1': self.info['gravity_compensation_v1']}
-                if getattr(self.controller, 'last_split_bundle', None) is not None:
+                if getattr(self._selected_controller, 'last_split_bundle', None) is not None:
                     scene_receipt = getattr(self.session, '_last_scene_control_submission', None)
                     if not isinstance(scene_receipt, dict) or scene_receipt.get('status') != 'acknowledged':
                         raise ValueError('split Position recording requires its scene submission receipt')
@@ -4593,7 +4602,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         details = position_episode_end_payload(
             state=state, boundary=boundary,
             source_closure_digest=self.value['source'].source_closure_digest,
-            controller=self.controller,
+            controller=self._selected_controller,
             position_profiles=self.position_profiles if self.dual_entity_position else None,
             switch_fault_receipt=self._position_controller_switch_fault_receipt,
             pending_switch=self._pending_position_switch,
@@ -4709,7 +4718,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     'source_id': self.value['source'].scene_source.source_id,
                     'source_closure_digest': self.value['source'].source_closure_digest,
                     'reset_sample_id': self.sample.sample_id,
-                    'controller_identity': self.controller.identity,
+                    'controller_identity': self._selected_controller.identity,
                     'task_evaluation_success': success,
                 }
                 if solution is not None:
@@ -4788,7 +4797,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _boundary(self):
         from ..trajectory.canonical.contracts import BoundaryRecord
         return BoundaryRecord(self.state.control_step, self.state.simulation_time,
-            self.state, self.feedback, self.controller.readiness(self.state, self.feedback),
+            self.state, self.feedback, self._selected_controller.readiness(self.state, self.feedback),
             {k: float(v) for k, v in self.info['task_metrics'].items()},
             bool(self.evaluation.success), bool(self.evaluation.failure))
 
@@ -4798,7 +4807,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return coordinator_receipt(
             step=self.state.control_step, time=self.state.simulation_time,
             artifact_hash=self.artifact.identity_hash,
-            controller_identity=self.controller.identity,
+            controller_identity=self._selected_controller.identity,
             solution_identity=self._active_solution_identity(), provider=self.provider,
             execution_mode=self._episode_mode, task_outcome=self.info,
             source_sha256=self._recording_adapter_source_sha256,
@@ -4894,7 +4903,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         solution_identity = self._active_solution_identity()
         self._recording_adapter_source_sha256, source_provenance = selected_source_provenance(
             adapter_path=__file__, binding=self.binding, value=self.value, artifact=self.artifact,
-            controller_identity=self.controller.identity, solution_identity=solution_identity,
+            controller_identity=self._selected_controller.identity, solution_identity=solution_identity,
             execution_configuration=execution_configuration,
             execution_receipt=(self.get_execution_receipt()
                                if getattr(self, 'resolved_public_config', None) is not None else None),
@@ -4903,7 +4912,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         metadata, recipe = selected_recording_metadata(
             artifact=self.artifact, sample=self.sample, realized=self.realized,
             execution=self.execution, provider=self.provider, source_provenance=source_provenance,
-            controller_identity=self.controller.identity, solution_identity=solution_identity,
+            controller_identity=self._selected_controller.identity, solution_identity=solution_identity,
             action_schema=self.metadata['action_schema'],
             factory=type(self).__module__ + '.' + type(self).__name__,
             configuration=self.value['resolved_configuration'],

@@ -178,7 +178,7 @@ def position_record_metadata(self):
             bootstrap = self.session._native_io.bootstrap_receipt()
         else:
             bootstrap = None
-        action_schema = self.controller.controller_binding().action_schema
+        action_schema = self.position_profiles[0].controller_binding().action_schema
         profile = {
             'schema_version': (
                 'f04-isaac-core-position-recording-profile-v1' if f04_native else
@@ -259,7 +259,7 @@ def position_record_metadata(self):
             'reset_plan_identity_sha256': self.value['reset_plan'].identity_hash,
             'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
             'reset_write_receipt': reset_receipt.to_mapping(),
-            'controller_identity_sha256': self.controller.identity,
+            'controller_identity_sha256': self.position_profiles[0].identity,
             'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
             'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
             'native_position_drive_receipt': (
@@ -334,7 +334,7 @@ def position_record_metadata(self):
             'resolved_config': {
                 'provider': self.provider, 'backend': self.backend,
                 'device': self.execution.physics_device, 'horizon': self.horizon,
-                'controller_profile': self.controller.profile_id,
+                'controller_profile': self.position_profiles[0].profile_id,
                 'execution_identity_sha256': self.execution.identity_hash,
             },
             'candidate_identity': {
@@ -345,14 +345,14 @@ def position_record_metadata(self):
                 'source_closure_digest': source.source_closure_digest,
                 'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
                 'execution_identity_sha256': self.execution.identity_hash,
-                'controller_identity_sha256': self.controller.identity,
+                'controller_identity_sha256': self.position_profiles[0].identity,
                 'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
                 **({'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256}
                    if f05_host_model_route else {}),
             },
         }
 
-    profile = self.controller
+    profile = self.position_profiles[0]
     action_schema = profile.controller_binding().action_schema
     action_contract = asdict(action_schema)
     position_profiles = self.position_profiles
@@ -498,9 +498,9 @@ def position_record_metadata(self):
 def record_position_transition(self, request, canonical, target, applied, *, terminated, truncated):
     from ..trajectory.canonical.episode import StructuredControlTransitionV1
 
-    schema = self.controller.controller_binding().action_schema
+    schema = self.position_profiles[0].controller_binding().action_schema
     groups = {(group.entity_id, group.group_id): group for group in request.groups}
-    entity_id = self.controller.entity_id
+    entity_id = self.position_profiles[0].entity_id
     arm = groups[(entity_id, 'arm')]
     gripper = groups[(entity_id, 'gripper')]
     action_values = np.asarray((*arm.values, *gripper.values), dtype=np.float32)
@@ -562,7 +562,7 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
         }
     control = StructuredControlTransitionV1(
         'structured-control-transition-v1', request, ({
-            'writer_id': self.controller.writer_id,
+            'writer_id': self.position_profiles[0].writer_id,
             'action_schema_id': schema.schema_id,
             'components': tuple(schema.components),
             'groups': (

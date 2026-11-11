@@ -171,8 +171,8 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
     if has_declared_position_control_capability(env):
         session_generation = getattr(env.session, 'physical_control_generation', None)
         generation = (session_generation if type(session_generation) is int
-                      else int(getattr(env.controller, 'generation', 0)))
-        _dispatch_record(env, 'position-target', (env.controller.identity,), generation)
+                      else int(getattr(env._selected_controller, 'generation', 0)))
+        _dispatch_record(env, 'position-target', (env._selected_controller.identity,), generation)
         result = env._prepare_reference_step(action, **context)
         current = getattr(env.session, '_control_lifecycle_dispatch', None)
         if current is not None and current.stage == 'preparing':
