@@ -79,7 +79,7 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
     assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
 
 
-def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
+def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypatch):
     from dataclasses import replace
     from pathlib import Path
     from task_env.robots.runtime import RobotRuntime
@@ -92,6 +92,10 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan():
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
+    from task_env.controllers.canonical.execution import ReferenceExecutionController
+    def reject_unused_controller(*args, **kwargs):
+        pytest.fail('USD Position must not construct an unused MJCF Controller')
+    monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_unused_controller)
     value = build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
     binding = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
     selected = bind_selected_controller(value, binding=binding, provider='isaacsim', backend='cuda')

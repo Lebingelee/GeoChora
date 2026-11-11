@@ -397,22 +397,18 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessSolution
 
-    # The Task supplies action/readiness data; the selected Controller owns execution.
-    if controller_builder is None:
-        legacy = build_reference(backend="cpu", include_solution=False,
-                                 controller_profile=controller_profile, resolved_config=resolved_config,
-                                 task_config=task_config)
-    else:
-        prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
-                                             resolved_config=resolved_config, task_config=task_config)
-        from ...runtime.sessions.source import close_execution_source_on_failure
-        with close_execution_source_on_failure(prepared.source):
-            source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
-            legacy = {"source": prepared.source, "artifact": prepared.artifact, "readiness": prepared.readiness,
-                      "source_sha256": source_ids,
-                      "resolved_configuration": {"runtime_config": asdict(prepared.config),
-                                                  "task_recipe": prepared.task_config,
-                                                  "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
+    # Both USD control modes prepare the same Task data without building a
+    # separate MJCF Controller; the selected USD Controller is created below.
+    prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
+                                         resolved_config=resolved_config, task_config=task_config)
+    from ...runtime.sessions.source import close_execution_source_on_failure
+    with close_execution_source_on_failure(prepared.source):
+        source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
+        legacy = {"source": prepared.source, "artifact": prepared.artifact, "readiness": prepared.readiness,
+                  "source_sha256": source_ids,
+                  "resolved_configuration": {"runtime_config": asdict(prepared.config),
+                                              "task_recipe": prepared.task_config,
+                                              "resolved_controller_gripper": asdict(prepared.config.robot.gripper)}}
     # USD owns an independent source; the temporary MJCF snapshot only serves
     # Task/readiness preparation and must not outlive construction.
     receipt = legacy["source"].execution_source_receipt

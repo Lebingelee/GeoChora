@@ -960,3 +960,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 10 文件 +58／−779，净减 721 行；其中部分新增为去除条件分支后的代码缩进迁移，无整文件迁移。版本诊断未修改，本文与当前状态文档修改 2 文件；无新增或删除文件，tracked 文件数保持 1357。本批消除的是旧诊断的专属 Env 生命周期，未改变四个任务的配置入口，也未完成 E01～E04 的全部构造收敛。
 
 115 项版本检查通过。MuJoCo 的四个正式任务及装配 Panda 完成短程，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；装配两个 writer 在同一提交中均获确认。PickCube 物理 Controller 的 reset 切换及 H5 读回通过，观察 10 个子步。NutAssembly GeoPhys CPU 完成 reset、Solution 单步、再次 reset 和重复关闭，控制时间从 0 推进至 0.01 秒；native 子步未计数，导入日志含 MJCF 语义诊断。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据分别位于 ignored `workspace/maintenance/v211_retire_mixed_cpu_20261112_9fmd71fa/`、`workspace/maintenance/v211_retire_mixed_geophys_20261112_kmd1habf/` 和 `workspace/maintenance/v211_retire_mixed_isaac_20261112_17i725j0/`；E01～E04 仍未接收。
+
+### 6.89 USD Position 直接准备 Task source
+
+输入 `a813e684`。PickCube 的 Isaac Position 原来先通过 MJCF 参考构造创建 Controller，再丢弃它并创建实际使用的 USD Position Controller。现在 USD Position 与 USD effort 均从不创建 Controller 的共同 Task source／readiness 准备开始，随后各自按已选控制语义构造实际 Controller。source 身份、真实主体／Controller plan 准入和失败清理保留；当前准备仍借用并关闭临时 MJCF Task 快照，尚未完成所有 source 构造职责归位。
+
+生产修改 1 文件 +12／−16，净减 4 行，其中既有 effort 分支的大部分代码迁到共同准备路径；版本诊断修改 1 文件 +5／−1，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1357。减少一次不参与执行的 Controller 构造；四任务的共同配置入口、Runtime 控制提交和 renderer 合同未改变，不将此局部变化视作 E02 完成。
+
+115 项版本检查通过，其中 USD Position 的真实 source 构造明确禁止创建旧 MJCF 参考 Controller，同时核对实际 Robot、source 和 Controller plan。Isaac CUDA Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭；观察 41 次 physics callback，订阅前启动推进未知。callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和独立读回成功。MuJoCo、GeoPhys、Isaac effort 和完整 Solution 本批未重跑，其旧证据只证明具体受测版本与路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_usd_position_task_source_20261112_vncixp28/`；E01～E04 仍未接收。
