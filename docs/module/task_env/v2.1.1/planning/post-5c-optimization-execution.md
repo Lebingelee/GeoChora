@@ -109,10 +109,10 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 | 事件 | 当前状态 | 实际变化／剩余条件 |
 | --- | --- | --- |
 | E00 | 基线与度量已记录 | 输入 `21577d32`，四保护输入、两个 pins、tracked 原始文件／行数快照；原 O0 启动成果保留 |
-| E01 | 实施中 | 正式 Task caller 进入共同构造 owner，Controller selector 归一化；高级 candidate 和 execution 输入仍待归并，见 6.1 |
-| E02 | 实施中 | 四主体实际绑定的 Robot 视图、简单 TaskDefinition lifecycle 已验证；Panda／Nut 语义接口仍待对账，见 6.1 |
-| E03 | 实施中，首批修复已验证 | reset 与 Solution reset 共用提交／采图收尾；close 共用资源回收，Position 首次 reset 前自有 source／Task 资源不再遗漏。构造与 profile 残余职责仍待处理 |
-| E04 | 实施中，首批修复已验证 | mixed Solution 接入共同控制分派；普通 Position 数组准入由 Task binding 决定；physical preflight 委托现有 adapter；重力补偿由实际 source/model 准入而非 Env Task UID 判断。其余动作／模型／时序仍需逐项对账 |
+| E01 | 实施中 | 正式 caller 共用构造、Controller selector 在两 codec 前归一化、registry 不再反射判断工厂；两 codec 与 Position 输入仍待对账，见 6.5～6.8 |
+| E02 | 实施中 | 四主体共用 Robot 视图，正式 PickCube／Nut／Pendulum／双轮车共用 TaskDefinition lifecycle；其余主体和 registry 合同仍待审计，见 6.4～6.8 |
+| E03 | 实施中 | reset／Solution reset 共用收尾与 close 资源回收，Isaac 正式配置及 MuJoCo／GeoPhys 隔离 worker 已复验；其余 reset／profile／fault 待审计 |
+| E04 | 实施中 | 共同提交与 source／state／clock 对齐；正式 Isaac RGB、MuJoCo／GeoPhys 隔离 worker 已定向复验；其余动作／模型／renderer 组合待核，见 6.5～6.6 |
 
 本次先修复 E01／E02 后续迁移会复用的 reset／close／submit 共同 owner，事件接收依赖未改变；不提前关闭 E03／E04 或整个目标。
 
