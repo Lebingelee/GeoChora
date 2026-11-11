@@ -620,3 +620,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 1 文件 +41／−78，净减 37 行，删除一条重复物理构建分支及其校验；无整文件迁移。版本诊断修改 1 文件 +13／−0；本文与当前状态文档修改 2 文件。无文件新增或删除，tracked 文件数保持 1365。四任务实际公共构造无需根据旧 component 结果再选择 physical builder；组件-only 配置解析以及真实 Position／effort 控制能力仍在，不能据此宣称整个 E01～E04 已完成。provider／renderer adapter、clock 和提交实现未改。
 
 55 项版本检查通过，包含四任务拒绝旧 component resolved 输入；单独以不启动物理的方式检查背景 component 构造与关闭。MuJoCo CPU 四任务、装配 Panda 和 PickCube reset-scoped joint／r3 切换短程通过，后者含 H5 读回，共观测 75 子步；同 seed 对照的 Robot／Controller、reset、可用 Artifact／Scene／source 身份和单步奖励一致。GeoPhys CPU 的 PickCube 和 Pendulum 通过短程，内部子步未观测，各保守预留 50。Isaac、renderer 和完整 Solution 本批未重跑；计划、冻结 diff、对照与结果位于 ignored `workspace/maintenance/v211_retire_component_physical_20261112_001/`。E01～E04 仍未接收。
+
+### 6.47 退休 tabletop 类级共享 binding
+
+输入 `983aa8e2`。PickCube／NutAssembly 不再在导入 Env 类时预先创建一份类级 Task binding；正式 `make_env` 依据规范配置为每个环境创建 binding。两个 Task 类中与基类完全重复的配置入口也已删除，调用共同入口。Nut 的已有 native-feedback 显式构造在被调用时创建自身 binding，不再读取类级单例；其能力没有因本批重获资格。旧的无配置直接 Env 构造不再作为正式入口，调用者应使用 `task_env.make_env` 及正式配置。
+
+生产修改 2 文件 +1／−16，净减 15 行；版本诊断修改 1 文件 +26／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1365。减少类加载时无关的 Task 构造及两份重复解析入口；每个 Env 的 binding、Controller 和 source 各自持有。provider／renderer adapter、source 映射、clock 和控制提交未改；共同四主体构建仍未完成。
+
+57 项版本检查通过，新增检查分别构造同一 tabletop 任务的两个 Env，确认 binding、Controller、source 独立，关闭第一个后第二个 source 仍存在；检查读取资产但不启动物理。MuJoCo CPU 的 PickCube、NutAssembly、装配 Panda 和 PickCube reset-scoped joint／r3 切换短程通过，切换含 H5 读回，共观测 25 子步；对照中主体、reset、可用 Artifact／Scene／source 身份和单步奖励一致，Nut Controller 因 Task 来源源码身份变化。GeoPhys CPU 的 NutAssembly 通过短程，内部子步未观测，保守预留 50。Isaac、renderer、显式 native-feedback 路线及完整 Solution 本批未重跑；计划、冻结 diff、对照与结果位于 ignored `workspace/maintenance/v211_task_binding_instance_20261112_001/`。E01～E04 仍未接收。

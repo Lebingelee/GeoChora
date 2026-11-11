@@ -56,3 +56,29 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name):
         assert controller.control_dt == value['artifact'].timebase.control_dt
     finally:
         value['source'].execution_source_receipt.close()
+
+
+@pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
+def test_each_public_environment_owns_its_binding_and_source(uid):
+    import sys
+    from task_env import make_env
+
+    config = {'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                            'physics_device': 'cpu', 'deployment': 'in_process',
+                            'interpreter': sys.executable}, 'episode': {'horizon': 8}}
+    first = make_env(uid, config=config)
+    second = None
+    try:
+        second = make_env(uid, config=config)
+        assert first.binding is not second.binding
+        assert first.controller is not second.controller
+        first_receipt = first.value['source'].execution_source_receipt
+        second_receipt = second.value['source'].execution_source_receipt
+        assert first_receipt is not second_receipt
+        first.close()
+        assert not first_receipt.snapshot_root.exists()
+        assert second_receipt.snapshot_root.exists()
+    finally:
+        first.close()
+        if second is not None:
+            second.close()

@@ -669,7 +669,6 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
 @register_env()
 class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
-    binding = _binding()
     uses_selected_public_config = True
     selected_controller_profiles = frozenset()
     selected_parameter_limits = {"lift_height_m": (0.01, 0.15)}
@@ -698,12 +697,6 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
         return None
 
     @classmethod
-    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
-        from ...environment.configuration import resolve_task_env_config
-        return cls.from_resolved_config(resolve_task_env_config(cls, config),
-                                        render_mode=render_mode, **kwargs)
-
-    @classmethod
     def selected_binding(cls, config):
         return _binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
                         json.loads(config.task_configuration_json))
@@ -712,4 +705,4 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     def for_native_feedback_profile(cls, *, backend, gripper_control_hz=500, horizon=6000):
         """Create the explicit normal R05b GeoPhys native-feedback route."""
         return cls(provider='geophys', backend=backend, horizon=horizon,
-                   _native_feedback_request=gripper_control_hz)
+                   _binding=_binding(), _native_feedback_request=gripper_control_hz)

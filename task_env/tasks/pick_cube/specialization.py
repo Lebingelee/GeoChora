@@ -613,7 +613,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     """Public selected P1.6 route, registered beside its task definition."""
 
     uid = REFERENCE_ENV_ID
-    binding = make_reference_binding()
 
     uses_selected_public_config = True
     from .physical_candidate import PICKCUBE_PHYSICAL_PROFILES
@@ -657,13 +656,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     @staticmethod
     def selected_default_controller_profile(task_config=None):
         return (_recipe() if task_config is None else task_config["recipe"])["default_controller_profile"]
-
-    @classmethod
-    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
-        """Compatibility entry; parsing belongs to the common resolver."""
-        from ...environment.configuration import resolve_task_env_config
-        return cls.from_resolved_config(resolve_task_env_config(cls, config),
-                                        render_mode=render_mode, **kwargs)
 
     @classmethod
     def selected_binding(cls, config):
