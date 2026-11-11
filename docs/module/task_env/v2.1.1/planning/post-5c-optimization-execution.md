@@ -880,3 +880,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +14／−8，净增 6 行；版本诊断修改 1 文件 +23／−0，本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。共同配置与 Env 减少具体任务名称，四任务仍使用既有正式构建入口；provider／renderer 的 source、状态、clock、提交和资源合同未改变。
 
 109 项版本检查通过，覆盖受声明约束的任务 reset profile、PickCube 不支持的组合以及既有配置等价检查。四个正式任务的 MuJoCo 短程各完成 reset、step、再次 reset 和关闭，分别观察 PickCube 5、NutAssembly 5、Pendulum 25、双轮车 25 个 native 子步；其中 NutAssembly 为 Solution 单步，不代表完整成功。GeoPhys、Isaac 及完整 Solution 本批未重跑；历史证据只证明当时代码和具体路线。冻结 diff、计划与运行收据位于 ignored `workspace/maintenance/v211_formal_config_20261112_fv3hdj96/`；E01～E04 仍未接收。
+
+### 6.79 Robot 声明位置驱动重力补偿能力
+
+输入 `9f5bf4b3`。共同配置此前允许 Pendulum、双轮车或装配 Panda 选择只适用于已支持一体 Panda 位置驱动路线的重力补偿，并在原生物化后才可能失败。现在一体 Panda 声明该控制能力，统一配置根据实际 Robot 选择在构建前核对；现有 MuJoCo CPU／进程和 Controller 组合约束不变。Robot 的能力声明不代替 provider 对 source、驱动和 native 物化的检查，也不表示所有 Panda source 都已支持。
+
+生产修改 2 文件 +11／−0；版本诊断修改 2 文件 +27／−1，其中 probe 增加正式配置选项；本文及当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1358。四任务继续使用共同配置解析，减少的是不支持 Robot 的无效构建；renderer、状态、clock 和控制提交合同未改。
+
+114 项版本检查通过，包含不支持 Robot 的静态拒绝和两个 tabletop 的能力准入。MuJoCo 下 PickCube 与 NutAssembly 均以重力补偿完成 reset、step、再次 reset 和关闭，各观察 5 个 native 子步；NutAssembly 的 Solution 只验证单步。GeoPhys、Isaac、完整 Solution 本批未重跑，历史证据仅证明当时代码和具体路线。冻结 diff、计划及运行收据位于 ignored `workspace/maintenance/v211_robot_gravity_20261112_h1qsas2z/`；E01～E04 仍未接收。

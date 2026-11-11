@@ -490,6 +490,16 @@ def _resolve_selected_config(environment_type, config):
     )
     if gravity_compensation and (provider, backend, selection.deployment) != ('mujoco', 'cpu', 'in_process'):
         raise ValueError('gravity compensation currently requires in-process MuJoCo CPU')
+    if gravity_compensation:
+        declared_robots = getattr(environment_type, 'selected_robot_uids', ())
+        default_robot = getattr(environment_type, 'default_robot_source_uid', None)
+        if default_robot is None and len(declared_robots) == 1:
+            default_robot = next(iter(declared_robots))
+        selected_robot = robot_uid or default_robot
+        from ..registry import AGENT_REGISTRY
+        if (selected_robot is None or 'position_drive_gravity_compensation' not in
+                getattr(AGENT_REGISTRY.get(selected_robot), 'control_capabilities', ())):
+            raise ValueError('selected Robot does not declare position-drive gravity compensation')
     for name in ("host", "engine", "solver_family", "solver_algorithm", "coupler"):
         if getattr(selection, name) != route_defaults[name]:
             raise ValueError(f"static_config: requested {name} has no implemented adapter for {provider}")

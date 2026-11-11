@@ -54,6 +54,7 @@ class PandaEffortSourceLayout:
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
+    control_capabilities = frozenset(('position_drive_gravity_compensation',))
 
     def build_direct_effort_execution(self, scene, artifact, source, *, entity_id,
                                             native_drive, native_ranges, layout=None,

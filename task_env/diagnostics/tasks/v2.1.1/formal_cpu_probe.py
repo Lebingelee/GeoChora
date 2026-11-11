@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');args=parser.parse_args()
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -39,6 +39,7 @@ try:
             config['controller']={'profile_id':args.profile or 'panda-joint-effort-reference-v1'}
             if args.record:config['controller']['parameters']={'reset_selection':True}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
+        if args.gravity:config.setdefault('controller',{})['gravity_compensation']=True
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
         if args.robot_uid is not None:config['robot']={'uid':args.robot_uid}
         env=construct(uid,config)

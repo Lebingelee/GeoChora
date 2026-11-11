@@ -107,6 +107,31 @@ def test_pickcube_reset_profile_requires_its_declared_controller(controller):
         })
 
 
+@pytest.mark.parametrize('uid,robot', [
+    ('pendulum-v1', None),
+    ('two-wheel-balance-v1', None),
+    ('pick-cube-p16-reference-v1', 'panda-arm-hand-v1'),
+])
+def test_gravity_compensation_requires_robot_capability(uid, robot):
+    importlib.import_module('task_env.tasks')
+    config = {'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+              'controller': {'gravity_compensation': True}}
+    if robot:
+        config['robot'] = {'uid': robot}
+    with pytest.raises(ValueError, match='selected Robot does not declare'):
+        resolve_task_env_config(ENV_REGISTRY.get(uid), config)
+
+
+@pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
+def test_panda_declares_gravity_compensation_for_formal_tabletop_tasks(uid):
+    importlib.import_module('task_env.tasks')
+    resolved = resolve_task_env_config(ENV_REGISTRY.get(uid), {
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'gravity_compensation': True},
+    })
+    assert resolved.gravity_compensation is True
+
+
 @pytest.mark.parametrize('key', ['provider', 'backend', 'horizon', 'source_delivery_manifest'])
 def test_retired_top_level_execution_inputs_are_rejected(key):
     importlib.import_module('task_env.tasks')
