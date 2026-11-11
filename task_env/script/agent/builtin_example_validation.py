@@ -506,7 +506,8 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             'compiled_consistent': compiled_consistent,
             'provider': spec.provider, 'backend': spec.backend, 'device': spec.device,
             'profile': spec.controller_profile, 'horizon': spec.horizon_control_ticks,
-            'seeds_required': list(spec.seeds), 'seeds_run': list(seeds),
+            'seeds_required': list(spec.seeds[:3]), 'seeds_diagnostic': list(spec.seeds[3:]),
+            'seeds_run': list(seeds),
             'rows': rows,
             'runtime_valid_count': sum(item.get('runtime_valid') is True for item in rows),
             'task_solved_count': sum(item.get('task_outcome') == 'SOLVED' for item in rows),
@@ -516,7 +517,9 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
                 'PASS' if planned_action_count_total > 0 else 'MISSING_CORE_PLANNED_ACTION_EVIDENCE'
             ),
             'disposition': 'PASS' if (
-                len(rows) == 3 and all(item.get('runtime_valid') is True for item in rows)
+                sorted(item.get('seed') for item in rows if item.get('seed') in spec.seeds[:3])
+                == sorted(spec.seeds[:3])
+                and all(item.get('runtime_valid') is True for item in rows)
                 and compiled_consistent and planned_action_count_total > 0
             )
                            else 'PREFLIGHT' if only_seed is not None and compiled_consistent and all(item.get('runtime_valid') is True for item in rows)

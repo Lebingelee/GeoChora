@@ -633,7 +633,7 @@ class PickCubeReadinessConfig:
             "transition_ticks": base.close_transition_steps, "pose_timeout_s": 1.,
             "formula": "max(ceil(range/opening_step),ceil(range/force_adjust_step))+ceil(margin/control_dt)",
             "measured_tcp_clearance_gate": measured_tcp_clearance_gate,
-            "measured_tcp_clearance_gate_hold_ticks": 2 * int(pose) if measured_tcp_clearance_gate else 0,
+            "measured_tcp_clearance_gate_hold_ticks": 3 * int(pose) if measured_tcp_clearance_gate else 0,
         }
         return cls(
             base, float(dt),
