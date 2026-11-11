@@ -55,6 +55,8 @@ runtime.
 | `check_candidate.py` | One candidate's four checks, with real reports |
 | `diagnose_candidate.py` | Regroup a failed feasibility report by outcome and reset offset; write fixed-pose diagnostic specs. Descriptive only: no physics, no Core import, no revision decision |
 | `construction_ledger.py` | Hash-bound per-round contexts, v0 compatibility, owner-repair continuation, five-round budget and escalation; `export-issues` writes per-issue escalation files and `resolve-issue` appends an owner's cited resolution claim without rewriting `open_issues` |
+| `compare_providers.py` | Seed-by-seed outcome comparison of one candidate's feasibility reports across providers. Outcomes only: not physical equivalence or Qualification |
+| `ledger_summary.py` | Markdown view of a ledger's rounds, revisions, reports and issues. Derived and read-only; not evidence |
 | `oracle_candidate.py` | Existing recorder, completion check and independent H5 inspection |
 | `judge_package.py` | Portable evidence index and pending-only verification |
 | `builtin_example_schema.py` / `harness_compiler.compile_builtin_pickcube_example` | Versioned built-in PickCube example input; delegates to the public Core UID and never creates a CandidateSpec |

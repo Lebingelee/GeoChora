@@ -90,6 +90,17 @@ open issues; issue resolution needs its own cited evidence. Ordinary v0
 the current context only when the external asset identity is unchanged;
 changing Core/catalog/input identity requires an explicit `--context` JSON.
 
+### Read-only views
+
+```sh
+"$PY" "$RT/ledger_summary.py" --ledger "$OUT/construction.json" --output "$OUT/construction.summary.md"
+"$PY" "$RT/compare_providers.py" --reports "$OUT/mujoco/feasibility.json" "$OUT/isaacsim/feasibility.json" --output "$OUT/provider-comparison.json"
+```
+
+`ledger_summary` revalidates the ledger, then lists each round's spec change, cited finding, reason and report results, plus the issues. It is a derived view for people: do not cite it in a revision or package it as evidence.
+
+`compare_providers` takes one feasibility report per provider and records, per seed, each provider's classification, steps, stage and reason, whether they agree, and how far the recorded start positions differ. Reports must share a spec unless `--allow-spec-mismatch` is given, and the mismatch is recorded. Each report is checked against the current completion contract and marked unverified if it fails; it is still shown. Agreement on outcomes is not per-step physical equivalence, replay validity or Qualification, and a disagreement does not say which provider is right.
+
 ### Issue escalation and resolution
 
 Every `execution_fault` and every `asset`/`harness`/`core`/`provider` finding is recorded in the ledger's `open_issues`. Hand them to their owners with:
