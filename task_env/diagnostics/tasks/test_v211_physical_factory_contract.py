@@ -48,6 +48,38 @@ def test_automatic_source_workspace_is_released_on_construction_failure(monkeypa
     assert len(seen) == 1 and not seen[0].exists()
 
 
+@pytest.mark.parametrize('prior_fails', [False, True])
+def test_workspace_cleanup_preserves_existing_task_close_result(monkeypatch, prior_fails):
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+    from task_env.tasks.position_candidate import builder
+
+    events = []
+    def prior_close():
+        events.append('task')
+        if prior_fails:
+            raise ValueError('task close failed')
+        return {'task_closed': True}
+    @dataclass(frozen=True)
+    class Binding:
+        close_task_resources: object
+    class Environment:
+        @staticmethod
+        def from_position_candidate(binding, **_kwargs):
+            return SimpleNamespace(binding=binding)
+
+    monkeypatch.setattr(builder, 'declare_position_candidate',
+                        lambda *_args, **_kwargs: SimpleNamespace(binding=Binding(prior_close)))
+    result = builder.build_position_candidate('/unused', provider='mujoco',
+        environment_type=Environment, close_task_resources=lambda: events.append('workspace'))
+    if prior_fails:
+        with pytest.raises(ValueError, match='task close failed'):
+            result.env.binding.close_task_resources()
+    else:
+        assert result.env.binding.close_task_resources() == {'task_closed': True}
+    assert events == ['task', 'workspace']
+
+
 @pytest.mark.parametrize(('physical_profile', 'expected_body'), [
     ('panda-direct-effort-v1', 'single'),
     ('panda-direct-effort-wrench-v1', ('panda-main', 'hand')),

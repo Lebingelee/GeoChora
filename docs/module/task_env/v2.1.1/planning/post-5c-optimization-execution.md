@@ -375,8 +375,8 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 
 ### 6.16 Position 自动 source 工作目录的所有权
 
-输入 `e1ee58d8`。Position 旧入口未指定 `source_workspace` 时，原实现以 `mkdtemp` 在项目 workspace 创建目录，却未将其交给关闭 owner。现在由现有 source owner 分配自动临时目录，声明构建将其 cleanup 接入 `ReferenceTaskBinding.close_task_resources`：Env 关闭、半构造失败均回收该 Env 自有目录；若已有任务资源关闭器，先保留其错误并继续尝试清理。显式 `source_workspace` 仍归调用方，Env 不删除。该调整不改变 Position source、Controller 或 provider 准入，也没有把已存在历史目录批量清理。
+输入 `e1ee58d8`。Position 旧入口未指定 `source_workspace` 时，原实现以 `mkdtemp` 在项目 workspace 创建目录，却未将其交给关闭 owner。现在由现有 source owner 分配自动临时目录，声明构建将其 cleanup 接入 `ReferenceTaskBinding.close_task_resources`：Env 关闭、半构造失败均回收该 Env 自有目录；若已有任务资源关闭器，保留其返回 receipt；若它失败，保留原错误并继续尝试清理。显式 `source_workspace` 仍归调用方，Env 不删除。该调整不改变 Position source、Controller 或 provider 准入，也没有把已存在历史目录批量清理。
 
-本批生产 3 个文件 +43／−14，净增 29 行；测试 1 个文件 +42；项目文件无新增、删除或迁移。10 个双锁合同通过，覆盖自动目录正常／重复 close、构造失败回收、显式 caller 目录及原 source／动作合同。第一次测试 `position-owned-source-016-pure.log` 误将固定 Menagerie 资产目录当自动目录而失败，未修改资产；纠正检查器后 `position-owned-source-016-pure-v2.log` 的 10 项通过，原失败保留。
+本批最终生产 3 个文件 +45／−14，净增 31 行；测试 1 个文件 +74；项目文件无新增、删除或迁移。10 个双锁合同通过，覆盖自动目录正常／重复 close、构造失败回收、显式 caller 目录及原 source／动作合同。第一次测试 `position-owned-source-016-pure.log` 误将固定 Menagerie 资产目录当自动目录而失败，未修改资产；纠正检查器后 `position-owned-source-016-pure-v2.log` 的 10 项通过，原失败保留。随后 3 项与前组部分重叠的合同检查验证已有关闭 receipt 和原始错误保留，见 `position-owned-source-016-close-contract.log`。
 
-真实 MuJoCo CPU Position direct 路线两次分别完成 reset→非零 step→第二次 reset→重复 close，各观测 5 子步，最后一次使用最终通用临时目录前缀，确认实际自有目录和 source snapshot 随关闭消失。显式目录继续保留由上述合同和未改语义的旧 native 路线复用；无新 GeoPhys native 或其他 Position 组合声明。冻结计划、diff 和结果为 `cpu-run-plan-028.json`／`029.json`、`cpu-source-028.diff`／`029.diff`、`cpu-028-owned-position/`／`cpu-029-owned-position/`。累计监督 53 次，345 个可观测子步，7 次 worker 内部子步未知；含历史保守计费共 995／2,000。
+真实 MuJoCo CPU Position direct 路线两次分别完成 reset→非零 step→第二次 reset→重复 close，各观测 5 子步，最后一次使用最终通用临时目录前缀，确认实际自有目录和 source snapshot 随关闭消失。后续仅补已有关闭器的返回值保留；本次 native 路径没有该已有关闭器，由最终纯合同验证新增分支。显式目录继续保留由上述合同和未改语义的旧 native 路线复用；无新 GeoPhys native 或其他 Position 组合声明。冻结计划、diff 和结果为 `cpu-run-plan-028.json`／`029.json`、`cpu-source-028.diff`／`029.diff`、`cpu-028-owned-position/`／`cpu-029-owned-position/`。累计监督 53 次，345 个可观测子步，7 次 worker 内部子步未知；含历史保守计费共 995／2,000。

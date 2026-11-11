@@ -702,9 +702,10 @@ def build_position_candidate(workspace, *, provider, horizon=6000,
     if close_task_resources is not None:
         prior = declared.binding.close_task_resources
         def close_resources():
+            receipt = None
             try:
                 if prior is not None:
-                    prior()
+                    receipt = prior()
             except BaseException as error:
                 try:
                     close_task_resources()
@@ -713,6 +714,7 @@ def build_position_candidate(workspace, *, provider, horizon=6000,
                 raise
             else:
                 close_task_resources()
+                return receipt
         declared.binding = replace(declared.binding, close_task_resources=close_resources)
     env = environment_type.from_position_candidate(declared.binding, provider=provider,
         backend='cpu', horizon=horizon, camera_observation_config=camera_observation_config)
