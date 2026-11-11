@@ -344,3 +344,27 @@ def test_formal_construction_rejects_missing_robot_subject_and_cleans_source(uid
     with pytest.raises(ValueError, match='source-owned Robot subject binding'):
         make_env(uid, config=config)
     assert receipts and all(not receipt.snapshot_root.exists() for receipt in receipts)
+
+
+@pytest.mark.parametrize('split', [False, True])
+def test_robot_rejects_controller_replaced_after_subject_compilation(split):
+    from task_env import make_env
+    from task_env.runtime.sessions.control import bind_selected_controller
+
+    config = {'execution': {'physics_provider': 'mujoco'}, 'episode': {'horizon': 8}}
+    if split:
+        config.update(robot={'uid': 'panda-arm-hand-v1'}, controller={'profile_id': 'r1_split'})
+    env = make_env('pick-cube-p16-reference-v1', config=config)
+    try:
+        if split:
+            rows = list(env.controller.position_binding_requirements())
+            first = rows[0]
+            rows[0] = (SimpleNamespace(writer_id=first[0].writer_id, identity='f' * 64), *first[1:])
+            foreign = SimpleNamespace(position_binding_requirements=lambda: tuple(rows))
+        else:
+            foreign = SimpleNamespace(identity='f' * 64)
+        with pytest.raises(ValueError, match='Controllers differ from their source-owned binding'):
+            bind_selected_controller({**env.value, 'controller': foreign}, binding=env.binding,
+                                     provider=env.provider, backend=env.backend)
+    finally:
+        env.close()

@@ -404,6 +404,19 @@ def bind_selected_controller(value, *, binding, provider, backend):
         raise TypeError('legacy selected routes do not accept a Controller profile collection')
     physical_match = _match_physical_execution(value)
     physical_execution = value.get('physical_execution') if physical_match is not None else None
+    subject_binding = getattr(value.get('source'), 'position_subject_binding', None)
+    if value.get('physical_execution') is None and subject_binding is not None:
+        bound = tuple(subject_binding.plan.controller_bindings)
+        declare = getattr(raw, 'position_binding_requirements', None)
+        if callable(declare):
+            owners = tuple(row[0] for row in declare())
+            actual = {(owner.writer_id, owner.identity) for owner in owners}
+            expected = {(row.writer_id, row.controller_identity) for row in bound}
+            valid = len(actual) == len(owners) == len(bound) and actual == expected
+        else:
+            valid = len(bound) == 1 and bound[0].controller_identity == getattr(raw, 'identity', None)
+        if not valid or any(row.controller_identity is None for row in bound):
+            raise ValueError('Robot Controllers differ from their source-owned binding')
     return SelectedControllerBinding(raw, (), False,
                                      value.get('physical_execution') is not None,
                                      (), (() if physical_match is None else (physical_match,)),

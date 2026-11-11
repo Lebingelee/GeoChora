@@ -992,3 +992,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +2／−0；版本诊断修改 1 文件 +25／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务继续使用现有共同配置入口及各自已编译主体；新增准入不改变 provider／renderer 的 source、clock、状态或提交合同。该约束不能单独证明四任务的全部构造职责已经统一。
 
 118 项版本检查通过，其中两个 tabletop 在移除主体绑定时均于正式构造失败并释放已准备的 source。四个正式任务及装配 Panda 的 MuJoCo 短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。此前 Isaac 原生短程明确记录了实际 Robot 主体、Controller 和 source plan，本批仅新增非空构造准入且 USD 构造合同检查通过，但未按本批源码重跑 Isaac；GeoPhys、worker 与完整 Solution 同样未重跑。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_require_constructed_robot_20261112_bzvetg39/`；E01～E04 仍未接收。
+
+### 6.93 Controller 选择核对主体计划中的实际 owner
+
+输入 `ea73fc89`。MJCF source 已持有编译后的主体和 Controller plan，但选择 Controller 时此前没有核对 plan 中的身份是否仍与实际对象一致。现在选择阶段对一体 Controller 核对身份，对多 owner Controller 同时核对每个 writer 和身份，并要求计划提供身份；不匹配时在构造／重建阶段拒绝。检查位于共同 Controller 选择，而 RobotRuntime 继续只暴露已绑定结果。物理 Controller 的既有 source 匹配和 USD typed Position 的独立匹配未改。
+
+生产修改 1 文件 +13／−0；版本诊断修改 1 文件 +24／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。新增代码核对实际主体 plan 与 Controller owner，不能单独证明 E02 全部构造职责已经统一；provider／renderer 的状态、clock、提交和资源生命周期未改。
+
+120 项版本检查通过，包含一体与装配 Panda 的 Controller 被替换后拒绝。四个正式任务和装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑，不能以这些短程结果替代完整成功证据。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_controller_source_match_final_20261112_idjnahua/`；E01～E04 仍未接收。
