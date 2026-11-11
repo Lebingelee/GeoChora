@@ -3483,9 +3483,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     evaluate=evaluate, observe=lambda _state: self.obs,
                     publish=publish, on_failure=on_failure)
 
-    def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
-        return self._step(action, proposal=proposal, observer_solution=observer_solution)
-
     def _prepare_mixed_control(self, action, *, proposal=None, observer_solution=None):
         self._mixed_controller_preparation_started = False
         try:
