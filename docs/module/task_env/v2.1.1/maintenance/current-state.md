@@ -51,3 +51,5 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 第八批将 Controller selector 在两类配置 codec 之前统一归一化；PickCube 也接受 `control.profile_id`，原输入、身份与能力限制保持。累计生产净增 235 行，详细证据见[第八批记录](../planning/post-5c-optimization-execution.md#67-第八批共同-controller-selector-的配置入口)。
 
 第九批移除 registry 对构造方法覆盖的反射判断，基类工厂处理既有组件配置和旧 binding，四个实际 caller 合同通过。累计生产净增 237 行；E00～E04 仍在实施。见[第九批记录](../planning/post-5c-optimization-execution.md#68-第九批registry-不再反射判断构造方法覆盖)。
+
+后续职责整理将 Panda MJCF 传动检查归入 MuJoCo source adapter，将质量模型执行组合归入 Controller owner。MuJoCo direct、joint-mass、R3-mass 真实短程复验通过；Isaac 质量模型未在本批重跑。见[职责整理记录](../planning/post-5c-optimization-execution.md#611-panda-mjcf-source-检查归属)。
