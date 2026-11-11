@@ -115,6 +115,14 @@ try:
         stepped=env.step_with_solution(solution) if args.case=='nut' else env.step(action)
         if args.case=='nut':
             assert not solution.failed
+        if args.case == 'assembled-live':
+            receipt=env.session._last_control_submission
+            bundle=env.controller.last_split_bundle
+            assert receipt['status'] == 'acknowledged'
+            assert set(receipt['writer_ids']) == {'panda-arm-position-writer', 'panda-hand-position-writer'}
+            assert {bundle.arm_identity, bundle.hand_identity} == {item.identity for item in env.robot.controllers}
+            assert tuple(receipt['controller_identities']) == (env.controller.identity,)
+            result['assembled_submission'] = receipt
         if args.sequence:
             dispatch=env.session._control_lifecycle_dispatch
             receipt=env.session._last_control_submission

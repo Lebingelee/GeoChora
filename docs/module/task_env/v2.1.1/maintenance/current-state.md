@@ -111,3 +111,5 @@ PickCube 与 NutAssembly 的 R3、arm hold 与 gripper cadence 现由共同 Cont
 两个 tabletop Task 类不再预创建共享 binding 或重复配置入口；正式 `make_env` 为各环境建立独立 binding 与 source。受影响 MuJoCo 和 GeoPhys 短程已复验；详见[实施记录 6.47](../planning/post-5c-optimization-execution.md#647-退休-tabletop-类级共享-binding)。
 
 Panda direct effort 与两个简单主体现通过共同 Runtime 入口构建单主体 physical execution；双轮车的被动俯仰状态独立保留。MuJoCo 与 GeoPhys 受影响短程、原构造合同对照通过；多主体和 Position 路线仍待收敛。详见[实施记录 6.48](../planning/post-5c-optimization-execution.md#648-单主体-effort-execution-共同构造)。
+
+装配 Panda 中无调用者的旧 leaf 诊断配置生成逻辑已移除；正式双 Controller 在一次 MuJoCo interval 中的两个 writer 与资源归属已复验。详见[实施记录 6.49](../planning/post-5c-optimization-execution.md#649-清除装配-panda-的无调用-leaf-诊断探针)。

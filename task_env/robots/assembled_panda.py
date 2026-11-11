@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..environment import AssetManifest, InitialStateSpec, ReferenceSpec
+from ..artifacts import FrameReference, JointReference
 from ..registry import register_agent
 from .base import BaseAgent
 from .panda import PANDA_ASSET_ROOT
@@ -188,73 +189,3 @@ class AssembledPandaAgent(BaseAgent):
         execution.validate_source(scene=declaration.scene, artifact_sha256=artifact.identity_hash,
             source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
         return execution
-
-from dataclasses import replace
-from ..artifacts import ActuatorReference, FrameReference, JointReference, PoseWorld
-from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
-from ..controllers.canonical.leaf_profiles import (
-    ARM_POSITION_ACTION_SCHEMA, ARM_POSITION_PROFILE_ID, HAND_POSITION_ACTION_SCHEMA,
-    HAND_POSITION_PROFILE_ID, PANDA_ARM_JOINT_IDS, PANDA_ARM_JOINT_LIMITS_RAD,
-    PANDA_HAND_FINGER_JOINT_IDS, PANDA_HAND_FINGER_LIMITS_M, PANDA_HAND_TENDON_IDENTITY,
-    PANDA_HAND_TENDON_COEFFICIENTS, PANDA_HAND_EQUALITY_IDENTITY,
-    PANDA_HAND_COMMAND_SCALE_CTRL_PER_OPENING_M, PANDA_HAND_ACTUATOR_GAINPRM,
-    PANDA_HAND_ACTUATOR_BIASPRM, LeafJointActuatorBindingV1, LeafProfileBindingV1,
-    panda_arm_required_state, panda_hand_required_state,
-)
-from ..controllers.canonical.leaf_plan import default_leaf_profile_section
-
-def panda_assembly_leaf_bindings(candidate, provider_version, build_sha):
-    scene = candidate.scene
-    assembly = candidate.assembly
-    asset_by_entity = {item.entity_id: item for item in scene.entities}
-    assets = {(item.asset_id, item.asset_version): item for item in scene.assets}
-    identity_pose = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
-    records = []
-    for is_arm in (True, False):
-        entity_id = "panda-arm" if is_arm else "panda-hand"
-        path = ("arm",) if is_arm else ("hand",)
-        kind = "arm_position" if is_arm else "hand_position"
-        group = "arm-position" if is_arm else "hand-position"
-        joints = PANDA_ARM_JOINT_IDS if is_arm else PANDA_HAND_FINGER_JOINT_IDS
-        limits = PANDA_ARM_JOINT_LIMITS_RAD if is_arm else PANDA_HAND_FINGER_LIMITS_M
-        actuators = tuple(f"actuator{i}" for i in range(1, 8)) if is_arm else ("actuator8",)
-        tcp = FrameReference(entity_id, "link7" if is_arm else "hand")
-        asset_instance = asset_by_entity[entity_id]
-        asset = assets[(asset_instance.asset_id, asset_instance.asset_version)]
-        binding = LeafProfileBindingV1(
-            "leaf-profile-binding-v1", "declared", kind,
-            ARM_POSITION_PROFILE_ID if is_arm else HAND_POSITION_PROFILE_ID,
-            ARM_POSITION_ACTION_SCHEMA if is_arm else HAND_POSITION_ACTION_SCHEMA,
-            scene.identity_hash, assembly.assembly_id, assembly.revision,
-            assembly.logical_content_sha256, path, "entity_member", "entity", entity_id,
-            entity_id, asset.asset_id, asset.asset_version,
-            candidate.runtime_source.source_closure_digest, "canonical-joint-position-v1", "0" * 64,
-            ARM_WRITER_ID if is_arm else HAND_WRITER_ID, group,
-            "mujoco", provider_version, build_sha, "cpu", 0.002, 5,
-            tuple(JointReference(entity_id, item) for item in joints),
-            "radian" if is_arm else "meter", tuple(limits),
-            tuple(ActuatorReference(entity_id, item) for item in actuators),
-            tuple(LeafJointActuatorBindingV1(
-                "leaf-joint-actuator-binding-v1", JointReference(entity_id, joint),
-                ActuatorReference(entity_id, actuator),
-            ) for joint, actuator in zip(joints, actuators, strict=True)) if is_arm else (),
-            tcp, "T_parent_from_tcp", identity_pose,
-            panda_arm_required_state(entity_id, tcp) if is_arm else panda_hand_required_state(entity_id, tcp),
-            None if is_arm else PANDA_HAND_TENDON_IDENTITY,
-            () if is_arm else PANDA_HAND_TENDON_COEFFICIENTS,
-            None if is_arm else PANDA_HAND_EQUALITY_IDENTITY,
-            None if is_arm else PANDA_HAND_COMMAND_SCALE_CTRL_PER_OPENING_M,
-            None if is_arm else "opening_m = finger_joint1_q_m + finger_joint2_q_m",
-            None if is_arm else "ctrl = 3187.5 * opening_m",
-            None if is_arm else (0.0, 255.0),
-            () if is_arm else PANDA_HAND_ACTUATOR_GAINPRM,
-            () if is_arm else PANDA_HAND_ACTUATOR_BIASPRM,
-        )
-        records.append(binding)
-    defaults = tuple(sorted((default_leaf_profile_section(item) for item in records),
-                             key=lambda item: item.member_path))
-    bindings = tuple(sorted((replace(item, configuration_identity_sha256=next(
-        section.configuration_identity_sha256 for section in defaults
-        if section.member_path == item.member_path
-    )) for item in records), key=lambda item: item.member_path))
-    return bindings, defaults

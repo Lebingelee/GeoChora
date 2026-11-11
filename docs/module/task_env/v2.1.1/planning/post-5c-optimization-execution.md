@@ -638,3 +638,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 58 项版本检查通过。首版错误地要求全部状态关节等于受控关节，双轮车在物理启动前拒绝（0 子步）；修正为独立状态关节后通过，新增检查保留该差异。对同一实际 source，分别以输入提交的原构造函数与新构造函数构建，Panda、Pendulum 和双轮车的主体身份、physical binding、状态需求、Controller 身份及 joint／frame 映射一致；Panda 的动作 schema 也一致，简单主体使用其已声明的任务动作合同。比较脚本首版误对不提供 `action_shape` 的简单 Controller 调用通用 schema，失败于无物理运行的对照；修正后通过。
 
 MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum 和双轮车 direct／velocity-damped 均完成短程；另复验 Panda physical sequence 的共同提交。首轮成功路线 40 子步、修正后六条路线 115 子步、序列 5 子步，共观测 160；切换路线含 H5 写入读回。GeoPhys CPU 的 Panda joint effort 和双轮车通过短程，内部子步未观测，各保守预留 50。Isaac、renderer 和完整 Solution 本批未重跑；计划、冻结 diff、合同对照与结果位于 ignored `workspace/maintenance/v211_shared_effort_execution_20261112_001/`。E01～E04 仍未接收。
+
+### 6.49 清除装配 Panda 的无调用 leaf 诊断探针
+
+输入 `b57df4ab`。删除 Robot 模块中无仓库调用者的 `panda_assembly_leaf_bindings` 及只供该函数使用的旧 leaf／实验配置导入；它依赖历史 candidate 对象和固定实验布局，不参与四任务的正式构建。装配 Panda 的 source recipe、Position 主体绑定及现有 effort 声明仍保留；本批不将这些未统一的构造宣称完成。
+
+生产修改 1 文件 +1／−70，净减 69 行；版本诊断修改 1 文件 +8／−0，为真实双 Controller interval 增加收据核对；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，tracked 文件数保持 1365。旧诊断专用数据生成逻辑退出 Robot 模块，provider／renderer、clock 与实际提交逻辑未改。
+
+58 项版本检查通过。MuJoCo CPU 的正式 PickCube 装配 Panda `r1_split` 与一体 Panda R3 短程通过，共观测 10 子步；装配路线实际确认一次 `position-target` 提交，arm 与 hand 两个 writer 的资源分别为七个 arm actuator 与一个 hand actuator，收据为 acknowledged，两个运行 Controller 身份与各自产出一致。与上次同 seed 对照的主体、Controller、Artifact、source、reset 和单步奖励一致。GeoPhys、Isaac、renderer 和完整 Solution 未在本批重跑；计划、冻结 diff、对照和提交收据位于 ignored `workspace/maintenance/v211_retire_assembly_leaf_probe_20261112_001/`。E01～E04 仍未接收。
