@@ -6,10 +6,7 @@ import json
 from pathlib import Path
 import numpy as np
 
-from ..artifacts import (ActionIntent, ActuatorReference, ActuatorResourceDefinition,
-    ArticulationDefinition, AssetDefinition, ControlGroup, EntityDefinition,
-    EntityInstance, FrameDefinition, FrameReference, InitializationContract,
-    JointDefinition, PoseWorld, RobotInstance, SceneDefinition,
+from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
     SemanticDefinition, Timebase)
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
 from ..artifacts import ExecutionSpecV1, RendererSelectionV1
@@ -20,14 +17,14 @@ from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
-from ..robots.two_wheel_balance import TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
+from ..robots.two_wheel_balance import TWO_WHEEL_BALANCE_MJCF_XML, TwoWheelBalanceEntity, TWO_WHEEL_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
     ensure_g05_isaac_app_open, load_g05_isaac_delivery,
 )
-from .two_wheel_balance import (TWO_WHEEL_BALANCE_MJCF_XML, TWO_WHEEL_BALANCE_TASK_UID,
+from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
     TWO_WHEEL_BALANCE_SCENE_UID, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
     TwoWheelBalanceTaskDefinition, TwoWheelBalanceObservationBuilder)
 
@@ -43,27 +40,6 @@ USD_BODY_PATHS = {
     'right_wheel': 'Geometry/balance_anchor/balance_chassis/right_wheel',
 }
 
-
-def _scene(*, source_revision=None):
-    identity = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
-    asset = AssetDefinition('asset-definition-v1', 'two-wheel-inline', 'v1',
-        'inline://task-env/two-wheel-balance', source_revision=source_revision,
-        source_content_sha256=hashlib.sha256(TWO_WHEEL_BALANCE_MJCF_XML.encode()).hexdigest())
-    entity = EntityInstance('entity-instance-v1', ENTITY, asset.asset_id, asset.asset_version)
-    frames = tuple(FrameDefinition('frame-definition-v1', ENTITY, name, 'runtime', None, None)
-                   for name in FRAMES)
-    refs = tuple(FrameReference(ENTITY, name) for name in FRAMES)
-    offsets = (identity, PoseWorld((-.22, 0., 0.), (1., 0., 0., 0.)),
-               PoseWorld((.22, 0., 0.), (1., 0., 0., 0.)))
-    joints = tuple(JointDefinition('joint-definition-v1', name, refs[parent], refs[child],
-        offset, identity, 'revolute', (0., 1., 0.), 'radian', 'radian_per_second', 1, 1)
-        for name, parent, child, offset in zip(NAMES, (0, 1, 1), (1, 2, 3), offsets, strict=True))
-    articulation = ArticulationDefinition('articulation-definition-v1', ENTITY, FRAMES[0], FRAMES, joints)
-    actuators = tuple(ActuatorResourceDefinition('actuator-resource-v1', ENTITY, a) for a in ACTUATORS)
-    group = ControlGroup('control-group-v1', ENTITY, 'wheel-drive',
-        tuple(ActuatorReference(ENTITY, a) for a in ACTUATORS))
-    return SceneDefinition('scene-definition-v3', 'two-wheel-inline-scene-v1', (asset,),
-        (entity,), frames, (articulation,), (RobotInstance('robot-instance-v1', ENTITY, (refs[0],)),), actuators, (group,))
 
 
 def _declaration(scene):
@@ -114,7 +90,8 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
         source_revision = isaac_loaded.delivery.asset_definition.source_revision
     else:
         source_revision = None
-    scene = _scene(source_revision=source_revision); task_source, artifact = _declaration(scene)
+    robot = TwoWheelBalanceEntity()
+    scene = robot.scene_definition(source_revision=source_revision); task_source, artifact = _declaration(scene)
     xml = ET.fromstring(TWO_WHEEL_BALANCE_MJCF_XML); section = xml.find('./actuator')
     motors = xml.findall('./actuator/motor')
     if section is None or len(section) != 2 or len(motors) != 2:
@@ -152,7 +129,7 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
             actuator_units={a: 'N*m' for a in ACTUATORS})
         execution_spec = None
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
-    physical = build_existing_subject_effort(TwoWheelBalanceEntity(), scene=scene, artifact=artifact,
+    physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
         source=source, profile_id=selected_profile_id)
     controller = physical.controllers[0]
     return {'artifact': artifact, 'task_source': task_source, 'source': source, 'controller': controller,

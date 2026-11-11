@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
+
+from ..artifacts import (ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
+    AssetDefinition, ControlGroup, EntityInstance, FrameDefinition, FrameReference,
+    JointDefinition, PoseWorld, RobotInstance, SceneDefinition)
 
 import numpy as np
 from ..environment.gym_compat import Box, Dict
@@ -33,6 +38,56 @@ TWO_WHEEL_ACTION_CONTRACT = ExternalActionContract(
 )
 
 
+TWO_WHEEL_BALANCE_MJCF_XML = """
+<mujoco model="task_env_two_wheel_balance">
+  <compiler angle="radian"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+  <worldbody>
+    <body name="balance_anchor" pos="0 0 0">
+      <geom name="balance_anchor_geom" type="cylinder" size="0.06 0.02"
+            mass="0" rgba="0.28 0.28 0.32 1"/>
+      <body name="balance_chassis" pos="0 0 0">
+        <joint name="chassis_pitch" type="hinge" axis="0 1 0"
+               damping="0.04"/>
+        <inertial pos="0 0 0.45" mass="2.0"
+                  diaginertia="0.20 0.20 0.20"/>
+        <geom name="balance_chassis_geom" type="box" pos="0 0 0.45"
+              size="0.18 0.10 0.45" mass="0"
+              rgba="0.20 0.48 0.78 1"/>
+        <body name="left_wheel" pos="-0.22 0 0">
+          <joint name="left_wheel_hinge" type="hinge" axis="0 1 0"
+                 damping="0.01"/>
+          <inertial pos="0 0 0" mass="0.25"
+                    diaginertia="0.01 0.01 0.01"/>
+          <geom name="left_wheel_geom" type="cylinder" size="0.12 0.045"
+                mass="0" rgba="0.08 0.08 0.10 1"/>
+        </body>
+        <body name="right_wheel" pos="0.22 0 0">
+          <joint name="right_wheel_hinge" type="hinge" axis="0 1 0"
+                 damping="0.01"/>
+          <inertial pos="0 0 0" mass="0.25"
+                    diaginertia="0.01 0.01 0.01"/>
+          <geom name="right_wheel_geom" type="cylinder" size="0.12 0.045"
+                mass="0" rgba="0.08 0.08 0.10 1"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="balance_anchor" body2="balance_chassis"/>
+    <exclude body1="balance_chassis" body2="left_wheel"/>
+    <exclude body1="balance_chassis" body2="right_wheel"/>
+    <exclude body1="left_wheel" body2="right_wheel"/>
+  </contact>
+  <actuator>
+    <motor name="left_wheel_torque" joint="left_wheel_hinge"
+           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+    <motor name="right_wheel_torque" joint="right_wheel_hinge"
+           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
+  </actuator>
+</mujoco>
+""".strip()
+
 @dataclass(frozen=True)
 class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
     """Stable body/joint/actuator names for the two-wheel topology."""
@@ -44,6 +99,33 @@ class TwoWheelBalanceEntity(DefaultCanonicalControllerMixin):
     left_actuator_name: str = "left_wheel_torque"
     right_actuator_name: str = "right_wheel_torque"
     assembly_id = 'two-wheel-source-assembly'
+
+    frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
+
+    @property
+    def actuator_names(self):
+        return (self.left_actuator_name, self.right_actuator_name)
+
+    def scene_definition(self, *, source_revision=None):
+        identity = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
+        asset = AssetDefinition('asset-definition-v1', 'two-wheel-inline', 'v1',
+            'inline://task-env/two-wheel-balance', source_revision=source_revision,
+            source_content_sha256=hashlib.sha256(TWO_WHEEL_BALANCE_MJCF_XML.encode()).hexdigest())
+        entity = EntityInstance('entity-instance-v1', self.uid, asset.asset_id, asset.asset_version)
+        frames = tuple(FrameDefinition('frame-definition-v1', self.uid, name, 'runtime', None, None)
+                       for name in self.frame_names)
+        refs = tuple(FrameReference(self.uid, name) for name in self.frame_names)
+        offsets = (identity, PoseWorld((-.22, 0., 0.), (1., 0., 0., 0.)),
+                   PoseWorld((.22, 0., 0.), (1., 0., 0., 0.)))
+        joints = tuple(JointDefinition('joint-definition-v1', name, refs[parent], refs[child],
+            offset, identity, 'revolute', (0., 1., 0.), 'radian', 'radian_per_second', 1, 1)
+            for name, parent, child, offset in zip(self.state_joint_names, (0, 1, 1), (1, 2, 3), offsets, strict=True))
+        articulation = ArticulationDefinition('articulation-definition-v1', self.uid, self.frame_names[0], self.frame_names, joints)
+        actuators = tuple(ActuatorResourceDefinition('actuator-resource-v1', self.uid, a) for a in self.actuator_names)
+        group = ControlGroup('control-group-v1', self.uid, 'wheel-drive',
+            tuple(ActuatorReference(self.uid, a) for a in self.actuator_names))
+        return SceneDefinition('scene-definition-v3', 'two-wheel-inline-scene-v1', (asset,),
+            (entity,), frames, (articulation,), (RobotInstance('robot-instance-v1', self.uid, (refs[0],)),), actuators, (group,))
 
     @property
     def state_joint_names(self):

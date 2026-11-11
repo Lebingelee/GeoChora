@@ -27,6 +27,7 @@ from ..registry import register_env
 from ..vectorization.registry import register_parallel_env
 from ..robots.two_wheel_balance import (
     TWO_WHEEL_ACTION_CONTRACT,
+    TWO_WHEEL_BALANCE_MJCF_XML,
     TWO_WHEEL_TORQUE_LIMIT_NM,
     TwoWheelTorqueActionAdapter,
 )
@@ -49,55 +50,7 @@ TWO_WHEEL_FALL_PITCH_RAD = 0.75
 TWO_WHEEL_REFERENCE_PROFILE_ID = "task-env-two-wheel-balance-reference-v1"
 
 
-TWO_WHEEL_BALANCE_MJCF_XML = """
-<mujoco model="task_env_two_wheel_balance">
-  <compiler angle="radian"/>
-  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <worldbody>
-    <body name="balance_anchor" pos="0 0 0">
-      <geom name="balance_anchor_geom" type="cylinder" size="0.06 0.02"
-            mass="0" rgba="0.28 0.28 0.32 1"/>
-      <body name="balance_chassis" pos="0 0 0">
-        <joint name="chassis_pitch" type="hinge" axis="0 1 0"
-               damping="0.04"/>
-        <inertial pos="0 0 0.45" mass="2.0"
-                  diaginertia="0.20 0.20 0.20"/>
-        <geom name="balance_chassis_geom" type="box" pos="0 0 0.45"
-              size="0.18 0.10 0.45" mass="0"
-              rgba="0.20 0.48 0.78 1"/>
-        <body name="left_wheel" pos="-0.22 0 0">
-          <joint name="left_wheel_hinge" type="hinge" axis="0 1 0"
-                 damping="0.01"/>
-          <inertial pos="0 0 0" mass="0.25"
-                    diaginertia="0.01 0.01 0.01"/>
-          <geom name="left_wheel_geom" type="cylinder" size="0.12 0.045"
-                mass="0" rgba="0.08 0.08 0.10 1"/>
-        </body>
-        <body name="right_wheel" pos="0.22 0 0">
-          <joint name="right_wheel_hinge" type="hinge" axis="0 1 0"
-                 damping="0.01"/>
-          <inertial pos="0 0 0" mass="0.25"
-                    diaginertia="0.01 0.01 0.01"/>
-          <geom name="right_wheel_geom" type="cylinder" size="0.12 0.045"
-                mass="0" rgba="0.08 0.08 0.10 1"/>
-        </body>
-      </body>
-    </body>
-  </worldbody>
-  <contact>
-    <exclude body1="balance_anchor" body2="balance_chassis"/>
-    <exclude body1="balance_chassis" body2="left_wheel"/>
-    <exclude body1="balance_chassis" body2="right_wheel"/>
-    <exclude body1="left_wheel" body2="right_wheel"/>
-  </contact>
-  <actuator>
-    <motor name="left_wheel_torque" joint="left_wheel_hinge"
-           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
-    <motor name="right_wheel_torque" joint="right_wheel_hinge"
-           gear="1" ctrllimited="true" ctrlrange="-1.5 1.5"/>
-  </actuator>
-</mujoco>
-""".strip()
+
 
 
 def _wrap_angle(angle: float) -> float:

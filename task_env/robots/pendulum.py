@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
+
+from ..artifacts import (ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
+    AssetDefinition, ControlGroup, EntityInstance, FrameDefinition, FrameReference,
+    JointDefinition, PoseWorld, RobotInstance, SceneDefinition)
 
 import numpy as np
 from ..environment.gym_compat import Box, Dict
@@ -37,6 +42,35 @@ PENDULUM_ACTION_CONTRACT = ExternalActionContract(
 )
 
 
+PENDULUM_MJCF_XML = """
+<mujoco model="task_env_pendulum">
+  <compiler angle="radian"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+  <worldbody>
+    <body name="pendulum_anchor" pos="0 0 0">
+      <geom name="pendulum_anchor_geom" type="cylinder" size="0.08 0.03"
+            mass="0" rgba="0.30 0.30 0.34 1"/>
+      <body name="pendulum_link" pos="0 0 0">
+        <joint name="pendulum_hinge" type="hinge" axis="0 1 0"
+               damping="0.05"/>
+        <inertial pos="0 0 0.25" mass="1.0"
+                  diaginertia="0.05 0.05 0.05"/>
+        <geom name="pendulum_link_geom" type="capsule"
+              fromto="0 0 0 0 0 0.50" size="0.04"
+              density="1000" rgba="0.16 0.46 0.82 1"/>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude body1="pendulum_anchor" body2="pendulum_link"/>
+  </contact>
+  <actuator>
+    <motor name="pendulum_torque" joint="pendulum_hinge"
+           gear="1" ctrllimited="true" ctrlrange="-2 2"/>
+  </actuator>
+</mujoco>
+""".strip()
+
 @dataclass(frozen=True)
 class PendulumEntity(DefaultCanonicalControllerMixin):
     """Stable scene names used by the Pendulum task and adapter."""
@@ -45,6 +79,28 @@ class PendulumEntity(DefaultCanonicalControllerMixin):
     joint_name: str = "pendulum_hinge"
     actuator_name: str = "pendulum_torque"
     assembly_id = 'pendulum-source-assembly'
+
+    def scene_definition(self, *, source_revision=None):
+        origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
+        source_hash = hashlib.sha256(PENDULUM_MJCF_XML.encode()).hexdigest()
+        asset = AssetDefinition('asset-definition-v1', 'pendulum-inline', 'v1',
+                                'inline://task-env/pendulum', source_revision=source_revision,
+                                source_content_sha256=source_hash)
+        entity = EntityInstance('entity-instance-v1', self.uid, asset.asset_id, asset.asset_version)
+        frames = tuple(FrameDefinition('frame-definition-v1', self.uid, name, 'runtime', None, None)
+                       for name in ('pendulum_anchor', 'pendulum_link'))
+        root, link = (FrameReference(self.uid, name) for name in ('pendulum_anchor', 'pendulum_link'))
+        joint = JointDefinition('joint-definition-v1', self.joint_name, root, link,
+                                origin, origin, 'revolute', (0., 1., 0.),
+                                'radian', 'radian_per_second', 1, 1)
+        articulation = ArticulationDefinition('articulation-definition-v1', self.uid, 'pendulum_anchor',
+            ('pendulum_anchor', 'pendulum_link'), (joint,))
+        actuator = ActuatorResourceDefinition('actuator-resource-v1', self.uid, self.actuator_name)
+        group = ControlGroup('control-group-v1', self.uid, 'hinge-drive',
+                             (ActuatorReference(self.uid, self.actuator_name),))
+        return SceneDefinition('scene-definition-v3', 'pendulum-inline-scene-v1', (asset,), (entity,),
+            frames, (articulation,), (RobotInstance('robot-instance-v1', self.uid, (root,)),),
+            (actuator,), (group,))
 
     @property
     def state_joint_names(self):

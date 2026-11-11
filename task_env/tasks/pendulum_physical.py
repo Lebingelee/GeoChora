@@ -7,10 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..artifacts import (ActionIntent, ActuatorResourceDefinition, ArticulationDefinition,
-    AssetDefinition, ControlGroup, EntityDefinition, EntityInstance, FrameDefinition,
-    FrameReference, InitializationContract, JointDefinition, PoseWorld,
-    RobotInstance, SceneDefinition, SemanticDefinition, Timebase)
+from ..artifacts import (ActionIntent, EntityDefinition, InitializationContract,
+    SemanticDefinition, Timebase)
 from ..artifacts.execution import ResetSampleV1, ResetPlanV1
 from ..artifacts import ExecutionSpecV1, RendererSelectionV1
 from ..assembly.assets import _source_closure_digest
@@ -20,43 +18,20 @@ from ..environment.task_source import TaskSourceV1, TaskArtifactDeclarationV1
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ReferenceTaskBinding, observe_task_definition
 from ..environment.gym_compat import Box, Dict
-from ..robots.pendulum import PendulumEntity, PENDULUM_ACTION_CONTRACT
+from ..robots.pendulum import PENDULUM_MJCF_XML, PendulumEntity, PENDULUM_ACTION_CONTRACT
 from ..runtime.sessions.physical_control import build_existing_subject_effort
 from ..runtime.sessions.source import project_scene_definition_v3_to_mjcf, source_asset_bytes
 from ..runtime.sessions.isaac_g05 import (
     G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source,
     ensure_g05_isaac_app_open, load_g05_isaac_delivery,
 )
-from .pendulum import (PENDULUM_MJCF_XML, PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
+from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
                        PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS)
 
 ENTITY = 'pendulum-v1'
 JOINT = f'{ENTITY}/pendulum_hinge'
 
-
-def _scene(*, source_revision=None):
-    origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
-    source_hash = hashlib.sha256(PENDULUM_MJCF_XML.encode()).hexdigest()
-    asset = AssetDefinition('asset-definition-v1', 'pendulum-inline', 'v1',
-                            'inline://task-env/pendulum', source_revision=source_revision,
-                            source_content_sha256=source_hash)
-    entity = EntityInstance('entity-instance-v1', ENTITY, asset.asset_id, asset.asset_version)
-    frames = tuple(FrameDefinition('frame-definition-v1', ENTITY, name, 'runtime', None, None)
-                   for name in ('pendulum_anchor', 'pendulum_link'))
-    root, link = (FrameReference(ENTITY, name) for name in ('pendulum_anchor', 'pendulum_link'))
-    joint = JointDefinition('joint-definition-v1', 'pendulum_hinge', root, link,
-                            origin, origin, 'revolute', (0., 1., 0.),
-                            'radian', 'radian_per_second', 1, 1)
-    articulation = ArticulationDefinition('articulation-definition-v1', ENTITY, 'pendulum_anchor',
-        ('pendulum_anchor', 'pendulum_link'), (joint,))
-    actuator = ActuatorResourceDefinition('actuator-resource-v1', ENTITY, 'pendulum_torque')
-    from ..artifacts import ActuatorReference
-    group = ControlGroup('control-group-v1', ENTITY, 'hinge-drive',
-                         (ActuatorReference(ENTITY, 'pendulum_torque'),))
-    return SceneDefinition('scene-definition-v3', 'pendulum-inline-scene-v1', (asset,), (entity,),
-        frames, (articulation,), (RobotInstance('robot-instance-v1', ENTITY, (root,)),),
-        (actuator,), (group,))
 
 
 def _declaration(scene):
@@ -104,9 +79,10 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
         source_revision = isaac_loaded.delivery.asset_definition.source_revision
     else:
         source_revision = None
-    scene = _scene(source_revision=source_revision)
+    robot = PendulumEntity()
+    scene = robot.scene_definition(source_revision=source_revision)
     task_source, artifact = _declaration(scene)
-    # Validate exact task-owned motor semantics before creating any provider.
+    # Validate exact source motor semantics before creating any provider.
     root_xml = ET.fromstring(PENDULUM_MJCF_XML)
     motors = root_xml.findall('./actuator/motor')
     actuator_section = root_xml.find('./actuator')
@@ -148,7 +124,7 @@ def _build(config, seed, sampled=None, *, provider='geophys', source_delivery_ma
             actuator_units={'pendulum_torque': 'N*m'})
         execution_spec = None
     selected_profile_id = config.control.profile_id or 'direct_joint_effort_v1'
-    physical = build_existing_subject_effort(PendulumEntity(), scene=scene, artifact=artifact,
+    physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
         source=source, profile_id=selected_profile_id)
     controller = physical.controllers[0]
     return {'artifact': artifact, 'task_source': task_source, 'source': source,

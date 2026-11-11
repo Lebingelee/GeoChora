@@ -31,6 +31,7 @@ from ..registry import register_env
 from ..vectorization.registry import register_parallel_env
 from ..robots.pendulum import (
     PENDULUM_ACTION_CONTRACT,
+    PENDULUM_MJCF_XML,
     PendulumTorqueActionAdapter,
 )
 from .base import BaseTaskEnv
@@ -51,37 +52,7 @@ PENDULUM_SUCCESS_WINDOW_STEPS = 5
 PENDULUM_REFERENCE_PROFILE_ID = "task-env-pendulum-reference-v1"
 
 
-# The asset is intentionally inline for the first non-arm TaskEnv.  It keeps
-# the exact reference scene local to the versioned task while still going
-# through GeoPhys's normal MJCF import and rigid runtime boundary.
-PENDULUM_MJCF_XML = """
-<mujoco model="task_env_pendulum">
-  <compiler angle="radian"/>
-  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
-  <worldbody>
-    <body name="pendulum_anchor" pos="0 0 0">
-      <geom name="pendulum_anchor_geom" type="cylinder" size="0.08 0.03"
-            mass="0" rgba="0.30 0.30 0.34 1"/>
-      <body name="pendulum_link" pos="0 0 0">
-        <joint name="pendulum_hinge" type="hinge" axis="0 1 0"
-               damping="0.05"/>
-        <inertial pos="0 0 0.25" mass="1.0"
-                  diaginertia="0.05 0.05 0.05"/>
-        <geom name="pendulum_link_geom" type="capsule"
-              fromto="0 0 0 0 0 0.50" size="0.04"
-              density="1000" rgba="0.16 0.46 0.82 1"/>
-      </body>
-    </body>
-  </worldbody>
-  <contact>
-    <exclude body1="pendulum_anchor" body2="pendulum_link"/>
-  </contact>
-  <actuator>
-    <motor name="pendulum_torque" joint="pendulum_hinge"
-           gear="1" ctrllimited="true" ctrlrange="-2 2"/>
-  </actuator>
-</mujoco>
-""".strip()
+
 
 
 def _wrap_angle(angle: float) -> float:

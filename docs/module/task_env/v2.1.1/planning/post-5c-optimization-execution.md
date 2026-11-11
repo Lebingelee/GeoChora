@@ -428,3 +428,11 @@ MuJoCo CPU 下 NutAssembly 单个 caller-owned Solution interval、PickCube R3�
 生产 5 文件修改，+76／−77 行，净减 1 行，原有 Assembly／Controller 执行组装按声明重写到共同 owner；无生产文件新增、删除或整文件搬迁。版本诊断 1 文件 +19／−13，2 个状态／实施文档修改。共享构建器不按 Task、provider 或 renderer 名分流；adapter 的原生 source 映射和 renderer 未改。
 
 MuJoCo CPU 下两主体 direct 和 velocity-damped 各完成 reset、非零 step、重复 reset 和 close，4 条运行共实测 100 个物理子步；direct 两条的 Robot subject 与 Controller identity 和上批同配置记录相同。GeoPhys CPU 的两主体 direct 路线也各完成相同行为；其内部物理子步未直接观测，各按 50 子步保守预留。首次 GeoPhys 命令未指定进程内解释器，preflight 拒绝、未启动物理；修正正式配置后复验通过，失败记录保留。版本纯检查 8 passed；所有锁释放。本批未实测 Isaac、renderer 或完整 Solution，保留原有界证据而不外推。计划、冻结 diff、原始结果在 ignored `workspace/maintenance/v211_subject_effort_20261112_001/`。
+
+### 6.23 简单主体 Scene 声明归 Robot
+
+输入 `568d8739`。Pendulum 与双轮车的内联 MJCF、主体 frame／joint／actuator 拓扑和 SceneDefinition 分别归各自 Robot；任务构建使用同一 Robot 实例声明场景并交给已有主体 effort 构建器，移除两个 task physical 文件中的独立 `_scene`。Task 仍负责自身任务 Artifact、reset 和 source 编译；这一步没有消除 provider 分流，也没有证明四主体已走完全一致的 source 构建链。
+
+生产修改 6 个文件，+156／−141，净增 15 行，文件数无增减；两段内联 XML 和 Scene 声明为职责迁移，不能把迁移行当成新功能或精简成果，另有调用与 imports 调整。测试／诊断文件无改动，文档修改两份，项目 tracked 文件数不变。Robot 自身声明仍有不同拓扑，属于主体差异；目前尚没有完整统一的场景组合器。renderer、clock、提交与 provider adapter 本次未修改。
+
+同一进程将旧 `_scene` 与新 Robot 声明分别按无 revision 和指定 revision 比较，四组 SceneDefinition 与 identity hash 均一致；内联 XML 内容亦未改动。第一次在移除旧模块 imports 后重跑比较时检查脚本缺少 `PoseWorld`，未启动物理；向比较命名空间补入原 artifacts 符号后通过。正式 Pendulum／双轮车 MuJoCo CPU 均完成 reset、非零 action、第二次 reset 和 close，各 25 个可观测子步。版本诊断 8 项纯合同通过。计划、冻结 diff、比较结果与运行记录位于 ignored `workspace/maintenance/v211_robot_scene_20261112_001/`。此前 GeoPhys CPU 的对应有界证据仍可作为历史参考，场景与内容身份一致，但本批未重跑 GeoPhys；Isaac 和 renderer 同样未重跑。E01～E04 仍未全部完成，不以本批为四主体统一或 adapter 全面接收。

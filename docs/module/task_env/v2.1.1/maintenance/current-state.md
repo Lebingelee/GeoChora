@@ -59,3 +59,5 @@ Pendulum 和双轮车现由各自 Robot 声明受控关节、writer 和 source �
 后续职责整理将 Panda MJCF 传动检查归入 MuJoCo source adapter，将质量模型执行组合归入 Controller owner。MuJoCo direct、joint-mass、R3-mass 真实短程复验通过；Isaac 质量模型未在本批重跑。见[职责整理记录](../planning/post-5c-optimization-execution.md#611-panda-mjcf-source-检查归属)。
 
 此前增量让 reset 策略由任务 binding 声明，并移除 Panda source 检查中的历史 checkout 绝对路径；当时的 Position 旧入口自动目录回收记录见[实施记录](../planning/post-5c-optimization-execution.md#614-reset-重建能力归属)。该入口及其专属目录管理现已退休。
+
+最新简单主体职责整理进一步将 Pendulum／双轮车的内联资产和 Scene 拓扑声明移至 Robot；正式构建用同一个 Robot 实例声明场景及绑定控制。两个 MuJoCo CPU 短程通过、场景身份与原实现一致；GeoPhys、Isaac 和 renderer 未在此批重跑。Task 中的 source 编译及 provider 分流仍待进一步归位，E01～E04 未完成。详见[实施记录 6.23](../planning/post-5c-optimization-execution.md#623-简单主体-scene-声明归-robot)。
