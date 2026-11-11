@@ -107,6 +107,18 @@ class PandaAgent(BaseAgent):
     uid = "panda-v1"
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
 
+    def artifact_entity(self, scene=None):
+        """Declare the canonical Panda identity consumed by Task Artifacts."""
+        from ..artifacts import EntityDefinition
+        manifest = self.asset_manifest()
+        return EntityDefinition(
+            self.uid, 'embodiment',
+            f'mujoco_menagerie/{manifest.source_revision}/franka_emika_panda/panda.xml',
+            (f'{self.uid}/base', f'{self.uid}/ee'),
+            tuple(f'{self.uid}/{name}' for name in self.physical_joint_names()),
+            'referenced_articulation', 'arm_hand_finger_collision', {},
+        )
+
     def compile_reference_position_source(self, source, *, artifact, controller, entity_id, recipe):
         """Bind the Panda already present in a checked task source."""
         from .panda_position_binding import compile_reference_position_source

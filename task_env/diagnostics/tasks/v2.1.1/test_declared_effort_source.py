@@ -51,3 +51,33 @@ def test_task_compiler_rejects_robot_joint_declaration_mismatching_scene():
     scene = robot.scene_definition()
     with pytest.raises(ValueError, match='state joints differ'):
         pendulum_physical._declaration(scene, replace(robot, joint_name='foreign_hinge'))
+
+
+@pytest.mark.parametrize(('task_name', 'robot_uid'), [
+    ('pickcube', 'panda-v1'), ('nut', 'panda-v1'),
+    ('pendulum', 'pendulum-v1'), ('wheel', 'two-wheel-balance-v1'),
+])
+def test_task_artifact_uses_registered_robot_entity(task_name, robot_uid):
+    from task_env.registry import make_agent
+    from task_env.assembly.panda_box import compile_panda_box_artifact
+    from task_env.tasks.pick_cube.specialization import _declaration as pickcube_declaration
+    from task_env.tasks.nut_assembly.specialization import build_artifact as nut_artifact
+
+    robot = make_agent(robot_uid)
+    if task_name == 'pickcube':
+        artifact = compile_panda_box_artifact(pickcube_declaration())
+        expected = robot.artifact_entity()
+    elif task_name == 'nut':
+        artifact = nut_artifact()
+        expected = robot.artifact_entity()
+    else:
+        scene = robot.scene_definition()
+        task = pendulum_physical if task_name == 'pendulum' else two_wheel_physical
+        _, artifact = task._declaration(scene, robot)
+        expected = robot.artifact_entity(scene)
+        assert artifact.scene_identity_hash == scene.identity_hash
+        assert set(artifact.initialization.joint_position) == set(expected.joints)
+        assert set(artifact.legacy_joint_bindings) == set(expected.joints)
+        return
+    matching = tuple(item for item in artifact.world.entities if item.semantic_id == robot_uid)
+    assert matching == (expected,)

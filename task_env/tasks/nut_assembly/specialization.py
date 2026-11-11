@@ -20,7 +20,6 @@ from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
 from ...assembly.compiler import (
     ReferenceTaskDeclarationV1,
-    panda_entity_declaration,
     reference_task_identity_fields,
 )
 from ...assembly.source import TaskSceneSource
@@ -194,6 +193,10 @@ def _recipe():
 def _artifact_declaration(*, lift_height_m=None, task_config=None) -> TaskArtifactDeclarationV1:
     recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, reset, asset = recipe["scene"], recipe["reset"], recipe["asset"]
+    robot_uids = tuple(recipe['agent_uids'])
+    if len(robot_uids) != 1:
+        raise ValueError('NutAssembly requires one declared Robot')
+    robot = make_agent(robot_uids[0])
     initialization = {"nut_pose": reset["nut_pose"], "joint_position": reset["joint_position"]}
     mass = float(asset["nut_mass_kg"])
     inertia = tuple(float(v) for v in asset["nut_diagonal_inertia_kg_m2"])
@@ -204,7 +207,7 @@ def _artifact_declaration(*, lift_height_m=None, task_config=None) -> TaskArtifa
         version=recipe["artifact_version"], entities=(
             EntityDefinition("tabletop-v1", "static", "nut-assembly-square-v1/task-local/table",
                 (), (), "box", "support_contact", {"top_z": float(scene["table_top_z"])}),
-            panda_entity_declaration(),
+            robot.artifact_entity(),
             EntityDefinition("square-nut-v1", "movable",
                 "nut-assembly-square-v1/task-local/square-nut/" + NUTASSEMBLY_NOMINAL_V1_ID,
                 (), (), "authored_compound", "table_hand_peg_contact",

@@ -709,22 +709,8 @@ def compile_named_effort_joint_reset_plan(*, artifact, source, task_seed, sample
 def compile_existing_subject_effort_task(*, scene, robot, task_id, artifact_id,
                                          semantic_id, success_definition, timebase):
     """Compile a joint-effort Task from an existing Robot and its Scene topology."""
-    entities = tuple(item for item in scene.entities if item.entity_id == robot.uid)
-    articulations = tuple(item for item in scene.articulations if item.entity_id == robot.uid)
-    if len(entities) != 1 or len(articulations) != 1:
-        raise ValueError('Task requires one declared Robot entity and articulation')
-    entity, articulation = entities[0], articulations[0]
-    assets = tuple(item for item in scene.assets
-                   if (item.asset_id, item.asset_version) == (entity.asset_id, entity.asset_version))
-    if len(assets) != 1:
-        raise ValueError('Robot entity must resolve to exactly one Scene asset')
-    names = tuple(robot.state_joint_names)
-    if names != tuple(joint.joint_id for joint in articulation.joints):
-        raise ValueError('Robot state joints differ from its Scene articulation')
-    joints = tuple(f'{robot.uid}/{name}' for name in names)
-    frames = tuple(f'{robot.uid}/{name}' for name in articulation.link_frame_ids)
-    subject = EntityDefinition(robot.uid, 'embodiment', assets[0].source_reference,
-                               frames, joints, 'source_owned', 'source_owned', {})
+    subject = robot.artifact_entity(scene)
+    joints = subject.joints
     initialization = InitializationContract('initialization-v0', {}, {name: 0. for name in joints},
                                              (), 'clear', 'source', 0)
     semantics = SemanticDefinition('semantics-v0', semantic_id, (), joints, {}, success_definition)

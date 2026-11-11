@@ -580,3 +580,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 输入 `cc2526df`。上批对齐的是 reset-scoped 物理选择；再次审计发现固定物理 Controller 与 Position 投影并存时也会产生同样的公开身份偏差。现在 RobotRuntime 和 `env.controller` 对任何已声明 physical execution 均公开该 execution 的实际 Controller，Position 只保留内部状态投影角色；Position 单独控制路径仍公开原 Controller。此项修正已有实际 owner 的投影，不更换执行、clock 或控制提交机制。
 
 生产修改 2 文件 +5／−0；版本诊断修改 1 文件 +8／−2；实施和当前状态文档 2 文件修改。无文件新增、删除或整文件迁移，tracked 文件数保持 1364。41 项版本纯合同通过；MuJoCo CPU 的固定 joint effort、可切换 joint／r3（含 H5 记录读回）、direct effort、Pendulum、双轮车完成真实短程，断言 Env、Robot 和实际 physical execution 的 Controller 对象一致，累计观测 70 子步。普通 Position、Nut 和装配 Panda 本批未改其 Controller 语义，使用本轮 6.39／6.40 对应受测证据；GeoPhys、Isaac、renderer 和完整 Solution 本批未重跑。计划及冻结 diff 位于 ignored `workspace/maintenance/v211_fixed_physical_owner_20261112_001/`。E01～E04 仍未接收。
+
+### 6.42 Robot 提供 Task Artifact 主体声明
+
+输入 `73d47118`。四个正式任务的 Artifact 主体声明现在消费 `RobotComponent.artifact_entity`：Panda 由注册的 Panda Robot 提供其固定资产、frame 和关节声明；Pendulum／双轮车由共同 Robot 合同从其自身 Scene 投影主体，并核对关节及资产。PickCube 的主体初态也改由注册 Robot 提供；NutAssembly 按任务声明的 Robot UID 获取主体。公共 Assembly compiler 中硬编码的 `panda_entity_declaration` 已移除。该变化发生在实际 Artifact 编译过程；tabletop 的 source、Controller 构建与两个简单任务仍未完全合流，装配 Panda 仍在后续 source 替换中形成实际嵌套主体，不据此声称 E02 完成。
+
+生产修改 6 文件 +44／−34，净增 10 行；其中既有主体声明及验证职责重写迁到 Robot 合同，非整文件迁移；版本诊断修改 1 文件 +30／−0；本文和当前状态文档修改 2 文件。没有文件新增、删除或整文件迁移，项目 tracked 文件数保持 1364。provider／renderer 的 source、native 映射、clock 和提交接口未更改。四个 Task Artifact 的完整 mapping 与 identity 在相同输入下均与输入版本相同；代码来源身份发生变化，不能仅凭 Artifact 一致扩大旧运行证据。
+
+45 项版本纯合同最终通过，包含四任务主体合同及 Robot／Scene 关节不匹配拒绝。新增测试首版将简单任务的 TaskArtifactV1 当成旧版 Artifact 读取，导致 2 项 AttributeError；改为检查 V1 的 Scene identity、关节绑定和初始化后通过。MuJoCo CPU 的 PickCube、NutAssembly、Pendulum、双轮车及装配 Panda 完成真实短程，共观测 65 子步。GeoPhys CPU 的 PickCube、NutAssembly 和 Pendulum 也完成短程，内部子步未观测，按每条 50 保守预留。Isaac、renderer 和完整 Solution 未重跑；历史有界结果只按具体代码与来源影响参考。计划、冻结 diff、前后 Artifact 对照及运行结果在 ignored `workspace/maintenance/v211_robot_artifact_20261112_001/`；E01～E04 仍未接收。

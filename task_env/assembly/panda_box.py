@@ -13,7 +13,7 @@ from ..environment.types import TaskCompositionSpec
 from ..objects.pick_cube import (CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE,
                                  CUBE_MASS, EE_SITE_NAME, PickCubeSceneComposer)
 from ..robots.panda import PandaAgent
-from .compiler import ReferenceTaskDeclarationV1, panda_entity_declaration
+from .compiler import ReferenceTaskDeclarationV1
 
 
 PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
@@ -68,7 +68,9 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
                          (value - extent, value + extent), (value - extent, value + extent))
         for axis, value in zip(('x', 'y'), center, strict=True)
     ) if extent else ()
-    joints = {f'panda-v1/{name}': value for name, value in PandaAgent().initial_state_spec().joint_positions}
+    from ..registry import make_agent
+    robot = make_agent('panda-v1')
+    joints = {f'{robot.uid}/{name}': value for name, value in robot.initial_state_spec().joint_positions}
     entities = (
         EntityDefinition('tabletop-v1', 'static', 'tabletop-v1/task-local',
                          ('tabletop-v1/top',), (), 'box', 'support_contact',
@@ -77,7 +79,7 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration):
                              for axis, value in zip('xyz', d.table_half_size, strict=True)},
                           **({'center_x': d.table_center_xy[0], 'center_y': d.table_center_xy[1]}
                              if d.include_table_center else {})}),
-        panda_entity_declaration(),
+        robot.artifact_entity(),
         EntityDefinition(d.object_id, 'movable', d.object_asset_reference, (), (),
                          'free_box', 'table_hand_contact',
                          {'half_size': CUBE_HALF_SIZE, 'mass': CUBE_MASS, **{

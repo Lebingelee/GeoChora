@@ -43,6 +43,26 @@ class RobotComponent(DefaultCanonicalControllerMixin, ABC):
     uid: ClassVar[str]
     component_controller_kinds: ClassVar[tuple[str, ...]] = ()
 
+    def artifact_entity(self, scene):
+        """Project this Robot's declared Scene identity into a Task Artifact."""
+        from ..artifacts import EntityDefinition
+
+        entities = tuple(item for item in scene.entities if item.entity_id == self.uid)
+        articulations = tuple(item for item in scene.articulations if item.entity_id == self.uid)
+        if len(entities) != 1 or len(articulations) != 1:
+            raise ValueError('Task requires one declared Robot entity and articulation')
+        entity, articulation = entities[0], articulations[0]
+        assets = tuple(item for item in scene.assets
+                       if (item.asset_id, item.asset_version) == (entity.asset_id, entity.asset_version))
+        if len(assets) != 1:
+            raise ValueError('Robot entity must resolve to exactly one Scene asset')
+        names = tuple(self.state_joint_names)
+        if names != tuple(joint.joint_id for joint in articulation.joints):
+            raise ValueError('Robot state joints differ from its Scene articulation')
+        return EntityDefinition(self.uid, 'embodiment', assets[0].source_reference,
+            tuple(f'{self.uid}/{name}' for name in articulation.link_frame_ids),
+            tuple(f'{self.uid}/{name}' for name in names), 'source_owned', 'source_owned', {})
+
 
 class AgentComponent(RobotComponent):
     """Legacy source-component capabilities for Robots that provide them."""

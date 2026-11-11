@@ -97,3 +97,5 @@ Pendulum／双轮车现在由同一 binding owner 实际编排 Robot、Scene、A
 正式配置已退休历史 `execution.source_workspace`，物理 source 快照由内部 owner 管理并在 close 后释放；MuJoCo 受影响路线和记录短程已复验。详见[实施记录 6.40](../planning/post-5c-optimization-execution.md#640-退休诊断-source_workspace-输入)。
 
 固定 physical execution 与 Position 投影并存时，Env／Robot 也公开实际 physical Controller，避免同一动作有两个对外身份；验证及范围见[实施记录 6.41](../planning/post-5c-optimization-execution.md#641-固定-physical-controller-的公开归属)。
+
+四任务的 Artifact 主体现从注册 Robot 的共同声明合同产生；公共 Assembly compiler 不再硬编码 Panda 主体。MuJoCo 四任务／装配 Panda 与 GeoPhys 三条受影响路线短程通过；完整四任务构建链尚未合流。详见[实施记录 6.42](../planning/post-5c-optimization-execution.md#642-robot-提供-task-artifact-主体声明)。
