@@ -8,7 +8,7 @@ from ..environment.reference_binding import position_input_kind
 
 
 def position_episode_end_payload(*, state, boundary, source_closure_digest,
-                                 controller=None, leaf_plan=None, leaf_receipt=None,
+                                 controller=None,
                                  position_profiles=None, switch_fault_receipt=None,
                                  pending_switch=None, execution_fault=None,
                                  last_transition=None, runtime_step=None, payload=None):
@@ -19,19 +19,8 @@ def position_episode_end_payload(*, state, boundary, source_closure_digest,
         'state_boundary_id': boundary.boundary_id,
         'source_closure_digest': source_closure_digest,
     }
-    if leaf_plan is not None:
-        details.update({
-            'effective_leaf_plan_identity_sha256': leaf_plan.identity_sha256,
-            'leaf_materialization_identity_sha256': leaf_receipt.identity_sha256,
-            'leaf_writers': tuple({
-                'writer_id': entry.binding.writer_id,
-                'binding_identity_sha256': entry.binding.identity_hash,
-                'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-            } for entry in leaf_plan.leaves),
-        })
-    else:
-        details.update({'controller_identity': controller.identity,
-                        'profile_id': controller.profile_id})
+    details.update({'controller_identity': controller.identity,
+                    'profile_id': controller.profile_id})
     if position_profiles is not None:
         details['position_writers'] = tuple({
             'entity_id': profile.entity_id,
@@ -140,106 +129,6 @@ def pending_controller_switch_receipt(pending, *, published_step, execution_faul
         })
     return receipt
 
-
-def _attached_leaf_record_metadata(self, asdict):
-    attachment = self.session.fixed_attachment_receipt
-    leaf_receipt = self.session.leaf_materialization_receipt
-    writers = tuple({
-        'writer_id': entry.binding.writer_id,
-        'profile_kind': entry.binding.profile_kind,
-        'action_schema_id': entry.binding.action_schema_id,
-        'binding_identity_sha256': entry.binding.identity_hash,
-        'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-        'member_path': entry.binding.member_path,
-        'entity_id': entry.binding.entity_id,
-        'control_group_id': entry.binding.control_group_id,
-        'joint_order': tuple((ref.entity_id, ref.joint_id) for ref in entry.binding.joint_order),
-        'actuator_order': tuple((ref.entity_id, ref.actuator_id) for ref in entry.binding.actuator_order),
-        'tcp_frame': (entry.binding.tcp_frame.entity_id, entry.binding.tcp_frame.frame_id),
-    } for entry in self.leaf_plan.leaves)
-    profile = {
-        'schema_version': 'leaf-position-recording-profile-v1',
-        'profile_id': 'r03c-attached-entity-position-leaves-v1',
-        'task_artifact_identity_hash': self.artifact.identity_hash,
-        'task_source_identity_sha256': self.artifact.task_source_identity_hash,
-        'scene_identity_hash': self.position_scene.identity_hash,
-        'source_id': self.value['source'].scene_source.source_id,
-        'source_closure_digest': self.value['source'].source_closure_digest,
-        'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-        'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
-        'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-        'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
-        'provider': self.provider,
-        'provider_version': self.leaf_plan.provider_version,
-        'provider_build_sha256': self.leaf_plan.provider_build_sha256,
-        'backend': self.backend,
-        'physics_dt_s': self.leaf_plan.physics_dt_s,
-        'control_substeps': self.leaf_plan.control_substeps,
-        'control_dt_s': self.artifact.timebase.control_dt,
-        'materialization_identity_sha256': leaf_receipt.identity_sha256,
-        'configuration_revision': self.session.leaf_configuration_revision,
-        'attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
-        'assembly_identity_sha256': self.value['fixed_attachment_plan'].logical_content_sha256,
-        'attachment_receipt': attachment,
-        'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
-        'leaf_materialization_receipt': asdict(leaf_receipt),
-        'leaf_materialization_receipt_identity_sha256': leaf_receipt.identity_sha256,
-        'provider_materialization_id': leaf_receipt.materialization_id,
-        'episode_id': self.value['resolved_configuration'].get('episode_id'),
-        'arm_active': self.value['resolved_configuration'].get('arm_active'),
-        'hand_active': self.value['resolved_configuration'].get('hand_active'),
-        'writers': writers,
-    }
-    env_metadata = {
-        'env_name': 'SelectedReferenceEnv.R03cAttachedLeafPositionV1',
-        'task_name': self.artifact.task_id,
-        'task_version': self.artifact.artifact_version,
-        'scene_uid': self.position_scene.scene_id,
-        'agent_uids': ('panda-arm', 'panda-hand'),
-        'physics_dt': self.artifact.timebase.physics_dt,
-        'control_substeps': self.artifact.timebase.control_substeps,
-        'control_frequency': 1.0 / self.artifact.timebase.control_dt,
-        'action_schema': {
-            'schema_id': 'r03c-attached-leaf-action-set-v1',
-            'components': tuple(ref.joint_id for ref in next(
-                item for item in self.leaf_plan.leaves
-                if item.binding.profile_kind == 'arm_position'
-            ).binding.joint_order) + ('opening_m',),
-            'units': ('radian',) * 7 + ('meter_total_opening',),
-        },
-        'observation_schema': {'leaf_specs': (
-            {'path': 'state.ee_pose', 'semantic': 'panda_arm_link7_pose_world'},
-            {'path': 'state.entities.panda-arm.joint_position', 'semantic': 'panda_arm_joint_positions'},
-            {'path': 'state.entities.panda-hand.joint_position', 'semantic': 'panda_hand_finger_positions'},
-            {'path': 'state.entities.panda-hand.hand_pose', 'semantic': 'panda_hand_pose_world'},
-            {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
-        )},
-        'leaf_position_v1': profile,
-        'reference_profile': profile,
-    }
-    return {
-        'env_metadata': env_metadata,
-        'universal_action_schema': {
-            'version': 'r03c-attached-leaf-action-set-v1',
-            'dimension': 8,
-            'components': env_metadata['action_schema']['components'],
-        },
-        'resolved_config': {
-            'provider': self.provider, 'backend': self.backend, 'horizon': self.horizon,
-            'effective_leaf_plan': self.leaf_plan.identity_sha256,
-            'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
-            'override_paths': tuple(item.member_path for item in self.value['leaf_overrides']),
-        },
-        'candidate_identity': {
-            'task_artifact_identity_hash': self.artifact.identity_hash,
-            'scene_identity_hash': self.position_scene.identity_hash,
-            'source_closure_digest': self.value['source'].source_closure_digest,
-            'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-            'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-            'attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
-            'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
-        },
-    }
 
 def position_record_metadata(self):
     from dataclasses import asdict
@@ -460,117 +349,6 @@ def position_record_metadata(self):
                 'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
                 **({'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256}
                    if f05_host_model_route else {}),
-            },
-        }
-
-    if getattr(self, 'leaf_position_profile', False):
-        if self.fixed_attachment_leaf_position_profile:
-            return _attached_leaf_record_metadata(self, asdict)
-        arm_entry = next(item for item in self.leaf_plan.leaves if item.binding.profile_kind == 'arm_position')
-        hand_entry = next(item for item in self.leaf_plan.leaves if item.binding.profile_kind == 'hand_position')
-        action_components = tuple(item.joint_id for item in arm_entry.binding.joint_order) + ('opening_m',)
-        observation_leaf_specs = (
-            {'path': 'state.ee_pose', 'semantic': 'panda_main_link7_pose_world'},
-            {'path': 'state.joint_position', 'semantic': 'panda_main_arm_then_two_finger_positions'},
-            {'path': 'state.hand_pose', 'semantic': 'panda_main_hand_pose_world'},
-            {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
-        )
-        env_metadata = {
-            'env_name': 'SelectedReferenceEnv.R02cLeafPositionV1',
-            'task_name': self.artifact.task_id,
-            'task_version': self.artifact.artifact_version,
-            'scene_uid': self.position_scene.scene_id,
-            'agent_uids': ('panda-main',),
-            'physics_dt': self.artifact.timebase.physics_dt,
-            'control_substeps': self.artifact.timebase.control_substeps,
-            'control_frequency': 1.0 / self.artifact.timebase.control_dt,
-            'action_schema': {
-                'schema_id': 'leaf-position-action-set-v1',
-                'components': action_components,
-                'units': ('radian',) * 7 + ('meter_total_opening',),
-            },
-            'observation_schema': {'leaf_specs': observation_leaf_specs},
-            'leaf_position_v1': {
-                'scene_identity_sha256': self.position_scene.identity_hash,
-                'task_artifact_identity_sha256': self.artifact.identity_hash,
-                'task_source_identity_sha256': self.artifact.task_source_identity_hash,
-                'source_id': self.value['source'].scene_source.source_id,
-                'source_xml_sha256': hashlib.sha256(self.value['source'].scene_source.xml.encode()).hexdigest(),
-                'source_closure_sha256': self.value['source'].source_closure_digest,
-                'effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
-                'provider': self.provider, 'provider_version': self.leaf_plan.provider_version,
-                'provider_build_sha256': self.leaf_plan.provider_build_sha256,
-                'backend': self.backend, 'physics_dt_s': self.leaf_plan.physics_dt_s,
-                'control_substeps': self.leaf_plan.control_substeps,
-                'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-                'configuration_revision': self.session.leaf_configuration_revision,
-                'writers': tuple({
-                    'writer_id': entry.binding.writer_id,
-                    'profile_kind': entry.binding.profile_kind,
-                    'action_schema_id': entry.binding.action_schema_id,
-                    'binding_identity_sha256': entry.binding.identity_hash,
-                    'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-                    'member_path': entry.binding.member_path,
-                    'entity_id': entry.binding.entity_id,
-                    'control_group_id': entry.binding.control_group_id,
-                    'joint_order': tuple(ref.joint_id for ref in entry.binding.joint_order),
-                    'actuator_order': tuple(ref.actuator_id for ref in entry.binding.actuator_order),
-                } for entry in self.leaf_plan.leaves),
-            },
-            'reference_profile': {
-                'schema_version': 'leaf-position-recording-profile-v1',
-                'profile_id': 'r02c-independent-position-leaves-v1',
-                'task_artifact_identity_hash': self.artifact.identity_hash,
-                'task_source_identity_sha256': self.artifact.task_source_identity_hash,
-                'scene_identity_hash': self.position_scene.identity_hash,
-                'source_id': self.value['source'].scene_source.source_id,
-                'source_closure_digest': self.value['source'].source_closure_digest,
-                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
-                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-                'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
-                'provider': self.provider,
-                'provider_version': self.leaf_plan.provider_version,
-                'provider_build_sha256': self.leaf_plan.provider_build_sha256,
-                'backend': self.backend,
-                'physics_dt_s': self.leaf_plan.physics_dt_s,
-                'control_substeps': self.leaf_plan.control_substeps,
-                'control_dt_s': self.artifact.timebase.control_dt,
-                'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-                'configuration_revision': self.session.leaf_configuration_revision,
-                'writers': tuple({
-                    'writer_id': entry.binding.writer_id,
-                    'profile_kind': entry.binding.profile_kind,
-                    'action_schema_id': entry.binding.action_schema_id,
-                    'binding_identity_sha256': entry.binding.identity_hash,
-                    'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-                    'member_path': entry.binding.member_path,
-                    'entity_id': entry.binding.entity_id,
-                    'control_group_id': entry.binding.control_group_id,
-                    'joint_order': tuple(ref.joint_id for ref in entry.binding.joint_order),
-                    'actuator_order': tuple(ref.actuator_id for ref in entry.binding.actuator_order),
-                } for entry in self.leaf_plan.leaves),
-            },
-        }
-        return {
-            'env_metadata': env_metadata,
-            'universal_action_schema': {
-                'version': 'r02c-leaf-position-action-set-v1',
-                'dimension': 8, 'components': action_components,
-            },
-            'resolved_config': {
-                'provider': self.provider, 'backend': self.backend,
-                'horizon': self.horizon, 'effective_leaf_plan': self.leaf_plan.identity_sha256,
-                'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
-                'override_paths': tuple(item.member_path for item in self.value['leaf_overrides']),
-            },
-            'candidate_identity': {
-                'task_artifact_identity_hash': self.artifact.identity_hash,
-                'scene_identity_hash': self.position_scene.identity_hash,
-                'source_closure_digest': self.value['source'].source_closure_digest,
-                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
-                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
             },
         }
 
@@ -900,103 +678,4 @@ def position_record_reset_info(self):
             'camera_observation_v1': self.info['camera_observation_v1'],
         } if self.camera_observation_config is not None else {}),
     }
-    if getattr(self, 'leaf_position_profile', False):
-        info.update({
-            'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
-            'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-            'leaf_configuration_revision': self.session.leaf_configuration_revision,
-        })
-        if self.fixed_attachment_leaf_position_profile:
-            info.update({
-                'fixed_attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
-                'fixed_attachment_receipt_identity_sha256': self.session.fixed_attachment_receipt[
-                    'receipt_identity_sha256'
-                ],
-            })
     return info
-
-
-def record_leaf_position_transition(self, action, request, result, *, terminated, truncated):
-    from dataclasses import asdict
-    from ..trajectory.canonical.episode import StructuredControlTransitionV1
-    if getattr(self, 'fixed_attachment_leaf_position_profile', False):
-        from ..controllers.canonical.leaf_actions import ARM_WRITER_ID, HAND_WRITER_ID
-    else:
-        from ..controllers.canonical.leaf_actions import MAIN_ARM_WRITER_ID as ARM_WRITER_ID, MAIN_HAND_WRITER_ID as HAND_WRITER_ID
-
-    groups = {(item.entity_id, item.group_id): item for item in request.groups}
-    commands = {item.writer_id: item for item in result.prepared_commands}
-    applied = {item.writer_id: item for item in result.apply_results}
-    entries = {entry.binding.writer_id: entry for entry in self.leaf_plan.leaves}
-    writer_controls = []
-    request_groups = {(item.entity_id, item.group_id): item for item in request.groups}
-    for writer_id, typed_action in ((ARM_WRITER_ID, action.arm), (HAND_WRITER_ID, action.hand)):
-        entry = entries[writer_id]
-        entity_id, group_id = entry.binding.entity_id, entry.binding.control_group_id
-        if (entity_id, group_id) not in request_groups:
-            raise ValueError('typed leaf request omits its exact Entity/ControlGroup')
-        command = commands[writer_id]
-        applied_result = applied[writer_id]
-        is_arm = entry.binding.profile_kind == 'arm_position'
-        components = (tuple(item.joint_id for item in entry.binding.joint_order)
-                      if is_arm else ('opening_m',))
-        values = tuple(typed_action.position_rad) if is_arm else (float(typed_action.opening_m),)
-        requested_group = request_groups[(entity_id, group_id)]
-        if (requested_group.action_schema_id != entry.binding.action_schema_id
-                or tuple(requested_group.values) != values):
-            raise ValueError('typed leaf request Group schema/values differ from its writer Action')
-        ack = applied_result.ack
-        target = command.target
-        writer_controls.append({
-            'writer_id': writer_id,
-            'action_schema_id': entry.binding.action_schema_id,
-            'components': components,
-            'groups': ({
-                'entity_id': entry.binding.entity_id,
-                'group_id': group_id,
-                'action_components': components,
-            },),
-            'requested_action': {
-                'schema_version': typed_action.schema_version,
-                'values': values,
-                'payload': typed_action.to_mapping(),
-                'unit': 'radian' if is_arm else 'meter_total_opening',
-            },
-            'canonical_action': {
-                'schema_version': 'leaf-canonical-action-v1',
-                'interpreted_values': values,
-                'target_identity_sha256': target.identity_hash,
-                'command_identity_sha256': command.command_identity_sha256,
-                'prepared_command': asdict(command),
-                'application_ack': ack.to_mapping(),
-                'source_boundary': target.source_boundary.to_mapping(),
-                'application_boundary': ack.application_boundary.to_mapping(),
-                'next_boundary': result.next_publication.view.boundary.to_mapping(),
-                'source_closure_sha256': self.value['source'].source_closure_digest,
-                'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
-                'effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
-                'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
-            },
-            'controller_target': {
-                'schema_version': target.schema_version,
-                'payload': target.to_mapping(),
-                'identity_hash': target.identity_hash,
-            },
-            'applied_control': {
-                'schema_version': applied_result.schema_version,
-                'payload': asdict(applied_result),
-                'target_hash': target.identity_hash,
-            },
-        })
-    control = StructuredControlTransitionV1(
-        'structured-control-transition-v1', request, tuple(writer_controls),
-    )
-    control.validate()
-    action_values = np.asarray(tuple(
-        value for key in sorted(groups) for value in groups[key].values
-    ), dtype=np.float32)
-    self.recorder.append_transition(
-        action_values, action_values, self.obs, float(self.evaluation.reward),
-        bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
-        structured_control=control,
-    )

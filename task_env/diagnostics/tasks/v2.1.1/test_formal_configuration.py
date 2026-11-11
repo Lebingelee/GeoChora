@@ -144,3 +144,16 @@ def test_recorded_formal_configuration_reconstructs_controller_and_episode():
     assert rebuilt.controller_profile == original.controller_profile
     assert rebuilt.robot_uid == original.robot_uid
     assert rebuilt.execution_spec_v2 == original.execution_spec_v2
+
+
+def test_recording_coordinator_serializes_typed_observation_schema():
+    from task_env.environment.types import ObservationFieldSpec, ObservationSchema
+    from task_env.recorders.reference_provenance import coordinator_receipt
+    schema = ObservationSchema('test-observation-v1', (ObservationFieldSpec('state.joint', (1,)),))
+    receipt = coordinator_receipt(step=0, time=0., artifact_hash='a' * 64,
+        controller_identity='controller', solution_identity=None, provider='mujoco',
+        execution_mode='external', task_outcome={'observation_schema': schema}, source_sha256='b' * 64)
+    outcome = receipt['owners']['coordinator']['fields']['task_outcome']['value']
+    assert outcome['observation_schema']['version'] == schema.version
+    assert outcome['observation_schema']['fields'][0]['name'] == 'state.joint'
+    assert len(receipt['integrity_hash']) == 64

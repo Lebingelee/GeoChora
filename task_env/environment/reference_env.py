@@ -1056,8 +1056,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             value, binding=self.binding, provider=self.provider, backend=self.backend,
         )
         self.mixed_control_profile = selected.mixed
-        self.leaf_plan = None
-        self.leaf_position_profile = False
         self.position_profiles = selected.position_profiles
         self.position_profile = selected.position
         self.controller = selected.controller
@@ -1519,8 +1517,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
                     raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
                 self.binding = _binding
-            self.leaf_position_profile = False
-            self.fixed_attachment_leaf_position_profile = False
             if _mixed_control_candidate and (
                 (provider not in {'mujoco', 'geophys'} or backend != 'cpu')
                 or self.binding.build_mixed_control_profile is None
@@ -1975,10 +1971,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 preflight_value = candidate_value if switching else self.value
                 facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
                              source=preflight_value['source'],
-                             controller=preflight_value.get('controller', preflight_value.get('leaf_plan')), seed=seed)
+                             controller=preflight_value.get('controller'), seed=seed)
                 if selection.deployment == 'isolated_worker':
-                    if (self._mixed_control_candidate or self.leaf_position_profile
-                            or self.dual_entity_position or self._diagnostic_profile is not None
+                    if (self._mixed_control_candidate or self.dual_entity_position or self._diagnostic_profile is not None
                             or self._native_feedback_profile is not None):
                         receipt = describe_execution_selection(selection, **facts)
                         receipt['phase'] = 'static_preflight'
@@ -2120,7 +2115,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 rebuilt = describe_execution_selection(
                     selection, requested=requested, task_uid=self.uid, artifact=self.artifact,
                     source=self.value['source'],
-                    controller=self.value.get('controller', self.value.get('leaf_plan')), seed=seed)
+                    controller=self.value.get('controller'), seed=seed)
                 if (rebuilt['identity_facts']['artifact_identity'] != deployment_receipt['identity_facts']['artifact_identity']
                         or rebuilt['identity_facts']['controller_identities'] != deployment_receipt['identity_facts']['controller_identities']):
                     raise ValueError('selected Artifact or Controller changed after preflight')
@@ -2129,7 +2124,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     value=self.value, binding=self.binding,
                     dependency_status=deployment_receipt['dependency']['status'],
                     request_identity=deployment_receipt['request_identity'])
-                plan = self.value.get('controller_binding_plan') or self.value.get('leaf_plan')
+                plan = self.value.get('controller_binding_plan')
                 if (reassessed.to_mapping()['rows'] != deployment_receipt['identity_facts']['assessment_rows']
                         or (None if plan is None else getattr(plan, 'identity_hash', None) or plan.identity_sha256)
                         != deployment_receipt['identity_facts']['control_binding_plan']):
@@ -4594,13 +4589,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('Position Stop requires a successfully returned reset boundary')
         boundary = typed.view.boundary
         from ..recorders.position_metadata import position_episode_end_payload
-        leaf = getattr(self, 'leaf_position_profile', False)
         details = position_episode_end_payload(
             state=state, boundary=boundary,
             source_closure_digest=self.value['source'].source_closure_digest,
-            controller=None if leaf else self.controller,
-            leaf_plan=self.leaf_plan if leaf else None,
-            leaf_receipt=self.session.leaf_materialization_receipt if leaf else None,
+            controller=self.controller,
             position_profiles=self.position_profiles if self.dual_entity_position else None,
             switch_fault_receipt=self._position_controller_switch_fault_receipt,
             pending_switch=self._pending_position_switch,
@@ -4836,7 +4828,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 receipt = describe_execution_selection(
                     selection, requested=requested, task_uid=self.uid,
                     artifact=self.artifact, source=self.value['source'],
-                    controller=self.value.get('controller', self.value.get('leaf_plan')), seed=None,
+                    controller=self.value.get('controller'), seed=None,
                 )
         result = json.loads(json.dumps(receipt, sort_keys=True, allow_nan=False))
         if getattr(self.binding, 'prepare_reset_switch', None) is not None and hasattr(self, '_switch_generation'):
@@ -4957,7 +4949,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.stop(str(reason))
             return finalize_structured_recording(
                 self.recorder, self.recording_path, self._position_episode_end, reason, position=True,
-                leaf=self.leaf_position_profile, camera=self.camera_observation_config is not None,
+                camera=self.camera_observation_config is not None,
             )
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')

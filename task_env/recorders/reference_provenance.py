@@ -206,8 +206,10 @@ def coordinator_receipt(*, step, time, artifact_hash, controller_identity,
                         solution_identity, provider, execution_mode, task_outcome,
                         source_sha256):
     """Project current state into the existing non-restorable owner receipt."""
+    from ..trajectory.metadata import plain_metadata
+
     fields = {'_stage_index': 0, 'execution_mode': execution_mode,
-              'task_outcome': task_outcome}
+              'task_outcome': plain_metadata(task_outcome)}
     result = {'control_step': step, 'simulation_time': time,
               'artifact_hash': artifact_hash, 'controller_identity': controller_identity,
               'solution_identity': solution_identity, 'provider': provider,

@@ -494,3 +494,13 @@ MuJoCo CPU 的 PickCube Panda direct effort、Pendulum、双轮车各完成 rese
 生产修改 8 文件 +34／−223，净减 189 行；版本诊断 1 文件 +21；本记录与当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。六条 MuJoCo CPU 进程内路线在首版 diff 下各完成 reset／非零 action 或 Nut 单个 Solution interval／再次 reset／close，合计 70 可观测子步；后续变动仅为记录配置投影及对应测试。最终 diff 下 PickCube 与 NutAssembly MuJoCo 隔离 worker 均通过相同生命周期，worker 内部子步不可观测，各保守计费 50；首次失败也按预留保守计费 50。28 项版本纯合同在最终 diff 下通过。
 
 本批未重跑 GeoPhys、Isaac、renderer 或完整 Solution。leaf 低层代码及非本轮触及的观察／记录分支尚未完成审计；E01～E04 仍未完成。两个冻结 diff、计划、失败与成功结果见 ignored `workspace/maintenance/v211_retire_leaf_dispatch_20261112_001/`。
+
+### 6.31 退休 leaf 观察／记录分支并修复记录投影
+
+输入 `4e0d8e63`。移除已无法被正式控制选择产生的 leaf 专属观察、episode-end、记录及 readback 分流；正式 Position 双主体和装配 Panda 的实体观察仍由各自声明的实际 Controller／subject 生成。历史 leaf H5 读取器不因产品构造入口退休而删除。共同 Env 的 preflight／记录不再携带无生产者的 leaf 状态。首次记录验证发现 typed `ObservationSchema` 无法直接进入协调器 JSON 收据，现复用现有 portable metadata 投影，保留字段后再计算完整性 hash。
+
+生产修改 5 文件 +46／−446，净减 400 行；版本诊断 2 文件 +49／−9；实施和当前状态 2 文档修改。无文件新增、删除或迁移，tracked 文件数不变。任务／Controller 语义及 provider、renderer、clock、提交实现未改。29 项版本纯合同通过，包括 typed schema 收据投影。
+
+MuJoCo CPU 的 PickCube、一体与装配 Panda、NutAssembly、Pendulum 和双轮车短程通过；其中一体与装配 Panda 和 NutAssembly 各完成单 interval 记录写入及读回（前两条 canonical mapping 精确、Nut streaming 字节精确），合计 65 可观测子步。PickCube reset-scoped joint effort 路线另完成 1 interval 的 H5 v3 结构化记录、1 transition／2 observations 读回及第二次 reset（5 子步）。这不是完整 Solution 或整段轨迹资格。纯测试在最后诊断变更后重跑；相关生产代码与前述成功运行相同。
+
+失败按原样保留：首次记录在首步前因 typed schema JSON 投影失败，修复后一次探针错误地对 legacy scalar route 调用不支持的 `stop`（5 子步），调整为正确的 `finish_recording` 后通过；物理记录首次未启用 reset-scoped selection 而被明确拒绝（0 子步），随后启用 selection 又发现 reset 前 `env.robot` 不可用（0 子步）。最终记录验证显式记录该 Robot 缺口，没有将其计作主体统一通过；此缺口属于 E02 后续工作。本批实际观测合计 75 子步。所有计划、冻结 diff、失败及成功结果位于 ignored `workspace/maintenance/v211_retire_leaf_observation_20261112_001/`。GeoPhys、Isaac 和 renderer 本批未重跑，E01～E04 仍未完成。

@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
-parser.add_argument('--profile',default=None);args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--record',action='store_true');args=parser.parse_args()
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -24,15 +24,21 @@ try:
             return original_step(*params,**kwargs)
         mujoco.mj_step=counted_step
     from task_env import make_env
-    if args.case in {'panda-r3','panda-gravity','panda-effort','assembled-unreset','assembled-live','nut'}:
+    if args.case in {'panda-r3','panda-gravity','panda-effort','panda-joint','assembled-unreset','assembled-live','nut'}:
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
         if args.case=='panda-effort':config['controller']={'profile_id':'panda-direct-effort-v1'}
+        if args.case=='panda-joint':
+            config['controller']={'profile_id':'panda-joint-effort-reference-v1'}
+            if args.record:config['controller']['parameters']={'reset_selection':True}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
         env=make_env(uid,config=config)
         action=np.asarray([.2,0.,0.,0.,0.,0.,0.,0.] if args.case=='panda-effort' else
                           [.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32)
+        if args.case=='panda-joint':
+            q=env.artifact.initialization.joint_position
+            action=np.asarray([q[f'panda-v1/joint{i}'] + (.002 if i==1 else 0.) for i in range(1,8)]+[.04],dtype=np.float32)
     else:
         uid='pendulum-v1' if args.case=='pendulum' else 'two-wheel-balance-v1'
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu',
@@ -42,11 +48,20 @@ try:
         action={'torque':np.asarray([.25]if args.case=='pendulum'else[.25,-.2],dtype=np.float32)}
     result['uid']=env.uid
     result['constructed']=True
-    robot=env.robot
-    result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
-        'parents':[s.parent_subject_id for s in robot.subjects],
-        'controller_identities':[str(c.identity) for c in robot.controllers]}
-    assert robot.controller is env.controller
+    if args.case=='panda-joint' and args.record:
+        from task_env.environment.types import StageUnavailableError
+        try:
+            robot=env.robot
+        except StageUnavailableError:
+            robot=None
+            result['robot_before_reset']='unavailable'
+    else:
+        robot=env.robot
+    if robot is not None:
+        result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
+            'parents':[s.parent_subject_id for s in robot.subjects],
+            'controller_identities':[str(c.identity) for c in robot.controllers]}
+        assert robot.controller is env.controller
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
     if args.case in {'nut','panda-r3','assembled-live'}:
         assert subject_binding is not None and robot.subjects == subject_binding.subjects
@@ -62,6 +77,8 @@ try:
             observation,info=env.reset_for_solution(solution,seed=19)
         else:
             observation,info=env.reset(seed=31)
+        assert env.observation_space.contains(observation)
+        if args.record:env.start_recording(Path('episode.h5').resolve())
         first=env.session.state_boundary_identity().to_mapping()
         if subject_binding is not None:
             live_binding=env.session._source.position_subject_binding
@@ -71,20 +88,30 @@ try:
             first_observation=np.asarray(observation['state']['proprioception']).copy()
 
         time_before=float(env.state.simulation_time)
+        if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
         stepped=env.step_with_solution(solution) if args.case=='nut' else env.step(action)
         if args.case=='nut':
             assert not solution.failed
         second=env.session.state_boundary_identity().to_mapping()
         time_after=float(env.state.simulation_time)
         result['steps'].append({'before':first,'after':second,'time_before':time_before,'time_after':time_after,'reward':float(stepped[1]),'terminated':bool(stepped[2]),'truncated':bool(stepped[3])})
+        assert env.observation_space.contains(stepped[0])
+        if args.record:
+            result['recording']=env.finish_recording('external_stop')
+            if 'transition_count' in result['recording']:
+                assert result['recording']['transition_count']==1 and result['recording']['observation_count']==2
+            else:
+                assert result['recording'].get('byte_exact') or result['recording'].get('logical_mapping_exact')
+            assert Path('episode.h5').is_file()
         assert time_after>time_before
         assert abs(time_after-time_before-env.artifact.timebase.control_dt)<1e-9
         observation,info=env.reset(seed=19 if args.case=='nut' else 31)
         reset=env.session.state_boundary_identity().to_mapping()
         assert reset['episode_id']!=first['episode_id']
         result['second_reset']=reset
-        assert env.robot is not robot and env.robot.controller is env.controller
-        result['robot_rebound_after_reset']=True
+        if robot is not None:
+            assert env.robot is not robot and env.robot.controller is env.controller
+            result['robot_rebound_after_reset']=True
         if args.case in {'pendulum','two-wheel'}:
             assert info['reset_parameters']==first_reset_parameters
             np.testing.assert_allclose(observation['state']['proprioception'],first_observation,atol=1e-6)

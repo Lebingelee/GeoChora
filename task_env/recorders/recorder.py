@@ -316,10 +316,9 @@ def begin_structured_recording(path, *, horizon, observation, reset_info, metada
     return path, recorder
 
 
-def finalize_structured_recording(recorder, path, episode_end, reason, *, position, leaf=False, camera=False):
+def finalize_structured_recording(recorder, path, episode_end, reason, *, position, camera=False):
     """Finalize and verify the existing v3 stream against its episode boundary."""
-    from .h5 import (load_camera_observations_h5, load_leaf_control_records_h5,
-                     load_structured_control_records_h5)
+    from .h5 import load_camera_observations_h5, load_structured_control_records_h5
 
     outcome = episode_end.outcome
     allowed_reasons = {
@@ -343,8 +342,7 @@ def finalize_structured_recording(recorder, path, episode_end, reason, *, positi
         outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
     )
     output = recorder.save_h5(path.parent, path.name)
-    loaded = (load_leaf_control_records_h5(output) if leaf
-              else load_structured_control_records_h5(output))
+    loaded = load_structured_control_records_h5(output)
     if (loaded['transition_count'] != trajectory.transition_count
             or loaded['observation_count'] != len(trajectory.observations)
             or loaded['outcome'] != outcome):
