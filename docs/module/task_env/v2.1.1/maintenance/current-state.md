@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-11。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-12。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
@@ -42,6 +42,8 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## E00～E04 当前实施
 
+维护者已调整实施方向：四个正式任务统一配置和 Robot 构建链，不再兼容过时诊断；本版本诊断归 `task_env/diagnostics/tasks/v2.1.1/`。旧 `panda-position-servo-candidate-v1` 注册及其专属自动目录管理已退出正式入口；PickCube 仍暂时引用旧目录中的 Panda 控制实现，必须迁至实际 owner。原 Position 历史证据保留，旧入口退休不等于 Position 控制能力退休。配置两条解析路径和主体分别构造仍未收敛，E00～E04 没有因此完成；此前批次是历史执行记录。
+
 维护者已直接要求本会话实施 E00～E04，输入 `21577d32`，当前 chat 单 writer。共同构造和旧物理 UID 翻译之后，正式 PickCube（含物理配置）／NutAssembly／Pendulum／双轮车已从本次 Artifact 构造 TaskDefinition，观察调用共同语义 lifecycle，reset 后重新绑定。数组与具名 canonical state 各保留真实表示；Gym typed info 保留，Solution callbacks 使用公共 metadata 值投影。已准入的普通 native 路线安装现有 live source／Controller interval binding，移除安装处的单一 R05c profile 名称分流，原严格准入仍保留。本批生产代码净增 122 行，累计净增 154 行；tracked 文件数不变。152 个不同纯合同节点及五条 MuJoCo CPU 交集通过；累计受监督 36 次／290 个可观测子步，加前序 150 保守计费为 440。四次本批失败和原始拒绝均保留，未称完整 Solution 成功。配置 codec、剩余主体／registry／reset／action／clock／部署审计继续；E00～E04 未完成。详细证据与限制见[实施记录第 6 节](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)，不提前签收或启动 G06。
 
 第六批将 Isaac source 首次重复编译收敛到共同构造，并让实际 physical execution 提供动作合同；Isaac 正式配置完成两次 reset／非零 step／三次 RGB 与独立读回。首次预检失败及受限修复、资源账和 SDK 退订诊断均保留。生产累计净增 182 行，文件数不变；其余 E00～E04 仍待逐项完成，细节见[第六批记录](../planning/post-5c-optimization-execution.md#65-第六批编译后的-controller-合同与-isaac-正式入口复验)。
@@ -54,4 +56,4 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 后续职责整理将 Panda MJCF 传动检查归入 MuJoCo source adapter，将质量模型执行组合归入 Controller owner。MuJoCo direct、joint-mass、R3-mass 真实短程复验通过；Isaac 质量模型未在本批重跑。见[职责整理记录](../planning/post-5c-optimization-execution.md#611-panda-mjcf-source-检查归属)。
 
-最近的增量让 reset 策略由任务 binding 声明，并移除 Panda source 检查中的历史 checkout 绝对路径；Position 旧入口自动创建的 source 目录现在在 Env 关闭或构造失败时回收。MuJoCo 受影响短程和故障合同已复验，见[实施记录](../planning/post-5c-optimization-execution.md#614-reset-重建能力归属)。
+此前增量让 reset 策略由任务 binding 声明，并移除 Panda source 检查中的历史 checkout 绝对路径；当时的 Position 旧入口自动目录回收记录见[实施记录](../planning/post-5c-optimization-execution.md#614-reset-重建能力归属)。该入口及其专属目录管理现已退休。

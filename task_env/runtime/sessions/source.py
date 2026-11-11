@@ -178,11 +178,6 @@ class ExecutionSourceReceiptV1:
             owner.cleanup()
 
 
-def owned_source_workspace():
-    """Allocate a source workspace whose lifetime is owned by its caller."""
-    return tempfile.TemporaryDirectory(prefix='geochora-source-')
-
-
 def matches_relocated_source_closure(receipt, actual_digest, *, asset_root, normalized_digest):
     """Verify an owned source snapshot against a location-independent closure.
 

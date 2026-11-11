@@ -380,3 +380,11 @@ reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prep
 本批最终生产 3 个文件 +45／−14，净增 31 行；测试 1 个文件 +74；项目文件无新增、删除或迁移。10 个双锁合同通过，覆盖自动目录正常／重复 close、构造失败回收、显式 caller 目录及原 source／动作合同。第一次测试 `position-owned-source-016-pure.log` 误将固定 Menagerie 资产目录当自动目录而失败，未修改资产；纠正检查器后 `position-owned-source-016-pure-v2.log` 的 10 项通过，原失败保留。随后 3 项与前组部分重叠的合同检查验证已有关闭 receipt 和原始错误保留，见 `position-owned-source-016-close-contract.log`。
 
 真实 MuJoCo CPU Position direct 路线两次分别完成 reset→非零 step→第二次 reset→重复 close，各观测 5 子步，最后一次使用最终通用临时目录前缀，确认实际自有目录和 source snapshot 随关闭消失。后续仅补已有关闭器的返回值保留；本次 native 路径没有该已有关闭器，由最终纯合同验证新增分支。显式目录继续保留由上述合同和未改语义的旧 native 路线复用；无新 GeoPhys native 或其他 Position 组合声明。冻结计划、diff 和结果为 `cpu-run-plan-028.json`／`029.json`、`cpu-source-028.diff`／`029.diff`、`cpu-028-owned-position/`／`cpu-029-owned-position/`。累计监督 53 次，345 个可观测子步，7 次 worker 内部子步未知；含历史保守计费共 995／2,000。
+
+### 6.17 维护者纠偏：退休旧 Position 注册
+
+2026-11-12 重新启动目标，输入 `54be99e1`。维护者指定四个正式任务统一构建，过时诊断不再要求兼容，本版本诊断进入 `task_env/diagnostics/tasks/v2.1.1/`。本批移除 `panda-position-servo-candidate-v1` 的注册、旧输入解析和仅供该入口使用的自动 source workspace 分配；直接引用旧实现的历史诊断不再作为当前产品兼容目标。未删除 `physical_profile.py`：正式 PickCube 仍调用其中 Panda effort 构建，后续须迁到真实 owner，不能假称退出 candidate 依赖。早前 6.16 是当时的资源修复记录，不代表旧入口继续受支持。
+
+本批生产 3 文件 +1／−115，净减 114 行；无新增、删除或迁移文件，无测试代码变更。当前记录和本页文档另计，不把文档当作生产代码。使用 `geochora` 环境 Python 做无 native 纯导入核对：四个正式 UID 均登记、旧 UID 从 registry 消失且 `make_env` 明确拒绝、PickCube 当前所需的 effort 实现仍可导入。此检查不运行构造／reset／step 或物理，既有真实运行证据的其他边界不变。
+
+构建协议仍有 selected／component 分流；Robot 仍未统一从声明构建；Position 旧 builder／公共 Env 的候选专用方法仍待按正式 caller 清理。本批没有修改 provider／renderer adapter、时钟或提交，没有完成 E01～E04。历史诊断的旧 UID 检查不作为本次验收；不执行历史测试矩阵。

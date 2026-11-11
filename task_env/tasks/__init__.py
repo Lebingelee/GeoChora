@@ -4,7 +4,6 @@ from .base import BaseTaskEnv
 from .empty import EmptyTaskEnv
 from .nut_assembly.task import NutAssemblyReferenceEnv
 from .pendulum import PendulumEnv
-from .position_candidate import PositionCandidateEnv
 from .pick_cube.task import PickCubeReferenceEnv
 from .pick_cube.physical_candidate import PickCubePhysicalCandidateEnv
 from .pick_cube.physical_isaac_candidate import PickCubeIsaacPhysicalCandidateEnv
@@ -17,7 +16,6 @@ __all__ = [
     "EmptyTaskEnv",
     "NutAssemblyReferenceEnv",
     "PendulumEnv",
-    "PositionCandidateEnv",
     "PickCubeReferenceEnv",
     "PickCubePhysicalCandidateEnv",
     "PickCubeIsaacPhysicalCandidateEnv",
