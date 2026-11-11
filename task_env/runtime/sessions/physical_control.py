@@ -231,35 +231,50 @@ def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
         source_closure_sha256, assembly, children, (subject,), declarations)
 
 
-def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
-    """Compile an existing Robot's declaration into one source-bound effort execution."""
+def build_declared_effort_execution(*, scene, artifact, source, subject, declarations,
+                                    assembly_id, controller_factory, state_joint_names,
+                                    joint_bindings, frame_bindings, nested_component_id=None):
+    """Compile one declared subject and bind its Controller to the Runtime execution."""
     from ...artifacts.state import StateFieldRequirement, StateRequirements
 
-    subject, declarations = robot.physical_subject_declaration(
-        source_id=source.source_id, source_closure_sha256=source.source_closure_digest)
     if len(subject.controller_writers) != 1:
         raise ValueError('single-subject effort construction requires one declared writer')
     writer = subject.controller_writers[0]
     compiled = compile_existing_subject_assembly(scene=scene, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest,
-        subject=subject, declarations=declarations, assembly_id=robot.assembly_id)
-    units = tuple(channel.unit for channel in compiled.binding.channels)
-    controller = subject.select_effort_controller(compiled.binding, profile_id=profile_id,
-        writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)
-    names = tuple(robot.state_joint_names)
+        subject=subject, declarations=declarations, assembly_id=assembly_id,
+        nested_component_id=nested_component_id)
+    controller = controller_factory(compiled.binding, writer)
     requirements = StateRequirements('state-requirements-v1', 'controller', writer, tuple(
-        StateFieldRequirement('state-field-requirement-v1', field, 'joint', subject.entity_id, name,
-            'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
-        for name in names for field in ('joint_position', 'joint_velocity')))
-    definitions = {joint.joint_id: joint for articulation in scene.articulations or ()
-                   if articulation.entity_id == subject.entity_id for joint in articulation.joints}
-    joint_bindings = {f'{subject.entity_id}/{name}': definitions[name] for name in names}
-    frame_bindings = {name: FrameReference(*name.split('/', 1)) for name in source.bodies}
+        StateFieldRequirement('state-field-requirement-v1', field, 'joint', subject.entity_id,
+            name, 'required', 'evaluation_boundary', 'joint-definition', 'joint_state_query')
+        for name in state_joint_names for field in ('joint_position', 'joint_velocity')))
     execution = PhysicalControlExecutionV1(compiled, (controller,), scene,
         joint_bindings, frame_bindings, requirements, 1, (subject,))
     execution.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
     return execution
+
+
+def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id):
+    """Compile an existing Robot's declaration into one source-bound effort execution."""
+    subject, declarations = robot.physical_subject_declaration(
+        source_id=source.source_id, source_closure_sha256=source.source_closure_digest)
+    names = tuple(robot.state_joint_names)
+    definitions = {joint.joint_id: joint for articulation in scene.articulations or ()
+                   if articulation.entity_id == subject.entity_id for joint in articulation.joints}
+    joint_bindings = {f'{subject.entity_id}/{name}': definitions[name] for name in names}
+    frame_bindings = {name: FrameReference(*name.split('/', 1)) for name in source.bodies}
+
+    def make_controller(binding, writer):
+        units = tuple(channel.unit for channel in binding.channels)
+        return subject.select_effort_controller(binding, profile_id=profile_id,
+            writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)
+
+    return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
+        subject=subject, declarations=declarations, assembly_id=robot.assembly_id,
+        controller_factory=make_controller, state_joint_names=names,
+        joint_bindings=joint_bindings, frame_bindings=frame_bindings)
 
 
 def compile_declared_subject_binding(scene, artifact_sha256, source_id, source_closure_sha256,

@@ -628,3 +628,13 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 2 文件 +1／−16，净减 15 行；版本诊断修改 1 文件 +26／−0；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1365。减少类加载时无关的 Task 构造及两份重复解析入口；每个 Env 的 binding、Controller 和 source 各自持有。provider／renderer adapter、source 映射、clock 和控制提交未改；共同四主体构建仍未完成。
 
 57 项版本检查通过，新增检查分别构造同一 tabletop 任务的两个 Env，确认 binding、Controller、source 独立，关闭第一个后第二个 source 仍存在；检查读取资产但不启动物理。MuJoCo CPU 的 PickCube、NutAssembly、装配 Panda 和 PickCube reset-scoped joint／r3 切换短程通过，切换含 H5 读回，共观测 25 子步；对照中主体、reset、可用 Artifact／Scene／source 身份和单步奖励一致，Nut Controller 因 Task 来源源码身份变化。GeoPhys CPU 的 NutAssembly 通过短程，内部子步未观测，保守预留 50。Isaac、renderer、显式 native-feedback 路线及完整 Solution 本批未重跑；计划、冻结 diff、对照与结果位于 ignored `workspace/maintenance/v211_task_binding_instance_20261112_001/`。E01～E04 仍未接收。
+
+### 6.48 单主体 effort execution 共同构造
+
+输入 `46c9b52b`。Panda direct effort 与 Pendulum／双轮车在共同 Assembly 编译之后，原先分别创建状态需求、physical execution 并验证 source；现在这些实际步骤由 Runtime 的同一个声明式构造入口完成。Robot 继续提供主体、传动及各自的 Controller 构造；Panda tendon 耦合、简单主体的关节控制和 provider 原生映射保持各自语义。状态关节独立于受控关节声明，以保留双轮车未被直接驱动的俯仰状态。装配 Panda 的多主体 effort、Position 和 USD 专用 effort 仍未进入此入口，不能据此称四主体构建已完全统一。
+
+生产修改 2 文件 +53／−48，净增 5 行；Panda 中的状态需求和 execution 收尾职责重写归 Runtime，非整文件迁移。版本诊断修改 1 文件 +18／−0，覆盖双轮车被动关节；本文和当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，项目 tracked 文件数保持 1365。provider／renderer 的原生映射、clock 和提交算法未改，source／绑定身份和单位校验继续执行。
+
+58 项版本检查通过。首版错误地要求全部状态关节等于受控关节，双轮车在物理启动前拒绝（0 子步）；修正为独立状态关节后通过，新增检查保留该差异。对同一实际 source，分别以输入提交的原构造函数与新构造函数构建，Panda、Pendulum 和双轮车的主体身份、physical binding、状态需求、Controller 身份及 joint／frame 映射一致；Panda 的动作 schema 也一致，简单主体使用其已声明的任务动作合同。比较脚本首版误对不提供 `action_shape` 的简单 Controller 调用通用 schema，失败于无物理运行的对照；修正后通过。
+
+MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum 和双轮车 direct／velocity-damped 均完成短程；另复验 Panda physical sequence 的共同提交。首轮成功路线 40 子步、修正后六条路线 115 子步、序列 5 子步，共观测 160；切换路线含 H5 写入读回。GeoPhys CPU 的 Panda joint effort 和双轮车通过短程，内部子步未观测，各保守预留 50。Isaac、renderer 和完整 Solution 本批未重跑；计划、冻结 diff、合同对照与结果位于 ignored `workspace/maintenance/v211_shared_effort_execution_20261112_001/`。E01～E04 仍未接收。

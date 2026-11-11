@@ -81,3 +81,21 @@ def test_task_artifact_uses_registered_robot_entity(task_name, robot_uid):
         return
     matching = tuple(item for item in artifact.world.entities if item.semantic_id == robot_uid)
     assert matching == (expected,)
+
+
+def test_two_wheel_state_requirements_include_passive_pitch():
+    import sys
+    from task_env import make_env
+
+    config = {'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                            'physics_device': 'cpu', 'deployment': 'in_process',
+                            'interpreter': sys.executable}, 'episode': {'horizon': 8}}
+    env = make_env('two-wheel-balance-v1', config=config)
+    try:
+        execution = env.value['physical_execution']
+        state_joints = {item.subject_id for item in execution.requirements.requirements}
+        driven_joints = {item.joint_id for item in execution.compiled.binding.channels}
+        assert 'chassis_pitch' in state_joints and 'chassis_pitch' not in driven_joints
+        assert driven_joints < state_joints
+    finally:
+        env.close()
