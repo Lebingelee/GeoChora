@@ -765,8 +765,15 @@ class PickCubeReadinessSolution(PickCubeSolution):
             action = self._corrected_gate_hold_action(
                 segment.plan.actions[gate.after_actions - 1]
             )
+        elif self._last_wait:
+            action = segment.plan.actions[-1]
+            # A pose-readiness hold faces the same steady-state servo offset as a
+            # gate hold, so it uses the same settled, clipped TCP correction.
+            if (self.readiness_config.measured_tcp_clearance_gate
+                    and self.readiness_config.policies[self._segment_index].kind == "pose_ready"):
+                action = self._corrected_gate_hold_action(action)
         else:
-            action = segment.plan.actions[-1] if self._last_wait else segment.plan.actions[self._action_index]
+            action = segment.plan.actions[self._action_index]
         diagnostics = {
             "expert_version": self.version, "readiness_hold": self._last_wait,
             "planned_actions_emitted": self.planned_actions_emitted,
@@ -1011,7 +1018,6 @@ class PickCubeReadinessSolution(PickCubeSolution):
 
     def _pending_measured_tcp_gate(self, segment):
         if (not self.readiness_config.measured_tcp_clearance_gate
-                or self._segment_index != 0
                 or self._measured_tcp_gate_index >= len(segment.plan.measured_tcp_gates)):
             return None
         gate = segment.plan.measured_tcp_gates[self._measured_tcp_gate_index]
