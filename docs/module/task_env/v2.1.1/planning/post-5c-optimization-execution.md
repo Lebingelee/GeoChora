@@ -327,3 +327,16 @@ E01 仍需对剩余配置 codec／Position 输入对账；E02～E04 的剩余审
 | Recorder／episode | `EpisodeExecutionState.execute_close` 统一协调；reference 路线在健康时按实际发布和 recorder 状态 finalize，再释放相机与 session；component 路线由 lifecycle 关闭 runtime，lifecycle 尚未建立时由 Env 关闭已返回的 runtime | 既有 close／fault 合同及受测重复 close；不同记录格式与完整 Solution 属后续验证 |
 
 reset 的共同阶段由 `EpisodeExecutionState.execute_reset` 顺序调用 prepare、materialize、reset、read state、observe、publish；异常传给实际失败阶段的 `on_failure`。source／target 的预检拒绝可在旧 session 关闭前发生；替换及物理写入后的故障则不能把旧 publication 冒充新状态。具体历史故障测试和真实路线的边界见本节前述批次；未据此宣称所有 provider／renderer 组合已覆盖。此表为静态 owner 审计和既有证据索引，不是新的一轮 native 测量。
+
+### 6.10 E04 动作入口及未调用旁路
+
+静态追踪当前实际 caller，删除 `SelectedReferenceEnv._step_leaf_position`：全仓 Python 搜索只有其定义，没有调用者；该私有包装直接调用 `_prepare_leaf_position`，缺少共同 `prepare_selected_control_action` 所建立的 dispatch。保留 `_prepare_leaf_position` 作为现有 lifecycle 的 leaf 实现，`dispatch_leaf_control_interval` 仍调用共同 `submit_control_command`；没有删改 typed Action、资源、边界或 clock 校验。本批删除 4 行生产代码，不新增／删除文件，不把未调用代码当作真实运行性能提升。
+
+| 动作入口 | 实际动作准备与提交 | 证据边界 |
+| --- | --- | --- |
+| 普通 selected `step`、caller `ExpertAction` | `_prepare_selected_step` → `prepare_selected_control_action`；按实际 physical／Position／leaf／mixed capability 准备，再经对应 Runtime submission | 现有 CPU 主体与正式 Isaac RGB、MuJoCo／GeoPhys worker 短程证据；只覆盖各受测组合 |
+| 调用方 `step_with_solution` | 验证 reset 时接受的同一 Solution；`act` 后 Position 经 `_step_position_profile`、其他路线经 `_step`，两者均调用 `prepare_selected_control_action`，由同一 episode coordinator 执行 | Nut MuJoCo 单 interval 和既有合同；完整 Solution 不在本项宣称 |
+| Env-owned `step_expert` | `prepare_expert`／`act` 后走同一个 `_step_position_profile` 或 `_step`；act 后验证失败保留故障 latch | 既有提案失败合同；具体 Solution 完整运行仍待 O5 |
+| 组件与 leaf | 组件先由 `TaskLifecycleAdapter.prepare_step` 交 episode coordinator；leaf 通过上述共同 selected dispatch 进入 `_prepare_leaf_position`／`dispatch_leaf_control_interval` | 既有主体和 leaf 合同；不把不同 typed 动作表示合并，也不声称所有组合实测 |
+
+本次无受影响实际 caller，复用既有 native 证据；仅做 Python AST、调用者搜索和差异检查。逐项故障与所有支持模式的完整对账仍未结束，不提前宣布 E04 接收。

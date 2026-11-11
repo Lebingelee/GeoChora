@@ -3887,10 +3887,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise
         return event
 
-    def _step_leaf_position(self, action):
-        operations = self._prepare_leaf_position(action)
-        return self._episode_execution_state().execute_interval(**operations)
-
     def _prepare_leaf_position(self, action):
         """Dispatch one real R02b two-leaf interval through the selected lifecycle."""
         if not getattr(self, 'leaf_position_profile', False) or self.session is None:
