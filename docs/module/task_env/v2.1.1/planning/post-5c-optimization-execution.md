@@ -612,3 +612,11 @@ MuJoCo CPU 下两任务 direct 和 velocity-damped Controller 各完成 reset、
 生产修改 3 文件 +24／−26，净减 2 行；版本诊断修改 1 文件 +20／−0；本文与当前状态文档修改 2 文件。无文件新增、删除或整文件迁移，项目 tracked 文件数保持 1365。两份 Task 文件减少重复控制构造，实际 R3、hold 和 gripper 依旧由同一个 Controller 组合 owner 管理。provider／renderer adapter、source 映射、clock 和实际提交未更改。
 
 51 项版本检查通过，其中 5 项读取真实 tabletop source；新增检查确认两个任务的 R3、hold、gripper 指向同一个基础 Controller，保持 500 Hz、10 N 和 Artifact 控制周期。MuJoCo CPU 的 PickCube、NutAssembly 与 PickCube reset-scoped joint／r3 各完成短程，切换路线含 H5 读回；初版及将 Controller 选项改为显式参数后的最终版各 20 子步，合计观测 40 子步。最终版与上批比较，Artifact、source、reset、主体和单步奖励一致；Controller 源码身份变化，历史身份不替换。GeoPhys CPU 的两个 tabletop 短程通过，内部子步未观测，各保守预留 50。Isaac USD source 与 physical 动作合同完成静态检查，未启动 SDK；renderer 和完整 Solution 本批未复验。计划、冻结 diff、身份对照及结果位于 ignored `workspace/maintenance/v211_r3_controller_owner_20261112_001/`；E01～E04 仍未接收。
+
+### 6.46 退休旧 component physical 构建分支
+
+输入 `ffaea599`。四个正式任务的配置解析已统一返回正式 resolved 配置；旧 `ResolvedEnvConfig` 直接进入这些任务时会在解析边界被拒绝。公共 Env 原先仍保留一条将旧 component 配置转为 physical task binding 的分支及其独立 provider、timebase、camera 等检查；该分支对于正式配置不可达，现已移除。独立 component 环境仍有自己的构造路径；正式 source、设备、渲染和控制能力检查继续由既有正式配置及 Runtime owner 执行。
+
+生产修改 1 文件 +41／−78，净减 37 行，删除一条重复物理构建分支及其校验；无整文件迁移。版本诊断修改 1 文件 +13／−0；本文与当前状态文档修改 2 文件。无文件新增或删除，tracked 文件数保持 1365。四任务实际公共构造无需根据旧 component 结果再选择 physical builder；组件-only 配置解析以及真实 Position／effort 控制能力仍在，不能据此宣称整个 E01～E04 已完成。provider／renderer adapter、clock 和提交实现未改。
+
+55 项版本检查通过，包含四任务拒绝旧 component resolved 输入；单独以不启动物理的方式检查背景 component 构造与关闭。MuJoCo CPU 四任务、装配 Panda 和 PickCube reset-scoped joint／r3 切换短程通过，后者含 H5 读回，共观测 75 子步；同 seed 对照的 Robot／Controller、reset、可用 Artifact／Scene／source 身份和单步奖励一致。GeoPhys CPU 的 PickCube 和 Pendulum 通过短程，内部子步未观测，各保守预留 50。Isaac、renderer 和完整 Solution 本批未重跑；计划、冻结 diff、对照与结果位于 ignored `workspace/maintenance/v211_retire_component_physical_20261112_001/`。E01～E04 仍未接收。

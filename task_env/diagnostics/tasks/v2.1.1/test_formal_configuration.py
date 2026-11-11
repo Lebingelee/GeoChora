@@ -197,3 +197,16 @@ def test_formal_configuration_rejects_diagnostic_source_workspace(uid):
     importlib.import_module('task_env.tasks')
     with pytest.raises(KeyError, match='source_workspace'):
         resolve_task_env_config(ENV_REGISTRY.get(uid), {'execution': {'source_workspace': '/tmp/old-source'}})
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_formal_construction_rejects_old_component_resolved_config(uid):
+    from task_env.environment.configuration import resolve_env_config
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get(uid)
+    old = resolve_env_config(task_uid=uid, scene_uid='tabletop-v1')
+    with pytest.raises(TypeError, match='mapping or YAML'):
+        task.from_resolved_config(old)

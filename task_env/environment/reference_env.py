@@ -872,60 +872,53 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         camera, renderer = task_rgb_camera, task_renderer
         if (camera is None) != (renderer is None):
             raise ValueError('task RGB camera and fixed renderer must be declared together')
+        if not selected:
+            provider = kwargs.pop('provider', 'geophys')
+            backend = kwargs.pop('backend', config.runtime.backend)
+            build_runtime = kwargs.pop('build_runtime', True)
+            manifest = kwargs.pop('source_delivery_manifest', None)
+            if kwargs:
+                raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
+            if type(build_runtime) is not bool:
+                raise TypeError('build_runtime must be a boolean')
+            if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
+                raise ValueError('component construction uses its configured GeoPhys route')
+            if config.runtime.batch_physics_layout != 'merged_scene':
+                raise StageUnavailableError('single TaskEnv construction requires merged_scene')
+            return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
+                       task_rgb_camera=camera, task_renderer=renderer)
         from contextlib import ExitStack
         with ExitStack() as preparation:
-            if selected:
-                if kwargs:
-                    raise ValueError('selected reference admits no unsupported extra kwargs')
-                if render_mode is not None:
-                    supports = getattr(cls, 'selected_supports_observer', None)
-                    pair = (config.physics_provider, config.environment.runtime.backend)
-                    admitted = (supports(config) if callable(supports) else
-                                render_mode in getattr(cls, 'observer_physics_modes', {}).get(pair, ()))
-                    if not admitted:
-                        raise ValueError('selected configuration admits state-only execution without observer rendering')
-                    render_mode = normalize_render_mode(render_mode).value
-                provider, backend = config.physics_provider, config.environment.runtime.backend
-                if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
-                    raise ValueError('unsupported fixed task RGB renderer and physics pairing')
-                environment = config.environment
-                import json
-                from ..runtime.sessions.provenance import preflight_selected_source
-                preflight_selected_source(config.execution_spec_v2,
-                    requested=(None if config.requested_execution_json is None
-                               else json.loads(config.requested_execution_json)), task_uid=cls.uid)
-                if provider == 'isaacsim':
-                    from ..runtime.sessions.isaac_native_io import prepare_isaac_source
-                    preparation.enter_context(prepare_isaac_source(
-                        rendering=render_mode is not None or camera is not None))
-                binding = cls._bind_robot_source_composer(cls.selected_binding(config), config)
-            else:
-                provider = kwargs.pop('provider', 'geophys')
-                backend = kwargs.pop('backend', config.runtime.backend)
-                build_runtime = kwargs.pop('build_runtime', True)
-                manifest = kwargs.pop('source_delivery_manifest', None)
-                if kwargs:
-                    raise ValueError(f'unsupported environment options: {sorted(kwargs)}')
-                if type(build_runtime) is not bool:
-                    raise TypeError('build_runtime must be a boolean')
-                if not build_runtime or not callable(getattr(cls, 'selected_binding', None)):
-                    if provider != 'geophys' or backend != config.runtime.backend or manifest is not None:
-                        raise ValueError('component construction uses its configured GeoPhys route')
-                    if config.runtime.batch_physics_layout != 'merged_scene':
-                        raise StageUnavailableError('single TaskEnv construction requires merged_scene')
-                    return cls(config=config, render_mode=render_mode, build_runtime=build_runtime,
-                               task_rgb_camera=camera, task_renderer=renderer)
-                cls._validate_physical_task_config(config, provider, backend, render_mode, camera, renderer, manifest)
-                environment = config
-                binding = cls.selected_binding(config, provider=provider, backend=backend,
-                                               source_delivery_manifest=manifest)
+            if kwargs:
+                raise ValueError('selected reference admits no unsupported extra kwargs')
+            if render_mode is not None:
+                supports = getattr(cls, 'selected_supports_observer', None)
+                pair = (config.physics_provider, config.environment.runtime.backend)
+                admitted = (supports(config) if callable(supports) else
+                            render_mode in getattr(cls, 'observer_physics_modes', {}).get(pair, ()))
+                if not admitted:
+                    raise ValueError('selected configuration admits state-only execution without observer rendering')
+                render_mode = normalize_render_mode(render_mode).value
+            provider, backend = config.physics_provider, config.environment.runtime.backend
+            if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
+                raise ValueError('unsupported fixed task RGB renderer and physics pairing')
+            environment = config.environment
+            import json
+            from ..runtime.sessions.provenance import preflight_selected_source
+            preflight_selected_source(config.execution_spec_v2,
+                requested=(None if config.requested_execution_json is None
+                           else json.loads(config.requested_execution_json)), task_uid=cls.uid)
+            if provider == 'isaacsim':
+                from ..runtime.sessions.isaac_native_io import prepare_isaac_source
+                preparation.enter_context(prepare_isaac_source(
+                    rendering=render_mode is not None or camera is not None))
+            binding = cls._bind_robot_source_composer(cls.selected_binding(config), config)
             horizon = environment.episode.horizon
             env = cls.from_task_binding(binding, provider=provider, backend=backend, horizon=horizon,
                 seed=environment.episode.seed if environment.episode.seed is not None else 31)
             try:
-                if selected:
-                    env.resolved_public_config = config
-                    env.config = environment
+                env.resolved_public_config = config
+                env.config = environment
                 if binding.task_reset_sampler is not None:
                     env._env_metadata = replace(build_stage0_metadata(env.uid, environment),
                         external_action=binding.external_action_contract,
@@ -1004,36 +997,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     cleanup()
                 except BaseException as cleanup_error:
                     error.add_note(f'task construction cleanup also failed: {cleanup_error!r}')
-
-    @classmethod
-    def _validate_physical_task_config(cls, config, provider, backend, render_mode, camera, renderer, manifest):
-        if (config.task.task_uid, config.scene.scene_uid, config.task.success_definition) != (
-                cls.task_uid, cls.scene_uid, cls.success_definition):
-            raise ValueError('physical task configuration differs from its declared Task identity')
-        if (provider, backend) not in {('geophys', 'cpu'), ('mujoco', 'cpu'), ('isaacsim', 'cuda')}:
-            raise ValueError('physical route requires GeoPhys/MuJoCo CPU or the admitted Isaac CUDA route')
-        if (config.control.profile_id == 'velocity_damped_joint_effort_v1'
-                and (provider, backend) != ('mujoco', 'cpu')):
-            raise ValueError('velocity-damped Controller is admitted only by the tested MuJoCo CPU source-state model')
-        if provider == 'isaacsim' and (manifest is None or render_mode is not None):
-            raise ValueError('Isaac physical route requires an explicit source_delivery_manifest and state-only construction')
-        if render_mode not in (None, 'human', 'rgb_array') or (render_mode == 'rgb_array' and provider != 'geophys'):
-            raise ValueError('physical task admits human construction or GeoPhys CPU rgb_array')
-        if render_mode == 'rgb_array' and config.render.backend not in {'raytracer', 'rasterizer'}:
-            raise ValueError('physical observer requires a GeoPhys renderer')
-        if config.render.camera_obs and provider != 'geophys':
-            raise ValueError('legacy camera observations require GeoPhys CPU')
-        if (config.runtime.physics_dt, config.runtime.control_substeps, config.runtime.backend) != (*cls.physical_task_timebase, backend):
-            raise ValueError('physical task requires its declared timebase and backend')
-        if (camera is None) != (renderer is None):
-            raise ValueError('task RGB camera and fixed renderer must be supplied together')
-        if camera is not None:
-            from ..environment.config import CameraSpec
-            if (type(camera) is not CameraSpec or camera.frame != 'world'
-                    or not np.isfinite((*camera.quaternion_wxyz, *camera.position,
-                                        camera.fov_y, camera.near, camera.far)).all()
-                    or np.linalg.norm(camera.quaternion_wxyz) < 1e-12):
-                raise ValueError('task RGB requires a finite world CameraSpec with nonzero quaternion')
 
     def _selected_execution_context(self):
         resolved = getattr(self, 'resolved_public_config', None)
