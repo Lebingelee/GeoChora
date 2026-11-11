@@ -55,8 +55,11 @@ _OVER_CUBE_HORIZONTAL_TOLERANCE = 0.010
 # bounded integral of the measured TCP error. Position servos can settle with a
 # steady-state offset at high, extended poses; re-emitting the identical command
 # would never close that gap. The physical gate thresholds stay unchanged.
+# Integrate only once the TCP has settled, so slow-tracking servos are not
+# driven by wind-up while still converging on the held command.
 _MEASURED_TCP_HOLD_INTEGRAL_GAIN = 0.10
 _MEASURED_TCP_HOLD_MAX_CORRECTION_M = 0.040
+_MEASURED_TCP_HOLD_SETTLED_STEP_M = 0.0005
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -653,6 +656,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
+        self._measured_tcp_hold_previous_tcp = None
         self._last_public_observation = None
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -699,6 +703,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._measured_tcp_gate_wait_ticks = 0
         self._last_measured_tcp_gate_hold = False
         self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
+        self._measured_tcp_hold_previous_tcp = None
         self._last_public_observation = observation
         self._clear_capture_candidate()
         self._capture_episode_context = None
@@ -991,8 +996,14 @@ class PickCubeReadinessSolution(PickCubeSolution):
         action = np.array(planned_action, dtype=np.float32, copy=True)
         observation = self._last_public_observation
         if observation is not None:
-            error = action[:3] - self._ee_pose(observation)[:3]
-            if np.isfinite(error).all():
+            tcp = self._ee_pose(observation)[:3].astype(np.float32)
+            previous = self._measured_tcp_hold_previous_tcp
+            self._measured_tcp_hold_previous_tcp = tcp
+            settled = previous is not None and float(
+                np.linalg.norm(tcp - previous)
+            ) <= _MEASURED_TCP_HOLD_SETTLED_STEP_M
+            error = action[:3] - tcp
+            if settled and np.isfinite(error).all():
                 self._measured_tcp_hold_correction = np.clip(
                     self._measured_tcp_hold_correction
                     + _MEASURED_TCP_HOLD_INTEGRAL_GAIN * error.astype(np.float32),
@@ -1046,6 +1057,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
             self._measured_tcp_gate_index += 1
             self._measured_tcp_gate_wait_ticks = 0
             self._measured_tcp_hold_correction = np.zeros(3, dtype=np.float32)
+            self._measured_tcp_hold_previous_tcp = None
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
