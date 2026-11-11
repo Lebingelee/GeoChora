@@ -434,10 +434,15 @@ class PickCubeSolution:
         target[:3] = cube + np.array(
             [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32
         )
+        # The face-aligned yaw is composed into the high pitched rotation, so the
+        # final descend toward the above pose only removes the wrist pitch.
+        yaw = np.eye(3)
         if getattr(getattr(self, "readiness_config", None), "measured_tcp_clearance_gate", False):
             target[3:7] = self._face_aligned_orientation(
                 start[3:7], self._cube_quaternion(observation)
             )
+            yaw = quat_wxyz_to_matrix(target[3:7].astype(np.float64)) @ quat_wxyz_to_matrix(
+                start[3:7].astype(np.float64)).T
         clearance_headroom = (
             _MEASURED_CLEARANCE_COMMAND_HEADROOM
             if getattr(
@@ -464,7 +469,8 @@ class PickCubeSolution:
         if clearance_headroom:
             pitched = clear.copy()
             pitched[3:7] = matrix_to_quat_wxyz(
-                rotvec_to_matrix(np.asarray([0.0, _R3_APPROACH_WRIST_PITCH_RAD, 0.0]))
+                yaw
+                @ rotvec_to_matrix(np.asarray([0.0, _R3_APPROACH_WRIST_PITCH_RAD, 0.0]))
                 @ quat_wxyz_to_matrix(clear[3:7])
             )
             rotation_actions = self._planner.plan_to_pose(
