@@ -51,6 +51,31 @@ def build_reference_position_controller(artifact, source, *, profile_id, dynamic
     raise ValueError(f'unsupported reference Position Controller profile: {profile_id!r}')
 
 
+def bind_reference_position_identity(controller, *, profile_id, construction_id):
+    """Bind execution provenance and describe the selected Controller owners."""
+    if profile_id in R3_REFERENCE_POSITION_PROFILES:
+        base_identity = controller.hold.controller.identity
+        execution_profile = controller.identity_profile()
+        controller.bind_identity_provenance({
+            'construction_id': construction_id,
+            'base_controller_identity': base_identity,
+            **execution_profile,
+        })
+        return {
+            'base_controller_identity': base_identity,
+            **execution_profile,
+            'controller_identity': controller.identity,
+            'controller_profile': profile_id,
+            'resolved_controller_profile': controller.rate_profile_mapping(),
+        }
+    if profile_id == 'r1_split':
+        return {'controller_profile': profile_id, 'controller_owners': (
+            {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
+            {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
+        )}
+    return {}
+
+
 @dataclass(frozen=True)
 class ArmTargetExecutionRequestV1:
     """Versioned task request consumed by the existing arm Controller owner."""

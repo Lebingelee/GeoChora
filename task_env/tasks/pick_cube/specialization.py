@@ -366,27 +366,16 @@ def _compile_reference_position_source(request, *, controller_profile, resolved_
 
 
 def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile):
+    from ...controllers.canonical.execution import bind_reference_position_identity
     from .solution import PickCubeReadinessSolution
     artifact, source = compiled.artifact, compiled.source
     task_config, recipe = context.task_config, context.task_config['recipe']
     is_r3_profile = context.is_r3_profile
     profile_source, readiness = context.profile_source, context.readiness
     source_intent, reset_plan = context.composition.intent, context.composition.reset_plan
-    if is_r3_profile:
-        execution_controller = controller
-        controller = execution_controller.hold.controller
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    base_controller_identity = None
-    execution_profile = None
-    if is_r3_profile:
-        base_controller_identity = controller.identity
-        execution_profile = execution_controller.identity_profile()
-        execution_controller.bind_identity_provenance({
-            "construction_id": recipe["construction_id"],
-            "base_controller_identity": base_controller_identity,
-            **execution_profile,
-        })
-        controller = execution_controller
+    controller_identity_fields = bind_reference_position_identity(
+        controller, profile_id=controller_profile, construction_id=recipe['construction_id'])
     root = Path(__file__).resolve().parents[3]
     from ...runtime.sessions.provenance import construction_revision
     revision = construction_revision(root)
@@ -404,20 +393,9 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         "source_revision": revision, "source_sha256": source_ids,
         "qualification": "NOT_REQUALIFIED",
     }
+    resolved.update(controller_identity_fields)
     if is_r3_profile:
-        resolved["base_controller_identity"] = base_controller_identity
-        resolved.update(execution_profile)
-        resolved["controller_identity"] = controller.identity
-    if is_r3_profile:
-        resolved["controller_profile"] = controller_profile
         resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
-        resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
-    elif controller_profile == 'r1_split':
-        resolved['controller_profile'] = controller_profile
-        resolved['controller_owners'] = (
-            {'writer_id': controller.arm.writer_id, 'identity': controller.arm.identity},
-            {'writer_id': controller.hand.writer_id, 'identity': controller.hand.identity},
-        )
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
         **({'reset_plan': reset_plan} if reset_plan is not None else {}),
