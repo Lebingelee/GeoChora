@@ -285,17 +285,6 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         profile_source, artifact, source, readiness)
 
 
-def compile_reference_robot_task(task_config, robot, legacy_artifact, source):
-    """Compile the same Task/Robot scene before choosing its Controller."""
-    from ...runtime.sessions.source import bind_reference_scene_source
-
-    task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
-        task_config, robot, legacy_artifact)
-    source, projected, closure = bind_reference_scene_source(
-        source, artifact=artifact, scene=scene, bodies=bodies, frames=frames)
-    return task_source, scene, artifact, source, projected, closure
-
-
 def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,
                                 lift_height_m, robot, controller_profile):
     """Compile PickCube declarations through the shared Task/Robot source owners."""
@@ -320,14 +309,13 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
         selected_robot = original.agents[0]
-        from ...runtime.sessions.source_composition_adapters import (
-            prepare_robot_source_intent)
-        intent, _recipe = prepare_robot_source_intent(original, robot=selected_robot,
+        from ...runtime.sessions.source_composition_adapters import prepare_reference_task_robot_source
+        intent, compiled = prepare_reference_task_robot_source(original, robot=selected_robot,
             controller_profile=controller_profile, existing_robot_entity=selected_robot.uid,
             task_body_names=PickCubeReferenceEnv.robot_source_roots,
-            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers)
-        task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
-            task_config, selected_robot, legacy_artifact, original)
+            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
+            compile_declaration=lambda: compile_pickcube_mjcf_task(task_config, selected_robot, legacy_artifact))
+        task_source, scene, artifact, source, projected, closure = compiled
 
         return {'artifact': artifact, 'task_source': task_source, 'source': source,
             '_robot': selected_robot, '_scene': scene, '_intent': intent,
@@ -387,15 +375,16 @@ def _compile_reference_position_source(request, *, controller_profile, resolved_
         lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
-        from ...runtime.sessions.source_composition_adapters import prepare_robot_source_intent
-        source_intent, _recipe = prepare_robot_source_intent(source, robot=selected_robot,
+        from ...runtime.sessions.source_composition_adapters import prepare_reference_task_robot_source
+        source_intent, compiled = prepare_reference_task_robot_source(source, robot=selected_robot,
             controller_profile=controller_profile, existing_robot_entity='panda-v1',
             task_body_names=PickCubeReferenceEnv.robot_source_roots,
-            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers)
+            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
+            compile_declaration=(lambda: compile_pickcube_mjcf_task(task_config, reference_robot, artifact))
+                if reference_robot is not None else None)
         reset_plan = None
-        if reference_robot is not None:
-            task_source, scene, artifact, source, _, _ = compile_reference_robot_task(
-                task_config, reference_robot, artifact, source)
+        if compiled is not None:
+            task_source, scene, artifact, source, _, _ = compiled
             reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=request.seed)
         return {'artifact': artifact, 'source': source, '_task_config': task_config,
             '_recipe': recipe, '_is_r3_profile': is_r3_profile,

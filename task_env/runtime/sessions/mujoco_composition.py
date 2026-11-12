@@ -12,6 +12,17 @@ import xml.etree.ElementTree as ET
 from .source_scene_import import declare_panda_scene
 
 
+def apply_mjcf_option_overrides(source_xml, overrides):
+    """Apply an admitted provider option mapping to an MJCF source."""
+    root = ET.fromstring(source_xml)
+    option = root.find('option')
+    if option is None:
+        raise ValueError('MJCF source has no option element')
+    for key, value in overrides.items():
+        option.set(key, str(value))
+    return ET.tostring(root, encoding='unicode')
+
+
 def panda_effort_source_limits(root_xml):
     """Verify the declared Panda MJCF transmission and return its drive limits."""
     defaults = root_xml.find("./default/default[@class='panda']/general")

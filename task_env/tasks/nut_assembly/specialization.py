@@ -7,7 +7,6 @@ import json
 import math
 from pathlib import Path
 import subprocess
-import xml.etree.ElementTree as ET
 
 import numpy as np
 from ...environment.task_definition import as_task_state_view
@@ -276,13 +275,8 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         overrides = recipe["providers"]["mujoco"]["option_overrides"]
         if overrides != {"noslip_iterations": 2}:
             raise ValueError("selected MuJoCo provider profile changed")
-        root = ET.fromstring(scene_xml)
-        option = root.find("option")
-        if option is None:
-            raise ValueError("MJCF source has no option element")
-        for key, value in overrides.items():
-            option.set(key, str(value))
-        scene_xml = ET.tostring(root, encoding="unicode")
+        from ...runtime.sessions.mujoco_composition import apply_mjcf_option_overrides
+        scene_xml = apply_mjcf_option_overrides(scene_xml, overrides)
         contact_profile = {"provider": "mujoco", "version": "mujoco-coulomb-noslip2-v1",
             "native_version_tested": recipe["providers"]["mujoco"]["native_version_tested"],
             "model_option_overrides": overrides}

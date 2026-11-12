@@ -437,6 +437,17 @@ def test_physical_early_failure_releases_prepared_task_source(monkeypatch):
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
+def test_mujoco_source_lowering_applies_declared_options_and_rejects_missing_option():
+    import xml.etree.ElementTree as ET
+    from task_env.runtime.sessions.mujoco_composition import apply_mjcf_option_overrides
+
+    source = '<mujoco><option timestep="0.002"/><worldbody/></mujoco>'
+    lowered = ET.fromstring(apply_mjcf_option_overrides(source, {'noslip_iterations': 2}))
+    assert lowered.find('option').attrib == {'timestep': '0.002', 'noslip_iterations': '2'}
+    with pytest.raises(ValueError, match='no option element'):
+        apply_mjcf_option_overrides('<mujoco/>', {'noslip_iterations': 2})
+
+
 def test_native_feedback_requires_source_owned_subject_before_materialization():
     from types import SimpleNamespace
     from task_env.runtime.sessions.control import materialize_control

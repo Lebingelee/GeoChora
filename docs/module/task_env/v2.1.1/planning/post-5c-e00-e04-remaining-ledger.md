@@ -63,7 +63,7 @@
 | R04 改 | PickCube `build_isaac_reference/build_pickcube_isaac_runtime_input_v1` 仍在 Task 内装配 USD runtime input、Position subjects 或 effort Controller；有效 USD byte reuse 已存在 | Task 保留场景物体、语义及必要命名声明；将 USD delivery 消费、runtime input 和原生 source 映射归现有 USD／Isaac source adapter，Position／effort Controller 建造归各 Controller capability，接 R02。保留 F06 精确准入与 source freshness，不要求 MJCF／USD 合并表示 | Task 不再亲自组织 USD native 构造；Isaac Position／effort 同一构建合同；必要 source／kinematics/readiness 输入仍可追踪。资产预装要求明确，不新增自动下载门 |
 | R05 改 | Nut `specialization._build_reference/build_runtime_source/_binding` 仍组织 source、Controller execution wrapper 和带 Solution 信息的 Controller identity | 将本体 source／Controller 执行准备接入 R02 的相同阶段。Nut 保留抓取／接触／reset、Solution 和严格反馈语义；接触参数可以由 Task 声明，由 adapter 应用。无需在本单元重写全部 Nut guard／stream 类型 | Nut 不再是一条另有 source＋Controller 编排的构造主线；当前 guarded ExpertAction 仍有效；两任务共用机制，任务策略分别保留 |
 | R06 改 | 简单主体的 `task_binding` 已很薄；`ExistingSubjectEffortTask.bind` 仍有 source→主体→physical execution 的内部构造流程 | 让这条流程消费 R02 相同阶段；该类可以保留为声明适配，不能持有另一套运行／reset 生命周期。保留各自 MJCF、USD 及传动 lowering，不为“统一”套 Panda source 方案 | Pendulum／双轮车和 Panda 在构建阶段使用相同请求、主体／Controller 编译合同及结果交接；差异限声明和有职责的 adapter／capability |
-| R07 核 | `compile_position_subjects`、`build_declared_effort_execution`、`bind_selected_controller` 已有真实主体匹配；`_compose` 可能在 Task Controller 创建后才组合 source | 对一体／装配 Panda、简单主体列出 Controller 通道 → Scene writer 资源 → native Joint/DOF/actuator/transmission 三层映射。确认组合／替换 source 后 Controller 与最终 source 同源；若存在先算后绑，说明其合法依赖并最终重验 | 原始声明、编译结果和实际 source 映射能对应；不靠相同字符串或事后 RobotRuntime 证明完成；保留耦合手指和双 writer 约束 |
+| R07 IN_PROGRESS | `compile_position_subjects`、`build_declared_effort_execution`、`bind_selected_controller` 已有真实主体匹配；`_compose` 可能在 Task Controller 创建后才组合 source | 对一体／装配 Panda、简单主体列出 Controller 通道 → Scene writer 资源 → native Joint/DOF/actuator/transmission 三层映射。确认组合／替换 source 后 Controller 与最终 source 同源；若存在先算后绑，说明其合法依赖并最终重验 | 原始声明、编译结果和实际 source 映射能对应；不靠相同字符串或事后 RobotRuntime 证明完成；保留耦合手指和双 writer 约束 |
 | R08 核 | 四 Task 已有 `task_definition_factory/task_state_projection`，RobotRuntime 只是视图 | 对共同构造和 reset 证明 TaskDefinition、空间、任务状态、Robot declaration 和 live Controller 来自 R02～R07 的实际结果。TaskDefinition 可有不同子类和语义 hook，不要求同一个类或完全相同参数 | 四任务构造对照及装配 Panda 子例；简单主体无虚假 gripper／ee；实际对象和状态来源匹配，非仅视图一致 |
 
 **单元退出：**R01～R08 均有确定结果；四正式构造实际消费共同阶段；对应的旧编排已处理；至少完成本单元受影响的正式构造／代表短程与必要错误检查。原生执行在有效授权与资源内进行；最终 U5 可以复用本单元完整覆盖的结果，不能重复增加 smoke。交付本单元净变化及 Task 内还留哪些构造知识、为何合法。
@@ -197,11 +197,13 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
-| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，R3 身份和 USD 主体绑定归各自 owner | [当前 USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)及[先前 CPU／Isaac 计划](../../../../../workspace/maintenance/v211_u1_common_build_20261112_001/plan.json)，版本诊断 283 项通过；受影响路线按原始结果分别判断 | R02～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
+| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，R3 身份和 USD 主体绑定归各自 owner | [当前 MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
 | U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+
+当前 MJCF source owner 调整后，110 项受影响诊断与 MuJoCo option 额外检查通过；PickCube Position／两种 effort／装配 Panda 和 NutAssembly 的 MuJoCo CPU 短程各完成 5 个显式子步、第二次 reset 与重复 close。GeoPhys CPU PickCube effort 完成短程与重复 close，native 子步未独立计数。MuJoCo 计划中的 source 配置哈希与 submodule 身份在运行启动后补记；GeoPhys 计划在运行前记录。USD 控制／lowering 未因本批改变而重跑。
 
 当前 USD 构建阶段调整后，Isaac PickCube Position／effort 各完成 5 个、Pendulum 完成 25 个显式子步，均有第二次 reset 和 Env／App close 收据；Position 的 SDK 关闭日志出现菜单回调访问空 USD context 的 `AttributeError`。资产清单哈希在运行启动后补记，source 新鲜度由现有检查核验；隐式启动推进数未知。先前 MuJoCo 七条受影响短程及 Isaac 验证按其[原始输入计划](../../../../../workspace/maintenance/v211_u1_common_build_20261112_001/plan.json)保留，Nut CPU 使用受限 Solution 单步。
 

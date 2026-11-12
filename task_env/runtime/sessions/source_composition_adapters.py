@@ -216,6 +216,22 @@ def prepare_robot_source_intent(source, *, robot, controller_profile, existing_r
     return intent, recipe
 
 
+def prepare_reference_task_robot_source(source, *, robot, controller_profile,
+                                        existing_robot_entity, task_body_names,
+                                        task_site_transfers, compile_declaration=None):
+    """Freeze Robot intent, then bind an optional Task scene to the source."""
+    intent, _recipe = prepare_robot_source_intent(source, robot=robot,
+        controller_profile=controller_profile, existing_robot_entity=existing_robot_entity,
+        task_body_names=task_body_names, task_site_transfers=task_site_transfers)
+    if compile_declaration is None:
+        return intent, None
+    from .source import bind_reference_scene_source
+    task_source, scene, artifact, bodies, frames = compile_declaration()
+    bound, projected, closure = bind_reference_scene_source(
+        source, artifact=artifact, scene=scene, bodies=bodies, frames=frames)
+    return intent, (task_source, scene, artifact, bound, projected, closure)
+
+
 def validate_effort_robot_intent(intent, source, execution, *, controller_profile):
     """Match source snapshot and compiled writer resources to the frozen request."""
     from ...assembly.source_composition import SourceCompositionIntentV1
