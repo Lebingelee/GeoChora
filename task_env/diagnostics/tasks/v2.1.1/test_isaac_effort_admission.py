@@ -327,6 +327,18 @@ def test_usd_position_factory_rejects_unsupported_profile_before_materialization
         build_reference_position_controller(None, source, profile_id='r1')
 
 
+def test_usd_controller_rejects_mismatched_compiled_source():
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.source_composition_adapters import build_usd_panda_control
+
+    artifact, source = object(), object()
+    runtime_input = SimpleNamespace(artifact=artifact, runtime_source=object())
+    with pytest.raises(ValueError, match='differs from the compiled Artifact or source'):
+        build_usd_panda_control(artifact, source, runtime_input=runtime_input, robot=None,
+            controller_profile='r3_continuous_v1', action_config=None, dynamic_profile=None,
+            velocity_limit=2., tcp_profile=None, end_frame_id='ee')
+
+
 def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, monkeypatch):
     import sys
     from pathlib import Path

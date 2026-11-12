@@ -377,6 +377,57 @@ def test_reference_controller_failure_releases_task_source(task_name, monkeypatc
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
+@pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
+def test_source_composition_failure_releases_source_before_controller(profile, monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import source as source_module, source_composition_adapters
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    receipts = []
+    snapshot = source_module.snapshot_legacy_mjcf_source
+    failure = RuntimeError('Robot composition failed')
+    def capture(*args, **kwargs):
+        source = snapshot(*args, **kwargs)
+        receipts.append(source_resource_receipt(source))
+        return source
+    def fail(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(source_composition_adapters, 'prepare_robot_source_intent', fail)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco'}, 'controller': {'profile_id': profile}})
+    with pytest.raises(RuntimeError) as raised:
+        PickCubeReferenceEnv.selected_binding(config).build_for_request('mujoco', 'cpu', 31, 8)
+    assert raised.value is failure
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_assembled_position_builds_controller_from_selected_source(monkeypatch):
+    from task_env.controllers.canonical import execution
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    seen = []
+    original = execution.build_reference_position_controller
+    def capture(artifact, source, **options):
+        seen.append((artifact, source))
+        return original(artifact, source, **options)
+    monkeypatch.setattr(execution, 'build_reference_position_controller', capture)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco'},
+        'robot': {'uid': 'panda-arm-hand-v1'}, 'controller': {'profile_id': 'r1_split'}})
+    binding = PickCubeReferenceEnv._build_selected_binding(config)
+    value = binding.build_for_request('mujoco', 'cpu', 31, 8)
+    try:
+        assert len(seen) == 1 and seen[0][0] is value['artifact']
+        assert value['source'].source_composition_request.robot_uid == binding.robot.uid
+        assert seen[0][1].source_id == value['source'].source_id
+        assert value['controller'].arm.writer_id != value['controller'].hand.writer_id
+        assert value['resolved_configuration']['controller_profile'] == 'r1_split'
+    finally:
+        source_resource_receipt(value['source']).close()
+
+
 def test_usd_source_identity_failure_releases_task_source(monkeypatch):
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import specialization

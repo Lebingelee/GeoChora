@@ -153,11 +153,12 @@ def compile_panda_effort_selection(artifact, source, *, robot, scene, intent,
     return factory, execution
 
 
-def build_usd_panda_control(runtime_input, robot, *, controller_profile, action_config,
+def build_usd_panda_control(artifact, source, *, runtime_input, robot, controller_profile, action_config,
                             dynamic_profile, velocity_limit, tcp_profile, end_frame_id,
                             physical_kind=None, native_drive=None, effort_settings=None):
     """Bind the selected Position or effort capability to the admitted USD source."""
-    source, artifact = runtime_input.runtime_source, runtime_input.artifact
+    if runtime_input.runtime_source is not source or runtime_input.artifact is not artifact:
+        raise ValueError('USD Controller input differs from the compiled Artifact or source')
     if physical_kind is None:
         if native_drive is not None or effort_settings is not None:
             raise ValueError('Position capability does not accept effort settings')
@@ -259,6 +260,30 @@ def prepare_reference_task_robot_source(source, *, robot, controller_profile,
     bound, projected, closure = bind_reference_scene_source(
         source, artifact=artifact, scene=scene, bodies=bodies, frames=frames)
     return intent, (task_source, scene, artifact, bound, projected, closure)
+
+
+def compose_declared_reference_source(value, *, robot, controller_profile,
+                                      existing_robot_entity, task_body_names,
+                                      task_site_transfers, compile_declaration,
+                                      reset_seed=None):
+    """Compose the declared Robot before the shared Controller build stage."""
+    source = value['source']
+    intent, compiled = prepare_reference_task_robot_source(
+        source, robot=robot, controller_profile=controller_profile,
+        existing_robot_entity=existing_robot_entity, task_body_names=task_body_names,
+        task_site_transfers=task_site_transfers, compile_declaration=compile_declaration)
+    result = {**value, '_intent': intent, '_robot': robot}
+    if compiled is None:
+        return {**result, '_reset_plan': None}
+    task_source, scene, artifact, bound, projected, closure = compiled
+    result.update(artifact=artifact, source=bound, task_source=task_source,
+                  _scene=scene, _projected=projected)
+    if 'source_sha256' in result:
+        result['source_sha256'] = {**result['source_sha256'], 'projected_closure': closure}
+    if reset_seed is not None:
+        from ...environment.task_source import sample_episode_reset_plan
+        result['_reset_plan'] = sample_episode_reset_plan(task_source, scene, artifact, task_seed=reset_seed)
+    return result
 
 
 def validate_effort_robot_intent(intent, source, execution, *, controller_profile):
