@@ -8,10 +8,12 @@ parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--extra-robot-asset-root',action='store_true')
 parser.add_argument('--annotate-robot-source',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);parser.add_argument('--expert-after-switch',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 if args.controller_kp is not None and not (args.case == 'panda-joint' and args.record):
     raise ValueError('Controller gain probe requires switchable panda-joint recording')
+if args.expert_after_switch and not (args.case == 'panda-joint' and args.record):
+    raise ValueError('Expert probe requires switchable panda-joint recording')
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -245,6 +247,14 @@ try:
             result['task_force']=force.to_mapping()
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
+        if args.expert_after_switch:
+            dispatch = getattr(env.session, '_control_lifecycle_dispatch', None)
+            try:env.step({**action, 'generation': action['generation'] + 1})
+            except ValueError:pass
+            else:raise AssertionError('stale Controller generation was accepted')
+            assert env._execution_fault is None and env.session.state_boundary_identity().to_mapping() == first
+            assert getattr(env.session, '_control_lifecycle_dispatch', None) is dispatch
+            result['stale_action_rejected_without_fault']=True
         stepped=env.step_with_solution(solution) if args.case=='nut' or args.solution else env.step(action)
         dispatch = env.session._control_lifecycle_dispatch
         submission = env.session._last_control_submission
@@ -306,9 +316,10 @@ try:
             result['invalid_reset_preserved_robot']=True
             switched_before=float(env.state.simulation_time)
             switched_action=env.bind_physical_action(np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32))
-            env.step(switched_action)
+            env.step_expert() if args.expert_after_switch else env.step(switched_action)
             assert abs(float(env.state.simulation_time)-switched_before-env.artifact.timebase.control_dt)<1e-9
             assert env.robot.controller is env.controller is env._physical_reset_selection.current.execution.controllers[0]
+            assert env.session._last_control_submission['status'] == 'acknowledged'
             result['switched_controller_advanced']=True
         else:
             observation,info=env.reset(seed=19 if args.case=='nut' else 31)

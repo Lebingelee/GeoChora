@@ -95,24 +95,28 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             raise TypeError('selected physical route requires PhysicalControlExecutionV1')
         from ...controllers.canonical.physical_sequence import PhysicalActionSequenceV1
         from ...controllers.canonical.position_sequence import PositionPhysicalActionV1
+        selection = getattr(env, '_physical_reset_selection', None)
         mixed = None
         if type(action) is PositionPhysicalActionV1:
+            if selection is not None:
+                raise ValueError('mixed Position/physical action does not support reset-scoped Controller switching')
             if proposal is not None or observer_solution is not None or caller_driven:
                 raise ValueError('mixed Position/physical action does not admit Solution')
             from .position_physical import prepare_mixed_position
             mixed = prepare_mixed_position(env, action)
             env.session._prepared_mixed_position = mixed
             action = dict(action.physical_actions)
-        selection = getattr(env, '_physical_reset_selection', None)
+        # Reject stale/foreign actions before publishing a dispatch or invoking
+        # the Controller. A caller can correct these inputs without reset.
+        if selection is not None:
+            if type(action) is PhysicalActionSequenceV1:
+                raise ValueError('physical action sequences do not support reset-scoped Controller switching')
+            action = selection.validate_action(action)
         env._physical_controller_preparation_started = False
         try:
             _dispatch_record(env, ('physical-effort-sequence' if type(action) is PhysicalActionSequenceV1
                                    else 'physical-effort-batch'),
                              tuple(item.identity for item in profile.controllers), profile.generation)
-            if selection is not None:
-                if type(action) is PhysicalActionSequenceV1:
-                    raise ValueError('physical action sequences do not support reset-scoped Controller switching')
-                action = selection.validate_action(action)
             result = env._prepare_physical_control(action, **context)
         except BaseException as error:
             if mixed is not None:

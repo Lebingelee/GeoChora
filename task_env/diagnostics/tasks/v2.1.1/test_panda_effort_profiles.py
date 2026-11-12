@@ -511,6 +511,85 @@ def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path, monkey
         env.close()
 
 
+def test_switchable_r3_expert_uses_the_selected_controller_submission():
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-r3-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+        'episode': {'horizon': 8},
+    })
+    try:
+        env.reset(seed=31)
+        before = env.state.control_step
+        env.step_expert()
+        assert env.state.control_step == before + 1
+        assert env.controller is env._physical_reset_selection.current.execution.controllers[0]
+        assert env.session._last_control_submission['status'] == 'acknowledged'
+    finally:
+        env.close()
+
+
+def test_stale_switchable_action_rejects_without_fault_or_dispatch():
+    import numpy as np
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+        'episode': {'horizon': 8},
+    })
+    try:
+        env.reset(seed=31)
+        q = env.artifact.initialization.joint_position
+        values = np.asarray([q[f'panda-v1/joint{i}'] for i in range(1, 8)] + [.04], dtype=np.float32)
+        action = env.bind_physical_action(values)
+        boundary = env.session.state_boundary_identity()
+        dispatch = getattr(env.session, '_control_lifecycle_dispatch', None)
+        with pytest.raises(ValueError, match='requires the R3 pose'):
+            env.step_expert()
+        assert env.solution is None
+        with pytest.raises(ValueError, match='stale or foreign'):
+            env.step({**action, 'generation': action['generation'] + 1})
+        assert env._execution_fault is None
+        assert env.session.state_boundary_identity() == boundary
+        assert getattr(env.session, '_control_lifecycle_dispatch', None) is dispatch
+        env.step(action)
+        assert env.session._last_control_submission['status'] == 'acknowledged'
+    finally:
+        env.close()
+
+
+def test_malformed_expert_proposal_faults_after_solution_act(monkeypatch):
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'r3_continuous_v1'},
+        'episode': {'horizon': 8},
+    })
+    try:
+        env.reset(seed=31)
+        solution = env.prepare_expert()
+        calls = []
+        def invalid_action(*_args):
+            calls.append('mutated')
+            return object()
+        monkeypatch.setattr(solution, 'act', invalid_action)
+        boundary = env.session.state_boundary_identity()
+        with pytest.raises(TypeError, match='expert Solution act'):
+            env.step_expert()
+        assert calls == ['mutated']
+        assert env._execution_fault.phase == 'expert_proposal'
+        assert env.session.state_boundary_identity() == boundary
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_expert()
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize(('profile', 'requires_kinematics'), [
     ('panda-joint-effort-reference-v1', False),
     ('panda-r3-effort-reference-v1', True),

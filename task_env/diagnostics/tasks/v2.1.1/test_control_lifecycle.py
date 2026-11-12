@@ -17,6 +17,21 @@ def test_undeclared_controller_cannot_bypass_the_submission_owner():
     assert calls == []
 
 
+def test_mixed_action_rejects_reset_scoped_selection_before_preparation():
+    from task_env.controllers.canonical.position_sequence import PositionPhysicalActionV1
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    session = SimpleNamespace()
+    profile = object.__new__(PhysicalControlExecutionV1)
+    env = SimpleNamespace(_stopped=False, session=session,
+        _physical_execution=lambda: profile, _physical_reset_selection=object())
+    action = object.__new__(PositionPhysicalActionV1)
+    with pytest.raises(ValueError, match='does not support reset-scoped'):
+        prepare_selected_control_action(env, action)
+    assert not hasattr(session, '_prepared_mixed_position')
+    assert not hasattr(session, '_control_lifecycle_dispatch')
+
+
 def test_position_sequence_is_not_reinterpreted_as_a_pose_action():
     from task_env.controllers.canonical.contracts import RequestedAction
     from task_env.controllers.canonical.position_sequence import PositionActionSequenceV1, PositionActionSliceV1

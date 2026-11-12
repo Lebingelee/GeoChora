@@ -3510,6 +3510,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             )
         if self._stopped or self._episode_mode in {'external', 'external_solution'}:
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
+        physical_selection = getattr(self, '_physical_reset_selection', None)
+        if physical_selection is not None and self.physical_action_spec()['kind'] != 'r3-pose':
+            raise ValueError('the selected Solution requires the R3 pose input spec')
         self.prepare_expert()
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
@@ -3517,7 +3520,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if getattr(self, 'position_profile', False):
             if not self.binding.external_solution_actions or len(self.position_profiles) != 1:
                 raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
-        elif hasattr(self.solution, 'readiness_config'):
+        elif physical_selection is None and hasattr(self.solution, 'readiness_config'):
             try:
                 self._require_published_execution_info()
             except BaseException as error:
@@ -3525,8 +3528,17 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise
         try:
             proposal = (self.solution.act(self.obs, task_info_for_solution(self.info))
-                        if self.binding.expert_uses_public_observation
+                        if physical_selection is not None or self.binding.expert_uses_public_observation
                         else self.solution.act())
+            from ..planners.contracts import ExpertAction
+            if not isinstance(proposal, ExpertAction):
+                raise TypeError('expert Solution act() must return ExpertAction')
+            if physical_selection is not None:
+                from ..planners.contracts import validate_caller_solution_action
+                validate_caller_solution_action(proposal,
+                    boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'), control_request_mode='position')
         except BaseException as error:
             self._latch_fault('expert_proposal', error, before_state=self.state)
             if self.binding.abort_solution_on_runtime_error:
@@ -3547,7 +3559,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             return self._step(
                 request, proposal=proposal, observer_solution=self.solution,
             )
-        return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
+        try:
+            action = (self.bind_physical_action(proposal.action)
+                      if physical_selection is not None else proposal.action)
+        except BaseException as error:
+            self._latch_fault('expert_action_validation', error, before_state=self.state)
+            raise
+        return self._step(action, proposal=proposal, observer_solution=self.solution)
 
     def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
