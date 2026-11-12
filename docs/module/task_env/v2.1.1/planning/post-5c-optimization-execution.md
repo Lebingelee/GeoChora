@@ -111,18 +111,18 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 | E00 基线 | 5c 接收与优化输入 `1f1359ee`、保护文件和两个 submodule pin 已记录。 | 按实际 HEAD、工作树和证据继续对账；E00 基线不证明架构已接收。 |
 | E01 入口与配置 | 四个正式任务使用 `make_env`、同一规范配置语义及默认值调用；mapping／YAML 对齐。Position candidate、两个 PickCube 旧物理 UID 及只服务历史诊断的 F04 Isaac Position 物化入口已退休；正式 PickCube USD 与普通 Robot effort 准入仍保留。 | 旧 component 路径仍有其他 caller；PickCube 正式物理构建仍调用 candidate 文件。Isaac 资产必须预装，自动生成／发行尚未完成。 |
 | E02 Task／Robot／Controller | 四任务的已选 Robot 进入声明、source、Controller 和 live 绑定；一体／装配 Panda 与两个普通 Robot 的主体能力保留。普通 Robot 动作空间来自已编译 Controller；PickCube 的 MJCF Position／effort 共用 Task／Robot 场景编译和 source 绑定；Isaac Position／effort 使用同一 Task binding 工厂并分别绑定 Controller；MJCF／USD Panda effort 共用 source／Controller 组合：Robot 提供主体和传动声明，source adapter 编译主体，Controller 构造动作映射并校验 reset 增益及可切换类型；普通 Robot 的 MJCF 传动检查和 USD 层级映射分别由 source 导入层与 Isaac adapter 负责。 | Panda 与普通 Robot 的 source 物化仍有不同路径；不能仅凭共同运行视图认定统一构造完成。Task 内剩余候选构建与具体 source 接线需按 owner 迁移。 |
-| E03 Env／生命周期 | TaskDefinition 生命周期、reset 重建、部分故障处理和 source／Env 关闭已收敛到共同 owner；隔离 worker 在构造失败和关闭时也按同一顺序释放 session、Runtime owner、source 与 Task 资源，并在关闭响应中传递失败；Isaac App 在共同构造边界按 provider 准备，不依赖 Task UID 或由普通 Robot source 再次启动。 | 继续核对各受影响路径的构造失败、reset、fault、共享 App／renderer 及 close 所有权。 |
-| E04 控制／推进 | 已受测的 action、Solution 单步和 Position／effort 均进入共同场景提交；可切换 R3 effort 的专家动作也消费当前 Controller 身份。未声明 Task 载荷的可切换 effort 过期动作在提交前无故障拒绝，Solution 产生无效提案则锁存故障；保留 typed 命令、writer 资源、单位、boundary 和 clock。 | 按实际 caller 完成已支持 ExpertAction／序列及失败语义核对；完整 Solution、所有 provider／renderer 及任意组合均不能由短程结果推断。 |
+| E03 Env／生命周期 | TaskDefinition 生命周期、reset 重建、部分故障处理和 source／Env 关闭已收敛到共同 owner；MJCF effort source 在共同构建请求中准备并由 RuntimeSource／Env 负责释放，Task binding 不再提前持有同一快照；隔离 worker 在构造失败和关闭时也按同一顺序释放 session、Runtime owner、source 与 Task 资源，并在关闭响应中传递失败；Isaac App 在共同构造边界按 provider 准备，不依赖 Task UID 或由普通 Robot source 再次启动。 | 继续核对各受影响路径的构造失败、reset、fault、共享 App／renderer 及 close 所有权。 |
+| E04 控制／推进 | 已受测的 action、Solution 单步和 Position／effort 均进入共同场景提交；可切换 R3 effort 的调用方 Solution 通过 `env.step(ExpertAction)` 消费当前 Controller 身份；调用方自己执行 `observe`。`step_expert` 仅为受限兼容入口，计划废弃。未声明 Task 载荷的可切换 effort 过期动作在提交前无故障拒绝，Solution 产生无效提案则锁存故障；保留 typed 命令、writer 资源、单位、boundary 和 clock。 | 按实际 caller 完成已支持 ExpertAction／序列及失败语义核对；完整 Solution、所有 provider／renderer 及任意组合均不能由短程结果推断。 |
 
 ### 6.1 累计文件与代码变化
 
-以 `1f1359ee` 为比较基线、当前冻结代码输入为范围，`git diff --no-renames` 中 `task_env` 跟踪文件由 980 减至 979；整个项目跟踪文件由 1363 增至 1364。生产 Python 涉及 107 个文件，+4,927／−14,300，净减 9,373 行，其中新增 3、删除 15、修改 89；诊断新增 17 个文件，+3,933／−0；其他 `task_env` 文本（含文档及资产）修改 8、删除 6 个文件，+28／−917。按 Git 整文件重命名检测无整文件迁移，按职责拆分的代码不伪装为原样迁移。旧目录中本阶段的 12 个诊断文件修改已撤回到优化启动基线；仍有效的 adapter 准入检查在 v2.1.1 目录维护，旧诊断不再作为兼容目标。
+以 `1f1359ee` 为比较基线、当前冻结代码输入为范围，`git diff --no-renames` 中 `task_env` 跟踪文件由 980 减至 979；整个项目跟踪文件由 1363 增至 1364。生产 Python 涉及 107 个文件，+4,952／−14,302，净减 9,350 行，其中新增 3、删除 15、修改 89；诊断新增 17 个文件，+4,000／−0；其他 `task_env` 文本（含文档及资产）修改 8、删除 6 个文件，+28／−917。按 Git 整文件重命名检测无整文件迁移，按职责拆分的代码不伪装为原样迁移。旧目录中本阶段的 12 个诊断文件修改已撤回到优化启动基线；仍有效的 adapter 准入检查在 v2.1.1 目录维护，旧诊断不再作为兼容目标。
 
 这些是累计文本 diff，不是对实现质量或最终接收的证明；历史台账、原始输出、四个未跟踪保护输入和其他用户修改不计入新增／删除。项目其他目录的跟踪文件变化包含文档和示例。每个事件最终接收时仍需按目标表提供该事件的精确对账及 diff。
 
 ### 6.2 受影响路线和证据
 
-- 最新冻结代码输入的版本诊断为 262 项通过，涵盖正式配置、Robot／Controller 绑定、资源故障边界和已验证 USD source 字节；它不等于原生运行或任务成功。
+- 最新冻结代码输入的版本诊断为 264 项通过，涵盖正式配置、Robot／Controller 绑定、资源故障边界和已验证 USD source 字节；它不等于原生运行或任务成功。
 - 四任务及装配 Panda 的 MuJoCo CPU 短程路线曾在 [共同配置默认值输入](../../../../../workspace/maintenance/v211_task_defaults_20261112/plan.json)下完成 reset、非零 action 或 Nut 单个 Solution interval、共同提交、再次 reset 和重复关闭；代码身份不同于本批，按改动影响参考。
 - PickCube 的 MuJoCo 直接 effort、关节参考和 R3 参考以及 Isaac CUDA 关节参考曾在 [共同 source／Controller 组合输入](../../../../../workspace/maintenance/v211_shared_effort_builder_20261112/plan.json)下完成短程运行。每条观测 5 个显式子步；这不是完整 Solution 或全部 provider 的结论。
 - 此前冻结输入的 PickCube Position 与关节 effort 的 Isaac CUDA 运行、预算和原始结果见 [USD source 验证计划](../../../../../workspace/maintenance/v211_pickcube_usd_source_20261112/plan.json)。两次均完成 reset、5 个显式子步、再次 reset、重复 Env close 和 App close 收据；关节 effort 路线的 SDK 关闭日志另有 Isaac 菜单回调访问空 USD context 的 `AttributeError`，因此不能称整个 SDK 关闭过程无异常。App 隐式启动推进数未知。
@@ -133,7 +133,8 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 - MJCF Task／Robot 场景合并后的 PickCube R3 Position、直接 effort 与关节 effort 见[本批 MuJoCo 计划](../../../../../workspace/maintenance/v211_shared_pickcube_task_scene_20261112/plan.json)：均完成 reset、5 个显式子步、第二次 reset 和重复 close；正式构建检查另确认 Position／effort 的 Task Artifact、场景与实体映射一致。本批未重跑 Isaac 或 GeoPhys；改变的共享场景步骤仅用于 MJCF 输入。
 - Isaac 共同 Task binding 改动后的 Position 与关节 effort 实际路线见[本批计划](../../../../../workspace/maintenance/v211_shared_usd_task_binding_20261112/plan.json)：均完成 reset、5 个显式子步、再次 reset、重复 Env close 和 App close；Position 的 SDK 关闭日志出现两次菜单回调访问空 USD context 的 `AttributeError`，effort 日志未见 traceback 或 `[Error]`。App 隐式启动推进数未知。
 - Panda effort 的主体编译与 Controller 构造归位后，正式 MuJoCo 关节／R3 切换与直接 effort 分别完成 10 和 5 个显式子步，见[CPU 计划](../../../../../workspace/maintenance/v211_panda_effort_owner_20261112/cpu-plan.json)；Isaac 关节 effort 完成 5 个显式子步、再次 reset、重复 Env close 和 App close，日志未见 traceback 或 `[Error]`，见[Isaac 计划](../../../../../workspace/maintenance/v211_panda_effort_owner_20261112/isaac-plan.json)。Isaac 隐式启动推进数未知。
-- [当前控制生命周期验证](../../../../../workspace/maintenance/v211_expert_control_lifecycle_20261112/plan.json)在 MuJoCo 下拒绝过期 Controller generation 且不锁存故障，随后执行关节 effort，再切换 R3 effort 并通过 `step_expert` 提交，总计 10 个显式子步；版本诊断另检查 Solution 提案失效后锁存故障。
+- [当前控制生命周期验证](../../../../../workspace/maintenance/v211_expert_control_lifecycle_20261112/plan.json)在 MuJoCo 下拒绝过期 Controller generation 且不锁存故障，随后执行关节 effort，再切换 R3 effort 并通过兼容入口 `step_expert` 提交，总计 10 个显式子步；版本诊断另检查 Solution 提案失效后锁存故障。
+- [当前 caller-owned Solution 与 source 验证](../../../../../workspace/maintenance/v211_caller_solution_source_owner_20261112/plan.json)在 MuJoCo 完成关节 effort 后切换 R3 effort，由调用方依次执行 `Solution.act`、`env.step`、`Solution.observe`，总计 10 个显式子步；直接 effort 另完成 5 个。版本诊断验证错误 Solution 身份在推进前拒绝、调用方自行 observe、构造失败及 source 重复关闭边界。
 - 5c 已接收的原生渲染及跨组合证据保留原有有界结论；本次未重新验证 renderer。完整 Solution 的单 seed 和记录读回留待 E13，G07 三 seed 矩阵不属于本次实现范围。
 
 ### 6.3 USD source 与资产边界

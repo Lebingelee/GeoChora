@@ -1364,7 +1364,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         if self.binding.physical_reset_selection_factory is not None:
-            self._physical_reset_selection = self.binding.physical_reset_selection_factory()
+            self._physical_reset_selection = self.binding.physical_reset_selection_factory(self.value)
         self._bind_selected_controller(self.value)
         self._bind_selected_task_definition()
         self.dual_entity_position = len(self.position_profiles) == 2
@@ -2882,6 +2882,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise RuntimeError('caller actions require reset without an Env-owned Solution')
             if self._stopped or self.session is None:
                 raise RuntimeError('reset required or episode already stopped')
+            physical_selection = getattr(self, '_physical_reset_selection', None)
+            if physical_selection is not None:
+                if self.physical_action_spec()['kind'] != 'r3-pose':
+                    raise ValueError('the selected Solution requires the R3 pose input spec')
+                validate_caller_solution_action(
+                    action, boundary=lambda: self.info.get('state_boundary_identity'),
+                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
+                    solution_identity=self.value.get('solution_identity'), control_request_mode='position',
+                )
+                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
+                return prepare_selected_control_action(
+                    self, self.bind_physical_action(action.action), proposal=action, caller_driven=True)
             from ..runtime.sessions.control_lifecycle import has_position_control_capability
             if has_position_control_capability(self):
                 if self.binding.position_execution_info is None or len(self.position_profiles) != 1:
@@ -2912,7 +2924,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
         return prepare_selected_control_action(self, action)
 
-    def _prepare_physical_control(self, action, *, proposal=None, observer_solution=None):
+    def _prepare_physical_control(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         """Prepare one named physical interval through the selected session."""
         from ..artifacts.state import CanonicalStatePublicationV1, CanonicalStatePublicationV2
         from ..controllers.canonical.physical_commands import PhysicalCommandContextV1, PhysicalControlReceiptV1
@@ -3140,9 +3152,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                      and self.evaluation.success)), task_truncated=False,
                 control_step=self.state.control_step, horizon=self.horizon,
                 ignore_done=getattr(self.binding, 'physical_ignore_done', False))
-            self._episode_mode = 'external_solution' if proposal is not None else 'external'
+            self._episode_mode = 'external_solution' if proposal is not None and not caller_driven else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
-            if proposal is not None:
+            if proposal is not None and not caller_driven:
                 observer_solution.observe(self.obs, float(self.evaluation.reward), terminated, truncated, task_info_for_solution(self.info))
                 self.info.update(selected_policy_execution_complete=bool(observer_solution.done),
                                  selected_policy_execution_failed=bool(observer_solution.failed),

@@ -8,12 +8,12 @@ parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--extra-robot-asset-root',action='store_true')
 parser.add_argument('--annotate-robot-source',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);parser.add_argument('--expert-after-switch',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);parser.add_argument('--solution-after-switch',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 if args.controller_kp is not None and not (args.case == 'panda-joint' and args.record):
     raise ValueError('Controller gain probe requires switchable panda-joint recording')
-if args.expert_after_switch and not (args.case == 'panda-joint' and args.record):
-    raise ValueError('Expert probe requires switchable panda-joint recording')
+if args.solution_after_switch and not (args.case == 'panda-joint' and args.record):
+    raise ValueError('caller-owned Solution probe requires switchable panda-joint recording')
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -247,7 +247,7 @@ try:
             result['task_force']=force.to_mapping()
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
-        if args.expert_after_switch:
+        if args.solution_after_switch:
             dispatch = getattr(env.session, '_control_lifecycle_dispatch', None)
             try:env.step({**action, 'generation': action['generation'] + 1})
             except ValueError:pass
@@ -316,7 +316,18 @@ try:
             result['invalid_reset_preserved_robot']=True
             switched_before=float(env.state.simulation_time)
             switched_action=env.bind_physical_action(np.asarray([.4,0.,.4,1.,0.,0.,0.,1.],dtype=np.float32))
-            env.step_expert() if args.expert_after_switch else env.step(switched_action)
+            if args.solution_after_switch:
+                from task_env.tasks.pick_cube import build_readiness_solution
+                solution = build_readiness_solution(controller_profile='r3_continuous_v1')
+                solution.reset(observation, info, env.metadata)
+                proposed = solution.act(observation, info)
+                observation, reward, terminated, truncated, info = env.step(proposed)
+                assert solution._awaiting_observation and env.solution is None
+                solution.observe(observation, reward, terminated, truncated, info)
+                assert not solution._awaiting_observation and solution.total_control_actions_emitted == 1
+                result['caller_solution_observed_once'] = True
+            else:
+                env.step(switched_action)
             assert abs(float(env.state.simulation_time)-switched_before-env.artifact.timebase.control_dt)<1e-9
             assert env.robot.controller is env.controller is env._physical_reset_selection.current.execution.controllers[0]
             assert env.session._last_control_submission['status'] == 'acknowledged'

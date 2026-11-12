@@ -545,7 +545,12 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
 
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
     """Build the task-owned PickCube readiness Solution for an external driver."""
-    return build_reference(backend=backend, controller_profile=controller_profile)["solution"]
+    value = build_reference(backend=backend, controller_profile=controller_profile)
+    from ...runtime.sessions.source import source_resource_receipt
+    receipt = source_resource_receipt(value['source'])
+    if receipt is not None:
+        receipt.close()
+    return value['solution']
 
 
 def _validate_external_readiness_solution(value, solution):

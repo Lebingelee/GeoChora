@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from task_env.runtime.sessions.mujoco_composition import panda_effort_source_limits
+from task_env.runtime.sessions.source import source_resource_receipt
 
 
 def test_formal_position_and_effort_share_task_and_robot_scene():
@@ -23,6 +24,44 @@ def test_formal_position_and_effort_share_task_and_robot_scene():
         finally:
             env.close()
     assert declarations[0] == declarations[1]
+
+
+def test_public_solution_factory_releases_its_preparation_source(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    captured = []
+    snapshot = source_module.snapshot_legacy_mjcf_source
+    def capture(source):
+        result = snapshot(source)
+        captured.append(result.execution_source_receipt.snapshot_root)
+        return result
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    solution = build_readiness_solution(controller_profile='r3_continuous_v1')
+    assert solution.identity
+    assert len(captured) == 1 and not captured[0].exists()
+
+
+def test_formal_env_releases_its_source_once(monkeypatch):
+    from task_env import make_env
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+    })
+    receipt = source_resource_receipt(env.value['source'])
+    snapshot = receipt.snapshot_root
+    calls = []
+    original = ExecutionSourceReceiptV1.close
+    def close(self):
+        calls.append(self)
+        return original(self)
+    monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', close)
+    env.close()
+    env.close()
+    assert calls == [receipt]
+    assert not snapshot.exists()
 
 
 def test_panda_source_preserves_paired_transmission_and_signed_limits():
@@ -80,7 +119,7 @@ def test_canonical_source_owns_and_validates_input_snapshot(monkeypatch):
             replace(source, scene_source=replace(source.scene_source, xml=source.scene_source.xml + ' '))
         snapshot = receipt.snapshot_root
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
     assert not snapshot.exists()
 
 
@@ -110,7 +149,7 @@ def test_effort_construction_accepts_task_scene_without_historical_hash(monkeypa
         with pytest.raises(ValueError, match='requested backend'):
             binding.build_for_request('mujoco', 'cuda', 31, 8)
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_effort_construction_accepts_multiple_declared_robot_roots(tmp_path, monkeypatch):
@@ -154,44 +193,22 @@ def test_failed_robot_composition_releases_canonical_source_snapshot():
             strategy._compose(value)
         assert not snapshot.exists()
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
-@pytest.mark.parametrize('cleanup_failure', [False, True])
-def test_failed_robot_source_composer_releases_prepared_task_source(monkeypatch, cleanup_failure):
-    from dataclasses import replace
+def test_rejected_robot_composer_does_not_prepare_a_source(monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube import specialization
 
-    config = resolve_task_env_config(PickCubeReferenceEnv, {
+    config = resolve_task_env_config(specialization.PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
         'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
-        'episode': {'horizon': 8},
     })
-    selected_binding = PickCubeReferenceEnv.selected_binding
-    snapshots = []
-
-    def prepare(cls, config, *, robot):
-        binding = selected_binding(config, robot=robot)
-        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
-        snapshots.append(source.source_snapshot_receipt.snapshot_root)
-        assert snapshots[-1].is_dir()
-        if cleanup_failure:
-            close = binding.close_task_resources
-            def fail_after_close():
-                close()
-                raise RuntimeError('cleanup failed')
-            binding = replace(binding, close_task_resources=fail_after_close)
-        return binding
-
+    def unexpected_source(**_kwargs):
+        pytest.fail('binding admission must not prepare a Task source')
     def reject(cls, binding, config):
         raise ValueError('source composition rejected')
-
-    monkeypatch.setattr(PickCubeReferenceEnv, 'selected_binding', classmethod(prepare))
-    monkeypatch.setattr(PickCubeReferenceEnv, '_bind_robot_source_composer', classmethod(reject))
-    with pytest.raises(ValueError, match='source composition rejected') as caught:
-        PickCubeReferenceEnv._build_selected_binding(config)
-    if cleanup_failure:
-        assert any('cleanup failed' in note for note in caught.value.__notes__)
-    assert len(snapshots) == 1
-    assert not snapshots[0].exists()
+    monkeypatch.setattr(specialization, '_prepare_reference_source', unexpected_source)
+    monkeypatch.setattr(specialization.PickCubeReferenceEnv, '_bind_robot_source_composer', classmethod(reject))
+    with pytest.raises(ValueError, match='source composition rejected'):
+        specialization.PickCubeReferenceEnv._build_selected_binding(config)

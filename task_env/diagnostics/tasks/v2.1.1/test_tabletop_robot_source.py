@@ -264,11 +264,12 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        binding.build_for_request('mujoco', 'cpu', 31, 8)
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert len(built) == len(declared) == len(bound) == 1
         assert built[0] is declared[0] is bound[0]
     finally:
-        binding.close_task_resources()
+        from task_env.runtime.sessions.source import source_resource_receipt
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('physical', [False, True])
@@ -431,7 +432,7 @@ def test_physical_early_failure_releases_prepared_task_source(monkeypatch):
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
     monkeypatch.setattr(subprocess, 'check_output', fail_revision)
     with pytest.raises(RuntimeError) as raised:
-        PickCubeReferenceEnv.selected_binding(config)
+        PickCubeReferenceEnv.selected_binding(config).build_for_request('mujoco', 'cpu', 31, 8)
     assert raised.value is failure
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
@@ -560,7 +561,8 @@ def test_position_robot_composes_checked_canonical_task_source(provider):
         with pytest.raises(ValueError, match='source closure digest mismatch'):
             compose(tampered, artifact=artifact, controller=controller)
     finally:
-        binding.close_task_resources()
+        from task_env.runtime.sessions.source import source_resource_receipt
+        source_resource_receipt(value['source']).close()
 
 
 def test_assembled_robot_rejects_foreign_task_joint_mapping_and_releases_source(monkeypatch):

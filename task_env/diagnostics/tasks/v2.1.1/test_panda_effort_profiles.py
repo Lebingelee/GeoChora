@@ -62,7 +62,7 @@ def test_formal_panda_effort_profile_source_contract(profile, controller_type, d
         if profile.startswith('panda-r3'):
             assert any(field.field_name == 'frame_pose_world' for field in execution.requirements.requirements)
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('profile', ['panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
@@ -80,9 +80,10 @@ def test_source_dynamics_profile_does_not_construct_unused_pd_servo(profile, mon
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        assert binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution'].requires_source_dynamics
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
+        assert value['physical_execution'].requires_source_dynamics
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_panda_subject_rejects_incomplete_native_transmission_declaration():
@@ -131,10 +132,12 @@ def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
+        assert used == []
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert [kind for kind, _ in used] == ['scene', 'execution']
         assert used[0][1] is used[1][1]
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_panda_effort_controller_rejects_foreign_writer():
@@ -148,14 +151,15 @@ def test_panda_effort_controller_rejects_foreign_writer():
     })
     task_binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        execution = task_binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution']
+        value = task_binding.build_for_request('mujoco', 'cpu', 31, 8)
+        execution = value['physical_execution']
         profile = execution.controllers[0].profile
         with pytest.raises(ValueError, match='writer binding'):
             LinearEffortControllerV1.zero_bias(execution.compiled.binding, writer_id='foreign',
                 channel_keys=profile.channel_keys, action_names=profile.action_names,
                 action_to_effort=profile.action_to_effort, cadence_s=.01, model_id='foreign')
     finally:
-        task_binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
@@ -201,7 +205,7 @@ def test_effort_retains_formal_task_identity(profile):
         with pytest.raises(ValueError, match='physical selection differs'):
             replace(selected.physical_execution, selection_profile_id='foreign-profile')
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('profile', ['panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
@@ -227,7 +231,7 @@ def test_mass_controller_requires_matching_source_dynamics(profile):
         with pytest.raises(ValueError, match='selected source'):
             execution.controllers[0].bind_model(foreign)
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize(('profile', 'expected'), [
@@ -246,7 +250,8 @@ def test_adapter_drive_mode_follows_bound_channels(profile, expected):
     })
     task_binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        binding = task_binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution'].compiled.binding
+        value = task_binding.build_for_request('mujoco', 'cpu', 31, 8)
+        binding = value['physical_execution'].compiled.binding
         assert uniform_native_drive_mode(binding) == expected
         opposite = 'disabled' if expected == 'position' else 'position'
         mixed = replace(binding, channels=(replace(binding.channels[0], native_drive=opposite),
@@ -254,7 +259,7 @@ def test_adapter_drive_mode_follows_bound_channels(profile, expected):
         with pytest.raises(ValueError, match='one supported native drive'):
             uniform_native_drive_mode(mixed)
     finally:
-        task_binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkeypatch):
@@ -275,7 +280,7 @@ def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkey
         assert value['source'].config.control.profile_id == config.controller_profile
         assert value['source'].config.episode.horizon == 8
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1'])
@@ -298,7 +303,7 @@ def test_effort_without_solution_does_not_prepare_solution_readiness(profile, mo
         assert value['controller'] is value['physical_execution'].controllers[0]
         assert 'solution_factory' not in value
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
@@ -320,9 +325,7 @@ def test_pickcube_position_and_effort_consume_the_same_lift(profile):
         assert binding.task_definition_factory(value['artifact']).semantics.parameters_si['lift_height'] == .17
         assert value['artifact'].initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
     finally:
-        if binding.close_task_resources is not None:
-            binding.close_task_resources()
-        elif value is not None:
+        if value is not None:
             source_resource_receipt(value['source']).close()
 
 
@@ -351,7 +354,7 @@ def test_fixed_effort_does_not_construct_position_controller(provider, profile, 
         assert binding.physical_observation_binding is None
         assert binding.physical_sequence_v2_observation is True
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_switchable_effort_recording_uses_physical_owner_metadata(monkeypatch, tmp_path):
@@ -511,6 +514,39 @@ def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path, monkey
         env.close()
 
 
+def test_caller_owned_solution_uses_public_step_and_observes_once():
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-r3-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+        'episode': {'horizon': 8},
+    })
+    try:
+        obs, info = env.reset(seed=31)
+        solution = build_readiness_solution(controller_profile='r3_continuous_v1')
+        assert solution.identity == env.value['solution_identity']
+        solution.reset(obs, info, env.metadata)
+        action = solution.act(obs, info)
+        boundary = env.session.state_boundary_identity()
+        with pytest.raises(ValueError, match='identity differs'):
+            env.step(replace(action, solution_identity='foreign'))
+        assert env._execution_fault is None
+        assert env.session.state_boundary_identity() == boundary
+        obs, reward, terminated, truncated, info = env.step(action)
+        assert env.session._last_control_submission['status'] == 'acknowledged'
+        assert solution._awaiting_observation
+        solution.observe(obs, reward, terminated, truncated, info)
+        assert not solution._awaiting_observation
+        assert solution.total_control_actions_emitted == 1
+        assert env.solution is None and env._episode_mode == 'external'
+    finally:
+        env.close()
+
+
 def test_switchable_r3_expert_uses_the_selected_controller_submission():
     from task_env import make_env
 
@@ -613,11 +649,12 @@ def test_effort_controller_constructs_only_its_required_source_model(profile, re
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
+        source = value['source']
         expected = project_scene_definition_v3_to_mjcf(source.scene_source.xml, source.scene_definition)
         assert used_sources == ([expected] if requires_kinematics else [])
     finally:
-        binding.close_task_resources()
+        source_resource_receipt(value['source']).close()
 
 
 def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatch):
@@ -648,4 +685,4 @@ def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatc
         assert left == right
         assert (left.force_world_N, left.start_substep, left.end_substep) == ((0., 0., 1.5), 0, 5)
     finally:
-        effort.close_task_resources()
+        assert effort.close_task_resources is None
