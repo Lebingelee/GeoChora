@@ -34,7 +34,7 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## 正式入口及当前实施
 
-截至代码基线 `f62a2413` 及本次冻结输入，四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；当前具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。Git 当前 HEAD 以实际工作树为准，不把此输入当作实时 HEAD。
+截至代码基线 `870bba74` 及本次冻结输入，四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；当前具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。Git 当前 HEAD 以实际工作树为准，不把此输入当作实时 HEAD。
 
 | 事件 | 当前状态 | 实际进展和剩余边界 |
 | --- | --- | --- |
@@ -44,6 +44,6 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 | E03 Env 生命周期 | 实施中 | reset、资源清理和 source 快照已部分归共同 owner；构造、故障及剩余专用状态仍需逐路径核对。 |
 | E04 控制与推进 | 实施中 | 正式受测动作进入共同场景提交；Panda effort 已接入主体／通道匹配，Position 投影由 Controller 提供。其他已支持序列、故障、模型及 provider／renderer 受影响路径仍需按实际代码和证据核对。 |
 
-本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。本次冻结代码输入的版本诊断 255 项通过；四任务、Panda 物理控制与 Isaac USD 的实际运行证据、输入身份及限制集中见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。其中 Solution 仅作单步验证；未重新验证的 renderer 和完整 Solution 不能由此推断通过。旧逐批记录可从 `69f4380e` 的同一文件恢复，原始输出按各自输入保留。
+本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。本次冻结代码输入的版本诊断 258 项通过；四任务、Panda 物理控制与 Isaac USD 的实际运行证据、输入身份及限制集中见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。其中 Solution 仅作单步验证；未重新验证的 renderer 和完整 Solution 不能由此推断通过。旧逐批记录可从 `69f4380e` 的同一文件恢复，原始输出按各自输入保留。
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。

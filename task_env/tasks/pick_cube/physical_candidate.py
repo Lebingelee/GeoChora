@@ -20,13 +20,13 @@ def physical_binding_from_config(config, *, robot=None):
             robot=robot, physical_kind=kind, physical_drive=drive)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(
-        drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
+        native_drive=drive, control_kind=kind,
         reset_switch=reset_switch, space_policy=space_policy,
         cube_force_z_N=force, task_config=task_config, resolved_config=config.environment,
         lift_height_m=lift_height_m, robot=robot)
 
 
-def make_physical_binding(*, drive_mode, control_kind,
+def make_physical_binding(*, native_drive, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None, robot=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
@@ -55,13 +55,8 @@ def make_physical_binding(*, drive_mode, control_kind,
         task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
             task_config, robot, legacy_artifact, original)
         def build_physical(kind, **parameters):
-            from ...controllers.canonical.dynamic_mass_effort import validate_reset_effort_parameters
-            validate_reset_effort_parameters(parameters)
-            if parameters and not reset_switch:
-                raise ValueError('controller parameters require physical reset selection')
             from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
             from .specialization import panda_effort_task_settings
-            native_drive = 'disabled' if drive_mode == 'effort-only' else 'position'
             return build_panda_source_effort_profile(robot, scene, artifact, source,
                 native_drive=native_drive, kind=kind, config=source.config.action,
                 source_xml=projected, end_frame_id='nutassembly_ee_site',
@@ -88,14 +83,16 @@ def make_physical_binding(*, drive_mode, control_kind,
                     'projected_closure': closure},
                 'resolved_configuration': {'provider': provider, 'backend': backend,
                     'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
-                    'drive_mode': drive_mode, 'control_kind': control_kind,
+                    'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
+                    'control_kind': control_kind,
                     **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
                        if cube_force_z_N is not None else {}),
                     'original_closure': original.source_closure_digest,
                     'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
         from .specialization import _validate_external_readiness_solution
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
-        from ...controllers.canonical.r3_effort import panda_reset_action_schema
+        from ...controllers.canonical.r3_effort import (PANDA_SWITCHABLE_EFFORT_KINDS,
+                                                        panda_reset_action_schema)
         owned_resources = ExitStack()
         binding = ReferenceTaskBinding(build=build,
             **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
@@ -110,7 +107,7 @@ def make_physical_binding(*, drive_mode, control_kind,
             position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
             physical_reset_action_schema=panda_reset_action_schema if reset_switch else None,
             physical_reset_selection_factory=(lambda: PhysicalResetSelection(build_physical,
-                initial_kind=control_kind, allowed_kinds=('joint', 'r3-pose'), space_policy=space_policy,
+                initial_kind=control_kind, allowed_kinds=PANDA_SWITCHABLE_EFFORT_KINDS, space_policy=space_policy,
                 declaration=physical))
                 if reset_switch else None,
             physical_action_observer=observe_physical_action if reset_switch else None)

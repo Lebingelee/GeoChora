@@ -427,6 +427,24 @@ def test_effort_reset_rebuilds_plan_for_requested_seed(switchable):
         env.close()
 
 
+@pytest.mark.parametrize('parameters', [{'kp': 0.}, {'kd': float('nan')}, {'unknown': 1.}])
+def test_invalid_reset_controller_gains_fail_before_materialization(parameters):
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+    })
+    try:
+        with pytest.raises(ValueError, match='unsupported or invalid physical controller parameters'):
+            env.reset(seed=31, options={'controller': {'kind': 'joint', 'parameters': parameters}})
+        assert env.session is None
+        assert env._physical_reset_selection.committed is None
+    finally:
+        env.close()
+
+
 def test_reset_switch_matches_the_candidate_controller_before_materialization():
     from task_env import make_env
 

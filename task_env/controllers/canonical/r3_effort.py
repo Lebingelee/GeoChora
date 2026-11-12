@@ -15,6 +15,7 @@ PANDA_EFFORT_PROFILE_KINDS = MappingProxyType({
     'panda-joint-mass-effort-v1': 'joint-mass',
     'panda-r3-mass-effort-v1': 'r3-mass-pose',
 })
+PANDA_SWITCHABLE_EFFORT_KINDS = ('joint', 'r3-pose')
 
 
 def resolve_panda_effort_options(profile_id, native_drive, parameters):
@@ -186,6 +187,11 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
     profile_ids = {value: key for key, value in PANDA_EFFORT_PROFILE_KINDS.items()}
     if kind not in profile_ids:
         raise ValueError('unknown Panda effort profile')
+    if dynamic_parameters is not None:
+        from .dynamic_mass_effort import validate_reset_effort_parameters
+        if mass_model is not None or kind not in PANDA_SWITCHABLE_EFFORT_KINDS:
+            raise ValueError('dynamic effort profile requires a joint or pose reference')
+        validate_reset_effort_parameters(dynamic_parameters)
 
     def selected(execution):
         return replace(execution, selection_profile_id=profile_ids[kind])
@@ -201,8 +207,6 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
             model, artifact_hash=artifact_hash, config=config, control_dt=cadence_s,
             profile=r3_profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
     if dynamic_parameters is not None:
-        if mass_model is not None or kind not in {'joint', 'r3-pose'}:
-            raise ValueError('dynamic effort profile requires a joint or pose reference')
         return selected(build_dynamic_reference_effort_execution(
             direct_execution, reference_kind=kind, cadence_s=cadence_s,
             r3_reference=reference, end_frame_id=end_frame_id,

@@ -12,6 +12,8 @@ class SourceCompositionCapabilityUnavailable(ValueError):
 def validate_effort_source_route(*, provider, backend, deployment, source_delivery_manifest,
                                  drive, kind, reset_selection):
     """Admit the source and reset capabilities before native materialization."""
+    from ...controllers.canonical.r3_effort import PANDA_SWITCHABLE_EFFORT_KINDS
+
     if deployment != 'in_process':
         raise ValueError('physical profile currently requires explicit in_process execution')
     if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
@@ -22,7 +24,7 @@ def validate_effort_source_route(*, provider, backend, deployment, source_delive
     elif source_delivery_manifest is not None:
         raise ValueError('MJCF physical profile does not consume a USD source delivery')
     if reset_selection and ((provider, backend) != ('mujoco', 'cpu') or drive != 'disabled'
-                            or kind not in {'joint', 'r3-pose'}):
+                            or kind not in PANDA_SWITCHABLE_EFFORT_KINDS):
         raise ValueError('physical reset selection requires an isolated MuJoCo reference Controller')
 
 

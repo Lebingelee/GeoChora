@@ -8,8 +8,10 @@ parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--extra-robot-asset-root',action='store_true')
 parser.add_argument('--annotate-robot-source',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
+if args.controller_kp is not None and not (args.case == 'panda-joint' and args.record):
+    raise ValueError('Controller gain probe requires switchable panda-joint recording')
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -187,7 +189,12 @@ try:
             solution=env.value['solution_factory']()
             observation,info=env.reset_for_solution(solution,seed=19 if args.case=='nut' else 31)
         else:
-            observation,info=env.reset(seed=31)
+            options = ({'controller': {'kind': 'joint', 'parameters': {'kp': args.controller_kp}}}
+                       if args.controller_kp is not None else None)
+            observation,info=env.reset(seed=31,options=options)
+            if args.controller_kp is not None:
+                assert env.physical_action_spec()['parameters'] == {'kp': args.controller_kp}
+                result['controller_reset_parameters'] = env.physical_action_spec()['parameters']
         assert env.observation_space.contains(observation)
         if args.task_rgb:
             assert observation['task_rgb'].shape == (48, 64, 3)
