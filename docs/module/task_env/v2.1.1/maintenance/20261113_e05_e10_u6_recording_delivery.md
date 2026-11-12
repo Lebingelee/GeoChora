@@ -13,6 +13,6 @@
 
 最终证据位于 `workspace/maintenance/v211_e05_e10_u6_20261113_001/`：`physical-record-release/native-plan.json`、各 `result.json` 与 H5；`readback-release/plan.json` 和 `result.json`（12 项通过，禁 SDK import）；`ownership-test/result.json`（Panda metadata owner，1 项通过）；`provenance-count/nut-record/result.json`；`legacy-read/ast-comparison.json`。真实旧 R02c/R03c H5 只读通过严格 Judge，复制文件篡改边界后拒绝。Nut 常规 execution 短记录与 PickCube canonical RGB 记录分别保存并读回，但后者的 canonical 格式并未存储 RGB，不将其混同为上述 v3 同次记录。初次 Nut RGB reset 因 source closure 不满足准入被拒；初次 Panda physical runner 将 10 个实际子步误设为 5 的预期，probe 本身通过后 runner 断言失败；最终均按冻结计划独立重跑并如实保留失败记录。
 
-相对本单元输入：已跟踪文件 1385→1391（+6）；新增 `recorders/legacy_typed_witness.py`、版本诊断 Judge、三个检查文件及本实施记录，无整文件删除。生产代码 +401/−721，净 −320；其中约 110 行 F05/F06 witness 从 H5 迁入 codec，约 480 行旧严格 Judge 从生产 H5 迁入诊断，迁移并非凭空减少。版本诊断 +646/−4，含上述迁入；本记录和索引文档另计。按当前 stage 5 基线 `1f1359ee` 到本单元生产 diff：生产及其他代码 +7749/−17256，净 −9507；该累计包括此前单元，不能归功于 U6。文件与文本统计不代替行为和职责验收。
+相对本单元输入：已跟踪 blob 1383→1389（+6，排除两个 submodule gitlink）；新增 `recorders/legacy_typed_witness.py`、版本诊断 Judge、三个检查文件及本实施记录，无整文件删除。生产代码 +401/−721，净 −320；其中约 110 行 F05/F06 witness 从 H5 迁入 codec，约 480 行旧严格 Judge 从生产 H5 迁入诊断，迁移并非凭空减少。版本诊断 +646/−4，含上述迁入；本记录和索引文档另计。按当前 stage 5 基线 `1f1359ee` 到本单元生产 diff：生产及其他代码 +7749/−17256，净 −9507；该累计包括此前单元，不能归功于 U6。文件与文本统计不代替行为和职责验收。
 
 限制：最终 MuJoCo 真实记录并不证明 GeoPhys/Isaac 新记录路径，相关代表性补测和最终影响映射留 U7；不扩展完整 Solution 或声称 task success。历史测试目录中旧严格 reader import 不再作为兼容目标，必要的当前检查已迁入 v2.1.1 诊断。未改变 protected untracked 输入、子模块 pin 或历史结果。

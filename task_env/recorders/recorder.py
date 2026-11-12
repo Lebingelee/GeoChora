@@ -308,6 +308,10 @@ def begin_structured_recording(path, *, horizon, observation, reset_info, metada
         path = path.with_name(path.name + '.h5')
     if path.exists():
         raise FileExistsError(path)
+    # Fail before arming the episode if this interpreter cannot write H5.  A
+    # missing dependency discovered after end_episode would leave a frozen
+    # recording that cannot be finalized through the public Env again.
+    import h5py  # noqa: F401
     config = {'schema_version': 'v3', 'max_transitions': max(horizon, 1)}
     if max_buffer_bytes is not None:
         config['max_buffer_bytes'] = max_buffer_bytes

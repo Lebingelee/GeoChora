@@ -48,6 +48,6 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
 
-## 当前实施范围：E05～E10（U1～U6 已实施）
+## 当前实施范围：E05～E10（本轮实施与对账待独立主审）
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U6 已实施（实施者自评），结果及边界见专用账本第 13 节；U7 待做最终影响复验和逐事件对账。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 本轮实施及影响对账已形成实施者自评，见[最终结果](20261113_e05_e10_u7_delivery.md)；GeoPhys 当前 pin 缺少正式 backend 初始化 facade，S09/E06 保留开放。独立主审和维护者接收尚待完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
