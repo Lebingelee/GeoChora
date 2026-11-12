@@ -52,7 +52,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
     selected_supports_isaac = False
 
     @classmethod
-    def selected_default_config(cls):
+    def selected_default_config(cls, task_config=None):
         d = cls.declaration()
         return resolve_env_config(
             task_uid=d.task_id, scene_uid='tabletop-v1', agent_uids=('panda-v1',),
@@ -66,7 +66,7 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         )
 
     @staticmethod
-    def selected_default_controller_profile():
+    def selected_default_controller_profile(task_config=None):
         return None
 
     @classmethod

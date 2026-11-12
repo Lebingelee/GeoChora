@@ -391,14 +391,10 @@ def _resolve_selected_config(environment_type, config):
     requested_json = (supplied.requested_execution_json if supplied is not None else
                       json.dumps(_identity_value(sections["execution"]), sort_keys=True,
                                  separators=(",", ":"), allow_nan=False))
-    configuration_loader = getattr(environment_type, "selected_task_configuration", None)
-    task_configuration = configuration_loader() if configuration_loader is not None else None
-    base = (environment_type.selected_default_config(task_configuration)
-            if configuration_loader is not None else environment_type.selected_default_config())
+    task_configuration = environment_type.selected_task_configuration()
+    base = environment_type.selected_default_config(task_configuration)
     execution_defaults = dict(_CORE_SELECTED_EXECUTION_DEFAULTS)
-    class_defaults = getattr(environment_type, "selected_execution_defaults", {})
-    if callable(class_defaults):
-        class_defaults = class_defaults()
+    class_defaults = environment_type.selected_execution_defaults
     task_yaml_defaults = (
         {} if task_configuration is None else task_configuration.get("execution", {})
     )
@@ -433,8 +429,7 @@ def _resolve_selected_config(environment_type, config):
             "selected reference currently admits only the state-only renderer selection; "
             "non-none renderer and physics-renderer combinations are unsupported"
         )
-    default_profile = (environment_type.selected_default_controller_profile(task_configuration)
-                       if configuration_loader is not None else environment_type.selected_default_controller_profile())
+    default_profile = environment_type.selected_default_controller_profile(task_configuration)
     profile = controller.get('profile_id', default_profile)
     if profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")

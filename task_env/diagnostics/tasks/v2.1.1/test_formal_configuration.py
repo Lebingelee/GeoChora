@@ -443,3 +443,42 @@ def test_formal_effort_task_consumes_selected_robot_action_declaration(uid, robo
         assert env.binding.action_space_factory.__self__ is env.value['physical_execution']
     finally:
         env.close()
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_all_formal_tasks_resolve_defaults_from_one_task_configuration(uid, monkeypatch):
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get(uid)
+    source = task.selected_task_configuration()
+    default_config = task.selected_default_config
+    default_controller = task.selected_default_controller_profile
+    calls = []
+
+    def configured(source_config):
+        calls.append(('environment', source_config))
+        return default_config(source_config)
+
+    def controller(source_config):
+        calls.append(('controller', source_config))
+        return default_controller(source_config)
+
+    monkeypatch.setattr(task, 'selected_task_configuration', staticmethod(lambda: source))
+    monkeypatch.setattr(task, 'selected_default_config', configured)
+    monkeypatch.setattr(task, 'selected_default_controller_profile', controller)
+    resolved = resolve_task_env_config(task, {'execution': {'physics_provider': 'mujoco'}})
+    assert calls == [('environment', source), ('controller', source)]
+    assert resolved.environment.control.profile_id == default_controller(source)
+
+
+@pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
+def test_tabletop_execution_defaults_preserve_class_yaml_caller_precedence(uid, monkeypatch):
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get(uid)
+    data = dict(task.selected_task_configuration())
+    data['execution'] = {'physics_provider': 'mujoco'}
+    monkeypatch.setattr(task, 'selected_task_configuration', staticmethod(lambda: data))
+    monkeypatch.setattr(task, 'selected_execution_defaults', {'physics_provider': 'geophys'})
+    assert resolve_task_env_config(task, None).physics_provider == 'mujoco'
+    assert resolve_task_env_config(task, {'execution': {'physics_provider': 'geophys'}}).physics_provider == 'geophys'

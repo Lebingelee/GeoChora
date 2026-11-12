@@ -439,7 +439,6 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     """Source-bound articulated two-wheel balance environment."""
 
     uses_selected_public_config = True
-    physical_task_timebase = (TWO_WHEEL_BALANCE_PHYSICS_DT, TWO_WHEEL_BALANCE_CONTROL_SUBSTEPS)
     selected_controller_profiles = frozenset(TwoWheelBalanceEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
@@ -448,12 +447,8 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
     observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
-    @classmethod
-    def selected_default_config(cls):
-        return cls.default_config()
-
     @staticmethod
-    def selected_default_controller_profile():
+    def selected_default_controller_profile(task_config=None):
         return 'direct_joint_effort_v1'
 
     @classmethod

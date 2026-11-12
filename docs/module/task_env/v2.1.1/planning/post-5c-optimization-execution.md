@@ -1536,3 +1536,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 最终版本诊断 230 项通过，包括三个已验证 Robot 资产的复制／查找、拒绝覆盖或损坏、无 SDK 的配置解析，以及有／无渲染的 App 先于 source 检查和失败清理。正式 PickCube Isaac CUDA 无显式 manifest 重试完成 reset、一次非零 step、5 个显式子步、再次 reset、重复 Env close 和 App close；正式 Pendulum 在同一共同启动变更后完成相同生命周期，25 个显式子步。改动前的缓存 Pendulum 输入也完成 25 个显式子步；三次成功合计观察 55 个显式子步，各次隐式启动推进未知。PickCube 成功输入冻结后仅增加了纯诊断测试，生产 diff 未变。冻结输入、预算、双锁、失败和成功日志位于 ignored `workspace/maintenance/v211_installed_usd_assets_20261112/`。本批未复验双轮车、NutAssembly、renderer 或完整 Solution，历史证据只在各自原输入和范围内参考。
 
 生产代码修改 2 文件、新增 1 文件，+98／−7，净增 91 行；版本诊断新增 1 文件 +111 行；API 与本文各修改 1 个文档文件；无文件删除或整文件迁移，tracked 文件数由 1363 增至 1365。本机新安装的三个独立资产包占 41,696,232 字节，属于缓存空间增加，并非仓库文件收敛。E01～E04 尚未整体接收。
+
+
+### 6.160 四任务配置默认值共同合同
+
+复核 ENTRY-01／02、SUBJ-01／02：四个正式 Task 已使用同一正式配置解析器，但此前因是否具有 Task YAML 而分别调用带参数或无参数的默认值方法，Pendulum 与双轮车各重复一份转发方法。现在共同 Env 提供无额外 Task 数据时的默认合同，解析器对四任务均以同一个 Task 配置值调用环境默认值与 Controller 默认值；PickCube／Nut 的 YAML 仍由各自 Task 提供。桌面任务中重复 Core 的 GeoPhys 默认值和两个普通任务没有 caller 的旧时间基类字段已移除。类、Task YAML、用户执行配置的优先级继续保留；示例 Task 的方法签名同步到共同合同。此改动移除的是默认值解析分流，不代表 component 历史路径、Task／Robot source 构造或 E01～E04 已全部收敛。
+
+最终版本诊断 236 项通过，包含四 Task 的同一默认值输入、YAML／mapping／已解析配置一致性，以及桌面任务执行配置的类／YAML／caller 优先级。MuJoCo CPU 用正式 YAML 配置验证 PickCube 一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车：五条均完成 reset、非零动作或一个 Solution interval、共同提交确认、第二次 reset、Robot 重绑定和重复关闭，分别观测 5、5、5、25、25 个显式 native 子步。Nut 仅一个 Solution interval，非完整 Solution；冻结 diff、运行预算、双锁和原始结果在 ignored `workspace/maintenance/v211_task_defaults_20261112/`。Isaac、GeoPhys、renderer 和完整 Solution 未在本批复验，旧结果只按原身份与范围参考。
+
+生产代码修改 6 文件 +17／−33，净减 16 行；版本诊断修改 1 文件 +39；示例修改 1 文件 +2／−2；本文修改 1 文件；无新增、删除或整文件迁移，tracked 文件数保持 1365。资源加载、状态、clock、提交和推进仍由现有 Runtime／adapter 管理，本批未重构其内部合同。E01～E04 尚未整体接收。

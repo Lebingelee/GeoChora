@@ -83,6 +83,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     object_uids: tuple[str, ...] = ()
     success_definition = 'none'
     supports_structured_control_recording = False
+    selected_execution_defaults = {}
     metadata = {'render_modes': [], 'stage': 'stage4_gym_contract'}
     render_mode = None
     action_space = None
@@ -278,6 +279,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 if callable(add_note):
                     add_note(f"construction rollback also failed: {cleanup_error!r}")
             raise
+
+    @staticmethod
+    def selected_task_configuration():
+        """Return task-owned configuration used to resolve the formal request."""
+        return None
+
+    @classmethod
+    def selected_default_config(cls, task_config=None):
+        """Provide the common environment defaults for a formal task request."""
+        return cls.default_config()
 
     @classmethod
     def default_config(cls) -> ResolvedEnvConfig:

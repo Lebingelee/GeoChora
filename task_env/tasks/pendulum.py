@@ -570,7 +570,6 @@ class PendulumEnv(BaseTaskEnv):
     """Single Pendulum with a shared source-bound physical runtime."""
 
     uses_selected_public_config = True
-    physical_task_timebase = (PENDULUM_PHYSICS_DT, PENDULUM_CONTROL_SUBSTEPS)
     selected_controller_profiles = frozenset(PendulumEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
@@ -579,12 +578,8 @@ class PendulumEnv(BaseTaskEnv):
     controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
     observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
-    @classmethod
-    def selected_default_config(cls):
-        return cls.default_config()
-
     @staticmethod
-    def selected_default_controller_profile():
+    def selected_default_controller_profile(task_config=None):
         return 'direct_joint_effort_v1'
 
     @classmethod

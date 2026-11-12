@@ -686,12 +686,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     robot_source_roots = (('tabletop-v1', 'grasp_table'), ('cube-v1', 'PickCube'))
     robot_source_site_transfers = (('hand', 'nutassembly_ee_site', 'hand'),)
     default_robot_source_uid = 'panda-v1'
-    selected_execution_defaults = {
-        "physics_provider": "geophys",
-        "physics_backend": "cpu",
-        "physics_device": "cpu",
-    }
-
     @staticmethod
     def selected_task_configuration():
         return _configuration()
