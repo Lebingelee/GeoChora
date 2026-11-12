@@ -12,7 +12,7 @@ import numpy as np
 from .gripper_execution import EqualRateGripperServo, NativeRateGripperServo
 
 
-R3_REFERENCE_POSITION_PROFILES = frozenset(('r3_continuous_v1', 'r3_continuous_v1_pose_path_x20'))
+R3_REFERENCE_POSITION_PROFILES = frozenset(('r3_continuous_v1',))
 REFERENCE_POSITION_CONTROLLER_PROFILES = R3_REFERENCE_POSITION_PROFILES | frozenset(('r1', 'r1_split'))
 
 

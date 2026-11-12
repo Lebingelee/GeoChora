@@ -321,3 +321,11 @@ def test_formal_controller_profile_cannot_be_null(uid):
     importlib.import_module('task_env.tasks')
     with pytest.raises(ValueError, match='unsupported selected controller profile'):
         resolve_task_env_config(ENV_REGISTRY.get(uid), {'controller': {'profile_id': None}})
+
+
+def test_solution_diagnostic_alias_is_not_a_controller_profile():
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='unsupported selected controller profile'):
+        resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), {
+            'controller': {'profile_id': 'r3_continuous_v1_pose_path_x20'},
+        })

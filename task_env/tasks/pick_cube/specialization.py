@@ -66,7 +66,6 @@ TASK_CONFIGURATION_KEYS = ("recipe", "environment")
 PICKCUBE_CONTROLLER_PROFILES = REFERENCE_POSITION_CONTROLLER_PROFILES
 _PICKCUBE_R3_PROFILES = R3_REFERENCE_POSITION_PROFILES
 _PICKCUBE_POSTURE_PATH_ORIGINAL = "original"
-_PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP = "world_x_roundtrip_v1"
 _NUT_ASSEMBLY_MAX_STAGE_PLAN_S = 6.0
 PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "schema_version": "pick-cube-r3-nut-aligned-profile-v2",
@@ -244,11 +243,7 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
     artifact, source = compiled.artifact, compiled.source
-    posture_path_profile = (
-        _PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP
-        if controller_profile == "r3_continuous_v1_pose_path_x20"
-        else _PICKCUBE_POSTURE_PATH_ORIGINAL
-    )
+    posture_path_profile = _PICKCUBE_POSTURE_PATH_ORIGINAL
     planner_config = (
         _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
         if is_r3_profile else None

@@ -260,7 +260,7 @@ class PandaAgent(BaseAgent):
         )
 
     def selected_controller_profiles(self):
-        return ('r1', 'r3_continuous_v1', 'r3_continuous_v1_pose_path_x20')
+        return ('r1', 'r3_continuous_v1')
 
     def supported_controller_kinds(self) -> tuple[str, ...]:
         return self.component_controller_kinds

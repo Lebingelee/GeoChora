@@ -1024,3 +1024,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +41／−28，净增 13 行；其中 profile 分支和声明由任务移至 Controller owner，属代码职责迁移而非新增一条任务构建路径。版本诊断修改 1 文件 +14／−5，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务配置入口不变，provider／renderer 的 source、状态、clock、提交和资源合同未改变；其他任务构造及 source 分流仍需收敛。
 
 128 项版本检查通过，包含两个 tabletop 实际消费共同 Controller 构造结果。MuJoCo 下 PickCube R1、R3、装配 Panda、NutAssembly、Pendulum、双轮车及 PickCube 物理 Controller 短程通过，分别观察 5、5、5、5、25、25、10 个 native 子步；R1 和物理 Controller 的 H5 读回通过。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac Position 未调用该 MJCF Controller 入口，本批未重跑 Isaac 或完整 Solution；旧证据仍只证明各自受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_reference_controller_owner_20261112_w7w93e81/`；E01～E04 仍未接收。
+
+### 6.97 Solution 诊断别名退出 Controller 配置
+
+输入 `bfab5aab`。历史 `r3_continuous_v1_pose_path_x20` 只切换 PickCube Solution 的姿态绕行，历史对照中 Controller 身份与普通 R3 相同；它不应作为另一种 Robot／Controller profile。现在该别名从共同 Controller 声明、Panda source recipe 和正式任务选择退出，普通 R3 仍使用原有 Solution 默认路径。Solution 类中的可选绕行实现尚在，本批未删除或验证它；历史对照证据保留。
+
+生产修改 3 文件 +3／−8，净减 5 行；版本诊断修改 1 文件 +8／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。正式配置消除一个把 Solution 选择伪装为 Controller 的分流；provider／renderer 的 source、状态、clock、提交和资源合同未改，Panda recipe 身份随声明变化。
+
+129 项版本检查通过，包含旧别名从正式 Controller 配置拒绝。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 R3 Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_retire_planner_alias_20261112_gmxd_5rp/` 和 `workspace/maintenance/v211_retire_planner_alias_isaac_20261112_7z_9i7kd/`；E01～E04 仍未接收。
