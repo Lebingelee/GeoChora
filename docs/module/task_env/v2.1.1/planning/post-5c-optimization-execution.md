@@ -15,8 +15,8 @@ O0 启动窗口交付是基线与导航纠偏：记录维护者功能接收和�
 | 顺序 | 具体 owner／落点 | 台账归属与交付 | 状态 |
 | --- | --- | --- | --- |
 | O0 | 当前摘要、现行导航、orchestration | GOV-03／04、DOC-01／02 的启动部分；接收范围、输入与后续依赖清楚 | 基线已记录；全条目未结案 |
-| O1 | `registry.make_env`、`configuration.resolve_task_env_config/resolve_execution_plan`、`ResolvedEnvConfig/ResolvedSelectedConfig`、Task binding、Robot recipe | ENTRY-01～03；GOV-01／02；TASK-01／02、SUBJ-01～03、SRC-01／02 的构建部分：一个正式请求及旧 caller 迁移 | NEXT，未实施 |
-| O2 | `SelectedReferenceEnv`、`ReferenceTaskBinding`、`selected_materialization`、`state_initialization`、Controller binding／`submit_control_command` | ENV-01～05、CTRL-01～05，TASK-04／SUBJ-01～03：共同 reset／控制／状态／close owner 及能力保全 | 待 O1 |
+| O1 | `registry.make_env`、`configuration.resolve_task_env_config/resolve_execution_plan`、`ResolvedEnvConfig/ResolvedSelectedConfig`、Task binding、Robot recipe | ENTRY-01～03；GOV-01／02；TASK-01／02、SUBJ-01～03、SRC-01／02 的构建部分：一个正式请求及旧 caller 迁移 | 实施中；见第 6 节及当前摘要 |
+| O2 | `SelectedReferenceEnv`、`ReferenceTaskBinding`、`selected_materialization`、`state_initialization`、Controller binding／`submit_control_command` | ENV-01～05、CTRL-01～05，TASK-04／SUBJ-01～03：共同 reset／控制／状态／close owner 及能力保全 | 实施中；见第 6 节及当前摘要 |
 | O3 | assembly/source composition、provider admission／worker、render registry／camera adapters、observations | SRC-01～04、RUN-01～04、REN-01～08、OBS-01／02；TASK-01～04 剩余职责：实际 source／native／视觉适配归位 | 待相应 O1／O2 输入 |
 | O4 | Nut Solution／feedback 支持、Recorder／reader／replay、CLI／examples／vector／LIBERO caller、diagnostics | TASK-03、REC-01～03、CALL-01～04、TEST-01～04；逐个 caller 迁移，通用格式与实验 oracle 分层 | 待相应上游 owner |
 | O5 | 最终生产入口和原始记录、独立 reader | V01～V09；按影响复用／最短补测，完整 Solution 与真实任务结果分列 | 待代码稳定及 native 执行包 |
@@ -26,7 +26,7 @@ O0 启动窗口交付是基线与导航纠偏：记录维护者功能接收和�
 
 O1～O4 是依赖顺序，不要求每包先耗一轮审计。已有 owner 清楚时，实施、定向验证、必要修复、兼容更新、报告与本地提交同包完成。没有实际缺陷的保全／待核项以 caller 和 diff 核对结案，不制造新抽象。后续完整 Solution 若已覆盖同一路径，复用其结果，避免额外 smoke run。
 
-## 3. O1 首包：正式配置与构建合同
+## 3. O1 首包：正式配置与构建合同（启动时记录）
 
 ### 3.1 已核实的当前调用链
 
@@ -103,6 +103,8 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 检查日志和[摘要](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/validation-summary.json)保存在本轮 ignored 输出目录；本地提交按当前阶段分支归属，仅包含本轮文档。后续实施前重新核对其实际输出 HEAD 与 dirty 归属。
 
 ## 6. E00～E04 实施记录
+
+本节按批记录当时的输入、结论与限制；最前面的状态表反映首批时点，当前状态以[摘要](../maintenance/current-state.md)及最新记录为准。
 
 维护者在启动提交 `21577d32` 后直接要求本会话实施 E00～E04，并要求文件／代码净变化、统一构建、职责可读性、adapter 对齐及功能保全六类成效。继续同一阶段分支、当前 chat 单 writer，不派发其他 agent；发布、refs／worktree 整理及 E05～E16 不在本轮实现目标内。第 3.4 节原派包准备要求保留为其他执行者接手规范；本次直接实施的输入、纯检查和限定 CPU 实测已单独冻结，不沿用旧 native 窗口。
 
@@ -1423,3 +1425,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 6 文件 +39／−61，净减 22 行，其中约 19 行 Panda 动作投影从 Runtime 通用控制模块迁入原 Controller owner；版本诊断修改 2 文件、新增 1 文件，+53／−0；本文新增记录。新增 1、删除 0、整文件迁移 0；项目 tracked 文件数 1358→1359。相对 `1f1359ee` 的 task_env 差异 140 文件（新增 14、删除 20、修改 106），+8310／−14848，净减 6538 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 205 项通过，包括无提交能力时无旁路、Position 序列不被重新投影以及真实 USD source 的 Controller 投影和 typed 请求检查。MuJoCo PickCube R1、R3 Solution 单步、Nut Solution 单步、装配 Panda、PickCube effort、Pendulum 和双轮车各完成 reset／推进／再次 reset／关闭并核对共同提交，分别观测 5／5／5／5／5／25／25 native 子步；GeoPhys PickCube R1 同样通过，native 子步不可观测并按 50 预留。Solution 均仅单步；Isaac 原生、renderer 和真实 Position 序列本批未复验。首轮真实运行通过后发现序列分派缺陷，修正并保留首轮记录；最终冻结输入、双锁、预算及收据在 ignored `workspace/maintenance/v211_no_control_bypass_v2_20261112/`，首轮在相邻无 v2 目录。E01～E04 尚未整体接收。
+
+
+### 6.147 普通 Robot source 身份与当前状态对账
+
+输入 `f691d32e`；实施前重新审阅台账 GOV、ENTRY、TASK、ENV、SUBJ 和 CTRL 并核对当前四任务调用链。Pendulum／双轮车的 Runtime source 消费所选 Robot 的 `source_xml`，但 Scene 资产摘要仍从模块常量计算；改为消费同一个 Robot 实际声明，保留 source 闭包和 native 传动检查。两个任务的物理时间步与子步不再在 Task 物理声明、任务类配置中重复写字面量，主体力矩上限复用 Robot 已声明常量。该项允许已声明 source 的身份正确传播，不证明任意 Robot 或资产可以组合。
+
+生产修改 6 文件 +17／−9，净增 8 行；版本诊断修改 2 文件 +37／−0；无新增、删除或整文件迁移，项目 tracked 文件数保持 1359。当前状态摘要从逐批追加的过时状态整理为 E00～E04 当前表，历史逐批结果仍在本执行记录及原始证据中；本文标明启动计划和首批状态的历史时点。相对 `1f1359ee` 的 task_env 差异 140 文件（新增 14、删除 20、修改 106），+8358／−14851，净减 6493 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 207 项通过。两种 Robot 的 Scene 摘要分别验证实际所选 source 字节；以仅增加无物理语义注释的 source，MuJoCo 和 GeoPhys 的 Pendulum／双轮车分别完成 reset、非零控制、再次 reset 和重复 close。MuJoCo 各观测 25 个 native 子步，GeoPhys 子步不可观测、各按 50 预留。未验证其他 source 变体、Isaac、renderer 或完整 Solution；此前证据按其原输入和范围保留。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_simple_robot_declarations_20261112/`。E01～E04 尚未整体接收。

@@ -38,6 +38,28 @@ def test_source_uses_selected_robot_asset_root(uid, robot_type, tmp_path, monkey
         env.close()
 
 
+@pytest.mark.parametrize(('uid', 'robot_type'), [
+    ('pendulum-v1', PendulumEntity), ('two-wheel-balance-v1', TwoWheelBalanceEntity),
+])
+def test_scene_identity_uses_the_selected_robot_source(uid, robot_type, monkeypatch):
+    import hashlib
+    from task_env import make_env
+
+    source_xml = robot_type.source_xml + '\n<!-- selected Robot source -->'
+    monkeypatch.setattr(robot_type, 'source_xml', source_xml)
+    env = make_env(uid)
+    try:
+        source = env.value['source']
+        assert env.binding.robot.source_xml == source_xml
+        assert source.scene_definition.assets[0].source_content_sha256 == hashlib.sha256(
+            source_xml.encode()).hexdigest()
+        assert source.scene_source.xml == source_xml
+        assert env.artifact.timebase.physics_dt == env.config.runtime.physics_dt
+        assert env.artifact.timebase.control_substeps == env.config.runtime.control_substeps
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
 def test_effort_build_uses_provider_from_request_and_selected_robot(uid, monkeypatch):
     from task_env import make_env

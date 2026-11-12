@@ -12,6 +12,7 @@ from ..robots.two_wheel_balance import TWO_WHEEL_ACTION_CONTRACT
 
 from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
     TWO_WHEEL_BALANCE_SCENE_UID, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
+    TWO_WHEEL_BALANCE_PHYSICS_DT, TWO_WHEEL_BALANCE_CONTROL_SUBSTEPS,
     TwoWheelBalanceTaskDefinition, TwoWheelBalanceObservationBuilder)
 
 ENTITY = 'two-wheel-balance-v1'
@@ -23,7 +24,9 @@ JOINTS = tuple(f'{ENTITY}/{name}' for name in NAMES)
 def _declaration(scene, robot):
     return compile_existing_subject_effort_task(scene=scene, robot=robot, task_id=TWO_WHEEL_BALANCE_TASK_UID,
         artifact_id='two-wheel-physical-v1', semantic_id='two-wheel-task-definition-v1',
-        success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION, timebase=Timebase(.002, 25, .05))
+        success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
+        timebase=Timebase(TWO_WHEEL_BALANCE_PHYSICS_DT, TWO_WHEEL_BALANCE_CONTROL_SUBSTEPS,
+                          TWO_WHEEL_BALANCE_PHYSICS_DT * TWO_WHEEL_BALANCE_CONTROL_SUBSTEPS))
 
 
 def sample_reset(rng):

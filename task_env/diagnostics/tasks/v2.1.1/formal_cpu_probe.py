@@ -6,6 +6,7 @@ parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--extra-robot-asset-root',action='store_true')
+parser.add_argument('--annotate-robot-source',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
@@ -30,6 +31,13 @@ try:
         mujoco.mj_step=counted_step
     from task_env import make_env
     from task_env.runtime.sessions.source import source_resource_receipt
+    if args.annotate_robot_source:
+        if args.case not in {'pendulum', 'two-wheel'}:
+            raise ValueError('annotated Robot source probe requires a simple Robot')
+        from task_env.robots.pendulum import PendulumEntity
+        from task_env.robots.two_wheel_balance import TwoWheelBalanceEntity
+        robot_type = PendulumEntity if args.case == 'pendulum' else TwoWheelBalanceEntity
+        robot_type.source_xml += '\n<!-- selected Robot source -->'
     if args.extra_robot_asset_root:
         if args.case != 'panda-effort':
             raise ValueError('extra Robot asset root probe requires PickCube effort')
@@ -129,6 +137,13 @@ try:
         table = ET.fromstring(env.value['source'].scene_source.xml).find(".//geom[@name='grasp_table_geom']")
         assert float(table.get('size').split()[0]) == args.table_half_x
     robot=env.robot
+    if args.annotate_robot_source:
+        import hashlib
+        source = env.value['source']
+        expected = hashlib.sha256(robot_type.source_xml.encode()).hexdigest()
+        assert source.scene_definition.assets[0].source_content_sha256 == expected
+        assert source.scene_source.xml == robot_type.source_xml
+        result['robot_source_sha256'] = expected
     result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
         'parents':[s.parent_subject_id for s in robot.subjects],
         'controller_identities':[str(c.identity) for c in robot.controllers]}

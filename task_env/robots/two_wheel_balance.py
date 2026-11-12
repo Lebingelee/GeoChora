@@ -112,7 +112,7 @@ class TwoWheelBalanceEntity(RobotComponent):
         identity = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
         asset = AssetDefinition('asset-definition-v1', 'two-wheel-inline', 'v1',
             'inline://task-env/two-wheel-balance', source_revision=source_revision,
-            source_content_sha256=hashlib.sha256(TWO_WHEEL_BALANCE_MJCF_XML.encode()).hexdigest())
+            source_content_sha256=hashlib.sha256(self.source_xml.encode()).hexdigest())
         entity = EntityInstance('entity-instance-v1', self.uid, asset.asset_id, asset.asset_version)
         frames = tuple(FrameDefinition('frame-definition-v1', self.uid, name, 'runtime', None, None)
                        for name in self.frame_names)
@@ -143,7 +143,8 @@ class TwoWheelBalanceEntity(RobotComponent):
             component_paths, (writer,),
             supported_controller_profiles=self.controller_profiles)
         joints = tuple(SubjectJointDeclarationV1(path, name, (writer,), actuator,
-            actuator, 1., (-1.5, 1.5), 'disabled') for path, name, actuator in zip(
+            actuator, 1., (-TWO_WHEEL_TORQUE_LIMIT_NM, TWO_WHEEL_TORQUE_LIMIT_NM), 'disabled')
+            for path, name, actuator in zip(
                 component_paths, (self.left_wheel_joint_name, self.right_wheel_joint_name),
                 (self.left_actuator_name, self.right_actuator_name), strict=True))
         return subject, joints

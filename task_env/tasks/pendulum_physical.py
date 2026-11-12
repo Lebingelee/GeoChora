@@ -12,7 +12,8 @@ from ..robots.pendulum import PENDULUM_ACTION_CONTRACT
 
 from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
-                       PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS)
+                       PendulumObservationBuilder, PENDULUM_TASK_SEMANTICS,
+                       PENDULUM_PHYSICS_DT, PENDULUM_CONTROL_SUBSTEPS)
 
 ENTITY = 'pendulum-v1'
 JOINT = f'{ENTITY}/pendulum_hinge'
@@ -22,7 +23,9 @@ JOINT = f'{ENTITY}/pendulum_hinge'
 def _declaration(scene, robot):
     return compile_existing_subject_effort_task(scene=scene, robot=robot, task_id=PENDULUM_TASK_UID,
         artifact_id='pendulum-physical-v1', semantic_id='pendulum-task-definition-v1',
-        success_definition=PENDULUM_SUCCESS_DEFINITION, timebase=Timebase(.002, 25, .05))
+        success_definition=PENDULUM_SUCCESS_DEFINITION,
+        timebase=Timebase(PENDULUM_PHYSICS_DT, PENDULUM_CONTROL_SUBSTEPS,
+                          PENDULUM_PHYSICS_DT * PENDULUM_CONTROL_SUBSTEPS))
 
 
 def _reset_plan(artifact, source, seed, sampled=None):

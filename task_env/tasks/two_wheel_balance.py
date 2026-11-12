@@ -439,7 +439,7 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
     """Source-bound articulated two-wheel balance environment."""
 
     uses_selected_public_config = True
-    physical_task_timebase = (.002, 25)
+    physical_task_timebase = (TWO_WHEEL_BALANCE_PHYSICS_DT, TWO_WHEEL_BALANCE_CONTROL_SUBSTEPS)
     selected_controller_profiles = frozenset(TwoWheelBalanceEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}

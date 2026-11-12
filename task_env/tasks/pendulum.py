@@ -570,7 +570,7 @@ class PendulumEnv(BaseTaskEnv):
     """Single Pendulum with a shared source-bound physical runtime."""
 
     uses_selected_public_config = True
-    physical_task_timebase = (.002, 25)
+    physical_task_timebase = (PENDULUM_PHYSICS_DT, PENDULUM_CONTROL_SUBSTEPS)
     selected_controller_profiles = frozenset(PendulumEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}

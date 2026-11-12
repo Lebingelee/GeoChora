@@ -80,7 +80,7 @@ class PendulumEntity(RobotComponent):
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
-        source_hash = hashlib.sha256(PENDULUM_MJCF_XML.encode()).hexdigest()
+        source_hash = hashlib.sha256(self.source_xml.encode()).hexdigest()
         asset = AssetDefinition('asset-definition-v1', 'pendulum-inline', 'v1',
                                 'inline://task-env/pendulum', source_revision=source_revision,
                                 source_content_sha256=source_hash)
@@ -114,7 +114,8 @@ class PendulumEntity(RobotComponent):
             (component_path,), (writer,),
             supported_controller_profiles=self.controller_profiles)
         joint = SubjectJointDeclarationV1(component_path, self.joint_name, (writer,),
-            self.actuator_name, self.actuator_name, 1., (-2., 2.), 'disabled')
+            self.actuator_name, self.actuator_name, 1.,
+            (-PENDULUM_TORQUE_LIMIT_NM, PENDULUM_TORQUE_LIMIT_NM), 'disabled')
         return subject, (joint,)
 
 
