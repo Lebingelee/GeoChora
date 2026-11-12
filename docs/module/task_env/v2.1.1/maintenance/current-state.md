@@ -229,3 +229,5 @@ PickCube 的 `lift_height_m` 已贯通 Position／effort 的 MJCF 与 USD 任务
 PickCube TaskDefinition 已移除仅供旧诊断使用的索引式评价，改为只消费 Artifact 与具名状态；受影响 MuJoCo、GeoPhys、Isaac Position 短程已复验。Isaac effort 控制曾通过短程，但其 recorder 当前不识别 Isaac provider，待 E10 处理。详见[实施记录 6.106](../planning/post-5c-optimization-execution.md#6106-pickcube-taskdefinition-退出旧索引诊断)。
 
 Pendulum 和双轮车旧 component scene／reset 工厂、专用 torque adapter 与失效 parallel 注册已退休；正式 MuJoCo／GeoPhys 单环境短程已复验，G06 并行待按正式合同实现。详见[实施记录 6.107](../planning/post-5c-optimization-execution.md#6107-退休两个普通任务的旧-component-与并行接线)。
+
+PickCube 无 Solution 的直接／joint effort 不再准备 R3 Solution readiness；需要的 R3 控制动力学与 reset 选择保留。详见[实施记录 6.108](../planning/post-5c-optimization-execution.md#6108-effort-构建不再准备未使用的-solution)。

@@ -1114,3 +1114,9 @@ Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误�
 删除两个不可达的旧 scene／reset／Task factory 和旧单独 torque adapter，撤销两个失效的 parallel 注册及相应旧 adapter 导出；正式 Robot 主体声明、共享 physical Controller、力矩单位及 reset 分布保留。G06 需以正式构建合同重新实现并行能力，不能再将历史 parallel 示例当作当前可用能力。同步修正内建任务、示例和迁移文档。生产修改 5 文件 +4／−395，净减 391 行；版本诊断修改 1 文件 +8／−0；API 文档修改 3 文件 +14／−32，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。
 
 148 项版本检查通过。Pendulum 和双轮车各自在 MuJoCo CPU 以正式 `make_env` 完成 reset、非零力矩 step、第二次 reset、关闭及 25 个实际 native 子步；两者在 GeoPhys CPU 完成同样生命周期，native 子步未直接计数。MJCF 导入有语义诊断。两任务的真实主体和 Controller 仍由共同的 source、Assembly 和 Runtime 控制合同消费；provider 的状态、clock、提交及 renderer 接口未变。Isaac 本轮未重跑，旧证据仍只对应原源码；本次删除的 adapter 和 component 工厂不参与正式 Isaac 调用链。冻结生产／诊断 diff、预算与收据位于 ignored `workspace/maintenance/v211_remove_legacy_actuation_20261112_n6ty3ks4/`。此项不宣称四任务主体构建完全统一，E01～E04 未整体接收。
+
+### 6.108 effort 构建不再准备未使用的 Solution
+
+输入 `7d64fbff`。PickCube 的 MJCF 直接及 joint effort 即使不提供 Solution，也会先加载 R3 动力学、生成 Solution readiness 和身份。现在 Task source 编译可按实际需要准备 readiness；未启用 Solution 的 effort 路线不再加载这些数据。需要 Solution 的 reset 选择仍准备 readiness，R3 effort 所需的动力学仍由该 Controller 的真实构建路径加载，source snapshot 和身份检查保留。这消除了普通 effort 对无关 Solution 准备的运行依赖；它仍使用 PickCube 现有 physical binding，尚未完成四任务共同构造。
+
+生产修改 2 文件 +38／−34，净增 4 行；其中多数变更是将 readiness 准备置于条件内的缩进迁移，不计作独立能力；版本诊断修改 1 文件 +23／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。150 项版本检查通过，包括在禁止 R3 动力学和 readiness 读取时构建直接／joint effort。MuJoCo 直接 effort、R3 effort 和 Position Solution 各完成 5 个 native 子步；joint effort 的 Controller reset 切换与 H5 读回完成 10 个子步。GeoPhys joint effort 完成 reset、step、再次 reset 和关闭，native 子步未直接计数。MJCF 导入有语义诊断。Position 和 Isaac 的 readiness 默认路径未关闭；Isaac 本轮未重跑，旧证据仍只对应原源码。完整 Solution 未运行。provider 的 source、状态、clock、提交和 renderer 合同未改；冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_effort_without_solution_20261112_kd8ubpcj/` 与 `workspace/maintenance/v211_effort_solution_retained_20261112_bsoz5a92/`。E01～E04 未整体接收。

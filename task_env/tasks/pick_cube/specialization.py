@@ -222,9 +222,8 @@ class _PreparedReferenceSource(NamedTuple):
 
 
 def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
-                              lift_height_m=None, task_config=None):
-    """Compile Task source and readiness without constructing a Controller."""
-    from .solution import PickCubeReadinessConfig
+                              lift_height_m=None, task_config=None, include_readiness=True):
+    """Compile Task source and only prepare Solution inputs when requested."""
 
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
@@ -236,38 +235,42 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
     is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
-    dynamic_profile, profile_source = _r3_dynamic_profile() if is_r3_profile else (None, None)
+    dynamic_profile, profile_source = (_r3_dynamic_profile()
+                                       if is_r3_profile and include_readiness else (None, None))
     if is_r3_profile:
         config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
     artifact, source = compiled.artifact, compiled.source
-    planner_config = (
-        _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
-        if is_r3_profile else None
-    )
-    readiness = PickCubeReadinessConfig.from_source(
-        artifact, source,
-        measured_tcp_clearance_gate=is_r3_profile,
-        planner=planner_config,
-        close_transition_steps=(
-            max(1, int(math.ceil(
-                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_transition_s"]
-                / artifact.timebase.control_dt - 1e-10
-            ))) if is_r3_profile else None
-        ),
-        close_settle_steps=(
-            max(1, int(math.ceil(
-                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_settle_s"]
-                / artifact.timebase.control_dt - 1e-10
-            ))) if is_r3_profile else 0
-        ),
-        postclose_hold_steps=(
-            max(1, int(math.ceil(
-                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["postclose_hold_s"]
-                / artifact.timebase.control_dt - 1e-10
-            ))) if is_r3_profile else 0
-        ),
-    )
+    readiness = None
+    if include_readiness:
+        from .solution import PickCubeReadinessConfig
+        planner_config = (
+            _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
+            if is_r3_profile else None
+        )
+        readiness = PickCubeReadinessConfig.from_source(
+            artifact, source,
+            measured_tcp_clearance_gate=is_r3_profile,
+            planner=planner_config,
+            close_transition_steps=(
+                max(1, int(math.ceil(
+                    PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_transition_s"]
+                    / artifact.timebase.control_dt - 1e-10
+                ))) if is_r3_profile else None
+            ),
+            close_settle_steps=(
+                max(1, int(math.ceil(
+                    PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_settle_s"]
+                    / artifact.timebase.control_dt - 1e-10
+                ))) if is_r3_profile else 0
+            ),
+            postclose_hold_steps=(
+                max(1, int(math.ceil(
+                    PICKCUBE_R3_CONTINUOUS_PROFILE_V1["postclose_hold_s"]
+                    / artifact.timebase.control_dt - 1e-10
+                ))) if is_r3_profile else 0
+            ),
+        )
     from ...runtime.sessions.source import snapshot_legacy_mjcf_source
     source = snapshot_legacy_mjcf_source(source)
     return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,

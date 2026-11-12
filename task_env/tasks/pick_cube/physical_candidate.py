@@ -162,15 +162,16 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
 
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
-        resolved_config=resolved_config, lift_height_m=lift_height_m)
+        resolved_config=resolved_config, lift_height_m=lift_height_m, include_readiness=reset_switch)
     legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(original):
-        from .solution import PickCubeReadinessSolution
         import subprocess
         revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
                                             'rev-parse', 'HEAD'], text=True).strip()
-        solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+        if reset_switch:
+            from .solution import PickCubeReadinessSolution
+            solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
         # The force-observation fixture starts inside the paired finger limits;
         # it retains PickCube semantics and is a distinct Artifact identity.
         if not reset_switch:

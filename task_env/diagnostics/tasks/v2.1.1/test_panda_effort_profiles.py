@@ -127,6 +127,29 @@ def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkey
         binding.close_task_resources()
 
 
+@pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1'])
+def test_effort_without_solution_does_not_prepare_solution_readiness(profile, monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
+
+    config = resolve_task_env_config(specialization.PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    def unexpected(*args, **kwargs):
+        pytest.fail('effort construction prepared unused Solution data')
+    monkeypatch.setattr(specialization, '_r3_dynamic_profile', unexpected)
+    monkeypatch.setattr(PickCubeReadinessConfig, 'from_source', unexpected)
+    binding = specialization.PickCubeReferenceEnv.selected_binding(config)
+    try:
+        value = binding.build('mujoco')
+        assert value['controller'] is value['physical_execution'].controllers[0]
+        assert 'solution_factory' not in value
+    finally:
+        binding.close_task_resources()
+
+
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
 def test_pickcube_position_and_effort_consume_the_same_lift(profile):
     from task_env.environment.configuration import resolve_task_env_config
