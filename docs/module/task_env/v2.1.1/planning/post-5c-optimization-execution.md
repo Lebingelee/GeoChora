@@ -1507,3 +1507,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 对照 SUBJ-01／02、CTRL-01／03：Pendulum 与双轮车的 Task binding 原先各自导入固定 Robot 动作常量，再交给共同构造器。现在两个 Robot 自身公开各自动作声明，共同构造器从实际选定的 Robot 读取；Task 不再指定 Robot 专有动作常量。实际动作空间仍来自已编译 Controller，原维度、顺序、上下界及单位核对保留。这消除两条 Task 特定接线，不声称 Panda 与普通 Robot 已完全使用相同 source 物化。
 
 生产代码修改 5 文件 +5／−6，净减 1；版本诊断修改 1 文件 +26 行；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断 219 项通过；检查实际 Robot 声明变化会进入相应正式 Task 构造。MuJoCo Pendulum 与双轮车正式 direct Controller 路线完成 reset、非零 step、再次 reset 和重复 close，各观测 25 个 native 子步；冻结输入、双锁及结果在 ignored `workspace/maintenance/v211_robot_action_declaration_20261112/`。GeoPhys、Isaac、renderer、tabletop 和完整 Solution 本批未复验，原有不同输入证据不扩展为本批原生结论。E01～E04 仍未整体接收。
+
+
+### 6.157 正式入口文档与实际代码对账
+
+对照 ENTRY-01／02：版本 API 页的当前段落仍声称旧 candidate UID 和 `control.profile_id`／`task.controller_profile` 可用，与现行 registry 和四任务正式解析器冲突。修正文档，使正式输入、旧入口退休及共同构建链对应当前代码；将涉及旧候选的阶段内容明确标为历史。TaskEnv API 索引同步说明四任务 RuntimeSession 路线。历史接收证据未改。
+
+本批修改 3 个文档文件，无生产或诊断代码变化，无新增、删除或迁移文件，tracked 文件数保持 1362。正式配置诊断 80 项通过；另直接查询 registry 确认三个旧 UID 未登记，并验证 PickCube、Pendulum、双轮车 Isaac 配置在未提供 source delivery 时被静态拒绝。当前 Isaac 仍要求显式 delivery，未达到台账要求的无需内部 source 输入，不能宣称 E01 完成；本批未运行 native、renderer 或 Solution。

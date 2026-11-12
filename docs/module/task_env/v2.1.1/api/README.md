@@ -10,9 +10,9 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ## 5c 后优化：当前正式构造增量
 
-正式 PickCube、NutAssembly、Pendulum 和双轮车已由同一个 `SelectedReferenceEnv.from_resolved_config` 构造 owner 消费任务声明。两个既有 resolved 配置值类型继续兼容；高级 candidate factory、execution 字段与 provider kwargs 尚未完成收敛，优化整体仍在实施。范围、原始检查及剩余条件见[实施记录 6.1](../planning/post-5c-optimization-execution.md#61-第二批正式构造与声明主体)。
+正式 PickCube、NutAssembly、Pendulum 和双轮车经 `make_env` 使用同一正式配置解析与 `SelectedReferenceEnv.from_resolved_config` 构建链。正式入口不接受旧 component resolved 配置；其他保留的 component caller 有其独立范围。共同 Robot 构造与 adapter 的后续收敛仍在实施，实际状态见[当前摘要](../maintenance/current-state.md)。
 
-支持选择 profile 的任务可统一写 `config={"controller": {"profile_id": ...}}`，例如 PickCube 的 `r3_continuous_v1`，或 Pendulum／双轮车的 `direct_joint_effort_v1`、已有限定路线的 `velocity_damped_joint_effort_v1`。`control.profile_id` 也可用于这些任务；旧 `task.controller_profile` 继续兼容，同义值保持原解析结果，冲突拒绝；不扩大任务原有可选 profile，NutAssembly 仍拒绝其未公开支持的 profile 选择。Mapping 与 YAML 使用同一解析。
+四个正式任务均使用 `config={"controller": {"profile_id": ...}}` 选择受支持的 Controller，例如 PickCube 的 `r3_continuous_v1`，或 Pendulum／双轮车的 `direct_joint_effort_v1` 和限定路线的 `velocity_damped_joint_effort_v1`。`control.profile_id` 与 `task.controller_profile` 不是正式输入；Mapping 与 YAML 使用同一解析。各任务和所选 Robot 的能力范围仍分别检查。
 
 四主体的 MuJoCo CPU 正式构造提供同一 `env.robot` 视图：`subjects`、`controllers` 和 `root_frames` 引用实际准入的声明与 owner，`controller` 与 Env 当前 Controller 是同一对象；reset 重绑后返回当前视图。装配 Panda 保留 arm／hand 两个 subject 及两个 Controller，不把它们压成一个控制器。视图不创建 Runtime、第二个推进者或状态副本。旧组件 Panda 的 `references`／`gripper`／`ee` 便利投影继续保留；当前 selected 视图未声明这些投影时相应字段为 None，使用共同 subject／Frame 声明，不为 Pendulum／双轮车制造 Panda 属性。
 
@@ -54,13 +54,13 @@ finally:
 
 相机可用世界 CameraSpec 声明，在编译后生成绑定几何；底层 advanced CameraGeometry 仍校验 Artifact。observer／task camera 身份必须不同，输出限原 HWC float32 RGB，renderer／physics pairing 和历史观察路线限制继续拒绝。本批只验证声明与生命周期合同，未新增真实 RGB 结论。
 
-旧 `pickcube-physical-candidate-v1` 仍接收原字段，但只翻译到上述正式配置，并返回 `PickCubeReferenceEnv`／正式 `env.uid`；不再保证返回旧 candidate 类。原显式 `source_workspace` 是高级兼容输入，其 `source-snapshot` 继续 caller-owned；普通构造自动管理并在 close／失败时释放自有快照。历史 construction_id／Artifact／source identity 不因入口迁移而被改名。旧 `pickcube-isaac-physical-candidate-v1` 也只翻译原字段到正式 PickCube factory；五种 physical profile 的声明可使用 `execution.physics_provider="isaacsim"`／`physics_backend="cuda"`／`physics_device="cuda:0"` 与原显式 `source_delivery_manifest`，仍限 in-process、原 drive fixture 和 1～1000 horizon，未开启 reset selection／MJCF source workspace。App 准备由 Runtime 执行。正式 Isaac factory 已在原 F06 USD source 范围内复验 reset、一个非零 interval、第二次 reset 和同步 RGB；不扩展为其他资产或完整 Solution 资格。Position 的中性／typed source 编译器返回 binding 声明，旧结果 bundle 经共同 Env 构造，保留原 Artifact、UID 及能力边界；它不会被替换成 PickCube Task。Position 旧入口未显式指定 source 工作目录时由 Env 回收自动目录，显式目录继续归调用方。详见[实施记录 6.3](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+旧 PickCube physical candidate、Isaac physical candidate 和 Position candidate UID 已退休，不再接收旧输入或 `source_workspace`。请使用本页正式 UID 和 `controller.profile_id`；历史候选的证据与身份按原记录保留。当前受支持的 Isaac 路线仍要求 `execution.source_delivery_manifest` 指向相应已验证 USD delivery，这项用户入口限制尚待优化；不得将历史 workspace 路径当作通用默认值。
 
 正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录 6.4](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 
-公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `task.controller_profile="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。
+公开 PickCube 配置可显式选择 `robot.uid="panda-arm-hand-v1"` 与 `controller.profile_id="r1_split"`：同一装配的 arm 和 hand 使用不同的 Controller/writer，沿既有 R1 动作语义产生目标并在一个 interval 提交。已有 MuJoCo CPU 单步和调用方 Solution 单步证据；不据此声明完整任务成功或其他 provider 的资格。原 `r1`、`r3` 配置仍保持各自行为。
 
 受控主体提供一个初始未绑定的 `default_controller`，目前仅针对显式声明的具名关节广义力通道。须以 `ControlledSubjectV1`、已编译的 physical binding、writer 和每个通道的 SI 单位调用 `bind`；成功后由现有直接 effort Controller 在当前 episode/boundary 生成命令，动作空间沿用其 float32 精度及声明的限幅。嵌套主体可用 `bind_many` 返回多个 Controller，交给现有 `PhysicalControlExecutionV1` 在一个 interval 组合；不兼容的 source、writer、单位、范围及不可由实际耦合传动表达的力向量继续拒绝。它不是自动为所有 provider 开启 effort 物理能力，也不是原生 motor 力读回。Pendulum 和双轮车 selected CPU 路线以该默认 Controller 构建；Panda 已有的 R1/R3 和装配 R1 双 Controller 为显式任务配置，不会被静默替换。Panda 默认 effort 的实际能力仅在各自 source/provider 准入及有界测试范围内成立。
 
@@ -126,14 +126,14 @@ MuJoCo 的独立版本化自由体和 Robot hand fixture 分别验证实际外�
 
 各次直接 effort 和外力实验的中间版本证据已按实际受影响路径作有界关联；最终版本的参考 Controller 对照不代替逐输入实验。具体接受范围及原失败见[002 独立主审](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。
 
-## 4c 有界 reset 控制路线
+## 4c 有界 reset 控制路线（历史记录）
 
 MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=True`，在 `reset(options={'controller': 'r3-pose'})` 或 `'joint'` 时选择控制器；需要调节参数时可用 `{'controller': {'kind': 'joint', 'parameters': {'kp': 120.0}}}`。`physical_action_spec()` 返回当前输入语义、参数、身份和 generation；用 `bind_physical_action(values)` 生成该 episode 的输入并交给 `step`。旧 episode 的输入即使 shape 相同也会拒绝。`action_space_policy='fixed_semantic'` 在破坏已有 session 前拒绝不同语义；这个候选是单环境标量接口，不承诺原生 batch。
 
 `reset_for_solution` / `step_with_solution` 可将既有 PickCube Solution 的绝对位姿送入 R3 reference 和具名关节 effort。该路线使用对应 MuJoCo source 的状态相关质量矩阵与 bias、禁用原生 position drive，并复用 Generic H5 v3 Recorder；记录的 ACK 和 admitted effort 不等于独立测力。seed 31 原任务成功和 A→B→A 证据经[独立主审](../maintenance/reviews/20261106_4c_attempt001_sol_review.md)有界接收，不扩展为其他 seed、source 或后端资格。任务 profile 将 MJCF actuator8 编写的 ±5 N 运行时配置为 ±10 N，与原 2c 任务配置一致；该成功不证明 ±5 N 条件。详情见 [4c 计划](../planning/stage4-4c-attempt001.md)和该 attempt 的 ignored 原始证据。
 
 <a id="visual-state-binding"></a>
-## 5a 显式 visual-state 绑定（有界接收）
+## 5a 显式 visual-state 绑定（历史有界接收）
 
 `pickcube-physical-candidate-v1` 的 MuJoCo CPU Position 路线成功 reset 后，可将 `CameraGeometry` 交给 `env.bind_visual_state(camera)`，再用 `env.sync_visual_state()` 消费最新已发布的 typed boundary。`env.visual_model_info()` 返回 source closure、具名几何／材质／相机／灯光、renderer-only 所有权和限制；`env.visual_body_pose(entity_id, frame_id)` 返回拥有的 body-origin world pose 副本。这个显式入口属于已有 Env 和 camera owner，独立 visual model 只复制 CPU 状态并运行同步 kinematics，不调用 physics step 或 Controller。reset／close 清理自有 renderer；不转移 physics 所有权。
 
@@ -142,7 +142,7 @@ MuJoCo CPU 的 `pickcube-physical-candidate-v1` 可显式设置 `reset_switch=Tr
 视觉更新或其结果验证失败时，renderer binding 进入 fault 并尝试关闭自有资源；即便回滚后的 Frame poses 可核对，也须重建 binding，因为这不能证明所有 renderer 派生字段均已恢复。故障后不再提供 pose、sync、capture 或旧 receipt 作为当前结果；已返回给调用者的旧 receipt 只表示它原来的历史边界。`env.visual_binding_status()` 报告 fault 与 renderer close 的实际状态，close 失败时释放结果为 unknown；physics Env 不因该 renderer 故障被关闭。reset 后可重新 bind，已有其他 owner 不受此绑定清理影响。
 
 <a id="observer-candidate"></a>
-## 5b observer 路线（有界接收）
+## 5b observer 路线（历史有界接收）
 
 MuJoCo CPU 的 PickCube 候选及 Isaac 6.2 的 F06 候选可在构造时传入 `render_mode='human'` 或 `'rgb_array'` 和显式 `observer_camera`。`render()` 使用已发布边界；RGB 为拥有的 HWC float32 数组，窗口与任务 observation 分离。MuJoCo 的 RGB 路线检查 offscreen GL 附件为 `GL_LINEAR` 且禁用 framebuffer sRGB 写转换；无法核实时拒绝该帧并使 renderer fault。receipt 所述为未经色彩校准的 framebuffer RGB，不能推断标准 sRGB、已知原色或输入纹理色域。Isaac 候选将公开 PhysX body 位姿同步到 renderer-facing Fabric，再核对全部发布 body 和具名 frame；变换或时钟不一致时拒绝帧。其 RGB 声明为 RTX tone mapping 后的 sRGB 传递函数；采集前后核验指定 RTX 设置和 OCIO 文件摘要，未通过时拒绝该帧。该声明不校准原色或源素材色域。该候选依赖实际 F06 source／App，并不证明任意 Isaac 场景。
 
