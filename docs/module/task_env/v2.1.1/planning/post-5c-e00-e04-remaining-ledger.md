@@ -219,20 +219,16 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
-| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，tabletop 的 Panda actuator 映射消费 Robot 声明，R3 身份和 USD 主体绑定归各自 owner | [当前 Joint／执行合同计划](../../../../../workspace/maintenance/v211_u1_joint_execution_contract_20261112_001/plan.json)、[Robot 映射计划](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)、[MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R05、R07～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
+| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，tabletop 的 Panda actuator 映射消费 Robot 声明，R3 身份和 USD 主体绑定归各自 owner | [当前 USD 准入计划](../../../../../workspace/maintenance/v211_u1_usd_admission_owner_20261112_001/plan.json)、[Joint／执行合同计划](../../../../../workspace/maintenance/v211_u1_joint_execution_contract_20261112_001/plan.json)、[Robot 映射计划](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)、[MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R05、R07～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
 | U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
 
-当前 Joint／执行合同调整后，180 项受影响诊断通过；MuJoCo Pendulum／双轮车各完成 25 个显式子步、二次 reset 和重复 close，Isaac PickCube Position／Pendulum 分别完成 5／25 个显式子步并取得 Env／App close 收据。Isaac Position 关闭日志有菜单回调空 USD context 的 `AttributeError`；隐式启动推进数未知。代码、资产、probe 与清单身份均在运行前记录。
+当前 USD 准入调整后，87 项受影响诊断及 18 项准入诊断通过；[当前 Isaac Position 短程](../../../../../workspace/maintenance/v211_u1_usd_admission_owner_20261112_001/plan.json)完成 5 个显式子步、二次 reset 和 Env／App close，日志未见 traceback，隐式启动推进数未知。先前的 [Isaac Position／Pendulum 和 MuJoCo 简单主体](../../../../../workspace/maintenance/v211_u1_joint_execution_contract_20261112_001/plan.json)结果按对应代码身份参考；该次 Position 关闭日志含 SDK 菜单回调空 USD context `AttributeError`。
 
-PickCube 与 NutAssembly 的七个 arm target 和耦合 gripper actuator 由所选 Panda 的 `reference_source_actuation` 提供，Position／effort recipe 复用同一声明；provider 仍核验实际模型。113 项受影响诊断及 6 项构造核对通过；当前冻结输入的 PickCube Position／两种 effort／装配 Panda 和 NutAssembly 在 MuJoCo CPU 各完成 5 个显式子步、二次 reset 与重复 close。USD 准备也消费 Panda 声明，本批没有重跑 Isaac；映射值未改变，旧结果仅按输入差异参考。
+PickCube 与 NutAssembly 的 arm／gripper actuator 由所选 Panda 声明，[MuJoCo 短程](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)覆盖 Position、两种 effort、装配 Panda 与 Nut 单个受限 Solution interval；[GeoPhys effort](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)子步未独立计数。旧记录的 source 哈希如在启动后补记，已在对应计划中标明，不能当作启动前冻结。
 
-source 缓存复用前现会验证 MJCF 快照或 USD source；失效时在 reset 计划前拒绝。72 项相关诊断、四任务及装配主体构造检查通过；[缓存验证](../../../../../workspace/maintenance/v211_u1_cached_source_freshness_20261112_001/plan.json)在 MuJoCo 关节 effort 完成 5 个显式子步、第二次 reset 与重复 close。
-
-当前 MJCF source owner 调整后，110 项受影响诊断与 MuJoCo option 额外检查通过；PickCube Position／两种 effort／装配 Panda 和 NutAssembly 的 MuJoCo CPU 短程各完成 5 个显式子步、第二次 reset 与重复 close。GeoPhys CPU PickCube effort 完成短程与重复 close，native 子步未独立计数。MuJoCo 计划中的 source 配置哈希与 submodule 身份在运行启动后补记；GeoPhys 计划在运行前记录。USD 控制／lowering 未因本批改变而重跑。
-
-当前 USD 构建阶段调整后，Isaac PickCube Position／effort 各完成 5 个、Pendulum 完成 25 个显式子步，均有第二次 reset 和 Env／App close 收据；Position 的 SDK 关闭日志出现菜单回调访问空 USD context 的 `AttributeError`。资产清单哈希在运行启动后补记，source 新鲜度由现有检查核验；隐式启动推进数未知。先前 MuJoCo 七条受影响短程及 Isaac 验证按其[原始输入计划](../../../../../workspace/maintenance/v211_u1_common_build_20261112_001/plan.json)保留，Nut CPU 使用受限 Solution 单步。
+缓存 source 复用前验证快照或 USD 新鲜度；[缓存验证](../../../../../workspace/maintenance/v211_u1_cached_source_freshness_20261112_001/plan.json)覆盖关节 effort 的 reset 与 close。各短程不代表完整 Solution、所有 provider／renderer 或 U1 最终接收。
 
 每格完成只写最终行为、真实 owner／提交／证据和残余限制；过程及失败日志保存在各单元原始输出，不在此逐次追加。目标是让下一次恢复直接读本表及当前单元，而非重走全仓发现流程。

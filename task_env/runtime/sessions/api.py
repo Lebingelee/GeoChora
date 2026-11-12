@@ -132,6 +132,40 @@ _F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 
 
+def _validate_f06_isaac_delivery(delivery, manifest_sha256):
+    """Keep the exact local delivery boundary in the provider admission owner."""
+    if (delivery.manifest_bytes_sha256 != manifest_sha256
+            or manifest_sha256 != _F06_DELIVERY_MANIFEST_SHA256_V1
+            or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
+            or not delivery.locally_validated or delivery.source_verified):
+        raise ValueError('F06 requires its exact locally validated, non-upstream Isaac desktop USD')
+
+
+def load_f06_isaac_delivery(manifest_path):
+    """Load and admit the reviewed desktop USD delivery before building a source."""
+    from ...assembly.usd_delivery import load_usd_asset_delivery
+
+    delivery = load_usd_asset_delivery(manifest_path)
+    _validate_f06_isaac_delivery(delivery, delivery.manifest_bytes_sha256)
+    return delivery
+
+
+def build_usd_task_runtime_input(*, schema_version, task_source, artifact, source,
+                                 execution, reset_plan, controller_profile,
+                                 horizon, horizon_min, horizon_max):
+    """Build source-bound USD admission inputs from the actual Runtime mappings."""
+    policy = {
+        'schema_version': 'usd-task-admission-policy-v1',
+        'bindings': {name: dict(getattr(source, name))
+                     for name in ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')},
+        'controller_profile': controller_profile,
+        'horizon_min': horizon_min, 'horizon_max': horizon_max,
+    }
+    return UsdRuntimeInputV1(schema_version, task_source, artifact, source, execution,
+        reset_plan, controller_profile, horizon,
+        source.scene_source.loaded_delivery.manifest_bytes_sha256, policy)
+
+
 class RuntimeSession(Protocol):
     @property
     def provider_materialization_id(self) -> str: ...
@@ -245,11 +279,7 @@ def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) ->
     if input_v1.schema_version != 'pick-cube-isaac-runtime-input-v1':
         raise ValueError('unsupported PickCube Isaac RuntimeInput schema')
     delivery = input_v1.runtime_source.scene_source.loaded_delivery
-    if (delivery.manifest_bytes_sha256 != input_v1.delivery_manifest_sha256
-            or input_v1.delivery_manifest_sha256 != _F06_DELIVERY_MANIFEST_SHA256_V1
-            or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
-            or not delivery.locally_validated or delivery.source_verified):
-        raise ValueError("F06 requires its exact locally validated, non-upstream Isaac desktop USD")
+    _validate_f06_isaac_delivery(delivery, input_v1.delivery_manifest_sha256)
     _validate_usd_task_policy(input_v1, _F06_TASK_POLICY_SHA256_V1)
     if (input_v1.execution.physics_provider, input_v1.execution.physics_backend,
             input_v1.execution.physics_profile, input_v1.execution.physics_device,

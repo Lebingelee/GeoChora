@@ -959,16 +959,10 @@ from ...artifacts import (ArticulationDefinition,
     SceneDefinition)
 from ...artifacts.execution import EpisodeResetPlanV1
 from ...environment import sample_episode_reset_plan, adapt_legacy_recipe_task_source, compile_task_artifact_v1
-from ...assembly.usd_delivery import load_usd_asset_delivery
 from ...runtime.sessions.source import UsdRuntimeInputV1, build_usd_runtime_source
 
 SCHEMA_VERSION = "pick-cube-isaac-scene-v1"
 SCENE_RECIPE_ID = "pick-cube-isaac-desktop-scene-v1"
-ISAAC_PROFILE_V1 = "isaac-gpu-physx-pickcube-f06-v1"
-ISAAC_REPRESENTATION_V1 = "isaacsim-6.2.0.0-pickcube-desktop-v1"
-ISAAC_DELIVERY_MANIFEST_SHA256_V1 = (
-    "6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2"
-)
 
 
 def build_pickcube_isaac_scene(task_config: dict, *, robot=None) -> SceneDefinition:
@@ -1155,12 +1149,9 @@ def build_pickcube_isaac_runtime_input_v1(
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError("F06 PickCube horizon must be an integer in [1, 1000]")
     path = Path(delivery_manifest).resolve(strict=True)
-    loaded = load_usd_asset_delivery(path)
+    from ...runtime.sessions.api import load_f06_isaac_delivery
+    loaded = load_f06_isaac_delivery(path)
     manifest_sha = loaded.manifest_bytes_sha256
-    if (manifest_sha != ISAAC_DELIVERY_MANIFEST_SHA256_V1
-            or not loaded.locally_validated or loaded.source_verified
-            or loaded.delivery.representation_id != ISAAC_REPRESENTATION_V1):
-        raise ValueError("F06 builder requires the exact generated PickCube desktop delivery v1")
 
     task_config = _configuration() if task_config is None else task_config
     legacy_artifact = build_artifact(task_config=task_config, lift_height_m=lift_height_m)
@@ -1189,20 +1180,13 @@ def build_pickcube_isaac_runtime_input_v1(
     reset_plan = sample_episode_reset_plan(
         task_source, scene, artifact, task_seed=task_seed,
     )
-    from ...runtime.sessions.api import isaac_cuda_execution_spec
-    execution = isaac_cuda_execution_spec(profile=ISAAC_PROFILE_V1, seed=task_seed)
-    policy = {
-        'schema_version': 'usd-task-admission-policy-v1',
-        'bindings': {
-            'joints': dict(joints), 'joint_targets': dict(joints),
-            'bodies': dict(bodies), 'frames': dict(frames), 'free_joints': dict(free_joints),
-        },
-        'controller_profile': 'r3_continuous_v1', 'horizon_min': 1, 'horizon_max': 1000,
-    }
-    result = UsdRuntimeInputV1(
-        "pick-cube-isaac-runtime-input-v1", task_source, artifact, source,
-        execution, reset_plan, "r3_continuous_v1", horizon, manifest_sha, policy,
-    )
+    from ...runtime.sessions.api import (F06_PICKCUBE_ISAAC_PROFILE,
+        build_usd_task_runtime_input, isaac_cuda_execution_spec)
+    execution = isaac_cuda_execution_spec(profile=F06_PICKCUBE_ISAAC_PROFILE, seed=task_seed)
+    result = build_usd_task_runtime_input(
+        schema_version='pick-cube-isaac-runtime-input-v1', task_source=task_source,
+        artifact=artifact, source=source, execution=execution, reset_plan=reset_plan,
+        controller_profile='r3_continuous_v1', horizon=horizon, horizon_min=1, horizon_max=1000)
     from ...runtime.sessions.api import _validate_f06_pickcube_isaac_input
     _validate_f06_pickcube_isaac_input(result, artifact, execution, source)
     return result

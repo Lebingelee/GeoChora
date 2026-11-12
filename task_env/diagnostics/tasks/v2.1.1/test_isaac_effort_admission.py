@@ -7,6 +7,27 @@ import pytest
 from task_env.runtime.sessions.api import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
 
 
+@pytest.mark.parametrize('change', ['hash', 'representation', 'local_validation', 'upstream'])
+def test_f06_delivery_admission_rejects_foreign_identity(change):
+    from task_env.runtime.sessions.api import _validate_f06_isaac_delivery
+
+    digest = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
+    delivery = SimpleNamespace(manifest_bytes_sha256=digest, locally_validated=True,
+        source_verified=False,
+        delivery=SimpleNamespace(representation_id='isaacsim-6.2.0.0-pickcube-desktop-v1'))
+    _validate_f06_isaac_delivery(delivery, digest)
+    if change == 'hash':
+        delivery.manifest_bytes_sha256 = '0' * 64
+    elif change == 'representation':
+        delivery.delivery.representation_id = 'foreign'
+    elif change == 'local_validation':
+        delivery.locally_validated = False
+    else:
+        delivery.source_verified = True
+    with pytest.raises(ValueError, match='exact locally validated'):
+        _validate_f06_isaac_delivery(delivery, digest)
+
+
 def test_g05_effort_rejects_foreign_delivery_and_timebase():
     renderer = SimpleNamespace(provider='none', backend='cpu', profile='none', device=None)
     execution = SimpleNamespace(physics_provider='isaacsim', physics_backend='cuda',
@@ -124,7 +145,6 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
         loads.append(result)
         return result
     monkeypatch.setattr(usd_delivery, 'load_usd_asset_delivery', record_load)
-    monkeypatch.setattr(specialization, 'load_usd_asset_delivery', record_load)
     calls = []
     build = source_composition_adapters.build_panda_source_effort_profile
     def record(*args, **kwargs):
