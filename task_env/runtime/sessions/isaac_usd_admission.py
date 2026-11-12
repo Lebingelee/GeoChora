@@ -6,9 +6,16 @@ from ...artifacts import ExecutionSpecV1
 from .source import UsdRuntimeInputV1
 
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
+F06_PICKCUBE_CONTROLLER_PROFILE = 'r3_continuous_v1'
 _F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
 _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
 _F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
+
+
+def validate_f06_controller_profile(profile):
+    """Admit the Controller profile frozen by the reviewed USD delivery."""
+    if profile != F06_PICKCUBE_CONTROLLER_PROFILE:
+        raise ValueError('F06 Isaac freezes the existing r3_continuous_v1 profile')
 
 
 def f06_capability_manifest(artifact, capabilities):
@@ -287,7 +294,7 @@ def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, r
         loaded=loaded, task_source=task_source, artifact=artifact, scene=scene,
         options=options, joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,
         seed=seed, horizon=horizon, schema_version='pick-cube-isaac-runtime-input-v1',
-        profile=F06_PICKCUBE_ISAAC_PROFILE, controller_profile='r3_continuous_v1',
+        profile=F06_PICKCUBE_ISAAC_PROFILE, controller_profile=F06_PICKCUBE_CONTROLLER_PROFILE,
         horizon_min=1, horizon_max=1000, provider_build_identity='isaacsim-6.2.0.0')
     _validate_f06_pickcube_isaac_input(result, artifact, result.execution, result.runtime_source)
     return result

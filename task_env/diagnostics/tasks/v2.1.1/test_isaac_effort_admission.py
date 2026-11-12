@@ -141,7 +141,7 @@ def test_usd_effort_binding_uses_physical_observation_and_no_position_compositio
 
 
 def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
-    from task_env.tasks.pick_cube import specialization
+    from task_env.runtime.sessions import source_composition_adapters
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
     calls = []
@@ -150,19 +150,20 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
             calls.append(request)
             return {**kwargs, 'task_seed': request.seed, 'horizon': request.horizon}
         return build
-    monkeypatch.setattr(specialization, '_isaac_reference_builder', capture_builder)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_reference_stages', capture_builder)
     config = _formal_isaac_joint_config()
     binding = PickCubeReferenceEnv._build_selected_binding(config)
     result = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     assert result['task_seed'] == 42
     assert result['horizon'] == 8
-    assert result['resolved_config'] is config.environment
-    assert result['robot'] is binding.robot
+    assert result['compile_source'].keywords['resolved_config'] is config.environment
+    assert result['compile_source'].keywords['robot'] is binding.robot
     assert calls[0].binding is binding
     with pytest.raises(ValueError, match='provider differs'):
         binding.build_for_request('mujoco', 'cpu', 42, 8)
+    from task_env.runtime.sessions.isaac_usd_admission import prepare_f06_task_delivery
     with pytest.raises(ValueError, match='horizon'):
-        binding.build_for_request('isaacsim', 'cuda', 42, 1001)
+        prepare_f06_task_delivery('unused', seed=42, horizon=1001, physical_drive='disabled')
 
 
 def test_reset_reconstruction_passes_one_request_for_sampled_and_solution_paths():
@@ -480,6 +481,17 @@ def test_usd_position_factory_rejects_unsupported_profile_before_materialization
     source = object.__new__(UsdRuntimeSourceV1)
     with pytest.raises(ValueError, match='requires the declared R3 Controller profile'):
         build_reference_position_controller(None, source, profile_id='r1')
+
+
+def test_usd_stages_reject_unsupported_profile_before_source_build():
+    from task_env.runtime.sessions.source_composition_adapters import build_panda_reference_stages
+
+    def unexpected(*args, **kwargs):
+        pytest.fail('an unsupported profile must not build a source or Controller')
+
+    with pytest.raises(ValueError, match='F06 Isaac freezes'):
+        build_panda_reference_stages(source_format='usd', backend='cuda', controller_profile='r1',
+                                     compile_source=unexpected, compile_control=unexpected)
 
 
 def test_usd_controller_rejects_mismatched_compiled_source():

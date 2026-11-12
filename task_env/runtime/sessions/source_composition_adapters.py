@@ -343,6 +343,73 @@ def compose_declared_reference_source(compiled, *, robot, controller_profile,
                                    task_source, scene, projected, reset_plan)
 
 
+def build_panda_reference_stages(*, source_format, backend, controller_profile,
+                                 compile_source, compile_control, physical_kind=None,
+                                 native_drive=None, reset_selection=False, task_settings=None,
+                                 existing_robot_entity=None, task_body_names=(),
+                                 task_site_transfers=(), scene_compiler=None,
+                                 force_limit_N=None, velocity_limit=None, tcp_profile=None):
+    """Build one declared Panda route using the shared source-bound stages.
+
+    Task callbacks produce task facts; this adapter owns source composition,
+    native Controller selection and episode reset materialization.
+    """
+    from ...environment.reference_binding import SourceBoundTaskBuilder
+
+    if source_format == 'usd':
+        from .isaac_usd_admission import validate_f06_controller_profile
+        validate_f06_controller_profile(controller_profile)
+        return SourceBoundTaskBuilder(
+            compile_source, None, backend='cuda', allow_sampled_reset=False,
+            controller_factory=build_usd_panda_control,
+            controller_options=lambda compiled, context, request: dict(
+                runtime_input=context.runtime_input, robot=context.robot,
+                controller_profile=controller_profile, action_config=context.action_config,
+                dynamic_profile=context.dynamic_profile, velocity_limit=velocity_limit,
+                tcp_profile=tcp_profile, physical_kind=physical_kind, native_drive=native_drive,
+                effort_settings=task_settings(physical_kind) if physical_kind is not None else None),
+            compile_control=compile_control)
+    if source_format != 'mjcf':
+        raise ValueError('Panda reference requires an admitted source format')
+    physical = physical_kind is not None
+
+    def compose(compiled, context, request):
+        reference_robot = getattr(context, 'reference_robot', context.robot)
+        declaration = (None if reference_robot is None else
+            lambda: scene_compiler(context.task_config, reference_robot, compiled.artifact))
+        composition = compose_declared_reference_source(
+            compiled, robot=context.robot, controller_profile=controller_profile,
+            existing_robot_entity=existing_robot_entity, task_body_names=task_body_names,
+            task_site_transfers=task_site_transfers, compile_declaration=declaration,
+            reset_seed=None if physical else request.seed)
+        return composition.compiled, context._replace(composition=composition)
+
+    if physical:
+        from ...environment.task_source import sample_episode_reset_plan
+        return SourceBoundTaskBuilder(
+            compile_source,
+            lambda value, request: sample_episode_reset_plan(
+                value['task_source'], value['source'].scene_definition,
+                value['artifact'], task_seed=request.seed),
+            backend=backend, reuse_source=True, allow_sampled_reset=False,
+            source_composer=compose, controller_factory=compile_panda_effort_selection,
+            controller_options=lambda compiled, context, request: dict(
+                robot=context.robot, composition=context.composition,
+                controller_profile=controller_profile, native_drive=native_drive,
+                kind=physical_kind, task_settings=task_settings, dynamic_parameters=reset_selection,
+                gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
+                                       if reset_selection else None)),
+            compile_control=compile_control)
+    from ...controllers.canonical.execution import build_reference_position_controller
+    return SourceBoundTaskBuilder(
+        compile_source, None, backend=backend, allow_sampled_reset=False,
+        source_composer=compose, controller_factory=build_reference_position_controller,
+        controller_options=lambda compiled, context, request: dict(
+            profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
+            force_limit_N=force_limit_N, joint_velocity_limit_rad_s=velocity_limit),
+        compile_control=compile_control)
+
+
 def validate_effort_robot_intent(intent, source, execution, *, controller_profile):
     """Match source snapshot and compiled writer resources to the frozen request."""
     from ...assembly.source_composition import SourceCompositionIntentV1

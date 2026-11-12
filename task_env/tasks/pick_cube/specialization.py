@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from functools import partial
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import inspect
@@ -28,7 +29,7 @@ from ...controllers.canonical.contracts import digest, reference_pose_action_bin
 from ...controllers.canonical.execution import (
     REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES)
 from ...environment import (
-    RuntimeSnapshot, sample_episode_reset_plan,
+    RuntimeSnapshot,
     TaskCompositionSpec,
     TaskEvaluation,
     TaskEvaluationContextV1,
@@ -404,45 +405,6 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
 
 
 
-def _compose_reference_source(compiled, context, request, *, controller_profile,
-                               reference_robot, sample_reset):
-    """Bind Task declarations to the source owner's explicit composition result."""
-    from ...runtime.sessions.source_composition_adapters import compose_declared_reference_source
-    composition = compose_declared_reference_source(
-        compiled, robot=context.robot, controller_profile=controller_profile,
-        existing_robot_entity='panda-v1', task_body_names=PickCubeReferenceEnv.robot_source_roots,
-        task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
-        compile_declaration=(lambda: compile_panda_box_mjcf_task(
-            context.task_config, reference_robot, compiled.artifact,
-            build_task_scene=build_pickcube_scene,
-            compile_task_artifact=compile_pickcube_task_artifact))
-            if reference_robot is not None else None,
-        reset_seed=request.seed if sample_reset else None)
-    return composition.compiled, context._replace(composition=composition)
-
-
-def _position_reference_builder(*, backend, controller_profile,
-                                resolved_config, lift_height_m, task_config, robot_uid, robot):
-    from ...environment.reference_binding import SourceBoundTaskBuilder
-    from ...controllers.canonical.execution import build_reference_position_controller
-    return SourceBoundTaskBuilder(
-        lambda request: _compile_reference_position_source(request,
-            controller_profile=controller_profile, resolved_config=resolved_config,
-            lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, robot=robot),
-        None, backend=backend, allow_sampled_reset=False,
-        source_composer=lambda compiled, context, request: _compose_reference_source(
-            compiled, context, request, controller_profile=controller_profile,
-            reference_robot=context.reference_robot, sample_reset=True),
-        controller_factory=build_reference_position_controller,
-        controller_options=lambda compiled, context, request: dict(
-            profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
-            force_limit_N=10.0,
-            joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']),
-        compile_control=lambda compiled, context, selection, request: _bind_reference_position_control(
-            compiled, context, selection, request,
-            controller_profile=controller_profile))
-
-
 def _compile_isaac_reference_source(request, *, delivery_manifest, controller_profile,
                                     resolved_config, task_config, lift_height_m,
                                     physical_drive, robot):
@@ -521,34 +483,6 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, reso
     }
 
 
-def _isaac_reference_builder(*, delivery_manifest, controller_profile,
-                             resolved_config, task_config, lift_height_m,
-                             physical_kind, physical_drive, robot):
-    if controller_profile != 'r3_continuous_v1':
-        raise ValueError('F06 Isaac freezes the existing r3_continuous_v1 profile')
-    from ...environment.reference_binding import SourceBoundTaskBuilder
-    from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
-    from ...runtime.sessions.source_composition_adapters import build_usd_panda_control
-    return SourceBoundTaskBuilder(
-        lambda request: _compile_isaac_reference_source(request,
-            delivery_manifest=delivery_manifest, controller_profile=controller_profile,
-            resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-            physical_drive=physical_drive, robot=robot),
-        None, backend='cuda', allow_sampled_reset=False,
-        controller_factory=build_usd_panda_control,
-        controller_options=lambda compiled, context, request: dict(
-            runtime_input=context.runtime_input, robot=context.robot,
-            controller_profile=controller_profile, action_config=context.action_config,
-            dynamic_profile=context.dynamic_profile,
-            velocity_limit=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'],
-            tcp_profile=PANDA_PICKCUBE_EE_TCP_V1, physical_kind=physical_kind,
-            native_drive=physical_drive,
-            effort_settings=panda_effort_task_settings(physical_kind) if physical_kind is not None else None),
-        compile_control=lambda compiled, context, selection, request: _bind_isaac_reference_control(
-            compiled, context, selection, request,
-            resolved_config=resolved_config))
-
-
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
     """Build the external Solution from Task and Robot declarations, without a source lease."""
     from .solution import PickCubeReadinessSolution
@@ -604,45 +538,45 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
     selected_provider = interval_provider or ('isaacsim' if source_delivery_manifest else None)
     runtime_input = selected_provider == 'isaacsim'
     backend = resolved_config.runtime.backend if resolved_config is not None else 'cpu'
+    from ...runtime.sessions.source_composition_adapters import build_panda_reference_stages
+    velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
     if runtime_input:
         if source_delivery_manifest is None:
             raise ValueError('F06 Isaac PickCube requires CUDA and its explicit source delivery')
-        builder = _isaac_reference_builder(
-            delivery_manifest=source_delivery_manifest,
-            controller_profile='r3_continuous_v1' if physical else controller_profile,
+        from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
+        from ...runtime.sessions.isaac_usd_admission import F06_PICKCUBE_CONTROLLER_PROFILE
+        profile = F06_PICKCUBE_CONTROLLER_PROFILE if physical else controller_profile
+        compile_source = partial(_compile_isaac_reference_source,
+            delivery_manifest=source_delivery_manifest, controller_profile=profile,
             resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-            robot=robot,
-            physical_kind=physical_kind, physical_drive=physical_drive)
-    elif physical:
-        from ...environment.reference_binding import SourceBoundTaskBuilder
-        from ...runtime.sessions.source_composition_adapters import compile_panda_effort_selection
-        builder = SourceBoundTaskBuilder(
-            lambda request: _compile_mjcf_effort_source(request, reset_switch=reset_switch,
-                task_config=task_config, resolved_config=resolved_config,
-                lift_height_m=lift_height_m, robot=robot),
-            lambda value, request: sample_episode_reset_plan(
-                value['task_source'], value['source'].scene_definition,
-                value['artifact'], task_seed=request.seed),
-            backend=backend, reuse_source=True, allow_sampled_reset=False,
-            source_composer=lambda compiled, context, request: _compose_reference_source(
-                compiled, context, request, controller_profile=physical_profile_id,
-                reference_robot=context.robot, sample_reset=False),
-            controller_factory=compile_panda_effort_selection,
-            controller_options=lambda compiled, context, request: dict(
-                robot=context.robot, composition=context.composition,
-                controller_profile=physical_profile_id, native_drive=physical_drive,
-                kind=physical_kind,
-                task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
-                gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
-                                       if reset_switch else None)),
-            compile_control=lambda compiled, context, selection, request: _bind_mjcf_effort_control(
-                compiled, context, selection, request, native_drive=physical_drive, control_kind=physical_kind,
-                reset_switch=reset_switch, cube_force_z_N=cube_force_z_N))
+            physical_drive=physical_drive, robot=robot)
+        finish = partial(_bind_isaac_reference_control, resolved_config=resolved_config)
+        source_format, tcp_profile = 'usd', PANDA_PICKCUBE_EE_TCP_V1
     else:
-        builder = _position_reference_builder(
-            backend=backend, controller_profile=controller_profile,
-            resolved_config=resolved_config, lift_height_m=lift_height_m,
-            task_config=task_config, robot_uid=robot_uid, robot=robot)
+        source_format, tcp_profile = 'mjcf', None
+        if physical:
+            profile = physical_profile_id
+            compile_source = partial(_compile_mjcf_effort_source, reset_switch=reset_switch,
+                task_config=task_config, resolved_config=resolved_config,
+                lift_height_m=lift_height_m, robot=robot)
+            finish = partial(_bind_mjcf_effort_control, native_drive=physical_drive,
+                control_kind=physical_kind, reset_switch=reset_switch, cube_force_z_N=cube_force_z_N)
+        else:
+            profile = controller_profile
+            compile_source = partial(_compile_reference_position_source,
+                controller_profile=controller_profile, resolved_config=resolved_config,
+                lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, robot=robot)
+            finish = partial(_bind_reference_position_control, controller_profile=controller_profile)
+    builder = build_panda_reference_stages(
+        source_format=source_format, backend=backend, controller_profile=profile,
+        compile_source=compile_source, compile_control=finish,
+        physical_kind=physical_kind, native_drive=physical_drive, reset_selection=reset_switch,
+        task_settings=panda_effort_task_settings, existing_robot_entity='panda-v1',
+        task_body_names=PickCubeReferenceEnv.robot_source_roots,
+        task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
+        scene_compiler=partial(compile_panda_box_mjcf_task,
+            build_task_scene=build_pickcube_scene, compile_task_artifact=compile_pickcube_task_artifact),
+        force_limit_N=10.0, velocity_limit=velocity_limit, tcp_profile=tcp_profile)
 
     def build(request):
         allowed = ({selected_provider} if selected_provider is not None else {'mujoco', 'geophys'})
