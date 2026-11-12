@@ -110,10 +110,12 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
         seen.update(kwargs)
         return SimpleNamespace(source_id='usd-source', source_closure_digest='a' * 64)
     monkeypatch.setattr(isaac_g05, 'build_g05_isaac_runtime_source', build_source)
+    delivery = object()
     args = dict(scene=scene, artifact=artifact, task_source=task_source,
                 composition=None, config=None, provider='isaacsim',
-                source_delivery_manifest='fixture', seed=31)
+                source_delivery=delivery, seed=31)
     source, spec, closure, subject, declarations = compile_declared_effort_source(robot=robot, **args)
+    assert seen['delivery'] is delivery
     assert subject.source_id == source.source_id
     assert subject.source_closure_sha256 == source.source_closure_digest
     assert len(declarations) == len(subject.channel_paths)
@@ -238,3 +240,32 @@ def test_source_checked_declaration_is_used_by_the_controller(uid, robot_type, m
             item.native_actuator for item in declared[0][1])
     finally:
         env.close()
+
+
+def test_isaac_scene_and_runtime_share_one_verified_delivery(monkeypatch):
+    from pathlib import Path
+    from task_env.runtime.sessions import declared_effort_source
+
+    root = Path(__file__).resolve().parents[4]
+    manifest = root / ('workspace/maintenance/v211_g05_5c_unit005_isaac_continuation_20261110_002/'
+                       'g05-delivery-014/pendulum/delivery_manifest.json')
+    if not manifest.is_file():
+        pytest.skip('validated Isaac delivery is unavailable')
+    loads = []
+    original = isaac_g05.load_g05_isaac_delivery
+    def load(path):
+        loaded = original(path)
+        loads.append(loaded)
+        return loaded
+    monkeypatch.setattr(isaac_g05, 'ensure_g05_isaac_app_open', lambda: None)
+    monkeypatch.setattr(isaac_g05, 'load_g05_isaac_delivery', load)
+    robot = PendulumEntity()
+    scene, delivery = declared_effort_source.declared_effort_scene(
+        robot, provider='isaacsim', source_delivery_manifest=manifest)
+    task_source, artifact = pendulum_physical._declaration(scene, robot)
+    source, _, _, _, _ = declared_effort_source.compile_declared_effort_source(
+        robot=robot, scene=scene, artifact=artifact, task_source=task_source,
+        composition=None, config=None, provider='isaacsim', source_delivery=delivery, seed=31)
+    assert loads == [delivery]
+    assert source.scene_source.loaded_delivery is delivery
+    assert source.scene_definition.assets[0] == delivery.delivery.asset_definition

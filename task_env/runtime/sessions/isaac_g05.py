@@ -39,15 +39,21 @@ def ensure_g05_isaac_app_open() -> object:
 def load_g05_isaac_delivery(manifest_path: str | Path) -> LoadedUsdDeliveryV1:
     """Load the exact local derived delivery used by a G05 task."""
     loaded = load_usd_asset_delivery(manifest_path)
+    _validate_g05_isaac_delivery(loaded)
+    return loaded
+
+
+def _validate_g05_isaac_delivery(loaded):
+    if type(loaded) is not LoadedUsdDeliveryV1:
+        raise TypeError('G05 Isaac requires a verified USD delivery')
     if (not loaded.locally_validated or loaded.source_verified
             or loaded.delivery.representation_format != 'usd'):
         raise ValueError('G05 Isaac requires a locally validated, non-upstream USD delivery')
     if loaded.delivery.representation_id != 'isaacsim-6.2.0.0-g05-mjcf-v1':
         raise ValueError('G05 Isaac delivery representation is not the reviewed 6.2 MJCF route')
-    return loaded
 
 
-def build_g05_isaac_runtime_source(*, manifest_path: str | Path,
+def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
                                    artifact: TaskArtifactV1,
                                    scene: SceneDefinition,
                                    task_source_identity_sha256: str,
@@ -59,7 +65,8 @@ def build_g05_isaac_runtime_source(*, manifest_path: str | Path,
     """Bind one task artifact/scene to the reviewed local Isaac USD delivery."""
     if type(artifact) is not TaskArtifactV1 or type(scene) is not SceneDefinition:
         raise TypeError('G05 Isaac source requires exact TaskArtifactV1 and SceneDefinition')
-    loaded = load_g05_isaac_delivery(manifest_path)
+    _validate_g05_isaac_delivery(delivery)
+    loaded = delivery
     asset = loaded.delivery.asset_definition
     declared = {(item.asset_id, item.asset_version): item for item in scene.assets}
     if declared.get((asset.asset_id, asset.asset_version)) != asset:

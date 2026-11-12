@@ -481,13 +481,13 @@ class ExistingSubjectEffortTask:
             if backend != config.runtime.backend:
                 raise ValueError('build request backend differs from resolved configuration')
             robot = self.robot
-            scene = declared_effort_scene(robot, provider=provider,
+            scene, delivery = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
             task_source, artifact = self.compile_declaration(scene, robot)
             source, execution_spec, closure, subject, declarations = compile_declared_effort_source(
                 robot=robot, scene=scene, artifact=artifact, task_source=task_source,
                 composition=self.composition, config=config, provider=provider,
-                source_delivery_manifest=source_delivery_manifest, seed=seed)
+                source_delivery=delivery, seed=seed)
             profile_id = config.control.profile_id
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)

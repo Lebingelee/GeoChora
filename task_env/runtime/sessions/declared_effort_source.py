@@ -12,17 +12,19 @@ from .source import project_mjcf_scene_source
 
 def declared_effort_scene(robot, *, provider, source_delivery_manifest):
     revision = None
+    delivery = None
     if provider == 'isaacsim':
         if source_delivery_manifest is None:
             raise ValueError('Isaac effort source requires source_delivery_manifest')
         from .isaac_g05 import ensure_g05_isaac_app_open, load_g05_isaac_delivery
         ensure_g05_isaac_app_open()
-        revision = load_g05_isaac_delivery(source_delivery_manifest).delivery.asset_definition.source_revision
-    return robot.scene_definition(source_revision=revision)
+        delivery = load_g05_isaac_delivery(source_delivery_manifest)
+        revision = delivery.delivery.asset_definition.source_revision
+    return robot.scene_definition(source_revision=revision), delivery
 
 
 def compile_declared_effort_source(*, robot, scene, artifact, task_source, composition,
-                                   config, provider, source_delivery_manifest, seed):
+                                   config, provider, source_delivery, seed):
     """Map Robot topology and declared transmissions to the chosen source adapter."""
     xml = robot.source_xml
     source_id = f'scene-definition-v3:{scene.identity_hash}'
@@ -71,7 +73,7 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
                 remaining.remove(joint)
         bodies = {key: paths[name] for key, name in body_names.items()}
         source = build_g05_isaac_runtime_source(
-            manifest_path=source_delivery_manifest, artifact=artifact, scene=scene,
+            delivery=source_delivery, artifact=artifact, scene=scene,
             task_source_identity_sha256=task_source.identity_hash, joints=joints,
             bodies=bodies, frames={}, free_joints={}, joint_targets=joints)
         execution_spec = ExecutionSpecV1(

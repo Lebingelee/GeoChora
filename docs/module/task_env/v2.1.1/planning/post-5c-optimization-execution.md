@@ -1514,3 +1514,14 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 对照 ENTRY-01／02：版本 API 页的当前段落仍声称旧 candidate UID 和 `control.profile_id`／`task.controller_profile` 可用，与现行 registry 和四任务正式解析器冲突。修正文档，使正式输入、旧入口退休及共同构建链对应当前代码；将涉及旧候选的阶段内容明确标为历史。TaskEnv API 索引同步说明四任务 RuntimeSession 路线。历史接收证据未改。
 
 本批修改 3 个文档文件，无生产或诊断代码变化，无新增、删除或迁移文件，tracked 文件数保持 1362。正式配置诊断 80 项通过；另直接查询 registry 确认三个旧 UID 未登记，并验证 PickCube、Pendulum、双轮车 Isaac 配置在未提供 source delivery 时被静态拒绝。当前 Isaac 仍要求显式 delivery，未达到台账要求的无需内部 source 输入，不能宣称 E01 完成；本批未运行 native、renderer 或 Solution。
+
+
+### 6.158 Isaac delivery 复用与 episode 导入
+
+对照 ENTRY-01、ENV-02／05、SRC-04：普通 Robot Isaac 构造此前分别为 Scene revision 和 Runtime source 加载同一 USD delivery；现共用同一 Core 验证对象，representation 解析仍执行字节新鲜度检查。此项减少重复加载，未提供正式资产自动供应，用户仍需显式 delivery；不能把历史 workspace 路径作为默认值，也不能将 E01 记为完成。
+
+首次正式 Pendulum Isaac 运行完成首次 reset、25 个显式子步后，第二次 reset 在 episode 结束时因轨迹包提前导入离线 `h5py` 工具而失败，关闭也报告该缺失，进程退出时出现 native 崩溃；结果、原始日志和该输入单独保留。修复为轨迹离线 API 按需导入，episode 合同不再要求 H5 依赖，离线导出在使用时仍可用。
+
+最终输入版本诊断 222 项通过，包含实际已验证 USD delivery 的单次加载与 source 身份检查、无 `h5py` 的 episode 导入及离线导出可用性。Isaac CUDA 正式 Pendulum 重跑完成构造、两次 reset、非零 step、25 个显式子步、重复 Env close 和 App close；每次构造／重建各加载一次，启动隐式物理推进数未知。MuJoCo CPU Pendulum 对受影响共同构造复验通过，观测 25 子步。两次 Isaac 共观察 50 个显式子步；失败不并入成功记录。冻结输入、预算、双锁和结果在 ignored `workspace/maintenance/v211_shared_usd_delivery_20261112/`。二轮均无 renderer；双轮车、PickCube 和完整 Solution 本批未作原生复验。
+
+生产代码修改 4 文件 +42／−44，净减 2；版本诊断修改 1 文件、新增 1 文件 +56／−1；无删除或整文件迁移，tracked 文件数由 1362 增至 1363。E01～E04 仍未整体接收。
