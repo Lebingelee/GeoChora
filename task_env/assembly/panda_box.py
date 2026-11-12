@@ -113,9 +113,9 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration, *, robot=
     )
 
 
-def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
+def compile_panda_box_artifact(declaration: PandaBoxDeclaration, *, robot=None):
     """Compile declarations into the current Artifact with no native runtime."""
-    return _panda_box_reference_declaration(declaration).artifact.compile()
+    return _panda_box_reference_declaration(declaration, robot=robot).artifact.compile()
 
 
 def compile_panda_box_mjcf_task(task_config, robot, legacy_artifact, *, build_task_scene,
@@ -165,12 +165,8 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
         cube_world_quat=d.source_box_quaternion_wxyz, robot_source=robot.single_mjcf_source(),
     )
     reference = _panda_box_reference_declaration(d, robot=robot)
-    if artifact is not None:
-        expected = reference.artifact.compile()
-        if artifact.identity_hash != expected.identity_hash:
-            raise ValueError("selected Artifact does not match the Panda box declaration")
     compiled = reference.compile(
-        scene_source=composer.build_source_description(), config=config,
+        scene_source=composer.build_source_description(), config=config, artifact=artifact,
         controller_factory=controller_factory, agents=(robot,), own_snapshot=own_snapshot,
     )
     return replace(compiled, source_owners=(

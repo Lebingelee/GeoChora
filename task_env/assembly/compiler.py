@@ -197,10 +197,10 @@ class ReferenceTaskDeclarationV1:
             source = snapshot_legacy_mjcf_source(source)
         return source
 
-    def compile(self, *, scene_source, config, controller_factory: Callable | None = None,
+    def compile(self, *, scene_source, config, artifact=None, controller_factory: Callable | None = None,
                 own_snapshot=False, **source_options) -> CompiledReferenceTaskV1:
         """Compile Artifact, source bindings and an optional pure controller."""
-        artifact = self.artifact.compile()
+        artifact = self.artifact.compile() if artifact is None else artifact
         source = self.compile_source(
             artifact, scene_source=scene_source, config=config, own_snapshot=own_snapshot, **source_options,
         )

@@ -275,17 +275,16 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
     recipe = task_config["recipe"]
     config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
         task_config, controller_profile, resolved_config)
-    compiled = compile_panda_box_task(_declaration(lift_height_m=lift_height_m, task_config=task_config),
-                                      config=config, robot=robot, backend=backend)
-    artifact, source, config = compiled.artifact, compiled.source, compiled.source.config
+    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
+    artifact = compile_panda_box_artifact(declaration, robot=robot)
     from .solution import PickCubeReadinessConfig
-    readiness = PickCubeReadinessConfig.from_source(
-        artifact, source, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+    readiness = PickCubeReadinessConfig.from_resolved_config(
+        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
                                                dynamic_profile=dynamic_profile))
-    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
-    source = snapshot_legacy_mjcf_source(source)
-    return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,
-        profile_source, artifact, source, readiness)
+    compiled = compile_panda_box_task(declaration, config=config, artifact=artifact,
+                                      robot=robot, backend=backend, own_snapshot=True)
+    return _PreparedReferenceSource(task_config, recipe, compiled.source.config, is_r3_profile,
+        dynamic_profile, profile_source, compiled.artifact, compiled.source, readiness)
 
 
 def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,

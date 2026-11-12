@@ -335,11 +335,26 @@ def test_readiness_failure_does_not_create_a_source_snapshot(monkeypatch):
         raise failure
     def unexpected_snapshot(*args, **kwargs):
         raise AssertionError('snapshot must not be created before readiness succeeds')
-    monkeypatch.setattr(PickCubeReadinessConfig, 'from_source', fail_readiness)
+    monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', fail_readiness)
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
     with pytest.raises(RuntimeError) as raised:
         specialization._prepare_reference_source(controller_profile='r3_continuous_v1')
     assert raised.value is failure
+
+
+def test_panda_box_compiler_rejects_foreign_artifact_before_snapshot(monkeypatch):
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    def unexpected_snapshot(*args, **kwargs):
+        pytest.fail('foreign Artifact must be rejected before snapshot allocation')
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
+    declaration = specialization._declaration(lift_height_m=.17)
+    foreign = specialization.build_artifact(lift_height_m=.18)
+    with pytest.raises(ValueError, match='source Artifact does not match the task declaration'):
+        compile_panda_box_task(declaration, config=specialization._environment_config(),
+                               artifact=foreign, own_snapshot=True)
 
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
