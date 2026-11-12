@@ -117,13 +117,9 @@ def validate_robot_source_request(source, *, robot, composition_intent, task_ent
     if source.execution_source_receipt is not None:
         source.execution_source_receipt.validate_snapshot()
     elif source.scene_definition is not None and recipe.mode == 'reference-task-source':
-        from ...assembly.assets import _source_closure_digest
-        from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
-        projected = project_scene_definition_v3_to_mjcf(source.scene_source.xml, source.scene_definition)
-        closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),
-                                         **source_asset_bytes(source.scene_source.base_dir, projected)})
-        if closure != source.source_closure_digest:
-            raise ValueError('Robot composition source closure differs from the canonical Scene bytes')
+        from .source import verify_projected_scene_source
+        verify_projected_scene_source(source.scene_source, source.scene_definition,
+                                      source.source_closure_digest)
     else:
         raise TypeError('Robot composition requires a verified source snapshot')
     return recipe

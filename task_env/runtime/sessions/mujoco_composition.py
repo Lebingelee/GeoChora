@@ -48,16 +48,9 @@ def panda_effort_source_limits(root_xml):
 
 def checked_panda_effort_source_limits(source, scene):
     """Verify the bound MJCF closure and read its Panda transmission limits."""
-    from ...assembly.assets import _source_closure_digest
-    from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+    from .source import verify_projected_scene_source
 
-    projected = project_scene_definition_v3_to_mjcf(source.scene_source.xml, scene)
-    closure = _source_closure_digest({
-        'scene.xml': projected.encode('utf-8'),
-        **source_asset_bytes(source.scene_source.base_dir, projected),
-    })
-    if closure != source.source_closure_digest:
-        raise ValueError('physical profile source closure differs from its actual bytes')
+    verify_projected_scene_source(source.scene_source, scene, source.source_closure_digest)
     return panda_effort_source_limits(ET.fromstring(source.scene_source.xml))
 
 

@@ -1211,3 +1211,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `a34eec23`。引用式 Robot 组合以前只接受旧 `ExecutionSourceReceiptV1`，因此已包含完整 Scene 和 source 闭包的规范 MJCF source 无法被相同 Position Robot／Controller 组合消费。现在共同 source 组合 adapter 对规范 source 重新投影 Scene 并根据实际 XML／资产计算闭包，与声明的 source 身份一致才继续；旧快照仍检查 receipt，替换式 Robot 组合仍要求受管快照。由实际 PickCube 规范 source 构建 R3 Position Controller 后，MuJoCo 和 GeoPhys 的共同组合均能产生与 Artifact、source 闭包绑定的 Robot／Controller 计划；更改重力声明会被闭包校验拒绝。
 
 生产修改 1 文件 +14／−3；版本诊断修改 1 文件 +43／−0；本文和当前状态文档各修改 1 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。173 项版本检查通过。MuJoCo 原 Position Solution 单步和装配 Panda 替换式路线各完成 5 个 native 子步，GeoPhys 原 Position 完成 reset、step、再次 reset 和关闭，native 子步未计数。规范 source／Position 组合本轮仅验证到纯构造合同，没有进行真实 materialize／step；旧 Position 普通构建尚未切换到该规范 source，Position／RGB 仍未修复。Isaac、renderer 和完整 Solution 本轮未复验。冻结生产输入、测试最终 diff、预算及收据位于 ignored `workspace/maintenance/v211_canonical_robot_reference_rxv171sd/`。E01～E04 尚未整体接收。
+
+
+### 6.121 规范 Scene source 校验归共同 Runtime owner
+
+输入 `5d43bd90`。引用式 Robot 组合、Panda effort source 限值读取以及 MuJoCo 物化此前各自执行 Scene 投影和 XML／资产闭包校验；将共同部分归入 Runtime source，三个调用处消费同一投影和校验。MuJoCo 特有的 freejoint 和 keyframe lowering 仍由物理 adapter 入口完成；source ID、闭包及资产路径检查未放宽。此项减少重复校验实现，但 Position 普通构建仍未切换到规范 source，Position／RGB 未修复。
+
+生产修改 3 文件 +14／−23，净减 9 行；版本诊断修改 1 文件 +1／−1，适配统一的闭包错误；本文和当前状态文档各修改 1 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。173 项版本检查通过，包括规范 source 字节篡改拒绝。MuJoCo effort／CameraSpec／RGB 和 Position Solution 单步各完成 5 个 native 子步；GeoPhys effort 完成 reset、step、第二次 reset 和关闭，native 子步未计数。MJCF 导入有语义诊断。Isaac 和完整 Solution 未复验；规范 source／Position 原生执行仍未验证。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_scene_source_verification_okbgfwoy/`。E01～E04 尚未整体接收。

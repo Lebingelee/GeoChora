@@ -368,13 +368,8 @@ def source_asset_bytes(base_dir, source_xml: str) -> dict[str, bytes]:
     return assets
 
 
-def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):
-    """Apply the shared Scene-v3 MJCF lowering and verify its source closure.
-
-    Runtime physics materialization and the D03 visual consumer use this same
-    source path. Returned XML contains the current MuJoCo compatibility lowering;
-    a renderer may append its camera/light settings after this boundary.
-    """
+def verify_projected_scene_source(scene_source, scene_definition, expected_closure_digest: str):
+    """Project a canonical Scene and verify its XML and asset closure."""
 
     if not isinstance(scene_source, TaskSceneSource):
         raise TypeError('MuJoCo Scene lowering requires the public TaskSceneSource value')
@@ -391,6 +386,13 @@ def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_d
     })
     if measured_closure != expected_closure_digest:
         raise ValueError('MuJoCo canonical source closure digest mismatch')
+    return source_xml, assets
+
+
+def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):
+    """Verify the common Scene source and lower it for the MuJoCo importer."""
+    source_xml, assets = verify_projected_scene_source(
+        scene_source, scene_definition, expected_closure_digest)
     root = ET.fromstring(source_xml)
     # GeoPhys accepts extended freejoint attributes; MuJoCo expects type=free.
     for element in root.iter('freejoint'):
