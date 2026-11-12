@@ -231,7 +231,7 @@ def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_fixt
 
 
 def compile_f06_task_input(*, loaded, task_source, artifact, scene, robot,
-                           task_scene_recipe_sha256, seed, horizon, binding_declaration):
+                           task_scene_recipe_sha256, seed, horizon):
     """Lower an admitted F06 Task/Robot declaration to its exact USD input."""
     from .source import bind_declared_usd_paths
 
@@ -242,7 +242,12 @@ def compile_f06_task_input(*, loaded, task_source, artifact, scene, robot,
     joints, bodies, frames, free_joints = bind_declared_usd_paths(
         scene, artifact, robot_uid=robot.uid,
         geometry_root=f06_isaac_robot_geometry_root(loaded),
-        entry_prim=loaded.delivery.entry_prim, **binding_declaration)
+        entry_prim=loaded.delivery.entry_prim,
+        base_semantic='panda-v1/base',
+        robot_frames={'panda-v1/ee': robot.reference_frame_parents()['ee']},
+        world_bodies={'cube-v1': 'cube_v1'},
+        world_frames={'tabletop-v1/top': 'tabletop_v1/top'},
+        free_body_semantics=('cube-v1',))
     result = compile_usd_task_runtime_input(
         loaded=loaded, task_source=task_source, artifact=artifact, scene=scene,
         options=options, joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,

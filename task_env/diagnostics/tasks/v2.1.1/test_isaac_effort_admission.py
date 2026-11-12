@@ -151,6 +151,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     from task_env.tasks.pick_cube import specialization
     from task_env.assembly import usd_delivery
     from task_env.runtime.sessions import source_composition_adapters
+    from task_env.runtime.sessions import source as source_module
 
     def unexpected_mjcf(*args, **kwargs):
         pytest.fail('USD task construction must not compile an extra MJCF RuntimeSource')
@@ -163,6 +164,12 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
         dynamic_profiles.append(profile)
         return profile
     monkeypatch.setattr(specialization, '_r3_dynamic_profile', capture_profile)
+    usd_bindings = []
+    original_usd_bind = source_module.bind_declared_usd_paths
+    def capture_usd_bind(*args, **kwargs):
+        usd_bindings.append(kwargs)
+        return original_usd_bind(*args, **kwargs)
+    monkeypatch.setattr(source_module, 'bind_declared_usd_paths', capture_usd_bind)
     loads = []
     original_load = usd_delivery.load_usd_asset_delivery
     def record_load(*args, **kwargs):
@@ -194,6 +201,10 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     if profile == 'r3_continuous_v1':
         assert len(dynamic_profiles) == 1
     assert len(loads) == 1
+    assert len(usd_bindings) == 1
+    assert usd_bindings[0]['world_bodies'] == {'cube-v1': 'cube_v1'}
+    assert usd_bindings[0]['world_frames'] == {'tabletop-v1/top': 'tabletop_v1/top'}
+    assert usd_bindings[0]['free_body_semantics'] == ('cube-v1',)
     assert value['source'].scene_source.loaded_delivery is loads[0]
     assert value['kinematics_source_xml'] == loads[0].source_input_bytes[
         loads[0].delivery.source_entry_file].decode('utf-8')

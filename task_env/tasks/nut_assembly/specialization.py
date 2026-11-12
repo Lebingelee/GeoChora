@@ -16,13 +16,11 @@ from ...artifacts import (
     PoseWorld, SemanticDefinition, TaskArtifact, Timebase,
 )
 from ...artifacts.execution import ResetSample
-from ...assembly.nut_assembly import build_nut_assembly_declared_model
+from ...assembly.nut_assembly import compile_nut_assembly_source
 from ...assembly.compiler import (
     CompiledReferenceTaskV1,
-    ReferenceTaskDeclarationV1,
     reference_task_identity_fields,
 )
-from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
 from ...controllers.canonical.production_r3 import (
@@ -261,33 +259,16 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         action=replace(config.action, **source_config["action_overrides"]),
         robot=replace(config.robot,
             gripper=replace(config.robot.gripper, **source_config["gripper_overrides"])))
-    scene = recipe["scene"]
-    scene_xml, base = build_nut_assembly_declared_model(
-        scene=scene, asset=recipe['asset'], physics_dt=recipe['physics_dt'],
-        robot_source=robot.single_mjcf_source())
-    from ...runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
-    scene_xml, contact_profile = apply_declared_provider_source_options(
-        scene_xml, provider=provider, declarations=recipe['providers'])
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
-    joint_targets, open_actuators = robot.reference_source_actuation()
-    runtime_source = ReferenceTaskDeclarationV1(
-        artifact=_artifact_declaration(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
-        composition=composition,
-        bodies={"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
-                "round-peg-v1": "peg2", f"{robot.uid}/base": "link0"},
-        frames={EEF: scene["ee_site_name"]},
-        free_joints={"square-nut-v1": "SquareNut_joint"},
-        joint_targets=joint_targets,
-        open_actuators=open_actuators,
-    ).compile_source(
-        artifact,
-        scene_source=TaskSceneSource(scene_xml, base,
-            "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
-        config=config, agents=(robot,), own_snapshot=True,
-    )
-    return runtime_source, contact_profile
+    return compile_nut_assembly_source(
+        artifact=artifact,
+        artifact_declaration=_artifact_declaration(lift_height_m=lift_height_m,
+                                                   task_config=task_config, robot=robot),
+        composition=composition, scene=recipe['scene'], asset=recipe['asset'],
+        physics_dt=recipe['physics_dt'], robot=robot, config=config, provider=provider,
+        provider_options=recipe['providers'], eef_semantic=EEF)
 
 
 def _source_identity_files():

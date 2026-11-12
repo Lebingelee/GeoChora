@@ -857,6 +857,33 @@ def test_robot_position_layout_is_compiled_by_runtime(robot_uid, profile, compon
         env.close()
 
 
+@pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
+def test_nut_source_assembly_receives_the_selected_robot_and_provider(provider, monkeypatch):
+    from task_env.assembly import nut_assembly as assembly
+    from task_env.registry import make_agent
+    from task_env.runtime.sessions.source import source_resource_receipt
+    from task_env.tasks.nut_assembly import specialization
+
+    robot = make_agent('panda-v1')
+    calls = []
+    compile_source = specialization.compile_nut_assembly_source
+    def record_compile(**kwargs):
+        calls.append((kwargs['robot'], kwargs['provider'], kwargs['artifact']))
+        return compile_source(**kwargs)
+    monkeypatch.setattr(specialization, 'compile_nut_assembly_source', record_compile)
+    artifact = specialization.build_artifact(robot=robot)
+    source, _ = specialization.build_runtime_source(artifact, provider, robot=robot)
+    try:
+        assert calls == [(robot, provider, artifact)]
+        assert source.agents == (robot,)
+        assert source.bodies['square-nut-v1'] == 'SquareNut'
+        assert source.frames['panda-v1/ee']
+        assert assembly.compile_nut_assembly_source is compile_source
+        source_resource_receipt(source).validate_snapshot()
+    finally:
+        source_resource_receipt(source).close()
+
+
 def test_nut_mujoco_source_records_provider_lowerer_identity():
     import xml.etree.ElementTree as ET
     from task_env.tasks.nut_assembly.specialization import build_reference

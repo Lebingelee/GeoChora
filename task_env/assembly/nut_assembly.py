@@ -28,6 +28,32 @@ def build_nut_assembly_declared_model(*, scene, asset, physics_dt, robot_source)
         robot_source=robot_source)
 
 
+def compile_nut_assembly_source(*, artifact, artifact_declaration, composition, scene, asset,
+                                physics_dt, robot, config, provider, provider_options, eef_semantic):
+    """Lower the declared Nut scene and Robot to a source with an owned snapshot."""
+    from .compiler import ReferenceTaskDeclarationV1
+    from .source import TaskSceneSource
+    from ..runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
+
+    xml, base = build_nut_assembly_declared_model(
+        scene=scene, asset=asset, physics_dt=physics_dt, robot_source=robot.single_mjcf_source())
+    xml, contact_profile = apply_declared_provider_source_options(
+        xml, provider=provider, declarations=provider_options)
+    joint_targets, open_actuators = robot.reference_source_actuation()
+    source = ReferenceTaskDeclarationV1(
+        artifact=artifact_declaration, composition=composition,
+        bodies={'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
+                'round-peg-v1': 'peg2', f'{robot.uid}/base': 'link0'},
+        frames={eef_semantic: scene['ee_site_name']},
+        free_joints={'square-nut-v1': 'SquareNut_joint'},
+        joint_targets=joint_targets, open_actuators=open_actuators,
+    ).compile_source(
+        artifact, scene_source=TaskSceneSource(
+            xml, base, 'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'),
+        config=config, agents=(robot,), own_snapshot=True)
+    return source, contact_profile
+
+
 def _find_body(root: ET.Element, name: str) -> ET.Element:
     for body in root.iter("body"):
         if body.get("name") == name:

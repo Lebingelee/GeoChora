@@ -954,10 +954,4 @@ def build_pickcube_isaac_runtime_input_v1(
     return compile_f06_task_input(
         loaded=loaded, task_source=task_source, artifact=artifact, scene=scene, robot=robot,
         task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        seed=task_seed, horizon=horizon, binding_declaration={
-            'base_semantic': 'panda-v1/base',
-            'robot_frames': {'panda-v1/ee': robot.reference_frame_parents()['ee']},
-            'world_bodies': {'cube-v1': 'cube_v1'},
-            'world_frames': {'tabletop-v1/top': 'tabletop_v1/top'},
-            'free_body_semantics': ('cube-v1',),
-        })
+        seed=task_seed, horizon=horizon)
