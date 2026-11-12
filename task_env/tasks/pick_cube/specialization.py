@@ -220,7 +220,7 @@ class _PreparedReferenceSource(NamedTuple):
 
 
 def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
-                              lift_height_m=None, task_config=None, include_readiness=True):
+                              lift_height_m=None, task_config=None, include_readiness=True, robot=None):
     """Compile Task source and only prepare Solution inputs when requested."""
 
     task_config = _configuration() if task_config is None else task_config
@@ -237,7 +237,7 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
                                        if is_r3_profile and include_readiness else (None, None))
     if is_r3_profile:
         config = _nut_aligned_environment_config(config)
-    compiled = compile_panda_box_task(declaration, config=config)
+    compiled = compile_panda_box_task(declaration, config=config, robot=robot)
     artifact, source = compiled.artifact, compiled.source
     readiness = None
     if include_readiness:
@@ -281,21 +281,21 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
+    selected_robot = make_agent(robot_uid)
+    profile_recipe = getattr(selected_robot, 'source_recipe_for_profile', None)
+    robot_recipe = (profile_recipe(controller_profile) if callable(profile_recipe)
+                    else selected_robot.source_recipe())
+    reference_robot = selected_robot if robot_recipe.mode == 'reference-task-source' else None
     (task_config, recipe, config, is_r3_profile, dynamic_profile, profile_source,
      artifact, source, readiness) = _prepare_reference_source(
         backend=backend, controller_profile=controller_profile, resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config)
+        lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
-        from ...registry import make_agent
-        selected_robot = make_agent(robot_uid)
-        profile_recipe = getattr(selected_robot, 'source_recipe_for_profile', None)
-        robot_recipe = (profile_recipe(controller_profile) if callable(profile_recipe)
-                        else selected_robot.source_recipe())
         reset_plan = None
-        if robot_recipe.mode == 'reference-task-source':
+        if reference_robot is not None:
             task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
-                task_config, source.agents[0], artifact)
+                task_config, reference_robot, artifact)
             from ...runtime.sessions.source import bind_reference_scene_source
             source, _, _ = bind_reference_scene_source(source, artifact=artifact,
                 scene=scene, bodies=bodies, frames=frames)

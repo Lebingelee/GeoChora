@@ -30,6 +30,25 @@ def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
         source_resource_receipt(source).close()
 
 
+def test_pickcube_reference_compiles_the_selected_robot_instance(monkeypatch):
+    from task_env.tasks.pick_cube import specialization
+
+    create = specialization.make_agent
+    selected = []
+    def capture(uid):
+        robot = create(uid)
+        selected.append(robot)
+        return robot
+    monkeypatch.setattr(specialization, 'make_agent', capture)
+    value = specialization.build_reference(backend='cpu', include_solution=False)
+    try:
+        assert len(selected) == 1
+        assert value['source'].agents == (selected[0],)
+        assert value['source'].scene_definition.robots[0].entity_id == selected[0].uid
+    finally:
+        source_resource_receipt(value['source']).close()
+
+
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
 def test_reference_source_composition_reuses_the_task_robot(task_name, monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config

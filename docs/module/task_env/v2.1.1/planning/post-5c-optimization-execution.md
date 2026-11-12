@@ -1267,3 +1267,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `7e801ecf`；实施前重新审阅 GOV、ENTRY、TASK、ENV-01～03、SUBJ、CTRL 与 source 边界。共同 reset 之前在 `build`、`build_seeded`、`build_sampled` 三种字段之间分支，任务各自拼装不同 builder。现在正式任务接收同一组 provider、backend、seed、horizon 和可选采样结果：普通初始化、reset、caller-owned Solution 和配置切换均通过同一构建入口；Pendulum／双轮车仍由自己的任务采样器提供结果，PickCube 的 source-bound reset 按 seed 编译。移除不再需要的多个 builder 字段及物理 binding 创建时重复的 provider／seed／horizon 参数；Isaac 实际构建请求仍校验 provider、backend 和 horizon。Harness 和 LIBERO 的相关 caller 字段同步迁移；LIBERO 尚有其他既有未迁移能力，不据此声称其运行。
 
 生产修改 7 文件 +42／−62，净减 20 行；版本诊断修改 5 文件 +30／−34，适配统一请求并检查普通采样与 Solution 请求；本文新增记录。无新增、删除或整文件迁移，tracked 文件数保持 1357。最终生产代码 176 项版本合同检查通过；随后增加的 Isaac horizon 拒绝断言在 11 项针对性检查中通过。最终物理 binding 输入下，MuJoCo reset-scoped Controller 切换／记录完成 10 个 native 子步。此前冻结的同批输入下，MuJoCo 四任务和装配 Panda 均完成 reset、控制、再次 reset、关闭，分别观测 PickCube／Nut／Pendulum／双轮／装配为 5／5／25／25／5 个子步；其中两个桌面任务为 Solution 单步，非完整 Solution。GeoPhys Pendulum 同批短程通过，native 子步未观测，按 50 预留，日志显示 Taichi 四线程；MJCF 导入保留语义诊断。上述先前输入与最终物理 binding 的差异仅为该 binding 删除已无用途的创建参数及 Isaac horizon 检查，证据身份分别保存在冻结 patch 中。Isaac、renderer 及完整 Solution 本批未作原生复验。预算、输入差异与收据位于 ignored `workspace/maintenance/v211_single_build_request__0go9q00/`。此项统一构建请求，不等于四主体 source 和构造机制已全部统一；E01～E04 仍未整体接收。
+
+
+### 6.129 引用式 PickCube 构建复用所选 Robot
+
+输入 `b21ae9d0`；实施前复核台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 和 source 边界。PickCube Position 正式构建之前创建所选 Robot 来判断 source recipe，却由 Panda box 编译器另造一个默认 Robot；引用式路线现在将同一所选实例交给 Task Artifact／source 编译及后续 Scene 声明，source 组合继续复用该实例。装配 Panda 仍需要原 Task 中的参考 source 供替换式 composer 使用，保留其现有路径和身份校验；这不是四主体完整统一。
+
+生产修改 2 文件 +12／−12，净变化 0；版本诊断修改 1 文件 +19／−0，检查所选 Robot 与实际 source 实例相同；本文新增记录。无新增、删除或整文件迁移，tracked 文件数保持 1357。最终代码 177 项版本合同检查通过。MuJoCo 正式一体 Panda Solution 单步及装配 Panda 短程均完成 reset、控制、再次 reset 和关闭，各观测 5 个 native 子步；非完整 Solution。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer 本批未复验；先前证据保持原输入和范围。冻结输入、双锁预算及收据位于 ignored `workspace/maintenance/v211_selected_robot_identity_btzsoime/`。E01～E04 尚未整体接收。
