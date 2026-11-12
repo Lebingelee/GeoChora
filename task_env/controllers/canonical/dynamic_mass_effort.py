@@ -6,6 +6,14 @@ from .contracts import digest
 from .physical_commands import ContributionPolicyV1, JointEffortV1, PhysicalCommandBatchV1, PhysicalCommandContextV1, PhysicalControlBindingV1
 
 
+def validate_reset_effort_parameters(parameters):
+    """Validate the supported reset-scoped dynamic servo gains."""
+    if (set(parameters) - {'kp', 'kd', 'finger_kp', 'finger_kd'}
+            or any(type(value) not in (int, float) or not 0. < value <= 5000.
+                   for value in parameters.values())):
+        raise ValueError('unsupported or invalid physical controller parameters')
+
+
 class DynamicMassEffortControllerV1:
     """Source-bound inverse dynamics with an injected model and constrained pair.
 

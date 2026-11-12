@@ -1443,3 +1443,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 3 文件 +24／−41，净减 17 行；版本诊断新增 1 文件 +51／−0，验证 source 验证失败释放新租约并保留旧租约、成功后替换及不修改原构建值；无整文件迁移，项目 tracked 文件数 1359→1360。相对 `1f1359ee` 的 task_env 差异 141 文件（新增 15、删除 20、修改 106），+8421／−14880，净减 6459 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 209 项通过。MuJoCo PickCube Solution 单步、Nut Solution 单步、effort Controller reset 切换、Pendulum 和双轮车均完成 reset／推进／再次 reset／关闭，分别观测 5／5／10／25／25 native 子步；GeoPhys PickCube Solution 单步同样完成短程，native 子步不可观测并按 50 预留。Solution 均非完整运行。Isaac、renderer 和装配主体本批未复验；旧证据保持原输入范围。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_common_reset_reconstruction_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.149 PickCube effort 控制与任务语义归位
+
+输入 `309c24af`；实施前重新审阅台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 与 source 边界，并核对 PickCube effort 实际构建。候选 binding 原先重复解析 Controller 的 drive／reset 选项、验证动态增益并定义 reset 动作 schema；现将这些能力归已有 Panda effort／动态 Controller owner，配置准入与真实构建消费同一解析。PickCube 夹爪开度目标和任务就绪信息归回 Task，provider／设备、source、外力及受支持交集仍由原准入处核验。候选文件自身减少 33 行；它仍负责 source 构建和资源，不能据此称 TASK-01／02 已完成。
+
+生产修改 4 文件 +75／−45，净增 30 行；其中约 25 行任务投影迁回 Task，其余新增为共用 Controller 选项及 schema 合同。版本诊断修改 1 文件 +20／−0；本文与当前摘要各修改 1 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1360。相对 `1f1359ee` 的 task_env 差异 141 文件（新增 15、删除 20、修改 106），+8472／−14881，净减 6409 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 210 项通过，覆盖选项解析、非法 drive／action policy／增益拒绝以及已有 USD source 的纯构造。MuJoCo PickCube direct、joint→R3 reset 切换和 R3 mass 分别完成 reset／推进／再次 reset／关闭，观测 5／10／5 native 子步；GeoPhys direct 同样完成短程，native 子步不可观测并按 50 预留。Isaac 原生、renderer、其他任务和完整 Solution 本批未复验。冻结输入、双锁、预算及收据在 ignored `workspace/maintenance/v211_effort_owners_20261112/`。E01～E04 尚未整体接收。

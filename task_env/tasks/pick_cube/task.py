@@ -15,6 +15,33 @@ from ...objects.pick_cube import CUBE_HALF_SIZE
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 
+
+def physical_execution_info(env):
+    """Project the task's measured gripper readiness at the current boundary."""
+    from .solution import PickCubePositionExecutionInfoV1
+
+    state = env.state
+    opening = sum(float(state.joint_position[name]) for name in FINGERS)
+    if -1e-6 <= opening < 0.:
+        opening = 0.
+    speed = sum(abs(float(state.joint_velocity[name])) for name in FINGERS)
+    target = getattr(env, '_last_physical_opening_target', None)
+    target = min(.08, max(0., opening)) if target is None else target
+    return PickCubePositionExecutionInfoV1('pickcube-position-execution-info-v1',
+        int(state.control_step), float(state.simulation_time), opening, speed, target,
+        bool(target <= .045 and opening <= .045 and speed <= .005))
+
+
+def observe_physical_action(env, action, spec):
+    """Retain the opening target needed by PickCube's readiness semantics."""
+    if action is None:
+        env._last_physical_opening_target = None
+    elif spec['kind'] == 'r3-pose':
+        env._last_physical_opening_target = .04 * (float(np.clip(action[-1], -1., 1.)) + 1.)
+    else:
+        env._last_physical_opening_target = float(action[-1])
+
+
 def semantic_definition(*, lift_height_m=None, task_config=None) -> SemanticDefinition:
     recipe = _recipe() if task_config is None else task_config["recipe"]
     scene, task = recipe["scene"], recipe["success"]

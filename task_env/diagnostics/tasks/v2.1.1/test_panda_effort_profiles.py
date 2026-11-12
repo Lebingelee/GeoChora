@@ -2,6 +2,26 @@
 
 import pytest
 
+
+def test_reference_effort_options_are_resolved_by_controller_capability():
+    from task_env.controllers.canonical.dynamic_mass_effort import validate_reset_effort_parameters
+    from task_env.controllers.canonical.r3_effort import resolve_panda_effort_options, panda_reset_action_schema
+
+    assert resolve_panda_effort_options('panda-direct-effort-v1', None, {}) == (
+        'direct', 'position', False, 'dynamic')
+    assert resolve_panda_effort_options('panda-joint-effort-reference-v1', None,
+        {'reset_selection': True, 'action_space_policy': 'fixed_semantic'}) == (
+            'joint', 'disabled', True, 'fixed_semantic')
+    assert panda_reset_action_schema('joint')['controller_kind'] == 'absolute_joint'
+    with pytest.raises(ValueError, match='isolated native drive'):
+        resolve_panda_effort_options('panda-joint-effort-reference-v1', 'position', {})
+    with pytest.raises(ValueError, match='requires reset selection'):
+        resolve_panda_effort_options('panda-direct-effort-v1', None,
+                                     {'action_space_policy': 'fixed_semantic'})
+    for invalid in ({'kp': True}, {'kp': float('inf')}, {'unexpected': 1.}):
+        with pytest.raises(ValueError, match='physical controller parameters'):
+            validate_reset_effort_parameters(invalid)
+
 from task_env.runtime.sessions.source import source_resource_receipt
 
 

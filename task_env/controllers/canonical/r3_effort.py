@@ -17,6 +17,34 @@ PANDA_EFFORT_PROFILE_KINDS = MappingProxyType({
 })
 
 
+def resolve_panda_effort_options(profile_id, native_drive, parameters):
+    """Resolve Controller-owned drive and reset options without provider policy."""
+    kind = PANDA_EFFORT_PROFILE_KINDS[profile_id]
+    if native_drive not in (None, 'position', 'disabled'):
+        raise ValueError('unsupported Robot native drive selection')
+    drive = native_drive or ('position' if kind == 'direct' else 'disabled')
+    if kind != 'direct' and drive != 'disabled':
+        raise ValueError('reference effort requires the isolated native drive fixture')
+    switch = parameters.get('reset_selection', False)
+    policy = parameters.get('action_space_policy', 'dynamic')
+    if type(switch) is not bool or policy not in {'dynamic', 'fixed_semantic'}:
+        raise ValueError('invalid physical reset selection or action-space policy')
+    if not switch and policy != 'dynamic':
+        raise ValueError('physical action-space policy requires reset selection')
+    return kind, drive, switch, policy
+
+
+def panda_reset_action_schema(kind):
+    """Describe the selected reference input after a reset-scoped change."""
+    if kind == 'r3-pose':
+        from .contracts import REFERENCE_POSE_ACTION_SCHEMA
+        return dict(REFERENCE_POSE_ACTION_SCHEMA)
+    if kind == 'joint':
+        return {'schema_id': 'physical-joint-reference-v1',
+                'controller_kind': 'absolute_joint', 'dimension': 8}
+    raise ValueError('unsupported physical controller reset selection')
+
+
 class ConstrainedPairEffortControllerV1:
     """Project two finger efforts onto the declared equal-motion constraint."""
     def __init__(self, servo):
