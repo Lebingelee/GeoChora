@@ -51,20 +51,23 @@ def resolve_robot_source_adapter(provider, backend):
 
 
 def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, task_body_names, task_site_transfers):
-    """Resolve the selected Robot recipe and provider composer once per build."""
+    """Resolve the provider composer and bind the selected Robot per source."""
     from ...registry import AGENT_REGISTRY
     from ...assembly.source_composition import build_source_composition_intent_v1
 
-    robot = AGENT_REGISTRY.create(robot_uid)
     profile = config.controller_profile
-    profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
-    recipe = profile_recipe(profile) if profile is not None and callable(profile_recipe) else robot.source_recipe()
-    if profile is not None and profile not in recipe.control_profiles:
-        raise ValueError('selected Robot does not declare this Controller profile')
     adapter = resolve_robot_source_adapter(config.physics_provider, config.environment.runtime.backend)
     task_entities = tuple(entity for entity, _ in task_body_names)
 
     def compose(source, *, artifact, controller):
+        existing = tuple(robot for robot in getattr(source, 'agents', ()) if robot.uid == robot_uid)
+        if len(existing) > 1:
+            raise ValueError('Task source contains multiple Robots with the selected identity')
+        robot = existing[0] if existing else AGENT_REGISTRY.create(robot_uid)
+        profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
+        recipe = profile_recipe(profile) if profile is not None and callable(profile_recipe) else robot.source_recipe()
+        if profile is not None and profile not in recipe.control_profiles:
+            raise ValueError('selected Robot does not declare this Controller profile')
         intent = build_source_composition_intent_v1(
             task_source=source, task_entity_ids=task_entities,
             existing_robot_entity_ids=(existing_robot_entity,), robot_recipe=recipe,

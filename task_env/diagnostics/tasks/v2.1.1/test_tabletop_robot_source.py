@@ -29,6 +29,36 @@ def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
         source.execution_source_receipt.close()
 
 
+@pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
+def test_reference_source_composition_reuses_the_task_robot(task_name, monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import mujoco_composition
+    from task_env.runtime.sessions.source_composition_adapters import declared_robot_source_composer
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_reference as build_pickcube
+    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv, build_reference as build_nut
+
+    cls = PickCubeReferenceEnv if task_name == 'pickcube' else NutAssemblyReferenceEnv
+    config = resolve_task_env_config(cls, {'execution': {'physics_provider': 'mujoco',
+        'physics_backend': 'cpu', 'physics_device': 'cpu'}})
+    value = (build_pickcube(backend='cpu', include_solution=False, controller_profile=config.controller_profile)
+             if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
+    original = mujoco_composition.compose_robot_source
+    seen = []
+    def capture(source, *, robot, **kwargs):
+        seen.append((source.agents[0], robot))
+        return original(source, robot=robot, **kwargs)
+    monkeypatch.setattr(mujoco_composition, 'compose_robot_source', capture)
+    try:
+        compose = declared_robot_source_composer(config, robot_uid=config.robot_uid,
+            existing_robot_entity=cls.default_robot_source_uid, task_body_names=cls.robot_source_roots,
+            task_site_transfers=cls.robot_source_site_transfers)
+        adapted = compose(value['source'], artifact=value['artifact'], controller=value['controller'])
+        assert len(seen) == 1 and seen[0][0] is seen[0][1]
+        assert adapted.agents[0] is seen[0][1]
+    finally:
+        value['source'].execution_source_receipt.close()
+
+
 def test_source_rejects_robot_outside_task_composition():
     artifact = SimpleNamespace(initialization=SimpleNamespace(joint_position={}), identity_hash='a' * 64)
     composition = TaskCompositionSpec('task-test', 'tabletop-v1', ('panda-v1',), ())

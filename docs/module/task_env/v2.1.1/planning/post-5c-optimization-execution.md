@@ -1072,3 +1072,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 4 文件 +11／−13，净减 2 行；版本诊断修改 1 文件 +37／−0，本文和当前状态文档修改 2 文件；没有新增、删除或整文件迁移，tracked 文件数仍为 1356。共同请求删除了 Controller 对任务名称的依赖，但没有改变配置构建入口，也没有证明四任务 Robot 构造已经统一；tabletop source 编译与组合分别创建 Robot 的问题仍待处理。provider／renderer 的 source、状态、clock、资源合同未变；两条 Solution 的 arm 请求仍进入已有 Controller 校验和共同提交链。
 
 137 项版本检查通过，包括两个 tabletop 的 hold、五个线性 ramp 子步、gripper 保持及先有反馈检查。PickCube、NutAssembly 的 MuJoCo 各完成一次 Solution 提交、5 个 native 子步、第二次 reset 和关闭；NutAssembly GeoPhys 完成同类生命周期及 Solution 单步，native 子步未直接计数。MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑，旧证据仍限定原源码身份；冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_shared_arm_request_20261112_q4uu7p3b/`。E01～E04 未因此整体接收。
+
+### 6.103 source 组合复用已声明的 Robot
+
+输入 `1516b404`。此前两个 tabletop 默认 Panda 路线由任务编译 Artifact 和 source 时创建一个 Robot，source composer 又按 UID 创建另一个 Robot 并交给 adapter。现在 composer 在每次 source 构建后查找身份匹配的已声明 Robot，将同一个实例交给 adapter；当选中的主体不在任务 source 中时，才按注册选择创建替换主体。重复身份仍被拒绝，Controller profile、source intent 和资源检查继续执行；profile 准入发生在 source 编译之后、adapter 组合之前，失败由现有 source 清理路径处理。
+
+生产修改 1 文件 +9／−6，净增 3 行，其中 profile 检查随共同组合调用迁移；版本诊断修改 1 文件 +30／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。新增版本检查直接证明 PickCube 与 NutAssembly 的 Artifact／source Robot 和 MuJoCo source adapter 使用同一实例；不等于任务声明、装配 Panda 的替换 source 和其他主体已统一构造。provider 仍通过既有 source recipe、intent 和 adapter 合同组合，状态、clock、控制提交和 renderer 资源合同未改。
+
+139 项版本检查通过。PickCube、NutAssembly 与装配 Panda 的 MuJoCo 短程分别完成 5 个 native 子步、第二次 reset 和关闭；两个 tabletop 的隔离 MuJoCo worker 完成 reset、step、再次 reset 和关闭，worker native 子步未直接计数。NutAssembly GeoPhys 完成同类生命周期和 Solution 单步，native 子步未直接计数；MJCF 导入有语义诊断。Isaac source 没有注册本次更改涉及的 composer，未重跑；完整 Solution 未重跑。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_source_robot_owner_20261112_oy7kp_rd/`。E01～E04 未因此整体接收。
