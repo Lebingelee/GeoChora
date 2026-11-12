@@ -277,7 +277,8 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         profile_source, artifact, source, readiness)
 
 
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
+                    lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
@@ -288,6 +289,19 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         lift_height_m=lift_height_m, task_config=task_config)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
+        from ...registry import make_agent
+        selected_robot = make_agent(robot_uid)
+        profile_recipe = getattr(selected_robot, 'source_recipe_for_profile', None)
+        robot_recipe = (profile_recipe(controller_profile) if callable(profile_recipe)
+                        else selected_robot.source_recipe())
+        reset_plan = None
+        if robot_recipe.mode == 'reference-task-source':
+            task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
+                task_config, source.agents[0], artifact)
+            from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
+            source, _, _ = bind_reference_scene_source(source, artifact=artifact,
+                scene=scene, bodies=bodies, frames=frames)
+            reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=task_seed)
         controller = build_reference_position_controller(
             artifact, source, profile_id=controller_profile, dynamic_profile=dynamic_profile,
             force_limit_N=10.0,
@@ -357,6 +371,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
             )
         return {
             "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
+            **({'reset_plan': reset_plan} if reset_plan is not None else {}),
             "readiness": readiness, "controller": controller,
             "solution": solution,
             "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
@@ -567,7 +582,7 @@ def position_execution_info(state, last_position_transition):
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None,
-                           cube_force_z_N=None):
+                           cube_force_z_N=None, robot_uid="panda-v1"):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def adapt(value):
@@ -590,7 +605,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
+        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid))
 
     def build_external(provider):
         if provider == "isaacsim":
@@ -601,7 +616,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"task_config": task_config} if task_config is not None else {}),
             )
         return adapt(build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
+                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid))
 
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
@@ -614,7 +629,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config))
+        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed))
 
     def task_com_wrenches(env):
         from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
@@ -739,7 +754,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             lift_height_m=dict(config.task_parameters).get("lift_height_m"),
             task_config=json.loads(config.task_configuration_json),
             interval_provider=config.physics_provider,
-            cube_force_z_N=cube_force_z_N,
+            cube_force_z_N=cube_force_z_N, robot_uid=config.robot_uid,
         )
 
         if config.reset_profile is not None:
@@ -900,6 +915,22 @@ def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame
     artifact = replace(artifact, legacy_frame_bindings=bindings)
     artifact.validate_scene(scene)
     return task_source, artifact
+
+
+def compile_pickcube_mjcf_task(task_config, robot, legacy_artifact):
+    """Compile the MJCF Task/Robot Scene and its complete state bindings."""
+    scene = build_pickcube_mjcf_scene(task_config, robot)
+    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
+              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
+              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
+    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
+                  for item in scene.frames or ()
+                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
+    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
+    bodies = {name: reference.frame_id for name, reference in additional.items()}
+    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
+    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
 
 
 def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):

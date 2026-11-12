@@ -140,13 +140,11 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
-    from ...artifacts import FrameReference
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import sample_episode_reset_plan
     from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import (_prepare_reference_source, evaluate, build_pickcube_mjcf_scene,
-                                 compile_pickcube_task_artifact)
+    from .specialization import _prepare_reference_source, evaluate, compile_pickcube_mjcf_task
     from .task import PickCubeTaskDefinition
 
     prepared = _prepare_reference_source(
@@ -172,25 +170,11 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
         robot = original.agents[0]
-        scene = build_pickcube_mjcf_scene(task_config, robot)
-        frame_bindings = {
-            'panda-v1/base': FrameReference('panda-v1', 'link0'),
-            'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
-            'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table'),
-        }
-        additional_frames = {}
-        for frame in scene.frames or ():
-            if frame.entity_id == 'panda-v1' and frame.frame_id != 'nutassembly_ee_site':
-                additional_frames[f'panda-v1/{frame.frame_id}'] = FrameReference('panda-v1', frame.frame_id)
-        task_source, artifact = compile_pickcube_task_artifact(
-            task_config, scene, legacy_artifact, frame_bindings=frame_bindings, cube_frame='PickCube',
-            additional_frames=additional_frames)
-        bodies = {f'panda-v1/{frame.frame_id}': frame.frame_id for frame in scene.frames or ()
-                  if frame.entity_id == 'panda-v1' and frame.frame_id != 'nutassembly_ee_site'}
-        bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
+        task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
+            task_config, robot, legacy_artifact)
         from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
-            scene=scene, bodies=bodies, frames={'panda-v1/ee': 'nutassembly_ee_site'})
+            scene=scene, bodies=bodies, frames=frames)
         def build_physical(kind, **parameters):
             if (set(parameters) - {'kp', 'kd', 'finger_kp', 'finger_kd'}
                     or any(type(value) not in (int, float) or not 0. < value <= 5000.

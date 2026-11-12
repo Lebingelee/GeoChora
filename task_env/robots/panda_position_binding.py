@@ -12,7 +12,9 @@ def compile_reference_position_source(robot, source, *, artifact, controller, en
     if entity_id != robot.uid or not recipe.sources or any(
             item.entity_ids != (entity_id,) for item in recipe.sources):
         raise ValueError('Panda reference recipe does not identify the existing Task Robot')
-    scene = declare_panda_scene(robot, entity_id=entity_id, scene_id='integrated-panda-position')
+    scene = source.scene_definition
+    if scene is None:
+        scene = declare_panda_scene(robot, entity_id=entity_id, scene_id='integrated-panda-position')
     joints = tuple(recipe.controlled_joints)
     plan, subject_identity, subjects = compile_panda_position_subjects(
         source_scene=scene, components=((entity_id, 'link0', joints, None),),

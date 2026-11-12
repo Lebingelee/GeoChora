@@ -25,6 +25,7 @@ try:
             return original_step(*params,**kwargs)
         mujoco.mj_step=counted_step
     from task_env import make_env
+    from task_env.runtime.sessions.source import source_resource_receipt
     def construct(uid, config):
         camera_options = {}
         if args.task_rgb:
@@ -93,7 +94,7 @@ try:
         result['robot']['binding_identity']=subject_binding.identity_hash
         result['robot']['resource_writers']=list(subject_binding.plan.resource_writers)
 
-    receipt=getattr(env.value['source'],'execution_source_receipt',None)
+    receipt=source_resource_receipt(env.value['source'])
     snapshot=None if receipt is None else str(receipt.snapshot_root)
     physical_source = (Path(env.value['source'].scene_source.base_dir)
                        if args.case == 'panda-joint' and args.record else None)
@@ -252,7 +253,7 @@ try:
                 'independent_expected':list(expected),'info_seed':info['seed'],
                 'reset_parameters':info['reset_parameters']}
 
-    current_receipt=getattr(env.value['source'],'execution_source_receipt',None)
+    current_receipt=source_resource_receipt(env.value['source'])
     current_snapshot=None if current_receipt is None else str(current_receipt.snapshot_root)
     result['current_source_snapshot_before_close']=current_snapshot
     env.close();env.close();result['repeated_close_completed']=True

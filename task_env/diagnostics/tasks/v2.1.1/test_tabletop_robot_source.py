@@ -6,6 +6,7 @@ import pytest
 from task_env.assembly.compiler import compile_reference_source
 from task_env.environment.types import TaskCompositionSpec
 from task_env.robots.panda import PandaAgent
+from task_env.runtime.sessions.source import source_resource_receipt
 
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
@@ -26,7 +27,7 @@ def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
         assert used and all(robot is source.agents[0] for robot in used)
         assert source.agents[0].uid == 'panda-v1'
     finally:
-        source.execution_source_receipt.close()
+        source_resource_receipt(source).close()
 
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
@@ -55,8 +56,10 @@ def test_reference_source_composition_reuses_the_task_robot(task_name, monkeypat
         adapted = compose(value['source'], artifact=value['artifact'], controller=value['controller'])
         assert len(seen) == 1 and seen[0][0] is seen[0][1]
         assert adapted.agents[0] is seen[0][1]
+        if adapted.scene_definition is not None:
+            assert adapted.position_subject_binding.plan.scene_identity_hash == adapted.scene_definition.identity_hash
     finally:
-        value['source'].execution_source_receipt.close()
+        source_resource_receipt(value['source']).close()
 
 
 def test_source_rejects_robot_outside_task_composition():
@@ -119,7 +122,7 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
         assert controller.gripper_config.force_limit_N == 10.0
         assert controller.control_dt == value['artifact'].timebase.control_dt
     finally:
-        value['source'].execution_source_receipt.close()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
@@ -156,7 +159,7 @@ def test_both_tabletop_controllers_use_the_same_hold_ramp_contract(task_name):
         with pytest.raises(ValueError, match='unsupported arm target execution'):
             controller.request_arm_execution(request('unsupported'))
     finally:
-        value['source'].execution_source_receipt.close()
+        source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
@@ -173,8 +176,8 @@ def test_each_public_environment_owns_its_binding_and_source(uid):
         second = make_env(uid, config=config)
         assert first.binding is not second.binding
         assert first.controller is not second.controller
-        first_receipt = first.value['source'].execution_source_receipt
-        second_receipt = second.value['source'].execution_source_receipt
+        first_receipt = source_resource_receipt(first.value['source'])
+        second_receipt = source_resource_receipt(second.value['source'])
         assert first_receipt is not second_receipt
         first.close()
         assert not first_receipt.snapshot_root.exists()
@@ -259,7 +262,7 @@ def test_usd_build_failure_releases_prepared_task_source(physical, monkeypatch):
 
     def capture(*args, **kwargs):
         source = original(*args, **kwargs)
-        receipts.append(source.execution_source_receipt)
+        receipts.append(source_resource_receipt(source))
         return source
 
     def fail(*args, **kwargs):
@@ -328,7 +331,7 @@ def test_reference_controller_failure_releases_task_source(task_name, monkeypatc
     failure = RuntimeError('Controller construction failed')
     def capture(*args, **kwargs):
         source = original(*args, **kwargs)
-        receipts.append(source.execution_source_receipt)
+        receipts.append(source_resource_receipt(source))
         return source
     def fail_controller(*args, **kwargs):
         raise failure
@@ -352,7 +355,7 @@ def test_usd_source_identity_failure_releases_task_source(monkeypatch):
     failure = RuntimeError('source identity failed')
     def capture(*args, **kwargs):
         source = original(*args, **kwargs)
-        receipts.append(source.execution_source_receipt)
+        receipts.append(source_resource_receipt(source))
         return source
     def fail_identity(*args, **kwargs):
         raise failure
@@ -397,7 +400,7 @@ def test_physical_early_failure_releases_prepared_task_source(monkeypatch):
     failure = RuntimeError('revision lookup failed')
     def capture(*args, **kwargs):
         source = original(*args, **kwargs)
-        receipts.append(source.execution_source_receipt)
+        receipts.append(source_resource_receipt(source))
         return source
     def fail_revision(*args, **kwargs):
         raise failure
@@ -434,7 +437,7 @@ def test_formal_construction_rejects_missing_robot_subject_and_cleans_source(uid
     snapshot = source_module.snapshot_legacy_mjcf_source
     def capture(*args, **kwargs):
         result = snapshot(*args, **kwargs)
-        receipts.append(result.execution_source_receipt)
+        receipts.append(source_resource_receipt(result))
         return result
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
     cls = ENV_REGISTRY.get(uid)

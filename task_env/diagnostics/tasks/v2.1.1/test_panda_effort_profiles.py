@@ -2,6 +2,8 @@
 
 import pytest
 
+from task_env.runtime.sessions.source import source_resource_receipt
+
 
 def test_panda_declares_shared_immutable_effort_profiles():
     from task_env.controllers.canonical.r3_effort import PANDA_EFFORT_PROFILE_KINDS
@@ -271,7 +273,7 @@ def test_pickcube_position_and_effort_consume_the_same_lift(profile):
         if binding.close_task_resources is not None:
             binding.close_task_resources()
         elif value is not None:
-            value['source'].execution_source_receipt.close()
+            source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
