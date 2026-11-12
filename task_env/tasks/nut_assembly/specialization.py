@@ -281,14 +281,13 @@ def _source_identity_files():
         "task_env/tasks/nut_assembly/solution.py",
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
         "task_env/assembly/r05b_trusted_execution_source_manifest.json",
-        "task_env/objects/nut_assembly.py", "task_env/assembly/source.py", "task_env/robots/panda.py",
-        "task_env/robots/panda_observation.py",
+        "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
         "task_env/runtime/sessions/mujoco_composition.py",
-        "task_env/robots/assembled_panda.py", "task_env/robots/source_recipe.py",
         "task_env/runtime/sessions/common.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
     )
-    paths = (*selected_reference_construction_sources(root), *(root / name for name in relative), R3_PROFILE_PATH)
+    paths = (*selected_reference_construction_sources(root), *PandaAgent.construction_source_paths(),
+             *(root / name for name in relative), R3_PROFILE_PATH)
     return construction_source_inventory(root, paths)
 
 

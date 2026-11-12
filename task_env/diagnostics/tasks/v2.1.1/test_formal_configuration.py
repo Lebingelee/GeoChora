@@ -97,6 +97,31 @@ def test_tabletop_tasks_consume_common_construction_source_owners():
     assert all(pick[key] == nut[key] for key in common)
 
 
+def test_tabletop_construction_inventory_consumes_robot_owned_paths(monkeypatch):
+    from pathlib import Path
+    from task_env.robots.panda import PandaAgent
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessSolution
+    from task_env.tasks.pick_cube.specialization import _source_identity_files as pick_sources
+    from task_env.tasks.nut_assembly.specialization import _source_identity_files as nut_sources
+
+    calls = []
+    original = PandaAgent.construction_source_paths
+    def capture():
+        calls.append(True)
+        return original()
+    monkeypatch.setattr(PandaAgent, 'construction_source_paths', staticmethod(capture))
+    pick = pick_sources(None, PickCubeReadinessSolution, provider='mujoco', robot=PandaAgent())
+    nut = nut_sources()
+    attached = pick_sources(None, PickCubeReadinessSolution, provider='mujoco', robot=AssembledPandaAgent())
+    root = Path(__file__).resolve().parents[4]
+    robot_paths = {path.relative_to(root).as_posix() for path in original()}
+    assert len(calls) == 3 and robot_paths <= pick.keys() and robot_paths <= nut.keys()
+    assert set(attached) - set(pick) == {
+        'task_env/assembly/fixed_attachment.py', 'task_env/assembly/panda_fixed_source.py',
+        'task_env/assembly/panda_source_profiles.py', 'task_env/runtime/sessions/mujoco_attachment_admission.py'}
+
+
 @pytest.mark.parametrize(('uid', 'profile'), [
     ('pick-cube-p16-reference-v1', 'r3_continuous_v1'),
     ('pick-cube-p16-reference-v1', 'panda-direct-effort-v1'),

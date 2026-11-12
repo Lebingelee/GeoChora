@@ -1,17 +1,25 @@
 """Declared two-source Panda arm and attached parallel hand."""
 from __future__ import annotations
 
+from pathlib import Path
 from ..environment import AssetManifest, InitialStateSpec, ReferenceSpec
 from ..artifacts import FrameReference, JointReference
 from ..registry import register_agent
 from .base import BaseAgent
-from .panda import PANDA_ASSET_ROOT
+from .panda import PANDA_ASSET_ROOT, PandaAgent
 
 
 @register_agent('panda-arm-hand-v1')
 class AssembledPandaAgent(BaseAgent):
     """Describe the exact pinned arm/hand recipe, without allocating a runtime."""
     uid = 'panda-arm-hand-v1'
+
+    @staticmethod
+    def construction_source_paths():
+        """Extend Panda's identity with its fixed-attachment construction owners."""
+        assembly = Path(__file__).resolve().parents[1] / 'assembly'
+        return (*PandaAgent.construction_source_paths(), *(assembly / name for name in (
+            'fixed_attachment.py', 'panda_fixed_source.py', 'panda_source_profiles.py')))
 
     def asset_manifest(self):
         return AssetManifest(owner_uid=self.uid, asset_kind='agent_mjcf',

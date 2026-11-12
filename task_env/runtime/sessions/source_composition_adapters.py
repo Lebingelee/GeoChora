@@ -10,6 +10,17 @@ class SourceCompositionCapabilityUnavailable(ValueError):
     """The selected provider/backend has no registered source composer."""
 
 
+def robot_construction_source_paths(robot):
+    """Combine Robot-owned source identity with its attachment admission owner."""
+    from pathlib import Path
+
+    paths = tuple(robot.construction_source_paths())
+    if robot.source_recipe().mode == 'replace-task-subtree':
+        from . import mujoco_attachment_admission
+        paths = (*paths, Path(mujoco_attachment_admission.__file__).resolve())
+    return paths
+
+
 def apply_declared_provider_source_options(source_xml, *, provider, declarations):
     """Lower provider-owned source options before source snapshotting."""
     if provider == 'geophys':

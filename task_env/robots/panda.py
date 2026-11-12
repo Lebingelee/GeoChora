@@ -56,6 +56,13 @@ class PandaAgent(BaseAgent):
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
     control_capabilities = frozenset(('position_drive_gravity_compensation',))
 
+    @staticmethod
+    def construction_source_paths():
+        """Declare the shared Panda implementation files used in construction identity."""
+        directory = Path(__file__).resolve().parent
+        return tuple(directory / name for name in (
+            'panda.py', 'assembled_panda.py', 'source_recipe.py', 'panda_observation.py'))
+
     def effort_source_layout(self):
         """Declare the Panda's default MJCF transmission and assembly names."""
         return PandaEffortSourceLayout(

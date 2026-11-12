@@ -162,22 +162,14 @@ def _source_identity_files(controller, solution_type, *, profile_source=None, pr
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
              Path(inspect.getsourcefile(compile_panda_box_task)).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
-             root / "task_env/robots/panda.py", root / "task_env/robots/assembled_panda.py",
-             root / "task_env/robots/source_recipe.py",
-             root / "task_env/robots/panda_observation.py",
              root / "task_env/tasks/pick_cube/observation.py"}
     files.update(selected_reference_construction_sources(root))
+    from ...runtime.sessions.source_composition_adapters import robot_construction_source_paths
+    files.update(robot_construction_source_paths(PandaAgent() if robot is None else robot))
     if provider == 'mujoco':
         files.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
     if provider == 'isaacsim':
         files.add(root / 'task_env/runtime/sessions/isaac_usd_admission.py')
-    if robot is not None and robot.source_recipe().mode == 'replace-task-subtree':
-        files.update(root / path for path in (
-            'task_env/assembly/fixed_attachment.py',
-            'task_env/assembly/panda_fixed_source.py',
-            'task_env/assembly/panda_source_profiles.py',
-            'task_env/runtime/sessions/mujoco_attachment_admission.py',
-        ))
     if controller is not None:
         files.add(Path(inspect.getsourcefile(type(controller))).resolve())
     if profile_source is not None:
