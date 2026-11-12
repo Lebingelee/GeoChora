@@ -576,7 +576,6 @@ class PendulumEnv(BaseTaskEnv):
     selected_supports_isaac = True
     selected_robot_uids = frozenset(('pendulum-v1',))
     controller_profile_routes = {'velocity_damped_joint_effort_v1': frozenset((('mujoco', 'cpu'),))}
-    observer_physics_modes = {('geophys', 'cpu'): ('human', 'rgb_array'), ('mujoco', 'cpu'): ('human',)}
 
     @staticmethod
     def selected_default_controller_profile(task_config=None):

@@ -1,6 +1,29 @@
 """Construct task RGB consumers at the renderer adapter boundary."""
 
 
+def selected_observer_route(config, render_mode):
+    """Select an observer using Robot, Controller and renderer declarations."""
+    import json
+    from ...registry import AGENT_REGISTRY
+    from ..base.contracts import OBSERVER_CAPABILITIES, normalize_render_mode
+
+    mode = normalize_render_mode(render_mode).value
+    try:
+        robot = AGENT_REGISTRY.get(config.robot_uid)
+    except KeyError as error:
+        raise ValueError('selected configuration admits state-only execution without observer rendering') from error
+    family = getattr(robot, 'observer_source_family', None)
+    kind_provider = getattr(robot, 'physical_controller_kinds', None)
+    kind = kind_provider().get(config.controller_profile) if callable(kind_provider) else None
+    reset_selection = json.loads(config.controller_parameters_json).get('reset_selection', False)
+    route = OBSERVER_CAPABILITIES.get((family, config.physics_provider, config.environment.runtime.backend))
+    if (route is None or kind is None or mode not in route.modes
+            or (route.controller_kinds is not None and kind not in route.controller_kinds)
+            or (route.reset_selection is not None and reset_selection != route.reset_selection)):
+        raise ValueError('selected configuration admits state-only execution without observer rendering')
+    return route
+
+
 def create_task_rgb_consumer(*, camera, renderer, provider, backend, provider_seed_getter,
                              artifact, color_space, session_getter,
                              source_getter, binding_getter):
@@ -61,13 +84,22 @@ def prepare_task_rgb_adapter(*, camera, renderer, provider, backend, artifact, o
     return capability, color_setup, native_request
 
 
-def prepare_observer_adapter(*, camera, render_mode, provider, backend, artifact, task_rgb):
+def prepare_observer_adapter(*, camera, render_mode, provider, backend, artifact, task_rgb,
+                             observer_route=None):
     """Admit observer geometry and return the native renderer's output contract."""
-    from ..base.contracts import ObserverRenderRequestV1, task_rgb_capability
+    from ..base.contracts import (OBSERVER_CAPABILITIES, ObserverRenderRequestV1,
+                                  normalize_render_mode, task_rgb_capability)
 
     if camera.task_artifact_hash != artifact.identity_hash:
         raise ValueError('observer camera TaskArtifact linkage mismatch')
-    capability = task_rgb_capability(provider, backend, provider)
+    if observer_route is None:
+        capability = task_rgb_capability(provider, backend, provider)
+    else:
+        key = (observer_route.source_family, provider, backend)
+        if (OBSERVER_CAPABILITIES.get(key) is not observer_route
+                or normalize_render_mode(render_mode).value not in observer_route.modes):
+            raise ValueError('observer route differs from its renderer capability')
+        capability = observer_route.camera
     if task_rgb is not None:
         task_camera, task_capability = task_rgb
         if camera.camera_id == task_camera.camera_id:

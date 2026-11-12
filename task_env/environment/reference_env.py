@@ -911,13 +911,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         with ExitStack() as preparation:
             if kwargs:
                 raise ValueError('selected reference admits no unsupported extra kwargs')
+            observer_route = None
             if render_mode is not None:
-                supports = getattr(cls, 'selected_supports_observer', None)
-                pair = (config.physics_provider, config.environment.runtime.backend)
-                admitted = (supports(config) if callable(supports) else
-                            render_mode in getattr(cls, 'observer_physics_modes', {}).get(pair, ()))
-                if not admitted:
-                    raise ValueError('selected configuration admits state-only execution without observer rendering')
+                from ..render.camera.task_rgb import selected_observer_route
+                observer_route = selected_observer_route(config, render_mode)
                 render_mode = normalize_render_mode(render_mode).value
             provider, backend = config.physics_provider, config.environment.runtime.backend
             if camera is not None and (provider, backend, renderer) not in _TASK_RGB_PAIRS:
@@ -978,7 +975,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     from .config import CameraSpec
                     geometry = (CameraGeometry.from_camera_spec(observer_camera, task_artifact_hash=env.artifact.identity_hash)
                                 if type(observer_camera) is CameraSpec else observer_camera)
-                    env._configure_selected_observer(render_mode, geometry)
+                    env._configure_selected_observer(render_mode, geometry, observer_route=observer_route)
             except BaseException as error:
                 try:
                     env.close()
@@ -2580,7 +2577,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             source_getter=lambda: self.value['source'], binding_getter=binding,
         )
 
-    def _configure_selected_observer(self, render_mode, camera):
+    def _configure_selected_observer(self, render_mode, camera, *, observer_route=None):
         from types import SimpleNamespace
         from ..render import TaskEnvRenderProvider
         from ..render.camera.task_rgb import prepare_observer_adapter
@@ -2588,7 +2585,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         task_binding = None if task_rgb is None else (task_rgb[0], self._task_rgb_capability)
         capability, request = prepare_observer_adapter(
             camera=camera, render_mode=render_mode, provider=self.provider, backend=self.backend,
-            artifact=self.artifact, task_rgb=task_binding)
+            artifact=self.artifact, task_rgb=task_binding, observer_route=observer_route)
         self.render_mode = render_mode
         self._selected_observer_camera = camera
         if request is not None:
@@ -2690,14 +2687,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Bind an independent MuJoCo visual model to the latest published state.
 
         Explicit update is separate from task RGB and never advances physics.
-        This bounded route is available after a MuJoCo CPU Position reset.
+        This bounded route is available after a MuJoCo CPU reset with a
+        renderer-compatible published state.
         """
         self._episode_execution_state().require_open('environment is closed')
-        if (self.provider, self.backend) != ('mujoco', 'cpu') or not getattr(self, 'position_profile', False):
-            raise ValueError('visual binding requires a MuJoCo CPU Position publication')
-        publication = self._published_position_typed_state
-        if publication is None or self._execution_fault is not None:
-            raise RuntimeError('visual binding requires a successfully published state')
+        if (self.provider, self.backend) != ('mujoco', 'cpu'):
+            raise ValueError('visual binding requires a MuJoCo CPU publication')
+        publication = self._observer_publication()
         if getattr(self, '_visual_state_session', None) is not None:
             raise RuntimeError('visual state is already bound; reset or close first')
         from ..artifacts import ExecutionSpecV1, RendererSelectionV1
@@ -2705,9 +2701,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise TypeError('capture must be bool')
         from ..render.camera import (DynamicCameraRenderSourceV2, V211_DYNAMIC_PROFILE, V211_RGB_PROFILE,
                                      V211_PHYSICS_PROFILE, create_dynamic_camera_session)
+        if getattr(self, 'position_profile', False):
+            joints, frames = self.position_joint_bindings, self.position_frame_bindings
+        else:
+            binding = self._task_rgb_state_binding
+            joints, frames = binding[3], binding[4]
         source = DynamicCameraRenderSourceV2.from_runtime_source(
-            self.value['source'], artifact=self.artifact, joint_bindings=self.position_joint_bindings,
-            frame_bindings=self.position_frame_bindings)
+            self.value['source'], artifact=self.artifact, joint_bindings=joints, frame_bindings=frames)
         selection = RendererSelectionV1('renderer-selection-v1', 'mujoco', 'native-opengl',
                                         V211_RGB_PROFILE if capture else V211_DYNAMIC_PROFILE, None)
         execution = ExecutionSpecV1('execution-spec-v1', 'mujoco', 'cpu', V211_PHYSICS_PROFILE,
@@ -2724,9 +2724,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Consume the latest successful Env publication without advancing it."""
         self._episode_execution_state().require_open('environment is closed')
         session = getattr(self, '_visual_state_session', None)
-        publication = self._published_position_typed_state
-        if session is None or publication is None or self._execution_fault is not None:
+        if session is None:
             raise RuntimeError('visual state binding and published boundary are required')
+        publication = self._observer_publication()
         return session.sync_state(publication.view)
 
     def visual_binding_status(self):

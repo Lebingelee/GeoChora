@@ -42,6 +42,38 @@ TASK_RGB_CAPABILITIES = {
 TASK_RGB_PAIRINGS = frozenset(TASK_RGB_CAPABILITIES)
 
 
+@dataclass(frozen=True)
+class ObserverCapability:
+    """An admitted observer route and the actual native camera capability it uses."""
+    source_family: str
+    provider: str
+    physics_backend: str
+    modes: frozenset[str]
+    controller_kinds: frozenset[str] | None
+    reset_selection: bool | None
+    camera: TaskRgbCapability
+
+
+def _observer_capability(family, provider, backend, modes, kinds=None, reset_selection=None):
+    return ObserverCapability(family, provider, backend, frozenset(modes),
+        None if kinds is None else frozenset(kinds), reset_selection,
+        TASK_RGB_CAPABILITIES[(provider, backend, provider)])
+
+
+OBSERVER_CAPABILITIES = {
+    ('inline-articulation-v1', 'geophys', 'cpu'): _observer_capability(
+        'inline-articulation-v1', 'geophys', 'cpu', ('human', 'rgb_array'), ('joint-effort',)),
+    ('inline-articulation-v1', 'mujoco', 'cpu'): _observer_capability(
+        'inline-articulation-v1', 'mujoco', 'cpu', ('human',), ('joint-effort',)),
+    ('panda-articulation-v1', 'geophys', 'cpu'): _observer_capability(
+        'panda-articulation-v1', 'geophys', 'cpu', ('human', 'rgb_array'), ('joint',), False),
+    ('panda-articulation-v1', 'mujoco', 'cpu'): _observer_capability(
+        'panda-articulation-v1', 'mujoco', 'cpu', ('human', 'rgb_array'), reset_selection=True),
+    ('panda-articulation-v1', 'isaacsim', 'cuda'): _observer_capability(
+        'panda-articulation-v1', 'isaacsim', 'cuda', ('human', 'rgb_array')),
+}
+
+
 def task_rgb_capability(provider, backend, renderer):
     try:
         return TASK_RGB_CAPABILITIES[(provider, backend, renderer)]

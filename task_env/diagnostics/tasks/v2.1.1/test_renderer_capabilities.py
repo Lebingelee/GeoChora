@@ -28,6 +28,55 @@ def test_capability_query_and_camera_math_do_not_import_native_sdk(monkeypatch):
     assert control.position == (1.0, 0.0, 0.0)
 
 
+@pytest.mark.parametrize(('robot', 'profile', 'provider', 'backend', 'mode', 'parameters'), [
+    ('pendulum-v1', 'direct_joint_effort_v1', 'geophys', 'cpu', 'rgb_array', '{}'),
+    ('two-wheel-balance-v1', 'direct_joint_effort_v1', 'mujoco', 'cpu', 'human', '{}'),
+    ('panda-v1', 'panda-joint-effort-reference-v1', 'geophys', 'cpu', 'rgb_array', '{}'),
+    ('panda-v1', 'panda-joint-effort-reference-v1', 'mujoco', 'cpu', 'rgb_array', '{"reset_selection":true}'),
+    ('panda-v1', 'panda-joint-effort-reference-v1', 'isaacsim', 'cuda', 'rgb_array', '{}'),
+])
+def test_observer_route_is_consumed_by_camera_factory(robot, profile, provider, backend, mode, parameters):
+    import task_env.tasks  # registers Robot declarations without starting a provider
+    from task_env.environment.config import CameraSpec
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.render.base.contracts import TASK_RGB_CAPABILITIES
+    from task_env.render.camera.task_rgb import prepare_observer_adapter, selected_observer_route
+
+    config = SimpleNamespace(robot_uid=robot, controller_profile=profile,
+        controller_parameters_json=parameters, physics_provider=provider,
+        environment=SimpleNamespace(runtime=SimpleNamespace(backend=backend)))
+    route = selected_observer_route(config, mode)
+    artifact = SimpleNamespace(identity_hash='a' * 64)
+    camera = CameraGeometry.from_camera_spec(CameraSpec('observer', width=4, height=3, depth=False),
+                                            task_artifact_hash=artifact.identity_hash)
+    capability, request = prepare_observer_adapter(camera=camera, render_mode=mode,
+        provider=provider, backend=backend, artifact=artifact, task_rgb=None, observer_route=route)
+    assert capability is route.camera is TASK_RGB_CAPABILITIES[(provider, backend, provider)]
+    assert (request is not None) == (capability.ownership == 'borrowed Runtime camera')
+
+
+def test_observer_route_rejects_unadmitted_control_and_foreign_descriptor():
+    from dataclasses import replace
+    import task_env.tasks
+    from task_env.environment.config import CameraSpec
+    from task_env.observations.canonical_camera import CameraGeometry
+    from task_env.render.camera.task_rgb import prepare_observer_adapter, selected_observer_route
+
+    config = SimpleNamespace(robot_uid='panda-v1', controller_profile='r3_continuous_v1',
+        controller_parameters_json='{}', physics_provider='isaacsim',
+        environment=SimpleNamespace(runtime=SimpleNamespace(backend='cuda')))
+    with pytest.raises(ValueError, match='state-only'):
+        selected_observer_route(config, 'rgb_array')
+    config.controller_profile = 'panda-direct-effort-v1'
+    route = selected_observer_route(config, 'rgb_array')
+    artifact = SimpleNamespace(identity_hash='a' * 64)
+    camera = CameraGeometry.from_camera_spec(CameraSpec('observer', width=4, height=3, depth=False),
+                                            task_artifact_hash=artifact.identity_hash)
+    with pytest.raises(ValueError, match='differs from its renderer capability'):
+        prepare_observer_adapter(camera=camera, render_mode='rgb_array', provider='isaacsim',
+            backend='cuda', artifact=artifact, task_rgb=None, observer_route=replace(route))
+
+
 def _isaac_camera_io():
     from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
     io = object.__new__(IsaacSimNativeRuntimeIOV1)

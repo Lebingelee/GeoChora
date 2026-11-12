@@ -50,4 +50,4 @@ O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 
 
 ## 当前实施范围：E05～E10（本轮实施与对账待独立主审）
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已形成阶段性自评，见[最终结果](20261113_e05_e10_u7_delivery.md)；GeoPhys 已使用当前 pin 的公开初始化 facade，S09 已有界复验；observer 准入仍分散于 Task，S19/E08 尚未收口；PickCube Task 内剩余 MJCF/USD 构造编排尚未归位，S27/E09 仍未完成。独立主审和维护者接收尚待完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已形成阶段性自评，见[最终结果](20261113_e05_e10_u7_delivery.md)；GeoPhys 已使用当前 pin 的公开初始化 facade，S09 已有界复验；observer 准入已由 Robot 能力和 renderer 合同选择，S19 已完成本轮实施与有界复验，E08 待独立主审；PickCube Task 内剩余 MJCF/USD 构造编排尚未归位，S27/E09 仍未完成。独立主审和维护者接收尚待完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。

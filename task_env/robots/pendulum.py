@@ -70,6 +70,7 @@ PENDULUM_MJCF_XML = """
 class PendulumEntity(RobotComponent):
     """Stable scene names used by the Pendulum task and adapter."""
 
+    observer_source_family = 'inline-articulation-v1'
     uid: str = "pendulum-v1"
     joint_name: str = "pendulum_hinge"
     actuator_name: str = "pendulum_torque"
@@ -78,6 +79,10 @@ class PendulumEntity(RobotComponent):
     source_base_dir = Path(__file__).resolve().parent
     controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
     action_contract = PENDULUM_ACTION_CONTRACT
+
+    @classmethod
+    def physical_controller_kinds(cls):
+        return {profile: 'joint-effort' for profile in cls.controller_profiles}
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))

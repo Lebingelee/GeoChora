@@ -91,6 +91,7 @@ TWO_WHEEL_BALANCE_MJCF_XML = """
 class TwoWheelBalanceEntity(RobotComponent):
     """Stable body/joint/actuator names for the two-wheel topology."""
 
+    observer_source_family = 'inline-articulation-v1'
     uid: str = "two-wheel-balance-v1"
     chassis_joint_name: str = "chassis_pitch"
     left_wheel_joint_name: str = "left_wheel_hinge"
@@ -102,6 +103,10 @@ class TwoWheelBalanceEntity(RobotComponent):
     source_base_dir = Path(__file__).resolve().parent
     controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
     action_contract = TWO_WHEEL_ACTION_CONTRACT
+
+    @classmethod
+    def physical_controller_kinds(cls):
+        return {profile: 'joint-effort' for profile in cls.controller_profiles}
 
     frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 

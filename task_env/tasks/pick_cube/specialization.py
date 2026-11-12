@@ -748,14 +748,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                 (options['provider'], drive, kind, switch) != ('mujoco', 'position', 'direct', False)):
             raise ValueError('PickCube Task COM force requires MuJoCo direct coexist control')
 
-    @classmethod
-    def selected_supports_observer(cls, config):
-        options = json.loads(config.controller_parameters_json)
-        kind = cls.panda_effort_profiles.get(config.controller_profile)
-        return ((config.physics_provider == 'isaacsim' and kind is not None)
-                or (config.physics_provider == 'mujoco' and options.get('reset_selection', False))
-                or (config.physics_provider == 'geophys' and kind == 'joint'
-                    and not options.get('reset_selection', False)))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.25), "cube_force_z_N": (-30., 30.)}
     selected_supports_isaac = True
     selected_isaac_controller_profiles = frozenset(('r3_continuous_v1',)) | frozenset(panda_effort_profiles)

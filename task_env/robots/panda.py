@@ -53,6 +53,7 @@ class PandaEffortSourceLayout:
 @register_agent("panda-v1")
 class PandaAgent(BaseAgent):
     uid = "panda-v1"
+    observer_source_family = 'panda-articulation-v1'
     component_controller_kinds = ("absolute_joint", "absolute_pose", "delta_pose")
     control_capabilities = frozenset(('position_drive_gravity_compensation',))
 
@@ -133,6 +134,11 @@ class PandaAgent(BaseAgent):
         """Expose Controller kinds; source and provider still admit actual combinations."""
         from ..controllers.canonical.r3_effort import PANDA_EFFORT_PROFILE_KINDS
         return PANDA_EFFORT_PROFILE_KINDS
+
+    @classmethod
+    def physical_controller_kinds(cls):
+        """Describe declared physical Controller kinds without selecting a provider."""
+        return cls.effort_controller_profiles()
 
     @staticmethod
     def physical_subject_declaration(*, entity_id, source_id, source_closure_sha256,
