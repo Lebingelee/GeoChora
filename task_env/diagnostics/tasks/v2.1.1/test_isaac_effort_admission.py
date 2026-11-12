@@ -113,8 +113,18 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     from pathlib import Path
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
+    from task_env.tasks.pick_cube import specialization
+    from task_env.assembly import usd_delivery
     from task_env.runtime.sessions import source_composition_adapters
 
+    loads = []
+    original_load = usd_delivery.load_usd_asset_delivery
+    def record_load(*args, **kwargs):
+        result = original_load(*args, **kwargs)
+        loads.append(result)
+        return result
+    monkeypatch.setattr(usd_delivery, 'load_usd_asset_delivery', record_load)
+    monkeypatch.setattr(specialization, 'load_usd_asset_delivery', record_load)
     calls = []
     build = source_composition_adapters.build_panda_source_effort_profile
     def record(*args, **kwargs):
@@ -136,6 +146,10 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     binding = PickCubeReferenceEnv.selected_binding(config)
     value = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     artifact = value['artifact']
+    assert len(loads) == 1
+    assert value['source'].scene_source.loaded_delivery is loads[0]
+    assert value['kinematics_source_xml'] == loads[0].source_input_bytes[
+        loads[0].delivery.source_entry_file].decode('utf-8')
     assert artifact.semantics.parameters_si['lift_height'] == .17
     assert artifact.initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
     assert value['reset_plan'].reset_sample.task_artifact_hash == artifact.identity_hash
@@ -247,3 +261,35 @@ def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
         _session_admission_input_route(value)
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(object())
+
+
+def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+    from task_env.assembly.usd_cache import install_usd_delivery
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    root = Path(__file__).resolve().parents[4]
+    original = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    if not original.is_file():
+        pytest.skip('verified Isaac source delivery is unavailable')
+    manifest = install_usd_delivery(original, provider='isaacsim', robot_uid='panda-v1', root=tmp_path)
+    build_input = specialization.build_pickcube_isaac_runtime_input_v1
+    def corrupt_after_admission(*args, **kwargs):
+        value = build_input(*args, **kwargs)
+        delivery = value.runtime_source.scene_source.loaded_delivery
+        entry = delivery.manifest_path.parent / delivery.delivery.source_entry_file
+        entry.write_bytes(entry.read_bytes() + b'\n<!-- changed -->\n')
+        return value
+    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', corrupt_after_admission)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                      'physics_device': 'cuda:0', 'deployment': 'in_process',
+                      'interpreter': sys.executable, 'source_delivery_manifest': str(manifest)},
+        'controller': {'profile_id': 'r3_continuous_v1'}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv._build_selected_binding(config)
+    with pytest.raises(ValueError, match='stale local USD original source'):
+        binding.build_for_request('isaacsim', 'cuda', 31, 8)

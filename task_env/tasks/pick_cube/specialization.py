@@ -415,13 +415,11 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
             delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
             physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m,
         )
-        manifest_path = Path(delivery_manifest).resolve(strict=True)
-        panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
-        panda_xml = panda_xml_path.read_text()
-        from ...assembly.usd_delivery import load_usd_asset_delivery
-        loaded = load_usd_asset_delivery(manifest_path)
-        if hashlib.sha256(panda_xml.encode("utf-8")).hexdigest() != loaded.delivery.source_entry_sha256:
-            raise ValueError("F06 kinematics Panda XML differs from the frozen source-entry bytes")
+        scene_source = runtime_input.runtime_source.scene_source
+        scene_source.assert_fresh()
+        loaded = scene_source.loaded_delivery
+        manifest_path = loaded.manifest_path
+        panda_xml = scene_source.xml
         action_config = legacy["source"].config.action
         physical = None
         if controller_builder is None:

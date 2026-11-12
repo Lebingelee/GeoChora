@@ -58,7 +58,7 @@ finally:
 
 维护者可以使用 `python -m task_env.assembly.usd_cache --provider isaacsim --robot <robot-uid> --manifest <已验证交付清单>` 预装本地 delivery。安装复制并重新验证完整闭包，不覆盖同位置的不同资产；默认位置为用户缓存，也可通过 `GEOCHORA_USD_ASSET_ROOT` 选择位置。此维护命令当前仍需要清单路径，不代表资产分发已经完成。
 
-正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录 6.4](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
+正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 
 ## 5c 共同主体与场景控制接口（按实际交集有界接收）
 
