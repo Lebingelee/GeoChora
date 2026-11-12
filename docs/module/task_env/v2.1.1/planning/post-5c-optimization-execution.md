@@ -1204,3 +1204,10 @@ R3 Position／RGB 的另一个失败仍在：当前 MJCF reference Task source �
 生产修改 4 文件 +15／−19，净减 4 行；版本诊断修改 1 文件 +30／−0，检查 joint 不创建运动学模型、R3 从实际绑定的 MJCF source 创建。本文和当前状态文档各修改 1 文件；无新增、删除或整文件迁移，tracked 文件保持 1356。171 项版本检查通过，包括 USD source 构造的静态检查；未进行本次 Isaac 原生复验。MuJoCo 的 R3 effort、R3 mass 各完成 reset、step、第二次 reset、关闭和 5 个子步；动态 reset 切换与记录完成 10 个子步；GeoPhys R3 effort 完成相同短程生命周期，native 子步未计数。MuJoCo 两个 R3 Controller 身份与此前相同；MJCF 导入有语义诊断。renderer 及完整 Solution 本轮未复验。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_effort_model_owner_77375rld/`。
 
 MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭包绑定；要切入完整 Scene／Artifact，需让共同 source 构建与生命周期拥有同一受验证资源，不能只为 renderer 添加投影。此项仍未解决，E01～E04 尚未整体接收。
+
+
+### 6.120 规范 MJCF source 接入引用式 Robot 组合
+
+输入 `a34eec23`。引用式 Robot 组合以前只接受旧 `ExecutionSourceReceiptV1`，因此已包含完整 Scene 和 source 闭包的规范 MJCF source 无法被相同 Position Robot／Controller 组合消费。现在共同 source 组合 adapter 对规范 source 重新投影 Scene 并根据实际 XML／资产计算闭包，与声明的 source 身份一致才继续；旧快照仍检查 receipt，替换式 Robot 组合仍要求受管快照。由实际 PickCube 规范 source 构建 R3 Position Controller 后，MuJoCo 和 GeoPhys 的共同组合均能产生与 Artifact、source 闭包绑定的 Robot／Controller 计划；更改重力声明会被闭包校验拒绝。
+
+生产修改 1 文件 +14／−3；版本诊断修改 1 文件 +43／−0；本文和当前状态文档各修改 1 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。173 项版本检查通过。MuJoCo 原 Position Solution 单步和装配 Panda 替换式路线各完成 5 个 native 子步，GeoPhys 原 Position 完成 reset、step、再次 reset 和关闭，native 子步未计数。规范 source／Position 组合本轮仅验证到纯构造合同，没有进行真实 materialize／step；旧 Position 普通构建尚未切换到该规范 source，Position／RGB 仍未修复。Isaac、renderer 和完整 Solution 本轮未复验。冻结生产输入、测试最终 diff、预算及收据位于 ignored `workspace/maintenance/v211_canonical_robot_reference_rxv171sd/`。E01～E04 尚未整体接收。

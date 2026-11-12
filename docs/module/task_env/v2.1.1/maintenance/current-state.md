@@ -249,3 +249,5 @@ reference effort 的共同 binding 检查和状态需求已从普通 PD 构造�
 PickCube 的 MJCF effort 与 USD 现共用 Task Source／Artifact 编译；MJCF Position 仍待切入完整 Scene 和 Artifact，Position／RGB 问题仍未解决。详见[实施记录 6.118](../planning/post-5c-optimization-execution.md#6118-pickcube-跨-source-共用-task-artifact-编译)。
 
 Panda effort 的运动学模型按 Controller profile 在共同构造处创建；MJCF／USD Task binding 不再分别决定模型。Position／RGB 的旧 source 身份和生命周期仍待统一。详见[实施记录 6.119](../planning/post-5c-optimization-execution.md#6119-panda-effort-运动学模型归-controller-构造)。
+
+引用式 Robot 组合现可校验并消费规范 MJCF Scene source，构造合同已覆盖 MuJoCo／GeoPhys；普通 Position 构建和 RGB 尚未切换或完成原生复验。详见[实施记录 6.120](../planning/post-5c-optimization-execution.md#6120-规范-mjcf-source-接入引用式-robot-组合)。

@@ -494,3 +494,46 @@ def test_pickcube_scene_representations_share_task_artifact_compiler():
     assert usd.scene_identity_hash == usd_scene.identity_hash
     assert mjcf.legacy_frame_bindings['cube-v1'] == FrameReference('cube-v1', 'PickCube')
     assert usd.legacy_frame_bindings['cube-v1'] == FrameReference('cube-v1', 'cube')
+
+
+@pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
+def test_position_robot_composes_checked_canonical_task_source(provider):
+    import sys
+    from dataclasses import replace
+    from task_env.controllers.canonical.execution import build_reference_position_controller
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions.source_composition_adapters import declared_robot_source_composer
+    from task_env.tasks.pick_cube import specialization as task
+
+    physical_config = resolve_task_env_config(task.PickCubeReferenceEnv, {
+        'execution': {'physics_provider': provider, 'physics_backend': 'cpu', 'deployment': 'in_process', 'interpreter': sys.executable},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+        'episode': {'horizon': 8},
+    })
+    position_config = resolve_task_env_config(task.PickCubeReferenceEnv, {
+        'execution': {'physics_provider': provider, 'physics_backend': 'cpu', 'deployment': 'in_process', 'interpreter': sys.executable},
+        'controller': {'profile_id': 'r3_continuous_v1'}, 'episode': {'horizon': 8},
+    })
+    binding = task.PickCubeReferenceEnv.selected_binding(physical_config)
+    try:
+        value = binding.build(provider)
+        source, artifact = value['source'], value['artifact']
+        dynamic_profile, _ = task._r3_dynamic_profile()
+        controller = build_reference_position_controller(artifact, source,
+            profile_id='r3_continuous_v1', dynamic_profile=dynamic_profile,
+            joint_velocity_limit_rad_s=task.PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'])
+        compose = declared_robot_source_composer(position_config, robot_uid=position_config.robot_uid,
+            existing_robot_entity=task.PickCubeReferenceEnv.default_robot_source_uid,
+            task_body_names=task.PickCubeReferenceEnv.robot_source_roots,
+            task_site_transfers=task.PickCubeReferenceEnv.robot_source_site_transfers)
+        adapted = compose(source, artifact=artifact, controller=controller)
+        assert adapted.position_subject_binding.plan.artifact_identity_hash == artifact.identity_hash
+        assert adapted.position_subject_binding.plan.source_closure_digest == source.source_closure_digest
+        assert adapted.scene_definition is source.scene_definition
+        xml = source.scene_source.xml
+        assert '0 0 -9.81' in xml
+        tampered = replace(source, scene_source=replace(source.scene_source, xml=xml.replace('0 0 -9.81', '0 0 -9.8', 1)))
+        with pytest.raises(ValueError, match='closure differs'):
+            compose(tampered, artifact=artifact, controller=controller)
+    finally:
+        binding.close_task_resources()
