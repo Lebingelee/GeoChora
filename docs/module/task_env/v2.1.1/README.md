@@ -2,7 +2,7 @@
 
 更新时间：2026-11-12。**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；当前进入代码与项目优化，G06／G07 尚未开始。**
 
-从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E04 已获维护者统一接收；下一范围为 [E05～E10 细化账本](planning/post-5c-e05-e10-remaining-ledger.md)及其[实施 Goal](planning/post-5c-e05-e10-goal.md)，当前仅规划就绪，尚未启动实施。
+从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E04 已获维护者统一接收；当前范围为 [E05～E10 细化账本](planning/post-5c-e05-e10-remaining-ledger.md)及其[实施 Goal](planning/post-5c-e05-e10-goal.md)，U1 已实施，实时进度以专用账本为准。
 
 优化及人工接收完成后才决定进入 G06；G07 的最终三 provider × 三 seed 门保留。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，G07 仍保留其最终集成范围。
 

@@ -271,16 +271,9 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         nut_mass_kg=float(recipe["asset"]["nut_mass_kg"]),
         nut_diagonal_inertia_kg_m2=tuple(recipe["asset"]["nut_diagonal_inertia_kg_m2"]),
         robot_source=robot.single_mjcf_source())
-    contact_profile = None
-    if provider == "mujoco":
-        overrides = recipe["providers"]["mujoco"]["option_overrides"]
-        if overrides != {"noslip_iterations": 2}:
-            raise ValueError("selected MuJoCo provider profile changed")
-        from ...runtime.sessions.mujoco_composition import apply_mjcf_option_overrides
-        scene_xml = apply_mjcf_option_overrides(scene_xml, overrides)
-        contact_profile = {"provider": "mujoco", "version": "mujoco-coulomb-noslip2-v1",
-            "native_version_tested": recipe["providers"]["mujoco"]["native_version_tested"],
-            "model_option_overrides": overrides}
+    from ...runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
+    scene_xml, contact_profile = apply_declared_provider_source_options(
+        scene_xml, provider=provider, declarations=recipe['providers'])
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
@@ -298,10 +291,8 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         artifact,
         scene_source=TaskSceneSource(scene_xml, base,
             "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
-        config=config, agents=(robot,),
+        config=config, agents=(robot,), own_snapshot=True,
     )
-    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
-    runtime_source = snapshot_legacy_mjcf_source(runtime_source)
     return runtime_source, contact_profile
 
 
@@ -329,6 +320,7 @@ def _source_identity_files():
         "task_env/runtime/sessions/api.py", "task_env/runtime/sessions/control.py",
         "task_env/runtime/sessions/position_subject_binding.py",
         "task_env/runtime/sessions/source_composition_adapters.py",
+        "task_env/runtime/sessions/mujoco_composition.py",
         "task_env/robots/assembled_panda.py", "task_env/robots/source_recipe.py",
         "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",

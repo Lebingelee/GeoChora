@@ -867,6 +867,34 @@ def scalar_joint_source_bindings(scene, artifact):
     return joints
 
 
+def bind_declared_usd_paths(scene, artifact, *, robot_uid, geometry_root, entry_prim,
+                            base_semantic, robot_frames, world_bodies, world_frames,
+                            free_body_semantics):
+    """Resolve Task and Robot declarations to one USD source binding."""
+    articulations = [item for item in scene.articulations if item.entity_id == robot_uid]
+    if len(articulations) != 1:
+        raise ValueError('USD source requires exactly one selected Robot articulation')
+    articulation = articulations[0]
+    paths = usd_articulation_paths(articulation, geometry_root=geometry_root)
+    bodies = {base_semantic: paths[articulation.root_frame_id],
+              **{name: f'{entry_prim}/{path}' for name, path in world_bodies.items()}}
+    frames = {name: f'{paths[parent]}/{local}'
+              for name, (parent, local) in robot_frames.items()}
+    if set(frames) & set(world_frames):
+        raise ValueError('USD frame declarations must have distinct semantic owners')
+    frames.update({name: f'{entry_prim}/{path}' for name, path in world_frames.items()})
+    if set(bodies) & set(frames) or base_semantic in world_bodies:
+        raise ValueError('USD body and frame declarations must have distinct semantic owners')
+    if set(bodies) | set(frames) != set(artifact.legacy_frame_bindings):
+        raise ValueError('USD body/frame map must cover every TaskArtifact runtime Frame')
+    if set(artifact.initialization.poses_world) != set(free_body_semantics):
+        raise ValueError('USD reset must bind exactly the declared floating bodies')
+    if not set(free_body_semantics) <= set(world_bodies):
+        raise ValueError('USD floating body must have a declared world path')
+    return (scalar_joint_source_bindings(scene, artifact), bodies, frames,
+            {name: bodies[name] for name in free_body_semantics})
+
+
 def build_usd_runtime_source(*, loaded, provider, provider_build_identity, options,
                              task_source_identity_sha256, scene, artifact, joints,
                              bodies, frames, free_joints, joint_targets):

@@ -13,7 +13,7 @@ from ..artifacts import (
     LogicalAssemblyV1, PoseWorld, RobotInstance, SceneDefinition,
 )
 from .assets import _source_closure_digest
-from .fixed_attachment import validate_fixed_attachment_scene
+from .panda_source_profiles import validate_panda_fixed_attachment_scene
 from .logical_source import project_logical_assembly_source
 from .source import TaskSceneSource
 
@@ -274,5 +274,5 @@ def declare_panda_fixed_source(manifest) -> PandaFixedSourceDeclarationV1:
         arm_path, hand_path, license_path)
     plan, parent_source, sources, _arm_assets, _hand_assets = _plan_and_source(
         scene, assembly, arm_xml, hand_xml, arm_records, hand_records, base_dir, license_path)
-    validate_fixed_attachment_scene(plan, assembly, scene)
+    validate_panda_fixed_attachment_scene(plan, assembly, scene)
     return PandaFixedSourceDeclarationV1(scene, assembly, projection, plan, sources, parent_source, assets)

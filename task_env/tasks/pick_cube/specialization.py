@@ -164,11 +164,10 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_conf
         raise ValueError("PickCube reference backend must be cpu or cuda")
     config = _environment_config() if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
-    from ...runtime.sessions.source import snapshot_legacy_mjcf_source
-    return snapshot_legacy_mjcf_source(compile_panda_box_source(declaration, artifact, config))
+    return compile_panda_box_source(declaration, artifact, config, own_snapshot=True)
 
 
-def _source_identity_files(controller, solution_type, *, profile_source=None):
+def _source_identity_files(controller, solution_type, *, profile_source=None, provider=None, robot=None):
     root = Path(__file__).resolve().parents[3]
     files = {Path(__file__).resolve(), Path(__file__).with_name("task.py").resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
@@ -195,6 +194,14 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              root / "task_env/recorders/position_metadata.py",
              root / "task_env/observations/selected_reference.py",
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
+    if provider == 'mujoco':
+        files.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
+    if robot is not None and robot.source_recipe().mode == 'replace-task-subtree':
+        files.update(root / path for path in (
+            'task_env/assembly/fixed_attachment.py',
+            'task_env/assembly/panda_fixed_source.py',
+            'task_env/assembly/panda_source_profiles.py',
+        ))
     if controller is not None:
         files.add(Path(inspect.getsourcefile(type(controller))).resolve())
     canonical = root / "task_env" / "controllers" / "canonical"
@@ -255,14 +262,14 @@ class _UsdSourceContext(NamedTuple):
     source_sha256: dict
 
 
-def _compile_task_source(*, backend, resolved_config, lift_height_m, task_config, robot):
+def _compile_task_source(*, backend, resolved_config, lift_height_m, task_config, robot, own_snapshot=False):
     """Compile the declared Task and Robot without selecting a Controller."""
     if backend not in {"cpu", "cuda"}:
         raise ValueError("PickCube reference backend must be cpu or cuda")
     declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
     config = _environment_config(task_config) if resolved_config is None else resolved_config
     config = replace(config, runtime=replace(config.runtime, backend=backend))
-    compiled = compile_panda_box_task(declaration, config=config, robot=robot)
+    compiled = compile_panda_box_task(declaration, config=config, robot=robot, own_snapshot=own_snapshot)
     return config, compiled.artifact, compiled.source
 
 
@@ -320,7 +327,7 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
 def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,
                                 lift_height_m, robot):
     """Compile PickCube declarations through the shared Task/Robot source owners."""
-    from ...runtime.sessions.source import close_execution_source_on_failure, snapshot_legacy_mjcf_source
+    from ...runtime.sessions.source import close_execution_source_on_failure
     backend = request.backend
     if reset_switch:
         # The switchable route admits the R3 Solution, so it needs its
@@ -332,8 +339,8 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
     else:
         _, legacy_artifact, source = _compile_task_source(
             backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
-            lift_height_m=lift_height_m, task_config=task_config, robot=robot)
-        original, readiness = snapshot_legacy_mjcf_source(source), None
+            lift_height_m=lift_height_m, task_config=task_config, robot=robot, own_snapshot=True)
+        original, readiness = source, None
     with close_execution_source_on_failure(original):
         revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
                                             'rev-parse', 'HEAD'], text=True).strip()
@@ -418,7 +425,8 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         controller = execution_controller
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    source_ids = _source_identity_files(controller, PickCubeReadinessSolution, profile_source=profile_source)
+    source_ids = _source_identity_files(controller, PickCubeReadinessSolution,
+        profile_source=profile_source, provider=request.provider, robot=context.robot)
     construction_identity = reference_task_identity_fields(artifact, source, controller)
     resolved = {
         "construction_id": recipe["construction_id"], "task_recipe": task_config,
@@ -1128,34 +1136,6 @@ def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, 
     return task_source, scene, artifact
 
 
-def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1, *, robot, delivery):
-    from ...runtime.sessions.api import f06_isaac_robot_geometry_root
-    from ...runtime.sessions.source import scalar_joint_source_bindings, usd_articulation_paths
-
-    entry = delivery.delivery.entry_prim
-    articulations = [item for item in scene.articulations if item.entity_id == robot.uid]
-    if len(articulations) != 1:
-        raise ValueError('USD source requires exactly one selected Robot articulation')
-    articulation = articulations[0]
-    paths = usd_articulation_paths(articulation,
-        geometry_root=f06_isaac_robot_geometry_root(delivery))
-    parent, local = robot.reference_frame_parents()['ee']
-    body_paths = {
-        "panda-v1/base": paths[articulation.root_frame_id],
-        "cube-v1": f"{entry}/cube_v1",
-    }
-    frame_paths = {
-        "panda-v1/ee": f"{paths[parent]}/{local}",
-        "tabletop-v1/top": f"{entry}/tabletop_v1/top",
-    }
-    scalar_joints = scalar_joint_source_bindings(scene, artifact)
-    if set(body_paths) | set(frame_paths) != set(artifact.legacy_frame_bindings):
-        raise ValueError("F06 USD body/frame map must cover every PickCube TaskArtifact runtime Frame")
-    if set(artifact.initialization.poses_world) != {"cube-v1"}:
-        raise ValueError("F06 PickCube reset must bind exactly the task-owned floating cube")
-    return scalar_joints, body_paths, frame_paths, {"cube-v1": f"{entry}/cube_v1"}
-
-
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
     task_config=None, physical_fixture=False, robot=None, lift_height_m=None,
@@ -1193,7 +1173,17 @@ def build_pickcube_isaac_runtime_input_v1(
             _canonical_task_recipe(task_config)
         ).hexdigest(),
     }
-    joints, bodies, frames, free_joints = _source_bindings(scene, artifact, robot=robot, delivery=loaded)
+    from ...runtime.sessions.api import f06_isaac_robot_geometry_root
+    from ...runtime.sessions.source import bind_declared_usd_paths
+    joints, bodies, frames, free_joints = bind_declared_usd_paths(
+        scene, artifact, robot_uid=robot.uid,
+        geometry_root=f06_isaac_robot_geometry_root(loaded),
+        entry_prim=loaded.delivery.entry_prim,
+        base_semantic='panda-v1/base',
+        robot_frames={'panda-v1/ee': robot.reference_frame_parents()['ee']},
+        world_bodies={'cube-v1': 'cube_v1'},
+        world_frames={'tabletop-v1/top': 'tabletop_v1/top'},
+        free_body_semantics=('cube-v1',))
     from ...runtime.sessions.api import (F06_PICKCUBE_ISAAC_PROFILE,
         _validate_f06_pickcube_isaac_input, compile_usd_task_runtime_input)
     result = compile_usd_task_runtime_input(

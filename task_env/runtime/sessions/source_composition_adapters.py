@@ -10,6 +10,16 @@ class SourceCompositionCapabilityUnavailable(ValueError):
     """The selected provider/backend has no registered source composer."""
 
 
+def apply_declared_provider_source_options(source_xml, *, provider, declarations):
+    """Lower provider-owned source options before source snapshotting."""
+    if provider == 'geophys':
+        return source_xml, None
+    if provider == 'mujoco':
+        from .mujoco_composition import apply_declared_mjcf_contact_profile
+        return apply_declared_mjcf_contact_profile(source_xml, declarations['mujoco'])
+    raise ValueError('source options require an admitted MJCF provider')
+
+
 def validate_effort_source_route(*, provider, backend, deployment, source_delivery_manifest,
                                  drive, kind, reset_selection):
     """Admit the source and reset capabilities before native materialization."""

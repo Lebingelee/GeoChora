@@ -1,6 +1,6 @@
 # E05～E10 剩余实施账本
 
-更新：2026-11-12。状态：`PLANNED_NOT_STARTED`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。规划交付不启动实施、native 或新的执行 Goal。
+更新：2026-11-12。状态：`IMPLEMENTING_U1`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。实施的实时进度见第 13 节。
 
 ## 0. 结论与使用方式
 
@@ -238,7 +238,7 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 
 | 单元 | 状态 | 最终效果／提交／证据／未完成项 |
 | --- | --- | --- |
-| U1／S01～S06 | OPEN | 尚未实施 |
+| U1／S01～S06 | IMPLEMENTED | 输入 `5dd3d29a`；[实施结果、四任务调用、模式边界和证据](../maintenance/20261112_e05_e10_u1_source_delivery.md)。Scene、Robot 和 MJCF adapter 分别接收桌面、主体声明及物化；USD 路径按声明绑定；source snapshot 的创建与失败释放归编译 owner；两实体 attachment 与受限 Panda 资产 profile 分开，严格准入保留。三原生代表路线及 GeoPhys × MuJoCo RGB 按实际影响复验，具体范围见记录；本结果为实施者自评，E05 与整个优化尚未接收。 |
 | U2／S07～S12 | OPEN | 尚未实施 |
 | U3／S13～S18 | OPEN | 尚未实施 |
 | U4／S19～S25 | OPEN | 尚未实施 |

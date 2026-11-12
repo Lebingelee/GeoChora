@@ -811,9 +811,37 @@ def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monke
     })
     try:
         assert compiled == [env.binding.robot]
-        assert env.value['source'].source_composition_request.robot_uid == env.binding.robot.uid
+        request = env.value['source'].source_composition_request
+        assert request.robot_uid == env.binding.robot.uid
+        edge = request.attachments[0]
+        assert (edge.parent_entity_id, edge.parent_frame_id, edge.child_entity_id,
+                edge.child_frame_id, edge.rule_id) == env.binding.robot.source_recipe_for_profile('r1_split').component_edges[0]
+        assert {'task_env/runtime/sessions/mujoco_composition.py',
+                'task_env/assembly/panda_source_profiles.py',
+                'task_env/assembly/fixed_attachment.py'} <= set(env.value['source_sha256'])
     finally:
         env.close()
+
+
+def test_assembled_composition_rejects_robot_attachment_mismatch(monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+
+    original = AssembledPandaAgent.source_recipe
+
+    def foreign_attachment(robot):
+        recipe = original(robot)
+        parent, _frame, child, child_frame, rule = recipe.component_edges[0]
+        return replace(recipe, component_edges=((parent, 'foreign_site', child, child_frame, rule),))
+
+    monkeypatch.setattr(AssembledPandaAgent, 'source_recipe', foreign_attachment)
+    with pytest.raises(ValueError, match='attachment differs from the admitted fixed source'):
+        make_env('pick-cube-p16-reference-v1', config={
+            'execution': {'physics_provider': 'mujoco'},
+            'robot': {'uid': 'panda-arm-hand-v1'},
+            'controller': {'profile_id': 'r1_split'},
+        })
 
 
 @pytest.mark.parametrize(('robot_uid', 'profile', 'component_count'), [
@@ -841,3 +869,16 @@ def test_robot_position_layout_is_compiled_by_runtime(robot_uid, profile, compon
         assert len(env.robot.subjects) == component_count
     finally:
         env.close()
+
+
+def test_nut_mujoco_source_records_provider_lowerer_identity():
+    import xml.etree.ElementTree as ET
+    from task_env.tasks.nut_assembly.specialization import build_reference
+
+    value = build_reference(provider='mujoco', include_solution=False)
+    try:
+        assert ET.fromstring(value['source'].scene_source.xml).find('option').get('noslip_iterations') == '2'
+        assert value['_contact_profile']['model_option_overrides'] == {'noslip_iterations': 2}
+        assert 'task_env/runtime/sessions/mujoco_composition.py' in value['source_sha256']
+    finally:
+        source_resource_receipt(value['source']).close()

@@ -883,6 +883,7 @@ class _MuJoCoSession(_SessionValues):
         import mujoco
         from .provenance import provider_build_identity
         from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+        from ...assembly import panda_source_profiles
 
         self._mj = mujoco
         runtime_identity = self._fixed_runtime_identity(mujoco)
@@ -892,6 +893,7 @@ class _MuJoCoSession(_SessionValues):
             scene=source.scene_definition,
             plan=source.fixed_attachment_plan,
             assembly=source.fixed_attachment_assembly,
+            source_profile=panda_source_profiles,
         )
         parent_root = ET.fromstring(lowered.parent_xml)
         for keyframe in tuple(parent_root.findall("keyframe")):

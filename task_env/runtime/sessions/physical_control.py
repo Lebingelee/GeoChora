@@ -549,8 +549,8 @@ class PhysicalControlExecutionV1:
                             or attachment.identity_hash != subject.attachment_plan.identity_hash
                             or assembly is None):
                         raise ValueError('subject attachment is not bound to the runtime source')
-                    from ...assembly.fixed_attachment import validate_fixed_attachment_scene
-                    validate_fixed_attachment_scene(attachment, assembly, scene)
+                    from ...assembly.panda_source_profiles import validate_panda_fixed_attachment_scene
+                    validate_panda_fixed_attachment_scene(attachment, assembly, scene)
         self.action_space()
 
 

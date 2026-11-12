@@ -118,13 +118,14 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
     return _panda_box_reference_declaration(declaration).artifact.compile()
 
 
-def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config):
+def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config, *, own_snapshot=False):
     """Resolve the same box asset into source names and registered components."""
-    return compile_panda_box_task(declaration, config=config, artifact=artifact).source
+    return compile_panda_box_task(declaration, config=config, artifact=artifact,
+                                  own_snapshot=own_snapshot).source
 
 
 def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None,
-                           controller_factory=None, robot=None):
+                           controller_factory=None, robot=None, own_snapshot=False):
     """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
     from ..registry import make_agent
@@ -141,7 +142,7 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
             raise ValueError("selected Artifact does not match the Panda box declaration")
     compiled = reference.compile(
         scene_source=composer.build_source_description(), config=config,
-        controller_factory=controller_factory, agents=(robot,),
+        controller_factory=controller_factory, agents=(robot,), own_snapshot=own_snapshot,
     )
     return replace(compiled, source_owners=(
         PickCubeSceneComposer, PandaAgent, PandaBoxDeclaration,

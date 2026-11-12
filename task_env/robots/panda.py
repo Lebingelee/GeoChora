@@ -232,6 +232,22 @@ class PandaAgent(BaseAgent):
             notes=("Stage 1 must resolve these names to qpos addresses.",),
         )
 
+    def component_mjcf_frames(self):
+        """Declare the legacy component reference frame without parsing MJCF."""
+        return (("hand", {"name": "nutassembly_ee_site", "pos": "0 0 0.0584",
+                           "size": "0.000001", "group": "6", "rgba": "0 0 0 0"}),)
+
+    def component_scene_identity(self):
+        """Preserve the historical component source identity for this Robot."""
+        return "task-env-empty-tabletop-panda", "task_env_empty_tabletop_panda_v1"
+
+    def component_initial_control(self):
+        """Declare position-drive targets and the open gripper actuator."""
+        return (
+            tuple((f"actuator{i}", f"joint{i}") for i in range(1, 8)),
+            ("actuator8",),
+        )
+
     @classmethod
     def selected_controller_profiles(cls):
         return ('r1', 'r3_continuous_v1')

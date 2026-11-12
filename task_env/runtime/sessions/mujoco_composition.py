@@ -12,6 +12,32 @@ import xml.etree.ElementTree as ET
 from .source_scene_import import declare_panda_scene
 
 
+def lower_component_scene_source(source_path, *, frames, add_world):
+    """Lower declared Robot frames and Scene content into a component source."""
+    source_path = source_path.resolve()
+    root = ET.parse(source_path).getroot()
+    compiler = root.find("compiler")
+    if compiler is None:
+        compiler = ET.SubElement(root, "compiler")
+    compiler.set("meshdir", str((source_path.parent / "assets").resolve()).replace("\\", "/"))
+    option = root.find("option")
+    if option is None:
+        option = ET.SubElement(root, "option")
+    option.set("timestep", "0.002")
+    option.set("gravity", "0 0 -9.81")
+    add_world(root)
+    for parent_name, attributes in frames:
+        bodies = [body for body in root.iter("body") if body.get("name") == parent_name]
+        if len(bodies) != 1:
+            raise ValueError(f"declared frame parent {parent_name!r} must be unique")
+        matches = [site for site in bodies[0].findall("site") if site.get("name") == attributes["name"]]
+        if len(matches) > 1:
+            raise ValueError("declared component frame must be unique")
+        if not matches:
+            ET.SubElement(bodies[0], "site", attributes)
+    return ET.tostring(root, encoding="unicode"), source_path.parent
+
+
 def apply_mjcf_option_overrides(source_xml, overrides):
     """Apply an admitted provider option mapping to an MJCF source."""
     root = ET.fromstring(source_xml)
@@ -21,6 +47,19 @@ def apply_mjcf_option_overrides(source_xml, overrides):
     for key, value in overrides.items():
         option.set(key, str(value))
     return ET.tostring(root, encoding='unicode')
+
+
+def apply_declared_mjcf_contact_profile(source_xml, declaration):
+    """Apply the currently admitted MuJoCo contact option profile."""
+    overrides = declaration['option_overrides']
+    if overrides != {'noslip_iterations': 2}:
+        raise ValueError('selected MuJoCo provider profile changed')
+    source_xml = apply_mjcf_option_overrides(source_xml, overrides)
+    return source_xml, {
+        'provider': 'mujoco', 'version': 'mujoco-coulomb-noslip2-v1',
+        'native_version_tested': declaration['native_version_tested'],
+        'model_option_overrides': overrides,
+    }
 
 
 def panda_effort_source_limits(root_xml):
@@ -160,6 +199,7 @@ def materialize_fixed_robot_task(*, composition, task_receipt, fixed_declaration
     )
     from ...assembly.panda_fixed_source import PandaFixedSourceDeclarationV1
     from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+    from ...assembly import panda_source_profiles
     from .source import ExecutionSourceReceiptV1
     import mujoco
 
@@ -190,7 +230,8 @@ def materialize_fixed_robot_task(*, composition, task_receipt, fixed_declaration
         raise ValueError('fixed robot source ownership differs from composition plan')
     lowered = lower_fixed_attachment_sources(
         parent_source=fixed_declaration.parent_source, source_by_entity=sources,
-        scene=fixed_declaration.scene, plan=fixed, assembly=fixed_declaration.assembly)
+        scene=fixed_declaration.scene, plan=fixed, assembly=fixed_declaration.assembly,
+        source_profile=panda_source_profiles)
     task_xml = task_receipt.closure_files['canonical-source.xml'].decode('utf-8')
     task_world_xml = extract_task_world_mjcf(
         task_xml=task_xml, expected_xml_sha256=task_receipt.canonical_xml_sha256,
@@ -339,6 +380,7 @@ def validate_composed_source_names(source) -> None:
     from ...assembly.source_composition import CompositionRuntimeInputV1
     from ...assembly.panda_fixed_source import PandaFixedSourceDeclarationV1
     from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+    from ...assembly import panda_source_profiles
     value = source.composition_runtime_input
     if type(value) is not CompositionRuntimeInputV1 or type(value.fixed_declaration) is not PandaFixedSourceDeclarationV1:
         raise TypeError('composition preflight requires the exact declared source owners')
@@ -356,7 +398,8 @@ def validate_composed_source_names(source) -> None:
         raise ValueError('composition assembly or attachment differs from its plan')
     lowered = lower_fixed_attachment_sources(
         parent_source=declaration.parent_source, source_by_entity=declaration.source_by_entity,
-        scene=declaration.scene, plan=fixed, assembly=declaration.assembly)
+        scene=declaration.scene, plan=fixed, assembly=declaration.assembly,
+        source_profile=panda_source_profiles)
     expected_robot_sources = {(declaration.source_by_entity[e].source_id,
                                fixed.source_closure_sha256, e)
                               for e in (fixed.parent_entity_id, fixed.child_entity_id)}
@@ -406,6 +449,7 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
     from ...artifacts import PoseWorld
     from ...assembly.panda_fixed_source import PandaFixedSourceDeclarationV1
     from ...assembly.fixed_attachment import lower_fixed_attachment_sources
+    from ...assembly import panda_source_profiles
     from .source import ExecutionSourceReceiptV1
     if type(declaration) is not PandaFixedSourceDeclarationV1 or type(task_receipt) is not ExecutionSourceReceiptV1:
         raise TypeError('task mount requires verified task and fixed robot declarations')
@@ -413,7 +457,7 @@ def derive_task_compatible_attachment(*, declaration, task_receipt, task_hand_na
     fixed = declaration.attachment_plan
     lower_fixed_attachment_sources(parent_source=declaration.parent_source,
         source_by_entity=declaration.source_by_entity, scene=declaration.scene,
-        plan=fixed, assembly=declaration.assembly)
+        plan=fixed, assembly=declaration.assembly, source_profile=panda_source_profiles)
     task = ET.fromstring(task_receipt.closure_files['canonical-source.xml'])
     arm = ET.fromstring(declaration.parent_source.xml)
     hand = ET.fromstring(declaration.source_by_entity[fixed.child_entity_id].xml)
@@ -528,6 +572,14 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
         task_hand_name=task_hand, source_hand_name=source_hand)
     fixed = declaration.attachment_plan
     arm, hand = fixed.parent_entity_id, fixed.child_entity_id
+    if len(recipe.component_edges) != 1:
+        raise ValueError('fixed Robot source requires exactly one declared attachment')
+    parent, parent_frame, child, child_frame, rule = recipe.component_edges[0]
+    if (parent, parent_frame, child, child_frame) != (
+            arm, fixed.parent_mount_site_name, hand, fixed.child_root.frame_id):
+        raise ValueError('Robot recipe attachment differs from the admitted fixed source')
+    if rule != 'fixed-transform-from-task-authored-tcp-v1':
+        raise ValueError('Robot recipe attachment rule is unsupported by this lowerer')
     from .position_subject_binding import compile_position_subjects
     control_plan, subject_identity, subjects = compile_position_subjects(
         source_scene=declaration.scene,
@@ -566,8 +618,7 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
     v2_robot_sources = tuple(CompositionSourceV2(item.source_id, item.closure_sha256, item.entity_ids)
                              for item in robot_sources)
     source_by_entity = declaration.source_by_entity
-    edge = CompositionAttachmentV2(arm, fixed.parent_mount_site_name, hand,
-        fixed.child_root.frame_id, 'fixed-transform-from-task-authored-tcp-v1',
+    edge = CompositionAttachmentV2(parent, parent_frame, child, child_frame, rule,
         source_by_entity[arm].source_id, fixed.source_closure_sha256,
         source_by_entity[hand].source_id, fixed.source_closure_sha256)
     request = SourceCompositionRequestV2('source-composition-request-v2',

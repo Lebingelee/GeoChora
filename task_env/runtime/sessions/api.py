@@ -741,11 +741,12 @@ def _validate_v1_materialization_source(
 def _validate_fixed_attachment_materialization_source(artifact, execution, source) -> None:
     """Preflight the one fixed Panda Arm+Hand plan before native import/compile."""
     from ...artifacts import FixedAttachmentPlanV1, LogicalAssemblyV1
-    from ...assembly.fixed_attachment import (
+    from ...assembly.panda_source_profiles import (
         R06B_ORDER_ASSET_VERSION, R06B_ORDER_RECIPE_ID, R06B_ORDER_SOURCE_SHA256,
-        fixed_attachment_source_recipe, lower_fixed_attachment_sources,
-        validate_fixed_attachment_scene,
+        R06B_ORDER_SOURCE_REFERENCES, fixed_attachment_source_recipe,
     )
+    from ...assembly import panda_source_profiles
+    from ...assembly.fixed_attachment import lower_fixed_attachment_sources
 
     plan = source.fixed_attachment_plan
     if type(plan) is not FixedAttachmentPlanV1 or type(source.fixed_attachment_assembly) is not LogicalAssemblyV1:
@@ -762,7 +763,7 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if scene is None:
         raise ValueError('fixed Attachment materialization requires a pinned canonical Scene-v3')
     artifact.validate_scene(scene)
-    validate_fixed_attachment_scene(plan, source.fixed_attachment_assembly, scene)
+    panda_source_profiles.validate_panda_fixed_attachment_scene(plan, source.fixed_attachment_assembly, scene)
     sources = source.fixed_attachment_sources
     if set(sources) != {'panda-arm', 'panda-hand'}:
         raise ValueError('fixed Attachment source pair differs from the exact two-Entity recipe')
@@ -822,7 +823,6 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if plan.collision_policy != 'source_preserved' or plan.extra_cross_entity_overrides:
         raise ValueError('fixed Attachment collision admission must preserve source filters and exclusions')
     assets = {(asset.asset_id, asset.asset_version): asset for asset in scene.assets}
-    from ...assembly.fixed_attachment import R06B_ORDER_SOURCE_REFERENCES
     source_references = (
         (R06B_ORDER_SOURCE_REFERENCES['panda-arm'], R06B_ORDER_SOURCE_REFERENCES['panda-hand'])
         if recipe == R06B_ORDER_RECIPE_ID else (
@@ -866,6 +866,7 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
         scene=scene,
         plan=plan,
         assembly=source.fixed_attachment_assembly,
+        source_profile=panda_source_profiles,
     )
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
