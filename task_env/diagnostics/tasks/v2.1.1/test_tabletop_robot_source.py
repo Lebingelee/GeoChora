@@ -469,3 +469,28 @@ def test_robot_rejects_controller_replaced_after_subject_compilation(split):
                                      provider=env.provider, backend=env.backend)
     finally:
         env.close()
+
+
+def test_pickcube_scene_representations_share_task_artifact_compiler():
+    from task_env.artifacts import FrameReference
+    from task_env.robots.panda import PandaAgent
+    from task_env.tasks.pick_cube import specialization as task
+
+    config = task._configuration()
+    legacy = task.build_artifact(lift_height_m=.17)
+    robot = PandaAgent()
+    mjcf_scene = task.build_pickcube_mjcf_scene(config, robot)
+    mjcf_source, mjcf = task.compile_pickcube_task_artifact(config, mjcf_scene, legacy,
+        frame_bindings={'panda-v1/base': FrameReference('panda-v1', 'link0'),
+                        'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
+                        'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')},
+        cube_frame='PickCube')
+    usd_source, usd_scene, usd = task.compile_pickcube_isaac_task_artifact(config, legacy, robot=robot)
+    assert mjcf_source.identity_hash == usd_source.identity_hash
+    assert mjcf.semantics == usd.semantics == legacy.semantics
+    assert mjcf.initialization == usd.initialization == legacy.initialization
+    assert mjcf.timebase == usd.timebase == legacy.timebase
+    assert mjcf.scene_identity_hash == mjcf_scene.identity_hash
+    assert usd.scene_identity_hash == usd_scene.identity_hash
+    assert mjcf.legacy_frame_bindings['cube-v1'] == FrameReference('cube-v1', 'PickCube')
+    assert usd.legacy_frame_bindings['cube-v1'] == FrameReference('cube-v1', 'cube')

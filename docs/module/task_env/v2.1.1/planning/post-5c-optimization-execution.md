@@ -1188,3 +1188,10 @@ GeoPhys 和 Isaac 当前没有 provider-owned source dynamics，故质量矩阵 
 生产修改 2 文件 +2／−2；版本诊断修改 2 文件 +13／−11；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。167 项版本检查通过，包含物理 session 没有相机方法时由 renderer 结果提供边界几何的检查。MuJoCo CPU joint effort 分别使用公开 CameraSpec 和 CameraGeometry，均完成 reset、step、再次 reset、关闭与 5 个 native 子步，RGB 的解析几何分别对应 reset／step 边界；MJCF 导入有语义诊断。此项没有改动物理推进。GeoPhys／Isaac 和完整 Solution 本轮未运行。
 
 R3 Position／RGB 的另一个失败仍在：当前 MJCF reference Task source 不提供完整 `SceneDefinition`，其 Artifact 仍为旧表示；renderer 的 source 合同要求完整 Scene 和 `TaskArtifactV1`，不能以 Panda 局部 Scene 伪装整场景。需将正式 Position Task、Robot 与 source 构建汇入同一完整合同后复验。失败记录继续保留于 6.116；本项未接收 E01～E04。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_rgb_camera_owner_upcla9eh/`。
+
+
+### 6.118 PickCube 跨 source 共用 Task Artifact 编译
+
+输入 `8ed86886`。MJCF effort binding 和 USD source 原先各自将 PickCube 任务配置、旧语义、Scene 和帧别名编译为 `TaskArtifactV1`，造成任务编译藏在两条不同控制／source 路径。将同一 Task Source、Artifact 编译、cube 身份绑定及 Scene 验证归到 PickCube Task 的共同编译函数；MJCF 和 USD 只提供各自真实 Scene 与帧声明。MJCF Scene 组合也从 physical candidate 私有函数归到 Task 声明处，消费所选 Robot 的真实主体。此项是接入共同 Task 声明的中间步骤：MJCF Position 仍使用旧 Artifact 与 source，Position／RGB 缺口没有解决；四任务 Robot／Controller 构造未整体统一。provider 和 renderer 执行合同未改。
+
+生产修改 2 文件 +41／−40，净增 1 行；其中 MJCF Scene 声明从 candidate 移至现有 Task 文件，属于代码段迁移，不是整文件迁移。版本诊断修改 1 文件 +25／−0，比较 MJCF／USD 的 Task Source、初始化、时间和任务语义及各自完整 Scene 帧。本文和当前状态文档各修改 1 文件；无新增、删除或整文件迁移，tracked 文件保持 1356。168 项版本检查通过；受影响 USD source／Artifact 的静态检查通过，未进行本次 Isaac 原生复验。MuJoCo effort／CameraSpec／RGB 完成 reset、step、第二次 reset、关闭与 5 个子步；GeoPhys effort 完成同样生命周期，native 子步未计数；MuJoCo R3 Position Solution 完成单步与 5 个子步，非完整 Solution。MuJoCo effort 与前次验证的 Scene、reset 样本和 Controller 身份一致，MJCF 导入有语义诊断。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_pickcube_shared_artifact_xsz4wlmz/`。E01～E04 尚未整体接收。

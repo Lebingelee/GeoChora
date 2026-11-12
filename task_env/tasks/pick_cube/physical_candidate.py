@@ -136,28 +136,17 @@ def _direct_physical_observation(env, state, *, hand_frame_id="hand"):
     return obs, info, evaluation
 
 
-def _pickcube_mjcf_scene(task_config, robot):
-    """Compose the Task scene using the declared MJCF Robot and frame names."""
-    from ...runtime.sessions.source_scene_import import declare_panda_scene
-    from .specialization import build_pickcube_scene
-
-    panda = declare_panda_scene(robot,
-        entity_id='panda-v1', scene_id=str(task_config['recipe']['scene_uid']))
-    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
-        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
-        cube_joint='PickCube_joint', table_frame='grasp_table')
-
-
 def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...artifacts import FrameReference
     from ...controllers.canonical.contracts import reference_pose_action
-    from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
+    from ...environment import sample_episode_reset_plan
     from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _prepare_reference_source, evaluate
+    from .specialization import (_prepare_reference_source, evaluate, build_pickcube_mjcf_scene,
+                                 compile_pickcube_task_artifact)
     from .task import PickCubeTaskDefinition
 
     prepared = _prepare_reference_source(
@@ -183,20 +172,19 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
         robot = original.agents[0]
-        scene = _pickcube_mjcf_scene(task_config, robot)
-        task_source = adapt_legacy_recipe_task_source({'recipe': task_config['recipe'], 'environment': task_config['environment']})
-        artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact, frame_bindings={
+        scene = build_pickcube_mjcf_scene(task_config, robot)
+        frame_bindings = {
             'panda-v1/base': FrameReference('panda-v1', 'link0'),
             'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
             'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table'),
-        })
-        frame_aliases = dict(artifact.legacy_frame_bindings)
-        frame_aliases['cube-v1'] = FrameReference('cube-v1', 'PickCube')
+        }
+        additional_frames = {}
         for frame in scene.frames or ():
             if frame.entity_id == 'panda-v1' and frame.frame_id != 'nutassembly_ee_site':
-                frame_aliases.setdefault(f'panda-v1/{frame.frame_id}', FrameReference('panda-v1', frame.frame_id))
-        artifact = replace(artifact, legacy_frame_bindings=frame_aliases)
-        artifact.validate_scene(scene)
+                additional_frames[f'panda-v1/{frame.frame_id}'] = FrameReference('panda-v1', frame.frame_id)
+        task_source, artifact = compile_pickcube_task_artifact(
+            task_config, scene, legacy_artifact, frame_bindings=frame_bindings, cube_frame='PickCube',
+            additional_frames=additional_frames)
         bodies = {f'panda-v1/{frame.frame_id}': frame.frame_id for frame in scene.frames or ()
                   if frame.entity_id == 'panda-v1' and frame.frame_id != 'nutassembly_ee_site'}
         bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})

@@ -872,31 +872,44 @@ def _canonical_task_recipe(task_config: dict) -> bytes:
     ).encode("utf-8")
 
 
-def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
-    """Compile the existing PickCube v0 semantics against its USD Scene."""
+def build_pickcube_mjcf_scene(task_config, robot):
+    """Compose the Task scene from the selected Robot's MJCF declaration."""
+    from ...runtime.sessions.source_scene_import import declare_panda_scene
+
+    panda = declare_panda_scene(robot, entity_id=robot.uid,
+        scene_id=str(task_config['recipe']['scene_uid']))
+    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
+        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
+        cube_joint='PickCube_joint', table_frame='grasp_table')
+
+
+def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame_bindings, cube_frame,
+                                   additional_frames=None):
+    """Compile the same Task semantics against a declared source Scene."""
     if set(task_config) - {'recipe', 'environment', 'execution'}:
         raise ValueError('unsupported PickCube task config fields')
-    scene = build_pickcube_isaac_scene(task_config, robot=robot)
-    # Execution defaults are consumed by configuration, not Task Source.
     task_source = adapt_legacy_recipe_task_source({
         'recipe': task_config['recipe'], 'environment': task_config['environment'],
     })
-    artifact = compile_task_artifact_v1(
-        task_source, scene, legacy_artifact,
-        frame_bindings={
-            "panda-v1/base": FrameReference("panda-v1", "link0"),
-            "panda-v1/ee": FrameReference("panda-v1", "ee"),
-        },
-    )
-    # The v0 Artifact's reset/success pose is the cube Entity identity, while
-    # RuntimeSourceV1 needs that pose bound to the cube's measured body Frame.
-    # Keep this task-specific alias explicit in the v1 projection.
+    artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact,
+                                        frame_bindings=frame_bindings)
     bindings = dict(artifact.legacy_frame_bindings)
-    bindings["cube-v1"] = FrameReference("cube-v1", "cube")
-    from dataclasses import replace
-
+    bindings['cube-v1'] = FrameReference('cube-v1', cube_frame)
+    for name, reference in (additional_frames or {}).items():
+        bindings.setdefault(name, reference)
     artifact = replace(artifact, legacy_frame_bindings=bindings)
     artifact.validate_scene(scene)
+    return task_source, artifact
+
+
+def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
+    """Compile the existing PickCube v0 semantics against its USD Scene."""
+    scene = build_pickcube_isaac_scene(task_config, robot=robot)
+    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings={
+            'panda-v1/base': FrameReference('panda-v1', 'link0'),
+            'panda-v1/ee': FrameReference('panda-v1', 'ee'),
+        }, cube_frame='cube')
     return task_source, scene, artifact
 
 
