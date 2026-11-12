@@ -12,7 +12,6 @@ from typing import NamedTuple
 import subprocess
 
 import numpy as np
-from ...environment.task_definition import as_task_state_view
 
 from ...artifacts import (
     ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
@@ -42,7 +41,6 @@ from ...environment.configuration import (
     overlay_public_env_config,
     resolve_env_config,
 )
-from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
 from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import PandaAgent
@@ -75,7 +73,7 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "postclose_hold_s": 0.1,
 }
 
-from .task import PickCubeTaskDefinition, semantic_definition, evaluate, sample_reset, task_com_wrench_factory
+from .task import semantic_definition, task_binding_fields
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -639,14 +637,10 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             else 'panda-main/gripper', 0.08
         ),
         validate_external_solution=_validate_external_readiness_solution,
-        reset_sample=lambda artifact, seed: sample_reset(artifact, seed, lift_height_m=lift_height_m, task_config=task_config),
-        evaluate=lambda state, semantics: evaluate(state, semantics, lift_height_m=lift_height_m, task_config=task_config),
-        task_definition_factory=PickCubeTaskDefinition.from_artifact,
-        task_state_projection=as_task_state_view,
-        object_poses=(("cube-v1", "cube_v1"),),
+        **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                              cube_force_z_N=cube_force_z_N),
         external_actions=True,
         external_solution_actions=True,
-        task_com_wrench_factory=task_com_wrench_factory(cube_force_z_N),
         interval_mode=(
             "native"
             if interval_provider in {"mujoco", "geophys"}

@@ -1253,3 +1253,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `681a1b0d`；实施前重新审阅 GOV-01／02、ENTRY、TASK-01／02、ENV-01～03、SUBJ、CTRL 和 source 边界。PickCube effort 路线为了取得任务 COM 力，原先额外构造 Position `ReferenceTaskBinding` 再从中提取 callback。现在 Task 直接声明同一个可选力贡献；Position 与 effort 两条真实构建链直接消费，力、单位、资源、interval 子步范围与共同提交不变。effort 不再构造 Position binding。此项只消除该依赖，不代表两个路线的 Robot/source 构建已经完全统一。
 
 生产修改 3 文件 +20／−14，净增 6 行；原力贡献实现从 Position specialization 迁到现有 Task 语义，属代码段迁移，无整文件迁移。版本诊断修改 2 文件 +34／−0，检查两路线声明一致及 effort 不再构造 Position binding，并支持正式短程输入；本文新增记录。无新增或删除文件，tracked 文件数保持 1357。最终代码 177 项版本合同检查通过。MuJoCo 正式 R1 Position 和 direct effort 分别以 1.5 N 的任务力完成 reset、一次控制、再次 reset、关闭，各观测 5 个 native 子步；此检查不替代或重开原 COM 历史判据。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer、完整 Solution 本批未复验。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_task_force_owner_xom0_foa/`。E01～E04 仍未整体接收。
+
+
+### 6.127 PickCube 控制路线共享 Task 语义
+
+输入 `c559b4e6`；实施前复核台账 GOV-01／02、ENTRY、TASK-01／02、ENV-01～03、SUBJ、CTRL 及 source 边界。PickCube Position 与 MJCF effort binding 之前各自写任务评估、TaskDefinition、状态投影、对象和任务力接线；现在这些实际字段由 PickCube Task 一处声明，两条正式绑定均消费。物理路线继续提供 source-bound reset sampler，控制、source 与资源 owner 不变；Isaac physical 路线通过已有正式 Task binding 消费相同任务声明。删除 specialization 中不再使用的重复导入。此项统一任务语义，不声称 Position／effort 或装配 Panda 的主体构建已统一。
+
+生产修改 3 文件 +26／−21，净增 5 行；任务语义字段由两处收敛到既有 Task 文件，是代码段迁移，无整文件迁移。版本诊断修改 1 文件 +3／−0，检查两路线 TaskDefinition、状态投影和对象映射一致；本文新增记录。无新增或删除文件，tracked 文件数保持 1357。最终代码 177 项版本合同检查通过。正式 MuJoCo 的 Position caller-owned Solution 单步和 direct effort 携任务力单步分别完成 reset、控制推进、再次 reset 和关闭，各观测 5 个 native 子步；非完整 Solution，原 COM 历史判据不变。MJCF 导入保留语义诊断；GeoPhys、Isaac 和 renderer 未作本批原生复验。冻结输入、双锁预算及收据位于 ignored `workspace/maintenance/v211_pickcube_task_binding_u_i36rl5/`。E01～E04 尚未整体接收。

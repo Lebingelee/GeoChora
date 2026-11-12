@@ -142,10 +142,9 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import sample_episode_reset_plan
-    from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _prepare_reference_source, evaluate, compile_pickcube_mjcf_task
-    from .task import PickCubeTaskDefinition
+    from .specialization import _prepare_reference_source, compile_pickcube_mjcf_task
+    from .task import task_binding_fields
 
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
@@ -243,18 +242,13 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             else:
                 env._last_physical_opening_target = float(action[-1])
         from .specialization import _validate_external_readiness_solution
-        from .task import task_com_wrench_factory
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         owned_resources = ExitStack()
         binding = ReferenceTaskBinding(build=build, build_seeded=build_seeded,
-            reset_sample=lambda _artifact, actual_seed: sample_episode_reset_plan(
-                task_source, scene, artifact, task_seed=actual_seed).reset_sample,
-            evaluate=lambda state, semantics: evaluate(state, semantics,
-                task_config=task_config, lift_height_m=lift_height_m),
-            task_definition_factory=PickCubeTaskDefinition.from_artifact,
-            task_state_projection=as_task_state_view,
-            object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
-            task_com_wrench_factory=task_com_wrench_factory(cube_force_z_N),
+            **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                cube_force_z_N=cube_force_z_N, reset_sampler=lambda _artifact, actual_seed:
+                    sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed).reset_sample),
+            external_actions=True, interval_mode='grouped',
             recorder_mode='execution', close_task_resources=owned_resources.close,
             action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,

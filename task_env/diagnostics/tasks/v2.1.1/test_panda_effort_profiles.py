@@ -456,6 +456,9 @@ def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatc
     monkeypatch.setattr(specialization, 'make_reference_binding', unexpected_position_binding)
     effort = specialization.PickCubeReferenceEnv.selected_binding(config('panda-direct-effort-v1'))
     try:
+        assert position.task_definition_factory == effort.task_definition_factory
+        assert position.task_state_projection is effort.task_state_projection
+        assert position.object_poses == effort.object_poses
         env = SimpleNamespace(artifact=SimpleNamespace(timebase=SimpleNamespace(control_substeps=5)))
         left, = position.task_com_wrench_factory(env)
         right, = effort.task_com_wrench_factory(env)

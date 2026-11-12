@@ -151,6 +151,23 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
+def task_binding_fields(*, task_config=None, lift_height_m=None, reset_sampler=None,
+                        cube_force_z_N=None):
+    """Provide the task semantics shared by each admitted control execution."""
+    if reset_sampler is None:
+        reset_sampler = lambda artifact, seed: sample_reset(
+            artifact, seed, lift_height_m=lift_height_m, task_config=task_config)
+    return {
+        'reset_sample': reset_sampler,
+        'evaluate': lambda state, semantics: evaluate(
+            state, semantics, lift_height_m=lift_height_m, task_config=task_config),
+        'task_definition_factory': PickCubeTaskDefinition.from_artifact,
+        'task_state_projection': as_task_state_view,
+        'object_poses': (('cube-v1', 'cube_v1'),),
+        'task_com_wrench_factory': task_com_wrench_factory(cube_force_z_N),
+    }
+
+
 def task_com_wrench_factory(cube_force_z_N):
     """Declare the Task's optional vertical force for the common control interval."""
     if cube_force_z_N is None:
