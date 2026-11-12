@@ -255,6 +255,15 @@ def _readiness_options(artifact, *, is_r3_profile, dynamic_profile):
     )
 
 
+def _build_readiness(artifact, config, *, is_r3_profile, dynamic_profile):
+    """Bind the same task readiness policy to either admitted source representation."""
+    from .solution import PickCubeReadinessConfig
+
+    return PickCubeReadinessConfig.from_resolved_config(
+        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+                                               dynamic_profile=dynamic_profile))
+
+
 def _resolve_readiness_declaration(task_config, controller_profile, resolved_config):
     """Resolve the Task's profile and action configuration for every source route."""
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
@@ -279,10 +288,8 @@ def _prepare_mjcf_source(*, backend="cpu", controller_profile="r1", resolved_con
     artifact = readiness = None
     if require_readiness:
         artifact = compile_panda_box_artifact(declaration, robot=robot)
-        from .solution import PickCubeReadinessConfig
-        readiness = PickCubeReadinessConfig.from_resolved_config(
-            artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
-                                                   dynamic_profile=dynamic_profile))
+        readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
+                                     dynamic_profile=dynamic_profile)
     compiled = compile_panda_box_task(declaration, config=config, artifact=artifact,
                                       robot=robot, backend=backend, own_snapshot=True)
     return _PreparedReferenceSource(task_config, recipe, compiled.source.config, is_r3_profile,
@@ -467,16 +474,15 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
                                     resolved_config, task_config, lift_height_m,
                                     physical_fixture, robot):
     """Compile Task readiness and the admitted USD source before Controller binding."""
-    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
+    from .solution import PickCubeReadinessSolution
 
     task_config = _configuration() if task_config is None else task_config
     config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
         task_config, controller_profile, resolved_config)
     config = replace(config, runtime=replace(config.runtime, backend='cpu'))
     artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
-    readiness = PickCubeReadinessConfig.from_resolved_config(
-        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
-                                               dynamic_profile=dynamic_profile))
+    readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
+                                 dynamic_profile=dynamic_profile)
     source_ids = _source_identity_files(None, PickCubeReadinessSolution,
                                         profile_source=profile_source, provider='isaacsim')
     robot = make_agent('panda-v1') if robot is None else robot
@@ -500,9 +506,6 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, reso
     from .solution import PickCubeReadinessSolution
     runtime_input, controller, physical = selection
     robot, action_config = context.robot, context.action_config
-    scene_source = runtime_input.runtime_source.scene_source
-    loaded, panda_xml = scene_source.loaded_delivery, scene_source.xml
-    manifest_path = loaded.manifest_path
     readiness = context.readiness
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     from ...runtime.sessions.isaac_usd_admission import f06_construction_source_inventory
@@ -553,8 +556,6 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, reso
         "execution_spec_v1": runtime_input.execution,
         "reset_plan": runtime_input.reset_plan,
         "session_admission_input": runtime_input,
-        "f06_delivery_manifest_path": str(manifest_path),
-        "kinematics_source_xml": panda_xml,
     }
 
 
@@ -588,7 +589,7 @@ def _isaac_reference_builder(*, delivery_manifest, controller_profile,
 
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
     """Build the external Solution from Task and Robot declarations, without a source lease."""
-    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
+    from .solution import PickCubeReadinessSolution
 
     robot = make_agent('panda-v1')
     robot.source_recipe_for_profile(controller_profile)
@@ -598,9 +599,8 @@ def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous
     if backend not in {'cpu', 'cuda'}:
         raise ValueError('PickCube reference backend must be cpu or cuda')
     artifact = build_artifact(task_config=task_config)
-    readiness = PickCubeReadinessConfig.from_resolved_config(
-        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
-                                               dynamic_profile=dynamic_profile))
+    readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
+                                 dynamic_profile=dynamic_profile)
     return PickCubeReadinessSolution(config=readiness)
 
 

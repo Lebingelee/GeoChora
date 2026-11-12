@@ -206,7 +206,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     assert usd_bindings[0]['world_frames'] == {'tabletop-v1/top': 'tabletop_v1/top'}
     assert usd_bindings[0]['free_body_semantics'] == ('cube-v1',)
     assert value['source'].scene_source.loaded_delivery is loads[0]
-    assert value['kinematics_source_xml'] == loads[0].source_input_bytes[
+    assert value['source'].scene_source.xml == loads[0].source_input_bytes[
         loads[0].delivery.source_entry_file].decode('utf-8')
     assert artifact.semantics.parameters_si['lift_height'] == .17
     assert artifact.initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
