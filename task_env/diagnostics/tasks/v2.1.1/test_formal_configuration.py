@@ -342,3 +342,17 @@ def test_resolved_controller_profile_has_one_owner():
         resolved.environment, control=replace(resolved.environment.control, profile_id='r3_continuous_v1')))
     assert changed.controller_profile == 'r3_continuous_v1'
     assert resolve_task_env_config(task, changed) == changed
+
+
+def test_execution_selection_has_one_owner():
+    from dataclasses import asdict, replace
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get('pendulum-v1')
+    resolved = resolve_task_env_config(task, {'execution': {'physics_provider': 'mujoco'}})
+    data = asdict(resolved)
+    assert not {'physics_provider', 'physics_device', 'render_default'} & data.keys()
+    assert resolved.physics_provider == resolved.execution_spec_v2.physics_provider == 'mujoco'
+    assert resolved.physics_device == resolved.execution_spec_v2.physics_device == 'cpu'
+    assert resolved.render_default == resolved.execution_spec_v2.render_default
+    with pytest.raises(TypeError, match='must be ExecutionSpecV2'):
+        replace(resolved, execution_spec_v2=None)

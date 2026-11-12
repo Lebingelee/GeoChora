@@ -309,14 +309,13 @@ def _resolve_selected_config(environment_type, config):
                                 "render_default": supplied.render_default.to_mapping()},
                   "episode": {"horizon": supplied.environment.episode.horizon, "seed": supplied.environment.episode.seed,
                               "ignore_done": supplied.environment.episode.ignore_done}}
-        if supplied.execution_spec_v2 is not None:
-            selection = supplied.execution_spec_v2
-            config["execution"].update({
-                name: getattr(selection, name) for name in (
-                    "host", "engine", "solver_family", "solver_algorithm", "coupler",
-                    "batch_layout", "deployment", "interpreter", "native_dt",
-                )
-            })
+        selection = supplied.execution_spec_v2
+        config["execution"].update({
+            name: getattr(selection, name) for name in (
+                "host", "engine", "solver_family", "solver_algorithm", "coupler",
+                "batch_layout", "deployment", "interpreter", "native_dt",
+            )
+        })
         config["task"] = dict(supplied.task_parameters)
         config['controller'] = {'parameters': json.loads(supplied.controller_parameters_json)}
         if supplied.gravity_compensation:
@@ -520,8 +519,6 @@ def _resolve_selected_config(environment_type, config):
     result = ResolvedSelectedConfig(
         environment=env,
         task_uid=environment_type.uid,
-        physics_provider=provider,
-        physics_device=device,
         gravity_compensation=gravity_compensation,
         reset_profile=reset_profile,
         robot_uid=robot_uid,
@@ -529,12 +526,9 @@ def _resolve_selected_config(environment_type, config):
         source_delivery_manifest=manifest,
         task_parameters=tuple(sorted(params)),
         task_configuration_json=task_configuration_json,
-        render_default=renderer,
         execution_spec_v2=selection,
         requested_execution_json=requested_json,
     )
-    if supplied is not None and supplied.execution_spec_v2 is None:
-        supplied = replace(supplied, execution_spec_v2=selection)
     if supplied is not None and supplied != result:
         raise ValueError("resolved selected configuration contains unsupported overrides")
     if supplied is not None and requested_json is not None:

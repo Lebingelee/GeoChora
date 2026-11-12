@@ -1048,3 +1048,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +5／−2，净增 3 行；版本诊断修改 1 文件 +13／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务及 reset／worker 均消费相同的 Controller 选择；这消除一个重复配置权威，不表示其余配置类型或构建链已经全部合并。provider／renderer 的 source、状态、clock、提交和资源合同未改。
 
 130 项版本检查通过，包括 Controller profile 的单一存储、替换后的读取和已解析配置重建。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期及 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑；旧证据仍只证明原受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_single_controller_config_20261112_x65s60e1/`；E01～E04 仍未接收。
+
+### 6.100 执行选择由同一请求持有
+
+输入 `c596cfc1`。正式已解析配置此前重复保存 provider、设备和默认 renderer，另有可为空的 `ExecutionSpecV2` 及缺失时补建旧分支。现在这三项只由必需的执行请求持有，外层属性直接读取；环境后端与请求后端必须一致。直接 dataclass 序列化时外层重复字段退出，已解析配置仍通过规范执行字段往返。请求中的默认 renderer 仍为 state-only，创建 Env 时另外声明的固定任务 RGB renderer 保持既有合同，并未归并或扩展。
+
+生产修改 2 文件 +25／−21，净增 4 行，其中部分是移除旧条件后的缩进迁移；版本诊断修改 1 文件 +14／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务和 worker 现在读取同一执行选择，删除旧的无执行请求补建分流；环境配置与执行请求仍为不同职责的数据结构，其他构建分流尚未收敛。provider／renderer 的实际 source、状态、clock、提交和资源合同未改。
+
+131 项版本检查通过，包括单一执行选择存储及缺少执行请求的拒绝。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 Position／固定任务 RGB 完成两次 reset、一次非零外部 action、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_single_execution_config_20261112_xivc3c1e/` 和 `workspace/maintenance/v211_single_execution_config_isaac_20261112_wobwghqv/`；E01～E04 仍未接收。

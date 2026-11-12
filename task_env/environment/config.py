@@ -582,21 +582,28 @@ class ResolvedSelectedConfig:
 
     environment: ResolvedEnvConfig
     task_uid: str
-    physics_provider: str
-    physics_device: str
+    execution_spec_v2: ExecutionSpecV2
     source_delivery_manifest: str | None = None
     task_parameters: tuple[tuple[str, float], ...] = ()
     task_configuration_json: str | None = None
-    render_default: RendererSelectionV1 = field(default_factory=lambda: RendererSelectionV1(
-        "renderer-selection-v1", "none", "cpu", "none", None,
-    ))
-    execution_spec_v2: ExecutionSpecV2 | None = None
     requested_execution_json: str | None = None
     gravity_compensation: bool = False
     reset_profile: str | None = None
     robot_uid: str | None = None
     native_drive: str | None = None
     controller_parameters_json: str = '{}'
+
+    @property
+    def physics_provider(self) -> str:
+        return self.execution_spec_v2.physics_provider
+
+    @property
+    def physics_device(self) -> str:
+        return self.execution_spec_v2.physics_device
+
+    @property
+    def render_default(self) -> RendererSelectionV1:
+        return self.execution_spec_v2.render_default
 
     @property
     def controller_profile(self) -> str | None:
@@ -617,8 +624,11 @@ class ResolvedSelectedConfig:
             raise ValueError('reset profile must be a nonempty trimmed string or None')
         if type(self.gravity_compensation) is not bool:
             raise TypeError('selected gravity_compensation must be a boolean')
-        if self.execution_spec_v2 is not None and type(self.execution_spec_v2) is not ExecutionSpecV2:
-            raise TypeError("selected execution_spec_v2 must be ExecutionSpecV2 or None")
+        if type(self.execution_spec_v2) is not ExecutionSpecV2:
+            raise TypeError("selected execution_spec_v2 must be ExecutionSpecV2")
+        self.execution_spec_v2.validate()
+        if self.environment.runtime.backend != self.execution_spec_v2.physics_backend:
+            raise ValueError("resolved environment and execution backend differ")
         if self.requested_execution_json is not None:
             if type(self.requested_execution_json) is not str or not isinstance(json.loads(self.requested_execution_json), dict):
                 raise ValueError("requested execution must be a JSON mapping")
