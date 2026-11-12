@@ -316,6 +316,56 @@ def begin_structured_recording(path, *, horizon, observation, reset_info, metada
     return path, recorder
 
 
+def begin_selected_recording(env, path, *, adapter_path):
+    """Choose the existing writer and prepare its metadata for one reset boundary."""
+    if env.value.get('physical_execution') is not None or getattr(env, '_physical_reset_selection', None) is not None:
+        from .physical_metadata import physical_boundary_info, physical_record_metadata
+        execution = env._physical_execution()
+        if getattr(env, '_physical_reset_selection', None) is None:
+            groups = execution.scene.control_groups or ()
+            if (len(execution.controllers) != 1 or len(groups) != 1
+                    or env.binding.external_action_contract is None):
+                raise ValueError('physical recording requires one declared controller and action group')
+        return begin_structured_recording(
+            path, horizon=env.horizon, observation=env.obs,
+            reset_info=physical_boundary_info(env, env.info),
+            metadata_factory=lambda: physical_record_metadata(env))
+    if getattr(env, 'position_profile', False):
+        from .position_metadata import position_record_metadata
+        return begin_structured_recording(
+            path, horizon=env.horizon, observation=env.obs, reset_info=env._position_reset_info,
+            metadata_factory=lambda: position_record_metadata(env, include_binding_provenance=True))
+
+    path = Path(path)
+    if path.exists():
+        raise FileExistsError(path)
+    from .reference_provenance import selected_recording_metadata, selected_source_provenance
+    execution_configuration = env._recorded_execution_configuration()
+    solution_identity = env._active_solution_identity()
+    env._recording_adapter_source_sha256, provenance = selected_source_provenance(
+        adapter_path=adapter_path, binding=env.binding, value=env.value, artifact=env.artifact,
+        controller_identity=env._selected_controller.identity, solution_identity=solution_identity,
+        execution_configuration=execution_configuration,
+        execution_receipt=(env.get_execution_receipt()
+                           if getattr(env, 'resolved_public_config', None) is not None else None))
+    owners = env._owners()
+    metadata, recipe = selected_recording_metadata(
+        artifact=env.artifact, sample=env.sample, realized=env.realized,
+        execution=env.execution, provider=env.provider, source_provenance=provenance,
+        controller_identity=env._selected_controller.identity, solution_identity=solution_identity,
+        action_schema=env.metadata['action_schema'],
+        factory=type(env).__module__ + '.' + type(env).__name__,
+        configuration=env.value['resolved_configuration'],
+        execution_configuration=execution_configuration, owners=owners)
+    if env.binding.recorder_mode == 'canonical':
+        from ..trajectory.canonical.contracts import CanonicalRecorder
+        return path, CanonicalRecorder(metadata, env._boundary())
+    from ..trajectory.canonical.execution import ExecutionRecorder
+    recorder = ExecutionRecorder(metadata, recipe, content_fields=('task_outcome',))
+    recorder.boundary(env._boundary(), owners, 'reference', env.info['task_metrics'])
+    return path, recorder
+
+
 def finalize_structured_recording(recorder, path, episode_end, reason, *, position, camera=False):
     """Finalize and verify the existing v3 stream against its episode boundary."""
     from .h5 import load_camera_observations_h5, load_structured_control_records_h5

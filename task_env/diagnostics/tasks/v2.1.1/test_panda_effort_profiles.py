@@ -397,12 +397,12 @@ def test_fixed_effort_does_not_construct_position_controller(provider, profile, 
 def test_switchable_effort_recording_uses_physical_owner_metadata(monkeypatch, tmp_path):
     import sys
     from task_env import make_env
-    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.recorders import position_metadata
 
-    def reject_position_metadata(_env):
+    def reject_position_metadata(_env, **_kwargs):
         raise AssertionError('physical recording must not use Position metadata')
 
-    monkeypatch.setattr(SelectedReferenceEnv, '_position_record_metadata', reject_position_metadata)
+    monkeypatch.setattr(position_metadata, 'position_record_metadata', reject_position_metadata)
     env = make_env('pick-cube-p16-reference-v1', config={
         'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process',
                       'interpreter': sys.executable},

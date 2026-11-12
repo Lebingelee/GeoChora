@@ -2910,9 +2910,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if (self.state.control_step >= self.horizon
                 and not getattr(self.binding, 'physical_ignore_done', False)):
             raise RuntimeError('selected physical-control horizon is exhausted')
-        if (self.recorder is not None and getattr(self.recorder, 'active', False)
-                and getattr(self, '_physical_reset_selection', None) is None):
-            raise StageUnavailableError('physical-control recording requires reset-scoped selection')
         profile = self._physical_execution()
         if type(profile) is not PhysicalControlExecutionV1:
             raise TypeError('selected physical route requires an admitted physical execution profile')
@@ -4211,69 +4208,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def start_recording(self, path):
-        from ..trajectory.canonical.execution import ExecutionRecorder
         if (self.session is None or self.state.control_step != 0 or self.recorder is not None
-                or self._stopped or self._position_episode_end is not None
-):
+                or self._stopped or self._position_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
-        if getattr(self, '_physical_reset_selection', None) is not None:
-            from ..recorders.recorder import begin_structured_recording
-            from ..recorders.physical_metadata import physical_record_metadata
-            self.recording_path, self.recorder = begin_structured_recording(
-                path, horizon=self.horizon, observation=self.obs, reset_info=self.info,
-                metadata_factory=lambda: physical_record_metadata(self),
-            )
-            return
-        if getattr(self, 'position_profile', False):
-            from ..recorders.recorder import begin_structured_recording
-            from ..recorders.position_metadata import position_control_binding_provenance
-            def metadata_factory():
-                record_metadata = self._position_record_metadata()
-                record_metadata['resolved_config']['position_control_binding_provenance'] = (
-                    position_control_binding_provenance(
-                        self._materialized_position_control_binding,
-                        self._materialized_position_control_selector,
-                    )
-                )
-                return record_metadata
-            self.recording_path, self.recorder = begin_structured_recording(
-                path, horizon=self.horizon, observation=self.obs,
-                reset_info=self._position_reset_info, metadata_factory=metadata_factory,
-            )
-            return
-        path = Path(path)
-        if path.exists():
-            raise FileExistsError(path)
-        from ..recorders.reference_provenance import (
-            selected_recording_metadata, selected_source_provenance,
-        )
-        execution_configuration = self._recorded_execution_configuration()
-        solution_identity = self._active_solution_identity()
-        self._recording_adapter_source_sha256, source_provenance = selected_source_provenance(
-            adapter_path=__file__, binding=self.binding, value=self.value, artifact=self.artifact,
-            controller_identity=self._selected_controller.identity, solution_identity=solution_identity,
-            execution_configuration=execution_configuration,
-            execution_receipt=(self.get_execution_receipt()
-                               if getattr(self, 'resolved_public_config', None) is not None else None),
-        )
-        owners = self._owners()
-        metadata, recipe = selected_recording_metadata(
-            artifact=self.artifact, sample=self.sample, realized=self.realized,
-            execution=self.execution, provider=self.provider, source_provenance=source_provenance,
-            controller_identity=self._selected_controller.identity, solution_identity=solution_identity,
-            action_schema=self.metadata['action_schema'],
-            factory=type(self).__module__ + '.' + type(self).__name__,
-            configuration=self.value['resolved_configuration'],
-            execution_configuration=execution_configuration, owners=owners,
-        )
-        if self.binding.recorder_mode == 'canonical':
-            from ..trajectory.canonical.contracts import CanonicalRecorder
-            recorder = CanonicalRecorder(metadata, self._boundary())
-            self.recording_path, self.recorder = path, recorder
-            return
-        recorder = ExecutionRecorder(metadata, recipe, content_fields=('task_outcome',))
-        recorder.boundary(self._boundary(), owners, 'reference', self.info['task_metrics'])
-        self.recording_path, self.recorder = path, recorder
+        from ..recorders.recorder import begin_selected_recording
+        self.recording_path, self.recorder = begin_selected_recording(self, path, adapter_path=__file__)
 
     def _record_interval(self, request, canonical, target, applied, stage, diagnostics,
                          terminated, truncated, substeps):
@@ -4289,7 +4228,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def finish_recording(self, reason):
-        if getattr(self, '_physical_reset_selection', None) is not None:
+        if (getattr(self, '_physical_reset_selection', None) is not None
+                or self.value.get('physical_execution') is not None):
             from ..recorders.recorder import finalize_structured_recording
             if self.recorder is None or not getattr(self.recorder, 'active', False):
                 raise RuntimeError('no active recording')
@@ -4332,17 +4272,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 'universal_action_schema': {'version': schema['schema_version'],
                     'dimension': len(schema['components']), 'components': schema['components']}}
         if getattr(self, 'position_profile', False):
-            return self._position_record_metadata()
+            from ..recorders.position_metadata import position_record_metadata
+            return position_record_metadata(self)
         return {'execution_configuration_v1': self.get_execution_receipt()}
-    def _position_record_metadata(self):
-        from ..recorders.position_metadata import position_record_metadata
-        result = position_record_metadata(self)
-        if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
-            result['resolved_config']['gravity_compensation'] = True
-            result['env_metadata']['reference_profile']['gravity_compensation'] = {
-                'enabled': True, 'schema_version': 'panda-gravity-position-contribution-v1',
-                'source_closure_digest': self.value['source'].source_closure_digest,
-            }
-        if self._selected_execution_context()[0] is not None:
-            result['execution_configuration_v1'] = self.get_execution_receipt()
-        return result

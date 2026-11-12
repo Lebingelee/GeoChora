@@ -37,7 +37,7 @@ def position_control_binding_provenance(binding, selector):
     }
 
 
-def position_record_metadata(self):
+def position_record_metadata(self, *, include_binding_provenance=False):
     from dataclasses import asdict
 
 
@@ -140,7 +140,7 @@ def position_record_metadata(self):
         'dimension': len(universal_components),
         'components': universal_components,
     }
-    return {
+    result = {
         'env_metadata': env_metadata,
         'universal_action_schema': universal_schema,
         'resolved_config': {
@@ -153,18 +153,19 @@ def position_record_metadata(self):
             'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
         },
     }
-    if self.dual_entity_position:
-        env_metadata['candidate_identity']['scene_identity_hash'] = self.position_scene.identity_hash
-        env_metadata['reference_profile']['writers'] = tuple({
-            'entity_id': item.entity_id,
-            'profile_id': item.profile_id,
-            'writer_id': item.writer_id,
-            'controller_identity': item.identity,
-            'required_state': item.requirements.to_mapping(),
-        } for item in position_profiles)
-        env_metadata['resolved_config']['controller_profiles'] = tuple(
-            item.profile_id for item in position_profiles
-        )
+    if getattr(getattr(self, 'resolved_public_config', None), 'gravity_compensation', False):
+        result['resolved_config']['gravity_compensation'] = True
+        result['env_metadata']['reference_profile']['gravity_compensation'] = {
+            'enabled': True, 'schema_version': 'panda-gravity-position-contribution-v1',
+            'source_closure_digest': self.value['source'].source_closure_digest,
+        }
+    if self._selected_execution_context()[0] is not None:
+        result['execution_configuration_v1'] = self.get_execution_receipt()
+    if include_binding_provenance:
+        result['resolved_config']['position_control_binding_provenance'] = (
+            position_control_binding_provenance(self._materialized_position_control_binding,
+                                                self._materialized_position_control_selector))
+    return result
 
 
 def record_position_transition(self, request, canonical, target, applied, *, terminated, truncated):

@@ -11,19 +11,42 @@ from task_env.controllers.canonical.contracts import digest
 from task_env.trajectory.canonical.streaming import load_streaming
 
 
+def inspect_selected_replay(path):
+    """Inspect the outer format without constructing an Env or importing a physics SDK.
+
+    Format support is not proof of source identity or successful re-execution.
+    """
+    with h5py.File(path, 'r') as handle:
+        schema = handle.attrs.get('schema')
+        if isinstance(schema, bytes):
+            schema = schema.decode('utf-8')
+        generic_schema = handle.attrs.get('schema_id')
+    supported = {'task-env-canonical-trajectory-v0', 'task-env-canonical-execution-v1',
+                 'task-env-canonical-execution-v2'}
+    if schema == 'task-env-canonical-trajectory-v1':
+        reason = ('canonical trajectory v1 stores structured controls/events/outcome; selected reference replay '
+                  'does not yet reproduce that execution contract')
+    elif schema == 'task-env-canonical-execution-v3':
+        reason = ('execution trajectory v3 stores structured controls/events/outcome; selected reference replay '
+                  'does not yet compare that contract')
+    elif schema not in supported:
+        reason = 'unsupported selected reference replay format'
+    else:
+        reason = None
+    return {'schema': schema, 'generic_schema': generic_schema,
+            'format_supported_for_reexecution': reason is None, 'reason': reason,
+            'source_identity_checked': False}
+
+
 def reexecute_selected(path, *, output):
-    from task_env import make_env
+    inspected = inspect_selected_replay(path)
+    if not inspected['format_supported_for_reexecution']:
+        raise ValueError(inspected['reason'])
+    outer = inspected['schema'] == 'task-env-canonical-trajectory-v0'
     from task_env.environment.reference_env import __file__ as adapter_file
     from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID as PC
     from task_env.tasks.nut_assembly.task import REFERENCE_ENV_ID as NA
     SELECTED_ENV_IDS = (PC, NA)
-    with h5py.File(path, 'r') as handle:
-        outer_schema = handle.attrs.get('schema')
-        if outer_schema == 'task-env-canonical-trajectory-v1':
-            raise ValueError('canonical trajectory v1 stores structured controls/events/outcome; selected reference replay does not yet reproduce that execution contract')
-        if outer_schema == 'task-env-canonical-execution-v3':
-            raise ValueError('execution trajectory v3 stores structured controls/events/outcome; selected reference replay does not yet compare that contract')
-        outer = outer_schema == 'task-env-canonical-trajectory-v0'
     if outer:
         from task_env.trajectory.canonical.h5 import load
         value = load(path).to_mapping()
@@ -51,6 +74,7 @@ def reexecute_selected(path, *, output):
     coordinator_source = metadata['source_provenance'].get('coordinator_source')
     if coordinator_source is not None and coordinator_source != reference_provenance.source_snapshot(reference_provenance.__file__):
         raise ValueError('coordinator source identity mismatch; no historical identity substitution')
+    from task_env import make_env
     env = make_env(configuration['env_id'], config={k:v for k,v in configuration.items() if k!='env_id'})
     try:
         binding_sources = {

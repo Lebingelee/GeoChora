@@ -1,5 +1,9 @@
 # v2.1.1 API 与迁移入口
 
+Recorder 旧叶节点格式的只读入口为 `task_env.recorders.load_legacy_leaf_control_h5`；它校验结构并解码历史记录，不声称实验通过。此前的 `load_leaf_control_records_h5` 已退休；需要原 R02c/R03c 固定条件和运动判据时，单独运行 `python task_env/diagnostics/tasks/v2.1.1/legacy_leaf_judge.py <历史H5路径>`。普通 v3 控制记录使用 `load_structured_control_records_h5`。`task_env.trajectory.reference_replay.inspect_selected_replay` 只检查外层格式、不会构造 Env；格式受支持不代表源码身份已核对或重执行成功。`reexecute_selected` 仍严格检查源码身份并拒绝不支持的格式。
+
+带物理状态边界的 v3 记录可用 `task_env.recorders.load_physical_recording_h5` 读取观测、结构化动作、clock、episode outcome 和可选 task RGB；它校验 source、控制提交和相机捕获的边界身份。RGB 字节本身尚无独立内容摘要，旧的 `load_camera_observations_h5` 是另一套多模态 Position 实验格式，不能将二者等同。当前非 Panda 物理记录只准入一个声明的 Controller 与一个 action group；详细受测范围见 U6 实施记录。
+
 当前（2026-11-11）：G01～G05 已各自有界接收，5c 单元 1～9 收口，现进入[代码与项目优化](../planning/post-5c-optimization-execution.md)。受测能力、正式入口尚存的迁移工作和限制以[当前摘要](../maintenance/current-state.md)及[单元 9 主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)为准。本页下面的历史设计／实现记录不把未实现目标升级为 API。
 
 历史记录：3b attempt001 已通过公开 factory 在三条指定路线完成 seed31 的10步与独立读回，整体仍为 PARTIAL、待 Sol 复审：三路线短窗正向位移均未过冻结门。PickCube F06 的 `env.step` 接受既有8维绝对世界位姿与开口动作，并复用已绑定 Controller 的结构化投影；其 Recorder 保存该运行的请求、模型和原生确认。其他 Position 路线仍按各自声明要求 typed action。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。

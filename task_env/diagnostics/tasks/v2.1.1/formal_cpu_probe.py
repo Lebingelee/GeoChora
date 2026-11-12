@@ -8,7 +8,7 @@ parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--extra-robot-asset-root',action='store_true')
 parser.add_argument('--annotate-robot-source',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);parser.add_argument('--solution-after-switch',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--count-provenance',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');parser.add_argument('--controller-kp',type=float,default=None);parser.add_argument('--solution-after-switch',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 if args.controller_kp is not None and not (args.case == 'panda-joint' and args.record):
     raise ValueError('Controller gain probe requires switchable panda-joint recording')
@@ -302,7 +302,16 @@ try:
             assert active_robot.controllers == committed.controllers
             assert active_robot.controller is env.controller is committed.controllers[0]
             result['first_physical_controller']=active_robot.controller.identity
+        if args.count_provenance:
+            from task_env.recorders import reference_provenance
+            provenance_calls=[]
+            original_source_snapshot=reference_provenance.source_snapshot
+            def counted_source_snapshot(path):
+                provenance_calls.append(str(path))
+                return original_source_snapshot(path)
+            reference_provenance.source_snapshot=counted_source_snapshot
         if args.record:env.start_recording(Path('episode.h5').resolve())
+        if args.count_provenance:result['provenance_start_calls']=list(provenance_calls)
         first=env.session.state_boundary_identity().to_mapping()
         if subject_binding is not None:
             live_binding=env.session._source.position_subject_binding
@@ -336,6 +345,7 @@ try:
             assert getattr(env.session, '_control_lifecycle_dispatch', None) is dispatch
             result['stale_action_rejected_without_fault']=True
         stepped=env.step_with_solution(solution) if args.case=='nut' or args.solution else env.step(action)
+        if args.count_provenance:result['provenance_after_step_calls']=list(provenance_calls)
         dispatch = env.session._control_lifecycle_dispatch
         submission = env.session._last_control_submission
         assert dispatch.stage == 'committed' and submission['status'] == 'acknowledged'

@@ -243,8 +243,8 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 | U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`，提交 `73eebf37`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 初始化 facade 的 provider 缺口、旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
 | U3／S13～S18 | IMPLEMENTED | 输入 `73eebf37`，提交 `ff5309d0`；[实施结果、字段来源、证据与限制](../maintenance/20261112_e05_e10_u3_observation_delivery.md)。Robot 与 Task 拥有各自投影，renderer 在 adapter 声明状态需求；四任务 schema、非 Position RGB 和跨 provider reset 已定向复验。光学 readback、重复 render、Isaac 采集与 Recorder metadata 分别留 U4/U6/U7；结果为实施者自评，E07/E08 尚未接收。 |
 | U4／S19～S25 | IMPLEMENTED | 输入 `ff5309d0`，提交 `1ce601fa`；[实施结果、真实采集与窗口证据](../maintenance/20261112_e05_e10_u4_renderer_delivery.md)。renderer capability 与 factory 对齐，Isaac task/observer 请求和故障分离，展示与相机输入走公开合同；三家原生及 cross 路线分别按影响复验。U3 简单任务附加 RGB schema 遗漏已修复，设备限制及先前失败保留；结果为实施者自评，E08 尚未接收。 |
-| U5／S26～S30 | IMPLEMENTED | 输入 `1ce601fa`；[实施结果、调用链与真实证据](../maintenance/20261113_e05_e10_u5_task_delivery.md)。PickCube 一次选择 source strategy，Task 场景声明与 F06 provider 资产分离；Nut 通用 guard/interval 归 completion/feedback，严格任务条件保留并修复 Solution 临时 source 泄漏。Task provenance/Recorder 共性留 U6，specialization 仍较大，E09 尚未接收；本结果为实施者自评。 |
-| U6／S31～S36 | OPEN | 尚未实施 |
+| U5／S26～S30 | IMPLEMENTED | 输入 `1ce601fa`，提交 `5cb0d470`；[实施结果、调用链与真实证据](../maintenance/20261113_e05_e10_u5_task_delivery.md)。PickCube 一次选择 source strategy，Task 场景声明与 F06 provider 资产分离；Nut 通用 guard/interval 归 completion/feedback，严格任务条件保留并修复 Solution 临时 source 泄漏。Task provenance/Recorder 共性留 U6，specialization 仍较大，E09 尚未接收；本结果为实施者自评。 |
+| U6／S31～S36 | IMPLEMENTED | 输入 `5cb0d470`；[实施结果与证据](../maintenance/20261113_e05_e10_u6_recording_delivery.md)。旧 Judge 与 codec 分层、只读 inspect；Pendulum 和双轮车进入 v3 物理记录，Pendulum 同次状态／动作／clock／RGB／outcome 已独立读回。图片字节没有独立摘要；GeoPhys／Isaac 受影响路线与最终对账留 U7。本结果为实施者自评。 |
 | U7／S37～S40 | OPEN | 尚未实施；最终分别给六事件状态，独立主审和维护者接收分列 |
 
 每行最终结果可链接一份按模块压缩的实现摘要及机器可复核证据；S格的最终owner/判断可放同一摘要的40行表，不另建40份报告。没有对应最终调用与证据的格子仍为OPEN。

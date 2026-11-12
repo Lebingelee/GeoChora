@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-12。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-13。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
@@ -18,7 +18,7 @@
 | GeoPhys／Menagerie | `c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7`／`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` |
 | 工作树 | 启动时 tracked clean；四个既有 untracked 输入原样保护，含优化台账 |
 | 执行窗口 | 单元 9 已有返包及释放记录；启动观察未见本仓库 native worker，前序协调 chat 为 idle；启动时当前 chat 仅写 O0 文档；后续直接实施 E00～E04 的资源使用按其运行计划及释放记录核对 |
-| 当前改动 | E00～E04 已完成实施、基线独立主审及主审余项修复，并于 2026-11-12 获维护者统一接收。当前生产 `912416e6`，精确验证输入及限制见执行计划第 6 节；不沿用启动表充当实时锁 |
+| 当前改动 | E00～E04 已完成实施、基线独立主审及主审余项修复，并于 2026-11-12 获维护者统一接收。E00～E04 接收生产 `912416e6`，精确验证输入及限制见执行计划第 6 节；不沿用启动表充当实时锁 |
 
 保护输入为 `MUJOCO_LOG.TXT`、2026-10-30 runtime route handoff、stage3 gravity proposal 和用户优化台账。精确大小／SHA-256 与原工作树状态在 ignored [输入快照](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json)。没有将它们加入本轮提交，也没有清理原始输出、改动 pins、merge／push／tag。
 
@@ -34,7 +34,7 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## 正式入口及当前实施
 
-当前生产为 `912416e6`；四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。基线生产 `76536d2a` 已有[独立主审建议](reviews/20261112_e00_e04_independent_review_76536d2a.md)，后续主审余项在 `912416e6` 修复并自检；维护者于本次对话统一接收 E00～E04。后续自检与原独立主审仍按各自时点保留。
+E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。基线生产 `76536d2a` 已有[独立主审建议](reviews/20261112_e00_e04_independent_review_76536d2a.md)，后续主审余项在 `912416e6` 修复并自检；维护者于本次对话统一接收 E00～E04。后续自检与原独立主审仍按各自时点保留。
 
 | 事件 | 当前状态 | 实际进展和剩余边界 |
 | --- | --- | --- |
@@ -48,6 +48,6 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
 
-## 当前实施范围：E05～E10（U1～U5 已实施）
+## 当前实施范围：E05～E10（U1～U6 已实施）
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U5 已实施，结果及边界见专用账本第 13 节，U6 待实施。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U6 已实施（实施者自评），结果及边界见专用账本第 13 节；U7 待做最终影响复验和逐事件对账。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
