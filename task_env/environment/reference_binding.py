@@ -81,6 +81,10 @@ class SourceBoundTaskBuilder:
                 if callable(assert_fresh):
                     assert_fresh()
         try:
+            if fresh:
+                assert_fresh = getattr(getattr(compiled.source, 'scene_source', None), 'assert_fresh', None)
+                if callable(assert_fresh):
+                    assert_fresh()
             if fresh and self.source_composer is not None:
                 compiled, context = self.source_composer(compiled, context, request)
             if fresh:

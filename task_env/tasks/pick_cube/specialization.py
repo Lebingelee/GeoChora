@@ -495,7 +495,6 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
         seed=request.seed, horizon=request.horizon, physical_fixture=physical_fixture)
     if runtime_input.artifact.timebase != artifact.timebase:
         raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
-    runtime_input.runtime_source.scene_source.assert_fresh()
     return (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
             _UsdSourceContext(runtime_input, robot, config.action, task_config, config,
                               readiness, dynamic_profile, source_ids))

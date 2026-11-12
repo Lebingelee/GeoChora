@@ -82,6 +82,23 @@ def test_cached_builder_rejects_stale_usd_source_before_reset_plan():
     assert plans == [31]
 
 
+def test_new_stale_source_is_rejected_before_controller_and_releases_lease(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+
+    calls = []
+    def stale():
+        raise ValueError('new source is stale')
+    source = SimpleNamespace(scene_source=SimpleNamespace(assert_fresh=stale))
+    receipt = SimpleNamespace(close=lambda: calls.append('closed'))
+    monkeypatch.setattr(source_module, 'source_resource_receipt', lambda value: receipt)
+    builder = SourceBoundTaskBuilder(lambda _request: (CompiledReferenceTaskV1(None, source), None),
+        None, backend='cuda', controller_factory=lambda *_args, **_kwargs: calls.append('controller'),
+        controller_options=lambda *_args: {})
+    with pytest.raises(ValueError, match='new source is stale'):
+        builder(TaskBuildRequest('isaacsim', 'cuda', 31, 8, None, None))
+    assert calls == ['closed'] and builder._cached is None
+
+
 def test_failed_controller_compilation_releases_new_source(monkeypatch):
     from task_env.runtime.sessions import source as source_module
 
