@@ -1,13 +1,18 @@
 """PickCube reset, observations, and task evaluation semantics."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import hashlib
+import json
 import math
 import numpy as np
 
-from ...artifacts import CanonicalStateView, PoseWorld, SemanticDefinition, TaskArtifact
+from ...artifacts import (CanonicalStateView, PoseWorld, SemanticDefinition, TaskArtifact,
+    AssetDefinition, ArticulationDefinition, EntityInstance, FrameDefinition, FrameReference,
+    JointDefinition, SceneDefinition)
 from ...artifacts.execution import ResetSample
-from ...environment import (TaskEvaluation, TaskEvaluationContextV1,
+from ...environment import (adapt_legacy_recipe_task_source, compile_task_artifact_v1,
+                            TaskEvaluation, TaskEvaluationContextV1,
                             TaskPredicateEvaluationV1, TaskPredicateResultV1)
 from ...environment.task_definition import CanonicalTaskStateView, TaskDefinitionBase, as_task_state_view
 from ...objects.pick_cube import CUBE_HALF_SIZE
@@ -285,6 +290,146 @@ def sample_reset(artifact: TaskArtifact, task_seed: int, *, lift_height_m=None, 
         velocity_policy="zero_named_joint_and_entity_velocities",
         control_policy="arm_targets_at_initial_joints_gripper_open", settle_steps=initial.settle_steps,
     )
+
+
+SCHEMA_VERSION = "pick-cube-isaac-scene-v1"
+SCENE_RECIPE_ID = "pick-cube-isaac-desktop-scene-v1"
+
+
+def build_pickcube_isaac_scene(task_config: dict, *, robot=None) -> SceneDefinition:
+    """Compose the Task scene with the admitted provider's Robot asset identity."""
+    if robot is None:
+        from ...registry import AGENT_REGISTRY
+        robot = AGENT_REGISTRY.create('panda-v1')
+    from ...runtime.sessions.isaac_usd_admission import build_f06_task_scene
+    return build_f06_task_scene(task_config, robot=robot, build_task_scene=build_pickcube_scene)
+
+
+def build_pickcube_scene(task_config, *, robot_scene, robot_asset, ee_frame, cube_frame, cube_joint, table_frame):
+    """Compose Task entities with an already declared Robot and source frame names."""
+    scene_id = robot_scene.scene_id
+    robot_entity = replace(robot_scene.entities[0], asset_id=robot_asset.asset_id,
+                           asset_version=robot_asset.asset_version)
+    recipe_digest = hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
+    cube_asset = AssetDefinition(
+        "asset-definition-v1", "pick-cube-cube-v1", "pick-cube-recipe-v1",
+        "geochora-task-scene://pick-cube-v1/cube", SCENE_RECIPE_ID, recipe_digest,
+    )
+    tabletop_asset = AssetDefinition(
+        "asset-definition-v1", "pick-cube-tabletop-v1", "pick-cube-recipe-v1",
+        "geochora-task-scene://pick-cube-v1/tabletop", SCENE_RECIPE_ID, recipe_digest,
+    )
+    cube = EntityInstance(
+        "entity-instance-v1", "cube-v1", cube_asset.asset_id, cube_asset.asset_version,
+    )
+    tabletop = EntityInstance(
+        "entity-instance-v1", "tabletop-v1", tabletop_asset.asset_id,
+        tabletop_asset.asset_version,
+    )
+    identity_pose = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+    cube_articulation = ArticulationDefinition(
+        "articulation-definition-v1",
+        "cube-v1",
+        "world",
+        ("world", cube_frame),
+        (JointDefinition(
+            "joint-definition-v1",
+            cube_joint,
+            FrameReference("cube-v1", "world"),
+            FrameReference("cube-v1", cube_frame),
+            identity_pose,
+            identity_pose,
+            "floating",
+            None,
+            "xyz_meter_quaternion_wxyz",
+            "linear_xyz_meter_per_second_angular_xyz_radian_per_second",
+            7,
+            6,
+        ),),
+    )
+    return SceneDefinition(
+        schema_version="scene-definition-v3",
+        scene_id=scene_id,
+        assets=(robot_asset, cube_asset, tabletop_asset),
+        entities=(robot_entity, cube, tabletop),
+        frames=(
+            *robot_scene.frames,
+            FrameDefinition("frame-definition-v1", robot_entity.entity_id, ee_frame, "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "cube-v1", "world", "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "cube-v1", cube_frame, "runtime", None, None),
+            FrameDefinition("frame-definition-v1", "tabletop-v1", table_frame, "runtime", None, None),
+        ),
+        articulations=(*robot_scene.articulations, cube_articulation),
+        robots=robot_scene.robots,
+        actuator_resources=robot_scene.actuator_resources,
+        control_groups=robot_scene.control_groups,
+    )
+
+
+def _canonical_task_recipe(task_config: dict) -> bytes:
+    return json.dumps(
+        {"schema_version": SCHEMA_VERSION, "recipe": task_config["recipe"]},
+        sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+
+
+def build_pickcube_mjcf_scene(task_config, robot):
+    """Compose the Task scene from the selected Robot's MJCF declaration."""
+    from ...runtime.sessions.source_scene_import import declare_panda_scene
+
+    panda = declare_panda_scene(robot, entity_id=robot.uid,
+        scene_id=str(task_config['recipe']['scene_uid']))
+    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
+        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
+        cube_joint='PickCube_joint', table_frame='grasp_table')
+
+
+def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame_bindings, cube_frame,
+                                   additional_frames=None):
+    """Compile the same Task semantics against a declared source Scene."""
+    if set(task_config) - {'recipe', 'environment', 'execution'}:
+        raise ValueError('unsupported PickCube task config fields')
+    task_source = adapt_legacy_recipe_task_source({
+        'recipe': task_config['recipe'], 'environment': task_config['environment'],
+    })
+    artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact,
+                                        frame_bindings=frame_bindings)
+    bindings = dict(artifact.legacy_frame_bindings)
+    bindings['cube-v1'] = FrameReference('cube-v1', cube_frame)
+    for name, reference in (additional_frames or {}).items():
+        bindings.setdefault(name, reference)
+    artifact = replace(artifact, legacy_frame_bindings=bindings)
+    artifact.validate_scene(scene)
+    return task_source, artifact
+
+
+def compile_pickcube_mjcf_task(task_config, robot, legacy_artifact):
+    """Compile the MJCF Task/Robot Scene and its complete state bindings."""
+    scene = build_pickcube_mjcf_scene(task_config, robot)
+    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
+              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
+              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
+    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
+                  for item in scene.frames or ()
+                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
+    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
+    bodies = {name: reference.frame_id for name, reference in additional.items()}
+    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
+    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
+
+
+def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
+    """Compile the existing PickCube v0 semantics against its USD Scene."""
+    scene = build_pickcube_isaac_scene(task_config, robot=robot)
+    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings={
+            'panda-v1/base': FrameReference('panda-v1', 'link0'),
+            'panda-v1/ee': FrameReference('panda-v1', 'ee'),
+        }, cube_frame='cube')
+    return task_source, scene, artifact
+
+
 
 
 # Existing imports remain a thin bridge while repository callers migrate.

@@ -16,6 +16,18 @@ GRIPPER_OPEN_TENDON_LENGTH = 0.04
 GRIPPER_SERVO_STIFFNESS = 5000.0
 GRIPPER_CLOSE_DAMPING = 120.0
 
+def build_nut_assembly_declared_model(*, scene, asset, physics_dt, robot_source):
+    """Materialize the Task's scene and object declarations with its selected Robot."""
+    parameters = {**scene, 'physics_dt': physics_dt,
+        'nut_contact_margin_m': asset['nut_contact_margin_m'],
+        'freejoint_damping': asset['freejoint_damping'],
+        'freejoint_armature': asset['freejoint_armature']}
+    return build_nut_assembly_model_xml(parameters,
+        nut_mass_kg=float(asset['nut_mass_kg']),
+        nut_diagonal_inertia_kg_m2=tuple(asset['nut_diagonal_inertia_kg_m2']),
+        robot_source=robot_source)
+
+
 def _find_body(root: ET.Element, name: str) -> ET.Element:
     for body in root.iter("body"):
         if body.get("name") == name:

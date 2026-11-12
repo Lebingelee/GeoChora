@@ -17,7 +17,7 @@ from ...artifacts import (
     PoseWorld, SemanticDefinition, TaskArtifact, Timebase,
 )
 from ...artifacts.execution import ResetSample
-from ...assembly.nut_assembly import build_nut_assembly_model_xml
+from ...assembly.nut_assembly import build_nut_assembly_declared_model
 from ...assembly.compiler import (
     CompiledReferenceTaskV1,
     ReferenceTaskDeclarationV1,
@@ -263,13 +263,8 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         robot=replace(config.robot,
             gripper=replace(config.robot.gripper, **source_config["gripper_overrides"])))
     scene = recipe["scene"]
-    scene_parameters = {**scene, "physics_dt": recipe["physics_dt"],
-        "nut_contact_margin_m": recipe["asset"]["nut_contact_margin_m"],
-        "freejoint_damping": recipe["asset"]["freejoint_damping"],
-        "freejoint_armature": recipe["asset"]["freejoint_armature"]}
-    scene_xml, base = build_nut_assembly_model_xml(scene_parameters,
-        nut_mass_kg=float(recipe["asset"]["nut_mass_kg"]),
-        nut_diagonal_inertia_kg_m2=tuple(recipe["asset"]["nut_diagonal_inertia_kg_m2"]),
+    scene_xml, base = build_nut_assembly_declared_model(
+        scene=scene, asset=recipe['asset'], physics_dt=recipe['physics_dt'],
         robot_source=robot.single_mjcf_source())
     from ...runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
     scene_xml, contact_profile = apply_declared_provider_source_options(
@@ -457,26 +452,23 @@ def _reference_builder(*, include_solution, resolved_config=None, lift_height_m=
             include_solution=include_solution, dynamic=dynamic))
 
 
-def _build_reference(*, provider, include_solution, resolved_config=None, lift_height_m=None,
-                     task_config=None, robot=None):
+def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None,
+                    lift_height_m=None, task_config=None, robot=None):
+    """Build the selected reference through the common source-bound stages."""
     from ...environment.reference_binding import TaskBuildRequest
     builder = _reference_builder(include_solution=include_solution, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=robot)
     return builder(TaskBuildRequest(provider, builder.backend, 31, 1000, None, None))
 
 
-def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None, task_config=None, robot=None):
-    """Build the unchanged selected 100 Hz/500 Hz reference route."""
-    return _build_reference(
-        provider=provider, include_solution=include_solution,
-        resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config, robot=robot,
-    )
-
-
 def build_outcome_solution(*, provider="mujoco"):
     """Build the task-owned external Solution for its matching selected source."""
-    return build_reference(provider=provider)["solution"]
+    value = build_reference(provider=provider)
+    from ...runtime.sessions.source import source_resource_receipt
+    receipt = source_resource_receipt(value['source'])
+    if receipt is not None:
+        receipt.close()
+    return value['solution']
 
 
 def _validate_external_solution(value, solution):

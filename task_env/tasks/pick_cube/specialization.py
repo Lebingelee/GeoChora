@@ -29,7 +29,7 @@ from ...controllers.canonical.contracts import digest, reference_pose_action_bin
 from ...controllers.canonical.execution import (
     REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES)
 from ...environment import (
-    RuntimeSnapshot,
+    RuntimeSnapshot, sample_episode_reset_plan,
     TaskCompositionSpec,
     TaskEvaluation,
     TaskEvaluationContextV1,
@@ -47,7 +47,7 @@ from ...robots.panda import PandaAgent
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import ControlBinding
 from ...robots.panda import PandaAgent, panda_reference_control_binding
-from ...runtime.sessions.source import RuntimeSource
+from ...runtime.sessions.source import RuntimeSource, UsdRuntimeInputV1
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
 from ...objects.pick_cube import (
@@ -73,7 +73,9 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "postclose_hold_s": 0.1,
 }
 
-from .task import semantic_definition, task_binding_fields
+from .task import (semantic_definition, task_binding_fields, build_pickcube_isaac_scene,
+    build_pickcube_scene, build_pickcube_mjcf_scene, compile_pickcube_task_artifact,
+    compile_pickcube_mjcf_task, compile_pickcube_isaac_task_artifact, _canonical_task_recipe)
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -744,73 +746,63 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             value['recipe_identity'] = digest(resolved)
         return value
 
-    position_builder = (_position_reference_builder(
-        backend=resolved_config.runtime.backend if resolved_config is not None else 'cpu',
-        include_solution=False, controller_profile=controller_profile,
-        resolved_config=resolved_config, lift_height_m=lift_height_m,
-        task_config=task_config, robot_uid=robot_uid, robot=robot)
-        if not physical and interval_provider != 'isaacsim' else None)
+    # Resolve the selected source strategy once at binding construction.
+    # Each resulting builder still consumes the same TaskBuildRequest.
+    selected_provider = interval_provider or ('isaacsim' if source_delivery_manifest else None)
+    runtime_input = selected_provider == 'isaacsim'
+    backend = resolved_config.runtime.backend if resolved_config is not None else 'cpu'
+    if runtime_input:
+        if source_delivery_manifest is None:
+            raise ValueError('F06 Isaac PickCube requires CUDA and its explicit source delivery')
+        builder = _isaac_reference_builder(
+            delivery_manifest=source_delivery_manifest, include_solution=False,
+            controller_profile='r3_continuous_v1' if physical else controller_profile,
+            resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
+            robot=robot, physical_fixture=(('effort-only' if physical_drive == 'disabled' else 'coexist')
+                                           if physical else False),
+            physical_kind=physical_kind, physical_drive=physical_drive)
+    elif physical:
+        from ...environment.reference_binding import SourceBoundTaskBuilder
+        from ...runtime.sessions.source_composition_adapters import compile_panda_effort_selection
+        builder = SourceBoundTaskBuilder(
+            lambda request: _compile_mjcf_effort_source(request, reset_switch=reset_switch,
+                task_config=task_config, resolved_config=resolved_config,
+                lift_height_m=lift_height_m, robot=robot),
+            lambda value, request: sample_episode_reset_plan(
+                value['task_source'], value['source'].scene_definition,
+                value['artifact'], task_seed=request.seed),
+            backend=backend, reuse_source=True, allow_sampled_reset=False,
+            source_composer=lambda compiled, context, request: _compose_reference_source(
+                compiled, context, request, controller_profile=physical_profile_id,
+                reference_robot=context.robot, sample_reset=False),
+            controller_factory=compile_panda_effort_selection,
+            controller_options=lambda compiled, context, request: dict(
+                robot=context.robot, scene=context.composition.scene, intent=context.composition.intent,
+                controller_profile=physical_profile_id, native_drive=physical_drive,
+                kind=physical_kind, config=compiled.source.config.action,
+                source_xml=context.composition.projected_xml, end_frame_id='nutassembly_ee_site',
+                task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
+                gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
+                                       if reset_switch else None)),
+            compile_control=lambda compiled, context, selection, request: _bind_mjcf_effort_control(
+                compiled, context, selection, request, native_drive=physical_drive, control_kind=physical_kind,
+                reset_switch=reset_switch, cube_force_z_N=cube_force_z_N))
+    else:
+        builder = _position_reference_builder(
+            backend=backend, include_solution=False, controller_profile=controller_profile,
+            resolved_config=resolved_config, lift_height_m=lift_height_m,
+            task_config=task_config, robot_uid=robot_uid, robot=robot)
 
     def build(request):
-        provider, backend, horizon, sampled = (request.provider, request.backend,
-            request.horizon, request.sampled_reset)
-        if sampled is not None:
-            raise ValueError('PickCube does not accept an externally sampled reset')
-        if physical and interval_provider is not None and provider != interval_provider:
-            raise ValueError('physical build provider differs from its configured route')
-        if physical and provider != 'isaacsim':
-            if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu')}:
-                raise ValueError('physical control requires an admitted MJCF provider and CPU backend')
-            return _compile_mjcf_effort_source(request, reset_switch=reset_switch,
-                task_config=task_config, resolved_config=resolved_config,
-                lift_height_m=lift_height_m, robot=robot)
-        if provider == "isaacsim":
-            if backend != "cuda" or source_delivery_manifest is None:
-                raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
-            if physical and (type(horizon) is not int or not 1 <= horizon <= 1000):
-                raise ValueError('Isaac physical source horizon must be in [1, 1000]')
-            builder = _isaac_reference_builder(
-                delivery_manifest=source_delivery_manifest, include_solution=False,
-                controller_profile='r3_continuous_v1' if physical else controller_profile,
-                resolved_config=resolved_config, task_config=task_config,
-                lift_height_m=lift_height_m, robot=robot,
-                physical_fixture=('effort-only' if physical_drive == 'disabled' else 'coexist') if physical else False,
-                physical_kind=physical_kind, physical_drive=physical_drive)
-            return builder(request)
-        if backend != 'cpu':
-            raise ValueError('PickCube MJCF construction requires the CPU backend')
-        if position_builder is None:
-            raise ValueError('Position source builder differs from its configured route')
-        return adapt(position_builder(request))
+        allowed = ({selected_provider} if selected_provider is not None else {'mujoco', 'geophys'})
+        if request.provider not in allowed:
+            raise ValueError('requested provider differs from the selected source route')
+        value = builder(request)
+        return adapt(value) if not physical and not runtime_input else value
 
     if physical:
         from .task import physical_task_binding
         from ...controllers.canonical.r3_effort import panda_effort_reset_capability
-        runtime_input = interval_provider == 'isaacsim'
-        if not runtime_input:
-            from ...environment.reference_binding import SourceBoundTaskBuilder
-            from ...runtime.sessions.source_composition_adapters import (
-                compile_panda_effort_selection)
-            build = SourceBoundTaskBuilder(build,
-                lambda value, request: sample_episode_reset_plan(
-                    value['task_source'], value['source'].scene_definition,
-                    value['artifact'], task_seed=request.seed),
-                backend=resolved_config.runtime.backend, reuse_source=True, allow_sampled_reset=False,
-                source_composer=lambda compiled, context, request: _compose_reference_source(
-                    compiled, context, request, controller_profile=physical_profile_id,
-                    reference_robot=context.robot, sample_reset=False),
-                controller_factory=compile_panda_effort_selection,
-                controller_options=lambda compiled, context, request: dict(
-                    robot=context.robot, scene=context.composition.scene, intent=context.composition.intent,
-                    controller_profile=physical_profile_id, native_drive=physical_drive,
-                    kind=physical_kind, config=compiled.source.config.action,
-                    source_xml=context.composition.projected_xml, end_frame_id='nutassembly_ee_site',
-                    task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
-                    gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
-                                           if reset_switch else None)),
-                compile_control=lambda compiled, context, selection, request: _bind_mjcf_effort_control(
-                    compiled, context, selection, request, native_drive=physical_drive, control_kind=physical_kind,
-                    reset_switch=reset_switch, cube_force_z_N=cube_force_z_N))
         return physical_task_binding(build=build, task_config=task_config, lift_height_m=lift_height_m,
             hand_frame_id='ee' if runtime_input else 'hand', runtime_input=runtime_input,
             validate_solution=_validate_external_readiness_solution,
@@ -984,224 +976,33 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
 
 
-from ...artifacts import (ArticulationDefinition,
-    AssetDefinition, EntityInstance, FrameDefinition, FrameReference, JointDefinition,
-    SceneDefinition)
-from ...artifacts.execution import EpisodeResetPlanV1
-from ...environment import sample_episode_reset_plan, adapt_legacy_recipe_task_source, compile_task_artifact_v1
-from ...runtime.sessions.source import UsdRuntimeInputV1
-
-SCHEMA_VERSION = "pick-cube-isaac-scene-v1"
-SCENE_RECIPE_ID = "pick-cube-isaac-desktop-scene-v1"
-
-
-def build_pickcube_isaac_scene(task_config: dict, *, robot=None) -> SceneDefinition:
-    """Compose the Panda source with task-owned PickCube entities and recipe."""
-    from ...registry import AGENT_REGISTRY
-    from ...runtime.sessions.source_scene_import import declare_panda_scene
-
-    scene_id = str(task_config["recipe"]["scene_uid"])
-    if robot is None:
-        robot = AGENT_REGISTRY.create('panda-v1')
-    panda_scene = declare_panda_scene(robot, entity_id="panda-v1", scene_id=scene_id)
-    source_asset = panda_scene.assets[0]
-    if not source_asset.source_content_sha256:
-        raise ValueError("Panda importer must provide the consumed source closure digest")
-
-    panda_asset = AssetDefinition(
-        schema_version="asset-definition-v1",
-        asset_id="f05-dg03-menagerie-panda-source-preserving-isaac-usd",
-        asset_version="f05-dg03-isaac-usd-v4",
-        source_reference=source_asset.source_reference,
-        source_revision=source_asset.source_revision,
-        source_content_sha256=source_asset.source_content_sha256,
-        license_id="bsd-3-clause",
-    )
-    return build_pickcube_scene(task_config, robot_scene=panda_scene, robot_asset=panda_asset,
-        ee_frame='ee', cube_frame='cube', cube_joint='cube_freejoint', table_frame='top')
-
-
-def build_pickcube_scene(task_config, *, robot_scene, robot_asset, ee_frame, cube_frame, cube_joint, table_frame):
-    """Compose Task entities with an already declared Robot and source frame names."""
-    scene_id = robot_scene.scene_id
-    robot_entity = replace(robot_scene.entities[0], asset_id=robot_asset.asset_id,
-                           asset_version=robot_asset.asset_version)
-    recipe_digest = hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
-    cube_asset = AssetDefinition(
-        "asset-definition-v1", "pick-cube-cube-v1", "pick-cube-recipe-v1",
-        "geochora-task-scene://pick-cube-v1/cube", SCENE_RECIPE_ID, recipe_digest,
-    )
-    tabletop_asset = AssetDefinition(
-        "asset-definition-v1", "pick-cube-tabletop-v1", "pick-cube-recipe-v1",
-        "geochora-task-scene://pick-cube-v1/tabletop", SCENE_RECIPE_ID, recipe_digest,
-    )
-    cube = EntityInstance(
-        "entity-instance-v1", "cube-v1", cube_asset.asset_id, cube_asset.asset_version,
-    )
-    tabletop = EntityInstance(
-        "entity-instance-v1", "tabletop-v1", tabletop_asset.asset_id,
-        tabletop_asset.asset_version,
-    )
-    identity_pose = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
-    cube_articulation = ArticulationDefinition(
-        "articulation-definition-v1",
-        "cube-v1",
-        "world",
-        ("world", cube_frame),
-        (JointDefinition(
-            "joint-definition-v1",
-            cube_joint,
-            FrameReference("cube-v1", "world"),
-            FrameReference("cube-v1", cube_frame),
-            identity_pose,
-            identity_pose,
-            "floating",
-            None,
-            "xyz_meter_quaternion_wxyz",
-            "linear_xyz_meter_per_second_angular_xyz_radian_per_second",
-            7,
-            6,
-        ),),
-    )
-    return SceneDefinition(
-        schema_version="scene-definition-v3",
-        scene_id=scene_id,
-        assets=(robot_asset, cube_asset, tabletop_asset),
-        entities=(robot_entity, cube, tabletop),
-        frames=(
-            *robot_scene.frames,
-            FrameDefinition("frame-definition-v1", robot_entity.entity_id, ee_frame, "runtime", None, None),
-            FrameDefinition("frame-definition-v1", "cube-v1", "world", "runtime", None, None),
-            FrameDefinition("frame-definition-v1", "cube-v1", cube_frame, "runtime", None, None),
-            FrameDefinition("frame-definition-v1", "tabletop-v1", table_frame, "runtime", None, None),
-        ),
-        articulations=(*robot_scene.articulations, cube_articulation),
-        robots=robot_scene.robots,
-        actuator_resources=robot_scene.actuator_resources,
-        control_groups=robot_scene.control_groups,
-    )
-
-
-def _canonical_task_recipe(task_config: dict) -> bytes:
-    return json.dumps(
-        {"schema_version": SCHEMA_VERSION, "recipe": task_config["recipe"]},
-        sort_keys=True, separators=(",", ":"), allow_nan=False,
-    ).encode("utf-8")
-
-
-def build_pickcube_mjcf_scene(task_config, robot):
-    """Compose the Task scene from the selected Robot's MJCF declaration."""
-    from ...runtime.sessions.source_scene_import import declare_panda_scene
-
-    panda = declare_panda_scene(robot, entity_id=robot.uid,
-        scene_id=str(task_config['recipe']['scene_uid']))
-    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
-        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
-        cube_joint='PickCube_joint', table_frame='grasp_table')
-
-
-def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame_bindings, cube_frame,
-                                   additional_frames=None):
-    """Compile the same Task semantics against a declared source Scene."""
-    if set(task_config) - {'recipe', 'environment', 'execution'}:
-        raise ValueError('unsupported PickCube task config fields')
-    task_source = adapt_legacy_recipe_task_source({
-        'recipe': task_config['recipe'], 'environment': task_config['environment'],
-    })
-    artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact,
-                                        frame_bindings=frame_bindings)
-    bindings = dict(artifact.legacy_frame_bindings)
-    bindings['cube-v1'] = FrameReference('cube-v1', cube_frame)
-    for name, reference in (additional_frames or {}).items():
-        bindings.setdefault(name, reference)
-    artifact = replace(artifact, legacy_frame_bindings=bindings)
-    artifact.validate_scene(scene)
-    return task_source, artifact
-
-
-def compile_pickcube_mjcf_task(task_config, robot, legacy_artifact):
-    """Compile the MJCF Task/Robot Scene and its complete state bindings."""
-    scene = build_pickcube_mjcf_scene(task_config, robot)
-    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
-              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
-              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
-    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
-                  for item in scene.frames or ()
-                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
-    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
-        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
-    bodies = {name: reference.frame_id for name, reference in additional.items()}
-    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
-    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
-
-
-def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
-    """Compile the existing PickCube v0 semantics against its USD Scene."""
-    scene = build_pickcube_isaac_scene(task_config, robot=robot)
-    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
-        frame_bindings={
-            'panda-v1/base': FrameReference('panda-v1', 'link0'),
-            'panda-v1/ee': FrameReference('panda-v1', 'ee'),
-        }, cube_frame='cube')
-    return task_source, scene, artifact
-
-
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
     task_config=None, physical_fixture=False, robot=None, lift_height_m=None,
 ) -> UsdRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
 
-    if type(task_seed) is not int or task_seed < 0:
-        raise ValueError("F06 PickCube task_seed must be a nonnegative integer")
-    if type(horizon) is not int or not 1 <= horizon <= 1000:
-        raise ValueError("F06 PickCube horizon must be an integer in [1, 1000]")
-    path = Path(delivery_manifest).resolve(strict=True)
-    from ...runtime.sessions.api import load_f06_isaac_delivery
-    loaded = load_f06_isaac_delivery(path)
-    manifest_sha = loaded.manifest_bytes_sha256
-
+    from ...runtime.sessions.isaac_usd_admission import prepare_f06_task_delivery
+    loaded, variant = prepare_f06_task_delivery(
+        delivery_manifest, seed=task_seed, horizon=horizon, physical_fixture=physical_fixture)
     task_config = _configuration() if task_config is None else task_config
     legacy_artifact = build_artifact(task_config=task_config, lift_height_m=lift_height_m)
-    if physical_fixture not in (False, 'coexist', 'effort-only'):
-        raise ValueError('F06 physical fixture must select coexist or effort-only')
-    if physical_fixture:
-        legacy_artifact = replace(legacy_artifact,
-            artifact_id=('pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist'
-                         else 'pickcube-f06-physical-effort-no-drive-v1'))
+    if variant is not None:
+        legacy_artifact = replace(legacy_artifact, artifact_id=variant)
     if robot is None:
         from ...registry import AGENT_REGISTRY
         robot = AGENT_REGISTRY.create('panda-v1')
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
         task_config, legacy_artifact, robot=robot,
     )
-    options = {
-        "f06_goal": "PickCube-Harness-three-backend-example",
-        "lowering": "pickcube-desktop-physx-native-mimic-v1",
-        "delivery_manifest_sha256": manifest_sha,
-        "task_scene_recipe_sha256": hashlib.sha256(
-            _canonical_task_recipe(task_config)
-        ).hexdigest(),
-    }
-    from ...runtime.sessions.api import f06_isaac_robot_geometry_root
-    from ...runtime.sessions.source import bind_declared_usd_paths
-    joints, bodies, frames, free_joints = bind_declared_usd_paths(
-        scene, artifact, robot_uid=robot.uid,
-        geometry_root=f06_isaac_robot_geometry_root(loaded),
-        entry_prim=loaded.delivery.entry_prim,
-        base_semantic='panda-v1/base',
-        robot_frames={'panda-v1/ee': robot.reference_frame_parents()['ee']},
-        world_bodies={'cube-v1': 'cube_v1'},
-        world_frames={'tabletop-v1/top': 'tabletop_v1/top'},
-        free_body_semantics=('cube-v1',))
-    from ...runtime.sessions.api import (F06_PICKCUBE_ISAAC_PROFILE,
-        _validate_f06_pickcube_isaac_input, compile_usd_task_runtime_input)
-    result = compile_usd_task_runtime_input(
-        loaded=loaded, task_source=task_source, artifact=artifact, scene=scene,
-        options=options, joints=joints, bodies=bodies, frames=frames,
-        free_joints=free_joints, seed=task_seed, horizon=horizon,
-        schema_version='pick-cube-isaac-runtime-input-v1', profile=F06_PICKCUBE_ISAAC_PROFILE,
-        controller_profile='r3_continuous_v1', horizon_min=1, horizon_max=1000,
-        provider_build_identity='isaacsim-6.2.0.0')
-    _validate_f06_pickcube_isaac_input(result, artifact, result.execution, result.runtime_source)
-    return result
+    from ...runtime.sessions.isaac_usd_admission import compile_f06_task_input
+    return compile_f06_task_input(
+        loaded=loaded, task_source=task_source, artifact=artifact, scene=scene, robot=robot,
+        task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
+        seed=task_seed, horizon=horizon, binding_declaration={
+            'base_semantic': 'panda-v1/base',
+            'robot_frames': {'panda-v1/ee': robot.reference_frame_parents()['ee']},
+            'world_bodies': {'cube-v1': 'cube_v1'},
+            'world_frames': {'tabletop-v1/top': 'tabletop_v1/top'},
+            'free_body_semantics': ('cube-v1',),
+        })

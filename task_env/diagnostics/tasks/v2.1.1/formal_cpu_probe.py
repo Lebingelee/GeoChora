@@ -1,7 +1,7 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
-parser=argparse.ArgumentParser();parser.add_argument('--public-ui-check',action='store_true');parser.add_argument('--observer-check',action='store_true');parser.add_argument('--task-renderer', default='mujoco', choices=('mujoco','geophys'));parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
+parser=argparse.ArgumentParser();parser.add_argument('--external-nut-solution',action='store_true');parser.add_argument('--public-ui-check',action='store_true');parser.add_argument('--observer-check',action='store_true');parser.add_argument('--task-renderer', default='mujoco', choices=('mujoco','geophys'));parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--table-half-x',type=float,default=None)
@@ -196,7 +196,13 @@ try:
     result['source_snapshot']=snapshot
     if args.case!='assembled-unreset':
         if args.case=='nut' or args.solution:
-            solution=env.value['solution_factory']()
+            if args.external_nut_solution:
+                from task_env.tasks.nut_assembly import build_outcome_solution
+                solution = build_outcome_solution(provider=args.provider)
+                assert solution.identity == env.value['solution_identity']
+                result['external_solution_identity_matched'] = True
+            else:
+                solution=env.value['solution_factory']()
             observation,info=env.reset_for_solution(solution,seed=19 if args.case=='nut' else 31)
         else:
             options = ({'controller': {'kind': 'joint', 'parameters': {'kp': args.controller_kp}}}

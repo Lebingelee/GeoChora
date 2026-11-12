@@ -62,6 +62,26 @@ def selected_control_application_receipt(*, request, canonical, target, applied,
     return receipt
 
 
+def validate_native_interval_boundaries(before, after, *, episode_id, reset_sample_id,
+                                        provider_materialization_id, interval_s, tolerance_s=1e-10):
+    """Check the identity and measured clock of one completed native interval."""
+    if (before.get('control_step', -2) + 1 != after.get('control_step', -1)
+            or before.get('episode_id') != episode_id or after.get('episode_id') != episode_id
+            or before.get('reset_sample_id') != reset_sample_id
+            or after.get('reset_sample_id') != reset_sample_id
+            or before.get('provider_materialization_id') != provider_materialization_id
+            or after.get('provider_materialization_id') != provider_materialization_id
+            or not before.get('identity_hash') or not after.get('identity_hash')):
+        raise ValueError('native interval boundary identity or reset lineage changed')
+    start_time = float(before['simulation_time_s'])
+    end_time = float(after['simulation_time_s'])
+    if (not math.isfinite(start_time) or not math.isfinite(end_time)
+            or not math.isfinite(interval_s) or interval_s <= 0
+            or abs((end_time - start_time) - interval_s) > tolerance_s):
+        raise ValueError('native interval did not complete the declared control interval')
+    return start_time, end_time
+
+
 @dataclass(frozen=True)
 class CanonicalGripperFeedback(Contract):
     semantic_id: str
@@ -155,30 +175,23 @@ class NativeControlFeedbackSampleV1(Contract):
                 or measurement.evaluation_control_step != feedback.control_step
                 or measurement.evaluation_simulation_time_s != feedback.simulation_time):
             raise ValueError('native force measurement is invalid or belongs to another feedback boundary')
-        if measurement.force_unit != 'N' or measurement.actuator_id != 'actuator8':
-            raise ValueError('selected NutAssembly native Guard requires the Panda actuator8 sample in N')
+        if measurement.force_unit != 'N':
+            raise ValueError('native Controller force sample must be measured in N')
         expected_force = max(0.0, -float(measurement.signed_force_N))
         if feedback.gripper.closing_force_N != expected_force:
             raise ValueError('canonical feedback differs from the measured signed actuator force')
-        dt = 0.002
-        native_index = measurement.native_step_index
         sample_time = measurement.native_sample_time_s
-        evaluation_time = feedback.simulation_time
         if sample_time is None or not math.isfinite(sample_time):
             raise ValueError('native force sample must carry its measurement time')
         if measurement.phase == 'reset_forward':
-            if native_index != 0 or sample_time != 0.0 or abs(evaluation_time) > 1e-10:
-                raise ValueError('reset-forward feedback must identify the exact reset state at t=0')
+            if (measurement.native_step_index != 0 or sample_time != 0.0
+                    or abs(feedback.simulation_time) > 1e-10):
+                raise ValueError('reset-forward feedback must identify the exact reset state')
         elif measurement.phase == 'native_step_pre_integration':
-            if (native_index < 1
-                    or not math.isclose(sample_time, (native_index - 1) * dt, rel_tol=0.0, abs_tol=1e-10)
-                    or not math.isclose(evaluation_time, native_index * dt, rel_tol=0.0, abs_tol=1e-10)
-                    or not math.isclose(evaluation_time - sample_time, dt, rel_tol=0.0, abs_tol=1e-10)):
-                raise ValueError('native feedback sample phase/time/freshness is not one completed 2 ms step')
+            if measurement.native_step_index < 1 or sample_time >= feedback.simulation_time:
+                raise ValueError('native force sample must precede its completed feedback boundary')
         else:
-            raise ValueError('native Guard does not admit this force sample phase')
-        if measurement.evaluation_control_step != native_index // 5:
-            raise ValueError('native feedback sample outer control step differs from its native index')
+            raise ValueError('native feedback does not admit this force sample phase')
 
     def to_mapping(self):
         self.validate()

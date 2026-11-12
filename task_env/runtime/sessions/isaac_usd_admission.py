@@ -168,3 +168,62 @@ def compile_usd_task_runtime_input(*, loaded, task_source, artifact, scene, opti
         artifact=artifact, source=source, execution=execution, reset_plan=reset_plan,
         controller_profile=controller_profile, horizon=horizon,
         horizon_min=horizon_min, horizon_max=horizon_max)
+
+
+def build_f06_task_scene(task_config, *, robot, build_task_scene):
+    """Project the exact F06 Panda source identity into the Task's scene declaration."""
+    from ...artifacts import AssetDefinition
+    from .source_scene_import import declare_panda_scene
+
+    panda = declare_panda_scene(robot, entity_id='panda-v1',
+                                scene_id=str(task_config['recipe']['scene_uid']))
+    source_asset = panda.assets[0]
+    if not source_asset.source_content_sha256:
+        raise ValueError('Panda importer must provide the consumed source closure digest')
+    asset = AssetDefinition('asset-definition-v1',
+        'f05-dg03-menagerie-panda-source-preserving-isaac-usd', 'f05-dg03-isaac-usd-v4',
+        source_asset.source_reference, source_asset.source_revision,
+        source_asset.source_content_sha256, license_id='bsd-3-clause')
+    return build_task_scene(task_config, robot_scene=panda, robot_asset=asset,
+                            ee_frame='ee', cube_frame='cube', cube_joint='cube_freejoint',
+                            table_frame='top')
+
+
+def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_fixture):
+    """Validate the exact F06 request before Task/Robot source construction."""
+    from pathlib import Path
+
+    if type(seed) is not int or seed < 0:
+        raise ValueError('F06 PickCube task_seed must be a nonnegative integer')
+    if type(horizon) is not int or not 1 <= horizon <= 1000:
+        raise ValueError('F06 PickCube horizon must be an integer in [1, 1000]')
+    if physical_fixture not in (False, 'coexist', 'effort-only'):
+        raise ValueError('F06 physical fixture must select coexist or effort-only')
+    loaded = load_f06_isaac_delivery(Path(delivery_manifest).resolve(strict=True))
+    variant = (None if not physical_fixture else
+        'pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist' else
+        'pickcube-f06-physical-effort-no-drive-v1')
+    return loaded, variant
+
+
+def compile_f06_task_input(*, loaded, task_source, artifact, scene, robot,
+                           task_scene_recipe_sha256, seed, horizon, binding_declaration):
+    """Lower an admitted F06 Task/Robot declaration to its exact USD input."""
+    from .source import bind_declared_usd_paths
+
+    options = {'f06_goal': 'PickCube-Harness-three-backend-example',
+               'lowering': 'pickcube-desktop-physx-native-mimic-v1',
+               'delivery_manifest_sha256': loaded.manifest_bytes_sha256,
+               'task_scene_recipe_sha256': task_scene_recipe_sha256}
+    joints, bodies, frames, free_joints = bind_declared_usd_paths(
+        scene, artifact, robot_uid=robot.uid,
+        geometry_root=f06_isaac_robot_geometry_root(loaded),
+        entry_prim=loaded.delivery.entry_prim, **binding_declaration)
+    result = compile_usd_task_runtime_input(
+        loaded=loaded, task_source=task_source, artifact=artifact, scene=scene,
+        options=options, joints=joints, bodies=bodies, frames=frames, free_joints=free_joints,
+        seed=seed, horizon=horizon, schema_version='pick-cube-isaac-runtime-input-v1',
+        profile=F06_PICKCUBE_ISAAC_PROFILE, controller_profile='r3_continuous_v1',
+        horizon_min=1, horizon_max=1000, provider_build_identity='isaacsim-6.2.0.0')
+    _validate_f06_pickcube_isaac_input(result, artifact, result.execution, result.runtime_source)
+    return result
