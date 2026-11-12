@@ -189,7 +189,7 @@ def test_effort_without_solution_does_not_prepare_solution_readiness(profile, mo
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
 def test_pickcube_position_and_effort_consume_the_same_lift(profile):
     from task_env.environment.configuration import resolve_task_env_config
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
 
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
@@ -203,6 +203,7 @@ def test_pickcube_position_and_effort_consume_the_same_lift(profile):
         value = binding.build_seeded('mujoco', 'cpu', 42, 8)
         assert value['artifact'].semantics.parameters_si['lift_height'] == .17
         assert binding.task_definition_factory(value['artifact']).semantics.parameters_si['lift_height'] == .17
+        assert value['artifact'].initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
     finally:
         if binding.close_task_resources is not None:
             binding.close_task_resources()

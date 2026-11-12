@@ -237,3 +237,5 @@ Isaac Panda effort 的 USD source 与传动准入已归 Runtime physical adapter
 MuJoCo／GeoPhys physical adapter 现在读取控制 binding 声明的 native drive，MuJoCo 全局关闭前核对完整 actuator 覆盖；受影响短程已复验。详见[实施记录 6.110](../planning/post-5c-optimization-execution.md#6110-native-drive-模式由控制-binding-声明)。
 
 Panda 的 gripper force cap 由 Robot 声明，MuJoCo adapter 核对实际 source 与配置后应用；reset 选择和直接 effort 已复验。详见[实施记录 6.111](../planning/post-5c-optimization-execution.md#6111-gripper-force-cap-由-robot-声明并由-adapter-核对)。
+
+PickCube effort 不再使用旧诊断的 0.02 m 手指初值；MuJoCo、GeoPhys、Isaac 受影响短程已核对正式 Task 初值。详见[实施记录 6.112](../planning/post-5c-optimization-execution.md#6112-删除-effort-路线的诊断手指初值)。

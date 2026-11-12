@@ -96,6 +96,12 @@ try:
         else:
             observation,info=env.reset(seed=31)
         assert env.observation_space.contains(observation)
+        if args.case in {'panda-effort','panda-joint'}:
+            for finger in ('panda-v1/finger_joint1','panda-v1/finger_joint2'):
+                declared=float(env.artifact.initialization.joint_position[finger])
+                assert abs(float(env.state.joint_position[finger])-declared)<1e-5
+            result['initial_finger_positions']={name:float(env.state.joint_position[name])
+                for name in ('panda-v1/finger_joint1','panda-v1/finger_joint2')}
         if args.case=='panda-joint' and args.record:
             active_robot=env.robot
             committed=env._physical_reset_selection.current.execution

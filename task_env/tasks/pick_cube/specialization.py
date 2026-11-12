@@ -952,17 +952,9 @@ def build_pickcube_isaac_runtime_input_v1(
     if physical_fixture not in (False, 'coexist', 'effort-only'):
         raise ValueError('F06 physical fixture must select coexist or effort-only')
     if physical_fixture:
-        # The source and task recipe remain unchanged. This versioned Artifact
-        # starts the coupled fingers inside their limits for force observation.
-        positions = dict(legacy_artifact.initialization.joint_position)
-        positions.update({'panda-v1/finger_joint1': .02, 'panda-v1/finger_joint2': .02})
         legacy_artifact = replace(legacy_artifact,
             artifact_id=('pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist'
-                         else 'pickcube-f06-physical-effort-no-drive-v1'),
-            initialization=replace(legacy_artifact.initialization, joint_position=positions,
-                                   reset_validity=('f06-physical-effort-interior-fingers-v1'
-                                                   if physical_fixture == 'coexist'
-                                                   else 'f06-physical-effort-no-drive-v1')))
+                         else 'pickcube-f06-physical-effort-no-drive-v1'))
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
         task_config, legacy_artifact, robot=robot,
     )

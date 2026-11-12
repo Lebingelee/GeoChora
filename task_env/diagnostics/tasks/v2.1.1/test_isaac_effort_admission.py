@@ -92,7 +92,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
     import sys
     from pathlib import Path
     from task_env.environment.configuration import resolve_task_env_config
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
 
     root = Path(__file__).resolve().parents[4]
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
@@ -109,6 +109,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
     value = binding.build_seeded('isaacsim', 'cuda', 42, 8)
     artifact = value['artifact']
     assert artifact.semantics.parameters_si['lift_height'] == .17
+    assert artifact.initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
     assert value['reset_plan'].reset_sample.task_artifact_hash == artifact.identity_hash
     if profile != 'r3_continuous_v1':
         from task_env.runtime.sessions.isaac_physical import build_isaac_panda_effort_execution
