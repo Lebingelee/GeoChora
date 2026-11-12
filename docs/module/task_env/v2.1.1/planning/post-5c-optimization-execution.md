@@ -116,13 +116,13 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 
 ### 6.1 累计文件与代码变化
 
-以 `1f1359ee` 为比较基线、当前冻结代码输入为范围，`git diff --no-renames` 中 `task_env` 跟踪文件由 977 减至 976；整个项目跟踪文件由 1363 增至 1364。生产 Python 涉及 107 个文件，+4,805／−14,038，净减 9,233 行；诊断涉及 28 个文件，+4,328／−22，净增 4,306 行；其他 `task_env` 文本（含文档及资产）14 个文件，+28／−917。生产范围内新增 3、删除 20、修改 90；诊断新增 16、修改 12；其他文档修改 8。按 Git 整文件重命名检测无整文件迁移，按职责拆分的代码不伪装为原样迁移。旧目录诊断的 12 个修改仍需按照用户的版本边界决定保留或退休。
+以 `1f1359ee` 为比较基线、当前冻结代码输入为范围，`git diff --no-renames` 中 `task_env` 跟踪文件由 977 减至 976；整个项目跟踪文件由 1363 增至 1364。生产 Python 涉及 107 个文件，+4,805／−14,038，净减 9,233 行；诊断涉及 16 个文件，+3,545／−0，净增 3,545 行；其他 `task_env` 文本（含文档及资产）14 个文件，+28／−917。生产范围内新增 3、删除 20、修改 90；诊断新增 16、修改 0；其他文档修改 8。按 Git 整文件重命名检测无整文件迁移，按职责拆分的代码不伪装为原样迁移。旧目录中本阶段的 12 个诊断文件修改已撤回到优化启动基线；仍有效的 adapter 准入检查在 v2.1.1 目录维护，旧诊断不再作为兼容目标。
 
 这些是累计文本 diff，不是对实现质量或最终接收的证明；历史台账、原始输出、四个未跟踪保护输入和其他用户修改不计入新增／删除。项目其他目录的跟踪文件变化包含文档和示例。每个事件最终接收时仍需按目标表提供该事件的精确对账及 diff。
 
 ### 6.2 受影响路线和证据
 
-- 最新冻结输入的版本诊断为 239 项通过，涵盖正式配置、Robot／Controller 绑定、资源故障边界和已验证 USD source 字节；它不等于原生运行或任务成功。
+- [最新冻结诊断输入](../../../../../workspace/maintenance/v211_versioned_diagnostics_20261112/result.json)的版本诊断为 243 项通过，涵盖正式配置、Robot／Controller 绑定、资源故障边界和已验证 USD source 字节；它不等于原生运行或任务成功。
 - 四任务及装配 Panda 的 MuJoCo CPU 短程路线曾在 [共同配置默认值输入](../../../../../workspace/maintenance/v211_task_defaults_20261112/plan.json)下完成 reset、非零 action 或 Nut 单个 Solution interval、共同提交、再次 reset 和重复关闭；代码身份不同于本批，按改动影响参考。
 - PickCube 的 MuJoCo 直接 effort、关节参考和 R3 参考以及 Isaac CUDA 关节参考曾在 [共同 source／Controller 组合输入](../../../../../workspace/maintenance/v211_shared_effort_builder_20261112/plan.json)下完成短程运行。每条观测 5 个显式子步；这不是完整 Solution 或全部 provider 的结论。
 - 当前冻结输入的 PickCube Position 与关节 effort 的 Isaac CUDA 运行、预算和原始结果见 [USD source 验证计划](../../../../../workspace/maintenance/v211_pickcube_usd_source_20261112/plan.json)。两次均完成 reset、5 个显式子步、再次 reset、重复 Env close 和 App close 收据；关节 effort 路线的 SDK 关闭日志另有 Isaac 菜单回调访问空 USD context 的 `AttributeError`，因此不能称整个 SDK 关闭过程无异常。App 隐式启动推进数未知。

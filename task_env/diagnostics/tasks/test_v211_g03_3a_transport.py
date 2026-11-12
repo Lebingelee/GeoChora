@@ -33,11 +33,6 @@ class FakeSession:
     def reset(self, value): self._episode = value; return {'episode': value, 'items': [1, 2]}
     def reset_plan(self, value): self._episode = value; return {'episode': value}
     def snapshot(self): return {'episode': self._episode, 'revision': self._revision}
-    def state_boundary_identity(self):
-        from task_env.runtime.sessions.common import LegacyStateBoundaryIdentity
-        return LegacyStateBoundaryIdentity('legacy-state-boundary-identity-v1', self._episode,
-            'sample', 'a' * 64, 'source', 'b' * 64, 'scene',
-            self.provider_materialization_id, self._revision, self._revision)
     def step(self): self._revision += 1; return self.snapshot()
     def control_feedback(self, value): raise ValueError('fixture failure')
     def apply_control(self, value): return value
@@ -86,10 +81,6 @@ def test_worker_dispatch_callbacks_owned_values_and_idempotent_close(tmp_path):
         assert session.episode_id == 'episode-a'
         assert session.reset_plan('episode-b') == {'episode': 'episode-b'}
         assert session.episode_id == 'episode-b'
-        boundary = session.state_boundary_identity()
-        assert boundary.episode_id == 'episode-b'
-        assert boundary.provider_materialization_id == session.provider_materialization_id
-        assert boundary.source_closure_digest == 'b' * 64
         assert session.native_interval_evidence['provenance_kind'] == 'synthetic_fixture'
         assert session.native_interval_evidence['advances'] == [{'step': 1}]
         assert session.step()['revision'] == 1
@@ -114,12 +105,6 @@ def test_worker_dispatch_callbacks_owned_values_and_idempotent_close(tmp_path):
 
 
 def test_worker_rejects_non_value_before_sending_and_wrong_startup_identity(tmp_path):
-    import numpy as np
-    assert _encode({'mass': np.float32(1.25), 'count': np.int64(2)}) == {'mass': 1.25, 'count': 2}
-    with pytest.raises(ValueError, match='nonfinite'):
-        _encode(np.float64(float('nan')))
-    with pytest.raises(TypeError, match='non-value'):
-        _encode(np.array([1.0]))
     with pytest.raises(TypeError, match='non-value'):
         _encode(object())
     with pytest.raises(ValueError, match='startup identity mismatch'):

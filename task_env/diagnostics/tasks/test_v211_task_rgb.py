@@ -29,41 +29,6 @@ def _selection():
                                'v211_mujoco_cpu_native_rgb_v1', None)
 
 
-def test_camera_spec_lowering_preserves_pose_and_artifact_link():
-    from task_env.environment.config import CameraSpec
-    spec = CameraSpec(name='rotated', quaternion_wxyz=(2., 0., 0., 2.),
-                      position=(1., 2., 3.), width=8, height=6, depth=False)
-    geometry = CameraGeometry.from_camera_spec(spec, task_artifact_hash='c' * 64)
-    np.testing.assert_allclose(geometry.T_parent_from_mount,
-        [[0., -1., 0., 1.], [1., 0., 0., 2.], [0., 0., 1., 3.], [0., 0., 0., 1.]], atol=1e-15)
-    assert geometry.task_artifact_hash == 'c' * 64
-    assert (geometry.width, geometry.height, geometry.depth) == (8, 6, False)
-
-
-def test_camera_spec_capture_metadata_uses_published_boundary_for_reset_and_step():
-    from types import SimpleNamespace
-    from task_env.environment.config import CameraSpec
-    from task_env.environment.reference_env import SelectedReferenceEnv
-    camera, selection = _camera(), _selection()
-    env = object.__new__(SelectedReferenceEnv)
-    env._task_camera_spec = CameraSpec(name='task', width=4, height=3, depth=False)
-    env._task_rgb_config = camera, 'mujoco'
-    env._task_rgb_consumer = TaskRgbObservationConsumerV1(camera, selection,
-        lambda _state: _Session(camera, selection), color_space='test')
-    env.session = SimpleNamespace(task_camera_binding=lambda view: {
-        'native': {'episode_id': view.boundary.episode_id, 'fov_y': 1.}})
-    for step in (0, 1):
-        view = _state(step)
-        env._publish_task_rgb_typed_state = lambda _state: SimpleNamespace(view=view)
-        image, receipt = env._capture_task_rgb_boundary(
-            SimpleNamespace(control_step=step, simulation_time=step * .01))
-        assert image.shape == (3, 4, 3)
-        assert receipt['requested_camera']['name'] == 'task'
-        assert receipt['realized_camera']['episode_id'] == view.boundary.episode_id
-        assert receipt['observation_boundary']['control_step'] == step
-        assert receipt['render_backend'] == 'native-opengl'
-
-
 def _capture(camera, selection, state):
     identity = CameraCaptureIdentityV1('camera-capture-identity-v1', camera.task_artifact_hash,
         camera.camera_id, camera.identity_hash, 'd' * 64, 'e' * 64, selection, 'f' * 64,
@@ -139,9 +104,7 @@ def test_task_rgb_rejects_wrong_episode_before_calling_renderer():
     consumer.close()
 
 
-@pytest.mark.parametrize('entry', ['reset', 'reset_for_solution'])
-def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkeypatch, entry):
-    from types import SimpleNamespace
+def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkeypatch):
     from task_env.environment.reference_env import SelectedReferenceEnv
 
     events = []
@@ -164,9 +127,6 @@ def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkey
     env._defer_task_rgb_capture = False
     env._reset_failure_receipt = 'prior'
     env.state = 'published-state'
-    env.value = {}
-    env.binding = SimpleNamespace(task_reset_sampler=None, build_external=lambda _provider: None,
-                                  validate_external_solution=lambda _value, _solution: None)
 
     def after_commit(state, result):
         assert state == env.state
@@ -184,7 +144,7 @@ def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkey
     monkeypatch.setattr(env, '_has_component_assembly', lambda: False, raising=False)
     monkeypatch.setattr(env, '_prepare_reference_reset', lambda **_kwargs: operations, raising=False)
 
-    result = (env.reset() if entry == 'reset' else env.reset_for_solution(object()))
+    result = SelectedReferenceEnv.reset(env)
 
     assert result == ({'task_rgb': 'captured'}, {'task_rgb_v1': 'receipt'})
     assert events == ['execute_reset_return', 'task_rgb_capture']

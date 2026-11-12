@@ -220,7 +220,6 @@ def test_mixed_close_receipt_failure_does_not_skip_remaining_cleanup(session_fai
         value={'source': SimpleNamespace(execution_source_receipt=SimpleNamespace(
             close=lambda: calls.append('source')))},
         binding=SimpleNamespace(close_task_resources=lambda: calls.append('task')),
-        _close_camera_consumer=lambda: None,
     )
     with pytest.raises(RuntimeError if session_fails else LookupError) as raised:
         SelectedReferenceEnv._close_reference_resources(env)
@@ -266,37 +265,20 @@ def test_reference_close_preserves_resource_order_and_primary_fault(route):
         _mixed_close_receipt=None, _published_position_state=None,
         _close_camera_consumer=camera_close,
     )
-    with pytest.raises(LookupError) as raised:
+    expected_error = LookupError if route == 'position' else RuntimeError
+    with pytest.raises(expected_error) as raised:
         SelectedReferenceEnv._close_reference_resources(env)
     assert env.session is None
-    assert events == ['camera', 'session', 'owner', 'source', 'task']
+    assert events == (['camera', 'session', 'owner'] if route == 'position'
+                      else ['session', 'owner', 'source', 'task'])
     notes = getattr(raised.value, '__notes__', [])
     assert any('owner failure' in note for note in notes)
-    assert any('session failure' in note for note in notes)
+    if route == 'position':
+        assert any('session failure' in note for note in notes)
     if route == 'mixed':
         assert env._mixed_close_receipt == {
             'session_closed': True, 'task_resource_close_receipt': {'closed': True},
         }
-
-
-def test_unmaterialized_position_close_releases_source_and_task_resources():
-    """Construction-owned resources need cleanup even before the first reset."""
-    from task_env.environment.reference_env import SelectedReferenceEnv
-
-    closed = []
-    env = object.__new__(SelectedReferenceEnv)
-    env.mixed_control_profile = False
-    env.position_profile = True
-    env._execution_fault = None
-    env._published_position_state = None
-    env._camera_consumer = None
-    env.session = None
-    env.recorder = None
-    env.value = {'source': SimpleNamespace(execution_source_receipt=SimpleNamespace(
-        close=lambda: closed.append('source')))}
-    env.binding = SimpleNamespace(close_task_resources=lambda: closed.append('task'))
-    env._close_reference_resources()
-    assert closed == ['source', 'task']
 
 
 @pytest.mark.parametrize(('joint_data', 'sampler', 'capture'), [

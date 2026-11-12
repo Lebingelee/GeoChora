@@ -1,37 +1,6 @@
 """Provider-free regressions for selected construction config and identity facts."""
 
 import pytest
-
-
-@pytest.mark.parametrize('uid, profile, section, key', [
-    ('pick-cube-p16-reference-v1', 'r3_continuous_v1', 'task', 'controller_profile'),
-    ('pendulum-v1', 'direct_joint_effort_v1', 'control', 'profile_id'),
-    ('two-wheel-balance-v1', 'velocity_damped_joint_effort_v1', 'control', 'profile_id'),
-])
-def test_common_controller_selector_preserves_legacy_resolution_and_rejects_conflicts(
-        tmp_path, uid, profile, section, key):
-    import yaml
-    import task_env.tasks
-    from task_env.registry import ENV_REGISTRY
-    from task_env.environment.configuration import resolve_task_env_config
-    task = ENV_REGISTRY.get(uid)
-    canonical = {'controller': {'profile_id': profile}}
-    path = tmp_path / 'controller.yaml'
-    path.write_text(yaml.safe_dump(canonical))
-    old = resolve_task_env_config(task, {section: {key: profile}})
-    assert resolve_task_env_config(task, canonical) == old
-    assert resolve_task_env_config(task, {'control': {'profile_id': profile}}) == old
-    assert resolve_task_env_config(task, path) == old
-    with pytest.raises(ValueError, match='conflicts'):
-        resolve_task_env_config(task, {**canonical, section: {key: 'different'}})
-
-
-def test_common_controller_selector_preserves_nutassembly_profile_limit():
-    from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv
-    from task_env.environment.configuration import resolve_task_env_config
-    for config in ({'controller': {'profile_id': 'r1'}}, {'task': {'controller_profile': 'r1'}}):
-        with pytest.raises(KeyError, match='controller_profile'):
-            resolve_task_env_config(NutAssemblyReferenceEnv, config)
 from types import SimpleNamespace
 
 from task_env.artifacts.contracts import RendererSelectionV1

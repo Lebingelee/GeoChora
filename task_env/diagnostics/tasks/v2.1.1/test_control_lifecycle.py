@@ -37,3 +37,33 @@ def test_position_sequence_is_not_reinterpreted_as_a_pose_action():
     sequence = PositionActionSequenceV1((PositionActionSliceV1(0, 5, action),))
     assert prepare_selected_control_action(env, sequence) is sequence
     assert session._control_lifecycle_dispatch.stage == 'prepared'
+
+
+@pytest.mark.parametrize('provider,backend,module,method', [
+    ('mujoco', 'cpu', 'mujoco_physical', 'preflight_physical_mujoco'),
+    ('geophys', 'cpu', 'geophys_physical', 'preflight_physical_geophys'),
+    ('isaacsim', 'cuda', 'isaac_physical', 'preflight_physical_isaac'),
+])
+def test_physical_execution_preflight_uses_its_native_adapter(monkeypatch, provider, backend, module, method):
+    from importlib import import_module
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    adapter = import_module('task_env.runtime.sessions.' + module)
+    execution = object.__new__(PhysicalControlExecutionV1)
+    artifact, source = object(), object()
+    calls = []
+    monkeypatch.setattr(adapter, method, lambda *args: calls.append(args))
+    execution.preflight(provider=provider, backend=backend, artifact=artifact, source=source)
+    assert calls == [(execution, artifact, source)]
+
+
+def test_unsupported_physical_preflight_rejects_before_native_import(monkeypatch):
+    import importlib
+    from task_env.environment.types import StageUnavailableError
+    from task_env.runtime.sessions.physical_control import PhysicalControlExecutionV1
+
+    monkeypatch.setattr(importlib, 'import_module',
+                        lambda *_args: pytest.fail('unsupported adapter must not import a provider'))
+    execution = object.__new__(PhysicalControlExecutionV1)
+    with pytest.raises(StageUnavailableError, match='not implemented'):
+        execution.preflight(provider='mujoco', backend='cuda', artifact=object(), source=object())

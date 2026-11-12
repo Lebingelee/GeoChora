@@ -19,14 +19,11 @@ def selected(**execution):
 
 
 def test_profile_round_trips_and_default_is_absent_from_request():
-    from task_env.environment.reset_switch import prepare_switch_reset
     default = resolve_task_env_config(PickCubeReferenceEnv, selected())
     assert default.reset_profile is None
-    assert PickCubeReferenceEnv.selected_binding(default).prepare_reset_switch is None
     assert 'reset_profile' not in default.requested_execution_json
     resolved = resolve_task_env_config(PickCubeReferenceEnv, selected(reset_profile=PROFILE))
     assert resolved.reset_profile == PROFILE
-    assert PickCubeReferenceEnv.selected_binding(resolved).prepare_reset_switch is prepare_switch_reset
     assert resolve_task_env_config(PickCubeReferenceEnv, resolved) == resolved
 
 
