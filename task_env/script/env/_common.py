@@ -48,6 +48,14 @@ _FORMAL_TASKS = frozenset(('pick-cube-p16-reference-v1', 'nut-assembly-outcome-r
                            'pendulum-v1', 'two-wheel-balance-v1'))
 
 
+def _example_action(env, observation):
+    from task_env.runtime.sessions.control_lifecycle import has_position_control_capability
+
+    if has_position_control_capability(env) and len(env.position_profiles) == 1:
+        return np.array([*observation['state']['ee_pose'], 1.], dtype=np.float64)
+    return env.action_space.sample()
+
+
 def inline_config(env_id: str, backend: str, horizon: int) -> dict[str, Any]:
     if env_id in _FORMAL_TASKS:
         return {'execution': {'physics_provider': 'geophys', 'physics_backend': backend},
@@ -113,9 +121,8 @@ def run_single(
             # Stage 13 exposes structured action spaces (for example,
             # ``{"torque": Box(...)}``) on the public boundary.  Keep the
             # sampled tree intact instead of assuming every space is a Box.
-            action = (solution.act(observation, info) if solution is not None else
-                      np.array([*observation['state']['ee_pose'], 1.], dtype=np.float64)
-                      if hasattr(env, 'step_expert') else env.action_space.sample())
+            action = (solution.act(observation, info) if solution is not None
+                      else _example_action(env, observation))
             if not env.action_space.contains(action.action if solution is not None else action):
                 raise ValueError("sampled action is outside the advertised action_space")
             if solution is not None:
@@ -144,7 +151,8 @@ def run_single(
             "steps_requested": steps,
             "steps_completed": len(rows),
             "rows": rows,
-            "resolved": (env.value['resolved_configuration'] if hasattr(env, 'step_expert') else resolved_config_summary(env)),
+            "resolved": (env.value['resolved_configuration'] if hasattr(env, 'value')
+                         and 'resolved_configuration' in env.value else resolved_config_summary(env)),
             "final_info": json_compatible(info),
         }
         output = stage14_output("env", summary_name, "summary.json")

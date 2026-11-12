@@ -217,6 +217,20 @@ R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_s
 | R24 核 | 更新被 U1～U3 改动直接影响的 examples、CLI、worker、记录入口与 LIBERO Core caller。范围外 component／batch／learner 只做受影响 import／pure build／space 核查 | 本次四任务不再从旧 candidate 构造；必要薄兼容有真实 caller；不扩展为完整训练／batch／LIBERO A123 回归 |
 | R25 核 | 每单元结束覆盖更新本账本第 10 节当前效果；执行过程放原始 ignored 证据，最终记录按模块压缩。保全现有执行记录 dirty，不自动吞入提交或清掉历史证据 | 一个当前摘要表、每单元一个结论入口；没有每批追加同类进度的长叙事，也没有只有“281 passed”的结果 |
 
+### U4 受影响入口与诊断分类
+
+| 调用／诊断 | 本次处理与成本 |
+| --- | --- |
+| `test_formal_configuration.py::test_config_resolution_does_not_open_assets_or_import_native_sdks` | 四任务纯配置解析；禁止常见 native SDK 导入及仓库资产打开。模块中 `test_formal_tasks_construct_from_common_request` 等会构造真实 source，不能整文件当纯测 |
+| `test_solution_compatibility.py`、`test_control_lifecycle.py` | fake 合同，覆盖 Solution 提案、公开 schema 数值检查、writer 冲突和部分写入回调；不构造 source 或 native |
+| `test_reset_reconstruction.py`、`test_worker_resources.py`、`test_task_rgb.py` | fake／临时 source receipt、socket 和 fake camera；不代表真实 SDK App 或图像采集 |
+| `formal_cpu_probe.py`、`test_panda_effort_profiles.py` 的 native node | 真实 source／MuJoCo；需冻结 node、输入、子步、资源和双锁。Isaac 或图像另需对应 GPU／显示资源，不由 CPU 证据外推 |
+| `task_env/script/env/_common.py`、四任务示例 | 正式 `make_env` 和共同配置；动作根据已绑定 Position capability 或 action space 生成，不再把 `step_expert` 方法存在与否当作主体类别。Nut Solution 接受 Gym `info` 中的公开 schema，同时仍拒绝非有限值 |
+| `bench_deploy/libero/trajectory/worker.py` | 保留真实 caller 的 `reset_for_solution → step_with_solution`，U3 兼容入口仍提供一次 act／observe；静态核对，不宣称完成 LIBERO benchmark 复验 |
+| vector／learner 与范围外 component | 不扩大为 G06 或训练实现；正式四任务的旧 parallel factory 拒绝由纯配置节点核对；未运行 batch physics |
+
+[四任务示例 MuJoCo 计划](../../../../../workspace/maintenance/v211_u4_cli_20261112_003/plan.json)各运行一个 interval，总计 60 显式子步；Nut caller-owned Solution 的 `act → step → observe` 同次完成。001 使用错误的 Nut seed 31 在其推进前被拒绝；002 使用 seed 19 后发现公开 schema 被 Solution 错误拒绝；两次 PickCube 各推进 5 子步、锁已释放，记录和日志保留。003 修正后通过，不能据此宣称任务成功或完整 Solution。11 项精确纯节点通过。已有执行记录的用户 dirty 内容未纳入本单元提交。
+
 ## 6. U5：用最短实际证据结束 E00～E04
 
 **依赖：U1～U4。** 复用同一最终 owner 已覆盖的结果，不在结尾机械重跑。以下是已有要求的映射，不新增全矩阵、像素门或完整 Solution。
@@ -279,7 +293,7 @@ R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_s
 | U1 | 实施者自评 PASS，独立主审及维护者接收待完成：`253e1efe` 与 `a5483e63` 将桌面 Position／effort 的 source 和 Controller 能力接入共同阶段；四任务构建结果交接见第 2 节。Task 继续提供任务参数和语义映射 | [MuJoCo 计划](../../../../../workspace/maintenance/v211_u1_shared_source_native_20261112_001/plan.json)：Position、effort、装配 Panda 各 5 个显式子步、二次 reset 和重复 close；[剩余任务计划](../../../../../workspace/maintenance/v211_u1_remaining_tasks_native_20261112_001/plan.json)：Nut、Pendulum、双轮车各完成对应短程。[Isaac 重试计划](../../../../../workspace/maintenance/v211_u1_usd_shared_native_20261112_002/plan.json)：Position、effort 各 5 个显式子步、二次 reset、App close receipt 完成，启动隐式推进 unknown；首次启动失败和早前 MuJoCo 运行偏差分别保留原始日志与[偏差记录](../../../../../workspace/maintenance/v211_u1_continuation_20261112_001/verification-notes.md) | R01～R08 均有实施者结论；U2 可沿现有结果开展生命周期核对。后续事件和全台账未完成 |
 | U2 | 实施者自评完成，独立主审及维护者接收待定：修复失败 reset 的旧 Runtime owner 遗失及预检拒绝后的 RNG 变化；保全 source、worker 与 camera 清理合同 | 第 3 节资源／阶段表、30 项纯合同检查与 [MuJoCo 最终冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)；Isaac 的成功路径沿用 U1 证据并保留日志限制 | R09～R14 均有实施者结论；U3 可继续，真实 Isaac 失败与真实 camera 失败未复验 |
 | U3 | 实施者自评完成，独立主审及维护者接收待定：兼容入口共用提案处理，保留调用方持有 Solution 的标准调用、现有 typed 语义和唯一提交 owner | 第 4 节支持表、12 项纯合同检查及 MuJoCo Solution／expert／故障／typed 控制冻结证据；部分 mixed／COM 交集未复验 | R15～R21 均有实施者结论；U4 可继续。完整 Solution 保留 E13 |
-| U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
+| U4 | 实施者自评完成，独立主审及维护者接收待定：示例按控制能力选动作，Nut caller-owned Solution 接受正式 schema，版本诊断标明真实成本并增加配置 import／资产守卫 | 第 5 节分类、11 项精确纯检查及[四任务示例计划](../../../../../workspace/maintenance/v211_u4_cli_20261112_003/plan.json)；LIBERO 静态核对 | R22～R25 均有实施者结论；批处理／训练与完整 benchmark 不在本单元 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
 
 当前 Controller owner 调整后，119 项受影响诊断通过；[冻结输入](../../../../../workspace/maintenance/v211_u1_position_controller_owner_20261112_002/plan.json)下 MuJoCo PickCube／Nut 和 Isaac Position／effort 各完成 5 个显式子步、二次 reset 与 close，Isaac 日志未见 traceback，隐式启动推进数未知。先前运行期间发生源码输入漂移，两条 Isaac 各消耗 5 个显式子步的结果未作为冻结输入证据；一次锁冲突未推进，均保留原始输出并计入计划。

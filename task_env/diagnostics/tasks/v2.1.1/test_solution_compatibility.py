@@ -39,3 +39,18 @@ def test_bad_solution_proposal_faults_after_act_and_preserves_abort_error():
             abort_on_error=True)
     assert calls == ['act', 'expert_proposal', 'runtime_error']
     assert any('abort failed' in note for note in raised.value.__notes__)
+
+
+def test_nut_solution_accepts_public_schema_but_still_rejects_nonfinite_info():
+    from task_env.environment.types import ObservationSchema
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+
+    solution = object.__new__(NutAssemblyOutcomeSolutionV1)
+    pose = np.array([0., 0., 0., 1., 0., 0., 0.])
+    observation = {'state': {'ee_pose': pose}, 'privileged_state': {
+        'square_nut_v1_body_pose': [pose], 'square_peg_v1_body_pose': [pose]}}
+    info = {'observation_schema': ObservationSchema('test-v1', ()), 'is_success': False,
+        'task_metrics': {'inserted_on_peg': False, 'released_nut': False, 'task_success': False}}
+    assert solution._validate(observation, info) is False
+    with pytest.raises(ValueError, match='nonfinite'):
+        solution._validate(observation, {**info, 'simulation_time_s': float('nan')})

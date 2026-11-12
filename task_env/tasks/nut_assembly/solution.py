@@ -1012,7 +1012,11 @@ class NutAssemblyOutcomeSolutionV1:
         return int(step), float(time_s)
 
     def _validate(self, obs, info, reward=0.0, readiness=None, samples=()):
-        if not self._finite((obs, info, reward, samples)):
+        # Gym info can contain the public typed ObservationSchema. Apply the
+        # same value projection used by the Env compatibility path so a
+        # caller-owned Solution can consume reset/step info directly.
+        from ...environment.metadata import task_info_for_solution
+        if not self._finite((obs, task_info_for_solution(info), reward, samples)):
             raise ValueError("nonfinite state or evidence")
         for pose in (self._ee(obs), self._body(obs, "square_nut_v1"),
                      self._body(obs, "square_peg_v1")):

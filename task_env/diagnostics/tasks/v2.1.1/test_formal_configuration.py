@@ -1,4 +1,4 @@
-"""Provider-free configuration checks for the four formal v2.1.1 tasks."""
+"""Formal configuration checks; some nodes also construct real task sources."""
 
 import importlib
 
@@ -7,6 +7,61 @@ import yaml
 
 from task_env.environment.configuration import resolve_task_env_config
 from task_env.registry import ENV_REGISTRY
+
+
+def test_config_resolution_does_not_open_assets_or_import_native_sdks(monkeypatch):
+    import builtins
+    import io
+    from pathlib import Path
+
+    asset_root = Path(__file__).resolve().parents[4] / 'asset'
+    original_import, original_import_module = builtins.__import__, importlib.import_module
+    original_open, original_io_open = builtins.open, io.open
+
+    def guarded_import(name, *args, **kwargs):
+        if name.split('.')[0] in {'mujoco', 'taichi', 'isaacsim', 'omni', 'pxr'}:
+            pytest.fail(f'configuration imported native SDK: {name}')
+        return original_import(name, *args, **kwargs)
+
+    def guarded_import_module(name, *args, **kwargs):
+        if name.split('.')[0] in {'mujoco', 'taichi', 'isaacsim', 'omni', 'pxr'}:
+            pytest.fail(f'configuration imported native SDK: {name}')
+        return original_import_module(name, *args, **kwargs)
+
+    def guard_open(opener, path, *args, **kwargs):
+        if isinstance(path, (str, bytes, Path)):
+            try:
+                Path(path).resolve().relative_to(asset_root)
+            except (ValueError, TypeError):
+                pass
+            else:
+                pytest.fail(f'configuration opened an asset: {path}')
+        return opener(path, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', guarded_import)
+    monkeypatch.setattr(importlib, 'import_module', guarded_import_module)
+    monkeypatch.setattr(builtins, 'open', lambda path, *a, **kw: guard_open(original_open, path, *a, **kw))
+    monkeypatch.setattr(io, 'open', lambda path, *a, **kw: guard_open(original_io_open, path, *a, **kw))
+    importlib.import_module('task_env.tasks')
+    for uid in ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+                'pendulum-v1', 'two-wheel-balance-v1'):
+        resolved = resolve_task_env_config(ENV_REGISTRY.get(uid), {
+            'execution': {'physics_provider': 'mujoco'}, 'episode': {'horizon': 8}})
+        assert resolved.environment.episode.horizon == 8
+
+
+def test_example_action_uses_control_capability_not_compatibility_method():
+    from types import SimpleNamespace
+    import numpy as np
+    from task_env.script.env._common import _example_action
+
+    torque = {'torque': np.array([0.2])}
+    simple = SimpleNamespace(position_profiles=(), position_plan=None,
+        action_space=SimpleNamespace(sample=lambda: torque), step_expert=lambda: None)
+    assert _example_action(simple, {'state': {'proprioception': [0.]}}) is torque
+    position = SimpleNamespace(position_profiles=(object(),), position_plan=object())
+    np.testing.assert_array_equal(_example_action(position, {'state': {'ee_pose': [1, 2, 3, 1, 0, 0, 0]}}),
+                                  [1, 2, 3, 1, 0, 0, 0, 1])
 
 
 @pytest.mark.parametrize(('uid', 'profile'), [
