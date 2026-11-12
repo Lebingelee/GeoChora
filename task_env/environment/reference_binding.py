@@ -36,6 +36,43 @@ class TaskBuildRequest:
     binding: object
 
 
+class SourceBoundTaskBuilder:
+    """Construct a task source and derive each episode's reset plan."""
+
+    def __init__(self, compile_source, reset_plan, *, backend, reuse_source=False,
+                 allow_sampled_reset=True):
+        self.compile_source, self.reset_plan = compile_source, reset_plan
+        self.backend, self.reuse_source = backend, reuse_source
+        self.allow_sampled_reset = allow_sampled_reset
+        self._cached = self._route = None
+
+    def __call__(self, request):
+        if request.backend != self.backend:
+            raise ValueError('requested backend differs from resolved configuration')
+        if request.sampled_reset is not None and not self.allow_sampled_reset:
+            raise ValueError('task does not accept an externally sampled reset')
+        route = (request.provider, request.backend)
+        if self._cached is not None and route != self._route:
+            raise ValueError('reused task source differs from the requested provider/backend')
+        fresh = self._cached is None
+        value = self.compile_source(request) if fresh else self._cached
+        try:
+            plan = self.reset_plan(value, request)
+        except BaseException as error:
+            if fresh:
+                from ..runtime.sessions.source import source_resource_receipt
+                receipt = source_resource_receipt(value.get('source'))
+                if receipt is not None:
+                    try:
+                        receipt.close()
+                    except BaseException as cleanup_error:
+                        error.add_note(f'task source cleanup also failed: {cleanup_error!r}')
+            raise
+        if self.reuse_source and fresh:
+            self._cached, self._route = value, route
+        return {**value, 'reset_plan': plan}
+
+
 class _StandardResetReconstruction:
     """Rebuild one task through its binding and manage source replacement."""
     def __init__(self, binding, provider, backend, horizon):
@@ -482,11 +519,8 @@ class ExistingSubjectEffortTask:
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
-        def build(request):
-            provider, backend, seed, sampled = (request.provider, request.backend,
-                                                 request.seed, request.sampled_reset)
-            if backend != config.runtime.backend:
-                raise ValueError('build request backend differs from resolved configuration')
+        def compile_source(request):
+            provider, seed = request.provider, request.seed
             robot = self.robot
             scene, delivery = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
@@ -500,7 +534,6 @@ class ExistingSubjectEffortTask:
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0], 'solution': None, 'physical_execution': physical,
-                'reset_plan': self.reset_plan(artifact, source, seed, sampled),
                 'construction_id': self.construction_id,
                 'source_revision': scene.assets[0].source_revision or self.source_revision,
                 'execution_spec_v1': execution_spec, 'selected_controller_profile_id': profile_id,
@@ -516,7 +549,10 @@ class ExistingSubjectEffortTask:
 
         action = self.robot.action_contract
         return ReferenceTaskBinding(
-            build=build,
+            build=SourceBoundTaskBuilder(compile_source,
+                lambda value, request: self.reset_plan(value['artifact'], value['source'],
+                                                       request.seed, request.sampled_reset),
+                backend=config.runtime.backend),
             task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,
             task_definition_factory=self.definition_factory, task_state_projection=self.state_projection,
             task_observation_schema=self.observation_schema, external_action_contract=action,

@@ -30,7 +30,7 @@ def make_physical_binding(*, native_drive, control_kind,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None, robot=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...environment import sample_episode_reset_plan
-    from ...environment.reference_binding import ReferenceTaskBinding
+    from ...environment.reference_binding import ReferenceTaskBinding, SourceBoundTaskBuilder
     from .specialization import (_compile_task_source, _nut_aligned_environment_config,
                                  _prepare_reference_source, compile_reference_robot_task)
     from .task import (physical_task_binding_fields,
@@ -42,78 +42,66 @@ def make_physical_binding(*, native_drive, control_kind,
                                                     panda_reset_action_schema)
     from ...runtime.sessions.source import close_execution_source_on_failure, snapshot_legacy_mjcf_source
 
-    # The common construction request owns the source, not the Task binding.
-    # Resets of this admitted route reuse its immutable source and build a new
-    # task reset plan; Env.close releases the source receipt once.
-    prepared_value = None
-
-    def build(request):
-        nonlocal prepared_value
-        provider, backend, actual_seed, sampled = (request.provider, request.backend,
-                                                   request.seed, request.sampled_reset)
-        if backend != resolved_config.runtime.backend:
-            raise ValueError('requested backend differs from the declared Robot source')
-        if sampled is not None:
-            raise ValueError('PickCube does not accept an externally sampled reset')
-        if prepared_value is None:
+    def compile_source(request):
+        provider, backend = request.provider, request.backend
+        if reset_switch:
+            # The switchable route admits the R3 Solution, so it needs its
+            # readiness data; the other effort profiles do not select R3.
+            prepared = _prepare_reference_source(
+                backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
+                resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
+            legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
+        else:
+            _, legacy_artifact, source = _compile_task_source(
+                backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
+                lift_height_m=lift_height_m, task_config=task_config, robot=robot)
+            original, readiness = snapshot_legacy_mjcf_source(source), None
+        with close_execution_source_on_failure(original):
+            import subprocess
+            revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
+                                                'rev-parse', 'HEAD'], text=True).strip()
             if reset_switch:
-                # The switchable route admits the R3 Solution, so it needs its
-                # readiness data; the other effort profiles do not select R3.
-                prepared = _prepare_reference_source(
-                    backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
-                    resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
-                legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
-            else:
-                _, legacy_artifact, source = _compile_task_source(
-                    backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
-                    lift_height_m=lift_height_m, task_config=task_config, robot=robot)
-                original, readiness = snapshot_legacy_mjcf_source(source), None
-            with close_execution_source_on_failure(original):
-                import subprocess
-                revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
-                                                    'rev-parse', 'HEAD'], text=True).strip()
-                if reset_switch:
-                    from .solution import PickCubeReadinessSolution
-                    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-                selected_robot = original.agents[0]
-                task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
-                    task_config, selected_robot, legacy_artifact, original)
+                from .solution import PickCubeReadinessSolution
+                solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+            selected_robot = original.agents[0]
+            task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
+                task_config, selected_robot, legacy_artifact, original)
 
-                from ...runtime.sessions.source_composition_adapters import prepare_panda_source_effort_factory
-                from .specialization import panda_effort_task_settings
-                build_physical = prepare_panda_source_effort_factory(
-                    selected_robot, scene, artifact, source, native_drive=native_drive,
-                    config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
-                    task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
-                    gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None)
+            from ...runtime.sessions.source_composition_adapters import prepare_panda_source_effort_factory
+            from .specialization import panda_effort_task_settings
+            build_physical = prepare_panda_source_effort_factory(
+                selected_robot, scene, artifact, source, native_drive=native_drive,
+                config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
+                task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
+                gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None)
 
-                physical = build_physical(control_kind)
-                candidate = {'artifact': artifact, 'task_source': task_source, 'source': source,
-                    'controller': physical.controllers[0], 'solution': None,
-                    **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
-                        'solution_identity': solution_identity, 'readiness': readiness,
-                        '_physical_controller_factory': build_physical} if reset_switch else {}),
-                    'physical_execution': physical,
-                    'construction_id': 'pickcube-mjcf-physical-candidate-v1',
-                    'source_revision': revision, 'source_sha256': {
-                        'original_closure': original.source_closure_digest,
-                        'projected_closure': closure},
-                    'resolved_configuration': {'provider': provider, 'backend': backend,
-                        'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
-                        'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
-                        'control_kind': control_kind,
-                        **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
-                           if cube_force_z_N is not None else {}),
-                        'original_closure': original.source_closure_digest,
-                        'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
-                reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed)
-                prepared_value = candidate
-                return {**candidate, 'reset_plan': reset_plan}
-        task_source, source, artifact = (prepared_value[key] for key in ('task_source', 'source', 'artifact'))
-        reset_plan = sample_episode_reset_plan(task_source, source.scene_definition, artifact, task_seed=actual_seed)
-        return {**prepared_value, 'reset_plan': reset_plan}
+            physical = build_physical(control_kind)
+            candidate = {'artifact': artifact, 'task_source': task_source, 'source': source,
+                'controller': physical.controllers[0], 'solution': None,
+                **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
+                    'solution_identity': solution_identity, 'readiness': readiness,
+                    '_physical_controller_factory': build_physical} if reset_switch else {}),
+                'physical_execution': physical,
+                'construction_id': 'pickcube-mjcf-physical-candidate-v1',
+                'source_revision': revision, 'source_sha256': {
+                    'original_closure': original.source_closure_digest,
+                    'projected_closure': closure},
+                'resolved_configuration': {'provider': provider, 'backend': backend,
+                    'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
+                    'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
+                    'control_kind': control_kind,
+                    **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
+                       if cube_force_z_N is not None else {}),
+                    'original_closure': original.source_closure_digest,
+                    'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
+            return candidate
 
-    return ReferenceTaskBinding(build=build,
+    def reset_plan(value, request):
+        return sample_episode_reset_plan(value['task_source'], value['source'].scene_definition,
+                                         value['artifact'], task_seed=request.seed)
+
+    return ReferenceTaskBinding(build=SourceBoundTaskBuilder(compile_source, reset_plan,
+            backend=resolved_config.runtime.backend, reuse_source=True, allow_sampled_reset=False),
         **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
             hand_frame_id='hand', cube_force_z_N=cube_force_z_N),
         action_schema=None, action_space_factory=None,

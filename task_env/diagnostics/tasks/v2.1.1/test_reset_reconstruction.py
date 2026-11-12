@@ -4,7 +4,42 @@ from types import SimpleNamespace
 
 import pytest
 
-from task_env.environment.reference_binding import _StandardResetReconstruction
+from task_env.environment.reference_binding import (
+    SourceBoundTaskBuilder, TaskBuildRequest, _StandardResetReconstruction,
+)
+
+
+def test_shared_source_builder_resamples_and_rejects_foreign_route():
+    source = object()
+    compiled = []
+    def compile_source(request):
+        compiled.append(request.provider)
+        return {'source': source}
+    builder = SourceBoundTaskBuilder(compile_source, lambda value, request: (value['source'], request.seed),
+                                    backend='cpu', reuse_source=True)
+    request = lambda provider, seed: TaskBuildRequest(provider, 'cpu', seed, 8, None, None)
+    first = builder(request('mujoco', 31))
+    second = builder(request('mujoco', 42))
+    assert compiled == ['mujoco']
+    assert first['reset_plan'] == (source, 31) and second['reset_plan'] == (source, 42)
+    with pytest.raises(ValueError, match='requested provider/backend'):
+        builder(request('geophys', 42))
+    assert compiled == ['mujoco']
+
+
+def test_failed_first_reset_plan_releases_only_new_source(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+
+    receipt = SimpleNamespace(closed=False)
+    receipt.close = lambda: setattr(receipt, 'closed', True)
+    monkeypatch.setattr(source_module, 'source_resource_receipt', lambda source: source)
+    def reject(_value, _request):
+        raise ValueError('invalid reset')
+    builder = SourceBoundTaskBuilder(lambda _request: {'source': receipt}, reject,
+                                    backend='cpu', reuse_source=True)
+    with pytest.raises(ValueError, match='invalid reset'):
+        builder(TaskBuildRequest('mujoco', 'cpu', 31, 8, None, None))
+    assert receipt.closed and builder._cached is None
 
 
 def test_reconstruction_replaces_source_only_after_validation(monkeypatch):
