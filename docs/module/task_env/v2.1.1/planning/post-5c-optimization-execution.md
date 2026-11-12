@@ -1434,3 +1434,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 6 文件 +17／−9，净增 8 行；版本诊断修改 2 文件 +37／−0；无新增、删除或整文件迁移，项目 tracked 文件数保持 1359。当前状态摘要从逐批追加的过时状态整理为 E00～E04 当前表，历史逐批结果仍在本执行记录及原始证据中；本文标明启动计划和首批状态的历史时点。相对 `1f1359ee` 的 task_env 差异 140 文件（新增 14、删除 20、修改 106），+8358／−14851，净减 6493 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 207 项通过。两种 Robot 的 Scene 摘要分别验证实际所选 source 字节；以仅增加无物理语义注释的 source，MuJoCo 和 GeoPhys 的 Pendulum／双轮车分别完成 reset、非零控制、再次 reset 和重复 close。MuJoCo 各观测 25 个 native 子步，GeoPhys 子步不可观测、各按 50 预留。未验证其他 source 变体、Isaac、renderer 或完整 Solution；此前证据按其原输入和范围保留。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_simple_robot_declarations_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.148 共同 reset 重建与选择身份
+
+输入 `49a0778e`；实施前重审台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 和 source 边界。共同 reset 重建之前有一个只有单一实际子类的抽象基类，以及只被该子类调用的 Solution 验证包装；现收为一个现有重建实现，保留采样、Solution 校验、source 验证及旧／新租约替换顺序。可切换 effort Controller 的预检与重建原各自复制实际 Controller 和 profile 到构建值；现由已存在的 prepared selection 生成一致的值，Env 仍负责编排预检、提交和物化。该变化不删除 native source、clock、故障或能力检查，也不宣称所有 reset 路径已完成收口。
+
+生产修改 3 文件 +24／−41，净减 17 行；版本诊断新增 1 文件 +51／−0，验证 source 验证失败释放新租约并保留旧租约、成功后替换及不修改原构建值；无整文件迁移，项目 tracked 文件数 1359→1360。相对 `1f1359ee` 的 task_env 差异 141 文件（新增 15、删除 20、修改 106），+8421／−14880，净减 6459 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 209 项通过。MuJoCo PickCube Solution 单步、Nut Solution 单步、effort Controller reset 切换、Pendulum 和双轮车均完成 reset／推进／再次 reset／关闭，分别观测 5／5／10／25／25 native 子步；GeoPhys PickCube Solution 单步同样完成短程，native 子步不可观测并按 50 预留。Solution 均非完整运行。Isaac、renderer 和装配主体本批未复验；旧证据保持原输入范围。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_common_reset_reconstruction_20261112/`。E01～E04 尚未整体接收。

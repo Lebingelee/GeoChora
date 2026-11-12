@@ -25,14 +25,21 @@ class ResetReconstructionResult:
     solution: object
 
 
-class _ResetReconstruction:
-    """Task binding's reconstruction policy for one selected configuration."""
+class _StandardResetReconstruction:
+    """Rebuild one task through its binding and manage source replacement."""
     def __init__(self, binding, provider, backend, horizon):
         self.binding, self.provider, self.backend, self.horizon = binding, provider, backend, horizon
         self.sampled_reset = None
 
     def build_switch_candidate(self, seed):
         return self._build(seed, None)
+
+    def initial(self, *, seed=31):
+        return self._build(seed, None)
+
+    def build_reset(self, current, seed, external_solution):
+        sampled = None if external_solution is not None else self.sampled_reset
+        return self._build(seed, sampled)
 
     def _build(self, seed, sampled):
         value = self.binding.build_for_request(self.provider, self.backend, seed,
@@ -78,17 +85,6 @@ class _ResetReconstruction:
         """Use the Env's currently admitted task binding without changing policy."""
         self.binding = binding
 
-    def _validate_solutions(self, value, external_solution, *, validate_owned=False):
-        if external_solution is not None:
-            self.binding.validate_external_solution(value, external_solution)
-        solution = value.get('solution')
-        if validate_owned and solution is not None:
-            self.binding.validate_external_solution(value, solution)
-        return solution
-
-    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
-        raise NotImplementedError
-
     def reconstruct(self, current, artifact, seed, external_solution, artifact_for_reset, *,
                     verify_source, set_phase=lambda _phase: None, prepared=None):
         value = prepared if prepared is not None else self.build_reset(current, seed, external_solution)
@@ -97,8 +93,13 @@ class _ResetReconstruction:
         receipt = source_resource_receipt(value.get('source'))
         try:
             verify_source(value)
-            artifact, seed, solution = self._finish(
-                value, artifact, seed, external_solution, artifact_for_reset, set_phase)
+            selector = self.binding.reset_runtime_input
+            runtime_input = selector(value) if selector else None
+            artifact = artifact_for_reset(artifact, value, runtime_input)
+            if external_solution is not None:
+                self.binding.validate_external_solution(value, external_solution)
+            solution = value.get('solution')
+            set_phase('reset_seed')
             # Keep the prior source lease until the replacement is validated;
             # a failed replacement must not strand the reset recovery route.
             if old_receipt is not None and old_receipt is not receipt:
@@ -113,24 +114,6 @@ class _ResetReconstruction:
                     error.add_note(f'rebuilt source cleanup also failed: {cleanup_error!r}')
             raise
         return ResetReconstructionResult(value, artifact, seed, solution)
-
-
-class _StandardResetReconstruction(_ResetReconstruction):
-    def initial(self, *, seed=31):
-        return self._build(seed, None)
-
-    def build_reset(self, current, seed, external_solution):
-        sampled = None if external_solution is not None else self.sampled_reset
-        return self._build(seed, sampled)
-
-    def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
-        selector = getattr(self.binding, 'reset_runtime_input', None)
-        runtime_input = selector(value) if selector else None
-        artifact = artifact_for_reset(artifact, value, runtime_input)
-        solution = self._validate_solutions(value, external_solution)
-        set_phase('reset_seed')
-        return artifact, seed, solution
-
 
 def legacy_position_physical_observation_binding(env):
     """Compatibility projection for selected callers that still publish V1 state."""

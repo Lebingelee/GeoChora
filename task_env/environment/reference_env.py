@@ -1821,10 +1821,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     requested['controller'] = {'gravity_compensation': True}
                 preflight_value = candidate_value if switching else self.value
                 if physical_candidate is not None:
-                    active = physical_candidate.execution
-                    preflight_value = {**preflight_value, 'physical_execution': active,
-                                       'controller': active.controllers[0],
-                                       'selected_controller_profile_id': active.selection_profile_id}
+                    preflight_value = physical_candidate.bind_value(preflight_value)
                 facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
                              source=preflight_value['source'],
                              controller=preflight_value.get('controller'), seed=seed)
@@ -1951,10 +1948,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 prepared=candidate_value if switching else None)
             self.value, self.artifact = rebuilt.value, rebuilt.artifact
             if physical_candidate is not None:
-                active = physical_candidate.execution
-                self.value = {**self.value, 'physical_execution': active,
-                              'controller': active.controllers[0],
-                              'selected_controller_profile_id': active.selection_profile_id}
+                self.value = physical_candidate.bind_value(self.value)
             seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
             previous_action_schema = self.binding.action_schema

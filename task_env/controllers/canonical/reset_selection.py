@@ -19,6 +19,12 @@ class PreparedPhysicalSelection:
     execution: PhysicalControlExecutionV1
     spec_id: str
 
+    def bind_value(self, value):
+        """Use the same prepared Controller for preflight and reconstruction."""
+        return {**value, 'physical_execution': self.execution,
+                'controller': self.execution.controllers[0],
+                'selected_controller_profile_id': self.execution.selection_profile_id}
+
 
 class PhysicalResetSelection:
     """Own the action identity and generation of one switchable scalar Env.
