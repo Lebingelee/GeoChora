@@ -153,6 +153,28 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 **单元退出：**R09～R14 的资源／阶段表与真实 owner 对齐；现有强诊断优先复用，少量正负例覆盖改变的失败边界。只有确有共同 owner 缺口才改生产；不因 `reference_env.py` 仍大就继续拆 helper。
 
+### U2 资源交接与 reset 阶段核对
+
+| 阶段 | 持有与交接 | 失败或关闭 |
+| --- | --- | --- |
+| Task source 构造／Controller 编译 | `SourceBoundTaskBuilder` 持有新 source receipt；复用时先验证 snapshot／USD freshness | 首次构造的 source 或 Controller 阶段失败由 builder 关闭 receipt，并在 cleanup 失败时保留原异常与附注；缓存不提交失败结果 |
+| Env 尚未返回 | `from_task_binding` 和 `SelectedReferenceEnv.__init__` 将初始 value 与 binding 交接 | 失败由 `_release_failed_task_construction → close_source_and_task_resources` 清理 source 与 Task 自有资源，异常及清理附注保留 |
+| reset 重建 | `_StandardResetReconstruction` 持有旧与候选 source receipt，先检查新 source、Artifact 和外部 Solution | 新 source 验证失败仅关闭新 receipt；通过后再关闭不同的旧 receipt，避免丢失原恢复路径 |
+| worker | `_materialize_selected` 重建并独立核验 binding/source；`serve_session` 管理 session 与关闭响应 | worker 清理顺序为 session、Runtime owner、source、Task；多个 cleanup 失败以附注保留，重复 cleanup 不再执行 |
+| episode 与 Runtime owner | 预检后旧 episode 的 publication 失效，旧 session 关闭；进程级 owner 可跨成功 reset 复用 | 若替代 session 未建成即失败，旧 owner 保持可达，Env close 时释放；失败的新 session owner 同样保留。close 失败保留首个异常与次级附注 |
+| camera／visual | RGB consumer 负责其 camera session；独立 visual session 持有自己的 renderer 资源，borrowed 模型的物理资源仍归 Runtime | reset 与 Env close 调用 consumer 清理；即使 camera close 失败，仍尝试关闭 visual。关闭状态以实际 receipt／异常为准 |
+| Recorder／Task | Recorder 由当前 Env episode 管理，未完成记录拒绝 reset；Task 自有资源由 binding 关闭 | 先结束可正常结束的 episode，再关闭 camera、session／Runtime owner、source／Task；fault 时不伪造正常 episode 结束 |
+
+| 阶段 | 实际职责与失败边界 |
+| --- | --- |
+| 预检／采样 | Task sampler 与 reset capability 准备 seed、Controller 和 source；固定 renderer 不兼容、无效选择等在破坏前拒绝。采样后的预检拒绝恢复 RNG，`seed=None` 与显式 seed 均覆盖 |
+| 破坏／重建 | `EpisodeExecutionState` 停止旧 episode；Env 清除 publication、关闭旧 camera／session；reconstruction 验证 source、重绑 Controller／TaskDefinition，再由 RuntimeBuilder 物化。此后失败 latch fault，清理异常附注到原异常 |
+| 初态／发布 | initializer 执行 reset，session 读回状态，Task 生成 observation；publication 成功才完成 episode commit。RGB 延后采集时校验同一 boundary／clock，失败仍 latch fault；Controller 的 reset selection 在旧 session 关闭后提交 |
+
+R09～R14 实施者核对完成，独立主审及维护者接收待定。版本化纯合同检查 30 项通过，覆盖 source、worker、相机和 RNG；不将 fake 当作真实 App。最终代码的 [MuJoCo 冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)覆盖四任务及 Panda effort／装配，每条完成构造、reset、一个非零 interval、第二次 reset 和重复 close；Pendulum／双轮车额外核对连续 RNG。前一轮等价实现的 002 也通过；001 因缺少 `scene` 模块在物理推进前失败，锁已释放。另一次误将含真实 source 构造的配置测试模块作为纯测运行，未按 native／source 窗口冻结或持锁，且桌面用例因缺少 `scene` 模块失败；不作为验证证据，详见[偏差记录](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/verification-notes.md)。
+
+Isaac 成功 reset 与 App close 参考 U1 的冻结运行：U2 改动仅影响失败后 owner 保留和有 Task sampler 的预检拒绝，未改其 provider／renderer 实现；U2 未重跑 Isaac 失败路径。U1 的 Position 关闭日志曾含 SDK 菜单回调警告，App receipt 和日志分别保留，无法仅凭 receipt 断言 SDK 无异常。GeoPhys、真实 camera 失败与跨 renderer 不扩大为本单元已复验范围。
+
 ## 4. U3：结束动作来源、提案和唯一提交的收口
 
 **对应：E04。依赖：U1 的 Controller 绑定和 U2 的 episode 生命周期。** 当前共同 submit 已存在。本单元整理真实入口及失败语义，不重新设计调度框架。
@@ -240,7 +262,7 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
 | U1 | 实施者自评 PASS，独立主审及维护者接收待完成：`253e1efe` 与 `a5483e63` 将桌面 Position／effort 的 source 和 Controller 能力接入共同阶段；四任务构建结果交接见第 2 节。Task 继续提供任务参数和语义映射 | [MuJoCo 计划](../../../../../workspace/maintenance/v211_u1_shared_source_native_20261112_001/plan.json)：Position、effort、装配 Panda 各 5 个显式子步、二次 reset 和重复 close；[剩余任务计划](../../../../../workspace/maintenance/v211_u1_remaining_tasks_native_20261112_001/plan.json)：Nut、Pendulum、双轮车各完成对应短程。[Isaac 重试计划](../../../../../workspace/maintenance/v211_u1_usd_shared_native_20261112_002/plan.json)：Position、effort 各 5 个显式子步、二次 reset、App close receipt 完成，启动隐式推进 unknown；首次启动失败和早前 MuJoCo 运行偏差分别保留原始日志与[偏差记录](../../../../../workspace/maintenance/v211_u1_continuation_20261112_001/verification-notes.md) | R01～R08 均有实施者结论；U2 可沿现有结果开展生命周期核对。后续事件和全台账未完成 |
-| U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
+| U2 | 实施者自评完成，独立主审及维护者接收待定：修复失败 reset 的旧 Runtime owner 遗失及预检拒绝后的 RNG 变化；保全 source、worker 与 camera 清理合同 | 第 3 节资源／阶段表、30 项纯合同检查与 [MuJoCo 最终冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)；Isaac 的成功路径沿用 U1 证据并保留日志限制 | R09～R14 均有实施者结论；U3 可继续，真实 Isaac 失败与真实 camera 失败未复验 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |

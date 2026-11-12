@@ -156,3 +156,25 @@ def test_environment_closes_rgb_and_visual_resources_once():
     env._close_camera_consumer()
     assert closed == ['rgb', 'visual']
     assert env._visual_binding_last_close == {'closed': True}
+
+
+def test_camera_cleanup_failure_still_closes_owned_visual_resource():
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    closed = []
+    class Resource:
+        close_status = {'closed': True}
+        def __init__(self, name, fail=False): self.name, self.fail = name, fail
+        def close(self):
+            closed.append(self.name)
+            if self.fail:
+                raise RuntimeError('camera close failed')
+
+    env = object.__new__(SelectedReferenceEnv)
+    env._task_rgb_consumer = Resource('rgb', fail=True)
+    env._visual_state_session = Resource('visual')
+    with pytest.raises(RuntimeError, match='camera close failed'):
+        env._close_camera_consumer()
+    env._close_camera_consumer()
+    assert closed == ['rgb', 'visual']
+    assert env._visual_binding_last_close == {'closed': True}

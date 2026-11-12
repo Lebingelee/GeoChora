@@ -139,3 +139,69 @@ def test_prepared_controller_value_is_shared_without_mutating_source_mapping():
     assert selected['controller'] is controller and original['controller'] is not controller
     assert selected['physical_execution'] is execution
     assert selected['selected_controller_profile_id'] == 'profile'
+
+
+def test_failed_reset_retains_previous_runtime_owner_until_env_close(monkeypatch):
+    from task_env.environment import reference_binding
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions import source as source_module
+
+    events = []
+    previous = SimpleNamespace(
+        close=lambda: events.append('session'),
+        close_runtime_owner=lambda: events.append('owner'),
+    )
+    def reject_reconstruction(*args, **kwargs):
+        raise RuntimeError('reconstruction failed')
+    reconstruction = SimpleNamespace(use_binding=lambda binding: None,
+                                     reconstruct=reject_reconstruction)
+    state = SimpleNamespace(fault=None, require_open=lambda message: None)
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: state, _task_rgb_config=None,
+        _physical_reset_selection=None, _physical_execution=lambda: None,
+        recorder=None, binding=SimpleNamespace(prepare_reset_switch=None),
+        _reset_reconstruction=reconstruction, resolved_public_config=None,
+        value={'source': object()}, _selected_execution_context=lambda: (None, None),
+        _position_episode_end=None, session=previous, artifact=object(),
+        _close_camera_consumer=lambda: None, reset_failure_receipt={},
+        _latch_fault=lambda phase, error: None, _execution_fault=object(),
+    )
+    monkeypatch.setattr(reference_binding, 'prepare_selected_reset', lambda *args, **kwargs: 31)
+    monkeypatch.setattr(source_module, 'close_source_and_task_resources',
+                        lambda source, binding, error=None: error)
+    operations = SelectedReferenceEnv._prepare_reference_reset(env, seed=31)
+    with pytest.raises(RuntimeError, match='reconstruction failed') as caught:
+        operations['prepare']()
+    operations['on_failure']('prepare', caught.value)
+    assert events == ['session']
+    assert env.session is None
+    SelectedReferenceEnv._close_reference_resources(env)
+    assert events == ['session', 'session', 'owner']
+    SelectedReferenceEnv._close_reference_resources(env)
+    assert events == ['session', 'session', 'owner']
+
+
+@pytest.mark.parametrize('requested_seed', [None, 47])
+def test_rejected_reset_preflight_preserves_task_rng(requested_seed):
+    from copy import deepcopy
+    import numpy as np
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    env = object.__new__(SelectedReferenceEnv)
+    env._np_random = np.random.default_rng(31)
+    env._np_random_seed = 31
+    old_rng = env._np_random
+    old_state = deepcopy(old_rng.bit_generator.state)
+    env.binding = SimpleNamespace(task_reset_sampler=lambda rng: rng.random())
+    env._reset_reconstruction = SimpleNamespace(sampled_reset=None)
+    env.config = None
+    env._execute_reset_operations = lambda prepare: prepare()
+    def reject(**kwargs):
+        raise ValueError('preflight rejected')
+    env._prepare_reference_reset = reject
+    with pytest.raises(ValueError, match='preflight rejected'):
+        env._reset_selected_task(seed=requested_seed, options=None)
+    assert env._np_random is old_rng
+    assert env._np_random_seed == 31
+    assert env._np_random.bit_generator.state == old_state
+    assert env._reset_reconstruction.sampled_reset is None

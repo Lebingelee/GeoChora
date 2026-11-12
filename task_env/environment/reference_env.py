@@ -1681,14 +1681,28 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             seed = configured_seed
         requested_seed = seed
         sampled = self.binding.task_reset_sampler is not None
+        preflight_complete = False
         if sampled:
-            requested_seed = None if seed is _RESET_SEED_UNSET else seed
-            GymEnvBase.reset(self, seed=requested_seed)
-            seed = int(self.np_random_seed)
-            self._reset_reconstruction.sampled_reset = self.binding.task_reset_sampler(self.np_random)
+            from copy import deepcopy
+            previous_rng = getattr(self, '_np_random', None)
+            previous_rng_seed = getattr(self, '_np_random_seed', None)
+            previous_rng_state = (None if previous_rng is None
+                                  else deepcopy(previous_rng.bit_generator.state))
+
+        def prepare():
+            nonlocal preflight_complete
+            operations = self._prepare_reference_reset(
+                seed=seed, options=options, external_solution=external_solution)
+            preflight_complete = True
+            return operations
+
         try:
-            result = self._execute_reset_operations(lambda: self._prepare_reference_reset(
-                seed=seed, options=options, external_solution=external_solution))
+            if sampled:
+                requested_seed = None if seed is _RESET_SEED_UNSET else seed
+                GymEnvBase.reset(self, seed=requested_seed)
+                seed = int(self.np_random_seed)
+                self._reset_reconstruction.sampled_reset = self.binding.task_reset_sampler(self.np_random)
+            result = self._execute_reset_operations(prepare)
             if sampled:
                 from .task_definition import EpisodeTerminationPolicyV1
                 observation, info = result
@@ -1698,6 +1712,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     termination_policy=EpisodeTerminationPolicyV1().to_mapping())
                 result = observation, info
             return result
+        except BaseException:
+            if sampled and not preflight_complete:
+                if previous_rng is not None:
+                    previous_rng.bit_generator.state = previous_rng_state
+                self._np_random = previous_rng
+                self._np_random_seed = previous_rng_seed
+            raise
         finally:
             if sampled:
                 self._reset_reconstruction.sampled_reset = None
@@ -2279,16 +2300,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as cleanup_error:
                 record_cleanup_error('selected reset camera cleanup', cleanup_error)
             failed_session, self.session = self.session, None
-            if failed_session is not None:
-                # A failed replacement can retain a process-level native
-                # owner after the session itself has closed.  Keep that
-                # owner reachable so Env.close() can release it even when no
-                # later reset successfully installs another session.
-                if callable(getattr(failed_session, 'close_runtime_owner', None)):
+            # Either session can retain a process-level owner even after its
+            # session closes. Keep both reachable for the final Env close.
+            for session in (previous_session, failed_session):
+                if callable(getattr(session, 'close_runtime_owner', None)):
                     abandoned = getattr(self, '_failed_runtime_sessions', None)
                     if abandoned is None:
                         abandoned = self._failed_runtime_sessions = []
-                    abandoned.append(failed_session)
+                    abandoned.append(session)
+            if failed_session is not None:
                 reset_effects['replacement_session_close_attempted'] = True
                 try:
                     failed_session.close()
