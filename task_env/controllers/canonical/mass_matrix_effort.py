@@ -17,7 +17,7 @@ class MassMatrixEffortControllerV1:
     part of controller identity; admission must verify native drive isolation.
     """
     def __init__(self, binding, *, matrix, nominal_position, max_abs_deviation,
-                 model_sha256, cadence_s, kp=20., kd=2.):
+                 model_sha256, cadence_s, kp=20., kd=2., selection_profile_id=None):
         if type(binding) is not PhysicalControlBindingV1:
             raise TypeError('mass effort controller requires a typed physical binding')
         names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
@@ -43,10 +43,16 @@ class MassMatrixEffortControllerV1:
         self._channels, self._matrix = channels, M.copy()
         self._nominal, self._radius = q0.copy(), radius.copy()
         self._cadence, self._kp, self._kd = float(cadence_s), float(kp), float(kd)
-        self.identity = digest({'schema':'mass-matrix-effort-controller-v1','binding':binding.identity_hash,
+        self.profile_id = selection_profile_id
+        identity = {'schema':'mass-matrix-effort-controller-v1','binding':binding.identity_hash,
             'model_sha256':model_sha256,'matrix':M.tolist(),'nominal':q0.tolist(),'radius':radius.tolist(),
             'cadence_s':self._cadence,'kp_s-2':self._kp,'kd_s-1':self._kd,
-            'pair_projection':'equal-coordinate-half-effort'})
+            'pair_projection':'equal-coordinate-half-effort'}
+        if selection_profile_id is not None:
+            from ...artifacts.contracts import _name
+            _name(selection_profile_id)
+            identity['selection_profile_id'] = selection_profile_id
+        self.identity = digest(identity)
 
     @property
     def action_shape(self):
@@ -92,7 +98,7 @@ class MassMatrixEffortControllerV1:
 
 def build_mass_effort_execution(direct_execution, *, matrix, nominal_position, max_abs_deviation,
                                 model_sha256, use_pose_reference=False, r3_reference=None,
-                                end_frame_id='ee'):
+                                end_frame_id='ee', selection_profile_id=None):
     """Compose a source-admitted mass servo into an existing physical execution."""
     from dataclasses import replace
     from ...artifacts.state import StateFieldRequirement, StateRequirements
@@ -102,7 +108,7 @@ def build_mass_effort_execution(direct_execution, *, matrix, nominal_position, m
     cadence = direct_execution.controllers[0].model.requirement.cadence_s
     servo = MassMatrixEffortControllerV1(binding, matrix=matrix,
         nominal_position=nominal_position, max_abs_deviation=max_abs_deviation,
-        model_sha256=model_sha256, cadence_s=cadence)
+        model_sha256=model_sha256, cadence_s=cadence, selection_profile_id=selection_profile_id)
     requirements = direct_execution.requirements
     if use_pose_reference:
         from .production_r3 import _ProductionR3ArmReference
@@ -114,7 +120,7 @@ def build_mass_effort_execution(direct_execution, *, matrix, nominal_position, m
         requirements = StateRequirements('state-requirements-v1', 'controller', servo.writer_id,
                                           (*requirements.requirements, field))
         controller = R3ReferenceEffortControllerV1(r3_reference, servo, entity_id=entity,
-                                                   end_frame_id=end_frame_id, opening_range_m=.08)
+            end_frame_id=end_frame_id, opening_range_m=.08, selection_profile_id=selection_profile_id)
     else:
         controller = servo
     return replace(direct_execution, controllers=(controller,), requirements=requirements)

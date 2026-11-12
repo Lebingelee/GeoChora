@@ -15,7 +15,7 @@ class DynamicMassEffortControllerV1:
     Neither output represents measured force.
     """
     def __init__(self, binding, *, cadence_s, kp=120., kd=22., finger_kp=1200., finger_kd=35.,
-                 mass_only=False):
+                 mass_only=False, selection_profile_id=None):
         if type(binding) is not PhysicalControlBindingV1:
             raise TypeError('dynamic effort requires a typed binding')
         channels = tuple(binding.channels)
@@ -41,6 +41,11 @@ class DynamicMassEffortControllerV1:
             'finger_projection':'equal-pair-half-effort'}
         if mass_only:
             identity['algorithm'] = 'mass-times-reference-acceleration-v1'
+        self.profile_id = selection_profile_id
+        if selection_profile_id is not None:
+            from ...artifacts.contracts import _name
+            _name(selection_profile_id)
+            identity['selection_profile_id'] = selection_profile_id
         self.identity = digest(identity)
 
     @property

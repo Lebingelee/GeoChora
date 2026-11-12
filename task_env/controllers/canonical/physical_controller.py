@@ -77,7 +77,7 @@ class LinearEffortControllerV1:
 
     @classmethod
     def zero_bias(cls, binding, *, writer_id, channel_keys, action_names,
-                  action_to_effort, cadence_s, model_id):
+                  action_to_effort, cadence_s, model_id, selection_profile_id=None):
         """Construct a source-bound linear Controller for declared channels."""
         from .model import AffineJointBiasModelV1
 
@@ -97,7 +97,8 @@ class LinearEffortControllerV1:
         zero = (0.,) * len(channels)
         model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement, zero, zero, zero)
         profile = LinearEffortProfileV1('linear-effort-profile-v1', writer_id,
-            tuple(action_names), tuple(channel_keys), tuple(action_to_effort), requirement)
+            tuple(action_names), tuple(channel_keys), tuple(action_to_effort), requirement,
+            selection_profile_id=selection_profile_id)
         return cls(profile, binding, model)
 
     def __init__(self, profile: LinearEffortProfileV1, binding: PhysicalControlBindingV1, model):

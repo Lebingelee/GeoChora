@@ -24,6 +24,7 @@ class ConstrainedPairEffortControllerV1:
             raise TypeError('paired effort requires the shared joint-reference servo')
         self.servo, self.binding, self.writer_id = servo, servo.binding, servo.writer_id
         self._channels, self.profile = servo._channels, servo.profile
+        self.profile_id = servo.profile_id
         self.identity = digest({'schema': 'constrained-pair-effort-controller-v1',
                                 'servo': servo.identity, 'projection': 'equal-pair-mean'})
 
@@ -49,7 +50,8 @@ class R3ReferenceEffortControllerV1:
     native adapter must independently prove that full-PD contributions do not
     duplicate active position drives.
     """
-    def __init__(self, reference, servo, *, entity_id, end_frame_id, opening_range_m):
+    def __init__(self, reference, servo, *, entity_id, end_frame_id, opening_range_m,
+                 selection_profile_id=None):
         from .mass_matrix_effort import MassMatrixEffortControllerV1
         from .dynamic_mass_effort import DynamicMassEffortControllerV1
         if type(servo) not in (JointReferenceEffortControllerV1, ConstrainedPairEffortControllerV1,
@@ -66,12 +68,21 @@ class R3ReferenceEffortControllerV1:
         self.reference, self.servo = reference, servo
         self.binding, self.writer_id = servo.binding, servo.writer_id
         self._channels = servo._channels
+        self.profile_id = selection_profile_id
+        self.model_requirement = getattr(getattr(servo, 'profile', None), 'model_requirement', None)
         self.entity_id, self.end_frame_id = entity_id, end_frame_id
         self.opening_range_m = float(opening_range_m)
-        self.identity = digest({'schema': 'r3-reference-effort-controller-v1',
+        identity = {'schema': 'r3-reference-effort-controller-v1',
             'r3_identity': reference.identity, 'servo_identity': servo.identity,
             'entity_id': entity_id, 'end_frame_id': end_frame_id,
-            'opening_range_m': self.opening_range_m})
+            'opening_range_m': self.opening_range_m}
+        if selection_profile_id is not None:
+            from ...artifacts.contracts import _name
+            _name(selection_profile_id)
+            if getattr(servo, 'profile_id', None) != selection_profile_id:
+                raise ValueError('R3 reference and servo Controller selections differ')
+            identity['selection_profile_id'] = selection_profile_id
+        self.identity = digest(identity)
         self._episode_id = None
         self._next_step = None
 
@@ -149,14 +160,10 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
         raise ValueError('unknown Panda effort profile')
 
     def selected(execution):
-        for controller in execution.controllers:
-            controller.profile_id = profile_ids[kind]
         return replace(execution, selection_profile_id=profile_ids[kind])
 
     if kind == 'direct':
         return selected(direct_execution)
-    if kind not in {'joint', 'r3-pose', 'joint-mass', 'r3-mass-pose'}:
-        raise ValueError('unknown Panda effort profile')
     reference = None
     if kind in {'r3-pose', 'r3-mass-pose'}:
         from .production_r3 import ProductionCanonicalPandaControllerR3
@@ -170,21 +177,23 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
             raise ValueError('dynamic effort profile requires a joint or pose reference')
         return selected(build_dynamic_reference_effort_execution(
             direct_execution, reference_kind=kind, cadence_s=cadence_s,
-            r3_reference=reference, end_frame_id=end_frame_id, **dynamic_parameters))
+            r3_reference=reference, end_frame_id=end_frame_id,
+            selection_profile_id=profile_ids[kind], **dynamic_parameters))
     if kind in {'joint-mass', 'r3-mass-pose'}:
         if mass_model is None:
             return selected(build_dynamic_reference_effort_execution(
                 direct_execution, reference_kind='r3-pose' if kind == 'r3-mass-pose' else 'joint',
                 cadence_s=cadence_s, r3_reference=reference, end_frame_id=end_frame_id,
-                kp=20., kd=2., mass_only=True))
+                kp=20., kd=2., mass_only=True, selection_profile_id=profile_ids[kind]))
         from .mass_matrix_effort import build_mass_effort_execution
         return selected(build_mass_effort_execution(
             direct_execution, **mass_model, use_pose_reference=kind == 'r3-mass-pose',
-            r3_reference=reference, end_frame_id=end_frame_id))
+            r3_reference=reference, end_frame_id=end_frame_id, selection_profile_id=profile_ids[kind]))
     if mass_model is not None:
         raise ValueError('mass model supplied to non-mass effort profile')
     return selected(build_reference_effort_execution(
-        direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id))
+        direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id,
+        selection_profile_id=profile_ids[kind]))
 
 
 def _reference_effort_contract(direct_execution, reference_kind, r3_reference, end_frame_id):
@@ -222,7 +231,8 @@ def _reference_effort_contract(direct_execution, reference_kind, r3_reference, e
 def build_reference_effort_execution(direct_execution, *, reference_kind, r3_reference=None,
                                      end_frame_id='ee', opening_range_m=.08,
                                      kp=(20., 20., 20., 20., 10., 10., 10., 50., 50.),
-                                     kd=(2., 2., 2., 2., 1., 1., 1., 4., 4.)):
+                                     kd=(2., 2., 2., 2., 1., 1., 1., 4., 4.),
+                                     selection_profile_id=None):
     """Build one named joint-reference or R3 pose-reference effort writer.
 
     The exact native drive isolation remains a session admission requirement;
@@ -250,10 +260,12 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
         matrix, tuple(kp), tuple(kd), requirement)
     model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement,
         (0.,)*9, tuple(-x for x in kp), tuple(-x for x in kd))
-    servo = ConstrainedPairEffortControllerV1(JointReferenceEffortControllerV1(profile, binding, model))
+    servo = ConstrainedPairEffortControllerV1(JointReferenceEffortControllerV1(
+        profile, binding, model, selection_profile_id=selection_profile_id))
     if reference_kind == 'r3-pose':
         controller = R3ReferenceEffortControllerV1(r3_reference, servo, entity_id=entity,
-            end_frame_id=end_frame_id, opening_range_m=opening_range_m)
+            end_frame_id=end_frame_id, opening_range_m=opening_range_m,
+            selection_profile_id=selection_profile_id)
     else:
         controller = servo
     return replace(direct_execution, controllers=(controller,), requirements=requirements)
@@ -262,17 +274,19 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
 def build_dynamic_reference_effort_execution(direct_execution, *, reference_kind, cadence_s,
                                              r3_reference=None, end_frame_id='ee',
                                              kp=120., kd=22., finger_kp=1200., finger_kd=35.,
-                                             mass_only=False):
+                                             mass_only=False, selection_profile_id=None):
     """Build a source-dynamics joint or R3 reference from the existing binding."""
     from dataclasses import replace
     from .dynamic_mass_effort import DynamicMassEffortControllerV1
     binding, _, entity, _, requirements = _reference_effort_contract(
         direct_execution, reference_kind, r3_reference, end_frame_id)
     servo = DynamicMassEffortControllerV1(binding, cadence_s=cadence_s,
-        kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd, mass_only=mass_only)
+        kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd, mass_only=mass_only,
+        selection_profile_id=selection_profile_id)
     if reference_kind == 'r3-pose':
         controller = R3ReferenceEffortControllerV1(r3_reference, servo,
-            entity_id=entity, end_frame_id=end_frame_id, opening_range_m=.08)
+            entity_id=entity, end_frame_id=end_frame_id, opening_range_m=.08,
+            selection_profile_id=selection_profile_id)
     else:
         controller = servo
     return replace(direct_execution, controllers=(controller,), requirements=requirements)

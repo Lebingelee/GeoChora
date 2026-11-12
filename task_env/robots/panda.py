@@ -101,7 +101,8 @@ class PandaAgent(BaseAgent):
                                  for j in range(8)) for i in range(len(names)))
             return LinearEffortControllerV1.zero_bias(binding, writer_id=writer,
                 channel_keys=keys, action_names=action_names, action_to_effort=matrix,
-                cadence_s=artifact.timebase.control_dt, model_id=layout.model_id)
+                cadence_s=artifact.timebase.control_dt, model_id=layout.model_id,
+                selection_profile_id='panda-direct-effort-v1')
         definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
                                  for j in a.joints if j.kind != 'fixed'}
         if joint_bindings is None:

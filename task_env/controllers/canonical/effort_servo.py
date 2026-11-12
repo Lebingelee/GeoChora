@@ -52,7 +52,7 @@ class JointReferenceEffortControllerV1:
     The existing physical admission rejects this explicit full PD when an
     uncoordinated native position drive is active.  No provider is accessed.
     """
-    def __init__(self, profile, binding, model):
+    def __init__(self, profile, binding, model, *, selection_profile_id=None):
         if type(profile) is not JointReferenceEffortProfileV1 or type(model) is not AffineJointBiasModelV1:
             raise TypeError('effort servo requires its exact typed profile and affine model')
         if (model.requirement != profile.model_requirement
@@ -68,8 +68,13 @@ class JointReferenceEffortControllerV1:
         self.binding = binding
         self._channels = self._linear._channels
         self.writer_id = profile.controller_id
-        self.identity = digest({'profile': profile.identity_hash, 'linear': self._linear.identity,
-                                'controller_law': 'explicit_full_pd'})
+        self.profile_id = selection_profile_id
+        identity = {'profile': profile.identity_hash, 'linear': self._linear.identity,
+                    'controller_law': 'explicit_full_pd'}
+        if selection_profile_id is not None:
+            _name(selection_profile_id)
+            identity['selection_profile_id'] = selection_profile_id
+        self.identity = digest(identity)
 
     @property
     def action_shape(self):

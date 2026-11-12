@@ -161,6 +161,22 @@ def test_effort_retains_formal_task_identity(profile):
         assert match.controller_identities == (value['controller'].identity,)
         assert match.subject_ids == ('panda-v1',)
         assert len(match.channel_keys) == len(match.resource_keys) == 9
+        if profile in {'panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
+                       'panda-r3-effort-reference-v1'}:
+            assert match.model_requirement_sha256 is not None
+        if profile == 'panda-direct-effort-v1':
+            from task_env.controllers.canonical.physical_controller import LinearEffortControllerV1
+            controller = value['controller']
+            alternate = LinearEffortControllerV1(
+                replace(controller.profile, selection_profile_id='foreign-profile'),
+                controller.binding, controller.model)
+            assert alternate.identity != controller.identity
+        if profile == 'panda-joint-effort-reference-v1':
+            from task_env.controllers.canonical.effort_servo import JointReferenceEffortControllerV1
+            servo = value['controller'].servo
+            alternate = JointReferenceEffortControllerV1(servo.profile, servo.binding, servo._linear.model,
+                                                          selection_profile_id='foreign-profile')
+            assert alternate.identity != servo.identity
         with pytest.raises(ValueError, match='physical selection differs'):
             replace(selected.physical_execution, selection_profile_id='foreign-profile')
     finally:

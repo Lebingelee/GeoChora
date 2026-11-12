@@ -232,7 +232,9 @@ def _match_physical_execution(value):
                for item in controller_channels):
             raise ValueError('selected Controller channels or writer differ from subject binding')
         action_profile = getattr(controller, 'profile', None)
-        model_requirement = getattr(action_profile, 'model_requirement', None)
+        model_requirement = getattr(controller, 'model_requirement', None)
+        if model_requirement is None:
+            model_requirement = getattr(action_profile, 'model_requirement', None)
         if model_requirement is not None:
             if (model_requirement.source_id, model_requirement.source_closure_sha256) != (
                     execution.compiled.binding.source_id,
