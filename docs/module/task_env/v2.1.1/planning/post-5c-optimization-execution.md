@@ -1324,3 +1324,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 6 文件 +9／−10，净减 1 行；版本诊断修改 1 文件 +18／−2，检查两种 Robot 声明的替代目录确实传入 Runtime source；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 134 文件（新增 12、删除 20、修改 102），+7726／−14674，净减 6948 行，其中包括此前历史路径退休及诊断迁移，不能归因于本批。
 
 最终输入版本诊断 189 项通过。MuJoCo Pendulum、双轮车均完成 reset、一次控制推进、再次 reset、重复 close，各观测 25 native 子步；GeoPhys Pendulum 完成同样短程，native 子步未观测，按 50 预留。GeoPhys 双轮车在此前 `fceb727f` 路线已短程通过，当前路径根目录变化后未重跑；由于 source 路径变化，不将旧结果当作最终输入复验。Isaac、renderer、桌面任务及完整 Solution 本批未复验。冻结输入、双锁、预算和收据位于 ignored `workspace/maintenance/v211_robot_source_root_20261112/`。装配／引用 source 和控制构造仍有未收敛边界，E01～E04 未整体接收。
+
+
+### 6.136 PickCube effort 记录实际 source 身份
+
+输入 `53a5777d`；实施前重读台账 GOV、ENTRY、TASK-01／02、ENV、SUBJ、CTRL 与 source 边界并核对当前调用链。正式 PickCube effort 构建先前将一次历史 source closure 的固定哈希写入本次 `source_sha256` 和 resolved configuration；本地验证发现它与真实 snapshot receipt 不同，不能准确标识本次 source。现在两个字段均来自本次已验证的 source closure。原有标准化闭包与 snapshot 字节检查继续保留；其资产路径改从所选 Robot 的 manifest 和实际 MJCF 声明取得，并检查 manifest owner、单个资产根及 mesh 目录归属，避免在该调用处重新硬编码仓库全局路径。Robot manifest 及现有 source 快照仍限制受支持资产；候选文件内历史标准化摘要和共同 source 机制尚待进一步迁移，本项不宣称候选职责已收口。
+
+生产修改 1 文件 +15／−5，净增 10 行；版本诊断修改 1 文件 +4／−1，检查两个输出摘要均与本次 snapshot 一致；本文新增记录。无新增、删除或整文件迁移；项目 tracked 文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 134 文件（新增 12、删除 20、修改 102），+7739／−14674，净减 6935 行，包含先前退休旧路径和诊断迁移，不归因于本批。
+
+最终输入版本诊断 189 项通过。MuJoCo PickCube direct effort（含 1.5 N 任务力）与 joint effort 各完成 reset、一次控制推进、再次 reset 和重复 close，各观测 5 个 native 子步；GeoPhys direct effort 同样完成短程，native 子步未观测，按 50 预留。此项不重开旧 COM 历史判据。Isaac、renderer、Nut、两个普通任务及完整 Solution 本批未复验。冻结输入、双锁和收据位于 ignored `workspace/maintenance/v211_actual_closure_20261112/`。E01～E04 未整体接收。

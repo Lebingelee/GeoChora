@@ -160,13 +160,23 @@ def make_physical_binding(*, drive_mode, control_kind,
     with ExitStack() as resources:
         resources.callback(receipt.close)
         from ...runtime.sessions.source import matches_relocated_source_closure
-        from ...utils._paths import MUJOCO_MENAGERIE_ROOT
+        robot = original.agents[0]
+        manifest = robot.asset_manifest()
+        if manifest.owner_uid != robot.uid or len(manifest.asset_roots) != 1:
+            raise ValueError('physical source requires one asset root owned by the selected Robot')
+        import xml.etree.ElementTree as ET
+        compiler = ET.fromstring(original.scene_source.xml).find('compiler')
+        meshdir = None if compiler is None else compiler.get('meshdir')
+        if not meshdir:
+            raise ValueError('physical source requires a declared mesh directory')
+        asset_root = Path(meshdir).resolve()
+        if not asset_root.is_relative_to(manifest.asset_roots[0].resolve()):
+            raise ValueError('physical source mesh directory is outside the Robot asset root')
         if not matches_relocated_source_closure(
                 receipt, original.source_closure_digest,
-                asset_root=MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets',
+                asset_root=asset_root,
                 normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
             raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
-        robot = original.agents[0]
         task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
             task_config, robot, legacy_artifact)
         from ...runtime.sessions.source import bind_reference_scene_source
@@ -204,14 +214,14 @@ def make_physical_binding(*, drive_mode, control_kind,
                 'physical_execution': physical,
                 'construction_id': 'pickcube-mjcf-physical-candidate-v1',
                 'source_revision': revision, 'source_sha256': {
-                    'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
+                    'original_closure': original.source_closure_digest,
                     'projected_closure': closure},
                 'resolved_configuration': {'provider': _provider, 'backend': 'cpu',
                     'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
                     'drive_mode': drive_mode, 'control_kind': control_kind,
                     **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
                        if cube_force_z_N is not None else {}),
-                    'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
+                    'original_closure': original.source_closure_digest,
                     'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
         def physical_execution_info(env):
             from .solution import PickCubePositionExecutionInfoV1

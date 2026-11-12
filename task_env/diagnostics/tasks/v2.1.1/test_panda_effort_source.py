@@ -40,9 +40,12 @@ def test_canonical_source_owns_and_validates_input_snapshot():
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
+        source = value['source']
         receipt = source_resource_receipt(source)
         assert receipt is source.source_snapshot_receipt
+        assert value['source_sha256']['original_closure'] == receipt.source_closure_digest
+        assert value['resolved_configuration']['original_closure'] == receipt.source_closure_digest
         assert source.execution_source_receipt is None
         assert receipt.snapshot_root.is_dir()
         receipt.validate_snapshot()
