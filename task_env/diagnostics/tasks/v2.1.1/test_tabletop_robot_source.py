@@ -282,23 +282,17 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
 
 
 @pytest.mark.parametrize('physical', [False, True])
-def test_usd_build_failure_releases_prepared_task_source(physical, monkeypatch):
+def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import specialization
 
-    receipts = []
-    original = source_module.snapshot_legacy_mjcf_source
     failure = RuntimeError('USD source preparation failed')
-
-    def capture(*args, **kwargs):
-        source = original(*args, **kwargs)
-        receipts.append(source_resource_receipt(source))
-        return source
-
+    def unexpected(*args, **kwargs):
+        pytest.fail('USD readiness must not allocate an MJCF snapshot')
     def fail(*args, **kwargs):
         raise failure
-
-    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
+    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected)
     monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', fail)
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(
@@ -307,30 +301,22 @@ def test_usd_build_failure_releases_prepared_task_source(physical, monkeypatch):
             physical_drive='disabled' if physical else None,
         )
     assert raised.value is failure
-    assert len(receipts) == 1
-    assert not receipts[0].snapshot_root.exists()
 
 
-def test_usd_build_failure_preserves_error_when_source_cleanup_fails(monkeypatch):
-    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+def test_usd_readiness_failure_prevents_delivery_construction(monkeypatch):
     from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
 
-    original_close = ExecutionSourceReceiptV1.close
-    failure = RuntimeError('USD source failed')
-
-    def fail_build(*args, **kwargs):
+    failure = RuntimeError('readiness failed')
+    def fail(*args, **kwargs):
         raise failure
-
-    def fail_close(receipt):
-        original_close(receipt)
-        raise OSError('cleanup failed')
-
-    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', fail_build)
-    monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_close)
+    def unexpected(*args, **kwargs):
+        pytest.fail('delivery must not be built after failed readiness')
+    monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', fail)
+    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', unexpected)
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
     assert raised.value is failure
-    assert any('cleanup failed' in note for note in raised.value.__notes__)
 
 
 def test_readiness_failure_does_not_create_a_source_snapshot(monkeypatch):

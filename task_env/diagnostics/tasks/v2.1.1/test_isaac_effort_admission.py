@@ -152,6 +152,10 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     from task_env.assembly import usd_delivery
     from task_env.runtime.sessions import source_composition_adapters
 
+    def unexpected_mjcf(*args, **kwargs):
+        pytest.fail('USD task construction must not compile an extra MJCF RuntimeSource')
+    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected_mjcf)
+
     dynamic_profiles = []
     original_profile = specialization._r3_dynamic_profile
     def capture_profile():
@@ -213,6 +217,35 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
                 artifact, source, native_drive='disabled' if expected_drive == 'position' else 'position')
     else:
         assert calls == []
+
+
+def test_readiness_from_resolved_config_matches_source_bound_readiness():
+    from types import SimpleNamespace
+    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
+
+    artifact = specialization.build_artifact()
+    config = specialization._nut_aligned_environment_config(specialization._environment_config())
+    dynamic, _ = specialization._r3_dynamic_profile()
+    options = specialization._readiness_options(artifact, is_r3_profile=True, dynamic_profile=dynamic)
+    source = SimpleNamespace(task_artifact_hash=artifact.identity_hash, config=config)
+    expected = PickCubeReadinessConfig.from_source(artifact, source, **options)
+    actual = PickCubeReadinessConfig.from_resolved_config(artifact, config, **options)
+    assert actual == expected and actual.identity == expected.identity
+    source.task_artifact_hash = 'foreign'
+    with pytest.raises(ValueError, match='source/Artifact mismatch'):
+        PickCubeReadinessConfig.from_source(artifact, source, **options)
+
+
+def test_usd_readiness_rejects_foreign_artifact_timebase(monkeypatch):
+    from types import SimpleNamespace
+    from task_env.tasks.pick_cube import specialization
+
+    foreign = SimpleNamespace(artifact=SimpleNamespace(timebase=object()))
+    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1',
+                        lambda *args, **kwargs: foreign)
+    with pytest.raises(ValueError, match='timebase differs'):
+        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
 
 
 def test_usd_rejects_unsupported_task_force():
@@ -316,7 +349,7 @@ def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
         _session_admission_input_route(object())
 
 
-def test_usd_controller_failure_releases_temporary_task_source(monkeypatch):
+def test_usd_controller_failure_does_not_allocate_mjcf_snapshot(monkeypatch):
     from pathlib import Path
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
     from task_env.runtime.sessions import source as source_module
@@ -326,20 +359,14 @@ def test_usd_controller_failure_releases_temporary_task_source(monkeypatch):
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
-    receipts = []
-    original = source_module.snapshot_legacy_mjcf_source
-    def capture(*args, **kwargs):
-        source = original(*args, **kwargs)
-        receipts.append(source_module.source_resource_receipt(source))
-        return source
+    def unexpected(*args, **kwargs):
+        pytest.fail('USD construction must not allocate an MJCF snapshot')
     def reject(*args, **kwargs):
-        assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
         raise RuntimeError('USD Controller rejected')
-    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
     monkeypatch.setattr(PandaPositionServoProfileV1, 'from_usd_source', reject)
     with pytest.raises(RuntimeError, match='USD Controller rejected'):
         build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
-    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
 def test_usd_position_factory_rejects_unsupported_profile_before_materialization():

@@ -597,9 +597,21 @@ class PickCubeReadinessConfig:
     ):
         if source.task_artifact_hash != artifact.identity_hash:
             raise ValueError("source/Artifact mismatch")
+        return cls.from_resolved_config(
+            artifact, source.config, measured_tcp_clearance_gate=measured_tcp_clearance_gate,
+            planner=planner, close_transition_steps=close_transition_steps,
+            close_settle_steps=close_settle_steps, postclose_hold_steps=postclose_hold_steps,
+        )
+
+    @classmethod
+    def from_resolved_config(
+        cls, artifact, config, *, measured_tcp_clearance_gate=False, planner=None,
+        close_transition_steps=None, close_settle_steps=0, postclose_hold_steps=0,
+    ):
+        """Resolve Task readiness from the declared timebase and control configuration."""
         if type(measured_tcp_clearance_gate) is not bool:
             raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
-        action, gripper = source.config.action, source.config.robot.gripper
+        action, gripper = config.action, config.robot.gripper
         if gripper.kind != "experimental_rate_limited":
             raise ValueError("readiness-v1 requires resolved experimental gripper profile")
         if planner is None:

@@ -245,33 +245,13 @@ class _UsdSourceContext(NamedTuple):
     source_sha256: dict
 
 
-def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
-                              lift_height_m=None, task_config=None, robot=None):
-    """Prepare the Task source and readiness for a Position Solution."""
-
-    task_config = _configuration() if task_config is None else task_config
-    recipe = task_config["recipe"]
-    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
-        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
-    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
-    dynamic_profile, profile_source = (_r3_dynamic_profile()
-                                       if is_r3_profile else (None, None))
-    if is_r3_profile:
-        resolved_config = _nut_aligned_environment_config(
-            _environment_config(task_config) if resolved_config is None else resolved_config)
-    config = _environment_config(task_config) if resolved_config is None else resolved_config
-    compiled = compile_panda_box_task(_declaration(lift_height_m=lift_height_m, task_config=task_config),
-                                      config=config, robot=robot, backend=backend)
-    artifact, source, config = compiled.artifact, compiled.source, compiled.source.config
-    from .solution import PickCubeReadinessConfig
+def _readiness_options(artifact, *, is_r3_profile, dynamic_profile):
+    """Project the Task's readiness policy independently of source representation."""
     planner_config = (
         _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
         if is_r3_profile else None
     )
-    readiness = PickCubeReadinessConfig.from_source(
-        artifact, source,
-        measured_tcp_clearance_gate=is_r3_profile,
-        planner=planner_config,
+    return dict(measured_tcp_clearance_gate=is_r3_profile, planner=planner_config,
         close_transition_steps=(
             max(1, int(math.ceil(
                 PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_transition_s"]
@@ -291,6 +271,30 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
             ))) if is_r3_profile else 0
         ),
     )
+
+
+def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
+                              lift_height_m=None, task_config=None, robot=None):
+    """Prepare the Task source and readiness for a Position Solution."""
+
+    task_config = _configuration() if task_config is None else task_config
+    recipe = task_config["recipe"]
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
+    dynamic_profile, profile_source = (_r3_dynamic_profile()
+                                       if is_r3_profile else (None, None))
+    if is_r3_profile:
+        resolved_config = _nut_aligned_environment_config(
+            _environment_config(task_config) if resolved_config is None else resolved_config)
+    config = _environment_config(task_config) if resolved_config is None else resolved_config
+    compiled = compile_panda_box_task(_declaration(lift_height_m=lift_height_m, task_config=task_config),
+                                      config=config, robot=robot, backend=backend)
+    artifact, source, config = compiled.artifact, compiled.source, compiled.source.config
+    from .solution import PickCubeReadinessConfig
+    readiness = PickCubeReadinessConfig.from_source(
+        artifact, source, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+                                               dynamic_profile=dynamic_profile))
     from ...runtime.sessions.source import snapshot_legacy_mjcf_source
     source = snapshot_legacy_mjcf_source(source)
     return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,
@@ -492,28 +496,33 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
                                     resolved_config, task_config, lift_height_m,
                                     physical_fixture, robot):
     """Compile Task readiness and the admitted USD source before Controller binding."""
-    from .solution import PickCubeReadinessSolution
-    from ...runtime.sessions.source import close_execution_source_on_failure
+    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
-    prepared = _prepare_reference_source(backend='cpu', controller_profile=controller_profile,
-        resolved_config=resolved_config, task_config=task_config,
-        lift_height_m=lift_height_m, robot=robot)
-    with close_execution_source_on_failure(prepared.source):
-        source_ids = _source_identity_files(None, PickCubeReadinessSolution,
-                                            profile_source=prepared.profile_source,
-                                            provider='isaacsim')
-        robot = prepared.source.agents[0]
-        action_config = prepared.source.config.action
-        runtime_input = build_pickcube_isaac_runtime_input_v1(
-            delivery_manifest, task_seed=request.seed, horizon=request.horizon, task_config=task_config,
-            physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m)
-        runtime_input.runtime_source.scene_source.assert_fresh()
-        result = (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
-                  _UsdSourceContext(runtime_input, robot, action_config, prepared.task_config,
-                      prepared.config, prepared.readiness, prepared.dynamic_profile, source_ids))
-        # Readiness uses a temporary MJCF snapshot; USD materialization owns its later lease.
-        prepared.source.execution_source_receipt.close()
-        return result
+    task_config = _configuration() if task_config is None else task_config
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f'unsupported PickCube controller_profile: {controller_profile!r}')
+    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
+    dynamic_profile, profile_source = (_r3_dynamic_profile() if is_r3_profile else (None, None))
+    config = _environment_config(task_config) if resolved_config is None else resolved_config
+    if is_r3_profile:
+        config = _nut_aligned_environment_config(config)
+    config = replace(config, runtime=replace(config.runtime, backend='cpu'))
+    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
+    readiness = PickCubeReadinessConfig.from_resolved_config(
+        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+                                               dynamic_profile=dynamic_profile))
+    source_ids = _source_identity_files(None, PickCubeReadinessSolution,
+                                        profile_source=profile_source, provider='isaacsim')
+    robot = make_agent('panda-v1') if robot is None else robot
+    runtime_input = build_pickcube_isaac_runtime_input_v1(
+        delivery_manifest, task_seed=request.seed, horizon=request.horizon, task_config=task_config,
+        physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m)
+    if runtime_input.artifact.timebase != artifact.timebase:
+        raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
+    runtime_input.runtime_source.scene_source.assert_fresh()
+    return (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
+            _UsdSourceContext(runtime_input, robot, config.action, task_config, config,
+                              readiness, dynamic_profile, source_ids))
 
 
 def _bind_isaac_reference_control(compiled, context, selection, request, *, include_solution, resolved_config):
