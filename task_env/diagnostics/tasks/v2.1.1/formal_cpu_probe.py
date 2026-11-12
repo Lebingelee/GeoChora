@@ -198,6 +198,20 @@ try:
                 assert env.physical_action_spec()['parameters'] == {'kp': args.controller_kp}
                 result['controller_reset_parameters'] = env.physical_action_spec()['parameters']
         assert env.observation_space.contains(observation)
+        layout = env.session.build_layout_facts
+        assert layout['materialization_id'] == env.session.provider_materialization_id
+        assert layout['source_closure'] == env.value['source'].source_closure_digest
+        assert layout['objects']['joints']
+        result['native_layout'] = layout
+        assert env._task_definition is not None
+        assert env._task_lifecycle.task_definition is env._task_definition
+        task_definition_type = type(env._task_definition)
+        artifact_hash = getattr(env._task_definition, 'artifact_hash', None)
+        if artifact_hash is not None:
+            assert artifact_hash == env.artifact.identity_hash
+        semantics = getattr(env._task_definition, 'semantics', None)
+        if semantics is not None:
+            assert semantics == env.artifact.semantics
         if args.task_rgb:
             assert observation['task_rgb'].shape == (48, 64, 3)
             assert info['task_rgb_v1']['capture_identity']['capture_phase'] == 'reset_initial'
@@ -334,6 +348,20 @@ try:
             result['switched_controller_advanced']=True
         else:
             observation,info=env.reset(seed=19 if args.case=='nut' else 31)
+        assert env.observation_space.contains(observation)
+        assert type(env._task_definition) is task_definition_type
+        assert env._task_lifecycle.task_definition is env._task_definition
+        artifact_hash = getattr(env._task_definition, 'artifact_hash', None)
+        if artifact_hash is not None:
+            assert artifact_hash == env.artifact.identity_hash
+        semantics = getattr(env._task_definition, 'semantics', None)
+        if semantics is not None:
+            assert semantics == env.artifact.semantics
+        result['task_definition'] = {'type': task_definition_type.__name__,
+            'artifact_identity': env.artifact.identity_hash,
+            'artifact_hash_checked': artifact_hash is not None,
+            'semantics_checked': semantics is not None,
+            'lifecycle_rebound': True, 'second_observation_in_space': True}
         if args.task_rgb:
             assert observation['task_rgb'].shape == (48, 64, 3)
             assert info['task_rgb_v1']['capture_identity']['capture_phase'] == 'reset_initial'
