@@ -113,6 +113,26 @@ def test_effort_without_solution_does_not_prepare_position_readiness(monkeypatch
         env.close()
 
 
+def test_switchable_effort_factory_uses_bound_source_frame_and_projection():
+    from task_env import make_env
+    from task_env.runtime.sessions.source import verify_projected_scene_source
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-r3-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+    })
+    try:
+        source = env.value['source']
+        factory = env.value['_physical_controller_factory']
+        projected, _ = verify_projected_scene_source(
+            source.scene_source, source.scene_definition, source.source_closure_digest)
+        assert factory.end_frame_id == source.frames[f'{env.robot.uid}/ee']
+        assert factory.source_xml == projected
+    finally:
+        env.close()
+
+
 def test_formal_position_and_effort_share_task_and_robot_scene():
     from task_env import make_env
 

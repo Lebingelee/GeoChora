@@ -164,11 +164,21 @@ def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_
     return factory(kind, **(dynamic_parameters or {}))
 
 
-def compile_panda_effort_selection(artifact, source, *, robot, scene, intent,
+def compile_panda_effort_selection(artifact, source, *, robot, composition,
                                    controller_profile, kind, **factory_options):
-    """Compile and verify an effort Controller against its admitted Robot source."""
+    """Compile an effort Controller from the complete, source-bound composition."""
+    if (type(composition) is not DeclaredReferenceSource
+            or composition.compiled.artifact is not artifact
+            or composition.compiled.source is not source
+            or composition.scene is None or composition.projected_xml is None):
+        raise ValueError('effort Controller requires its exact composed source and Scene')
+    frame_key = f'{robot.uid}/ee'
+    if frame_key not in source.frames:
+        raise ValueError('effort source does not bind the declared Robot end frame')
+    scene, intent = composition.scene, composition.intent
     factory = prepare_panda_source_effort_factory(robot, scene, artifact, source,
-                                                  **factory_options)
+        source_xml=composition.projected_xml, end_frame_id=source.frames[frame_key],
+        config=source.config.action, **factory_options)
     execution = factory(kind)
     validate_effort_robot_intent(intent, source, execution,
                                  controller_profile=controller_profile)

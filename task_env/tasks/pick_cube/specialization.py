@@ -695,10 +695,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 reference_robot=context.robot, sample_reset=False),
             controller_factory=compile_panda_effort_selection,
             controller_options=lambda compiled, context, request: dict(
-                robot=context.robot, scene=context.composition.scene, intent=context.composition.intent,
+                robot=context.robot, composition=context.composition,
                 controller_profile=physical_profile_id, native_drive=physical_drive,
-                kind=physical_kind, config=compiled.source.config.action,
-                source_xml=context.composition.projected_xml, end_frame_id='nutassembly_ee_site',
+                kind=physical_kind,
                 task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
                 gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
                                        if reset_switch else None)),
