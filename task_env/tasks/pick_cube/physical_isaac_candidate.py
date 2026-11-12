@@ -32,11 +32,12 @@ def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, contr
                                      include_solution=False, physical_fixture=drive_mode,
                                      controller_builder=build_controller, task_config=task_config,
                                      resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
-    from .physical_candidate import _direct_physical_observation, _direct_physical_observation_spaces
+    from .task import physical_observation
+    from ...observations.selected_reference import selected_reference_observation_spaces
     return replace(base, build=build,
         scalar_control_binding=None, action_space_factory=None,
-        observation_space_factory=_direct_physical_observation_spaces,
-        observation_projection=partial(_direct_physical_observation, hand_frame_id='ee'),
+        observation_space_factory=partial(selected_reference_observation_spaces, include_robot_state=True),
+        observation_projection=partial(physical_observation, hand_frame_id='ee'),
         physical_sequence_v2_observation=True,
         action_schema=None,
         recorder_mode='execution', interval_mode='grouped')

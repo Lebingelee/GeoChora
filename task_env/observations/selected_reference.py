@@ -23,11 +23,11 @@ def switch_observation_space():
     })
 
 
-def selected_reference_observation_spaces(env):
+def selected_reference_observation_spaces(env, *, include_robot_state=False):
     """Build the existing Panda reference projection; mixed tasks own their spaces."""
     keys = [key for _, key in env.binding.object_poses]
     state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
-    if env.position_profile:
+    if env.position_profile or include_robot_state:
         state_spaces.update({
             'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
             'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),

@@ -71,64 +71,6 @@ def physical_binding_from_config(config, *, robot=None):
         lift_height_m=lift_height_m, robot=robot)
 
 
-def _direct_physical_observation_spaces(env):
-    """PickCube's existing single-Panda state shape, declared by the task."""
-    from collections import OrderedDict
-    import numpy as np
-    from ...environment.gym_compat import Box, Dict
-    return OrderedDict((
-        ('state', Dict({
-            'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-            'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
-        })),
-        ('privileged_state', Dict({'cube_v1_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)})),
-    ))
-
-
-def _direct_physical_observation(env, state, *, hand_frame_id="hand"):
-    """Project the physical publication without requiring a Position controller."""
-    import numpy as np
-    from ...artifacts import CanonicalStateView
-    view = env.typed_state.view
-    joints = {v.joint_id: v for v in view.joints if v.entity_id == 'panda-v1'}
-    names = tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
-    if any(name not in joints for name in names):
-        raise ValueError('PickCube observation requires its named Panda joints')
-    hands = [v for v in view.frames if v.frame.entity_id == 'panda-v1' and v.frame.frame_id == hand_frame_id]
-    if len(hands) != 1:
-        raise ValueError('PickCube observation requires one hand frame')
-    hand = hands[0].pose_world
-    adapted = CanonicalStateView(
-        schema_version='canonical-state-v0', convention=state.convention,
-        control_step=state.control_step, simulation_time=state.simulation_time,
-        joint_position={**state.joint_position, **{f'panda-v1/{n}': float(joints[n].position[0]) for n in names}},
-        joint_velocity={**state.joint_velocity, **{f'panda-v1/{n}': float(joints[n].velocity[0]) for n in names}},
-        pose_world=dict(state.pose_world),
-    )
-    from ...environment.reference_binding import evaluate_task_definition
-    evaluation = evaluate_task_definition(env, adapted)
-    site = state.pose_world['panda-v1/ee']
-    pose = np.asarray((*site.position, *site.quaternion_wxyz), dtype=np.float32)
-    hand_pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
-    cube = state.pose_world['cube-v1']
-    boundary = view.boundary
-    obs = {'state': {'ee_pose': pose.copy(),
-                     'joint_position': np.asarray([joints[n].position[0] for n in names], dtype=np.float32),
-                     'hand_pose': hand_pose,
-                     'boundary_identity_sha256': np.frombuffer(bytes.fromhex(
-                         boundary.boundary_id.removeprefix('state-boundary-')), dtype=np.uint8).copy()},
-           'privileged_state': {'cube_v1_body_pose': np.asarray(
-               [(*cube.position, *cube.quaternion_wxyz)], dtype=np.float32)}}
-    info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
-            'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
-            'simulation_time_s': float(state.simulation_time),
-            'state_boundary_identity': boundary.to_mapping(), 'state_boundary_id': boundary.boundary_id,
-            'state_sample_clock': view.sample_clock.to_mapping()}
-    return obs, info, evaluation
-
-
 def make_physical_binding(*, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None, robot=None):
@@ -136,8 +78,10 @@ def make_physical_binding(*, drive_mode, control_kind,
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import sample_episode_reset_plan
     from ...environment.reference_binding import ReferenceTaskBinding
+    from functools import partial
+    from ...observations.selected_reference import selected_reference_observation_spaces
     from .specialization import _prepare_reference_source, compile_pickcube_mjcf_task
-    from .task import task_binding_fields
+    from .task import physical_observation, task_binding_fields
 
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
@@ -252,8 +196,8 @@ def make_physical_binding(*, drive_mode, control_kind,
             recorder_mode='execution', close_task_resources=owned_resources.close,
             action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,
-            observation_space_factory=_direct_physical_observation_spaces,
-            observation_projection=_direct_physical_observation,
+            observation_space_factory=partial(selected_reference_observation_spaces, include_robot_state=True),
+            observation_projection=physical_observation,
             validate_external_solution=_validate_external_readiness_solution if reset_switch else None,
             position_execution_info=physical_execution_info if reset_switch else None,
             position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,

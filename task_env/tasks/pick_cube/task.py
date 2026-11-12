@@ -151,6 +151,48 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
+def physical_observation(env, state, *, hand_frame_id="hand"):
+    """Project the physical publication without requiring a Position controller."""
+    view = env.typed_state.view
+    robot = env.binding.robot
+    entity = robot.uid
+    joints = {v.joint_id: v for v in view.joints if v.entity_id == entity}
+    names = robot.physical_joint_names()
+    if any(name not in joints for name in names):
+        raise ValueError('PickCube observation requires its named Panda joints')
+    hands = [v for v in view.frames if v.frame.entity_id == entity and v.frame.frame_id == hand_frame_id]
+    if len(hands) != 1:
+        raise ValueError('PickCube observation requires one hand frame')
+    hand = hands[0].pose_world
+    adapted = CanonicalStateView(
+        schema_version='canonical-state-v0', convention=state.convention,
+        control_step=state.control_step, simulation_time=state.simulation_time,
+        joint_position={**state.joint_position, **{f'{entity}/{n}': float(joints[n].position[0]) for n in names}},
+        joint_velocity={**state.joint_velocity, **{f'{entity}/{n}': float(joints[n].velocity[0]) for n in names}},
+        pose_world=dict(state.pose_world),
+    )
+    from ...environment.reference_binding import evaluate_task_definition
+    evaluation = evaluate_task_definition(env, adapted)
+    site = state.pose_world[f'{entity}/ee']
+    pose = np.asarray((*site.position, *site.quaternion_wxyz), dtype=np.float32)
+    hand_pose = np.asarray((*hand.position, *hand.quaternion_wxyz), dtype=np.float32)
+    cube = state.pose_world['cube-v1']
+    boundary = view.boundary
+    obs = {'state': {'ee_pose': pose.copy(),
+                     'joint_position': np.asarray([joints[n].position[0] for n in names], dtype=np.float32),
+                     'hand_pose': hand_pose,
+                     'boundary_identity_sha256': np.frombuffer(bytes.fromhex(
+                         boundary.boundary_id.removeprefix('state-boundary-')), dtype=np.uint8).copy()},
+           'privileged_state': {'cube_v1_body_pose': np.asarray(
+               [(*cube.position, *cube.quaternion_wxyz)], dtype=np.float32)}}
+    info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
+            'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
+            'simulation_time_s': float(state.simulation_time),
+            'state_boundary_identity': boundary.to_mapping(), 'state_boundary_id': boundary.boundary_id,
+            'state_sample_clock': view.sample_clock.to_mapping()}
+    return obs, info, evaluation
+
+
 def task_binding_fields(*, task_config=None, lift_height_m=None, reset_sampler=None,
                         cube_force_z_N=None):
     """Provide the task semantics shared by each admitted control execution."""

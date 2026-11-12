@@ -1351,3 +1351,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 6 文件 +36／−19，净增 17 行；版本诊断修改 2 文件 +56／−7，检查两任务重定位 Robot source、快照完整性、未声明根目录拒绝及真实探针；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7832／−14693，净减 6861 行；包含先前旧路径退休及诊断迁移，不归因于本批。
 
 最终生产输入版本诊断 193 项通过；随后仅修正探针输出变量，不影响 pytest 覆盖的生产代码。MuJoCo PickCube 和 Nut 分别使用实际复制到独立目录、由所选 Robot 声明的 Panda MJCF／资产完成 Solution 单步、再次 reset 和重复 close，各观测 5 个 native 子步，非完整 Solution；MuJoCo 装配 Panda 短程完成并观测 5 子步。GeoPhys PickCube Solution 短程通过，native 子步未观测，按 50 预留。首次重定位探针在成功构造后因诊断变量未定义而失败，native 推进 0；修正后使用单独目录重跑通过，保留初次输入和结果。Isaac、renderer、普通任务和完整 Solution 本批未复验。冻结输入、双锁和收据在 ignored `workspace/maintenance/v211_declared_tabletop_source_20261112/`。E01～E04 未整体接收。
+
+
+### 6.139 PickCube effort 观测归位并共享空间声明
+
+输入 `93854fa6`；实施前重审台账 GOV、TASK-01／02、ENV-03／04、SUBJ 和 CTRL 并核对两个正式 effort binding。PickCube MuJoCo candidate 原有观测投影和一份独立空间声明，Isaac candidate 反向 import 此候选文件获取它们。现在任务对象与评价投影归 PickCube Task；主体身份和关节次序取共同入口已选 Robot 的声明。两个 binding 共同使用已有 reference observation 空间 owner，并显式声明需要主体状态；删除候选内重复空间构造以及 Isaac 对另一候选观测实现的 import。保留当前 Panda／cube、MuJoCo hand 和 Isaac ee 的既有语义；公共空间现仍固定本范围 Panda 形状，不宣称适用于任意 Robot。
+
+生产修改 4 文件 +53／−66，净减 13 行；其中约 42 行观测投影从 candidate 迁至 Task，并改用所选 Robot 身份／关节声明；candidate 自身 +5／−61。版本诊断修改 1 文件 +4／−1，检查 Isaac binding 指向共同空间及 Task 观测 owner；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 136 文件（新增 12、删除 20、修改 104），+7883／−14754，净减 6871 行；包含此前旧路径退休和诊断迁移，不归因于本批。
+
+最终输入版本诊断 193 项通过；MuJoCo PickCube direct effort 完成 reset、控制、再次 reset 和关闭，观测 5 native 子步；可切换 joint／R3 effort 路线完成控制、记录、无效切换拒绝、有效 reset 切换及后续控制，观测 10 子步。GeoPhys direct effort 同样完成短程，native 子步未观测，按 50 预留。Isaac 仅检查 binding 和 schema 引用，未启动原生路线；renderer、其他任务及完整 Solution 本批未复验。冻结输入、双锁、预算与收据在 ignored `workspace/maintenance/v211_pickcube_observation_owner_20261112/`。E01～E04 未整体接收。

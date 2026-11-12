@@ -44,14 +44,17 @@ def test_compiled_action_contract_requires_a_real_physical_execution():
 
 
 def test_usd_effort_binding_does_not_request_position_source_composition():
+    from task_env.observations.selected_reference import selected_reference_observation_spaces
     from task_env.tasks.pick_cube.specialization import _configuration
     from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
-    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv, physical_observation
 
     binding = make_isaac_physical_binding(delivery_manifest='unused-until-build',
         horizon=8, drive_mode='effort-only', control_kind='joint',
         task_config=_configuration(), resolved_config=None)
     assert binding.scalar_control_binding is None
+    assert binding.observation_projection.func is physical_observation
+    assert binding.observation_space_factory.func is selected_reference_observation_spaces
     assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding
 
 
