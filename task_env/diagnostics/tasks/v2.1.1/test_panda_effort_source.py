@@ -57,6 +57,28 @@ def test_canonical_source_owns_and_validates_input_snapshot():
     assert not snapshot.exists()
 
 
+def test_effort_construction_accepts_task_scene_without_historical_hash():
+    from copy import deepcopy
+    from task_env.tasks.pick_cube.physical_candidate import make_physical_binding
+    from task_env.tasks.pick_cube.specialization import _configuration, _environment_config
+
+    task_config = deepcopy(_configuration())
+    task_config['recipe']['scene']['table_half_size'][0] = .29
+    binding = make_physical_binding(drive_mode='coexist', control_kind='direct',
+        task_config=task_config, resolved_config=_environment_config(task_config))
+    try:
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
+        source = value['source']
+        table = ET.fromstring(source.scene_source.xml).find(".//geom[@name='grasp_table_geom']")
+        assert tuple(map(float, table.get('size').split())) == (.29, .2, .01)
+        receipt = source.source_snapshot_receipt
+        receipt.validate_snapshot()
+        assert value['source_sha256']['original_closure'] == receipt.source_closure_digest
+        assert value['physical_execution'].controllers
+    finally:
+        binding.close_task_resources()
+
+
 def test_failed_robot_composition_releases_canonical_source_snapshot():
     from dataclasses import replace
     from task_env.environment.configuration import resolve_task_env_config

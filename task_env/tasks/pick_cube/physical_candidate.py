@@ -9,11 +9,6 @@ from pathlib import Path
 
 from ...robots.panda import PandaAgent
 
-# This normalized closure was derived only after the original pinned receipt
-# and all of its referenced assets passed the historical source verification.
-_PANDA_NORMALIZED_CLOSURE_SHA256 = 'cbb7c0a3a68a5e08161651933aef262d340659c04fefc5825f3b8a4ff319e23f'
-
-
 def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
                                     parameters, gravity_compensation, reset_profile,
                                     source_delivery_manifest, execution_spec, task_parameters, horizon):
@@ -159,7 +154,6 @@ def make_physical_binding(*, drive_mode, control_kind,
         receipt = original.execution_source_receipt
     with ExitStack() as resources:
         resources.callback(receipt.close)
-        from ...runtime.sessions.source import matches_relocated_source_closure
         robot = original.agents[0]
         manifest = robot.asset_manifest()
         if manifest.owner_uid != robot.uid or len(manifest.asset_roots) != 1:
@@ -172,11 +166,9 @@ def make_physical_binding(*, drive_mode, control_kind,
         asset_root = Path(meshdir).resolve()
         if not asset_root.is_relative_to(manifest.asset_roots[0].resolve()):
             raise ValueError('physical source mesh directory is outside the Robot asset root')
-        if not matches_relocated_source_closure(
-                receipt, original.source_closure_digest,
-                asset_root=asset_root,
-                normalized_digest=_PANDA_NORMALIZED_CLOSURE_SHA256):
-            raise ValueError('PickCube physical candidate requires the exact original MJCF closure')
+        if receipt.source_closure_digest != original.source_closure_digest:
+            raise ValueError('physical source differs from its owned snapshot')
+        receipt.validate_snapshot()
         task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
             task_config, robot, legacy_artifact)
         from ...runtime.sessions.source import bind_reference_scene_source

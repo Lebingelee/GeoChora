@@ -4,6 +4,7 @@ import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
+parser.add_argument('--table-half-x',type=float,default=None)
 parser.add_argument('--relocate-robot-assets',action='store_true')
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
@@ -28,6 +29,15 @@ try:
         mujoco.mj_step=counted_step
     from task_env import make_env
     from task_env.runtime.sessions.source import source_resource_receipt
+    if args.table_half_x is not None:
+        if args.case != 'panda-effort':
+            raise ValueError('table declaration probe requires PickCube effort')
+        from copy import deepcopy
+        from task_env.tasks.pick_cube import specialization
+        task_config = deepcopy(specialization._configuration())
+        task_config['recipe']['scene']['table_half_size'][0] = args.table_half_x
+        specialization.PickCubeReferenceEnv.selected_task_configuration = staticmethod(lambda: task_config)
+        result['declared_table_half_x'] = args.table_half_x
     if args.relocate_robot_assets:
         if args.case != 'assembled-live':
             raise ValueError('relocated Robot source probe requires assembled-live')
@@ -98,6 +108,10 @@ try:
         action={'torque':np.asarray([.25]if args.case=='pendulum'else[.25,-.2],dtype=np.float32)}
     result['uid']=env.uid
     result['constructed']=True
+    if args.table_half_x is not None:
+        import xml.etree.ElementTree as ET
+        table = ET.fromstring(env.value['source'].scene_source.xml).find(".//geom[@name='grasp_table_geom']")
+        assert float(table.get('size').split()[0]) == args.table_half_x
     robot=env.robot
     result['robot']={'uid':robot.uid,'subjects':[s.subject_id for s in robot.subjects],
         'parents':[s.parent_subject_id for s in robot.subjects],

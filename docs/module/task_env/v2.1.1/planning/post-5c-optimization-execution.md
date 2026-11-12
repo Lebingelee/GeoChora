@@ -1333,3 +1333,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 1 文件 +15／−5，净增 10 行；版本诊断修改 1 文件 +4／−1，检查两个输出摘要均与本次 snapshot 一致；本文新增记录。无新增、删除或整文件迁移；项目 tracked 文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 134 文件（新增 12、删除 20、修改 102），+7739／−14674，净减 6935 行，包含先前退休旧路径和诊断迁移，不归因于本批。
 
 最终输入版本诊断 189 项通过。MuJoCo PickCube direct effort（含 1.5 N 任务力）与 joint effort 各完成 reset、一次控制推进、再次 reset 和重复 close，各观测 5 个 native 子步；GeoPhys direct effort 同样完成短程，native 子步未观测，按 50 预留。此项不重开旧 COM 历史判据。Isaac、renderer、Nut、两个普通任务及完整 Solution 本批未复验。冻结输入、双锁和收据位于 ignored `workspace/maintenance/v211_actual_closure_20261112/`。E01～E04 未整体接收。
+
+
+### 6.137 移除历史整场景摘要准入
+
+输入 `c5de70fc`；实施前再次核对 GOV、ENTRY、TASK-01／02、ENV、SUBJ、CTRL 和 source 边界。正式 PickCube effort 构建原来以历史运行的标准化 SHA-256 限定整个 Task／Robot MJCF 闭包，而非只检查 Robot 资产。将任务桌面半宽从 0.28 改为 0.29 时，原输入在主体／传动检查之前被该旧摘要拒绝。现移除此固定整场景资格和只服务它的闭包归一化 helper；保留本次 source 与 receipt 的闭包一致、snapshot 字节、所选 Robot manifest owner／资产根和 MJCF mesh 目录归属检查，以及后续 Robot 通道、native 传动、Scene／Artifact 映射检查。实际 source 闭包继续进入运行身份。此变化不再保证整份场景与某次历史字节完全一致，也不宣称支持任意修改过的 Robot 资产；历史精确资格及原结论不迁移到新 source。
+
+生产修改 2 文件 +3／−31，净减 28 行；版本诊断修改 2 文件 +36／−0，验证替换 Task 桌面声明仍生成 source、实际 snapshot 身份和 Controller，并为真实探针提供同一声明；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 134 文件（新增 12、删除 20、修改 102），+7749／−14676，净减 6927 行；包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终输入版本诊断 190 项通过；其中保留 source 变化／snapshot 不一致拒绝与错误 tendon 传动拒绝。使用内部 Task 声明将桌面半宽改为 0.29 的正式 PickCube direct effort，在 MuJoCo 和 GeoPhys 上分别完成 reset、控制推进、再次 reset 和重复 close；MuJoCo 观测 5 native 子步，GeoPhys 未观测，按 50 预留。默认 MuJoCo joint effort 也完成短程并观测 5 子步。声明通过诊断注入，并非宣称新公开配置字段；不扩大任意资产或组件组合支持。Isaac、renderer、其他任务及完整 Solution 本批未复验；历史证据按原 source 身份保留。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_task_scene_declaration_20261112/`。E01～E04 尚未整体接收。

@@ -200,26 +200,6 @@ class ExecutionSourceReceiptV1:
             owner.cleanup()
 
 
-def matches_relocated_source_closure(receipt, actual_digest, *, asset_root, normalized_digest):
-    """Verify an owned source snapshot against a location-independent closure.
-
-    Only the single declared asset-root occurrence is normalized; the receipt
-    and every actual source byte remain unchanged.
-    """
-    if receipt is None or actual_digest != receipt.source_closure_digest:
-        return False
-    receipt.validate_snapshot()
-    files = dict(receipt.closure_files)
-    canonical = files.get('canonical-source.xml')
-    if not isinstance(canonical, bytes):
-        return False
-    root = str(Path(asset_root).resolve()).encode()
-    if canonical.count(root) != 1:
-        return False
-    files['canonical-source.xml'] = canonical.replace(root, b'${GEOCHORA_SOURCE_ASSET_ROOT}', 1)
-    return _source_closure_digest(files) == normalized_digest
-
-
 def snapshot_legacy_mjcf_source(source):
     """Capture the files actually referenced by an existing Panda MJCF source.
 
