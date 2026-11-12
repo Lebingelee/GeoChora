@@ -183,10 +183,60 @@ def resolve_robot_source_adapter(provider, backend):
     return adapter
 
 
+def prepare_robot_source_intent(source, *, robot, controller_profile, existing_robot_entity,
+                                task_body_names, task_site_transfers):
+    """Freeze and validate the Task/Robot request before source composition."""
+    from ...assembly.source_composition import build_source_composition_intent_v1
+
+    profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
+    recipe = (profile_recipe(controller_profile) if controller_profile is not None and callable(profile_recipe)
+              else robot.source_recipe())
+    if controller_profile is not None and controller_profile not in recipe.control_profiles:
+        raise ValueError('selected Robot does not declare this Controller profile')
+    task_entities = tuple(entity for entity, _ in task_body_names)
+    intent = build_source_composition_intent_v1(
+        task_source=source, task_entity_ids=task_entities,
+        existing_robot_entity_ids=(existing_robot_entity,), robot_recipe=recipe,
+        task_site_transfers=task_site_transfers)
+    validate_robot_source_request(source, robot=robot, composition_intent=intent,
+        task_entities=task_entities, existing_robot_entity=existing_robot_entity,
+        task_body_names=task_body_names, task_site_transfers=task_site_transfers,
+        robot_recipe=recipe, controller_profile=controller_profile)
+    return intent, recipe
+
+
+def validate_effort_robot_intent(intent, source, execution, *, controller_profile):
+    """Match source snapshot and compiled writer resources to the frozen request."""
+    from ...assembly.source_composition import SourceCompositionIntentV1
+    from .physical_control import PhysicalControlExecutionV1
+    from .source import source_resource_receipt
+
+    if type(intent) is not SourceCompositionIntentV1 or type(execution) is not PhysicalControlExecutionV1:
+        raise TypeError('effort composition requires typed intent and physical execution')
+    receipt = source_resource_receipt(source)
+    if (receipt is None or receipt.source_id != intent.task_source_id
+            or receipt.source_closure_digest != intent.task_source_closure_sha256):
+        raise ValueError('effort source snapshot differs from the composition intent')
+    receipt.validate_snapshot()
+    entities = {entity.entity_id for entity in execution.scene.entities}
+    if entities != set(intent.task_entity_ids) | set(intent.existing_robot_entity_ids):
+        raise ValueError('effort Scene ownership differs from the composition intent')
+    subjects = execution.subjects
+    if (len(subjects) != 1 or subjects[0].entity_id != intent.robot_uid
+            or execution.selection_profile_id != controller_profile
+            or controller_profile not in intent.control_profiles
+            or tuple(channel.joint_id for channel in execution.compiled.binding.channels)
+            != intent.controlled_joints):
+        raise ValueError('effort subject or Controller differs from the composition intent')
+    writers = {(channel.entity_id, channel.native_actuator, writer)
+               for channel in execution.compiled.binding.channels for writer in channel.owner_ids}
+    if writers != set(intent.resource_writers):
+        raise ValueError('effort writer resources differ from the composition intent')
+
+
 def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, task_body_names, task_site_transfers, robot=None):
     """Resolve the provider composer and bind the selected Robot per source."""
     from ...registry import AGENT_REGISTRY
-    from ...assembly.source_composition import build_source_composition_intent_v1
 
     profile = config.controller_profile
     adapter = resolve_robot_source_adapter(config.physics_provider, config.environment.runtime.backend)
@@ -199,14 +249,9 @@ def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, 
         selected = robot if robot is not None else (existing[0] if existing else AGENT_REGISTRY.create(robot_uid))
         if selected.uid != robot_uid or (existing and existing[0] is not selected):
             raise ValueError('Task source differs from the selected Robot declaration')
-        profile_recipe = getattr(selected, 'source_recipe_for_profile', None)
-        recipe = profile_recipe(profile) if profile is not None and callable(profile_recipe) else selected.source_recipe()
-        if profile is not None and profile not in recipe.control_profiles:
-            raise ValueError('selected Robot does not declare this Controller profile')
-        intent = build_source_composition_intent_v1(
-            task_source=source, task_entity_ids=task_entities,
-            existing_robot_entity_ids=(existing_robot_entity,), robot_recipe=recipe,
-            task_site_transfers=task_site_transfers)
+        intent, recipe = prepare_robot_source_intent(source, robot=selected,
+            controller_profile=profile, existing_robot_entity=existing_robot_entity,
+            task_body_names=task_body_names, task_site_transfers=task_site_transfers)
         return adapter.compose_robot_source(source, robot=selected, composition_intent=intent,
             artifact=artifact, controller=controller, robot_recipe=recipe,
             controller_profile=profile, task_entities=task_entities,

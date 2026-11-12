@@ -27,6 +27,72 @@ def test_formal_position_and_effort_share_task_binding_factory(monkeypatch):
     assert calls == [None, 'joint']
 
 
+def test_effort_intent_precedes_scene_import_and_controls_writer_ownership(monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.robots.panda import PandaAgent
+    from task_env.runtime.sessions import source_composition_adapters, source_scene_import
+
+    events = []
+    prepare = source_composition_adapters.prepare_robot_source_intent
+    declare = source_scene_import.declare_panda_scene
+    def capture_intent(source, **kwargs):
+        assert source.scene_definition is None
+        result = prepare(source, **kwargs)
+        events.append('intent')
+        return result
+    def capture_scene(*args, **kwargs):
+        assert events == ['intent']
+        events.append('scene')
+        return declare(*args, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'prepare_robot_source_intent', capture_intent)
+    monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture_scene)
+    config = {'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+              'controller': {'profile_id': 'panda-direct-effort-v1'}}
+    env = make_env('pick-cube-p16-reference-v1', config=config)
+    try:
+        assert events == ['intent', 'scene']
+        assert len(env.value['resolved_configuration']['source_composition_intent_v1_sha256']) == 64
+    finally:
+        env.close()
+
+    original_recipe = PandaAgent.source_recipe_for_profile
+    def foreign_writer(robot, profile):
+        recipe = original_recipe(robot, profile)
+        return replace(recipe, resource_writers=tuple((entity, actuator, 'foreign-writer')
+                                                       for entity, actuator, _ in recipe.resource_writers))
+    monkeypatch.setattr(PandaAgent, 'source_recipe_for_profile', foreign_writer)
+    events.clear()
+    with pytest.raises(ValueError, match='writer resources differ'):
+        make_env('pick-cube-p16-reference-v1', config=config)
+
+
+def test_position_freezes_input_intent_before_scene_import(monkeypatch):
+    from task_env import make_env
+    from task_env.runtime.sessions import source_composition_adapters, source_scene_import
+
+    inputs = []
+    prepare = source_composition_adapters.prepare_robot_source_intent
+    declare = source_scene_import.declare_panda_scene
+    def capture_intent(source, **kwargs):
+        result = prepare(source, **kwargs)
+        inputs.append((source.scene_definition, result[0].identity_hash))
+        return result
+    def capture_scene(*args, **kwargs):
+        assert inputs and inputs[0][0] is None
+        return declare(*args, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'prepare_robot_source_intent', capture_intent)
+    monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture_scene)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'r3_continuous_v1'},
+    })
+    try:
+        assert env.value['resolved_configuration']['input_source_composition_intent_v1_sha256'] == inputs[0][1]
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('profile', ('panda-direct-effort-v1', 'panda-joint-effort-reference-v1'))
 def test_effort_without_solution_does_not_prepare_position_readiness(monkeypatch, profile):
     from task_env import make_env

@@ -161,6 +161,18 @@ class PandaAgent(BaseAgent):
             tuple((self.uid, f'actuator{index}', 'panda-position-controller')
                   for index in range(1, 9)))
 
+    def source_recipe_for_profile(self, profile):
+        """Declare the writer ownership of the selected Controller profile."""
+        recipe = self.source_recipe()
+        if profile in self.selected_controller_profiles():
+            return recipe
+        if profile not in self.effort_controller_profiles():
+            raise ValueError('Panda does not declare this Controller profile')
+        from dataclasses import replace
+        return replace(recipe, control_profiles=tuple(self.effort_controller_profiles()),
+            resource_writers=tuple((self.uid, f'actuator{index}', 'panda-direct-effort')
+                                   for index in range(1, 9)))
+
     def reference_spec(self) -> ReferenceSpec:
         return ReferenceSpec(
             body_names=("link0", "hand", "left_finger", "right_finger"),

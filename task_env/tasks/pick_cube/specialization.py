@@ -297,7 +297,8 @@ def compile_reference_robot_task(task_config, robot, legacy_artifact, source):
 
 
 def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,
-                                lift_height_m, robot, native_drive, control_kind, cube_force_z_N):
+                                lift_height_m, robot, native_drive, control_kind, controller_profile,
+                                cube_force_z_N):
     """Compile PickCube declarations through the shared Task/Robot source owners."""
     from ...runtime.sessions.source import close_execution_source_on_failure, snapshot_legacy_mjcf_source
     provider, backend = request.provider, request.backend
@@ -320,10 +321,15 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
         selected_robot = original.agents[0]
+        from ...runtime.sessions.source_composition_adapters import (
+            prepare_robot_source_intent, prepare_panda_source_effort_factory, validate_effort_robot_intent)
+        intent, _recipe = prepare_robot_source_intent(original, robot=selected_robot,
+            controller_profile=controller_profile, existing_robot_entity=selected_robot.uid,
+            task_body_names=PickCubeReferenceEnv.robot_source_roots,
+            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers)
         task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
             task_config, selected_robot, legacy_artifact, original)
 
-        from ...runtime.sessions.source_composition_adapters import prepare_panda_source_effort_factory
         build_physical = prepare_panda_source_effort_factory(
             selected_robot, scene, artifact, source, native_drive=native_drive,
             config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
@@ -331,6 +337,7 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
             gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None)
 
         physical = build_physical(control_kind)
+        validate_effort_robot_intent(intent, source, physical, controller_profile=controller_profile)
         candidate = {'artifact': artifact, 'task_source': task_source, 'source': source,
             'controller': physical.controllers[0], 'solution': None,
             **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
@@ -342,6 +349,7 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
                 'original_closure': original.source_closure_digest,
                 'projected_closure': closure},
             'resolved_configuration': {'provider': provider, 'backend': backend,
+                'source_composition_intent_v1_sha256': intent.identity_hash,
                 'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
                 'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
                 'control_kind': control_kind,
@@ -371,6 +379,11 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
+        from ...runtime.sessions.source_composition_adapters import prepare_robot_source_intent
+        source_intent, _recipe = prepare_robot_source_intent(source, robot=selected_robot,
+            controller_profile=controller_profile, existing_robot_entity='panda-v1',
+            task_body_names=PickCubeReferenceEnv.robot_source_roots,
+            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers)
         reset_plan = None
         if reference_robot is not None:
             task_source, scene, artifact, source, _, _ = compile_reference_robot_task(
@@ -421,6 +434,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         construction_identity = reference_task_identity_fields(artifact, source, controller)
         resolved = {
             "construction_id": recipe["construction_id"], "task_recipe": task_config,
+            "input_source_composition_intent_v1_sha256": source_intent.identity_hash,
             "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
             "artifact": artifact.to_mapping(), **construction_identity,
             "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
@@ -665,7 +679,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None,
                            cube_force_z_N=None, robot_uid="panda-v1", robot=None,
-                           physical_kind=None, physical_drive=None, reset_switch=False,
+                           physical_kind=None, physical_drive=None, physical_profile_id=None, reset_switch=False,
                            space_policy='dynamic'):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
@@ -704,7 +718,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return _compile_mjcf_effort_source(request, reset_switch=reset_switch,
                 task_config=task_config, resolved_config=resolved_config,
                 lift_height_m=lift_height_m, robot=robot, native_drive=physical_drive,
-                control_kind=physical_kind, cube_force_z_N=cube_force_z_N)
+                control_kind=physical_kind, controller_profile=physical_profile_id,
+                cube_force_z_N=cube_force_z_N)
         if provider == "isaacsim":
             if backend != "cuda" or source_delivery_manifest is None:
                 raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
@@ -873,7 +888,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                 lift_height_m=dict(config.task_parameters).get('lift_height_m'),
                 cube_force_z_N=dict(config.task_parameters).get('cube_force_z_N'), robot=robot,
                 interval_provider=config.physics_provider, physical_kind=kind, physical_drive=drive,
-                reset_switch=switch, space_policy=policy)
+                physical_profile_id=profile, reset_switch=switch, space_policy=policy)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):
