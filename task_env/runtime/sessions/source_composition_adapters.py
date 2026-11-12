@@ -256,16 +256,28 @@ def resolve_robot_source_adapter(provider, backend):
     return adapter
 
 
-def prepare_robot_source_intent(source, *, robot, controller_profile, existing_robot_entity,
-                                task_body_names, task_site_transfers):
-    """Freeze and validate the Task/Robot request before source composition."""
-    from ...assembly.source_composition import build_source_composition_intent_v1
-
+def _selected_robot_source_recipe(robot, controller_profile):
+    """Resolve and admit the Robot's source recipe for the selected Controller."""
     profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
     recipe = (profile_recipe(controller_profile) if controller_profile is not None and callable(profile_recipe)
               else robot.source_recipe())
     if controller_profile is not None and controller_profile not in recipe.control_profiles:
         raise ValueError('selected Robot does not declare this Controller profile')
+    return recipe
+
+
+def reference_task_source_robot(robot, controller_profile):
+    """Select the Robot that can be built into the reference Task source."""
+    recipe = _selected_robot_source_recipe(robot, controller_profile)
+    return robot if recipe.mode == 'reference-task-source' else None
+
+
+def prepare_robot_source_intent(source, *, robot, controller_profile, existing_robot_entity,
+                                task_body_names, task_site_transfers):
+    """Freeze and validate the Task/Robot request before source composition."""
+    from ...assembly.source_composition import build_source_composition_intent_v1
+
+    recipe = _selected_robot_source_recipe(robot, controller_profile)
     task_entities = tuple(entity for entity, _ in task_body_names)
     intent = build_source_composition_intent_v1(
         task_source=source, task_entity_ids=task_entities,

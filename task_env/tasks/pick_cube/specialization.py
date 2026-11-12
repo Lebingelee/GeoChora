@@ -184,8 +184,6 @@ def _r3_dynamic_profile():
 
 class _PreparedReferenceSource(NamedTuple):
     task_config: dict
-    recipe: dict
-    config: object
     is_r3_profile: bool
     dynamic_profile: object
     profile_source: object
@@ -281,7 +279,6 @@ def _prepare_mjcf_source(*, backend="cpu", controller_profile="r1", resolved_con
     """Compile one Task/Robot source; resolve readiness only when the route needs it."""
 
     task_config = _configuration() if task_config is None else task_config
-    recipe = task_config["recipe"]
     config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
         task_config, controller_profile, resolved_config)
     declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
@@ -292,7 +289,7 @@ def _prepare_mjcf_source(*, backend="cpu", controller_profile="r1", resolved_con
                                      dynamic_profile=dynamic_profile)
     compiled = compile_panda_box_task(declaration, config=config, artifact=artifact,
                                       robot=robot, backend=backend, own_snapshot=True)
-    return _PreparedReferenceSource(task_config, recipe, compiled.source.config, is_r3_profile,
+    return _PreparedReferenceSource(task_config, is_r3_profile,
         dynamic_profile, profile_source, compiled.artifact, compiled.source, readiness)
 
 
@@ -349,20 +346,18 @@ def _bind_mjcf_effort_control(compiled, context, selection, request, *, native_d
 
 def _compile_reference_position_source(request, *, controller_profile, resolved_config,
                                        lift_height_m, task_config, robot_uid, robot):
+    from ...runtime.sessions.source_composition_adapters import reference_task_source_robot
     selected_robot = make_agent(robot_uid) if robot is None else robot
     if selected_robot.uid != robot_uid:
         raise ValueError('selected Robot differs from the requested identity')
-    profile_recipe = getattr(selected_robot, 'source_recipe_for_profile', None)
-    robot_recipe = (profile_recipe(controller_profile) if callable(profile_recipe)
-                    else selected_robot.source_recipe())
-    reference_robot = selected_robot if robot_recipe.mode == 'reference-task-source' else None
-    (task_config, recipe, config, is_r3_profile, dynamic_profile, profile_source,
-     artifact, source, readiness) = _prepare_mjcf_source(
+    reference_robot = reference_task_source_robot(selected_robot, controller_profile)
+    prepared = _prepare_mjcf_source(
         backend=request.backend, controller_profile=controller_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
-    return (CompiledReferenceTaskV1(artifact, source),
-            _PositionSourceContext(task_config, selected_robot, reference_robot,
-                is_r3_profile, dynamic_profile, profile_source, readiness))
+    return (CompiledReferenceTaskV1(prepared.artifact, prepared.source),
+            _PositionSourceContext(prepared.task_config, selected_robot, reference_robot,
+                prepared.is_r3_profile, prepared.dynamic_profile, prepared.profile_source,
+                prepared.readiness))
 
 
 def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile):

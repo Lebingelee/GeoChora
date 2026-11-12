@@ -342,6 +342,26 @@ def test_readiness_failure_does_not_create_a_source_snapshot(monkeypatch):
     assert raised.value is failure
 
 
+def test_position_rejects_unsupported_robot_profile_before_source_snapshot(monkeypatch):
+    from dataclasses import replace
+    from task_env.environment.reference_binding import TaskBuildRequest
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    robot = PandaAgent()
+    original = robot.source_recipe_for_profile
+    monkeypatch.setattr(robot, 'source_recipe_for_profile', lambda profile: replace(
+        original(profile), control_profiles=('other-profile',)))
+    def unexpected_snapshot(_source):
+        pytest.fail('unsupported Robot profile must not allocate a snapshot')
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
+    request = TaskBuildRequest('mujoco', 'cpu', 31, 8, None, None)
+    with pytest.raises(ValueError, match='does not declare this Controller profile'):
+        specialization._compile_reference_position_source(request, controller_profile='r1',
+            resolved_config=None, lift_height_m=None, task_config=None,
+            robot_uid='panda-v1', robot=robot)
+
+
 def test_panda_box_compiler_rejects_foreign_artifact_before_snapshot(monkeypatch):
     from task_env.assembly.panda_box import compile_panda_box_task
     from task_env.runtime.sessions import source as source_module
