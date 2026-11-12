@@ -12,6 +12,30 @@ import numpy as np
 from .gripper_execution import EqualRateGripperServo, NativeRateGripperServo
 
 
+R3_REFERENCE_POSITION_PROFILES = frozenset(('r3_continuous_v1', 'r3_continuous_v1_pose_path_x20'))
+REFERENCE_POSITION_CONTROLLER_PROFILES = R3_REFERENCE_POSITION_PROFILES | frozenset(('r1', 'r1_split'))
+
+
+def build_reference_position_controller(artifact, source, *, profile_id, dynamic_profile=None,
+                                        force_limit_N=10.0, gripper_rate_hz=500,
+                                        joint_velocity_limit_rad_s=2.0):
+    """Construct the selected Panda position Controller from its bound source."""
+    if profile_id == 'r1':
+        from .production import ProductionCanonicalPandaController
+        return ProductionCanonicalPandaController.from_source(artifact, source)
+    if profile_id == 'r1_split':
+        from .split_panda_position import SplitPandaPositionControllerV1
+        return SplitPandaPositionControllerV1(artifact, source)
+    if profile_id in R3_REFERENCE_POSITION_PROFILES:
+        if dynamic_profile is None:
+            raise ValueError('R3 Controller requires its declared dynamic profile')
+        return ReferenceExecutionController.from_source(
+            artifact, source, profile=dynamic_profile, force_limit_N=force_limit_N,
+            gripper_rate_hz=gripper_rate_hz,
+            joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
+    raise ValueError(f'unsupported reference Position Controller profile: {profile_id!r}')
+
+
 @dataclass(frozen=True)
 class ArmTargetExecutionRequestV1:
     """Versioned task request consumed by the existing arm Controller owner."""

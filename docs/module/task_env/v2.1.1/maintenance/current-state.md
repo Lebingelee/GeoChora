@@ -205,3 +205,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 四任务默认 Robot UID 已在共同配置解析阶段确定；MuJoCo、GeoPhys 和 Isaac 受影响短程及两个 MuJoCo worker 已复验。详见[实施记录 6.94](../planning/post-5c-optimization-execution.md#694-默认-robot-在共同配置中确定)。
 
 四任务配置现在明确解析实际 Controller profile；NutAssembly 声明既有 R3，普通 effort 构造不再重复补默认值。详见[实施记录 6.95](../planning/post-5c-optimization-execution.md#695-controller-profile-在共同配置中确定)。
+
+两个 tabletop 的 MJCF 参考 Position Controller 选择与构造已归共同 Controller owner；R1、R3、装配主体及受影响短程已复验。详见[实施记录 6.96](../planning/post-5c-optimization-execution.md#696-tabletop-参考-controller-构造归共同-owner)。

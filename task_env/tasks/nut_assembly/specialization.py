@@ -25,7 +25,7 @@ from ...assembly.compiler import (
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
-from ...controllers.canonical.execution import ReferenceExecutionController
+from ...controllers.canonical.execution import build_reference_position_controller
 from ...controllers.canonical.production_r3 import (
     R3_PROFILE_PATH, load_r3_dynamic_profile,
 )
@@ -354,9 +354,11 @@ def _build_reference(*, provider, include_solution, resolved_config=None, lift_h
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
         dynamic = load_r3_dynamic_profile()
-        execution_controller = ReferenceExecutionController.from_source(
-            artifact, source, profile=dynamic, gripper_rate_hz=500,
-            force_limit_N=recipe['controller']['force_cap_N'])
+        controller_profile = (resolved_config.control.profile_id if resolved_config is not None
+                              else NutAssemblyReferenceEnv.selected_default_controller_profile())
+        execution_controller = build_reference_position_controller(
+            artifact, source, profile_id=controller_profile, dynamic_profile=dynamic,
+            gripper_rate_hz=500, force_limit_N=recipe['controller']['force_cap_N'])
         controller = execution_controller.hold.controller
         settings = dict(recipe["solution"]["config"])
         settings["grasp_offset"] = tuple(settings["grasp_offset"])

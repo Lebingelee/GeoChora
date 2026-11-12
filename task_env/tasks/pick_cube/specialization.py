@@ -26,7 +26,9 @@ from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifa
 from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
-from ...controllers.canonical.execution import ReferenceExecutionController
+from ...controllers.canonical.execution import (ReferenceExecutionController,
+    REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES,
+    build_reference_position_controller)
 from ...environment import (
     RuntimeSnapshot,
     TaskCompositionSpec,
@@ -61,16 +63,8 @@ CONFIG_PATH = Path(__file__).with_name("config.yaml")
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
-PICKCUBE_CONTROLLER_PROFILES = {
-    "r1",
-    "r1_split",
-    "r3_continuous_v1",
-    "r3_continuous_v1_pose_path_x20",
-}
-_PICKCUBE_R3_PROFILES = frozenset({
-    "r3_continuous_v1",
-    "r3_continuous_v1_pose_path_x20",
-})
+PICKCUBE_CONTROLLER_PROFILES = REFERENCE_POSITION_CONTROLLER_PROFILES
+_PICKCUBE_R3_PROFILES = R3_REFERENCE_POSITION_PROFILES
 _PICKCUBE_POSTURE_PATH_ORIGINAL = "original"
 _PICKCUBE_POSTURE_PATH_WORLD_X_ROUNDTRIP = "world_x_roundtrip_v1"
 _NUT_ASSEMBLY_MAX_STAGE_PLAN_S = 6.0
@@ -291,7 +285,6 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
 
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
     """Construct the single selected P1.6 route without importing a provider."""
-    from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
@@ -301,18 +294,12 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         lift_height_m=lift_height_m, task_config=task_config)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(source):
-        if controller_profile == "r1":
-            controller = ProductionCanonicalPandaController.from_source(artifact, source)
-        elif controller_profile == "r1_split":
-            from ...controllers.canonical.split_panda_position import SplitPandaPositionControllerV1
-            controller = SplitPandaPositionControllerV1(artifact, source)
-        else:
-            execution_controller = ReferenceExecutionController.from_source(
-                artifact, source, profile=dynamic_profile, force_limit_N=10.0,
-                joint_velocity_limit_rad_s=(
-                    PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
-                ),
-            )
+        controller = build_reference_position_controller(
+            artifact, source, profile_id=controller_profile, dynamic_profile=dynamic_profile,
+            force_limit_N=10.0,
+            joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"])
+        if is_r3_profile:
+            execution_controller = controller
             controller = execution_controller.hold.controller
         solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
         solution = PickCubeReadinessSolution(config=readiness) if include_solution else None

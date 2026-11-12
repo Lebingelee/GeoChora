@@ -1016,3 +1016,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +5／−5，净变化 0；版本诊断修改 1 文件 +11／−1，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。本批使四任务已解析配置表达实际 Controller 选择，消除两个普通任务构造时的默认回退；其他任务构造职责尚未收敛。provider／renderer 的 source、状态、clock、提交和资源合同未改变。
 
 128 项版本检查通过，包括四任务空 profile 拒绝及 NutAssembly R3 的 YAML／mapping／已解析配置往返。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 的既有默认 R3 选择未改，本批未重跑 Isaac 或完整 Solution；旧证据仍只证明各自受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_resolved_controller_profile_20261112_g4vcow4m/`；E01～E04 仍未接收。
+
+### 6.96 tabletop 参考 Controller 构造归共同 owner
+
+输入 `5969bc83`。PickCube 原来在任务文件中按 R1、split 和 R3 分别创建具体 Controller，NutAssembly 另行直接创建 R3。现在这些参考 Position profile 的实际选择和构造由 Controller 模块的共同入口负责；两个任务提供已选 profile、source 和各自的控制参数，继续负责自身 Solution 与执行元数据。PickCube 的 profile 集合也改为消费同一 Controller 声明，装配 Panda 的两个实际 Controller 仍由该入口构造并由原主体 plan 绑定。此变化针对 MJCF 参考控制，不声称 USD Position、effort 和普通任务已合成同一实现。
+
+生产修改 3 文件 +41／−28，净增 13 行；其中 profile 分支和声明由任务移至 Controller owner，属代码职责迁移而非新增一条任务构建路径。版本诊断修改 1 文件 +14／−5，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务配置入口不变，provider／renderer 的 source、状态、clock、提交和资源合同未改变；其他任务构造及 source 分流仍需收敛。
+
+128 项版本检查通过，包含两个 tabletop 实际消费共同 Controller 构造结果。MuJoCo 下 PickCube R1、R3、装配 Panda、NutAssembly、Pendulum、双轮车及 PickCube 物理 Controller 短程通过，分别观察 5、5、5、5、25、25、10 个 native 子步；R1 和物理 Controller 的 H5 读回通过。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac Position 未调用该 MJCF Controller 入口，本批未重跑 Isaac 或完整 Solution；旧证据仍只证明各自受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_reference_controller_owner_20261112_w7w93e81/`；E01～E04 仍未接收。
