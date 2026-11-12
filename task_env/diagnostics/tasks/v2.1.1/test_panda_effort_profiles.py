@@ -53,6 +53,15 @@ def test_panda_subject_rejects_incomplete_native_transmission_declaration():
             native_actuators=('joint1',), transmission_ids=('drive1',))
 
 
+@pytest.mark.parametrize(('drive', 'limit'), [('position', 10.), ('disabled', -1.), ('disabled', float('nan'))])
+def test_panda_rejects_invalid_gripper_force_override(drive, limit):
+    from task_env.robots.panda import PandaAgent
+
+    with pytest.raises(ValueError, match='positive limit and isolated drives'):
+        PandaAgent().build_direct_effort_execution(None, None, None, entity_id='panda-v1',
+            native_drive=drive, native_ranges=((-5., 5.),) * 8, gripper_force_limit_N=limit)
+
+
 def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.robots.panda import PandaAgent

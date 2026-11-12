@@ -227,14 +227,10 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             from ...runtime.sessions.mujoco_composition import checked_panda_effort_source_limits
             native_drive = 'disabled' if drive_mode == 'effort-only' else 'position'
             limits = checked_panda_effort_source_limits(source, scene)
-            if reset_switch:
-                if (artifact.artifact_id != 'pickcube-mjcf-physical-effort-task-v1'
-                        or native_drive != 'disabled' or limits[7] != (-5., 5.)):
-                    raise ValueError('task gripper force override requires its exact source and isolated fixture')
-                limits[7] = (-10., 10.)
             physical = robot.build_direct_effort_execution(
                 scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
-                native_ranges=tuple(limits))
+                native_ranges=tuple(limits), gripper_force_limit_N=(
+                    source.config.robot.gripper.force_limit_N if reset_switch else None))
             model = None
             if kind in {'r3-pose', 'r3-mass-pose'}:
                 from ...controllers.canonical.kinematics import PandaKinematics, PANDA_PICKCUBE_EE_TCP_V1

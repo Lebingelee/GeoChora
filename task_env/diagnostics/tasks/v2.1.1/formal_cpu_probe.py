@@ -99,6 +99,12 @@ try:
         if args.case=='panda-joint' and args.record:
             active_robot=env.robot
             committed=env._physical_reset_selection.current.execution
+            cap=env.session._build_layout_facts['physical_gripper_force_cap']
+            declared=env.value['source'].config.robot.gripper.force_limit_N
+            assert cap['source_range_N']==[-5.,5.]
+            assert cap['configured_range_N']==[-declared,declared]
+            assert cap['source_mjcf_modified'] is False
+            result['physical_gripper_force_cap']=cap
             assert active_robot.subjects == committed.subjects
             assert active_robot.controllers == committed.controllers
             assert active_robot.controller is env.controller is committed.controllers[0]

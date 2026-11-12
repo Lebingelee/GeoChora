@@ -56,7 +56,6 @@ class MuJoCoPhysicalPort:
         if session._provider != 'mujoco' or session._mixed_actuator_plan is not None:
             raise ValueError('physical port requires a scalar MuJoCo session')
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
-        artifact_id = getattr(session._artifact, 'artifact_id', None)
         drive_mode = uniform_native_drive_mode(binding)
         direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
                         and all(c.native_drive == 'disabled' for c in binding.channels))
@@ -93,17 +92,25 @@ class MuJoCoPhysicalPort:
                 raise ValueError('physical transmissions alias one native actuator')
             actuator_ids.add(actuator)
             first = group[0][0]
-            if artifact_id == 'pickcube-mjcf-physical-effort-task-v1' and first.native_actuator == 'actuator8':
-                if (len(group) != 2 or first.native_range != (-10., 10.)
-                        or not bool(model.actuator_forcelimited[actuator])
-                        or not _same(model.actuator_forcerange[actuator], (-5., 5.))):
-                    raise ValueError('task gripper force cap differs from the checked source')
-                # Match the existing PickCube R3 position route's public
-                # runtime 10 N force-limit configuration; source bytes stay fixed.
-                model.actuator_forcerange[actuator] = (-10., 10.)
+            if (not direct_motor and bool(model.actuator_forcelimited[actuator])
+                    and not _same(model.actuator_forcerange[actuator], first.native_range)):
+                config = getattr(source, 'config', None)
+                gripper = getattr(getattr(config, 'robot', None), 'gripper', None)
+                limit = getattr(gripper, 'force_limit_N', None)
+                source_range = tuple(float(value) for value in model.actuator_forcerange[actuator])
+                if (len(group) != 2 or first.native_drive != 'disabled'
+                        or first.native_actuator not in source.open_actuators
+                        or any(channel.kind != 'prismatic' for channel, _ in group)
+                        or not all(math.isfinite(value) for value in source_range)
+                        or not source_range[0] < 0 < source_range[1]
+                        or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0
+                        or not _same(first.native_range, (-limit, limit))):
+                    raise ValueError('physical force cap differs from the declared gripper configuration')
+                model.actuator_forcerange[actuator] = first.native_range
                 session._build_layout_facts['physical_gripper_force_cap'] = {
-                    'schema_version': 'pickcube-runtime-gripper-cap-v1', 'source_range_N': [-5., 5.],
-                    'configured_range_N': [-10., 10.], 'source_mjcf_modified': False}
+                    'schema_version': 'physical-gripper-cap-v1', 'native_actuator': first.native_actuator,
+                    'source_range_N': list(source_range), 'configured_range_N': list(first.native_range),
+                    'source_mjcf_modified': False}
             if direct_motor:
                 if (bool(model.actuator_forcelimited[actuator])
                         or not bool(model.actuator_ctrllimited[actuator])

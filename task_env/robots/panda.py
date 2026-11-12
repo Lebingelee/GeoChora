@@ -58,7 +58,8 @@ class PandaAgent(BaseAgent):
 
     def build_direct_effort_execution(self, scene, artifact, source, *, entity_id,
                                             native_drive, native_ranges, layout=None,
-                                            joint_bindings=None, frame_bindings=None):
+                                            joint_bindings=None, frame_bindings=None,
+                                            gripper_force_limit_N=None):
         """Bind Panda's declared channels to a direct-effort Controller execution.
 
         The source adapter supplies verified native ranges; this function does not
@@ -69,6 +70,12 @@ class PandaAgent(BaseAgent):
 
         if native_drive not in {'position', 'disabled'}:
             raise ValueError('Panda effort profile requires a declared native drive mode')
+        if gripper_force_limit_N is not None:
+            if (native_drive != 'disabled' or type(gripper_force_limit_N) not in (int, float)
+                    or not np.isfinite(gripper_force_limit_N) or gripper_force_limit_N <= 0
+                    or len(native_ranges) != 8):
+                raise ValueError('Panda gripper force limit requires a positive limit and isolated drives')
+            native_ranges = (*native_ranges[:7], (-gripper_force_limit_N, gripper_force_limit_N))
         names = self.physical_joint_names()
         definitions = {j.joint_id: j for a in scene.articulations or ()
                        if a.entity_id == entity_id for j in a.joints}
