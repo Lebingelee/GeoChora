@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+from pathlib import Path
 
 from ..artifacts import (ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
     AssetDefinition, ControlGroup, EntityInstance, FrameDefinition, FrameReference,
@@ -74,6 +75,7 @@ class PendulumEntity(RobotComponent):
     actuator_name: str = "pendulum_torque"
     assembly_id = 'pendulum-source-assembly'
     source_xml = PENDULUM_MJCF_XML
+    source_base_dir = Path(__file__).resolve().parent
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+from pathlib import Path
 
 from ..artifacts import (ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
     AssetDefinition, ControlGroup, EntityInstance, FrameDefinition, FrameReference,
@@ -98,6 +99,7 @@ class TwoWheelBalanceEntity(RobotComponent):
     right_actuator_name: str = "right_wheel_torque"
     assembly_id = 'two-wheel-source-assembly'
     source_xml = TWO_WHEEL_BALANCE_MJCF_XML
+    source_base_dir = Path(__file__).resolve().parent
 
     frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 

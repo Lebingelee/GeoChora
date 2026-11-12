@@ -1,5 +1,4 @@
 """Check declared effort source mappings without starting a physics SDK."""
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +8,22 @@ from task_env.robots.two_wheel_balance import TwoWheelBalanceEntity
 from task_env.runtime.sessions import isaac_g05
 from task_env.runtime.sessions.declared_effort_source import compile_declared_effort_source
 from task_env.tasks import pendulum_physical, two_wheel_physical
+
+
+@pytest.mark.parametrize(('uid', 'robot_type'), [
+    ('pendulum-v1', PendulumEntity),
+    ('two-wheel-balance-v1', TwoWheelBalanceEntity),
+])
+def test_source_uses_selected_robot_asset_root(uid, robot_type, tmp_path, monkeypatch):
+    from task_env import make_env
+
+    monkeypatch.setattr(robot_type, 'source_base_dir', tmp_path)
+    env = make_env(uid)
+    try:
+        assert env.binding.robot.source_base_dir == tmp_path
+        assert env.value['source'].scene_source.base_dir == tmp_path
+    finally:
+        env.close()
 
 
 @pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
@@ -63,7 +78,7 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
     monkeypatch.setattr(isaac_g05, 'build_g05_isaac_runtime_source', build_source)
     args = dict(scene=scene, artifact=artifact, task_source=task_source,
                 composition=None, config=None, provider='isaacsim',
-                source_delivery_manifest='fixture', seed=31, base_dir=Path(task.__file__).parent)
+                source_delivery_manifest='fixture', seed=31)
     source, spec, closure, subject, declarations = compile_declared_effort_source(robot=robot, **args)
     assert subject.source_id == source.source_id
     assert subject.source_closure_sha256 == source.source_closure_digest
@@ -74,6 +89,7 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
     assert closure == source.source_closure_digest
     assert spec.physics_provider == 'isaacsim'
     corrupted = SimpleNamespace(source_xml=robot.source_xml.replace('gear="1"', 'gear="2"', 1),
+                                source_base_dir=robot.source_base_dir,
                                 physical_subject_declaration=robot.physical_subject_declaration,
                                 state_joint_names=robot.state_joint_names)
     with pytest.raises(ValueError, match='transmission differs'):

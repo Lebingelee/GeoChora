@@ -22,11 +22,11 @@ def declared_effort_scene(robot, *, provider, source_delivery_manifest):
 
 
 def compile_declared_effort_source(*, robot, scene, artifact, task_source, composition,
-                                   config, provider, source_delivery_manifest, seed, base_dir):
+                                   config, provider, source_delivery_manifest, seed):
     """Map Robot topology and declared transmissions to the chosen source adapter."""
     xml = robot.source_xml
     source_id = f'scene-definition-v3:{scene.identity_hash}'
-    scene_source = TaskSceneSource(xml, base_dir, source_id)
+    scene_source = TaskSceneSource(xml, robot.source_base_dir, source_id)
     _, _, closure = project_mjcf_scene_source(scene_source, scene)
     subject, declarations = robot.physical_subject_declaration(
         source_id=source_id, source_closure_sha256=closure)

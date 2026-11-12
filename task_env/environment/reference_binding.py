@@ -457,7 +457,6 @@ class ExistingSubjectEffortTask:
     composition: object
     construction_id: str
     source_revision: str
-    source_base_dir: object
     reset_sampler: Callable
     reset_metadata: Callable
     definition_factory: Callable
@@ -484,8 +483,7 @@ class ExistingSubjectEffortTask:
             source, execution_spec, closure, subject, declarations = compile_declared_effort_source(
                 robot=robot, scene=scene, artifact=artifact, task_source=task_source,
                 composition=self.composition, config=config, provider=provider,
-                source_delivery_manifest=source_delivery_manifest, seed=seed,
-                base_dir=self.source_base_dir)
+                source_delivery_manifest=source_delivery_manifest, seed=seed)
             profile_id = config.control.profile_id
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)

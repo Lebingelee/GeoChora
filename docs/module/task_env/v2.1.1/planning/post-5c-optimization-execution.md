@@ -1315,3 +1315,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 1 文件 +3／−12，净减 9 行；版本诊断修改 1 文件 +13／−1，实测可切换 effort Solution 进入共同作用域、提交与录制；本文新增记录。无新增、删除或整文件迁移；项目 tracked 文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 134 文件（新增 12、删除 20、修改 102），+7708／−14671，净减 6963 行，含此前历史目录退休与诊断迁移，不代表本批贡献。
 
 最终输入版本诊断 187 项通过；其中的 MuJoCo 可切换 R3 effort Solution 验证了该路径一个真实 interval 和 recorder，未单独统计 native 子步。双锁冻结探针中，MuJoCo PickCube R3 与 NutAssembly 各完成一次正式 Solution 推进、再次 reset、close，分别观测 5 个 native 子步，均非完整 Solution。附加任务力探针误填 `panda` case，脚本实际选择普通任务并在调用不存在的任务力工厂前失败，native 推进 0，不是产品失败也不作为有效功能证据；输入与记录位于 `workspace/maintenance/v211_solution_interval_20261112/`。Isaac position Solution、GeoPhys、renderer、完整 Solution 本批未复验；其原有证据保留原输入和范围。E01～E04 仍未整体接收。
+
+
+### 6.135 普通 Robot 拥有其 source 根目录
+
+输入 `894d2725`；实施前重新核对台账 GOV、TASK-04、ENV、SUBJ-02／03、CTRL 和 source 所有权。Pendulum 与双轮车的 MJCF 字节已经由各自 Robot 声明，但相对资产根目录仍由对应 Task 物理文件提供；这使 source 解释依赖 Task 文件位置。现由 Robot 声明 source 根目录，共同 effort source 编译器直接消费，Task binding 不再传递 source 路径。两个现有 inline source 不含外部资源；该变更说明路径归属，不证明任意外部资产或 Robot 可组合。source 字节、闭包／身份、传动与 provider 校验保持。
+
+生产修改 6 文件 +9／−10，净减 1 行；版本诊断修改 1 文件 +18／−2，检查两种 Robot 声明的替代目录确实传入 Runtime source；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 134 文件（新增 12、删除 20、修改 102），+7726／−14674，净减 6948 行，其中包括此前历史路径退休及诊断迁移，不能归因于本批。
+
+最终输入版本诊断 189 项通过。MuJoCo Pendulum、双轮车均完成 reset、一次控制推进、再次 reset、重复 close，各观测 25 native 子步；GeoPhys Pendulum 完成同样短程，native 子步未观测，按 50 预留。GeoPhys 双轮车在此前 `fceb727f` 路线已短程通过，当前路径根目录变化后未重跑；由于 source 路径变化，不将旧结果当作最终输入复验。Isaac、renderer、桌面任务及完整 Solution 本批未复验。冻结输入、双锁、预算和收据位于 ignored `workspace/maintenance/v211_robot_source_root_20261112/`。装配／引用 source 和控制构造仍有未收敛边界，E01～E04 未整体接收。

@@ -1,7 +1,6 @@
 """Source-bound two-wheel declarations for the shared physical RuntimeSession."""
 from __future__ import annotations
 
-from pathlib import Path
 import numpy as np
 
 from ..artifacts import Timebase
@@ -72,7 +71,7 @@ def task_binding(config, *, robot, source_delivery_manifest=None):
         composition=TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID, (robot.uid,), (),
                                         success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION),
         construction_id='two-wheel-shared-physical-v1', source_revision='two-wheel-inline-v1',
-        source_base_dir=Path(__file__).resolve().parent, reset_sampler=sample_reset,
+        reset_sampler=sample_reset,
         reset_metadata=reset_metadata, definition_factory=lambda _artifact: TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2),
         state_projection=_task_state, observation_schema=TwoWheelBalanceObservationBuilder(
             joint_ids={'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}).schema,
