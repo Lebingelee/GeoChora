@@ -12,6 +12,10 @@
 
 GeoPhys 固定子模块的 `simulation` 已公开导出真实 assembly 函数；当前 pin 未发现等价的正式 backend 初始化 facade，`init_task_env_backend` 仍集中调用 `geophys.test_runtime.init_test_backend`。后续最小 provider 改善是由 GeoPhys 提供正式初始化入口，再由该 adapter 迁移调用；本轮不改子模块 pin、不使用私有 solver 补洞。
 
+可交付给 GeoPhys 的最小接口方案：在 provider 自有的公开 runtime 命名空间提供 `initialize_backend(arch, **options)`（名称由 provider 最终确定），让现有 test/demo 和 TaskEnv adapter 调用同一个进程级初始化 owner。该 owner 需要保持当前 backend 归一化、编译／缓存策略、可用架构选择及失败清理，并与现有一次性初始化和 shutdown 状态共用；不能把 `test_runtime.py` 复制到 Core 或直接通过私有 solver 初始化。接口需定义重复调用、已初始化后切换 backend、并发调用和关闭归属的语义；当前实现对已初始化直接返回，不能推断它会校验后续 backend 是否一致。
+
+交接和验收顺序：先在 GeoPhys 自己测试单进程首次／重复初始化、不同 backend 冲突、失败后清理及非 owner 不关闭共享 runtime；再由维护者更新 provider 依赖，修改 `provider_bootstrap.init_task_env_backend` 调用正式入口，复验 scalar 的构建、reset、一个 interval、第二次 reset、重复 close，以及 component 纯构建和现有 worker 参数转发。batch 实物验证仍属于 G06。本轮不改子模块 pin；现有公开 `simulation.assemble_mjcf_articulated_runtime` 是场景装配接口，不能把它误作 backend 初始化接口。
+
 | GeoPhys 调用方 | 本单元边界 |
 | --- | --- |
 | 正式 scalar | `make_env → _GeoPhysSession → bootstrap_task_runtime → provider_bootstrap → GeoPhysRuntimeBoundary`；Pendulum 短程实际复验。 |
