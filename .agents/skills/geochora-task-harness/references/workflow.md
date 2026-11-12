@@ -40,6 +40,14 @@ Unified findings have `check, category, locality, spec_path, observed, expected,
 
 If a diagnostic is needed, make an explicit separate spec and run `feasibility_probe.py --core-repo ... --spec ... --catalog ... --provider ... --seeds ... --output ...`. Diagnostic probes are evidence, not new accepted candidates. Isolate relevant variables using the failure's actual reset poses and stage; keep failed diagnostics. Do not count a one-seed diagnostic as the final 20-seed check.
 
+To prepare those diagnostics from a failed feasibility report:
+
+```sh
+"$PY" "$RT/diagnose_candidate.py" --report "$OUT/round1/feasibility.json" --spec "$OUT/round1/candidate.spec.json" --output-dir "$OUT/round1-diagnosis"
+```
+
+`summary.json` groups non-solved seeds by classification/phase/stage/reason, gives each seed's offset from the reset center, and lists every finding with its `finding_index`, whether the ledger permits a spec revision for it, and whether diagnostics are required. `source.report_sha256` is the value a revision cites. Each `fixed-pose-seed<N>.spec.json` pins the reset to that seed's recorded pose with zero extent; pass it to `feasibility_probe.py` yourself (`--seeds` restricts which are written). The tool reads JSON only: it runs nothing, decides nothing, and an offset pattern is a lead to test, not proof of infeasibility. Rows without a recorded start pose get no spec.
+
 For a supported repair, write a new spec and a revision JSON:
 
 ```json
@@ -81,6 +89,35 @@ open issues; issue resolution needs its own cited evidence. Ordinary v0
 `begin --revision` remains supported. In v1, ordinary spec revisions may reuse
 the current context only when the external asset identity is unchanged;
 changing Core/catalog/input identity requires an explicit `--context` JSON.
+
+### Read-only views
+
+```sh
+"$PY" "$RT/ledger_summary.py" --ledger "$OUT/construction.json" --output "$OUT/construction.summary.md"
+"$PY" "$RT/compare_providers.py" --reports "$OUT/mujoco/feasibility.json" "$OUT/isaacsim/feasibility.json" --output "$OUT/provider-comparison.json"
+```
+
+`ledger_summary` revalidates the ledger, then lists each round's spec change, cited finding, reason and report results, plus the issues. It is a derived view for people: do not cite it in a revision or package it as evidence.
+
+`compare_providers` takes one feasibility report per provider and records, per seed, each provider's classification, steps, stage and reason, whether they agree, and how far the recorded start positions differ. Reports must share a spec unless `--allow-spec-mismatch` is given, and the mismatch is recorded. Each report is checked against the current completion contract and marked unverified if it fails; it is still shown. Agreement on outcomes is not per-step physical equivalence, replay validity or Qualification, and a disagreement does not say which provider is right.
+
+### Issue escalation and resolution
+
+Every `execution_fault` and every `asset`/`harness`/`core`/`provider` finding is recorded in the ledger's `open_issues`. Hand them to their owners with:
+
+```sh
+"$PY" "$RT/construction_ledger.py" export-issues --ledger "$OUT/construction.json" --output-dir "$OUT/issues"
+```
+
+This writes `issues.json` and one `issue-<NN>.escalation.json` per issue (finding, report ref, round, spec, Core commit, provider, and a `resolution_template`). It never modifies the ledger. `owner_hint` is the reported locality; `unknown` means ownership is not established.
+
+When the owner returns evidence, complete the template (`disposition`: `owner_fixed` or `not_reproduced`; `owner`: `asset`, `core`, `provider` or `harness`; a `reason`; absolute `evidence` file paths) and record it:
+
+```sh
+"$PY" "$RT/construction_ledger.py" resolve-issue --ledger "$OUT/construction.json" --issue-index 0 --resolution "$OUT/issue-00.resolution.json"
+```
+
+The resolution must cite that issue's exact report hash and finding index, and its evidence must be files other than the failing report. It is appended to `issue_events`; `open_issues`, rounds, state and the five-round budget are unchanged, and an issue takes one resolution. Evidence files are hash-bound: editing one later invalidates the ledger. A recorded resolution is the owner's claim for Human review, carried into the Stage-1 package manifest; it is not approval, and accepting a limitation is the Human Judge's decision, not a disposition. A stopped ledger still continues only through `continue-owner-repair`. Ledger commands print `unresolved_issues` beside the unchanged `open_issues` count.
 
 ## D. Oracle Candidate
 

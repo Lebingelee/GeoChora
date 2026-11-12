@@ -298,6 +298,16 @@ def owner_repair_bundle(log, output, copy_file):
     return index
 
 
+def check_issue_event_files(history,index):
+    """Every resolution input and evidence file must be an indexed package file with its recorded hash."""
+    indexed={item['path']:item['sha256'] for item in index['files']}
+    relocations=index.get('relocations',{})
+    for event in history.get('issue_events',[]):
+        for ref in [event['input'],*event['evidence']]:
+            require(indexed.get(relocations.get(ref['path']))==ref['sha256'],
+                f'issue resolution evidence missing from package: {ref["path"]}')
+
+
 def round_history(log):
     return [{'number':r['number'],'status':r['status'],'spec_sha256':r['spec_sha256'],
         'core_commit':(r.get('context') or {}).get('core_commit',log['core_commit']),
@@ -355,17 +365,19 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     copy_tree(v,'validation/current')
     copy_tree(u,'local_assets')
     copy_file(logpath,'validation/history/construction_log.json')
-    if 'evidence_directory' in log:copy_tree(Path(log['evidence_directory']),'validation/history/rounds')
-    else:
-        def collect(value):
-            if isinstance(value,dict):
-                if set(value)=={'path','sha256'}:
-                    copy_file(value['path'],f"validation/history/refs/{value['sha256']}/{Path(value['path']).name}")
-                else:
-                    for child in value.values():collect(child)
-            elif isinstance(value,list):
-                for child in value:collect(child)
-        collect(log)
+    def collect(value):
+        if isinstance(value,dict):
+            if set(value)=={'path','sha256'}:
+                copy_file(value['path'],f"validation/history/refs/{value['sha256']}/{Path(value['path']).name}")
+            else:
+                for child in value.values():collect(child)
+        elif isinstance(value,list):
+            for child in value:collect(child)
+    if 'evidence_directory' in log:
+        copy_tree(Path(log['evidence_directory']),'validation/history/rounds')
+        # Resolution inputs and owner evidence may live outside that directory.
+        collect(log.get('issue_events',[]))
+    else:collect(log)
     repair_index=owner_repair_bundle(log,output,copy_file)
     history=round_history(log)
     save_json(history,output/'validation/history/rounds.json')
@@ -393,7 +405,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
         'evidence_ref':'validation/evidence.json','judge_decision_ref':'judge_decision.yaml',
         'video':{'status':'NOT_RECORDED','reason':'selected route has no supported render configuration'},
         'qualification':'NOT_ASSESSED','D0':'NOT_ASSESSED','D1':'NOT_ASSESSED','D2':'NOT_ASSESSED',
-        'open_issues':log.get('open_issues',[]),
+        'open_issues':log.get('open_issues',[]),'issue_events':log.get('issue_events',[]),
         'construction_rounds':history,'owner_repair_evidence':repair_index,
         'scope':'bounded lift candidate; no LIBERO equivalence, freeze, training readiness or replay qualification'}
     (output/'manifest.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True,sort_keys=False))
@@ -418,6 +430,7 @@ Expert completion, physical task success and termination flags are retained inde
 ## Review gaps and limits
 
 - Review open_issues in manifest.yaml and the full construction history; a later passing candidate does not resolve earlier execution faults.
+- issue_events in manifest.yaml are owners' cited resolution claims for those issues; each needs Human review and none removes an issue from the record.
 - Construction round history preserves each round's Core context, including prior failures; owner-repair diagnosis and source diff are indexed under `validation/history/owner_repair/`.
 - Lift surrogate and box-collision proxy do not establish LIBERO In/On equivalence.
 - No supported selected-route camera video; no video is claimed. H5 and checks are available for review.
@@ -479,6 +492,9 @@ def verify(directory,*,core_repo):
     history=json.loads((root/'validation/history/construction_log.json').read_text())
     require(manifest.get('open_issues',[])==history.get('open_issues',[]),
         'package altered historical open issues')
+    require(manifest.get('issue_events',[])==history.get('issue_events',[]),
+        'package altered recorded issue resolutions')
+    check_issue_event_files(history,data)
     require(isinstance(history.get('rounds'),list),'construction history rounds are malformed')
     expected_bindings=[]
     for round_ in history['rounds']:
