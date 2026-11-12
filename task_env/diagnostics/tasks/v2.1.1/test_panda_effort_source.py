@@ -75,8 +75,30 @@ def test_effort_construction_accepts_task_scene_without_historical_hash():
         receipt.validate_snapshot()
         assert value['source_sha256']['original_closure'] == receipt.source_closure_digest
         assert value['physical_execution'].controllers
+        with pytest.raises(ValueError, match='requested backend'):
+            binding.build_for_request('mujoco', 'cuda', 31, 8)
     finally:
         binding.close_task_resources()
+
+
+def test_effort_construction_accepts_multiple_declared_robot_roots(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.robots.panda import PandaAgent
+
+    original = PandaAgent.asset_manifest
+    monkeypatch.setattr(PandaAgent, 'asset_manifest', lambda self: replace(
+        original(self), asset_roots=(*original(self).asset_roots, tmp_path)))
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+    })
+    try:
+        source = env.value['source']
+        source.source_snapshot_receipt.validate_snapshot()
+        assert env.value['physical_execution'].controllers == env.robot.controllers
+    finally:
+        env.close()
 
 
 def test_failed_robot_composition_releases_canonical_source_snapshot():

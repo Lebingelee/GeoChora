@@ -5,6 +5,7 @@ parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--table-half-x',type=float,default=None)
+parser.add_argument('--extra-robot-asset-root',action='store_true')
 parser.add_argument('--relocate-robot-assets',action='store_true')
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
@@ -29,6 +30,19 @@ try:
         mujoco.mj_step=counted_step
     from task_env import make_env
     from task_env.runtime.sessions.source import source_resource_receipt
+    if args.extra_robot_asset_root:
+        if args.case != 'panda-effort':
+            raise ValueError('extra Robot asset root probe requires PickCube effort')
+        from dataclasses import replace
+        from task_env.robots.panda import PandaAgent
+        original_manifest = PandaAgent.asset_manifest
+        extra_root = Path('additional-robot-assets').resolve()
+        extra_root.mkdir()
+        def manifest_with_extra_root(robot):
+            manifest = original_manifest(robot)
+            return replace(manifest, asset_roots=(*manifest.asset_roots, extra_root))
+        PandaAgent.asset_manifest = manifest_with_extra_root
+        result['extra_robot_asset_root'] = str(extra_root)
     if args.table_half_x is not None:
         if args.case != 'panda-effort':
             raise ValueError('table declaration probe requires PickCube effort')

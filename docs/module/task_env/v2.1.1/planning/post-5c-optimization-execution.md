@@ -1378,3 +1378,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 4 文件 +21／−3，净增 18 行，用于 Robot 能力合同及共同静态匹配；版本诊断修改 1 文件 +15／−0，验证两个不匹配组合的静态拒绝，并让重力补偿检查使用其合法 Robot／Controller 组合；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7936／−14768，净减 6832 行；包含此前旧路径退休及诊断迁移，不归因于本批。
 
 最终输入版本诊断 197 项通过。正式 MuJoCo PickCube／Nut Solution 单步、Pendulum、双轮车和装配 Panda 各完成 reset、控制推进、再次 reset 和重复 close，分别观测 5／5／25／25／5 native 子步；Solution 非完整运行。GeoPhys、Isaac、renderer 和完整 Solution 本批未复验；本次只改静态匹配，其他能力证据仍按原输入和影响引用。冻结输入、双锁、预算和收据位于 ignored `workspace/maintenance/v211_robot_controller_admission_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.142 Robot source 资产根与请求 backend 对齐
+
+输入 `f1a89faa`；实施前重审台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 与 source 边界。Scene 导入原先要求单一资产根，PickCube effort 另行重复验证同一限制和 snapshot；这比 Robot source 清单更严格。现由 Scene 导入依据 Robot 清单逐项验证 source 与依赖归属并计算闭包摘要，PickCube 使用已有共同 source 快照校验，移除重复分支；构建请求校验 backend 与 source 一致并记录实际 backend。保留 owner、source 边界、快照和传动检查。装配 Panda 的两源装配格式未改动，此项不表示任意资产均受支持。
+
+生产修改 2 文件 +19／−24，净减 5 行；版本诊断修改 2 文件、新增 1 文件，+79／−0；本文新增记录。新增文件 1、删除 0、整文件迁移 0，项目 tracked 文件数 1357→1358。相对 `1f1359ee` 的 task_env 差异 138 文件（新增 13、删除 20、修改 105），+8018／−14776，净减 6758 行，包含此前历史路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 199 项通过；依赖来自第二资产根的摘要变化与越界拒绝由隔离导入检查验证。MuJoCo 与 GeoPhys PickCube direct effort 在 Robot 清单增加额外资产根的情况下完成 reset、推进、再次 reset 和关闭，MuJoCo 观测 5 个 native 子步，GeoPhys 不可观测并按 50 预留；原生探针没有实际从额外根加载网格。导入器仍报告一项已有语义诊断，不能据此扩大支持范围。Isaac、renderer、其他任务及完整 Solution 本批未复验。冻结输入、双锁、预算及收据位于 ignored `workspace/maintenance/v211_multiroot_20261112/`；`input.patch` 为运行时已跟踪代码差异，`full-input.patch` 另含新诊断文件。E01～E04 尚未整体接收。
