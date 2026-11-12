@@ -255,6 +255,34 @@ def physical_task_binding_fields(*, task_config, lift_height_m, hand_frame_id,
     }
 
 
+def physical_task_binding(*, build, task_config, lift_height_m, hand_frame_id,
+                          validate_solution, control_kind=None, reset_switch=False,
+                          space_policy='dynamic', cube_force_z_N=None, runtime_input=False):
+    """Bind PickCube semantics to a source-bound physical Controller."""
+    from ...environment.reference_binding import ReferenceTaskBinding
+    fields = physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+        hand_frame_id=hand_frame_id, cube_force_z_N=cube_force_z_N)
+    if runtime_input:
+        return ReferenceTaskBinding(build=build, **fields,
+            reset_runtime_input=lambda value: value.get('session_admission_input'),
+            validate_external_solution=validate_solution, external_solution_actions=True,
+            reset_expert_kwargs=lambda env: {'execution_info': env.expert_execution_info()},
+            observe_expert_kwargs=lambda env, _samples: {'execution_info': env.expert_execution_info()})
+    from ...controllers.canonical.reset_selection import PhysicalResetSelection
+    from ...controllers.canonical.r3_effort import PANDA_SWITCHABLE_EFFORT_KINDS, panda_reset_action_schema
+    return ReferenceTaskBinding(build=build, **fields, action_schema=None, action_space_factory=None,
+        external_solution_actions=reset_switch,
+        validate_external_solution=validate_solution if reset_switch else None,
+        position_execution_info=physical_execution_info if reset_switch else None,
+        position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
+        physical_reset_action_schema=panda_reset_action_schema if reset_switch else None,
+        physical_reset_selection_factory=(lambda value: PhysicalResetSelection(
+            value['_physical_controller_factory'], initial_kind=control_kind,
+            allowed_kinds=PANDA_SWITCHABLE_EFFORT_KINDS, space_policy=space_policy,
+            declaration=value['physical_execution'])) if reset_switch else None,
+        physical_action_observer=observe_physical_action if reset_switch else None)
+
+
 def task_com_wrench_factory(cube_force_z_N):
     """Declare the Task's optional vertical force for the common control interval."""
     if cube_force_z_N is None:

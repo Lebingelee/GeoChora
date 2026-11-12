@@ -8,6 +8,25 @@ from task_env.runtime.sessions.mujoco_composition import panda_effort_source_lim
 from task_env.runtime.sessions.source import source_resource_receipt
 
 
+def test_formal_position_and_effort_share_task_binding_factory(monkeypatch):
+    from task_env import make_env
+    from task_env.tasks.pick_cube import specialization
+
+    calls = []
+    factory = specialization.make_reference_binding
+    def capture(**kwargs):
+        calls.append(kwargs.get('physical_kind'))
+        return factory(**kwargs)
+    monkeypatch.setattr(specialization, 'make_reference_binding', capture)
+    for profile in ('r3_continuous_v1', 'panda-joint-effort-reference-v1'):
+        env = make_env('pick-cube-p16-reference-v1', config={
+            'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+            'controller': {'profile_id': profile},
+        })
+        env.close()
+    assert calls == [None, 'joint']
+
+
 @pytest.mark.parametrize('profile', ('panda-direct-effort-v1', 'panda-joint-effort-reference-v1'))
 def test_effort_without_solution_does_not_prepare_position_readiness(monkeypatch, profile):
     from task_env import make_env

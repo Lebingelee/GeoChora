@@ -296,6 +296,62 @@ def compile_reference_robot_task(task_config, robot, legacy_artifact, source):
     return task_source, scene, artifact, source, projected, closure
 
 
+def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,
+                                lift_height_m, robot, native_drive, control_kind, cube_force_z_N):
+    """Compile PickCube declarations through the shared Task/Robot source owners."""
+    from ...runtime.sessions.source import close_execution_source_on_failure, snapshot_legacy_mjcf_source
+    provider, backend = request.provider, request.backend
+    if reset_switch:
+        # The switchable route admits the R3 Solution, so it needs its
+        # readiness data; the other effort profiles do not select R3.
+        prepared = _prepare_reference_source(
+            backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
+            resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
+        legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
+    else:
+        _, legacy_artifact, source = _compile_task_source(
+            backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
+            lift_height_m=lift_height_m, task_config=task_config, robot=robot)
+        original, readiness = snapshot_legacy_mjcf_source(source), None
+    with close_execution_source_on_failure(original):
+        revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
+                                            'rev-parse', 'HEAD'], text=True).strip()
+        if reset_switch:
+            from .solution import PickCubeReadinessSolution
+            solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+        selected_robot = original.agents[0]
+        task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
+            task_config, selected_robot, legacy_artifact, original)
+
+        from ...runtime.sessions.source_composition_adapters import prepare_panda_source_effort_factory
+        build_physical = prepare_panda_source_effort_factory(
+            selected_robot, scene, artifact, source, native_drive=native_drive,
+            config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
+            task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
+            gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None)
+
+        physical = build_physical(control_kind)
+        candidate = {'artifact': artifact, 'task_source': task_source, 'source': source,
+            'controller': physical.controllers[0], 'solution': None,
+            **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
+                'solution_identity': solution_identity, 'readiness': readiness,
+                '_physical_controller_factory': build_physical} if reset_switch else {}),
+            'physical_execution': physical,
+            'construction_id': 'pickcube-mjcf-physical-v1',
+            'source_revision': revision, 'source_sha256': {
+                'original_closure': original.source_closure_digest,
+                'projected_closure': closure},
+            'resolved_configuration': {'provider': provider, 'backend': backend,
+                'finger_initial_position_m': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
+                'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
+                'control_kind': control_kind,
+                **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
+                   if cube_force_z_N is not None else {}),
+                'original_closure': original.source_closure_digest,
+                'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
+        return candidate
+
+
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
                     lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31, robot=None):
     """Construct the single selected P1.6 route without importing a provider."""
@@ -609,7 +665,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None,
                            cube_force_z_N=None, robot_uid="panda-v1", robot=None,
-                           physical_kind=None, physical_drive=None):
+                           physical_kind=None, physical_drive=None, reset_switch=False,
+                           space_policy='dynamic'):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     physical = physical_kind is not None
@@ -639,8 +696,15 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             request.seed, request.horizon, request.sampled_reset)
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
-        if physical and (provider, backend) != ('isaacsim', 'cuda'):
-            raise ValueError('Isaac physical control requires Isaac CUDA')
+        if physical and interval_provider is not None and provider != interval_provider:
+            raise ValueError('physical build provider differs from its configured route')
+        if physical and provider != 'isaacsim':
+            if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu')}:
+                raise ValueError('physical control requires an admitted MJCF provider and CPU backend')
+            return _compile_mjcf_effort_source(request, reset_switch=reset_switch,
+                task_config=task_config, resolved_config=resolved_config,
+                lift_height_m=lift_height_m, robot=robot, native_drive=physical_drive,
+                control_kind=physical_kind, cube_force_z_N=cube_force_z_N)
         if provider == "isaacsim":
             if backend != "cuda" or source_delivery_manifest is None:
                 raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
@@ -663,15 +727,19 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed, robot=robot))
 
     if physical:
-        from .task import physical_task_binding_fields
-        return ReferenceTaskBinding(build=build,
-            **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
-                                           hand_frame_id='ee'),
-            reset_runtime_input=lambda value: value.get('session_admission_input'),
-            validate_external_solution=_validate_external_readiness_solution,
-            external_solution_actions=True,
-            reset_expert_kwargs=lambda env: {'execution_info': env.expert_execution_info()},
-            observe_expert_kwargs=lambda env, _samples: {'execution_info': env.expert_execution_info()})
+        from .task import physical_task_binding
+        runtime_input = interval_provider == 'isaacsim'
+        if not runtime_input:
+            from ...environment.reference_binding import SourceBoundTaskBuilder
+            build = SourceBoundTaskBuilder(build,
+                lambda value, request: sample_episode_reset_plan(
+                    value['task_source'], value['source'].scene_definition,
+                    value['artifact'], task_seed=request.seed),
+                backend=resolved_config.runtime.backend, reuse_source=True, allow_sampled_reset=False)
+        return physical_task_binding(build=build, task_config=task_config, lift_height_m=lift_height_m,
+            hand_frame_id='ee' if runtime_input else 'hand', runtime_input=runtime_input,
+            validate_solution=_validate_external_readiness_solution, control_kind=physical_kind,
+            reset_switch=reset_switch, space_policy=space_policy, cube_force_z_N=cube_force_z_N)
 
     return ReferenceTaskBinding(
         build=build,
@@ -795,8 +863,15 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
     def selected_binding(cls, config, *, robot=None):
         profile = config.controller_profile
         if profile in cls.panda_effort_profiles:
-            from .physical_candidate import physical_binding_from_config
-            return physical_binding_from_config(config, robot=robot)
+            from ...controllers.canonical.r3_effort import resolve_panda_effort_options
+            kind, drive, switch, policy = resolve_panda_effort_options(
+                profile, config.native_drive, json.loads(config.controller_parameters_json))
+            return make_reference_binding(source_delivery_manifest=config.source_delivery_manifest,
+                resolved_config=config.environment, task_config=json.loads(config.task_configuration_json),
+                lift_height_m=dict(config.task_parameters).get('lift_height_m'),
+                cube_force_z_N=dict(config.task_parameters).get('cube_force_z_N'), robot=robot,
+                interval_provider=config.physics_provider, physical_kind=kind, physical_drive=drive,
+                reset_switch=switch, space_policy=policy)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):

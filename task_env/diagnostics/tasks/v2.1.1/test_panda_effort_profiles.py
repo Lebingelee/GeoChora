@@ -689,7 +689,7 @@ def test_effort_controller_constructs_only_its_required_source_model(profile, re
         source_resource_receipt(value['source']).close()
 
 
-def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatch):
+def test_task_force_uses_the_same_declaration_for_position_and_effort():
     from types import SimpleNamespace
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube import specialization
@@ -701,11 +701,9 @@ def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatc
         })
 
     position = specialization.PickCubeReferenceEnv.selected_binding(config('r1'))
-    def unexpected_position_binding(*_args, **_kwargs):
-        pytest.fail('effort construction must not construct a Position task binding')
-    monkeypatch.setattr(specialization, 'make_reference_binding', unexpected_position_binding)
     effort = specialization.PickCubeReferenceEnv.selected_binding(config('panda-direct-effort-v1'))
     try:
+        assert position.scalar_control_binding is not None and effort.scalar_control_binding is None
         assert position.task_definition_factory == effort.task_definition_factory
         assert position.task_state_projection is effort.task_state_projection
         assert position.object_poses == effort.object_poses

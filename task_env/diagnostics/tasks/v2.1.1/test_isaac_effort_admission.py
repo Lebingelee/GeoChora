@@ -82,7 +82,7 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     assert result['horizon'] == 8
     assert result['resolved_config'] is config.environment
     assert result['robot'] is binding.robot
-    with pytest.raises(ValueError, match='Isaac CUDA'):
+    with pytest.raises(ValueError, match='provider differs'):
         binding.build_for_request('mujoco', 'cpu', 42, 8)
     with pytest.raises(ValueError, match='horizon'):
         binding.build_for_request('isaacsim', 'cuda', 42, 1001)
