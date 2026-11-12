@@ -25,3 +25,54 @@ def test_panda_source_preserves_paired_transmission_and_signed_limits():
     root.find('./tendon/fixed/joint').set('coef', '1')
     with pytest.raises(ValueError, match='tendon/equality'):
         panda_effort_source_limits(root)
+
+
+def test_canonical_source_owns_and_validates_input_snapshot():
+    from dataclasses import replace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions.source import source_resource_receipt
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+        'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        source = binding.build('mujoco')['source']
+        receipt = source_resource_receipt(source)
+        assert receipt is source.source_snapshot_receipt
+        assert source.execution_source_receipt is None
+        assert receipt.snapshot_root.is_dir()
+        receipt.validate_snapshot()
+        with pytest.raises(ValueError, match='snapshot differs'):
+            replace(source, scene_source=replace(source.scene_source, xml=source.scene_source.xml + ' '))
+        snapshot = receipt.snapshot_root
+    finally:
+        binding.close_task_resources()
+    assert not snapshot.exists()
+
+
+def test_failed_robot_composition_releases_canonical_source_snapshot():
+    from dataclasses import replace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+        'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        value = binding.build('mujoco')
+        snapshot = value['source'].source_snapshot_receipt.snapshot_root
+        def fail(*args, **kwargs):
+            raise ValueError('composition rejected')
+        strategy = replace(binding, compose_robot_source=fail).reset_reconstruction_strategy('mujoco', 'cpu', 8)
+        with pytest.raises(ValueError, match='composition rejected'):
+            strategy._compose(value)
+        assert not snapshot.exists()
+    finally:
+        binding.close_task_resources()

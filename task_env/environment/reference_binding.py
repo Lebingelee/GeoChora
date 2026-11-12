@@ -62,7 +62,8 @@ class _ResetReconstruction:
             result['recipe_identity'] = digest(resolved)
             return result
         except BaseException as error:
-            receipt = getattr(source, 'execution_source_receipt', None)
+            from ..runtime.sessions.source import source_resource_receipt
+            receipt = source_resource_receipt(source)
             if receipt is not None:
                 try:
                     receipt.close()
@@ -88,8 +89,9 @@ class _ResetReconstruction:
     def reconstruct(self, current, artifact, seed, external_solution, artifact_for_reset, *,
                     verify_source, set_phase=lambda _phase: None, prepared=None):
         value = prepared if prepared is not None else self.build_reset(current, seed, external_solution)
-        old_receipt = getattr(current.get('source'), 'execution_source_receipt', None)
-        receipt = getattr(value.get('source'), 'execution_source_receipt', None)
+        from ..runtime.sessions.source import source_resource_receipt
+        old_receipt = source_resource_receipt(current.get('source'))
+        receipt = source_resource_receipt(value.get('source'))
         try:
             verify_source(value)
             artifact, seed, solution = self._finish(

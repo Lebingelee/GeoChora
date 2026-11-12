@@ -984,7 +984,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     @staticmethod
     def _release_failed_task_construction(value, binding, error):
         source = value.get('source') if isinstance(value, Mapping) else None
-        receipt = getattr(source, 'execution_source_receipt', None)
+        from ..runtime.sessions.source import source_resource_receipt
+        receipt = source_resource_receipt(source)
         for cleanup in (getattr(receipt, 'close', None), getattr(binding, 'close_task_resources', None)):
             if callable(cleanup):
                 try:
@@ -1819,7 +1820,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     selection, **facts, binding=candidate_binding, value=preflight_value)
             except BaseException as error:
                 if switching:
-                    receipt = getattr(candidate_value.get('source'), 'execution_source_receipt', None)
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(candidate_value.get('source'))
                     if receipt is not None:
                         try:
                             receipt.close()
@@ -1835,7 +1837,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 previous_episode_end = self.stop('reset')
             except BaseException as error:
                 if switching:
-                    receipt = getattr(candidate_value.get('source'), 'execution_source_receipt', None)
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(candidate_value.get('source'))
                     if receipt is not None:
                         try:
                             receipt.close()
@@ -2278,7 +2281,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 # session fails before it is installed on this environment.
                 seen = set()
                 for value in (candidate_value, previous_value):
-                    receipt = getattr(value.get('source'), 'execution_source_receipt', None)
+                    from ..runtime.sessions.source import source_resource_receipt
+                    receipt = source_resource_receipt(value.get('source'))
                     if receipt is None or id(receipt) in seen:
                         continue
                     seen.add(id(receipt))
@@ -3997,7 +4001,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 owner_error_label='failed reset Runtime owner close')
         self._failed_runtime_sessions = []
         source = self.value.get('source')
-        source_receipt = getattr(source, 'execution_source_receipt', None)
+        from ..runtime.sessions.source import source_resource_receipt
+        source_receipt = source_resource_receipt(source)
         if source_receipt is not None:
             cleanup('source receipt cleanup', source_receipt.close)
         if self.binding.close_task_resources is not None:

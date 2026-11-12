@@ -253,3 +253,5 @@ Panda effort 的运动学模型按 Controller profile 在共同构造处创建�
 引用式 Robot 组合现可校验并消费规范 MJCF Scene source，构造合同已覆盖 MuJoCo／GeoPhys；普通 Position 构建和 RGB 尚未切换或完成原生复验。详见[实施记录 6.120](../planning/post-5c-optimization-execution.md#6120-规范-mjcf-source-接入引用式-robot-组合)。
 
 规范 Scene 的投影与闭包校验已由 Runtime source 统一提供给引用式 Robot 组合、effort 绑定及 MuJoCo 物化；Position 仍需接入规范 source。详见[实施记录 6.121](../planning/post-5c-optimization-execution.md#6121-规范-scene-source-校验归共同-runtime-owner)。
+
+规范 MJCF source 的输入快照已可由共同 Env 生命周期跟踪；MuJoCo／GeoPhys 的规范 source Position 合同完成一个真实控制 interval，正式 Position 入口及 RGB 仍待切换。详见[实施记录 6.122](../planning/post-5c-optimization-execution.md#6122-规范-source-快照纳入共同生命周期)。

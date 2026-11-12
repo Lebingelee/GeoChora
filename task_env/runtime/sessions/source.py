@@ -17,13 +17,19 @@ from ...assembly.source import TaskSceneSource, UsdTaskSceneSourceV1
 from ...assembly.assets import _source_closure_digest
 
 
+def source_resource_receipt(source):
+    """Return the snapshot owned by a RuntimeSource, independent of projection."""
+    return (getattr(source, 'source_snapshot_receipt', None)
+            or getattr(source, 'execution_source_receipt', None))
+
+
 @contextmanager
 def close_execution_source_on_failure(source):
     """Keep a source lease on success; release it if its owner cannot be built."""
     try:
         yield source
     except BaseException as error:
-        receipt = getattr(source, 'execution_source_receipt', None)
+        receipt = source_resource_receipt(source)
         if receipt is not None:
             try:
                 receipt.close()
@@ -437,6 +443,7 @@ class RuntimeSource:
     source_reference_plan: object | None = None
     source_composition_request: object | None = None
     source_composition_intent: object | None = None
+    source_snapshot_receipt: ExecutionSourceReceiptV1 | None = None
 
     @property
     def source_id(self) -> str:
@@ -449,6 +456,14 @@ class RuntimeSource:
         return self.position_subject_binding
 
     def __post_init__(self):
+        snapshot = self.source_snapshot_receipt
+        if snapshot is not None:
+            if (type(snapshot) is not ExecutionSourceReceiptV1 or self.scene_definition is None
+                    or self.execution_source_receipt is not None
+                    or Path(self.scene_source.base_dir).resolve() != snapshot.snapshot_root
+                    or self.scene_source.xml.encode('utf-8') != snapshot.importer_xml):
+                raise ValueError('canonical source snapshot differs from its owned input')
+            snapshot.validate_snapshot()
         if self.source_composition_request is not None:
             from ...assembly.source_composition import (
                 SourceCompositionIntentV1, SourceCompositionRequestV2,

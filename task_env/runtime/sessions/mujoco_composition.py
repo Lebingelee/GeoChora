@@ -73,6 +73,7 @@ def bind_reference_scene_source(source, *, artifact, scene, bodies, frames):
     bound = replace(source, task_artifact_hash=artifact.identity_hash,
         scene_source=TaskSceneSource(xml, destination, f'scene-definition-v3:{scene.identity_hash}'),
         scene_definition=scene, source_closure_digest=closure, execution_source_receipt=None,
+        source_snapshot_receipt=receipt,
         bodies=bodies, frames=frames)
     return bound, projected, closure
 

@@ -1218,3 +1218,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `5d43bd90`。引用式 Robot 组合、Panda effort source 限值读取以及 MuJoCo 物化此前各自执行 Scene 投影和 XML／资产闭包校验；将共同部分归入 Runtime source，三个调用处消费同一投影和校验。MuJoCo 特有的 freejoint 和 keyframe lowering 仍由物理 adapter 入口完成；source ID、闭包及资产路径检查未放宽。此项减少重复校验实现，但 Position 普通构建仍未切换到规范 source，Position／RGB 未修复。
 
 生产修改 3 文件 +14／−23，净减 9 行；版本诊断修改 1 文件 +1／−1，适配统一的闭包错误；本文和当前状态文档各修改 1 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。173 项版本检查通过，包括规范 source 字节篡改拒绝。MuJoCo effort／CameraSpec／RGB 和 Position Solution 单步各完成 5 个 native 子步；GeoPhys effort 完成 reset、step、第二次 reset 和关闭，native 子步未计数。MJCF 导入有语义诊断。Isaac 和完整 Solution 未复验；规范 source／Position 原生执行仍未验证。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_scene_source_verification_okbgfwoy/`。E01～E04 尚未整体接收。
+
+
+### 6.122 规范 source 快照纳入共同生命周期
+
+输入 `cb9b91fd`。MJCF 规范 source 的 XML 和资产存放在受验证的原始快照内，但此前快照只由 PickCube physical binding 保存，公共 Env 无法从规范 source 识别其资源。现在 source 显式携带该快照，并在构造时核对输入 XML 和目录；共同 Env 的构造失败、Robot 组合失败、reset 和 close 使用同一资源识别方式。规范投影身份仍由 Scene 和投影闭包独立校验，原始快照 receipt 不冒充投影闭包；既有 task binding 的资源关闭仍保留，直至正式构建进一步统一。
+
+生产修改 4 文件 +32／−9，净增 23 行；版本诊断修改 2 文件 +53／−1，新增 1 个 103 行版本化 Runtime probe；无删除或整文件迁移，tracked 文件 1356→1357。175 项版本检查通过，包含篡改输入拒绝及组合失败释放快照。MuJoCo 和 GeoPhys 分别使用实际规范 source、相同 TaskArtifact／Scene／Position 计划完成 Runtime materialize、reset 和一个受控 interval；MuJoCo 实测 5 子步，GeoPhys 未计数 native 子步。该验证直接调用共同 Runtime 合同，尚非正式 Position make_env 路线。MuJoCo effort／CameraSpec／RGB 和动态 Controller reset／记录，以及 GeoPhys effort 的重复 reset 和关闭通过；MJCF 导入有语义诊断。Isaac、Position／RGB 和完整 Solution 未复验。普通 Position 入口仍未接入规范 source，E01～E04 尚未整体接收。预算、冻结生产输入及收据位于 ignored `workspace/maintenance/v211_canonical_source_lifetime_i8h4nbr_/`。

@@ -532,7 +532,8 @@ def test_position_robot_composes_checked_canonical_task_source(provider):
         assert adapted.scene_definition is source.scene_definition
         xml = source.scene_source.xml
         assert '0 0 -9.81' in xml
-        tampered = replace(source, scene_source=replace(source.scene_source, xml=xml.replace('0 0 -9.81', '0 0 -9.8', 1)))
+        tampered = replace(source, source_snapshot_receipt=None,
+            scene_source=replace(source.scene_source, xml=xml.replace('0 0 -9.81', '0 0 -9.8', 1)))
         with pytest.raises(ValueError, match='source closure digest mismatch'):
             compose(tampered, artifact=artifact, controller=controller)
     finally:
