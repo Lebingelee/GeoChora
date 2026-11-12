@@ -7,6 +7,32 @@ import pytest
 from task_env.runtime.sessions.api import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
 
 
+def test_f06_construction_facts_preserve_frozen_config_projection(monkeypatch):
+    from dataclasses import dataclass
+    import hashlib
+    import json
+    from task_env.runtime.sessions import isaac_usd_admission
+
+    @dataclass
+    class Config:
+        gravity_compensation: bool = False
+        value: int = 3
+
+    runtime_input = SimpleNamespace(delivery_manifest_sha256='delivery',
+                                    construction_identity_fields=lambda: {'source_id': 'source'})
+    monkeypatch.setattr(isaac_usd_admission, 'f06_construction_source_inventory',
+                        lambda *_args, **_kwargs: {'owner': 'digest'})
+    for resolved, expected in ((Config(), {'value': 3}),
+                               (None, {'gravity_compensation': False, 'value': 3})):
+        facts = isaac_usd_admission.f06_construction_facts(runtime_input, {}, task_path=__file__,
+            physical=False, resolved_config=resolved, fallback_config=Config())
+        assert facts['runtime_config'] == expected
+        assert facts['runtime_config_sha256'] == hashlib.sha256(json.dumps(
+            expected, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        assert facts['source_id'] == 'source' and facts['source_sha256'] == {'owner': 'digest'}
+        assert facts['f06_delivery_manifest_sha256'] == 'delivery'
+
+
 def test_f06_rejects_unknown_drive_before_loading_delivery(monkeypatch):
     from task_env.runtime.sessions import isaac_usd_admission
 

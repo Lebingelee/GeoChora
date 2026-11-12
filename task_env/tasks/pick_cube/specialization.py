@@ -480,33 +480,23 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, reso
     robot, action_config = context.robot, context.action_config
     readiness = context.readiness
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    from ...runtime.sessions.isaac_usd_admission import f06_construction_source_inventory
+    from ...runtime.sessions.isaac_usd_admission import f06_construction_facts
     from ...runtime.sessions.provenance import construction_revision
-    source_ids = f06_construction_source_inventory(
-        runtime_input, context.source_sha256, task_path=__file__, physical=physical is not None)
+    provider_facts = f06_construction_facts(runtime_input, context.source_sha256,
+        task_path=__file__, physical=physical is not None, resolved_config=resolved_config,
+        fallback_config=context.config)
+    source_ids = provider_facts['source_sha256']
     root = Path(__file__).resolve().parents[3]
     revision = construction_revision(root)
-    effective_config = (asdict(context.config)
-                        if resolved_config is None else asdict(resolved_config))
-    # Keep historical F06 source/configuration identity when the additive
-    # gravity option is disabled; F06 does not yet admit the enabled route.
-    if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
-        effective_config.pop('gravity_compensation', None)
-    effective_config_sha = hashlib.sha256(json.dumps(
-        effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     resolved = {
         "construction_id": "pickcube-p16-reference-construction-v2",
         "task_recipe": context.task_config,
-        **runtime_input.construction_identity_fields(),
-        "runtime_config": effective_config,
-        "runtime_config_sha256": effective_config_sha,
+        **provider_facts,
         "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
         "resolved_controller_gripper": asdict(context.config.robot.gripper),
         "controller_identity": controller.identity,
         "solution_identity": solution_identity,
         "source_revision": revision,
-        "source_sha256": source_ids,
-        "f06_delivery_manifest_sha256": runtime_input.delivery_manifest_sha256,
         "tcp_profile": PANDA_PICKCUBE_EE_TCP_V1.to_mapping(),
         "qualification": "NOT_REQUALIFIED",
     }

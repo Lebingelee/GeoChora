@@ -76,6 +76,30 @@ def f06_construction_source_inventory(runtime_input, declared_sources, *, task_p
     sources['f06_delivery_manifest_sha256'] = delivery.manifest_bytes_sha256
     return sources
 
+
+def f06_construction_facts(runtime_input, declared_sources, *, task_path, physical,
+                           resolved_config, fallback_config):
+    """Project F06 source, configuration and identity facts for construction."""
+    from dataclasses import asdict
+    import hashlib
+    import json
+
+    config = asdict(fallback_config if resolved_config is None else resolved_config)
+    # F06's frozen configuration identity predates this disabled option.
+    if resolved_config is not None and not getattr(resolved_config, 'gravity_compensation', False):
+        config.pop('gravity_compensation', None)
+    config_sha = hashlib.sha256(json.dumps(
+        config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    return {
+        **runtime_input.construction_identity_fields(),
+        'runtime_config': config,
+        'runtime_config_sha256': config_sha,
+        'source_sha256': f06_construction_source_inventory(
+            runtime_input, declared_sources, task_path=task_path, physical=physical),
+        'f06_delivery_manifest_sha256': runtime_input.delivery_manifest_sha256,
+    }
+
+
 def _validate_usd_task_policy(input_v1, expected_sha256):
     """Verify a pinned task declaration before trusting its binding and limits."""
     from ...controllers.canonical.contracts import digest
