@@ -242,14 +242,14 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     built, declared, bound = [], [], []
-    original_source = specialization._compile_task_source
+    original_source = specialization.compile_panda_box_task
     original_scene = source_scene_import.declare_panda_scene
     from task_env.runtime.sessions import source_composition_adapters
     original_control = source_composition_adapters.build_panda_direct_effort_execution
 
     def source(*args, **kwargs):
         value = original_source(*args, **kwargs)
-        built.append(value[2].agents[0])
+        built.append(value.source.agents[0])
         return value
 
     def scene(robot, **kwargs):
@@ -264,7 +264,7 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
         raise AssertionError('effort source preparation must not construct a reference Controller')
 
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_reference)
-    monkeypatch.setattr(specialization, '_compile_task_source', source)
+    monkeypatch.setattr(specialization, 'compile_panda_box_task', source)
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', scene)
     monkeypatch.setattr(source_composition_adapters, 'build_panda_direct_effort_execution', control)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
@@ -272,13 +272,15 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
         'controller': {'profile_id': 'panda-direct-effort-v1'},
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
+    value = None
     try:
         value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert len(built) == len(declared) == len(bound) == 1
         assert built[0] is declared[0] is bound[0]
     finally:
         from task_env.runtime.sessions.source import source_resource_receipt
-        source_resource_receipt(value['source']).close()
+        if value is not None:
+            source_resource_receipt(value['source']).close()
 
 
 @pytest.mark.parametrize('physical', [False, True])
@@ -555,18 +557,16 @@ def test_robot_rejects_controller_replaced_after_subject_compilation(split):
 
 def test_pickcube_scene_representations_share_task_artifact_compiler():
     from task_env.artifacts import FrameReference
+    from task_env.assembly.panda_box import compile_panda_box_mjcf_task
     from task_env.robots.panda import PandaAgent
     from task_env.tasks.pick_cube import specialization as task
 
     config = task._configuration()
     legacy = task.build_artifact(lift_height_m=.17)
     robot = PandaAgent()
-    mjcf_scene = task.build_pickcube_mjcf_scene(config, robot)
-    mjcf_source, mjcf = task.compile_pickcube_task_artifact(config, mjcf_scene, legacy,
-        frame_bindings={'panda-v1/base': FrameReference('panda-v1', 'link0'),
-                        'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
-                        'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')},
-        cube_frame='PickCube')
+    mjcf_source, mjcf_scene, mjcf, _, _ = compile_panda_box_mjcf_task(
+        config, robot, legacy, build_task_scene=task.build_pickcube_scene,
+        compile_task_artifact=task.compile_pickcube_task_artifact)
     usd_source, usd_scene, usd = task.compile_pickcube_isaac_task_artifact(config, legacy, robot=robot)
     assert mjcf_source.identity_hash == usd_source.identity_hash
     assert mjcf.semantics == usd.semantics == legacy.semantics

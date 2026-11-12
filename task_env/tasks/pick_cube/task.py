@@ -373,17 +373,6 @@ def _canonical_task_recipe(task_config: dict) -> bytes:
     ).encode("utf-8")
 
 
-def build_pickcube_mjcf_scene(task_config, robot):
-    """Compose the Task scene from the selected Robot's MJCF declaration."""
-    from ...runtime.sessions.source_scene_import import declare_panda_scene
-
-    panda = declare_panda_scene(robot, entity_id=robot.uid,
-        scene_id=str(task_config['recipe']['scene_uid']))
-    return build_pickcube_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
-        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
-        cube_joint='PickCube_joint', table_frame='grasp_table')
-
-
 def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame_bindings, cube_frame,
                                    additional_frames=None):
     """Compile the same Task semantics against a declared source Scene."""
@@ -401,22 +390,6 @@ def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame
     artifact = replace(artifact, legacy_frame_bindings=bindings)
     artifact.validate_scene(scene)
     return task_source, artifact
-
-
-def compile_pickcube_mjcf_task(task_config, robot, legacy_artifact):
-    """Compile the MJCF Task/Robot Scene and its complete state bindings."""
-    scene = build_pickcube_mjcf_scene(task_config, robot)
-    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
-              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
-              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
-    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
-                  for item in scene.frames or ()
-                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
-    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
-        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
-    bodies = {name: reference.frame_id for name, reference in additional.items()}
-    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
-    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
 
 
 def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):

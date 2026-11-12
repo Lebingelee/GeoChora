@@ -118,6 +118,30 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
     return _panda_box_reference_declaration(declaration).artifact.compile()
 
 
+def compile_panda_box_mjcf_task(task_config, robot, legacy_artifact, *, build_task_scene,
+                               compile_task_artifact):
+    """Bind Task declarations to this MJCF asset's canonical native names."""
+    from ..artifacts import FrameReference
+    from ..runtime.sessions.source_scene_import import declare_panda_scene
+
+    panda = declare_panda_scene(robot, entity_id=robot.uid,
+        scene_id=str(task_config['recipe']['scene_uid']))
+    scene = build_task_scene(task_config, robot_scene=panda, robot_asset=panda.assets[0],
+        ee_frame='nutassembly_ee_site', cube_frame='PickCube',
+        cube_joint='PickCube_joint', table_frame='grasp_table')
+    frames = {'panda-v1/base': FrameReference('panda-v1', 'link0'),
+              'panda-v1/ee': FrameReference('panda-v1', 'nutassembly_ee_site'),
+              'tabletop-v1/top': FrameReference('tabletop-v1', 'grasp_table')}
+    additional = {f'panda-v1/{item.frame_id}': FrameReference('panda-v1', item.frame_id)
+                  for item in scene.frames or ()
+                  if item.entity_id == 'panda-v1' and item.frame_id != 'nutassembly_ee_site'}
+    task_source, artifact = compile_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings=frames, cube_frame='PickCube', additional_frames=additional)
+    bodies = {name: reference.frame_id for name, reference in additional.items()}
+    bodies.update({'cube-v1': 'PickCube', 'tabletop-v1/top': 'grasp_table'})
+    return task_source, scene, artifact, bodies, {'panda-v1/ee': 'nutassembly_ee_site'}
+
+
 def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config, *, own_snapshot=False,
                              backend=None):
     """Resolve the same box asset into source names and registered components."""

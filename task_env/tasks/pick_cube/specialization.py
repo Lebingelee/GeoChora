@@ -21,7 +21,8 @@ from ...artifacts import (
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
-                                   compile_panda_box_source, compile_panda_box_task)
+                                   compile_panda_box_mjcf_task, compile_panda_box_source,
+                                   compile_panda_box_task)
 from ...assembly.compiler import CompiledReferenceTaskV1, reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
@@ -71,8 +72,8 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
 }
 
 from .task import (semantic_definition, task_binding_fields, build_pickcube_isaac_scene,
-    build_pickcube_scene, build_pickcube_mjcf_scene, compile_pickcube_task_artifact,
-    compile_pickcube_mjcf_task, compile_pickcube_isaac_task_artifact, _canonical_task_recipe)
+    build_pickcube_scene, compile_pickcube_task_artifact,
+    compile_pickcube_isaac_task_artifact, _canonical_task_recipe)
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -453,8 +454,10 @@ def _compose_reference_source(compiled, context, request, *, controller_profile,
         compiled, robot=context.robot, controller_profile=controller_profile,
         existing_robot_entity='panda-v1', task_body_names=PickCubeReferenceEnv.robot_source_roots,
         task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
-        compile_declaration=(lambda: compile_pickcube_mjcf_task(
-            context.task_config, reference_robot, compiled.artifact))
+        compile_declaration=(lambda: compile_panda_box_mjcf_task(
+            context.task_config, reference_robot, compiled.artifact,
+            build_task_scene=build_pickcube_scene,
+            compile_task_artifact=compile_pickcube_task_artifact))
             if reference_robot is not None else None,
         reset_seed=request.seed if sample_reset else None)
     return composition.compiled, context._replace(composition=composition)
