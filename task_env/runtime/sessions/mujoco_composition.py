@@ -507,7 +507,11 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
         raise ValueError('assembled Panda requires one declared Task end-effector site')
     task_hand, _site, source_hand = task_site_transfers[0]
     from ...assembly.panda_fixed_source import declare_panda_fixed_source
-    declaration = declare_panda_fixed_source()
+    manifest = robot.asset_manifest()
+    if (manifest.owner_uid != robot.uid
+            or any(item.source_revision != manifest.source_revision for item in recipe.sources)):
+        raise ValueError('Robot source manifest differs from the selected source recipe')
+    declaration = declare_panda_fixed_source(manifest)
     declaration = derive_task_compatible_attachment(
         declaration=declaration, task_receipt=source.execution_source_receipt,
         task_hand_name=task_hand, source_hand_name=source_hand)

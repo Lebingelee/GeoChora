@@ -583,3 +583,52 @@ def test_assembled_robot_rejects_foreign_task_joint_mapping_and_releases_source(
             'controller': {'profile_id': 'r1_split'},
         })
     assert receipts and all(not receipt.snapshot_root.exists() for receipt in receipts)
+
+
+def test_assembled_robot_composer_uses_declared_asset_root(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+    from task_env.runtime.sessions.source import source_asset_bytes
+
+    original = AssembledPandaAgent.asset_manifest
+    manifest = original(AssembledPandaAgent())
+    root = tmp_path / 'declared-robot'
+    root.mkdir()
+    for source in manifest.mjcf_sources:
+        (root / source.name).write_bytes(source.read_bytes())
+        for relative, content in source_asset_bytes(manifest.asset_roots[0], source.read_text()).items():
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+    (root / 'LICENSE').write_bytes((manifest.asset_roots[0] / 'LICENSE').read_bytes())
+    relocated = replace(manifest, asset_roots=(root,),
+        mjcf_sources=tuple(root / source.name for source in manifest.mjcf_sources))
+    monkeypatch.setattr(AssembledPandaAgent, 'asset_manifest', lambda _self: relocated)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco'},
+        'robot': {'uid': 'panda-arm-hand-v1'},
+        'controller': {'profile_id': 'r1_split'},
+    })
+    try:
+        declaration = env.value['source'].composition_runtime_input.fixed_declaration
+        assert declaration.parent_source.base_dir == root.resolve()
+        assert all(source.base_dir == root.resolve() for source in declaration.source_by_entity.values())
+    finally:
+        env.close()
+
+
+def test_assembled_robot_rejects_foreign_asset_manifest(monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+
+    original = AssembledPandaAgent.asset_manifest
+    monkeypatch.setattr(AssembledPandaAgent, 'asset_manifest',
+        lambda self: replace(original(self), owner_uid='foreign-robot'))
+    with pytest.raises(ValueError, match='Robot source manifest differs from the selected source recipe'):
+        make_env('pick-cube-p16-reference-v1', config={
+            'execution': {'physics_provider': 'mujoco'},
+            'robot': {'uid': 'panda-arm-hand-v1'},
+            'controller': {'profile_id': 'r1_split'},
+        })

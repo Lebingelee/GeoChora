@@ -1281,3 +1281,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `372eed00`；实施前重新核对 GOV、ENTRY、TASK、ENV、SUBJ-02／03、CTRL-01／02 和 source 组合边界。MuJoCo composer 原先直接枚举装配 Panda 的臂关节、手指和 actuator，并自行指定打开 actuator；现在装配 Robot 一处声明这些部件关系，Robot 主体编译和 provider composer 同时消费。composer 按该声明将 Task source 关节映射到实际 native 名称，并核验每个关节以及打开 actuator；固定附件、source 闭包、writer 和实际 native 模型校验仍由原 owner 负责。这个变化减少 adapter 对特定 Robot 通道的硬编码，替换式 source 与一体 source 的其余差异仍未消除。
 
 生产修改 2 文件 +27／−13，净增 14 行；Robot 关节／actuator 声明从 adapter 收敛到 Robot，属于代码段迁移，无整文件迁移。版本诊断修改 1 文件 +23／−0，验证错误 Task 关节映射在 native 之前拒绝并释放 source；本文新增记录。无新增或删除文件，tracked 文件数保持 1357。最终代码 178 项版本合同检查通过。正式 MuJoCo 装配 Panda 完成 reset、双 writer 控制、第二次 reset 和关闭，观测 5 个 native 子步；provider 的原生名称、固定连接和资源核对仍有效。本批未复验其他 provider、renderer 或完整 Solution。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_robot_joint_ownership_h_1kc72h/`。E01～E04 尚未整体接收。
+
+
+### 6.131 装配 source 消费 Robot 资产声明
+
+输入 `1a1292f1`；实施前复核 GOV、ENTRY、TASK、ENV、SUBJ-02／03、CTRL 与 SRC-02／04。装配 Panda 的 provider composer 原先忽略所选 Robot 的资产路径，固定从仓库目录读取 arm／hand；现在它消费 Robot 的 `AssetManifest` 中两个 MJCF 和资产根目录，核对 manifest owner 与 recipe revision，原受支持 source 字节、license、资产闭包和 native 映射检查保留。实际声明的根目录贯穿固定附件编译与 provider 物化；从该生产构造移除仅服务旧顺序诊断的可选分支，不清除其他仍有调用的历史检查。
+
+生产修改 2 文件 +36／−35，净增 1 行；版本诊断修改 2 文件 +74／−0，验证重定位资产根和 foreign owner 拒绝，并支持真实运行输入；本文新增记录。无新增、删除或整文件迁移，tracked 文件数保持 1357。最终代码 180 项版本合同检查通过。正式 MuJoCo 使用复制到独立目录、由 Robot 明确声明的资产完成装配 Panda reset、双 writer 控制、第二次 reset 和关闭，观测 5 个 native 子步；这验证已支持的两源资产，不扩大为任意 Robot 组合。GeoPhys、Isaac、renderer 和完整 Solution 本批未复验。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_declared_robot_source_61gx1xn_/`。替换式与引用式 source 的共同构造及四主体统一仍未完成，E01～E04 尚未整体接收。

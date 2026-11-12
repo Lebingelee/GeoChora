@@ -4,6 +4,7 @@ import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
+parser.add_argument('--relocate-robot-assets',action='store_true')
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 plan=json.loads(Path(args.plan).read_text())
@@ -27,6 +28,26 @@ try:
         mujoco.mj_step=counted_step
     from task_env import make_env
     from task_env.runtime.sessions.source import source_resource_receipt
+    if args.relocate_robot_assets:
+        if args.case != 'assembled-live':
+            raise ValueError('relocated Robot source probe requires assembled-live')
+        from dataclasses import replace
+        from task_env.robots.assembled_panda import AssembledPandaAgent
+        from task_env.runtime.sessions.source import source_asset_bytes
+        manifest = AssembledPandaAgent().asset_manifest()
+        root = Path('declared-robot-assets').resolve()
+        root.mkdir()
+        for source in manifest.mjcf_sources:
+            (root / source.name).write_bytes(source.read_bytes())
+            for relative, content in source_asset_bytes(manifest.asset_roots[0], source.read_text()).items():
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+        (root / 'LICENSE').write_bytes((manifest.asset_roots[0] / 'LICENSE').read_bytes())
+        relocated = replace(manifest, asset_roots=(root,),
+            mjcf_sources=tuple(root / source.name for source in manifest.mjcf_sources))
+        AssembledPandaAgent.asset_manifest = lambda _self: relocated
+        result['declared_robot_asset_root'] = str(root)
     def construct(uid, config):
         camera_options = {}
         if args.task_rgb:
@@ -90,6 +111,10 @@ try:
     if physical_execution is not None and not (args.case=='panda-joint' and args.record):
         assert env.controller is robot.controller is physical_execution.controllers[0]
         assert robot.controllers == physical_execution.controllers
+    if args.relocate_robot_assets:
+        declaration = env.value['source'].composition_runtime_input.fixed_declaration
+        assert declaration.parent_source.base_dir == root
+        result['resolved_robot_asset_root'] = str(declaration.parent_source.base_dir)
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
     if args.case in {'nut','panda-r3','assembled-live'}:
         assert subject_binding is not None and robot.subjects == subject_binding.subjects

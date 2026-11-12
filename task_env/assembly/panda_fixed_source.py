@@ -13,8 +13,7 @@ from ..artifacts import (
     LogicalAssemblyV1, PoseWorld, RobotInstance, SceneDefinition,
 )
 from .assets import _source_closure_digest
-from .fixed_attachment import (R06B_ORDER_ASSET_VERSION, R06B_ORDER_RECIPE_ID,
-    R06B_ORDER_SOURCE_REFERENCES, derive_r06b_order_sources, validate_fixed_attachment_scene)
+from .fixed_attachment import validate_fixed_attachment_scene
 from .logical_source import project_logical_assembly_source
 from .source import TaskSceneSource
 
@@ -25,10 +24,6 @@ ASSEMBLY_ID = "panda-arm-hand-fixed"
 ASSEMBLY_REVISION = "r03b-001"
 SCENE_ID = "phase-ii-r03b-fixed-attachment"
 MENAGERIE_REVISION = "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
-MENAGERIE_ROOT = Path(__file__).resolve().parents[2] / "asset/external/mujoco_menagerie/franka_emika_panda"
-ARM_XML = MENAGERIE_ROOT / "panda_nohand.xml"
-HAND_XML = MENAGERIE_ROOT / "hand.xml"
-LICENSE = MENAGERIE_ROOT / "LICENSE"
 ARM_SHA256 = "e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071"
 HAND_SHA256 = "d2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a"
 LICENSE_SHA256 = "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
@@ -134,31 +129,25 @@ def _entity_scene(xml: str, entity_id: str, asset_id: str, asset_version: str,
     return asset, entity, tuple(frames), articulation, actuators, records
 
 
-def _scene_and_bindings(*, order_variant: bool = False):
-    if (_sha(ARM_XML), _sha(HAND_XML), _sha(LICENSE)) != (ARM_SHA256, HAND_SHA256, LICENSE_SHA256):
-        raise ValueError("R03b fixed source bytes or Menagerie license differ from the frozen recipe")
-    arm_xml, hand_xml = ARM_XML.read_text(), HAND_XML.read_text()
-    if order_variant:
-        arm_xml, hand_xml = derive_r06b_order_sources(arm_xml, hand_xml)
-    asset_version = R06B_ORDER_ASSET_VERSION if order_variant else "menagerie-b846dd12"
-    scene_id = "phase-ii-r06b-order-v1-fixed-attachment" if order_variant else SCENE_ID
+def _scene_and_bindings(arm_path, hand_path, license_path):
+    if (_sha(arm_path), _sha(hand_path), _sha(license_path)) != (ARM_SHA256, HAND_SHA256, LICENSE_SHA256):
+        raise ValueError("fixed source bytes or Menagerie license differ from the frozen recipe")
+    arm_xml, hand_xml = arm_path.read_text(), hand_path.read_text()
+    asset_version = "menagerie-b846dd12"
     arm_asset, arm_entity, arm_frames, arm_articulation, arm_actuators, arm_records = _entity_scene(
         arm_xml, ARM_ENTITY, "panda-arm-nohand", asset_version,
-        (R06B_ORDER_SOURCE_REFERENCES[ARM_ENTITY] if order_variant
-         else "menagerie:franka_emika_panda/panda_nohand.xml"), False,
+        "menagerie:franka_emika_panda/panda_nohand.xml", False,
     )
     hand_asset, hand_entity, hand_frames, hand_articulation, hand_actuators, hand_records = _entity_scene(
         hand_xml, HAND_ENTITY, "panda-hand", asset_version,
-        (R06B_ORDER_SOURCE_REFERENCES[HAND_ENTITY] if order_variant
-         else "menagerie:franka_emika_panda/hand.xml"), True,
+        "menagerie:franka_emika_panda/hand.xml", True,
     )
     semantic_arm_actuators = tuple(f"actuator{i}" for i in range(1, 8))
-    expected_arm_source_order = tuple(reversed(semantic_arm_actuators)) if order_variant else semantic_arm_actuators
-    if arm_actuators != expected_arm_source_order or hand_actuators != ("actuator8",):
+    if arm_actuators != semantic_arm_actuators or hand_actuators != ("actuator8",):
         raise ValueError("fixed source actuator inventory/order differs from its pinned recipe")
     parent_root, child_root = FrameReference(ARM_ENTITY, "link0"), FrameReference(HAND_ENTITY, "hand")
     scene = SceneDefinition(
-        "scene-definition-v3", scene_id,
+        "scene-definition-v3", SCENE_ID,
         (arm_asset, hand_asset), (arm_entity, hand_entity),
         arm_frames + hand_frames, (arm_articulation, hand_articulation),
         (
@@ -180,7 +169,7 @@ def _scene_and_bindings(*, order_variant: bool = False):
     asset_by_entity = {ARM_ENTITY: arm_asset, HAND_ENTITY: hand_asset}
     assembly = LogicalAssemblyV1(
         "logical-assembly-v1", ASSEMBLY_ID,
-        (R06B_ORDER_RECIPE_ID if order_variant else ASSEMBLY_REVISION),
+        ASSEMBLY_REVISION,
         LogicalAssemblyScenePinV1(
             "logical-assembly-scene-pin-v1", scene.scene_id, scene.schema_version, scene.identity_hash,
         ),
@@ -199,7 +188,7 @@ def _scene_and_bindings(*, order_variant: bool = False):
     return scene, assembly, projection, arm_xml, hand_xml, arm_records, hand_records, asset_by_entity
 
 
-def _plan_and_source(scene, assembly, arm_xml, hand_xml, arm_records, hand_records):
+def _plan_and_source(scene, assembly, arm_xml, hand_xml, arm_records, hand_records, base_dir, license_path):
     parent_root, child_root = FrameReference(ARM_ENTITY, "link0"), FrameReference(HAND_ENTITY, "hand")
     parent_mount, child_mount = FrameReference(ARM_ENTITY, "attachment_site"), child_root
     body_names = {}
@@ -225,11 +214,11 @@ def _plan_and_source(scene, assembly, arm_xml, hand_xml, arm_records, hand_recor
         "child/scene.xml": hand_xml.encode("utf-8"),
     }
     from ..runtime.sessions.source import source_asset_bytes
-    arm_assets = source_asset_bytes(MENAGERIE_ROOT, arm_xml)
-    hand_assets = source_asset_bytes(MENAGERIE_ROOT, hand_xml)
+    arm_assets = source_asset_bytes(base_dir, arm_xml)
+    hand_assets = source_asset_bytes(base_dir, hand_xml)
     files.update({f"parent/{path}": content for path, content in arm_assets.items()})
     files.update({f"child/{path}": content for path, content in hand_assets.items()})
-    files["license/LICENSE"] = LICENSE.read_bytes()
+    files["license/LICENSE"] = license_path.read_bytes()
     closure_sha = _source_closure_digest(files)
     asset_by_id = {asset.asset_id: asset for asset in scene.assets}
     parent_asset = asset_by_id["panda-arm-nohand"]
@@ -249,9 +238,9 @@ def _plan_and_source(scene, assembly, arm_xml, hand_xml, arm_records, hand_recor
         body_names, site_names, joint_names, actuator_names, tendon_names,
     )
     source_id = f"scene-definition-v3:{scene.identity_hash}"
-    parent_source = TaskSceneSource(arm_xml, MENAGERIE_ROOT, source_id)
+    parent_source = TaskSceneSource(arm_xml, base_dir, source_id)
     child_source = TaskSceneSource(
-        hand_xml, MENAGERIE_ROOT,
+        hand_xml, base_dir,
         f"fixed-attachment-source-v1:{HAND_ENTITY}:{plan.child_source_sha256}",
     )
     return plan, parent_source, {ARM_ENTITY: parent_source, HAND_ENTITY: child_source}, arm_assets, hand_assets
@@ -269,13 +258,21 @@ class PandaFixedSourceDeclarationV1:
     assets_by_entity: object
 
 
-def declare_panda_fixed_source(*, order_variant: bool = False) -> PandaFixedSourceDeclarationV1:
-    """Validate the exact supported two-source recipe and declare its ownership."""
-    if type(order_variant) is not bool:
-        raise TypeError('fixed Panda source selector must be a bool')
+def declare_panda_fixed_source(manifest) -> PandaFixedSourceDeclarationV1:
+    """Resolve the selected Robot's declared MJCF sources into one fixed assembly."""
+    from ..environment.types import AssetManifest
+    if (type(manifest) is not AssetManifest or manifest.asset_kind != 'agent_mjcf'
+            or len(manifest.mjcf_sources) != 2 or len(manifest.asset_roots) != 1
+            or manifest.source_revision != MENAGERIE_REVISION):
+        raise ValueError('fixed Robot source requires its declared two-source MJCF manifest')
+    base_dir = manifest.asset_roots[0].resolve()
+    arm_path, hand_path = (path.resolve() for path in manifest.mjcf_sources)
+    if any(not path.is_relative_to(base_dir) for path in (arm_path, hand_path)):
+        raise ValueError('Robot source paths must belong to the declared asset root')
+    license_path = base_dir / 'LICENSE'
     scene, assembly, projection, arm_xml, hand_xml, arm_records, hand_records, assets = _scene_and_bindings(
-        order_variant=order_variant)
+        arm_path, hand_path, license_path)
     plan, parent_source, sources, _arm_assets, _hand_assets = _plan_and_source(
-        scene, assembly, arm_xml, hand_xml, arm_records, hand_records)
+        scene, assembly, arm_xml, hand_xml, arm_records, hand_records, base_dir, license_path)
     validate_fixed_attachment_scene(plan, assembly, scene)
     return PandaFixedSourceDeclarationV1(scene, assembly, projection, plan, sources, parent_source, assets)
