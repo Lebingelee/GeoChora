@@ -7,7 +7,7 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
                                 task_config, resolved_config, lift_height_m=None):
     """Declare source and Controller bindings; Env and Runtime own lifecycle."""
     from .specialization import build_isaac_reference, make_reference_binding
-    from .physical_usd_profile import build_f06_direct_effort_execution
+    from ...runtime.sessions.isaac_physical import build_isaac_panda_effort_execution
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('Isaac physical source horizon must be in [1, 1000]')
     manifest = delivery_manifest
@@ -15,7 +15,8 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
         from ...controllers.canonical.kinematics import PandaKinematics, PANDA_PICKCUBE_EE_TCP_V1
         from .physical_reference_profile import build_pickcube_effort_profile
         source, artifact = runtime_input.runtime_source, runtime_input.artifact
-        physical = build_f06_direct_effort_execution(robot, source.scene_definition, artifact, source)
+        physical = build_isaac_panda_effort_execution(robot, source.scene_definition, artifact, source,
+            native_drive='disabled' if drive_mode == 'effort-only' else 'position')
         model = (PandaKinematics(panda_xml, tcp_profile=PANDA_PICKCUBE_EE_TCP_V1)
                  if control_kind in {'r3-pose', 'r3-mass-pose'} else None)
         return build_pickcube_effort_profile(physical, artifact, source, kind=control_kind,

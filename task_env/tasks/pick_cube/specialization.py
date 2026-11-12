@@ -446,6 +446,9 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           Path(__file__).parents[2] / "controllers/canonical/kinematics.py")
         if physical is None:
             identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
+        else:
+            identity_paths += (Path(inspect.getsourcefile(controller_builder)),
+                               Path(__file__).parents[2] / "runtime/sessions/isaac_physical.py")
         for path in identity_paths:
             source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
                 path.read_bytes()

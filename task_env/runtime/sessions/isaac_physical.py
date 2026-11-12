@@ -9,6 +9,36 @@ from ...controllers.canonical.physical_commands import (
 from .physical_control import PhysicalControlExecutionV1, ResolvedPhysicalBatchV1, prepare_physical_command_batch, _rotate
 
 
+def build_isaac_panda_effort_execution(robot, scene, artifact, source, *, native_drive):
+    """Bind the admitted USD Panda transmissions to the Robot's effort Controller."""
+    from ...robots.panda import PandaEffortSourceLayout
+    from .source import (UsdRuntimeSourceV1, position_joint_bindings_from_artifact,
+                         position_frame_bindings_from_artifact)
+
+    if type(source) is not UsdRuntimeSourceV1:
+        raise TypeError('Isaac effort requires a USD RuntimeSource')
+    source.validate()
+    if (source.source_closure_digest != 'dc2a87a74963e0ec10f3cf98b3e33cc87226350dde78aeddbc88244a0fbdafc6'
+            or source.task_artifact.identity_hash != artifact.identity_hash
+            or source.scene_definition.identity_hash != scene.identity_hash):
+        raise ValueError('Isaac effort requires the admitted source and Artifact')
+    expected_artifacts = {'position': 'pickcube-f06-physical-effort-fixture-v1',
+                          'disabled': 'pickcube-f06-physical-effort-no-drive-v1'}
+    if expected_artifacts.get(native_drive) != artifact.artifact_id:
+        raise ValueError('Isaac effort drive differs from its admitted Artifact')
+    names = robot.physical_joint_names()
+    layout = PandaEffortSourceLayout(
+        tuple(name if i < 7 else 'finger_joint1' for i, name in enumerate(names)),
+        tuple(f'f06-arm-{i+1}' if i < 7 else 'f06-mimic-pair' for i in range(9)),
+        'f06-panda-direct-effort-assembly', 'f06-panda-direct-effort-components',
+        'f06-direct-effort-zero-bias-v1', 'finger-pair-effort')
+    return robot.build_direct_effort_execution(
+        scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
+        native_ranges=((-250., 250.),) * 7 + ((-5., 5.),), layout=layout,
+        joint_bindings=position_joint_bindings_from_artifact(scene, artifact, source),
+        frame_bindings=position_frame_bindings_from_artifact(artifact, source))
+
+
 def preflight_physical_isaac(execution, artifact, source):
     if type(execution) is not PhysicalControlExecutionV1:
         raise TypeError('physical session requires an exact execution profile')

@@ -86,7 +86,8 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
     assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
 
 
-@pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
+@pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1',
+                                    'panda-joint-effort-reference-v1'])
 def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
     import sys
     from pathlib import Path
@@ -109,6 +110,15 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
     artifact = value['artifact']
     assert artifact.semantics.parameters_si['lift_height'] == .17
     assert value['reset_plan'].reset_sample.task_artifact_hash == artifact.identity_hash
+    if profile != 'r3_continuous_v1':
+        from task_env.runtime.sessions.isaac_physical import build_isaac_panda_effort_execution
+        source = value['source']
+        assert 'task_env/runtime/sessions/isaac_physical.py' in value['source_sha256']
+        expected_drive = 'position' if profile == 'panda-direct-effort-v1' else 'disabled'
+        assert {channel.native_drive for channel in value['physical_execution'].compiled.binding.channels} == {expected_drive}
+        with pytest.raises(ValueError, match='drive differs'):
+            build_isaac_panda_effort_execution(value['robot'], source.scene_definition,
+                artifact, source, native_drive='disabled' if expected_drive == 'position' else 'position')
 
 
 def test_usd_rejects_unsupported_task_force():

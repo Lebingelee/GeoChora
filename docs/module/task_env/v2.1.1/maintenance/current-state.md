@@ -231,3 +231,5 @@ PickCube TaskDefinition 已移除仅供旧诊断使用的索引式评价，改�
 Pendulum 和双轮车旧 component scene／reset 工厂、专用 torque adapter 与失效 parallel 注册已退休；正式 MuJoCo／GeoPhys 单环境短程已复验，G06 并行待按正式合同实现。详见[实施记录 6.107](../planning/post-5c-optimization-execution.md#6107-退休两个普通任务的旧-component-与并行接线)。
 
 PickCube 无 Solution 的直接／joint effort 不再准备 R3 Solution readiness；需要的 R3 控制动力学与 reset 选择保留。详见[实施记录 6.108](../planning/post-5c-optimization-execution.md#6108-effort-构建不再准备未使用的-solution)。
+
+Isaac Panda effort 的 USD source 与传动准入已归 Runtime physical adapter，任务侧传递驱动选择；Isaac 直接 effort 已做真实短程复验。详见[实施记录 6.109](../planning/post-5c-optimization-execution.md#6109-isaac-effort-source-准入归-runtime-adapter)。
