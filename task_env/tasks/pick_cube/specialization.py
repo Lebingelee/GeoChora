@@ -1097,20 +1097,26 @@ def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, 
     return task_source, scene, artifact
 
 
-def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
-    entry = "/F06Scene"
+def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1, *, robot, delivery):
+    from ...runtime.sessions.api import f06_isaac_robot_geometry_root
+    from ...runtime.sessions.source import scalar_joint_source_bindings, usd_articulation_paths
+
+    entry = delivery.delivery.entry_prim
+    articulations = [item for item in scene.articulations if item.entity_id == robot.uid]
+    if len(articulations) != 1:
+        raise ValueError('USD source requires exactly one selected Robot articulation')
+    articulation = articulations[0]
+    paths = usd_articulation_paths(articulation,
+        geometry_root=f06_isaac_robot_geometry_root(delivery))
+    parent, local = robot.reference_frame_parents()['ee']
     body_paths = {
-        "panda-v1/base": f"{entry}/panda/Geometry/link0",
+        "panda-v1/base": paths[articulation.root_frame_id],
         "cube-v1": f"{entry}/cube_v1",
     }
     frame_paths = {
-        "panda-v1/ee": (
-            f"{entry}/panda/Geometry/link0/link1/link2/link3/link4/"
-            "link5/link6/link7/hand/ee"
-        ),
+        "panda-v1/ee": f"{paths[parent]}/{local}",
         "tabletop-v1/top": f"{entry}/tabletop_v1/top",
     }
-    from ...runtime.sessions.source import scalar_joint_source_bindings
     scalar_joints = scalar_joint_source_bindings(scene, artifact)
     if set(body_paths) | set(frame_paths) != set(artifact.legacy_frame_bindings):
         raise ValueError("F06 USD body/frame map must cover every PickCube TaskArtifact runtime Frame")
@@ -1142,6 +1148,9 @@ def build_pickcube_isaac_runtime_input_v1(
         legacy_artifact = replace(legacy_artifact,
             artifact_id=('pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist'
                          else 'pickcube-f06-physical-effort-no-drive-v1'))
+    if robot is None:
+        from ...registry import AGENT_REGISTRY
+        robot = AGENT_REGISTRY.create('panda-v1')
     task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
         task_config, legacy_artifact, robot=robot,
     )
@@ -1153,7 +1162,7 @@ def build_pickcube_isaac_runtime_input_v1(
             _canonical_task_recipe(task_config)
         ).hexdigest(),
     }
-    joints, bodies, frames, free_joints = _source_bindings(scene, artifact)
+    joints, bodies, frames, free_joints = _source_bindings(scene, artifact, robot=robot, delivery=loaded)
     source = build_usd_runtime_source(loaded=loaded, provider='isaacsim',
         provider_build_identity='isaacsim-6.2.0.0', options=options,
         task_source_identity_sha256=task_source.identity_hash, artifact=artifact, scene=scene,

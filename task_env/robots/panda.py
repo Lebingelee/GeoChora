@@ -94,6 +94,11 @@ class PandaAgent(BaseAgent):
             entity_id, end_frame_id, ((entity_id, 'arm'), (entity_id, 'gripper')))
 
     @staticmethod
+    def reference_frame_parents():
+        """Declare the link and local name of the Panda reference frame."""
+        return {'ee': ('hand', 'ee')}
+
+    @staticmethod
     def physical_joint_names():
         return tuple(f'joint{i}' for i in range(1, 8)) + ('finger_joint1', 'finger_joint2')
 

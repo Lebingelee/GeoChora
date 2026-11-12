@@ -166,7 +166,9 @@ def test_source_maps_subject_and_rejects_wrong_motor(robot, task, expected_bodie
     assert subject.source_id == source.source_id
     assert subject.source_closure_sha256 == source.source_closure_digest
     assert len(declarations) == len(subject.channel_paths)
-    assert isaac_g05._usd_articulation_bodies(seen['articulation'], seen['body_names']) == expected_bodies
+    from task_env.runtime.sessions.source import usd_articulation_paths
+    paths = usd_articulation_paths(seen['articulation'])
+    assert {key: paths[name] for key, name in seen['body_names'].items()} == expected_bodies
     assert seen['joints'] == {f'{robot.uid}/{name}': name for name in robot.state_joint_names}
     assert seen['joint_targets'] == seen['joints']
     assert closure == source.source_closure_digest
@@ -319,11 +321,11 @@ def test_isaac_scene_and_runtime_share_one_verified_delivery(monkeypatch):
 
 def test_isaac_source_rejects_unreachable_articulation_body():
     from types import SimpleNamespace
-    from task_env.runtime.sessions.isaac_g05 import _usd_articulation_bodies
+    from task_env.runtime.sessions.source import usd_articulation_paths
 
     frame = lambda name: SimpleNamespace(frame_id=name)
     articulation = SimpleNamespace(root_frame_id='root', joints=(
         SimpleNamespace(parent_frame=frame('missing'), child_frame=frame('child')),
     ))
     with pytest.raises(ValueError, match='cannot resolve USD body paths'):
-        _usd_articulation_bodies(articulation, {'robot/child': 'child'})
+        usd_articulation_paths(articulation)

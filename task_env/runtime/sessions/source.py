@@ -839,6 +839,23 @@ class UsdRuntimeSourceV1:
         self.scene_source.assert_fresh()
 
 
+def usd_articulation_paths(articulation, *, geometry_root='Geometry'):
+    """Lower declared articulation edges to a USD geometry hierarchy."""
+    paths = {articulation.root_frame_id: f'{geometry_root}/{articulation.root_frame_id}'}
+    remaining = list(articulation.joints)
+    while remaining:
+        ready = [joint for joint in remaining if joint.parent_frame.frame_id in paths]
+        if not ready:
+            raise ValueError('subject articulation cannot resolve USD body paths')
+        for joint in ready:
+            child = joint.child_frame.frame_id
+            if child in paths:
+                raise ValueError('subject articulation has duplicate USD body paths')
+            paths[child] = f'{paths[joint.parent_frame.frame_id]}/{child}'
+            remaining.remove(joint)
+    return paths
+
+
 def scalar_joint_source_bindings(scene, artifact):
     """Resolve declared scalar Scene joints against the Task Artifact."""
     joints = {f'{articulation.entity_id}/{joint.joint_id}': joint.joint_id

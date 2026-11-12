@@ -150,6 +150,12 @@ def load_f06_isaac_delivery(manifest_path):
     return delivery
 
 
+def f06_isaac_robot_geometry_root(delivery):
+    """Locate the robot hierarchy within the admitted desktop delivery."""
+    _validate_f06_isaac_delivery(delivery, delivery.manifest_bytes_sha256)
+    return f'{delivery.delivery.entry_prim}/panda/Geometry'
+
+
 def build_usd_task_runtime_input(*, schema_version, task_source, artifact, source,
                                  execution, reset_plan, controller_profile,
                                  horizon, horizon_min, horizon_max):
