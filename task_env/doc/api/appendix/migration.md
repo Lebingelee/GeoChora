@@ -92,10 +92,10 @@ is added.
 
 | Retired or retained entry point | Current behavior and migration |
 | --- | --- |
-| `task_env.script.render_single` | Explicit retired-route error; it depended on historical task construction. Use `examples/rendering/pendulum_single_rgb.py` for the bounded current scalar Pendulum route or `examples/rendering/pendulum_parallel_rgb.py` for the bounded batch route; selected manipulation renderer support is not claimed. |
+| `task_env.script.render_single` | Explicit retired-route error; it depended on historical task construction. Use `examples/rendering/pendulum_single_rgb.py` for the scalar Pendulum route. The historical parallel example awaits G06 integration. |
 | `task_env.script.camera.static`, `task_env.script.camera.bound`, and `task_env.script.camera_lighting_probe` | Explicit retired-route errors; these used the historical PickCube task, and the lighting probe read provider-private renderer state. `CameraSpec` and Camera contracts remain. |
 | `task_env.script.camera._common` | Removed; only the retired camera scripts called it. Exact source is recoverable from the S4.5-B base commit in the recovery manifest. |
-| `task_env.script.render_parallel` | Retained as an advanced Pendulum-only batch rendering entry point. The bounded smoke covers GeoPhys CPU, `merged_scene`, rasterizer, RGB-array mode, one world and one step. Other renderers/providers and headed UI are unverified. |
+| `task_env.script.render_parallel` | Historical batch rendering entry point; the old Pendulum parallel registration has retired and a formal batch route awaits G06. |
 | `task_env.script.render_input_probe` | Retained as a standalone Taichi Forge window-input probe. It does not construct a TaskEnv or establish a rendering capability. |
 | `task_env.script.trajectory.convert`, `replay`, and `merge` | Retained as generic offline utilities; historical replay remains explicit and separate from canonical H5 inspection and selected-source reexecution. |
 

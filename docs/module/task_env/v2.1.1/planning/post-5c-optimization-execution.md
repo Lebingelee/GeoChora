@@ -1106,3 +1106,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 146 项版本检查通过。当前源码下 MuJoCo Position 的 Solution 单步与直接 effort 各完成 5 个 native 子步及第二次 reset；GeoPhys joint effort 完成 reset、step、第二次 reset 和关闭，native 子步未直接计数。Isaac Position 非默认 lift 完成相同生命周期、RGB 及独立读回，观察 41 次 physics callback，订阅前启动推进未知；SDK 日志保留只读目录、USD 包和渲染预热警告。本项之前的 `a265736c` 还真实验证了 Isaac 直接 effort 在 0.17 米 lift 下的非零力矩、第二次 reset、RGB 和独立读回，观察 41 次 callback；该证据只对应 `a265736c`，当前 TaskDefinition 改动后没有再次重跑 Isaac effort。完整 Solution 未运行。
 
 Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误用 Position 专属断言；第二次暴露真实 recorder 限制——`selected_recording_metadata` 调用的 `provider_build_identity` 不接受 `isaacsim`，`start_recording` 因而报 `ValueError('unknown provider')`。去掉录制后 effort 控制路线通过；不能把它当作录制能力通过，录制修复留待 E10。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_pickcube_named_final_20261112_tzr8tscd/`、`workspace/maintenance/v211_named_pickcube_isaac_20261112_rchuh6qq/`、`workspace/maintenance/v211_isaac_effort_lift_20261112_u8rdr1rn/` 和 `workspace/maintenance/v211_isaac_effort_state_20261112_wzke9iah/`。E01～E04 未整体接收。
+
+### 6.107 退休两个普通任务的旧 component 与并行接线
+
+输入 `34b0365c`。Pendulum 和双轮车正式单环境已通过声明的 Robot、Controller 和共同执行链构建，但 Task 文件仍分别维护旧 component scene composer、native 索引 reset sampler、旧 Task factory 和专用 torque action adapter；两个旧 scene composer 还拒绝 Robot。旧 parallel registry 继续宣称这两个类有框架并行能力。修改前直接调用该并行 factory，两个任务均在 `ResolvedSelectedConfig` 上访问不存在的 `runtime` 而失败；G06 本来就尚未接收。
+
+删除两个不可达的旧 scene／reset／Task factory 和旧单独 torque adapter，撤销两个失效的 parallel 注册及相应旧 adapter 导出；正式 Robot 主体声明、共享 physical Controller、力矩单位及 reset 分布保留。G06 需以正式构建合同重新实现并行能力，不能再将历史 parallel 示例当作当前可用能力。同步修正内建任务、示例和迁移文档。生产修改 5 文件 +4／−395，净减 391 行；版本诊断修改 1 文件 +8／−0；API 文档修改 3 文件 +14／−32，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。
+
+148 项版本检查通过。Pendulum 和双轮车各自在 MuJoCo CPU 以正式 `make_env` 完成 reset、非零力矩 step、第二次 reset、关闭及 25 个实际 native 子步；两者在 GeoPhys CPU 完成同样生命周期，native 子步未直接计数。MJCF 导入有语义诊断。两任务的真实主体和 Controller 仍由共同的 source、Assembly 和 Runtime 控制合同消费；provider 的状态、clock、提交及 renderer 接口未变。Isaac 本轮未重跑，旧证据仍只对应原源码；本次删除的 adapter 和 component 工厂不参与正式 Isaac 调用链。冻结生产／诊断 diff、预算与收据位于 ignored `workspace/maintenance/v211_remove_legacy_actuation_20261112_n6ty3ks4/`。此项不宣称四任务主体构建完全统一，E01～E04 未整体接收。

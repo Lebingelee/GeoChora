@@ -11,12 +11,10 @@ from .assembled_panda import AssembledPandaAgent
 from .pendulum import (
     PENDULUM_ACTION_CONTRACT,
     PendulumEntity,
-    PendulumTorqueActionAdapter,
 )
 from .two_wheel_balance import (
     TWO_WHEEL_ACTION_CONTRACT,
     TwoWheelBalanceEntity,
-    TwoWheelTorqueActionAdapter,
 )
 from .runtime import RobotControllerHandle, RobotFrameReference, RobotRuntime
 
@@ -30,10 +28,8 @@ __all__ = [
     "PandaGripperController",
     "PENDULUM_ACTION_CONTRACT",
     "PendulumEntity",
-    "PendulumTorqueActionAdapter",
     "TWO_WHEEL_ACTION_CONTRACT",
     "TwoWheelBalanceEntity",
-    "TwoWheelTorqueActionAdapter",
     "RobotControllerHandle",
     "RobotFrameReference",
     "RobotRuntime",

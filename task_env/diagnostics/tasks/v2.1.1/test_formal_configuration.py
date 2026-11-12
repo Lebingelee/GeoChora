@@ -371,3 +371,11 @@ def test_formal_class_does_not_enter_component_construction(uid):
         task(config=old, build_runtime=False)
     with pytest.raises(TypeError, match='through make_env'):
         task()
+
+
+@pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
+def test_legacy_parallel_factory_is_not_advertised_for_formal_tasks(uid):
+    from task_env.vectorization.registry import PARALLEL_ENV_REGISTRY
+
+    importlib.import_module('task_env.tasks')
+    assert not PARALLEL_ENV_REGISTRY.contains(uid)

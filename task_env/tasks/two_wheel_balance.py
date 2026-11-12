@@ -11,7 +11,6 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import (
-    EpisodePhysicsState,
     ObservationFieldSpec,
     ObservationSchema,
     RuntimeSnapshot,
@@ -24,12 +23,10 @@ from ..environment import (
 from ..environment.configuration import resolve_env_config
 from ..environment.task_definition import TaskDefinitionBase
 from ..registry import register_env
-from ..vectorization.registry import register_parallel_env
 from ..robots.two_wheel_balance import (
     TWO_WHEEL_ACTION_CONTRACT,
     TWO_WHEEL_BALANCE_MJCF_XML,
     TWO_WHEEL_TORQUE_LIMIT_NM,
-    TwoWheelTorqueActionAdapter,
 )
 from .base import BaseTaskEnv
 
@@ -182,24 +179,6 @@ class TwoWheelBalanceTaskDefinition(TaskDefinitionBase):
         if self.success_window_steps < 1:
             raise ValueError("Two-wheel success window must be positive")
         self._upright_steps = 0
-
-    def create_action_adapter(self, compiled_scene):
-        names = compiled_scene.references.names.actuators
-        joint_data = compiled_scene.scene_model.joint_data
-        return TwoWheelTorqueActionAdapter(
-            actuator_ids=(names["left_wheel_torque"], names["right_wheel_torque"]),
-            actuator_count=int(joint_data["n_actuators"]),
-        )
-
-    def create_observation_builder(self, compiled_scene, **_kwargs):
-        del compiled_scene
-        return TwoWheelBalanceObservationBuilder(
-            joint_ids={
-                "pitch": (self.pitch_qpos_id, self.pitch_qvel_id),
-                "left": (self.left_qpos_id, self.left_qvel_id),
-                "right": (self.right_qpos_id, self.right_qvel_id),
-            }
-        )
 
     def build_observation(
         self,
@@ -454,84 +433,6 @@ class TwoWheelBalanceTaskDefinition(TaskDefinitionBase):
         )
 
 
-class TwoWheelBalanceResetSampler:
-    """Replayable initial pitch and wheel-rate perturbation."""
-
-    def sample_episode_state(
-        self,
-        *,
-        compiled_scene: object,
-        initial_state: EpisodePhysicsState,
-        rng: np.random.Generator,
-        seed: int | None,
-    ) -> tuple[EpisodePhysicsState, dict[str, Any]]:
-        del seed
-        joint_data = compiled_scene.scene_model.joint_data
-        names = compiled_scene.references.names.joints
-        pitch_joint = names["chassis_pitch"]
-        left_joint = names["left_wheel_hinge"]
-        right_joint = names["right_wheel_hinge"]
-        qpos_adr = np.asarray(joint_data["jnt_qposadr"], dtype=np.int32)
-        dof_adr = np.asarray(joint_data["jnt_dofadr"], dtype=np.int32)
-        qpos = np.asarray(initial_state.qpos, dtype=np.float32).copy()
-        qvel = np.asarray(initial_state.qvel, dtype=np.float32).copy()
-        ctrl = np.asarray(initial_state.ctrl, dtype=np.float32).copy()
-        act = np.asarray(initial_state.act, dtype=np.float32).copy()
-        pitch = float(rng.uniform(-0.08, 0.08))
-        pitch_rate = float(rng.uniform(-0.20, 0.20))
-        left_position = float(rng.uniform(-0.02, 0.02))
-        right_position = float(rng.uniform(-0.02, 0.02))
-        left_rate = float(rng.uniform(-0.30, 0.30))
-        right_rate = float(rng.uniform(-0.30, 0.30))
-        qpos[qpos_adr[pitch_joint]] = np.float32(pitch)
-        qpos[qpos_adr[left_joint]] = np.float32(left_position)
-        qpos[qpos_adr[right_joint]] = np.float32(right_position)
-        qvel[dof_adr[pitch_joint]] = np.float32(pitch_rate)
-        qvel[dof_adr[left_joint]] = np.float32(left_rate)
-        qvel[dof_adr[right_joint]] = np.float32(right_rate)
-        ctrl.fill(0.0)
-        act.fill(0.0)
-        return (
-            EpisodePhysicsState(
-                qpos=qpos,
-                qvel=qvel,
-                qacc=np.zeros_like(qvel),
-                ctrl=ctrl,
-                act=act,
-            ),
-            {
-                "profile": "two_wheel_balance_uniform_perturbation_v1",
-                "pitch_range_rad": [-0.08, 0.08],
-                "pitch_rate_range_rad_s": [-0.20, 0.20],
-                "wheel_position_range_rad": [-0.02, 0.02],
-                "wheel_rate_range_rad_s": [-0.30, 0.30],
-                "pitch_rad": pitch,
-                "pitch_rate_rad_s": pitch_rate,
-                "left_wheel_position_rad": left_position,
-                "right_wheel_position_rad": right_position,
-                "left_wheel_rate_rad_s": left_rate,
-                "right_wheel_rate_rad_s": right_rate,
-            },
-        )
-
-
-class _TwoWheelBalanceSceneComposer:
-    def build_scene_source(self, composition, agents):
-        del composition
-        if tuple(agents):
-            raise ValueError("Two-wheel balance scene must not receive robot agents")
-        from scene import SceneSource
-
-        return (
-            SceneSource.mjcf_string(
-                TWO_WHEEL_BALANCE_MJCF_XML,
-                label="task-env-two-wheel-balance-inline-v1",
-            ),
-            "two_wheel_balance_inline_v1",
-        )
-
-
-@register_parallel_env()
 @register_env()
 class TwoWheelBalanceEnv(BaseTaskEnv):
     """Source-bound articulated two-wheel balance environment."""
@@ -653,25 +554,6 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
             },
         }
 
-    def create_scene_composer(self):
-        return _TwoWheelBalanceSceneComposer()
-
-    def create_reset_sampler(self):
-        return TwoWheelBalanceResetSampler()
-
-    def create_task_definition(self, compiled_scene):
-        names = compiled_scene.references.names.joints
-        joint_data = compiled_scene.scene_model.joint_data
-        qpos_adr = np.asarray(joint_data["jnt_qposadr"], dtype=np.int32)
-        dof_adr = np.asarray(joint_data["jnt_dofadr"], dtype=np.int32)
-        return TwoWheelBalanceTaskDefinition(
-            pitch_qpos_id=int(qpos_adr[names["chassis_pitch"]]),
-            pitch_qvel_id=int(dof_adr[names["chassis_pitch"]]),
-            left_qpos_id=int(qpos_adr[names["left_wheel_hinge"]]),
-            left_qvel_id=int(dof_adr[names["left_wheel_hinge"]]),
-            right_qpos_id=int(qpos_adr[names["right_wheel_hinge"]]),
-            right_qvel_id=int(dof_adr[names["right_wheel_hinge"]]),
-        )
 
 
 __all__ = [

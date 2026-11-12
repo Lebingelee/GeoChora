@@ -11,7 +11,6 @@ import numpy as np
 from ..environment.gym_compat import Box, Dict
 
 from ..environment import (
-    EpisodePhysicsState,
     ObservationFieldSpec,
     ObservationSchema,
     RuntimeSnapshot,
@@ -28,11 +27,9 @@ from ..environment import (
 from ..environment.configuration import resolve_env_config
 from ..environment.task_definition import TaskDefinitionBase
 from ..registry import register_env
-from ..vectorization.registry import register_parallel_env
 from ..robots.pendulum import (
     PENDULUM_ACTION_CONTRACT,
     PENDULUM_MJCF_XML,
-    PendulumTorqueActionAdapter,
 )
 from .base import BaseTaskEnv
 
@@ -312,22 +309,6 @@ class PendulumTaskDefinition(TaskDefinitionBase):
         )
         self._upright_steps = 0
 
-    def create_action_adapter(self, compiled_scene):
-        names = compiled_scene.references.names
-        actuator_id = names.actuators["pendulum_torque"]
-        actuator_count = int(compiled_scene.scene_model.joint_data["n_actuators"])
-        return PendulumTorqueActionAdapter(
-            actuator_id=actuator_id,
-            actuator_count=actuator_count,
-        )
-
-    def create_observation_builder(self, compiled_scene, **_kwargs):
-        del compiled_scene
-        return PendulumObservationBuilder(
-            qpos_id=self.qpos_id,
-            qvel_id=self.qvel_id,
-        )
-
     def _coerce_action(
         self,
         action: Mapping[str, np.ndarray] | np.ndarray,
@@ -583,67 +564,6 @@ class PendulumTaskDefinition(TaskDefinitionBase):
         )
 
 
-class PendulumResetSampler:
-    """Replayable random initial state for the fixed Pendulum profile."""
-
-    def sample_episode_state(
-        self,
-        *,
-        compiled_scene: object,
-        initial_state: EpisodePhysicsState,
-        rng: np.random.Generator,
-        seed: int | None,
-    ) -> tuple[EpisodePhysicsState, dict[str, Any]]:
-        del seed
-        joint_id = compiled_scene.references.names.joints["pendulum_hinge"]
-        qpos_id = int(compiled_scene.scene_model.joint_data["jnt_qposadr"][joint_id])
-        dof_id = int(compiled_scene.scene_model.joint_data["jnt_dofadr"][joint_id])
-        qpos = np.asarray(initial_state.qpos, dtype=np.float32).copy()
-        qvel = np.asarray(initial_state.qvel, dtype=np.float32).copy()
-        ctrl = np.asarray(initial_state.ctrl, dtype=np.float32).copy()
-        act = np.asarray(initial_state.act, dtype=np.float32).copy()
-        theta_value, theta_dot_value = PENDULUM_TASK_SEMANTICS.sample_reset(rng)
-        theta = float(theta_value)
-        theta_dot = float(theta_dot_value)
-        qpos[qpos_id] = np.float32(theta)
-        qvel[dof_id] = np.float32(theta_dot)
-        ctrl.fill(0.0)
-        act.fill(0.0)
-        return (
-            EpisodePhysicsState(
-                qpos=qpos,
-                qvel=qvel,
-                qacc=np.zeros_like(qvel),
-                ctrl=ctrl,
-                act=act,
-            ),
-            {
-                "profile": "pendulum_uniform_angle_velocity_v1",
-                "angle_range_rad": [-math.pi, math.pi],
-                "angular_velocity_range_rad_s": [-1.0, 1.0],
-                "theta_rad": theta,
-                "theta_dot_rad_s": theta_dot,
-            },
-        )
-
-
-class _PendulumSceneComposer:
-    def build_scene_source(self, composition, agents):
-        del composition
-        if tuple(agents):
-            raise ValueError("Pendulum scene must not receive robot agents")
-        from scene import SceneSource
-
-        return (
-            SceneSource.mjcf_string(
-                PENDULUM_MJCF_XML,
-                label="task-env-pendulum-inline-v1",
-            ),
-            "pendulum_inline_v1",
-        )
-
-
-@register_parallel_env()
 @register_env()
 class PendulumEnv(BaseTaskEnv):
     """Single Pendulum with a shared source-bound physical runtime."""
@@ -761,18 +681,6 @@ class PendulumEnv(BaseTaskEnv):
             },
         }
 
-    def create_scene_composer(self):
-        return _PendulumSceneComposer()
-
-    def create_reset_sampler(self):
-        return PendulumResetSampler()
-
-    def create_task_definition(self, compiled_scene):
-        joint_id = compiled_scene.references.names.joints["pendulum_hinge"]
-        return PendulumTaskDefinition(
-            qpos_id=int(compiled_scene.scene_model.joint_data["jnt_qposadr"][joint_id]),
-            qvel_id=int(compiled_scene.scene_model.joint_data["jnt_dofadr"][joint_id]),
-        )
 
 
 __all__ = [
@@ -790,6 +698,5 @@ __all__ = [
     "PendulumEnv",
     "PendulumObservationBuilder",
     "PendulumTaskSemantics",
-    "PendulumResetSampler",
     "PendulumTaskDefinition",
 ]

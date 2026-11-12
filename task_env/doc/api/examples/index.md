@@ -30,7 +30,7 @@ The historical v1.1.0 `single_inline` Pendulum route was reported to fail during
 | Offline H5 inspection | `examples/recording/inspect_h5.py --input <recording.h5>` | Canonical schema/hash/projection and T+1 validation; not D0 replay. |
 | Batch environment | `task_env.script.env.parallel_inline` | Old Pendulum `make_parallel_env` route; unified Env batch adaptation is deferred. |
 | SB3 example | `examples/learning/pendulum_sb3.py --output-dir <fresh-dir>` | One update through the existing Pendulum PPO runner; no convergence claim. |
-| Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Bounded Pendulum × GeoPhys CPU × rasterizer RGB smokes through scalar `make_env` and merged-scene batch routes. |
+| Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Scalar Pendulum rendering is the current route; the historical parallel example awaits G06 integration. |
 | Offline trajectory conversion | `task_env.script.trajectory.convert` | Existing Panda/controller action conversion contract. |
 | Historical H5 replay | `task_env.script.trajectory.replay --historical ...` | Recovery-only route; not selected-source acceptance or D0 by default. |
 
