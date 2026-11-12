@@ -19,23 +19,6 @@ G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 G05_ISAAC_BUILD_IDENTITY = 'isaacsim-6.2.0.0'
 
 
-def ensure_g05_isaac_app_open() -> object:
-    """Open the process-owned Isaac App before G05 USD inspection.
-
-    The G05 source loader is intentionally still responsible for the complete
-    Core/USD closure and its source identity.  This helper only moves the
-    existing process App owner ahead of that check so Kit's USD libraries are
-    established before any ``pxr`` import.  The owner is the same singleton
-    later consumed by native materialization; this function never constructs a
-    second App owner.
-    """
-    from .isaac_native_io import _process_app_owner
-
-    owner = _process_app_owner()
-    owner.open()
-    return owner
-
-
 def load_g05_isaac_delivery(manifest_path: str | Path) -> LoadedUsdDeliveryV1:
     """Load the exact local derived delivery used by a G05 task."""
     loaded = load_usd_asset_delivery(manifest_path)
@@ -107,6 +90,5 @@ def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
 
 __all__ = [
     'G05_ISAAC_BUILD_IDENTITY', 'G05_ISAAC_EFFORT_PROFILE',
-    'ensure_g05_isaac_app_open',
     'build_g05_isaac_runtime_source', 'load_g05_isaac_delivery',
 ]

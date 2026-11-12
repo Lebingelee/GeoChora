@@ -268,11 +268,9 @@ def main():
         if request.get('kind') != 'build' or not isinstance(payload, dict) or request_identity(payload) != identity:
             raise ValueError('worker build request identity mismatch')
         _validate_environment(payload)
-        # Kit must establish its USD libraries before F06 reconstructs the
-        # USD source. Importing the standalone USD wheel first can load an
-        # incompatible set of libraries into the same process.
-        if (payload.get('uid') == 'pick-cube-p16-reference-v1'
-                and payload.get('selection', {}).get('physics_provider') == 'isaacsim'):
+        # Kit must establish its USD libraries before any Isaac source is
+        # reconstructed, independently of which Task supplied that source.
+        if payload.get('selection', {}).get('physics_provider') == 'isaacsim':
             from .isaac_native_io import _process_app_owner, F06_ISAAC_APP_LAUNCH_PROFILE_V1
             early_app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
             early_app_owner.open(f06_compatibility=True)

@@ -15,8 +15,7 @@ def declared_effort_scene(robot, *, provider, source_delivery_manifest):
     if provider == 'isaacsim':
         if source_delivery_manifest is None:
             raise ValueError('Isaac effort source requires source_delivery_manifest')
-        from .isaac_g05 import ensure_g05_isaac_app_open, load_g05_isaac_delivery
-        ensure_g05_isaac_app_open()
+        from .isaac_g05 import load_g05_isaac_delivery
         delivery = load_g05_isaac_delivery(source_delivery_manifest)
         revision = delivery.delivery.asset_definition.source_revision
     return robot.scene_definition(source_revision=revision), delivery

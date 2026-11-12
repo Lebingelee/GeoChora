@@ -257,7 +257,6 @@ def test_isaac_scene_and_runtime_share_one_verified_delivery(monkeypatch):
         loaded = original(path)
         loads.append(loaded)
         return loaded
-    monkeypatch.setattr(isaac_g05, 'ensure_g05_isaac_app_open', lambda: None)
     monkeypatch.setattr(isaac_g05, 'load_g05_isaac_delivery', load)
     robot = PendulumEntity()
     scene, delivery = declared_effort_source.declared_effort_scene(

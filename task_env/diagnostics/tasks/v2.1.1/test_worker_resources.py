@@ -167,3 +167,49 @@ def test_worker_preserves_all_cleanup_failures_after_session_error():
     finally:
         client.close()
         server.close()
+
+
+@pytest.mark.parametrize(('uid', 'provider', 'starts_app'), [
+    ('pick-cube-p16-reference-v1', 'isaacsim', True),
+    ('pendulum-v1', 'isaacsim', True),
+    ('two-wheel-balance-v1', 'isaacsim', True),
+    ('nut-assembly-outcome-reference-v1', 'mujoco', False),
+])
+def test_worker_prepares_isaac_by_provider_before_task_source(monkeypatch, uid, provider, starts_app):
+    import os
+    import sys
+    from task_env.runtime.sessions import isaac_native_io, worker
+    from task_env.runtime.sessions.transport import request_identity
+
+    payload = {'uid': uid, 'selection': {'physics_provider': provider}}
+    identity = request_identity(payload)
+    events, responses = [], []
+    class Owner:
+        def open(self, **kwargs):
+            events.append(('app-open', kwargs))
+        def close(self):
+            events.append(('app-close',))
+    monkeypatch.setattr(isaac_native_io, '_process_app_owner', lambda **_kwargs: Owner())
+    monkeypatch.setattr(worker, '_receive', lambda _sock: {
+        'kind': 'build', 'request_identity': identity, 'payload': payload})
+    monkeypatch.setattr(worker, '_validate_environment', lambda _payload: None)
+    def fail_build(_payload):
+        events.append(('source',))
+        raise ValueError('source build failed')
+    monkeypatch.setattr(worker, '_materialize_selected', fail_build)
+    monkeypatch.setattr(worker, '_send', lambda _sock, response: responses.append(response))
+    monkeypatch.setattr(worker, '_write_runtime_scope_receipt', lambda: None)
+    server, client = socket.socketpair()
+    worker_fd = os.dup(server.fileno())
+    monkeypatch.setattr(sys, 'argv', ['worker', str(worker_fd)])
+    try:
+        result = worker.main()
+        assert result == (1 if starts_app else None)
+        assert responses[0]['kind'] == 'startup_error'
+        if starts_app:
+            assert events == [('app-open', {'f06_compatibility': True}), ('source',), ('app-close',)]
+        else:
+            assert events == [('source',)]
+    finally:
+        server.close()
+        client.close()
