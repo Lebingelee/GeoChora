@@ -236,6 +236,9 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     value = binding.build_for_request('isaacsim', 'cuda', 42, 8)
+    from task_env.controllers.canonical.contracts import digest
+    assert value['recipe_identity'] == digest(value['resolved_configuration'])
+    assert value['source_sha256'] == value['resolved_configuration']['source_sha256']
     artifact = value['artifact']
     if profile == 'r3_continuous_v1':
         assert len(dynamic_profiles) == 1

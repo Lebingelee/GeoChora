@@ -404,6 +404,51 @@ def test_reference_controller_failure_releases_task_source(task_name, monkeypatc
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
+def test_task_result_cannot_override_runtime_source_and_releases_lease(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    receipts = []
+    snapshot = source_module.snapshot_legacy_mjcf_source
+
+    def capture(*args, **kwargs):
+        source = snapshot(*args, **kwargs)
+        receipts.append(source_resource_receipt(source))
+        return source
+
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(specialization, '_bind_reference_position_control',
+                        lambda *args, **kwargs: {'source': object()})
+    with pytest.raises(ValueError, match='conflicts with source or Controller ownership'):
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1').build_for_request(
+            'mujoco', 'cpu', 31, 8)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_task_result_cannot_override_physics_facts_and_releases_lease(monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube import specialization
+
+    receipts = []
+    snapshot = source_module.snapshot_legacy_mjcf_source
+
+    def capture(*args, **kwargs):
+        source = snapshot(*args, **kwargs)
+        receipts.append(source_resource_receipt(source))
+        return source
+
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(specialization, '_bind_mjcf_effort_control',
+                        lambda *args, **kwargs: {'resolved_configuration': {'provider': 'foreign'}})
+    config = resolve_task_env_config(specialization.PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'}})
+    with pytest.raises(ValueError, match='conflicts with Runtime construction facts'):
+        specialization.PickCubeReferenceEnv.selected_binding(config).build_for_request('mujoco', 'cpu', 31, 8)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
 def test_source_composition_failure_releases_source_before_controller(profile, monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config

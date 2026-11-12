@@ -357,6 +357,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                                  prepare_source, source_context, compile_control,
                                  robot_uid, robot=None, delivery_manifest=None,
                                  build_task_scene=None, compile_task_artifact=None,
+                                 task_source_path=None, resolved_config=None,
                                  physical_kind=None,
                                  native_drive=None, reset_selection=False, task_settings=None,
                                  existing_robot_entity=None, task_body_names=(),
@@ -369,6 +370,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
     """
     from ...environment.reference_binding import SourceBoundTaskBuilder
     from ...assembly.compiler import CompiledReferenceTaskV1
+    physical = physical_kind is not None
 
     def compile_source(request):
         from ...registry import make_agent
@@ -402,6 +404,74 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
         with close_execution_source_on_failure(compiled.source):
             return compiled, source_context(plan, compiled, None, selected, reference)
 
+    def finish_control(compiled, context, selection, request):
+        """Combine Task semantics with the one source/Controller handoff."""
+        if source_format == 'usd':
+            from pathlib import Path
+            from .isaac_usd_admission import f06_construction_facts
+            from .provenance import construction_revision
+
+            runtime_input, controller, execution = selection
+            provider_facts = f06_construction_facts(runtime_input, context.source_sha256,
+                task_path=task_source_path, physical=execution is not None,
+                resolved_config=resolved_config, fallback_config=context.config)
+            revision = construction_revision(Path(__file__).resolve().parents[3])
+            value = {'robot': context.robot, 'artifact': runtime_input.artifact,
+                     'source': runtime_input.runtime_source, 'controller': controller,
+                     'solution': None, 'execution_spec_v1': runtime_input.execution,
+                     'reset_plan': runtime_input.reset_plan,
+                     'session_admission_input': runtime_input, 'source_revision': revision,
+                     'source_sha256': provider_facts['source_sha256']}
+            if execution is not None:
+                value['physical_execution'] = execution
+        elif physical:
+            from pathlib import Path
+            from .provenance import construction_revision
+
+            factory, execution = selection
+            source_sha256 = {
+                'original_closure': context.composition.intent.task_source_closure_sha256,
+                'projected_closure': compiled.source.source_closure_digest,
+            }
+            value = {'artifact': compiled.artifact, 'source': compiled.source,
+                     'task_source': context.composition.task_source,
+                     'controller': execution.controllers[0], 'solution': None,
+                     'physical_execution': execution,
+                     'source_revision': construction_revision(Path(__file__).resolve().parents[3]),
+                     'source_sha256': source_sha256}
+            if reset_selection:
+                value['_physical_controller_factory'] = factory
+        else:
+            value = {'artifact': compiled.artifact, 'source': compiled.source,
+                     'controller': selection, 'solution': None}
+            if context.composition.reset_plan is not None:
+                value['reset_plan'] = context.composition.reset_plan
+        task_value = compile_control(compiled, context, selection, request)
+        if source_format == 'usd':
+            from ...controllers.canonical.contracts import digest
+
+            runtime_facts = {**provider_facts, 'source_revision': revision,
+                             'controller_identity': controller.identity}
+            task_facts = task_value.get('resolved_configuration', {})
+            if runtime_facts.keys() & task_facts.keys():
+                raise ValueError('Task configuration conflicts with Runtime construction facts')
+            resolved = {**runtime_facts, **task_facts}
+            task_value = {**task_value, 'resolved_configuration': resolved,
+                          'recipe_identity': digest(resolved)}
+        elif physical:
+            runtime_facts = {'provider': request.provider, 'backend': request.backend,
+                'source_composition_intent_v1_sha256': context.composition.intent.identity_hash,
+                'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
+                'control_kind': physical_kind, **source_sha256,
+                'physical_binding': execution.compiled.binding.identity_hash}
+            task_facts = task_value.get('resolved_configuration', {})
+            if runtime_facts.keys() & task_facts.keys():
+                raise ValueError('Task configuration conflicts with Runtime construction facts')
+            task_value = {**task_value, 'resolved_configuration': {**runtime_facts, **task_facts}}
+        if value.keys() & task_value.keys():
+            raise ValueError('Task construction conflicts with source or Controller ownership')
+        return {**value, **task_value}
+
     if source_format == 'usd':
         from .isaac_usd_admission import validate_f06_controller_profile
         validate_f06_controller_profile(controller_profile)
@@ -414,11 +484,9 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                 dynamic_profile=context.dynamic_profile, velocity_limit=velocity_limit,
                 tcp_profile=tcp_profile, physical_kind=physical_kind, native_drive=native_drive,
                 effort_settings=task_settings(physical_kind) if physical_kind is not None else None),
-            compile_control=compile_control)
+            compile_control=finish_control)
     if source_format != 'mjcf':
         raise ValueError('Panda reference requires an admitted source format')
-    physical = physical_kind is not None
-
     def compose(compiled, context, request):
         reference_robot = getattr(context, 'reference_robot', context.robot)
         declaration = (None if reference_robot is None else
@@ -445,7 +513,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
                 kind=physical_kind, task_settings=task_settings, dynamic_parameters=reset_selection,
                 gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
                                        if reset_selection else None)),
-            compile_control=compile_control)
+            compile_control=finish_control)
     from ...controllers.canonical.execution import build_reference_position_controller
     return SourceBoundTaskBuilder(
         compile_source, None, backend=backend, allow_sampled_reset=False,
@@ -453,7 +521,7 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
         controller_options=lambda compiled, context, request: dict(
             profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
             force_limit_N=force_limit_N, joint_velocity_limit_rad_s=velocity_limit),
-        compile_control=compile_control)
+        compile_control=finish_control)
 
 
 def validate_effort_robot_intent(intent, source, execution, *, controller_profile):
