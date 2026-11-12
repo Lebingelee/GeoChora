@@ -248,12 +248,38 @@ def test_readiness_from_resolved_config_matches_source_bound_readiness():
         PickCubeReadinessConfig.from_source(artifact, source, **options)
 
 
+def test_custom_action_config_produces_same_mjcf_and_usd_readiness():
+    from dataclasses import replace
+    from pathlib import Path
+    from task_env.runtime.sessions.source import source_resource_receipt
+    from task_env.tasks.pick_cube import specialization
+
+    root = Path(__file__).resolve().parents[4]
+    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    if not manifest.is_file():
+        pytest.skip('verified Isaac source delivery is unavailable')
+    config = specialization._environment_config()
+    changed = replace(config, action=replace(config.action,
+        ik_position_deadband=config.action.ik_position_deadband * 2))
+    mjcf = specialization.build_reference(controller_profile='r3_continuous_v1',
+                                           resolved_config=changed, include_solution=False)
+    try:
+        usd = specialization.build_isaac_reference(delivery_manifest=manifest, horizon=8,
+                                                   resolved_config=changed, include_solution=False)
+        assert mjcf['readiness'].identity == usd['readiness'].identity
+        default_solution = specialization.build_readiness_solution()
+        assert mjcf['readiness'].identity != default_solution.readiness_config.identity
+    finally:
+        source_resource_receipt(mjcf['source']).close()
+
+
 def test_usd_readiness_rejects_foreign_artifact_timebase(monkeypatch):
     from types import SimpleNamespace
+    from task_env.runtime.sessions import isaac_usd_admission
     from task_env.tasks.pick_cube import specialization
 
     foreign = SimpleNamespace(artifact=SimpleNamespace(timebase=object()))
-    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1',
+    monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input',
                         lambda *args, **kwargs: foreign)
     with pytest.raises(ValueError, match='timebase differs'):
         specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
@@ -414,14 +440,15 @@ def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, m
     if not original.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     manifest = install_usd_delivery(original, provider='isaacsim', robot_uid='panda-v1', root=tmp_path)
-    build_input = specialization.build_pickcube_isaac_runtime_input_v1
+    from task_env.runtime.sessions import isaac_usd_admission
+    build_input = isaac_usd_admission.compile_f06_task_input
     def corrupt_after_admission(*args, **kwargs):
         value = build_input(*args, **kwargs)
         delivery = value.runtime_source.scene_source.loaded_delivery
         entry = delivery.manifest_path.parent / delivery.delivery.source_entry_file
         entry.write_bytes(entry.read_bytes() + b'\n<!-- changed -->\n')
         return value
-    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', corrupt_after_admission)
+    monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', corrupt_after_admission)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
                       'physics_device': 'cuda:0', 'deployment': 'in_process',

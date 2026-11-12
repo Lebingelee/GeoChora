@@ -218,7 +218,8 @@ def test_each_public_environment_owns_its_binding_and_source(uid):
 
 def test_usd_task_scene_uses_the_supplied_robot(monkeypatch):
     from task_env.runtime.sessions import source_scene_import
-    from task_env.tasks.pick_cube.specialization import _configuration, build_pickcube_isaac_scene
+    from task_env.runtime.sessions.isaac_usd_admission import build_f06_task_scene
+    from task_env.tasks.pick_cube.specialization import _configuration, build_pickcube_scene
 
     robot = PandaAgent()
     original = source_scene_import.declare_panda_scene
@@ -229,7 +230,7 @@ def test_usd_task_scene_uses_the_supplied_robot(monkeypatch):
         return original(subject, **kwargs)
 
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture)
-    scene = build_pickcube_isaac_scene(_configuration(), robot=robot)
+    scene = build_f06_task_scene(_configuration(), robot=robot, build_task_scene=build_pickcube_scene)
     assert used == [robot]
     assert scene.robots[0].entity_id == 'panda-v1'
 
@@ -286,6 +287,7 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
 @pytest.mark.parametrize('physical', [False, True])
 def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
     from task_env.runtime.sessions import source as source_module
+    from task_env.runtime.sessions import isaac_usd_admission
     from task_env.tasks.pick_cube import specialization
 
     failure = RuntimeError('USD source preparation failed')
@@ -295,7 +297,7 @@ def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
         raise failure
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
     monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected)
-    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', fail)
+    monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', fail)
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(
             delivery_manifest='unused', include_solution=False,
@@ -308,6 +310,7 @@ def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
 def test_usd_readiness_failure_prevents_delivery_construction(monkeypatch):
     from task_env.tasks.pick_cube import specialization
     from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
+    from task_env.runtime.sessions import isaac_usd_admission
 
     failure = RuntimeError('readiness failed')
     def fail(*args, **kwargs):
@@ -315,7 +318,7 @@ def test_usd_readiness_failure_prevents_delivery_construction(monkeypatch):
     def unexpected(*args, **kwargs):
         pytest.fail('delivery must not be built after failed readiness')
     monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', fail)
-    monkeypatch.setattr(specialization, 'build_pickcube_isaac_runtime_input_v1', unexpected)
+    monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', unexpected)
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
     assert raised.value is failure
@@ -559,6 +562,7 @@ def test_pickcube_scene_representations_share_task_artifact_compiler():
     from task_env.artifacts import FrameReference
     from task_env.assembly.panda_box import compile_panda_box_mjcf_task
     from task_env.robots.panda import PandaAgent
+    from task_env.runtime.sessions.isaac_usd_admission import build_f06_task_scene
     from task_env.tasks.pick_cube import specialization as task
 
     config = task._configuration()
@@ -567,7 +571,10 @@ def test_pickcube_scene_representations_share_task_artifact_compiler():
     mjcf_source, mjcf_scene, mjcf, _, _ = compile_panda_box_mjcf_task(
         config, robot, legacy, build_task_scene=task.build_pickcube_scene,
         compile_task_artifact=task.compile_pickcube_task_artifact)
-    usd_source, usd_scene, usd = task.compile_pickcube_isaac_task_artifact(config, legacy, robot=robot)
+    usd_scene = build_f06_task_scene(config, robot=robot, build_task_scene=task.build_pickcube_scene)
+    usd_source, usd = task.compile_pickcube_task_artifact(config, usd_scene, legacy,
+        frame_bindings={'panda-v1/base': FrameReference('panda-v1', 'link0'),
+                        'panda-v1/ee': FrameReference('panda-v1', 'ee')}, cube_frame='cube')
     assert mjcf_source.identity_hash == usd_source.identity_hash
     assert mjcf.semantics == usd.semantics == legacy.semantics
     assert mjcf.initialization == usd.initialization == legacy.initialization

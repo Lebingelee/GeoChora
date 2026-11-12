@@ -45,7 +45,7 @@ from ...registry import make_agent, make_object, make_scene, register_env
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import ControlBinding
 from ...robots.panda import PandaAgent, panda_reference_control_binding
-from ...runtime.sessions.source import RuntimeSource, UsdRuntimeInputV1
+from ...runtime.sessions.source import RuntimeSource
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
 from ...objects.pick_cube import (
@@ -71,9 +71,8 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "postclose_hold_s": 0.1,
 }
 
-from .task import (semantic_definition, task_binding_fields, build_pickcube_isaac_scene,
-    build_pickcube_scene, compile_pickcube_task_artifact,
-    compile_pickcube_isaac_task_artifact, _canonical_task_recipe)
+from .task import (semantic_definition, task_binding_fields, build_pickcube_scene,
+    compile_pickcube_task_artifact, _canonical_task_recipe)
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -274,21 +273,26 @@ def _readiness_options(artifact, *, is_r3_profile, dynamic_profile):
     )
 
 
+def _resolve_readiness_declaration(task_config, controller_profile, resolved_config):
+    """Resolve the Task's profile and action configuration for every source route."""
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
+    dynamic_profile, profile_source = (_r3_dynamic_profile() if is_r3_profile else (None, None))
+    config = _environment_config(task_config) if resolved_config is None else resolved_config
+    if is_r3_profile:
+        config = _nut_aligned_environment_config(config)
+    return config, is_r3_profile, dynamic_profile, profile_source
+
+
 def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
                               lift_height_m=None, task_config=None, robot=None):
     """Prepare the Task source and readiness for a Position Solution."""
 
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
-    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
-        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
-    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
-    dynamic_profile, profile_source = (_r3_dynamic_profile()
-                                       if is_r3_profile else (None, None))
-    if is_r3_profile:
-        resolved_config = _nut_aligned_environment_config(
-            _environment_config(task_config) if resolved_config is None else resolved_config)
-    config = _environment_config(task_config) if resolved_config is None else resolved_config
+    config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
+        task_config, controller_profile, resolved_config)
     compiled = compile_panda_box_task(_declaration(lift_height_m=lift_height_m, task_config=task_config),
                                       config=config, robot=robot, backend=backend)
     artifact, source, config = compiled.artifact, compiled.source, compiled.source.config
@@ -502,13 +506,8 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
     task_config = _configuration() if task_config is None else task_config
-    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
-        raise ValueError(f'unsupported PickCube controller_profile: {controller_profile!r}')
-    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
-    dynamic_profile, profile_source = (_r3_dynamic_profile() if is_r3_profile else (None, None))
-    config = _environment_config(task_config) if resolved_config is None else resolved_config
-    if is_r3_profile:
-        config = _nut_aligned_environment_config(config)
+    config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
+        task_config, controller_profile, resolved_config)
     config = replace(config, runtime=replace(config.runtime, backend='cpu'))
     artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
     readiness = PickCubeReadinessConfig.from_resolved_config(
@@ -517,9 +516,13 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
     source_ids = _source_identity_files(None, PickCubeReadinessSolution,
                                         profile_source=profile_source, provider='isaacsim')
     robot = make_agent('panda-v1') if robot is None else robot
-    runtime_input = build_pickcube_isaac_runtime_input_v1(
-        delivery_manifest, task_seed=request.seed, horizon=request.horizon, task_config=task_config,
-        physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m)
+    from ...runtime.sessions.isaac_usd_admission import compile_f06_task_input
+    runtime_input = compile_f06_task_input(
+        delivery_manifest=delivery_manifest, legacy_artifact=artifact, robot=robot,
+        task_config=task_config, build_task_scene=build_pickcube_scene,
+        compile_task_artifact=compile_pickcube_task_artifact,
+        task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
+        seed=request.seed, horizon=request.horizon, physical_fixture=physical_fixture)
     if runtime_input.artifact.timebase != artifact.timebase:
         raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
     runtime_input.runtime_source.scene_source.assert_fresh()
@@ -641,13 +644,8 @@ def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous
     robot = make_agent('panda-v1')
     robot.source_recipe_for_profile(controller_profile)
     task_config = _configuration()
-    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
-        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
-    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
-    dynamic_profile, _ = _r3_dynamic_profile() if is_r3_profile else (None, None)
-    config = _environment_config(task_config)
-    if is_r3_profile:
-        config = _nut_aligned_environment_config(config)
+    config, is_r3_profile, dynamic_profile, _ = _resolve_readiness_declaration(
+        task_config, controller_profile, None)
     if backend not in {'cpu', 'cuda'}:
         raise ValueError('PickCube reference backend must be cpu or cuda')
     artifact = build_artifact(task_config=task_config)
@@ -944,30 +942,3 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
                     'joint_velocity_units': ['rad/s'] * 7 + ['m/s'] * 2,
                 })
         return binding
-
-
-
-def build_pickcube_isaac_runtime_input_v1(
-    delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
-    task_config=None, physical_fixture=False, robot=None, lift_height_m=None,
-) -> UsdRuntimeInputV1:
-    """Build the current PickCube Task and public USD source through Core owners."""
-
-    from ...runtime.sessions.isaac_usd_admission import prepare_f06_task_delivery
-    loaded, variant = prepare_f06_task_delivery(
-        delivery_manifest, seed=task_seed, horizon=horizon, physical_fixture=physical_fixture)
-    task_config = _configuration() if task_config is None else task_config
-    legacy_artifact = build_artifact(task_config=task_config, lift_height_m=lift_height_m)
-    if variant is not None:
-        legacy_artifact = replace(legacy_artifact, artifact_id=variant)
-    if robot is None:
-        from ...registry import AGENT_REGISTRY
-        robot = AGENT_REGISTRY.create('panda-v1')
-    task_source, scene, artifact = compile_pickcube_isaac_task_artifact(
-        task_config, legacy_artifact, robot=robot,
-    )
-    from ...runtime.sessions.isaac_usd_admission import compile_f06_task_input
-    return compile_f06_task_input(
-        loaded=loaded, task_source=task_source, artifact=artifact, scene=scene, robot=robot,
-        task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        seed=task_seed, horizon=horizon)

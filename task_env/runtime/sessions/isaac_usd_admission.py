@@ -230,11 +230,22 @@ def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_fixt
     return loaded, variant
 
 
-def compile_f06_task_input(*, loaded, task_source, artifact, scene, robot,
-                           task_scene_recipe_sha256, seed, horizon):
-    """Lower an admitted F06 Task/Robot declaration to its exact USD input."""
+def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, robot,
+                           build_task_scene, compile_task_artifact, task_scene_recipe_sha256,
+                           seed, horizon, physical_fixture):
+    """Admit the delivery and lower Task/Robot declarations to the exact USD input."""
+    from dataclasses import replace
+    from ...artifacts import FrameReference
     from .source import bind_declared_usd_paths
 
+    loaded, variant = prepare_f06_task_delivery(
+        delivery_manifest, seed=seed, horizon=horizon, physical_fixture=physical_fixture)
+    if variant is not None:
+        legacy_artifact = replace(legacy_artifact, artifact_id=variant)
+    scene = build_f06_task_scene(task_config, robot=robot, build_task_scene=build_task_scene)
+    task_source, artifact = compile_task_artifact(task_config, scene, legacy_artifact,
+        frame_bindings={'panda-v1/base': FrameReference('panda-v1', 'link0'),
+                        'panda-v1/ee': FrameReference('panda-v1', 'ee')}, cube_frame='cube')
     options = {'f06_goal': 'PickCube-Harness-three-backend-example',
                'lowering': 'pickcube-desktop-physx-native-mimic-v1',
                'delivery_manifest_sha256': loaded.manifest_bytes_sha256,

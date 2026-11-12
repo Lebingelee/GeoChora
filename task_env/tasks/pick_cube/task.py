@@ -296,15 +296,6 @@ SCHEMA_VERSION = "pick-cube-isaac-scene-v1"
 SCENE_RECIPE_ID = "pick-cube-isaac-desktop-scene-v1"
 
 
-def build_pickcube_isaac_scene(task_config: dict, *, robot=None) -> SceneDefinition:
-    """Compose the Task scene with the admitted provider's Robot asset identity."""
-    if robot is None:
-        from ...registry import AGENT_REGISTRY
-        robot = AGENT_REGISTRY.create('panda-v1')
-    from ...runtime.sessions.isaac_usd_admission import build_f06_task_scene
-    return build_f06_task_scene(task_config, robot=robot, build_task_scene=build_pickcube_scene)
-
-
 def build_pickcube_scene(task_config, *, robot_scene, robot_asset, ee_frame, cube_frame, cube_joint, table_frame):
     """Compose Task entities with an already declared Robot and source frame names."""
     scene_id = robot_scene.scene_id
@@ -390,19 +381,6 @@ def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame
     artifact = replace(artifact, legacy_frame_bindings=bindings)
     artifact.validate_scene(scene)
     return task_source, artifact
-
-
-def compile_pickcube_isaac_task_artifact(task_config: dict, legacy_artifact, *, robot=None):
-    """Compile the existing PickCube v0 semantics against its USD Scene."""
-    scene = build_pickcube_isaac_scene(task_config, robot=robot)
-    task_source, artifact = compile_pickcube_task_artifact(task_config, scene, legacy_artifact,
-        frame_bindings={
-            'panda-v1/base': FrameReference('panda-v1', 'link0'),
-            'panda-v1/ee': FrameReference('panda-v1', 'ee'),
-        }, cube_frame='cube')
-    return task_source, scene, artifact
-
-
 
 
 # Existing imports remain a thin bridge while repository callers migrate.
