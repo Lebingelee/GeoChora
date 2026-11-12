@@ -214,6 +214,7 @@ source迁出Task在U1实施，renderer迁出Env在U4实施；U5清除已被替�
 | E14～E16／G06／G07 | 只同步直接变化的文档/Skill；不清证据、旧refs/worktree或缓存，不merge/push/tag/发布；后续阶段不自动开始 |
 | GeoPhys公开构建接口 | S09需在实施时核对实际provider公开能力；当前只确认demo/test bootstrap使用，不预设缺陷或擅自改子模块pin |
 | Isaac采样／资源迁移 | 现有成功证据保留；若S21改了运行链，需要明确预算下的受影响真实采集，不得以冻结旧运行替代新行为 |
+| U2 isolated Isaac 启动预算偏差 | 第二次 reset 重建 worker，实际顺序启动两次 App，超过该次计划的单次启动上限；两次未并发。保留[计划与原始日志](../../../../../workspace/maintenance/v211_e05_e10_u2_20261112_001/isaac-isolated-worker-retry2/)，今后按 reset 重建次数冻结 App 启动上限；该事实不改写既有 5c 结论。 |
 
 本表仅登记新增的范围外问题、owner和为何不阻塞本单元；本单元合同被破坏时回到对应S格修复，不能随意延期或增加全矩阵。
 
@@ -238,8 +239,8 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 
 | 单元 | 状态 | 最终效果／提交／证据／未完成项 |
 | --- | --- | --- |
-| U1／S01～S06 | IMPLEMENTED | 输入 `5dd3d29a`；[实施结果、四任务调用、模式边界和证据](../maintenance/20261112_e05_e10_u1_source_delivery.md)。Scene、Robot 和 MJCF adapter 分别接收桌面、主体声明及物化；USD 路径按声明绑定；source snapshot 的创建与失败释放归编译 owner；两实体 attachment 与受限 Panda 资产 profile 分开，严格准入保留。三原生代表路线及 GeoPhys × MuJoCo RGB 按实际影响复验，具体范围见记录；本结果为实施者自评，E05 与整个优化尚未接收。 |
-| U2／S07～S12 | OPEN | 尚未实施 |
+| U1／S01～S06 | IMPLEMENTED | 输入 `5dd3d29a`，提交 `1a2bc947`；[实施结果、四任务调用、模式边界和证据](../maintenance/20261112_e05_e10_u1_source_delivery.md)。Scene、Robot 和 MJCF adapter 分别接收桌面、主体声明及物化；USD 路径按声明绑定；source snapshot 的创建与失败释放归编译 owner；两实体 attachment 与受限 Panda 资产 profile 分开，严格准入保留。三原生代表路线及 GeoPhys × MuJoCo RGB 按实际影响复验，具体范围见记录；本结果为实施者自评，E05 与整个优化尚未接收。 |
+| U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 初始化 facade 的 provider 缺口、旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
 | U3／S13～S18 | OPEN | 尚未实施 |
 | U4／S19～S25 | OPEN | 尚未实施 |
 | U5／S26～S30 | OPEN | 尚未实施 |

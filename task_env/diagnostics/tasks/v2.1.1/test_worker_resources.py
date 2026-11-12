@@ -213,3 +213,77 @@ def test_worker_prepares_isaac_by_provider_before_task_source(monkeypatch, uid, 
     finally:
         server.close()
         client.close()
+
+
+@pytest.mark.parametrize('close_fails', [False, True])
+def test_worker_app_open_failure_still_closes_owner(monkeypatch, close_fails):
+    import os
+    import sys
+    from task_env.runtime.sessions import isaac_native_io, worker
+    from task_env.runtime.sessions.transport import request_identity
+
+    payload = {'uid': 'pendulum-v1', 'selection': {'physics_provider': 'isaacsim'}}
+    events, replies = [], []
+    class Owner:
+        def open(self, **_kwargs):
+            events.append('open')
+            raise RuntimeError('open failed')
+        def close(self):
+            events.append('close')
+            if close_fails:
+                raise RuntimeError('close failed')
+    monkeypatch.setattr(isaac_native_io, '_process_app_owner', lambda **_kwargs: Owner())
+    monkeypatch.setattr(worker, '_receive', lambda _sock: {
+        'kind': 'build', 'request_identity': request_identity(payload), 'payload': payload})
+    monkeypatch.setattr(worker, '_validate_environment', lambda _payload: None)
+    monkeypatch.setattr(worker, '_send', lambda _sock, reply: replies.append(reply))
+    monkeypatch.setattr(worker, '_write_runtime_scope_receipt', lambda: None)
+    monkeypatch.setattr(worker, '_materialize_selected', lambda _payload: pytest.fail('unexpected build'))
+    server, client = socket.socketpair()
+    monkeypatch.setattr(sys, 'argv', ['worker', str(os.dup(server.fileno()))])
+    try:
+        if close_fails:
+            with pytest.raises(RuntimeError, match='close failed'):
+                worker.main()
+        else:
+            assert worker.main() == 1
+        assert events == ['open', 'close']
+        assert replies[0]['kind'] == 'startup_error'
+        assert 'open failed' in replies[0]['error']['message']
+    finally:
+        server.close()
+        client.close()
+
+
+@pytest.mark.parametrize(('deployment', 'expected'), [
+    ('in_process', ['app-open']),
+    ('isolated_worker', []),
+])
+def test_parent_only_opens_isaac_for_in_process_source(monkeypatch, deployment, expected):
+    from contextlib import contextmanager
+    import sys
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions import isaac_native_io, provenance
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                      'physics_device': 'cuda:0', 'deployment': deployment,
+                      'interpreter': sys.executable},
+        'episode': {'horizon': 8},
+    })
+    events = []
+    @contextmanager
+    def app_source(**_kwargs):
+        events.append('app-open')
+        yield
+    class SourceConstructionReached(Exception):
+        pass
+    def stop_before_source(_cls, _config):
+        raise SourceConstructionReached()
+    monkeypatch.setattr(provenance, 'preflight_selected_source', lambda *_a, **_k: None)
+    monkeypatch.setattr(isaac_native_io, 'prepare_isaac_source', app_source)
+    monkeypatch.setattr(PickCubeReferenceEnv, '_build_selected_binding', classmethod(stop_before_source))
+    with pytest.raises(SourceConstructionReached):
+        PickCubeReferenceEnv.from_resolved_config(config)
+    assert events == expected

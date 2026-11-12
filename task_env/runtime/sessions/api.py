@@ -21,53 +21,21 @@ from ...controllers.canonical.feedback import (
 )
 from ...controllers.canonical.contracts import MixedActuatorCommandV1
 from .source import RuntimeSource, UsdRuntimeSourceV1, UsdRuntimeInputV1
+from .isaac_g05 import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
+from .mujoco_attachment_admission import _validate_fixed_attachment_materialization_source
+from .isaac_usd_admission import (
+    F06_PICKCUBE_ISAAC_PROFILE, _F06_DELIVERY_MANIFEST_SHA256_V1,
+    _F06_REPRESENTATION_V1, _F06_TASK_POLICY_SHA256_V1,
+    _validate_f06_isaac_delivery, load_f06_isaac_delivery,
+    f06_isaac_robot_geometry_root, _validate_usd_task_policy,
+    _validate_exact_admission_binding, _validate_f06_pickcube_isaac_input,
+    f06_capability_manifest, isaac_cuda_execution_spec,
+    build_usd_task_runtime_input, compile_usd_task_runtime_input,
+)
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
-F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
-G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
-
-
-def isaac_cuda_execution_spec(*, profile, seed):
-    """Declare the admitted single-session Isaac execution defaults."""
-    from ...artifacts import RendererSelectionV1
-
-    return ExecutionSpecV1(
-        'execution-spec-v1', 'isaacsim', 'cuda', profile, seed, 'best_effort',
-        RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
-        physics_device='cuda:0', camera_overrides=())
-
-
-def _validate_g05_isaac_effort_source(artifact, execution, source):
-    """Validate the existing G05 USD effort route before native materialization."""
-    execution.validate()
-    source.validate()
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode,
-            execution.render_default.provider, execution.render_default.backend,
-            execution.render_default.profile, execution.render_default.device,
-            execution.camera_overrides) != (
-            'isaacsim', 'cuda', 'cuda:0', G05_ISAAC_EFFORT_PROFILE, 'best_effort',
-            'none', 'cpu', 'none', None, ()):
-        raise ValueError('G05 Isaac effort profile is state-only and requires cuda:0')
-    if (source.task_artifact.identity_hash != artifact.identity_hash
-            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
-        raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
-    delivery = source.scene_source.loaded_delivery
-    representation = source.scene_source.representation
-    if (representation.provider, representation.provider_build_identity,
-            representation.representation_format, representation.runtime_admitted,
-            delivery.locally_validated, delivery.source_verified) != (
-            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, True, False):
-        raise ValueError('G05 Isaac effort source representation is not the exact local 6.2 USD route')
-    if delivery.delivery.representation_id != 'isaacsim-6.2.0.0-g05-mjcf-v1':
-        raise ValueError('G05 Isaac effort source delivery is not the reviewed MJCF conversion')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-            artifact.timebase.control_dt) != (0.002, 25, 0.05):
-        raise ValueError('G05 Isaac effort profile requires the task 2 ms / 25 substep timebase')
-    if set(source.joint_targets) != set(source.joints) or not source.joints:
-        raise ValueError('G05 Isaac effort source must expose an exact scalar joint target map')
 
 
 def close_session_and_runtime_owner(
@@ -125,77 +93,7 @@ def validate_selected_position_route(execution):
         raise ValueError('versioned Position construction has an unsupported provider execution route')
 
 
-_F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acbecb9a30667cdebf113e2'
-_F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
-# Digest of the task-owned USD binding and limits admitted with this delivery.
-_F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
-
-
-def _validate_f06_isaac_delivery(delivery, manifest_sha256):
-    """Keep the exact local delivery boundary in the provider admission owner."""
-    if (delivery.manifest_bytes_sha256 != manifest_sha256
-            or manifest_sha256 != _F06_DELIVERY_MANIFEST_SHA256_V1
-            or delivery.delivery.representation_id != _F06_REPRESENTATION_V1
-            or not delivery.locally_validated or delivery.source_verified):
-        raise ValueError('F06 requires its exact locally validated, non-upstream Isaac desktop USD')
-
-
-def load_f06_isaac_delivery(manifest_path):
-    """Load and admit the reviewed desktop USD delivery before building a source."""
-    from ...assembly.usd_delivery import load_usd_asset_delivery
-
-    delivery = load_usd_asset_delivery(manifest_path)
-    _validate_f06_isaac_delivery(delivery, delivery.manifest_bytes_sha256)
-    return delivery
-
-
-def f06_isaac_robot_geometry_root(delivery):
-    """Locate the robot hierarchy within the admitted desktop delivery."""
-    _validate_f06_isaac_delivery(delivery, delivery.manifest_bytes_sha256)
-    return f'{delivery.delivery.entry_prim}/panda/Geometry'
-
-
-def build_usd_task_runtime_input(*, schema_version, task_source, artifact, source,
-                                 execution, reset_plan, controller_profile,
-                                 horizon, horizon_min, horizon_max):
-    """Build source-bound USD admission inputs from the actual Runtime mappings."""
-    policy = {
-        'schema_version': 'usd-task-admission-policy-v1',
-        'bindings': {name: dict(getattr(source, name))
-                     for name in ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')},
-        'controller_profile': controller_profile,
-        'horizon_min': horizon_min, 'horizon_max': horizon_max,
-    }
-    return UsdRuntimeInputV1(schema_version, task_source, artifact, source, execution,
-        reset_plan, controller_profile, horizon,
-        source.scene_source.loaded_delivery.manifest_bytes_sha256, policy)
-
-
-def compile_usd_task_runtime_input(*, loaded, task_source, artifact, scene, options,
-                                   joints, bodies, frames, free_joints, seed, horizon,
-                                   schema_version, profile, controller_profile,
-                                   horizon_min, horizon_max, provider_build_identity):
-    """Compile a USD delivery and reset into a source-bound input.
-
-    The task supplies its scene and semantic mappings; the provider owner
-    controls delivery admission, native representation and execution profile.
-    """
-    from ...environment.task_source import sample_episode_reset_plan
-    from .source import build_usd_runtime_source
-
-    source = build_usd_runtime_source(
-        loaded=loaded, provider='isaacsim', provider_build_identity=provider_build_identity,
-        options=options, task_source_identity_sha256=task_source.identity_hash,
-        artifact=artifact, scene=scene, joints=joints, bodies=bodies, frames=frames,
-        free_joints=free_joints, joint_targets=joints)
-    reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
-    execution = isaac_cuda_execution_spec(profile=profile, seed=seed)
-    return build_usd_task_runtime_input(
-        schema_version=schema_version, task_source=task_source,
-        artifact=artifact, source=source, execution=execution, reset_plan=reset_plan,
-        controller_profile=controller_profile, horizon=horizon,
-        horizon_min=horizon_min, horizon_max=horizon_max)
 
 
 class RuntimeSession(Protocol):
@@ -278,90 +176,8 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
     )
 
 
-def _validate_usd_task_policy(input_v1, expected_sha256):
-    """Verify a pinned task declaration before trusting its binding and limits."""
-    from ...controllers.canonical.contracts import digest
-
-    policy = input_v1.admission_policy
-    if type(policy) is not dict:
-        raise ValueError('USD task admission policy is missing or malformed')
-    try:
-        valid_identity = digest(policy) == expected_sha256
-    except (TypeError, ValueError):
-        valid_identity = False
-    if not valid_identity:
-        raise ValueError('USD task admission policy differs from the trusted policy identity')
-    bindings = policy['bindings']
-    source = input_v1.runtime_source
-    if any(dict(getattr(source, name)) != bindings[name]
-           for name in ('joints', 'joint_targets', 'bodies', 'frames', 'free_joints')):
-        raise ValueError('USD RuntimeSource differs from its exact task binding map')
-    if (input_v1.controller_profile != policy['controller_profile']
-            or type(input_v1.horizon) is not int
-            or not policy['horizon_min'] <= input_v1.horizon <= policy['horizon_max']):
-        raise ValueError('USD task requires its frozen controller and horizon limit')
-
-
-def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) -> None:
-    """Admit the exact locally validated PickCube desktop USD F06 input."""
-    if type(input_v1) is not UsdRuntimeInputV1:
-        raise TypeError('F06 Isaac materialization requires its exact PickCube RuntimeInputV1')
-    _validate_exact_admission_binding(input_v1, artifact, execution, source,
-                                      'F06 materialization differs from its exact Task/Scene/Execution identities')
-    if input_v1.schema_version != 'pick-cube-isaac-runtime-input-v1':
-        raise ValueError('unsupported PickCube Isaac RuntimeInput schema')
-    delivery = input_v1.runtime_source.scene_source.loaded_delivery
-    _validate_f06_isaac_delivery(delivery, input_v1.delivery_manifest_sha256)
-    _validate_usd_task_policy(input_v1, _F06_TASK_POLICY_SHA256_V1)
-    if (input_v1.execution.physics_provider, input_v1.execution.physics_backend,
-            input_v1.execution.physics_profile, input_v1.execution.physics_device,
-            input_v1.execution.provider_seed, input_v1.execution.determinism_mode) != (
-            "isaacsim", "cuda", F06_PICKCUBE_ISAAC_PROFILE, "cuda:0",
-            input_v1.reset_plan.reset_sample.task_seed, "best_effort"):
-        raise ValueError("F06 ExecutionSpec differs from its frozen Isaac provider/seed profile")
-
-
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.physics_profile, execution.determinism_mode) != (
-            'isaacsim', 'cuda', 'cuda:0', F06_PICKCUBE_ISAAC_PROFILE, 'best_effort'):
-        raise ValueError('unsupported F06 PickCube Isaac CUDA/PhysX execution intersection')
-    representation = source.scene_source.representation
-    if (representation.provider, representation.provider_build_identity,
-            representation.representation_format, representation.runtime_admitted,
-            representation.source_verified, source.scene_source.locally_validated,
-            source.scene_source.source_verified) != (
-            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
-        raise ValueError('F06 admission requires its exact locally validated non-upstream USD')
-    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
-            != input_v1.delivery_manifest_sha256
-            or dict(source.joints) != dict(source.joint_targets)):
-        raise ValueError('F06 delivery or exact PickCube source Joint identity changed')
-    if execution.render_default.provider != 'none' or execution.camera_overrides:
-        raise ValueError('F06 Core cell is state-only and does not admit a renderer')
-
-
 def _f06_pickcube_isaac_capability_manifest(artifact):
-    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
-    import os
-
-    # The Artifact request cannot expand this fixed source-bound adapter.
-    names = sorted(CAPABILITIES)
-    version = os.environ.get('GEOCHORA_SELECTED_ISAAC_VERSION', '6.2.0.0')
-    if version not in {'6.1.0.0', '6.2.0.0'}:
-        raise ValueError('F06 capability manifest requires an admitted Isaac release')
-    return ProviderCapabilityManifest(
-        'provider-capability-v0', 'isaacsim', version,
-        'f06-pickcube-desktop-native-mimic-v1', 'cuda', F06_PICKCUBE_ISAAC_PROFILE,
-        'none', 'best_effort',
-        tuple(CapabilityClaim(name, 'implemented', 'F06-exact-PickCube-desktop-source-bound-cell')
-              for name in names),
-        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
-        'bounded F06 PickCube Isaac desktop cell; no provider-wide qualification',
-    )
-
-
-
-
+    return f06_capability_manifest(artifact, CAPABILITIES)
 
 
 def _session_admission_input_route(input_v1) -> str | None:
@@ -382,14 +198,6 @@ def _require_session_admission_input_route(input_v1, expected, message):
         raise TypeError(message) from error
     if actual != expected:
         raise TypeError(message)
-
-
-def _validate_exact_admission_binding(input_v1, artifact, execution, source, message):
-    input_v1.validate()
-    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
-            or type(execution) is not ExecutionSpecV1
-            or execution.identity_hash != input_v1.execution.identity_hash):
-        raise ValueError(message)
 
 
 def _close_failed_native_materialization(
@@ -737,139 +545,6 @@ def _validate_v1_materialization_source(
                 f'RuntimeSource Frame {legacy_name!r} does not uniquely target its canonical Scene Frame'
             )
 
-
-def _validate_fixed_attachment_materialization_source(artifact, execution, source) -> None:
-    """Preflight the one fixed Panda Arm+Hand plan before native import/compile."""
-    from ...artifacts import FixedAttachmentPlanV1, LogicalAssemblyV1
-    from ...assembly.panda_source_profiles import (
-        R06B_ORDER_ASSET_VERSION, R06B_ORDER_RECIPE_ID, R06B_ORDER_SOURCE_SHA256,
-        R06B_ORDER_SOURCE_REFERENCES, fixed_attachment_source_recipe,
-    )
-    from ...assembly import panda_source_profiles
-    from ...assembly.fixed_attachment import lower_fixed_attachment_sources
-
-    plan = source.fixed_attachment_plan
-    if type(plan) is not FixedAttachmentPlanV1 or type(source.fixed_attachment_assembly) is not LogicalAssemblyV1:
-        raise TypeError('fixed Attachment materialization requires the typed R03b plan and Assembly')
-    if execution.physics_provider != 'mujoco' or execution.backend != 'cpu' or execution.render_provider != 'none':
-        raise ValueError('fixed Attachment materialization is bounded to MuJoCo CPU without rendering')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps, artifact.timebase.control_dt) != (
-        0.002, 5, 0.01,
-    ):
-        raise ValueError('fixed Attachment materialization requires the R03b 2 ms / 100 Hz timebase')
-    if source.free_joints:
-        raise ValueError('fixed Attachment must not admit a free root joint')
-    scene = source.scene_definition
-    if scene is None:
-        raise ValueError('fixed Attachment materialization requires a pinned canonical Scene-v3')
-    artifact.validate_scene(scene)
-    panda_source_profiles.validate_panda_fixed_attachment_scene(plan, source.fixed_attachment_assembly, scene)
-    sources = source.fixed_attachment_sources
-    if set(sources) != {'panda-arm', 'panda-hand'}:
-        raise ValueError('fixed Attachment source pair differs from the exact two-Entity recipe')
-    recipe = fixed_attachment_source_recipe(
-        sources['panda-arm'].xml, sources['panda-hand'].xml,
-    )
-    expected_asset_version = (R06B_ORDER_ASSET_VERSION if recipe == R06B_ORDER_RECIPE_ID
-                              else 'menagerie-b846dd12')
-    expected_source_hashes = (
-        (R06B_ORDER_SOURCE_SHA256['panda-arm'], R06B_ORDER_SOURCE_SHA256['panda-hand'])
-        if recipe == R06B_ORDER_RECIPE_ID else (
-            'e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071',
-            'd2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a',
-        )
-    )
-    expected_scene_id = ('phase-ii-r06b-order-v1-fixed-attachment'
-                         if recipe == R06B_ORDER_RECIPE_ID else 'phase-ii-r03b-fixed-attachment')
-    expected_assembly_revision = (R06B_ORDER_RECIPE_ID if recipe == R06B_ORDER_RECIPE_ID
-                                  else 'r03b-001')
-    expected_task_ids = ({'phase-ii-r06b-order-v1-fixed-arm-hand',
-                          'phase-ii-r06b-order-v1-attached-leaf-position'}
-                         if recipe == R06B_ORDER_RECIPE_ID else
-                         {'phase-ii-r03b-fixed-arm-hand', 'phase-ii-r03c-attached-leaf-position'})
-    if (
-        plan.parent_entity_id, plan.child_entity_id,
-        plan.parent_asset_id, plan.parent_asset_version,
-        plan.child_asset_id, plan.child_asset_version,
-        plan.parent_source_sha256, plan.child_source_sha256,
-        plan.license_source_sha256, plan.parent_mount_site_name,
-        plan.child_mount_body_name, plan.namespace_prefix,
-        plan.parent_mount.frame_id, plan.child_mount.frame_id,
-        plan.parent_root.frame_id, plan.child_root.frame_id,
-        plan.reset_hand_opening_m, plan.assembly_revision,
-        scene.scene_id,
-    ) != (
-        'panda-arm', 'panda-hand', 'panda-arm-nohand', expected_asset_version,
-        'panda-hand', expected_asset_version,
-        *expected_source_hashes,
-        'a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9',
-        'attachment_site', 'probe_hand_hand', 'probe_hand_',
-        'attachment_site', 'hand', 'link0', 'hand', 0.076,
-        expected_assembly_revision, expected_scene_id,
-    ):
-        raise ValueError('fixed Attachment source pair differs from the accepted R03a source recipe')
-    if artifact.task_id not in expected_task_ids:
-        raise ValueError('fixed Attachment TaskArtifact identity differs from its exact source recipe')
-    if (
-        plan.parent_site_from_child_root.position,
-        plan.parent_site_from_child_root.quaternion_wxyz,
-        plan.attach_frame_from_child_worldbody.position,
-        plan.attach_frame_from_child_worldbody.quaternion_wxyz,
-    ) != (
-        (0.0, 0.0, 0.0), (0.9238795391929064, 0.0, 0.0, 0.38268341623423263),
-        (0.0, 0.0, 0.0), (0.38268341623423263, 0.0, 0.0, -0.9238795391929064),
-    ):
-        raise ValueError('fixed Attachment mount direction or child-frame compensation differs from the source oracle')
-    if plan.collision_policy != 'source_preserved' or plan.extra_cross_entity_overrides:
-        raise ValueError('fixed Attachment collision admission must preserve source filters and exclusions')
-    assets = {(asset.asset_id, asset.asset_version): asset for asset in scene.assets}
-    source_references = (
-        (R06B_ORDER_SOURCE_REFERENCES['panda-arm'], R06B_ORDER_SOURCE_REFERENCES['panda-hand'])
-        if recipe == R06B_ORDER_RECIPE_ID else (
-            'menagerie:franka_emika_panda/panda_nohand.xml',
-            'menagerie:franka_emika_panda/hand.xml',
-        )
-    )
-    for (asset_id, asset_version, source_reference) in zip(
-        (plan.parent_asset_id, plan.child_asset_id),
-        (plan.parent_asset_version, plan.child_asset_version), source_references, strict=True,
-    ):
-        asset = assets[(asset_id, asset_version)]
-        if (asset.source_reference, asset.source_revision, asset.license_id) != (
-            source_reference, 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7', 'Apache-2.0',
-        ):
-            raise ValueError('fixed Attachment Asset provenance differs from the pinned source recipe')
-    if source.task_artifact_hash != artifact.identity_hash:
-        raise ValueError('fixed Attachment RuntimeSource does not bind the exact TaskArtifact')
-    if source.scene_source.source_id != f'scene-definition-v3:{scene.identity_hash}':
-        raise ValueError('fixed Attachment RuntimeSource ID differs from the pinned Scene')
-    if set(source.joints) != set(artifact.initialization.joint_position):
-        raise ValueError('fixed Attachment Joint bindings do not cover the exact reset declaration')
-    if any(source.joints.get(key) != value for key, value in plan.native_joint_names.items()):
-        raise ValueError('fixed Attachment Joint binding differs from its Entity/native map')
-    if source.bodies != plan.native_body_names or source.frames != plan.native_site_names:
-        raise ValueError('fixed Attachment body/Site bindings differ from their explicit maps')
-    expected_arm_targets = {
-        f'{plan.parent_entity_id}/joint{index}': plan.native_actuator_names[
-            f'{plan.parent_entity_id}/actuator{index}'
-        ] for index in range(1, 8)
-    }
-    if dict(source.joint_targets) != expected_arm_targets:
-        raise ValueError('fixed Attachment Arm target mapping differs from its seven named actuator owners')
-    expected_hand_open = (plan.native_actuator_names[f'{plan.child_entity_id}/actuator8'],)
-    if source.open_actuators != expected_hand_open:
-        raise ValueError('fixed Attachment open-actuator mapping differs from source Hand actuator8')
-    # The source and path closure are re-read here, still before importing MuJoCo.
-    lowered = lower_fixed_attachment_sources(
-        parent_source=source.scene_source,
-        source_by_entity=source.fixed_attachment_sources,
-        scene=scene,
-        plan=plan,
-        assembly=source.fixed_attachment_assembly,
-        source_profile=panda_source_profiles,
-    )
-    if lowered.source_closure_sha256 != source.source_closure_digest:
-        raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
 def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None,
                           observer_render_request=None, legacy_observer_requested=False,

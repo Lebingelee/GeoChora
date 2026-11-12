@@ -28,11 +28,9 @@ def bootstrap_task_runtime(
     reset_sampler=None,
     create_render_source: bool = False,
 ) -> TaskRuntimeBootstrap:
-    from geophys.demo_runtime import assemble_mjcf_articulated_runtime
-    from geophys.test_runtime import init_test_backend
-    from solvers.rigid import RigidGroundConfig
+    from .provider_bootstrap import init_task_env_backend, materialize_task_scene
 
-    init_test_backend(config.runtime.backend)
+    init_task_env_backend(config.runtime.backend)
     compiled = compile_task_scene(
         composition=composition,
         scene=scene,
@@ -40,36 +38,8 @@ def bootstrap_task_runtime(
         objects=objects,
         scene_composer=scene_composer,
     )
-    solver_kwargs = {
-        "dt": config.runtime.physics_dt,
-        "gravity": config.runtime.gravity,
-        "integrator": config.runtime.integrator,
-        "ground": RigidGroundConfig(
-            height=-1.0,
-            visible=False,
-            contact_margin=0.0,
-        ),
-        "enable_ground_contact": False,
-        "enable_domain_boundary_contact": False,
-        "broadphase": config.runtime.broadphase,
-        "prewarm_kernels": False,
-    }
-    if config.runtime.rigid_solver_backend is not None:
-        solver_kwargs["rigid_solver_backend"] = config.runtime.rigid_solver_backend
-    if config.runtime.body_contact_solver_iterations is not None:
-        solver_kwargs["body_contact_solver_iterations"] = (
-            config.runtime.body_contact_solver_iterations
-        )
-
-    runtime = assemble_mjcf_articulated_runtime(
-        compiled.imported_scene,
-        scene_model=compiled.scene_model,
-        apply_mjcf_options=True,
-        default_dt=config.runtime.physics_dt,
-        default_gravity=config.runtime.gravity,
-        default_integrator=config.runtime.integrator,
-        solver_kwargs=solver_kwargs,
-        create_simulator=True,
+    runtime = materialize_task_scene(
+        compiled, config.runtime,
         create_render_source=bool(create_render_source or config.render.camera_obs),
     )
     resolve_initial_state = getattr(reset_sampler, "resolve_initial_state", None)

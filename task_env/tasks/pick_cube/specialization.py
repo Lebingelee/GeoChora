@@ -196,11 +196,14 @@ def _source_identity_files(controller, solution_type, *, profile_source=None, pr
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     if provider == 'mujoco':
         files.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
+    if provider == 'isaacsim':
+        files.add(root / 'task_env/runtime/sessions/isaac_usd_admission.py')
     if robot is not None and robot.source_recipe().mode == 'replace-task-subtree':
         files.update(root / path for path in (
             'task_env/assembly/fixed_attachment.py',
             'task_env/assembly/panda_fixed_source.py',
             'task_env/assembly/panda_source_profiles.py',
+            'task_env/runtime/sessions/mujoco_attachment_admission.py',
         ))
     if controller is not None:
         files.add(Path(inspect.getsourcefile(type(controller))).resolve())
@@ -525,7 +528,8 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
         lift_height_m=lift_height_m, robot=robot)
     with close_execution_source_on_failure(prepared.source):
         source_ids = _source_identity_files(None, PickCubeReadinessSolution,
-                                            profile_source=prepared.profile_source)
+                                            profile_source=prepared.profile_source,
+                                            provider='isaacsim')
         robot = prepared.source.agents[0]
         action_config = prepared.source.config.action
         runtime_input = build_pickcube_isaac_runtime_input_v1(

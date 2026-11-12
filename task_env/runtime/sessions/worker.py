@@ -271,9 +271,9 @@ def main():
         # Kit must establish its USD libraries before any Isaac source is
         # reconstructed, independently of which Task supplied that source.
         if payload.get('selection', {}).get('physics_provider') == 'isaacsim':
-            from .isaac_native_io import _process_app_owner, F06_ISAAC_APP_LAUNCH_PROFILE_V1
-            early_app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
-            early_app_owner.open(f06_compatibility=True)
+            from .isaac_native_io import isaac_worker_app_owner, open_isaac_worker_app
+            early_app_owner = isaac_worker_app_owner()
+            open_isaac_worker_app(early_app_owner)
         session, handlers, source, binding = _materialize_selected(payload)
         from .source import close_source_and_task_resources
         owned_closed = False

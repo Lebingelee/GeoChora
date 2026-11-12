@@ -461,6 +461,16 @@ def _process_app_owner(*, launch_profile_id: str | None = None) -> IsaacSimAppOw
         return _PROCESS_APP_OWNER
 
 
+def isaac_worker_app_owner() -> IsaacSimAppOwnerV1:
+    """Select the provider's App profile before worker source reconstruction."""
+    return _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+
+
+def open_isaac_worker_app(owner: IsaacSimAppOwnerV1) -> None:
+    """Open an already-owned worker App with the provider's SDK policy."""
+    owner.open(f06_compatibility=True)
+
+
 @contextmanager
 def prepare_isaac_source(*, rendering):
     """Open the process App before any SDK source inspection.

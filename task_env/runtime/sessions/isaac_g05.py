@@ -18,6 +18,37 @@ G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 G05_ISAAC_BUILD_IDENTITY = 'isaacsim-6.2.0.0'
 
 
+def _validate_g05_isaac_effort_source(artifact, execution, source):
+    """Admit the exact existing G05 USD effort route before native materialization."""
+    execution.validate()
+    source.validate()
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode,
+            execution.render_default.provider, execution.render_default.backend,
+            execution.render_default.profile, execution.render_default.device,
+            execution.camera_overrides) != (
+            'isaacsim', 'cuda', 'cuda:0', G05_ISAAC_EFFORT_PROFILE, 'best_effort',
+            'none', 'cpu', 'none', None, ()):
+        raise ValueError('G05 Isaac effort profile is state-only and requires cuda:0')
+    if (source.task_artifact.identity_hash != artifact.identity_hash
+            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
+        raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
+    delivery = source.scene_source.loaded_delivery
+    representation = source.scene_source.representation
+    if (representation.provider, representation.provider_build_identity,
+            representation.representation_format, representation.runtime_admitted,
+            delivery.locally_validated, delivery.source_verified) != (
+            'isaacsim', G05_ISAAC_BUILD_IDENTITY, 'usd', False, True, False):
+        raise ValueError('G05 Isaac effort source representation is not the exact local 6.2 USD route')
+    if delivery.delivery.representation_id != 'isaacsim-6.2.0.0-g05-mjcf-v1':
+        raise ValueError('G05 Isaac effort source delivery is not the reviewed MJCF conversion')
+    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+            artifact.timebase.control_dt) != (0.002, 25, 0.05):
+        raise ValueError('G05 Isaac effort profile requires the task 2 ms / 25 substep timebase')
+    if set(source.joint_targets) != set(source.joints) or not source.joints:
+        raise ValueError('G05 Isaac effort source must expose an exact scalar joint target map')
+
+
 def load_g05_isaac_delivery(manifest_path: str | Path) -> LoadedUsdDeliveryV1:
     """Load the exact local derived delivery used by a G05 task."""
     loaded = load_usd_asset_delivery(manifest_path)

@@ -927,7 +927,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             preflight_selected_source(config.execution_spec_v2,
                 requested=(None if config.requested_execution_json is None
                            else json.loads(config.requested_execution_json)), task_uid=cls.uid)
-            if provider == 'isaacsim':
+            if provider == 'isaacsim' and config.execution_spec_v2.deployment == 'in_process':
                 from ..runtime.sessions.isaac_native_io import prepare_isaac_source
                 preparation.enter_context(prepare_isaac_source(
                     rendering=render_mode is not None or camera is not None))

@@ -7,6 +7,20 @@ import pytest
 from task_env.runtime.sessions.api import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
 
 
+def test_f06_capability_manifest_stays_source_bounded(monkeypatch):
+    from task_env.runtime.sessions.api import _f06_pickcube_isaac_capability_manifest
+
+    monkeypatch.setenv('GEOCHORA_SELECTED_ISAAC_VERSION', '6.2.0.0')
+    manifest = _f06_pickcube_isaac_capability_manifest(None)
+    assert manifest.provider_name == 'isaacsim'
+    assert manifest.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+    assert 'rgb_camera' in manifest.known_unsupported
+    assert 'no provider-wide qualification' in manifest.evidence_reference
+    monkeypatch.setenv('GEOCHORA_SELECTED_ISAAC_VERSION', 'foreign')
+    with pytest.raises(ValueError, match='admitted Isaac release'):
+        _f06_pickcube_isaac_capability_manifest(None)
+
+
 @pytest.mark.parametrize('change', ['hash', 'representation', 'local_validation', 'upstream'])
 def test_f06_delivery_admission_rejects_foreign_identity(change):
     from task_env.runtime.sessions.api import _validate_f06_isaac_delivery
