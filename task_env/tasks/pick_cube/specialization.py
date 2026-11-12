@@ -276,6 +276,17 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         profile_source, artifact, source, readiness)
 
 
+def compile_reference_robot_task(task_config, robot, legacy_artifact, source):
+    """Compile the same Task/Robot scene before choosing its Controller."""
+    from ...runtime.sessions.source import bind_reference_scene_source
+
+    task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
+        task_config, robot, legacy_artifact)
+    source, projected, closure = bind_reference_scene_source(
+        source, artifact=artifact, scene=scene, bodies=bodies, frames=frames)
+    return task_source, scene, artifact, source, projected, closure
+
+
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
                     lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31, robot=None):
     """Construct the single selected P1.6 route without importing a provider."""
@@ -297,11 +308,8 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     with close_execution_source_on_failure(source):
         reset_plan = None
         if reference_robot is not None:
-            task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
-                task_config, reference_robot, artifact)
-            from ...runtime.sessions.source import bind_reference_scene_source
-            source, _, _ = bind_reference_scene_source(source, artifact=artifact,
-                scene=scene, bodies=bodies, frames=frames)
+            task_source, scene, artifact, source, _, _ = compile_reference_robot_task(
+                task_config, reference_robot, artifact, source)
             reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=task_seed)
         controller = build_reference_position_controller(
             artifact, source, profile_id=controller_profile, dynamic_profile=dynamic_profile,

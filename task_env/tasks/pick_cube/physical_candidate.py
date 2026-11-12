@@ -1,7 +1,6 @@
 """Source-traced PickCube MJCF physical-control candidate using the selected Env."""
 from __future__ import annotations
 
-from dataclasses import replace
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -34,7 +33,7 @@ def make_physical_binding(*, drive_mode, control_kind,
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...environment import sample_episode_reset_plan
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _prepare_reference_source, compile_pickcube_mjcf_task
+    from .specialization import _prepare_reference_source, compile_reference_robot_task
     from .task import (physical_task_binding_fields,
                        physical_execution_info, observe_physical_action)
 
@@ -54,11 +53,8 @@ def make_physical_binding(*, drive_mode, control_kind,
     with ExitStack() as resources:
         resources.callback(receipt.close)
         robot = original.agents[0]
-        task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
-            task_config, robot, legacy_artifact)
-        from ...runtime.sessions.source import bind_reference_scene_source
-        source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
-            scene=scene, bodies=bodies, frames=frames)
+        task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
+            task_config, robot, legacy_artifact, original)
         def build_physical(kind, **parameters):
             from ...controllers.canonical.dynamic_mass_effort import validate_reset_effort_parameters
             validate_reset_effort_parameters(parameters)

@@ -7,6 +7,24 @@ import pytest
 from task_env.runtime.sessions.mujoco_composition import panda_effort_source_limits
 
 
+def test_formal_position_and_effort_share_task_and_robot_scene():
+    from task_env import make_env
+
+    declarations = []
+    for profile in ('r3_continuous_v1', 'panda-joint-effort-reference-v1'):
+        env = make_env('pick-cube-p16-reference-v1', config={
+            'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+            'controller': {'profile_id': profile},
+        })
+        try:
+            source = env.value['source']
+            declarations.append((env.robot.uid, env.value['artifact'].identity_hash,
+                source.scene_definition.identity_hash, dict(source.bodies), dict(source.frames)))
+        finally:
+            env.close()
+    assert declarations[0] == declarations[1]
+
+
 def test_panda_source_preserves_paired_transmission_and_signed_limits():
     actuators = ''.join(
         f'<general name="actuator{i}" class="panda" joint="joint{i}" '
