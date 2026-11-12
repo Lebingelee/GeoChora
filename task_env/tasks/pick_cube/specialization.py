@@ -954,7 +954,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
 
 
-from ...artifacts import (ExecutionSpecV1, RendererSelectionV1, ArticulationDefinition,
+from ...artifacts import (ArticulationDefinition,
     AssetDefinition, EntityInstance, FrameDefinition, FrameReference, JointDefinition,
     SceneDefinition)
 from ...artifacts.execution import EpisodeResetPlanV1
@@ -1135,15 +1135,8 @@ def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
         ),
         "tabletop-v1/top": f"{entry}/tabletop_v1/top",
     }
-    scalar_joints = {}
-    for articulation in scene.articulations:
-        for joint in articulation.joints:
-            if joint.kind in {"revolute", "continuous", "prismatic"}:
-                semantic = f"{articulation.entity_id}/{joint.joint_id}"
-                scalar_joints[semantic] = joint.joint_id
-    required = set(artifact.legacy_joint_bindings)
-    if set(scalar_joints) != required:
-        raise ValueError("F06 USD binding map must cover every PickCube scalar Joint exactly")
+    from ...runtime.sessions.source import scalar_joint_source_bindings
+    scalar_joints = scalar_joint_source_bindings(scene, artifact)
     if set(body_paths) | set(frame_paths) != set(artifact.legacy_frame_bindings):
         raise ValueError("F06 USD body/frame map must cover every PickCube TaskArtifact runtime Frame")
     if set(artifact.initialization.poses_world) != {"cube-v1"}:
@@ -1196,12 +1189,8 @@ def build_pickcube_isaac_runtime_input_v1(
     reset_plan = sample_episode_reset_plan(
         task_source, scene, artifact, task_seed=task_seed,
     )
-    execution = ExecutionSpecV1(
-        "execution-spec-v1", "isaacsim", "cuda", ISAAC_PROFILE_V1,
-        task_seed, "best_effort", RendererSelectionV1(
-            "renderer-selection-v1", "none", "cpu", "none", None,
-        ), "cuda:0", (),
-    )
+    from ...runtime.sessions.api import isaac_cuda_execution_spec
+    execution = isaac_cuda_execution_spec(profile=ISAAC_PROFILE_V1, seed=task_seed)
     policy = {
         'schema_version': 'usd-task-admission-policy-v1',
         'bindings': {

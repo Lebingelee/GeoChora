@@ -29,6 +29,16 @@ F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 
 
+def isaac_cuda_execution_spec(*, profile, seed):
+    """Declare the admitted single-session Isaac execution defaults."""
+    from ...artifacts import RendererSelectionV1
+
+    return ExecutionSpecV1(
+        'execution-spec-v1', 'isaacsim', 'cuda', profile, seed, 'best_effort',
+        RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
+        physics_device='cuda:0', camera_overrides=())
+
+
 def _validate_g05_isaac_effort_source(artifact, execution, source):
     """Validate the existing G05 USD effort route before native materialization."""
     execution.validate()

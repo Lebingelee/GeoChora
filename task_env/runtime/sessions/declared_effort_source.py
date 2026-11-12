@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ...artifacts import ExecutionSpecV1, RendererSelectionV1
 from ...assembly.compiler import compile_reference_source
 from ...assembly.source import TaskSceneSource
-from .source import project_mjcf_scene_source
+from .source import project_mjcf_scene_source, scalar_joint_source_bindings
 
 
 def declared_effort_scene(robot, *, provider, source_delivery_manifest):
@@ -37,23 +36,22 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
     if len(articulations) != 1:
         raise ValueError('declared effort source requires one subject articulation')
     articulation = articulations[0]
-    joints = {f'{subject.entity_id}/{name}': name for name in robot.state_joint_names}
+    joints = scalar_joint_source_bindings(scene, artifact)
+    if set(joints) != {f'{subject.entity_id}/{name}' for name in robot.state_joint_names}:
+        raise ValueError('Robot state joints differ from the declared source Scene')
     frames = articulation.link_frame_ids
     body_names = {f'{subject.entity_id}/{name}': name for name in frames}
     torque_actuators = {f'{subject.entity_id}/{item.joint_id}': item.native_actuator
                         for item in declarations}
     if provider == 'isaacsim':
         from .isaac_g05 import G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source
+        from .api import isaac_cuda_execution_spec
         source = build_g05_isaac_runtime_source(
             delivery=source_delivery, artifact=artifact, scene=scene,
             task_source_identity_sha256=task_source.identity_hash, joints=joints,
             articulation=articulation, body_names=body_names,
             frames={}, free_joints={}, joint_targets=joints)
-        execution_spec = ExecutionSpecV1(
-            'execution-spec-v1', 'isaacsim', 'cuda', G05_ISAAC_EFFORT_PROFILE,
-            seed, 'best_effort',
-            RendererSelectionV1('renderer-selection-v1', 'none', 'cpu', 'none', None),
-            physics_device='cuda:0', camera_overrides=())
+        execution_spec = isaac_cuda_execution_spec(profile=G05_ISAAC_EFFORT_PROFILE, seed=seed)
         closure = source.source_closure_digest
     else:
         source = compile_reference_source(

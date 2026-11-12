@@ -58,11 +58,11 @@
 | ID／类别 | 当前定位与事实 | 依序实施／核查动作 | 本格完成证据 |
 | --- | --- | --- | --- |
 | R01 PASS | `registry.make_env`、`SelectedReferenceEnv.from_resolved_config`、四 Task 的 `selected_binding` 已有共同入口；旧 flags／codec 仍服务其他 caller | 冻结四任务实际 UID、配置字段与默认值表，保留当前规范。核对入口解析一次、预解析值身份重验、mapping／YAML 等价及正式类拒绝旧 component 构造。只处理实际进入四任务的分流 | 四 caller 的实际方法链和现有配置诊断对应；没有把范围外 component 全删作为门 |
-| R02 改 | `TaskBuildRequest` 统一回调签名，但 `ReferenceTaskBinding.build` 仍接受由 Task 自行编排的大构造过程；`_StandardResetReconstruction._compose` 另有后置组合 | 在 `ReferenceTaskBinding/SourceBoundTaskBuilder` 及现有 runtime source／Controller owner 中落实共同构建阶段和明确输入／输出。Task 交声明、Task hook 和参数；公共构建 owner 调用 source、主体、Controller 的能力实现。接通四正式 caller，移除被取代的任务级编排，不只加另一层封装 | 一张阶段 owner 表；四条真实构造链实际执行同一阶段合同；`artifact/source/controller/physical_execution/reset_plan` 等现有结果字段有明确供给者，不能交未被调用的新 schema |
+| R02 IN_PROGRESS | `TaskBuildRequest` 统一回调签名，但 `ReferenceTaskBinding.build` 仍接受由 Task 自行编排的大构造过程；`_StandardResetReconstruction._compose` 另有后置组合 | 在 `ReferenceTaskBinding/SourceBoundTaskBuilder` 及现有 runtime source／Controller owner 中落实共同构建阶段和明确输入／输出。Task 交声明、Task hook 和参数；公共构建 owner 调用 source、主体、Controller 的能力实现。接通四正式 caller，移除被取代的任务级编排，不只加另一层封装 | 一张阶段 owner 表；四条真实构造链实际执行同一阶段合同；`artifact/source/controller/physical_execution/reset_plan` 等现有结果字段有明确供给者，不能交未被调用的新 schema |
 | R03 改 | PickCube `specialization._compile_mjcf_effort_source/build_reference` 仍准备 source、选择 Position／effort 工厂并包装 Controller 身份；`make_reference_binding.build` 再选路线 | 保留 Task 的 cube／table 声明、reset／Solution 参数；将 MJCF source／主体构造编排归 source owner，Controller 构造／执行 cadence 和身份包装归 Controller owner，通过 R02 调用。原命名映射作为显式 Task／Robot 数据传入，不让 adapter 反推 PickCube | PickCube Position、直接 effort、可切换 effort 进入共同阶段；Task 不再直接完成这三套 source＋Controller 构造；被替代代码同批删除 |
-| R04 改 | PickCube `build_isaac_reference/build_pickcube_isaac_runtime_input_v1` 仍在 Task 内装配 USD runtime input、Position subjects 或 effort Controller；有效 USD byte reuse 已存在 | Task 保留场景物体、语义及必要命名声明；将 USD delivery 消费、runtime input 和原生 source 映射归现有 USD／Isaac source adapter，Position／effort Controller 建造归各 Controller capability，接 R02。保留 F06 精确准入与 source freshness，不要求 MJCF／USD 合并表示 | Task 不再亲自组织 USD native 构造；Isaac Position／effort 同一构建合同；必要 source／kinematics/readiness 输入仍可追踪。资产预装要求明确，不新增自动下载门 |
+| R04 IN_PROGRESS | PickCube `build_isaac_reference/build_pickcube_isaac_runtime_input_v1` 仍在 Task 内装配 USD runtime input、Position subjects 或 effort Controller；有效 USD byte reuse 已存在 | Task 保留场景物体、语义及必要命名声明；将 USD delivery 消费、runtime input 和原生 source 映射归现有 USD／Isaac source adapter，Position／effort Controller 建造归各 Controller capability，接 R02。保留 F06 精确准入与 source freshness，不要求 MJCF／USD 合并表示 | Task 不再亲自组织 USD native 构造；Isaac Position／effort 同一构建合同；必要 source／kinematics/readiness 输入仍可追踪。资产预装要求明确，不新增自动下载门 |
 | R05 改 | Nut `specialization._build_reference/build_runtime_source/_binding` 仍组织 source、Controller execution wrapper 和带 Solution 信息的 Controller identity | 将本体 source／Controller 执行准备接入 R02 的相同阶段。Nut 保留抓取／接触／reset、Solution 和严格反馈语义；接触参数可以由 Task 声明，由 adapter 应用。无需在本单元重写全部 Nut guard／stream 类型 | Nut 不再是一条另有 source＋Controller 编排的构造主线；当前 guarded ExpertAction 仍有效；两任务共用机制，任务策略分别保留 |
-| R06 改 | 简单主体的 `task_binding` 已很薄；`ExistingSubjectEffortTask.bind` 仍有 source→主体→physical execution 的内部构造流程 | 让这条流程消费 R02 相同阶段；该类可以保留为声明适配，不能持有另一套运行／reset 生命周期。保留各自 MJCF、USD 及传动 lowering，不为“统一”套 Panda source 方案 | Pendulum／双轮车和 Panda 在构建阶段使用相同请求、主体／Controller 编译合同及结果交接；差异限声明和有职责的 adapter／capability |
+| R06 PASS | 简单主体的 `task_binding` 已很薄；`ExistingSubjectEffortTask.bind` 仍有 source→主体→physical execution 的内部构造流程 | 让这条流程消费 R02 相同阶段；该类可以保留为声明适配，不能持有另一套运行／reset 生命周期。保留各自 MJCF、USD 及传动 lowering，不为“统一”套 Panda source 方案 | Pendulum／双轮车和 Panda 在构建阶段使用相同请求、主体／Controller 编译合同及结果交接；差异限声明和有职责的 adapter／capability |
 | R07 IN_PROGRESS | `compile_position_subjects`、`build_declared_effort_execution`、`bind_selected_controller` 已有真实主体匹配；`_compose` 可能在 Task Controller 创建后才组合 source | 对一体／装配 Panda、简单主体列出 Controller 通道 → Scene writer 资源 → native Joint/DOF/actuator/transmission 三层映射。确认组合／替换 source 后 Controller 与最终 source 同源；若存在先算后绑，说明其合法依赖并最终重验 | 原始声明、编译结果和实际 source 映射能对应；不靠相同字符串或事后 RobotRuntime 证明完成；保留耦合手指和双 writer 约束 |
 | R08 IN_PROGRESS | 四 Task 已有 `task_definition_factory/task_state_projection`，RobotRuntime 只是视图 | 对共同构造和 reset 证明 TaskDefinition、空间、任务状态、Robot declaration 和 live Controller 来自 R02～R07 的实际结果。TaskDefinition 可有不同子类和语义 hook，不要求同一个类或完全相同参数 | 四任务构造对照及装配 Panda 子例；简单主体无虚假 gripper／ee；实际对象和状态来源匹配，非仅视图一致 |
 
@@ -80,6 +80,17 @@
 | `two-wheel-balance-v1` | `two-wheel-balance-v1` | `direct_joint_effort_v1` | GeoPhys／CPU | 400 |
 
 `test_formal_configuration.py` 覆盖四任务 resolve-once、等价 mapping／YAML、预解析身份重验和 component 输入拒绝；本批版本诊断 283 项通过。范围外 component caller 仍存在，不以全仓移除为本格条件。
+
+### R02／R06：构建阶段与简单主体
+
+| 阶段 | 当前实际 owner | 差异及边界 |
+| --- | --- | --- |
+| 输入和选定 Robot | `make_env`、配置 resolver、`TaskBuildRequest`、Robot 声明 | 四任务共用请求；任务提供默认值和语义 |
+| source／主体 | `SourceBoundTaskBuilder` 调用各声明和 source adapter；简单主体由 `compile_declared_effort_source` 编译 | MJCF／USD 分别 lower；共同 `scalar_joint_source_bindings` 核对 Scene／Artifact，Robot 声明再次限定状态关节 |
+| Controller／绑定 | `compile_declared_effort_source` 与 `build_existing_subject_effort` 交接已验证主体，再经 `bind_selected_controller` | Pendulum 和双轮共用 effort 路线；Panda 的 Position／effort 使用其能力工厂，不伪造相同 native 算法 |
+| 语义和 reset | TaskDefinition factory／Task reset hook 由共同 Env 生命周期调用 | Task 保留奖励、状态投影和 reset 分布；缓存只由当前 binding 持有，复用前核验 source |
+
+R06 为实施者自评 PASS：两个简单任务已消费共同请求、分阶段 builder、主体／Controller 编译与结果交接，没有独立 reset／step／close 生命周期；各自传动和 USD／MJCF 映射由相应 adapter 保留。真实路线证据见本节末尾计划。R02 仍未通过：tabletop Task 内的 source／Controller 编排尚未全部归位，阶段调用本身不足以结案。
 
 ### R07／R08：主体到执行的当前对照
 
@@ -208,11 +219,13 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
-| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，tabletop 的 Panda actuator 映射消费 Robot 声明，R3 身份和 USD 主体绑定归各自 owner | [当前 Robot 映射计划](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)、[MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
+| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，tabletop 的 Panda actuator 映射消费 Robot 声明，R3 身份和 USD 主体绑定归各自 owner | [当前 Joint／执行合同计划](../../../../../workspace/maintenance/v211_u1_joint_execution_contract_20261112_001/plan.json)、[Robot 映射计划](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)、[MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R05、R07～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
 | U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+
+当前 Joint／执行合同调整后，180 项受影响诊断通过；MuJoCo Pendulum／双轮车各完成 25 个显式子步、二次 reset 和重复 close，Isaac PickCube Position／Pendulum 分别完成 5／25 个显式子步并取得 Env／App close 收据。Isaac Position 关闭日志有菜单回调空 USD context 的 `AttributeError`；隐式启动推进数未知。代码、资产、probe 与清单身份均在运行前记录。
 
 PickCube 与 NutAssembly 的七个 arm target 和耦合 gripper actuator 由所选 Panda 的 `reference_source_actuation` 提供，Position／effort recipe 复用同一声明；provider 仍核验实际模型。113 项受影响诊断及 6 项构造核对通过；当前冻结输入的 PickCube Position／两种 effort／装配 Panda 和 NutAssembly 在 MuJoCo CPU 各完成 5 个显式子步、二次 reset 与重复 close。USD 准备也消费 Panda 声明，本批没有重跑 Isaac；映射值未改变，旧结果仅按输入差异参考。
 

@@ -839,6 +839,17 @@ class UsdRuntimeSourceV1:
         self.scene_source.assert_fresh()
 
 
+def scalar_joint_source_bindings(scene, artifact):
+    """Resolve declared scalar Scene joints against the Task Artifact."""
+    joints = {f'{articulation.entity_id}/{joint.joint_id}': joint.joint_id
+              for articulation in scene.articulations
+              for joint in articulation.joints
+              if joint.kind in {'revolute', 'continuous', 'prismatic'}}
+    if set(joints) != set(artifact.legacy_joint_bindings):
+        raise ValueError('source joint map must cover every TaskArtifact scalar Joint exactly')
+    return joints
+
+
 def build_usd_runtime_source(*, loaded, provider, provider_build_identity, options,
                              task_source_identity_sha256, scene, artifact, joints,
                              bodies, frames, free_joints, joint_targets):

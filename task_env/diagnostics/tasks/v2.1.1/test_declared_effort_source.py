@@ -12,6 +12,19 @@ from task_env.tasks.pendulum import PendulumEnv
 from task_env.tasks.two_wheel_balance import TwoWheelBalanceEnv
 
 
+def test_scalar_source_map_rejects_artifact_scene_joint_mismatch():
+    from task_env.runtime.sessions.source import scalar_joint_source_bindings
+
+    scene = SimpleNamespace(articulations=(SimpleNamespace(entity_id='robot', joints=(
+        SimpleNamespace(joint_id='hinge', kind='revolute'),
+        SimpleNamespace(joint_id='mount', kind='fixed'),)),))
+    artifact = SimpleNamespace(legacy_joint_bindings={'robot/hinge': object()})
+    assert scalar_joint_source_bindings(scene, artifact) == {'robot/hinge': 'hinge'}
+    artifact.legacy_joint_bindings = {'robot/other': object()}
+    with pytest.raises(ValueError, match='must cover every TaskArtifact scalar Joint'):
+        scalar_joint_source_bindings(scene, artifact)
+
+
 @pytest.mark.parametrize(('uid', 'robot_type', 'controlled_joints'), [
     ('pendulum-v1', PendulumEntity, ('pendulum_hinge',)),
     ('two-wheel-balance-v1', TwoWheelBalanceEntity, ('left_wheel_hinge', 'right_wheel_hinge')),
