@@ -4,6 +4,28 @@ The caller supplies Robot-owned semantic projection; this adapter owns source
 parsing and closure collection and never creates a physics runtime.
 """
 from pathlib import Path
+import xml.etree.ElementTree as ET
+
+
+def validate_declared_effort_transmissions(xml, declarations):
+    """Verify MJCF motor mappings against the Robot's effort transmissions."""
+    root = ET.fromstring(xml)
+    section = root.find('./actuator')
+    motors = root.findall('./actuator/motor')
+    if section is None or len(section) != len(declarations) or len(motors) != len(declarations):
+        raise ValueError('source motor count differs from Robot transmission declaration')
+    for motor, declaration in zip(motors, declarations, strict=True):
+        try:
+            limits = tuple(float(value) for value in motor.get('ctrlrange', '').split())
+            gear = float(motor.get('gear', ''))
+        except ValueError as exc:
+            raise ValueError('source motor transmission is invalid') from exc
+        if (motor.get('name') != declaration.native_actuator
+                or motor.get('joint') != declaration.joint_id
+                or gear != declaration.transmission_coefficient
+                or motor.get('ctrllimited') != 'true'
+                or limits != declaration.native_range):
+            raise ValueError('source motor transmission differs from Robot declaration')
 
 
 def import_agent_source_scene(manifest, *, owner_uid, entity_id, scene_id, scene_factory):

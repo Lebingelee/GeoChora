@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import xml.etree.ElementTree as ET
 
 from ...artifacts import ExecutionSpecV1, RendererSelectionV1
 from ...assembly.compiler import compile_reference_source
@@ -32,23 +31,8 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
     _, _, closure = project_mjcf_scene_source(scene_source, scene)
     subject, declarations = robot.physical_subject_declaration(
         source_id=source_id, source_closure_sha256=closure)
-    root = ET.fromstring(xml)
-    section = root.find('./actuator')
-    motors = root.findall('./actuator/motor')
-    if section is None or len(section) != len(declarations) or len(motors) != len(declarations):
-        raise ValueError('source motor count differs from Robot transmission declaration')
-    for motor, declaration in zip(motors, declarations, strict=True):
-        try:
-            limits = tuple(float(value) for value in motor.get('ctrlrange', '').split())
-            gear = float(motor.get('gear', ''))
-        except ValueError as exc:
-            raise ValueError('source motor transmission is invalid') from exc
-        if (motor.get('name') != declaration.native_actuator
-                or motor.get('joint') != declaration.joint_id
-                or gear != declaration.transmission_coefficient
-                or motor.get('ctrllimited') != 'true'
-                or limits != declaration.native_range):
-            raise ValueError('source motor transmission differs from Robot declaration')
+    from .source_scene_import import validate_declared_effort_transmissions
+    validate_declared_effort_transmissions(xml, declarations)
 
     articulations = tuple(a for a in scene.articulations if a.entity_id == subject.entity_id)
     if len(articulations) != 1:
@@ -61,21 +45,11 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
                         for item in declarations}
     if provider == 'isaacsim':
         from .isaac_g05 import G05_ISAAC_EFFORT_PROFILE, build_g05_isaac_runtime_source
-        # USD export retains the declared articulation hierarchy under Geometry.
-        paths = {articulation.root_frame_id: f'Geometry/{articulation.root_frame_id}'}
-        remaining = list(articulation.joints)
-        while remaining:
-            ready = [joint for joint in remaining if joint.parent_frame.frame_id in paths]
-            if not ready:
-                raise ValueError('subject articulation cannot resolve USD body paths')
-            for joint in ready:
-                paths[joint.child_frame.frame_id] = paths[joint.parent_frame.frame_id] + '/' + joint.child_frame.frame_id
-                remaining.remove(joint)
-        bodies = {key: paths[name] for key, name in body_names.items()}
         source = build_g05_isaac_runtime_source(
             delivery=source_delivery, artifact=artifact, scene=scene,
             task_source_identity_sha256=task_source.identity_hash, joints=joints,
-            bodies=bodies, frames={}, free_joints={}, joint_targets=joints)
+            articulation=articulation, body_names=body_names,
+            frames={}, free_joints={}, joint_targets=joints)
         execution_spec = ExecutionSpecV1(
             'execution-spec-v1', 'isaacsim', 'cuda', G05_ISAAC_EFFORT_PROFILE,
             seed, 'best_effort',

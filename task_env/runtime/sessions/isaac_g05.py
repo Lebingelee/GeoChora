@@ -53,12 +53,27 @@ def _validate_g05_isaac_delivery(loaded):
         raise ValueError('G05 Isaac delivery representation is not the reviewed 6.2 MJCF route')
 
 
+def _usd_articulation_bodies(articulation, body_names):
+    """Lower declared articulation frames to the admitted USD hierarchy."""
+    paths = {articulation.root_frame_id: f'Geometry/{articulation.root_frame_id}'}
+    remaining = list(articulation.joints)
+    while remaining:
+        ready = [joint for joint in remaining if joint.parent_frame.frame_id in paths]
+        if not ready:
+            raise ValueError('subject articulation cannot resolve USD body paths')
+        for joint in ready:
+            paths[joint.child_frame.frame_id] = paths[joint.parent_frame.frame_id] + '/' + joint.child_frame.frame_id
+            remaining.remove(joint)
+    return {key: paths[name] for key, name in body_names.items()}
+
+
 def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
                                    artifact: TaskArtifactV1,
                                    scene: SceneDefinition,
                                    task_source_identity_sha256: str,
                                    joints: dict[str, str],
-                                   bodies: dict[str, str],
+                                   articulation,
+                                   body_names: dict[str, str],
                                    frames: dict[str, str] | None = None,
                                    free_joints: dict[str, str] | None = None,
                                    joint_targets: dict[str, str] | None = None) -> UsdRuntimeSourceV1:
@@ -83,7 +98,7 @@ def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
     )
     source = UsdRuntimeSourceV1(
         'usd-runtime-source-v1', artifact, scene, scene_source,
-        joints, bodies, frames or {}, free_joints or {},
+        joints, _usd_articulation_bodies(articulation, body_names), frames or {}, free_joints or {},
         joint_targets if joint_targets is not None else joints,
     )
     source.validate()
