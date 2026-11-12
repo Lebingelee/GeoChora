@@ -266,8 +266,13 @@ class PandaAgent(BaseAgent):
             notes=("Stage 1 must resolve these names to qpos addresses.",),
         )
 
-    def selected_controller_profiles(self):
+    @classmethod
+    def selected_controller_profiles(cls):
         return ('r1', 'r3_continuous_v1')
+
+    @classmethod
+    def declared_controller_profiles(cls):
+        return (*cls.selected_controller_profiles(), *cls.effort_controller_profiles())
 
     def supported_controller_kinds(self) -> tuple[str, ...]:
         return self.component_controller_kinds

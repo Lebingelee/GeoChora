@@ -99,8 +99,13 @@ class AssembledPandaAgent(BaseAgent):
         # The component-runtime controller route is not admitted by this slice.
         return ()
 
-    def selected_controller_profiles(self):
+    @classmethod
+    def selected_controller_profiles(cls):
         return ('r1', 'r1_split')
+
+    @classmethod
+    def declared_controller_profiles(cls):
+        return cls.selected_controller_profiles()
 
     def compile_effort_subjects(self, declaration, *, artifact_sha256, source_id,
                                 native_ranges, native_drive='disabled'):

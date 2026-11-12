@@ -359,7 +359,7 @@ def _resolve_selected_config(environment_type, config):
     if robot_uid not in choices:
         raise ValueError('selected task does not admit the requested robot')
     from ..registry import AGENT_REGISTRY
-    AGENT_REGISTRY.get(robot_uid)
+    robot_type = AGENT_REGISTRY.get(robot_uid)
     controller = values.get('controller', {})
     if not isinstance(controller, Mapping) or set(controller) - {'profile_id', 'gravity_compensation', 'parameters'}:
         raise ValueError('unsupported selected Controller fields')
@@ -438,6 +438,8 @@ def _resolve_selected_config(environment_type, config):
     profile = controller.get('profile_id', default_profile)
     if profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
+    if profile not in robot_type.declared_controller_profiles():
+        raise ValueError(f'Robot {robot_uid!r} does not declare Controller profile {profile!r}')
     profile_routes = getattr(environment_type, 'controller_profile_routes', {})
     if profile in profile_routes and (provider, backend) not in profile_routes[profile]:
         raise ValueError(f'Controller profile {profile!r} is not admitted on {provider}/{backend}')

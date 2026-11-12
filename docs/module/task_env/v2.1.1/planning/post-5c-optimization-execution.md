@@ -1369,3 +1369,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 4 文件 +8／−14，净减 6 行；版本诊断修改 1 文件 +12／−0，核对任务允许集合、默认选择与实际主体支持集合；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7901／−14766，净减 6865 行，包含此前历史路径退休和诊断迁移，不归因于本批。
 
 最终输入版本诊断 195 项通过。MuJoCo Pendulum／双轮车均以速度阻尼 Controller 完成 reset、控制、再次 reset 和重复 close，各观测 25 个 native 子步；GeoPhys Pendulum 默认 direct Controller 同样完成短程，native 子步未观测，按 50 预留。Isaac、renderer、桌面任务和完整 Solution 本批未复验；能力列表内容与先前相同，不据此扩大既有证据范围。冻结输入、双锁、预算及收据位于 ignored `workspace/maintenance/v211_robot_controller_choices_20261112/`。E01～E04 未整体接收。
+
+
+### 6.141 共同配置准入校验 Robot 的 Controller 能力
+
+输入 `4e10c9cf`；实施前重审台账 GOV、ENTRY、TASK、ENV、SUBJ-01～03 和 CTRL-01／03。配置解析此前只核对 Task 允许的 Controller 集合，没有同时核对所选 Robot：一体 Panda／`r1_split` 与装配 Panda／`r3_continuous_v1` 都能通过静态解析，之后才由 source recipe 拒绝。现有 Robot 声明暴露共同的 profile 能力查询；一体 Panda 合并其既有 Position 与 effort 能力，装配 Panda 使用既有 Position 声明，两个普通 Robot 使用各自主体声明。共同配置解析在 Task 准入之外检查所选 Robot 能力，不按 Task 或 Robot UID 私设分支；不匹配在 source／native 构建前拒绝，provider、source 和 native 映射检查保持。旧扩展 Robot 若要进入该正式协议须声明自身能力，本项未验证其他任务。
+
+生产修改 4 文件 +21／−3，净增 18 行，用于 Robot 能力合同及共同静态匹配；版本诊断修改 1 文件 +15／−0，验证两个不匹配组合的静态拒绝，并让重力补偿检查使用其合法 Robot／Controller 组合；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7936／−14768，净减 6832 行；包含此前旧路径退休及诊断迁移，不归因于本批。
+
+最终输入版本诊断 197 项通过。正式 MuJoCo PickCube／Nut Solution 单步、Pendulum、双轮车和装配 Panda 各完成 reset、控制推进、再次 reset 和重复 close，分别观测 5／5／25／25／5 native 子步；Solution 非完整运行。GeoPhys、Isaac、renderer 和完整 Solution 本批未复验；本次只改静态匹配，其他能力证据仍按原输入和影响引用。冻结输入、双锁、预算和收据位于 ignored `workspace/maintenance/v211_robot_controller_admission_20261112/`。E01～E04 尚未整体接收。

@@ -42,6 +42,12 @@ class RobotComponent(DefaultCanonicalControllerMixin, ABC):
 
     uid: ClassVar[str]
     component_controller_kinds: ClassVar[tuple[str, ...]] = ()
+    controller_profiles: ClassVar[tuple[str, ...]] = ()
+
+    @classmethod
+    def declared_controller_profiles(cls):
+        """Return the Controller profiles this Robot can bind."""
+        return tuple(cls.controller_profiles)
 
     def artifact_entity(self, scene):
         """Project this Robot's declared Scene identity into a Task Artifact."""

@@ -70,6 +70,20 @@ def test_retired_controller_selector_inputs_are_rejected(values):
         resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), values)
 
 
+@pytest.mark.parametrize(('robot', 'profile'), [
+    ('panda-v1', 'r1_split'),
+    ('panda-arm-hand-v1', 'r3_continuous_v1'),
+])
+def test_controller_profile_must_be_declared_by_selected_robot(robot, profile):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='does not declare Controller profile') as error:
+        resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), {
+            'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+            'robot': {'uid': robot}, 'controller': {'profile_id': profile},
+        })
+    assert error.value.phase == 'static_config'
+
+
 def test_reset_switch_preserves_canonical_controller_profile():
     from task_env.environment.reset_switch import prepare_switch_reset
     importlib.import_module('task_env.tasks')
@@ -118,6 +132,7 @@ def test_gravity_compensation_requires_robot_capability(uid, robot):
               'controller': {'gravity_compensation': True}}
     if robot:
         config['robot'] = {'uid': robot}
+        config['controller']['profile_id'] = 'r1'
     with pytest.raises(ValueError, match='selected Robot does not declare'):
         resolve_task_env_config(ENV_REGISTRY.get(uid), config)
 
