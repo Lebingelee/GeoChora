@@ -182,8 +182,8 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         if isinstance(schema_metadata, Mapping)
         else ()
     )
-    semantics = {
-        str(spec.get("path")): str(spec.get("semantic", ""))
+    declarations = {
+        str(spec.get("path")): spec
         for spec in field_specs if isinstance(spec, Mapping)
     }
     grouped: dict[str, dict[str, Any]] = {}
@@ -191,7 +191,14 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         root, _, name = leaf["path"].partition("/")
         group = grouped.setdefault(root, {"order": [], "leaves": {}})
         group["order"].append(name)
-        group["leaves"][name] = {"shape": leaf["shape"], "dtype": leaf["dtype"], "semantic": semantics.get(leaf["path"].replace("/", "."), "")}
+        declared_path = leaf["path"].replace("/", ".")
+        declaration = declarations.get(declared_path, {})
+        fields = {"shape": leaf["shape"], "dtype": leaf["dtype"],
+                  "semantic": str(declaration.get("semantic", ""))}
+        if h5_version == "v3":
+            fields.update({key: declaration[key] for key in ("unit", "frame", "time_reference")
+                           if key in declaration})
+        group["leaves"][name] = fields
     source_action_schema = _action_schema(metadata)
     controller_kind = source_action_schema.get("controller_kind")
     reference = source_action_schema.get("reference")
