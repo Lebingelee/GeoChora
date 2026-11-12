@@ -65,7 +65,6 @@ FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
 PICKCUBE_CONTROLLER_PROFILES = REFERENCE_POSITION_CONTROLLER_PROFILES
 _PICKCUBE_R3_PROFILES = R3_REFERENCE_POSITION_PROFILES
-_PICKCUBE_POSTURE_PATH_ORIGINAL = "original"
 _NUT_ASSEMBLY_MAX_STAGE_PLAN_S = 6.0
 PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "schema_version": "pick-cube-r3-nut-aligned-profile-v2",
@@ -219,7 +218,6 @@ class _PreparedReferenceSource(NamedTuple):
     profile_source: object
     artifact: object
     source: object
-    posture_path_profile: object
     readiness: object
 
 
@@ -243,7 +241,6 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         config = _nut_aligned_environment_config(config)
     compiled = compile_panda_box_task(declaration, config=config)
     artifact, source = compiled.artifact, compiled.source
-    posture_path_profile = _PICKCUBE_POSTURE_PATH_ORIGINAL
     planner_config = (
         _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
         if is_r3_profile else None
@@ -252,7 +249,6 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
         artifact, source,
         measured_tcp_clearance_gate=is_r3_profile,
         planner=planner_config,
-        posture_path_profile=posture_path_profile,
         close_transition_steps=(
             max(1, int(math.ceil(
                 PICKCUBE_R3_CONTINUOUS_PROFILE_V1["gripper_close_transition_s"]
@@ -275,7 +271,7 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
     from ...runtime.sessions.source import snapshot_legacy_mjcf_source
     source = snapshot_legacy_mjcf_source(source)
     return _PreparedReferenceSource(task_config, recipe, config, is_r3_profile, dynamic_profile,
-        profile_source, artifact, source, posture_path_profile, readiness)
+        profile_source, artifact, source, readiness)
 
 
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None, lift_height_m=None, task_config=None):
@@ -284,7 +280,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
     (task_config, recipe, config, is_r3_profile, dynamic_profile, profile_source,
-     artifact, source, posture_path_profile, readiness) = _prepare_reference_source(
+     artifact, source, readiness) = _prepare_reference_source(
         backend=backend, controller_profile=controller_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config)
     from ...runtime.sessions.source import close_execution_source_on_failure
@@ -349,7 +345,6 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         if is_r3_profile:
             resolved["controller_profile"] = controller_profile
             resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
-            resolved["task_controller_profile"]["posture_path_profile"] = posture_path_profile
             resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
         elif controller_profile == 'r1_split':
             resolved['controller_profile'] = controller_profile

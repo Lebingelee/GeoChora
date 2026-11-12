@@ -3,7 +3,8 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
-parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');args=parser.parse_args()
+parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
+if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 plan=json.loads(Path(args.plan).read_text())
 started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':args.provider,'status':'RUNNING','steps':[],'started_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'native_substeps':0 if args.provider=='mujoco' else None}
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
@@ -89,9 +90,9 @@ try:
         result['physical_source_before_close'] = str(physical_source)
     result['source_snapshot']=snapshot
     if args.case!='assembled-unreset':
-        if args.case=='nut':
+        if args.case=='nut' or args.solution:
             solution=env.value['solution_factory']()
-            observation,info=env.reset_for_solution(solution,seed=19)
+            observation,info=env.reset_for_solution(solution,seed=19 if args.case=='nut' else 31)
         else:
             observation,info=env.reset(seed=31)
         assert env.observation_space.contains(observation)
@@ -123,9 +124,10 @@ try:
             result['physical_sequence_spec']=spec
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
-        stepped=env.step_with_solution(solution) if args.case=='nut' else env.step(action)
-        if args.case=='nut':
+        stepped=env.step_with_solution(solution) if args.case=='nut' or args.solution else env.step(action)
+        if args.case=='nut' or args.solution:
             assert not solution.failed
+            result['solution_step']={'identity':solution.identity,'failed':bool(solution.failed)}
         if args.case == 'assembled-live':
             receipt=env.session._last_control_submission
             bundle=env.controller.last_split_bundle

@@ -53,23 +53,6 @@ _NUT_R3_CLOSE_TRANSITION_STEPS = 34
 _NUT_R3_CLOSE_SETTLE_STEPS = 50
 _NUT_R3_POSTCLOSE_HOLD_STEPS = 10
 _MAX_CARTESIAN_PLAN_CALLS = 7
-_POSTURE_PATH_ORIGINAL = "original"
-_POSTURE_PATH_WORLD_X_ROUNDTRIP = "world_x_roundtrip_v1"
-
-
-def _quat_multiply_wxyz(left: np.ndarray, right: np.ndarray) -> np.ndarray:
-    """Multiply normalized WXYZ quaternions, with ``left`` in world frame."""
-    lw, lx, ly, lz = np.asarray(left, dtype=np.float64).reshape(4)
-    rw, rx, ry, rz = np.asarray(right, dtype=np.float64).reshape(4)
-    return np.asarray(
-        [
-            lw * rw - lx * rx - ly * ry - lz * rz,
-            lw * rx + lx * rw + ly * rz - lz * ry,
-            lw * ry - lx * rz + ly * rw + lz * rx,
-            lw * rz + lx * ry - ly * rx + lz * rw,
-        ],
-        dtype=np.float64,
-    )
 
 
 class SegmentStatus(str, Enum):
@@ -201,8 +184,6 @@ class PickCubeSolutionConfig:
     close_transition_steps: int = _MIN_CLOSE_TRANSITION_STEPS
     close_settle_steps: int = 0
     postclose_hold_steps: int = 0
-    posture_path_profile: str = _POSTURE_PATH_ORIGINAL
-    posture_detour_angle_rad: float = float(np.deg2rad(20.0))
     planner: AbsolutePosePlannerConfig = field(
         default_factory=lambda: AbsolutePosePlannerConfig(
             max_translation_per_step=0.012,
@@ -232,14 +213,6 @@ class PickCubeSolutionConfig:
             raise ValueError(
                 "close profile must be PickCube's 20/0/0 primitive or NutAssembly R3's 34/50/10 primitive"
             )
-        if self.posture_path_profile not in {
-            _POSTURE_PATH_ORIGINAL,
-            _POSTURE_PATH_WORLD_X_ROUNDTRIP,
-        }:
-            raise ValueError("unsupported PickCube posture path profile")
-        if (not np.isfinite(self.posture_detour_angle_rad)
-                or not 0.0 < self.posture_detour_angle_rad < np.pi):
-            raise ValueError("posture detour angle must be finite and in (0, pi)")
 
 
 class PickCubeSolution:
@@ -467,33 +440,12 @@ class PickCubeSolution:
             target_position=transit[:3],
             gripper=1.0,
         )
-        posture_actions = ()
-        if self.config.posture_path_profile == _POSTURE_PATH_WORLD_X_ROUNDTRIP:
-            half_angle = 0.5 * self.config.posture_detour_angle_rad
-            world_x_delta = np.asarray(
-                [np.cos(half_angle), np.sin(half_angle), 0.0, 0.0],
-                dtype=np.float64,
-            )
-            detour = transit.copy()
-            detour[3:7] = _quat_multiply_wxyz(world_x_delta, transit[3:7])
-            posture_actions = (
-                self._planner.plan_to_pose(
-                    current_pose=transit,
-                    goal_pose=detour,
-                    gripper=1.0,
-                ),
-                self._planner.plan_to_pose(
-                    current_pose=detour,
-                    goal_pose=transit,
-                    gripper=1.0,
-                ),
-            )
         descend_actions = self._planner.plan_translation_only(
             current_pose=transit,
             target_position=target[:3],
             gripper=1.0,
         )
-        action_segments = (vertical_actions, lateral_actions, *posture_actions, descend_actions)
+        action_segments = (vertical_actions, lateral_actions, descend_actions)
         actions = np.concatenate([segment for segment in action_segments if len(segment)], axis=0)
         minimum_height = (
             _R3_HIGH_CLEARANCE_COMMAND_ABOVE_CUBE_TOP
@@ -503,9 +455,7 @@ class PickCubeSolution:
             - _MEASURED_CLEARANCE_TOLERANCE
         )
         vertical_end = len(vertical_actions)
-        lateral_end = vertical_end + len(lateral_actions) + sum(
-            len(segment) for segment in posture_actions
-        )
+        lateral_end = vertical_end + len(lateral_actions)
         return SegmentPlan(
             actions=actions,
             target_pose=target,
@@ -641,7 +591,6 @@ class PickCubeReadinessConfig:
         *,
         measured_tcp_clearance_gate=False,
         planner=None,
-        posture_path_profile=_POSTURE_PATH_ORIGINAL,
         close_transition_steps=None,
         close_settle_steps=0,
         postclose_hold_steps=0,
@@ -654,13 +603,12 @@ class PickCubeReadinessConfig:
         if gripper.kind != "experimental_rate_limited":
             raise ValueError("readiness-v1 requires resolved experimental gripper profile")
         if planner is None:
-            base = PickCubeSolutionConfig(posture_path_profile=posture_path_profile)
+            base = PickCubeSolutionConfig()
             action_budget_derivation = {
                 "formula": "legacy PickCube action budget",
                 "action_budget": base.action_budget,
                 "planner_max_steps": base.planner.max_steps,
                 "settle_steps": base.planner.settle_steps,
-                "posture_path_profile": posture_path_profile,
             }
         else:
             if type(planner) is not AbsolutePosePlannerConfig:
@@ -681,7 +629,6 @@ class PickCubeReadinessConfig:
                 close_transition_steps=close_steps,
                 close_settle_steps=close_settle_steps,
                 postclose_hold_steps=postclose_hold_steps,
-                posture_path_profile=posture_path_profile,
                 planner=planner,
             )
             action_budget_derivation = {
@@ -691,7 +638,7 @@ class PickCubeReadinessConfig:
                     "move_above_vertical_lateral_descent": 3,
                     "grasp_descent": 1,
                     "lift": 1,
-                    "world_x_posture_detour_and_return_reserved_for_both_candidates": 2,
+                    "additional_plan_reserve": 2,
                 },
                 "planner_max_steps": planner.max_steps,
                 "settle_steps_per_call": planner.settle_steps,
@@ -700,7 +647,6 @@ class PickCubeReadinessConfig:
                 "close_settle_steps": close_settle_steps,
                 "postclose_hold_steps": postclose_hold_steps,
                 "action_budget": action_budget,
-                "posture_path_profile": posture_path_profile,
             }
         dt = Decimal(str(artifact.timebase.control_dt))
         ceil = lambda value: int(value.to_integral_value(rounding=ROUND_CEILING))

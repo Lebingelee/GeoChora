@@ -1032,3 +1032,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +3／−8，净减 5 行；版本诊断修改 1 文件 +8／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。正式配置消除一个把 Solution 选择伪装为 Controller 的分流；provider／renderer 的 source、状态、clock、提交和资源合同未改，Panda recipe 身份随声明变化。
 
 129 项版本检查通过，包含旧别名从正式 Controller 配置拒绝。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 R3 Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_retire_planner_alias_20261112_gmxd_5rp/` 和 `workspace/maintenance/v211_retire_planner_alias_isaac_20261112_7z_9i7kd/`；E01～E04 仍未接收。
+
+### 6.98 清除退休姿态绕行的 Solution 分支
+
+输入 `f592e8bb`。旧 20° 姿态绕行原只由已退休的诊断 Controller 别名选择，正式 R3 始终采用原始路径。删除该可选路径、专属配置和四元数辅助函数，正常路径直接连接垂直、横向和下降段；保留原有 7 次规划预算作为余量，不缩短正常 Solution 的动作时限。配置／元数据变化使 Solution 身份变化；历史对照和原有接收结论保留，但不能把历史身份当成本版新证据。
+
+生产修改 2 文件 +6／−65，净减 59 行；版本诊断修改 1 文件 +7／−5，增加正式 PickCube Solution 单步探针；本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。移除的是退休诊断的 Task／Solution 分流，Robot／Controller、provider／renderer 的 source、状态、clock、提交和资源合同未变。
+
+129 项版本检查通过。四个正式任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube 正式 R3 Solution 在 MuJoCo 完成 reset、一个 Solution step、H5 逻辑读回及再次 reset，观察 5 个子步；GeoPhys 同一 Solution 完成 reset、单步和再次 reset，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。PickCube MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，按 50 保守预算记账。Isaac CUDA 默认 R3 Position／同步 RGB 完成两次 reset、一次非零外部 action、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。上述 Solution 证据均为单步，本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_retire_posture_detour_20261112_8wuqh_ao/` 和 `workspace/maintenance/v211_retire_posture_detour_isaac_20261112_al0n6izh/`；E01～E04 仍未接收。
