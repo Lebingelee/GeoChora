@@ -710,6 +710,29 @@ def test_formal_construction_uses_one_selected_robot_declaration(uid):
         env.close()
 
 
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+])
+def test_tabletop_source_uses_selected_robot_actuation_declaration(uid, monkeypatch):
+    from task_env import make_env
+    from task_env.robots.panda import PandaAgent
+
+    calls = []
+    original = PandaAgent.reference_source_actuation
+    def capture(robot):
+        calls.append(robot)
+        return original(robot)
+    monkeypatch.setattr(PandaAgent, 'reference_source_actuation', capture)
+    env = make_env(uid, config={'execution': {'physics_provider': 'mujoco'}})
+    try:
+        assert any(robot is env.binding.robot for robot in calls)
+        targets, opening = original(env.binding.robot)
+        assert env.value['source'].joint_targets == targets
+        assert env.value['source'].open_actuators == opening
+    finally:
+        env.close()
+
+
 def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monkeypatch):
     from task_env import make_env
     from task_env.robots.assembled_panda import AssembledPandaAgent

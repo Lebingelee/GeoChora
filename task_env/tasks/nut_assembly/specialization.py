@@ -283,15 +283,16 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
+    joint_targets, open_actuators = robot.reference_source_actuation()
     runtime_source = ReferenceTaskDeclarationV1(
         artifact=_artifact_declaration(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         composition=composition,
         bodies={"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
-                "round-peg-v1": "peg2", "panda-v1/base": "link0"},
+                "round-peg-v1": "peg2", f"{robot.uid}/base": "link0"},
         frames={EEF: scene["ee_site_name"]},
         free_joints={"square-nut-v1": "SquareNut_joint"},
-        joint_targets={f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)},
-        open_actuators=("actuator8",),
+        joint_targets=joint_targets,
+        open_actuators=open_actuators,
     ).compile_source(
         artifact,
         scene_source=TaskSceneSource(scene_xml, base,

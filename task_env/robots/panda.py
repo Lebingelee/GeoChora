@@ -64,6 +64,16 @@ class PandaAgent(BaseAgent):
             'panda-direct-effort-assembly', 'panda-direct-effort-components',
             'direct-effort-zero-bias-v1', 'finger-tendon-effort')
 
+    def reference_source_actuation(self):
+        """Declare the arm targets and coupled opening actuator of this source."""
+        names = self.physical_joint_names()
+        actuators = self.effort_source_layout().native_actuators
+        if len(names) != 9 or len(actuators) != len(names) or actuators[-2] != actuators[-1]:
+            raise ValueError('Panda reference source requires seven arm and coupled finger channels')
+        return ({f'{self.uid}/{name}': actuator
+                 for name, actuator in zip(names[:7], actuators[:7], strict=True)},
+                (actuators[-1],))
+
     def artifact_entity(self, scene=None):
         """Declare the canonical Panda identity consumed by Task Artifacts."""
         from ..artifacts import EntityDefinition
@@ -154,12 +164,13 @@ class PandaAgent(BaseAgent):
         """Declare this Panda's pinned asset and canonical controlled joints."""
         from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
         manifest = self.asset_manifest()
+        targets, opening = self.reference_source_actuation()
         return RobotSourceRecipeV1(self.uid, 'reference-task-source', (
             RobotSourceReferenceV1('panda-menagerie-source', manifest.source_reference,
                                    manifest.source_revision, (self.uid,)),), (),
             self.physical_joint_names(), self.selected_controller_profiles(),
-            tuple((self.uid, f'actuator{index}', 'panda-position-controller')
-                  for index in range(1, 9)))
+            tuple((self.uid, name, 'panda-position-controller')
+                  for name in (*targets.values(), *opening)))
 
     def source_recipe_for_profile(self, profile):
         """Declare the writer ownership of the selected Controller profile."""
@@ -170,8 +181,8 @@ class PandaAgent(BaseAgent):
             raise ValueError('Panda does not declare this Controller profile')
         from dataclasses import replace
         return replace(recipe, control_profiles=tuple(self.effort_controller_profiles()),
-            resource_writers=tuple((self.uid, f'actuator{index}', 'panda-direct-effort')
-                                   for index in range(1, 9)))
+            resource_writers=tuple((entity, actuator, 'panda-direct-effort')
+                                   for entity, actuator, _writer in recipe.resource_writers))
 
     def reference_spec(self) -> ReferenceSpec:
         return ReferenceSpec(

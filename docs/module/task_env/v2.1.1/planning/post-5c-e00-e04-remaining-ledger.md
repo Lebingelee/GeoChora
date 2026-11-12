@@ -208,11 +208,13 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
-| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，R3 身份和 USD 主体绑定归各自 owner | [当前 MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
+| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，tabletop 的 Panda actuator 映射消费 Robot 声明，R3 身份和 USD 主体绑定归各自 owner | [当前 Robot 映射计划](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)、[MJCF 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/plan.json)、[GeoPhys 计划](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)及[USD 计划](../../../../../workspace/maintenance/v211_u1_usd_build_stages_20261112_001/plan.json)；按对应输入复用版本诊断与真实路线 | R02～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
 | U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+
+PickCube 与 NutAssembly 的七个 arm target 和耦合 gripper actuator 由所选 Panda 的 `reference_source_actuation` 提供，Position／effort recipe 复用同一声明；provider 仍核验实际模型。113 项受影响诊断及 6 项构造核对通过；当前冻结输入的 PickCube Position／两种 effort／装配 Panda 和 NutAssembly 在 MuJoCo CPU 各完成 5 个显式子步、二次 reset 与重复 close。USD 准备也消费 Panda 声明，本批没有重跑 Isaac；映射值未改变，旧结果仅按输入差异参考。
 
 source 缓存复用前现会验证 MJCF 快照或 USD source；失效时在 reset 计划前拒绝。72 项相关诊断、四任务及装配主体构造检查通过；[缓存验证](../../../../../workspace/maintenance/v211_u1_cached_source_freshness_20261112_001/plan.json)在 MuJoCo 关节 effort 完成 5 个显式子步、第二次 reset 与重复 close。
 

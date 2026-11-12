@@ -70,6 +70,7 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration, *, robot=
     ) if extent else ()
     from ..registry import make_agent
     robot = make_agent('panda-v1') if robot is None else robot
+    joint_targets, open_actuators = robot.reference_source_actuation()
     joints = {f'{robot.uid}/{name}': value for name, value in robot.initial_state_spec().joint_positions}
     entities = (
         EntityDefinition('tabletop-v1', 'static', 'tabletop-v1/task-local',
@@ -105,10 +106,10 @@ def _panda_box_reference_declaration(declaration: PandaBoxDeclaration, *, robot=
         composition=TaskCompositionSpec(d.task_id, 'tabletop-v1', ('panda-v1',), ('cube-v1',),
                                         success_definition=d.success_definition),
         bodies={d.object_id: 'PickCube'},
-        frames={'panda-v1/ee': EE_SITE_NAME},
+        frames={f'{robot.uid}/ee': EE_SITE_NAME},
         free_joints={d.object_id: 'PickCube_joint'},
-        joint_targets={f'panda-v1/joint{i}': f'actuator{i}' for i in range(1, 8)},
-        open_actuators=('actuator8',),
+        joint_targets=joint_targets,
+        open_actuators=open_actuators,
     )
 
 
