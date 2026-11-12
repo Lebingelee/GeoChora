@@ -362,7 +362,8 @@ def _bind_reference_controller(value, request, *, include_solution, resolved_con
                           else NutAssemblyReferenceEnv.selected_default_controller_profile())
     execution_controller = build_reference_position_controller(
         artifact, source, profile_id=controller_profile, dynamic_profile=dynamic,
-        gripper_rate_hz=500, force_limit_N=recipe['controller']['force_cap_N'])
+        force_limit_N=recipe['controller']['force_cap_N'])
+    execution_profile = execution_controller.identity_profile()
     controller = execution_controller.hold.controller
     settings = dict(recipe["solution"]["config"])
     settings["grasp_offset"] = tuple(settings["grasp_offset"])
@@ -388,8 +389,8 @@ def _bind_reference_controller(value, request, *, include_solution, resolved_con
         "solution_identity": description["identity"],
         "construction_source_sha256": source_files["task_env/tasks/nut_assembly/specialization.py"],
         "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
-        "cadence": "native-gripper-500hz-v1",
-        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+        "cadence": execution_profile['gripper_cadence'],
+        "arm_execution_profile": execution_profile['arm_execution_profile'],
         "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
     execution_controller.bind_identity_provenance(controller_identity)
     root = Path(__file__).resolve().parents[3]
@@ -415,10 +416,10 @@ def _bind_reference_controller(value, request, *, include_solution, resolved_con
         "outcome_policy": description["outcome_policy_mapping"],
         "outcome_policy_identity": description["outcome_policy_identity"],
         "completion_policy": "on_expert_terminal_stage",
-        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+        "arm_execution_profile": execution_profile['arm_execution_profile'],
         "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
-        "gripper_control_hz": 500,
-        "gripper_feedback_hz": 500,
+        "gripper_control_hz": execution_profile['gripper_control_hz'],
+        "gripper_feedback_hz": execution_profile['gripper_feedback_hz'],
         "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
         "provider_contact_profile": contact_profile,
         "source_revision": revision, "source_sha256": source_files,

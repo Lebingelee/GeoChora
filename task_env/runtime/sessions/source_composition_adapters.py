@@ -153,6 +153,35 @@ def compile_panda_effort_selection(robot, scene, artifact, source, *, intent,
     return factory, execution
 
 
+def build_usd_panda_control(runtime_input, robot, *, controller_profile, action_config,
+                            dynamic_profile, velocity_limit, tcp_profile, end_frame_id,
+                            physical_kind=None, native_drive=None, effort_settings=None):
+    """Bind the selected Position or effort capability to the admitted USD source."""
+    source, artifact = runtime_input.runtime_source, runtime_input.artifact
+    if physical_kind is None:
+        if native_drive is not None or effort_settings is not None:
+            raise ValueError('Position capability does not accept effort settings')
+        from ...controllers.canonical.execution import build_reference_position_controller
+        from .position_subject_binding import bind_position_subjects_to_runtime_input
+        controller = build_reference_position_controller(artifact, source,
+            profile_id=controller_profile, dynamic_profile=dynamic_profile,
+            execution=runtime_input.execution, action_config=action_config,
+            joint_velocity_limit_rad_s=velocity_limit, entity_id=robot.uid,
+            hand_frame_id=end_frame_id, tcp_profile=tcp_profile)
+        runtime_input = bind_position_subjects_to_runtime_input(
+            runtime_input, robot, controller, entity_id=robot.uid, end_frame_id=end_frame_id)
+        return runtime_input, controller, None
+    if native_drive is None or effort_settings is None:
+        raise ValueError('effort capability requires its drive and task settings')
+    physical = build_panda_source_effort_profile(robot, source.scene_definition, artifact, source,
+        native_drive=native_drive, kind=physical_kind, config=action_config,
+        source_xml=source.scene_source.xml, end_frame_id=end_frame_id, task_settings=effort_settings)
+    from .physical_control import PhysicalControlExecutionV1
+    if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
+        raise TypeError('USD effort capability must return one physical execution')
+    return runtime_input, physical.controllers[0], physical
+
+
 @dataclass(frozen=True)
 class SourceCompositionAdapterV1:
     provider: str

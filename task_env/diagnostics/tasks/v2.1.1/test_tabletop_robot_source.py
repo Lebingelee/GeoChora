@@ -124,6 +124,13 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
     module = pickcube if task_name == 'pickcube' else nut
     original = module.build_reference_position_controller
     constructed = []
+    profiles = []
+    profile = ReferenceExecutionController.identity_profile
+    def capture_profile(controller):
+        result = profile(controller)
+        profiles.append((controller, result))
+        return result
+    monkeypatch.setattr(ReferenceExecutionController, 'identity_profile', capture_profile)
     def capture(artifact, source, **kwargs):
         controller = original(artifact, source, **kwargs)
         constructed.append((controller, artifact, source, kwargs['profile_id']))
@@ -139,6 +146,8 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
         assert controller.inner.controller is controller.hold.controller
         assert controller.gripper_rate_hz == 500
         assert controller.gripper_config.force_limit_N == 10.0
+        assert len(profiles) == 1 and profiles[0][0] is controller
+        assert value['resolved_configuration']['gripper_control_hz'] == profiles[0][1]['gripper_control_hz']
         assert controller.control_dt == value['artifact'].timebase.control_dt
     finally:
         source_resource_receipt(value['source']).close()
@@ -294,7 +303,8 @@ def test_usd_build_failure_releases_prepared_task_source(physical, monkeypatch):
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(
             delivery_manifest='unused', include_solution=False,
-            controller_builder=(lambda *args: None) if physical else None,
+            physical_kind='direct' if physical else None,
+            physical_drive='disabled' if physical else None,
         )
     assert raised.value is failure
     assert len(receipts) == 1
@@ -384,7 +394,7 @@ def test_usd_source_identity_failure_releases_task_source(monkeypatch):
     monkeypatch.setattr(specialization, '_source_identity_files', fail_identity)
     with pytest.raises(RuntimeError) as raised:
         specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False,
-                                              controller_builder=lambda *args: None)
+                                              physical_kind='direct', physical_drive='disabled')
     assert raised.value is failure
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 

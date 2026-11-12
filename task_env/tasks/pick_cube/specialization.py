@@ -497,6 +497,7 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
         source_ids = _source_identity_files(None, PickCubeReadinessSolution,
                                             profile_source=prepared.profile_source)
         legacy = {'readiness': prepared.readiness, 'source_sha256': source_ids,
+            'dynamic_profile': prepared.dynamic_profile,
             'resolved_configuration': {'runtime_config': asdict(prepared.config),
                 'task_recipe': prepared.task_config,
                 'resolved_controller_gripper': asdict(prepared.config.robot.gripper)}}
@@ -515,7 +516,7 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
 
 
 def _bind_isaac_reference_control(value, request, *, include_solution, resolved_config,
-                                  controller_builder):
+                                  controller_profile, physical_kind, physical_drive):
     from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
     from .solution import PickCubeReadinessSolution
     runtime_input, robot = value['_runtime_input'], value['_robot']
@@ -523,27 +524,14 @@ def _bind_isaac_reference_control(value, request, *, include_solution, resolved_
     scene_source = runtime_input.runtime_source.scene_source
     loaded, panda_xml = scene_source.loaded_delivery, scene_source.xml
     manifest_path = loaded.manifest_path
-    physical = None
-    if controller_builder is None:
-        from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
-        dynamic_profile, _profile_source = _r3_dynamic_profile()
-        controller = PandaPositionServoProfileV1.from_usd_source(
-            runtime_input.artifact, runtime_input.runtime_source,
-            execution=runtime_input.execution, kinematics_source_xml=panda_xml,
-            config=action_config, pose_target_method="achieved_state_dls_v1",
-            arm_tracking_method="production_r3_continuous_v1", arm_tracking_profile=dynamic_profile,
-            arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
-            entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
-        )
-        from ...runtime.sessions.position_subject_binding import bind_position_subjects_to_runtime_input
-        runtime_input = bind_position_subjects_to_runtime_input(
-            runtime_input, robot, controller, entity_id='panda-v1', end_frame_id='ee')
-    else:
-        physical = controller_builder(robot, runtime_input, panda_xml, action_config)
-        from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
-        if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
-            raise TypeError('USD Controller builder must return one physical execution')
-        controller = physical.controllers[0]
+    from ...runtime.sessions.source_composition_adapters import build_usd_panda_control
+    runtime_input, controller, physical = build_usd_panda_control(
+        runtime_input, robot, controller_profile=controller_profile, action_config=action_config,
+        dynamic_profile=legacy['dynamic_profile'],
+        velocity_limit=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'],
+        tcp_profile=PANDA_PICKCUBE_EE_TCP_V1, end_frame_id='ee', physical_kind=physical_kind,
+        native_drive=physical_drive,
+        effort_settings=panda_effort_task_settings(physical_kind) if physical_kind is not None else None)
     readiness = legacy["readiness"]
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
@@ -556,8 +544,7 @@ def _bind_isaac_reference_control(value, request, *, include_solution, resolved_
     if physical is None:
         identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
     else:
-        identity_paths += (Path(inspect.getsourcefile(controller_builder)),
-                           Path(__file__).parents[2] / "runtime/sessions/source_composition_adapters.py",
+        identity_paths += (Path(__file__).parents[2] / "runtime/sessions/source_composition_adapters.py",
                            Path(__file__).parents[2] / "runtime/sessions/isaac_physical.py")
     for path in identity_paths:
         source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
@@ -624,7 +611,7 @@ def _bind_isaac_reference_control(value, request, *, include_solution, resolved_
 
 def _isaac_reference_builder(*, delivery_manifest, include_solution, controller_profile,
                              resolved_config, task_config, lift_height_m, physical_fixture,
-                             controller_builder, robot):
+                             physical_kind, physical_drive, robot):
     if controller_profile != 'r3_continuous_v1':
         raise ValueError('F06 Isaac freezes the existing r3_continuous_v1 profile')
     from ...environment.reference_binding import SourceBoundTaskBuilder
@@ -636,19 +623,21 @@ def _isaac_reference_builder(*, delivery_manifest, include_solution, controller_
         None, backend='cuda', allow_sampled_reset=False,
         compile_control=lambda value, request: _bind_isaac_reference_control(
             value, request, include_solution=include_solution, resolved_config=resolved_config,
-            controller_builder=controller_builder))
+            controller_profile=controller_profile, physical_kind=physical_kind,
+            physical_drive=physical_drive))
 
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile='r3_continuous_v1',
                           resolved_config=None, task_config=None, lift_height_m=None,
-                          physical_fixture=False, controller_builder=None, robot=None):
+                          physical_fixture=False, physical_kind=None, physical_drive=None, robot=None):
     """Build the admitted USD route through the common construction stages."""
     from ...environment.reference_binding import TaskBuildRequest
     builder = _isaac_reference_builder(delivery_manifest=delivery_manifest,
         include_solution=include_solution, controller_profile=controller_profile,
         resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-        physical_fixture=physical_fixture, controller_builder=controller_builder, robot=robot)
+        physical_fixture=physical_fixture, physical_kind=physical_kind,
+        physical_drive=physical_drive, robot=robot)
     return builder(TaskBuildRequest('isaacsim', 'cuda', task_seed, horizon, None, None))
 
 
@@ -712,14 +701,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
     if physical != (physical_drive is not None):
         raise ValueError('physical Controller kind and drive must be declared together')
 
-    def build_physical_controller(robot, runtime_input, panda_xml, action_config):
-        from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
-        source, artifact = runtime_input.runtime_source, runtime_input.artifact
-        return build_panda_source_effort_profile(robot, source.scene_definition, artifact, source,
-            native_drive=physical_drive, kind=physical_kind, config=action_config,
-            source_xml=panda_xml, end_frame_id='ee',
-            task_settings=panda_effort_task_settings(physical_kind))
-
     def adapt(value):
         if cube_force_z_N is not None:
             from ...controllers.canonical.contracts import digest
@@ -761,7 +742,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 resolved_config=resolved_config, task_config=task_config,
                 lift_height_m=lift_height_m, robot=robot,
                 physical_fixture=('effort-only' if physical_drive == 'disabled' else 'coexist') if physical else False,
-                controller_builder=build_physical_controller if physical else None)
+                physical_kind=physical_kind, physical_drive=physical_drive)
             return builder(request)
         if backend != 'cpu':
             raise ValueError('PickCube MJCF construction requires the CPU backend')

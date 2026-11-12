@@ -19,8 +19,22 @@ ARM_HOLD_RAMP_PROFILE = 'r3-hold-ramp-v1'
 
 def build_reference_position_controller(artifact, source, *, profile_id, dynamic_profile=None,
                                         force_limit_N=10.0, gripper_rate_hz=500,
-                                        joint_velocity_limit_rad_s=2.0):
+                                        joint_velocity_limit_rad_s=2.0, execution=None,
+                                        action_config=None, entity_id=None, hand_frame_id=None,
+                                        tcp_profile=None):
     """Construct the selected Panda position Controller from its bound source."""
+    from ...runtime.sessions.source import UsdRuntimeSourceV1
+
+    if isinstance(source, UsdRuntimeSourceV1):
+        if profile_id not in R3_REFERENCE_POSITION_PROFILES or dynamic_profile is None:
+            raise ValueError('USD Position requires the declared R3 Controller profile')
+        from .position_profile import PandaPositionServoProfileV1
+        return PandaPositionServoProfileV1.from_usd_source(
+            artifact, source, execution=execution, kinematics_source_xml=source.scene_source.xml,
+            config=action_config, pose_target_method='achieved_state_dls_v1',
+            arm_tracking_method='production_r3_continuous_v1', arm_tracking_profile=dynamic_profile,
+            arm_joint_velocity_limit_rad_s=joint_velocity_limit_rad_s,
+            entity_id=entity_id, hand_frame_id=hand_frame_id, tcp_profile=tcp_profile)
     if profile_id == 'r1':
         from .production import ProductionCanonicalPandaController
         return ProductionCanonicalPandaController.from_source(artifact, source)

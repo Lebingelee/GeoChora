@@ -138,6 +138,13 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     from task_env.assembly import usd_delivery
     from task_env.runtime.sessions import source_composition_adapters
 
+    dynamic_profiles = []
+    original_profile = specialization._r3_dynamic_profile
+    def capture_profile():
+        profile = original_profile()
+        dynamic_profiles.append(profile)
+        return profile
+    monkeypatch.setattr(specialization, '_r3_dynamic_profile', capture_profile)
     loads = []
     original_load = usd_delivery.load_usd_asset_delivery
     def record_load(*args, **kwargs):
@@ -166,6 +173,8 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     binding = PickCubeReferenceEnv.selected_binding(config)
     value = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     artifact = value['artifact']
+    if profile == 'r3_continuous_v1':
+        assert len(dynamic_profiles) == 1
     assert len(loads) == 1
     assert value['source'].scene_source.loaded_delivery is loads[0]
     assert value['kinematics_source_xml'] == loads[0].source_input_bytes[
@@ -307,6 +316,15 @@ def test_usd_controller_failure_releases_temporary_task_source(monkeypatch):
     with pytest.raises(RuntimeError, match='USD Controller rejected'):
         build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+
+
+def test_usd_position_factory_rejects_unsupported_profile_before_materialization():
+    from task_env.controllers.canonical.execution import build_reference_position_controller
+    from task_env.runtime.sessions.source import UsdRuntimeSourceV1
+
+    source = object.__new__(UsdRuntimeSourceV1)
+    with pytest.raises(ValueError, match='requires the declared R3 Controller profile'):
+        build_reference_position_controller(None, source, profile_id='r1')
 
 
 def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, monkeypatch):
