@@ -482,3 +482,35 @@ def test_tabletop_execution_defaults_preserve_class_yaml_caller_precedence(uid, 
     monkeypatch.setattr(task, 'selected_execution_defaults', {'physics_provider': 'geophys'})
     assert resolve_task_env_config(task, None).physics_provider == 'mujoco'
     assert resolve_task_env_config(task, {'execution': {'physics_provider': 'geophys'}}).physics_provider == 'geophys'
+
+
+def test_panda_effort_configuration_does_not_load_candidate_builders():
+    import subprocess
+    import sys
+
+    script = '''
+import sys
+from task_env.environment.configuration import resolve_task_env_config
+from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+resolved = resolve_task_env_config(PickCubeReferenceEnv, {
+    'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+    'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+})
+assert resolved.controller_profile == 'panda-joint-effort-reference-v1'
+assert 'task_env.tasks.pick_cube.physical_candidate' not in sys.modules
+assert 'task_env.tasks.pick_cube.physical_isaac_candidate' not in sys.modules
+'''
+    subprocess.run([sys.executable, '-c', script], check=True)
+
+
+def test_effort_reset_selection_rejects_provider_without_its_source_capability():
+    import sys
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    with pytest.raises(ValueError, match='reset selection requires an isolated MuJoCo'):
+        resolve_task_env_config(PickCubeReferenceEnv, {
+            'execution': {'physics_provider': 'geophys', 'deployment': 'in_process',
+                          'interpreter': sys.executable},
+            'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                           'parameters': {'reset_selection': True}},
+        })

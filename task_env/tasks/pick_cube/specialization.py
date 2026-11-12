@@ -668,8 +668,31 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         if (options['reset_profile'] is not None
                 and (options['profile'] != 'r3_continuous_v1' or options['gravity_compensation'])):
             raise ValueError('reset profile requires PickCube R3 without gravity compensation')
-        from .physical_candidate import validate_physical_configuration
-        validate_physical_configuration(**options)
+        profile = options['profile']
+        parameters = options['parameters']
+        native_drive = options['native_drive']
+        if profile not in PandaAgent.effort_controller_profiles():
+            if native_drive is not None or parameters:
+                raise ValueError('Robot/Controller/source options require a declared physical profile')
+            return
+        from ...controllers.canonical.r3_effort import resolve_panda_effort_options
+        from ...runtime.sessions.source_composition_adapters import validate_effort_source_route
+        kind, drive, switch, _policy = resolve_panda_effort_options(profile, native_drive, parameters)
+        validate_effort_source_route(provider=options['provider'], backend=options['backend'],
+            deployment=options['execution_spec'].deployment,
+            source_delivery_manifest=options['source_delivery_manifest'],
+            drive=drive, kind=kind, reset_selection=switch)
+        if (options['robot_uid'] != 'panda-v1' or options['gravity_compensation']
+                or options['reset_profile'] is not None):
+            raise ValueError('physical profile requires its declared Panda source without Position-only options')
+        if options['provider'] == 'isaacsim':
+            if parameters or set(options['task_parameters']) - {'lift_height_m'}:
+                raise ValueError('Isaac physical control does not admit MJCF-only options')
+            if options['horizon'] > 1000:
+                raise ValueError('Isaac physical source horizon must be in [1, 1000]')
+        if ('cube_force_z_N' in options['task_parameters'] and
+                (options['provider'], drive, kind, switch) != ('mujoco', 'position', 'direct', False)):
+            raise ValueError('PickCube Task COM force requires MuJoCo direct coexist control')
 
     @classmethod
     def selected_supports_observer(cls, config):

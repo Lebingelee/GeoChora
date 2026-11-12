@@ -6,42 +6,6 @@ from contextlib import ExitStack
 from pathlib import Path
 
 
-
-from ...robots.panda import PandaAgent
-
-def validate_physical_configuration(*, provider, backend, profile, robot_uid, native_drive,
-                                    parameters, gravity_compensation, reset_profile,
-                                    source_delivery_manifest, execution_spec, task_parameters, horizon):
-    profiles = PandaAgent.effort_controller_profiles()
-    if profile not in profiles:
-        if native_drive is not None or parameters:
-            raise ValueError('Robot/Controller/source options require a declared physical profile')
-        return
-    from ...controllers.canonical.r3_effort import resolve_panda_effort_options
-    kind, drive, switch, _policy = resolve_panda_effort_options(profile, native_drive, parameters)
-    if execution_spec.deployment != 'in_process':
-        raise ValueError('physical profile currently requires explicit in_process execution')
-    if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
-        raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
-    if robot_uid != 'panda-v1' or gravity_compensation or reset_profile is not None:
-        raise ValueError('physical profile requires its declared Panda source without Position-only options')
-    if provider == 'isaacsim':
-        if source_delivery_manifest is None or parameters or set(task_parameters) - {'lift_height_m'}:
-            raise ValueError('Isaac physical control requires its USD delivery without MJCF-only options')
-        if horizon > 1000:
-            raise ValueError('Isaac physical source horizon must be in [1, 1000]')
-    elif source_delivery_manifest is not None:
-        raise ValueError('MJCF physical profile does not consume a USD source delivery')
-    if switch and ((provider, backend) != ('mujoco', 'cpu') or drive != 'disabled'
-                   or kind not in {'joint', 'r3-pose'}):
-        raise ValueError('physical reset selection requires an isolated MuJoCo reference Controller')
-    if set(task_parameters) - {'cube_force_z_N', 'lift_height_m'}:
-        raise ValueError('physical source retains its declared Task parameters; unsupported override')
-    if 'cube_force_z_N' in task_parameters and (provider, drive, kind, switch) != (
-            'mujoco', 'position', 'direct', False):
-        raise ValueError('PickCube Task COM force requires MuJoCo direct coexist control')
-
-
 def physical_binding_from_config(config, *, robot=None):
     import json
     options = json.loads(config.controller_parameters_json)

@@ -1545,3 +1545,14 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 最终版本诊断 236 项通过，包含四 Task 的同一默认值输入、YAML／mapping／已解析配置一致性，以及桌面任务执行配置的类／YAML／caller 优先级。MuJoCo CPU 用正式 YAML 配置验证 PickCube 一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车：五条均完成 reset、非零动作或一个 Solution interval、共同提交确认、第二次 reset、Robot 重绑定和重复关闭，分别观测 5、5、5、25、25 个显式 native 子步。Nut 仅一个 Solution interval，非完整 Solution；冻结 diff、运行预算、双锁和原始结果在 ignored `workspace/maintenance/v211_task_defaults_20261112/`。Isaac、GeoPhys、renderer 和完整 Solution 未在本批复验，旧结果只按原身份与范围参考。
 
 生产代码修改 6 文件 +17／−33，净减 16 行；版本诊断修改 1 文件 +39；示例修改 1 文件 +2／−2；本文修改 1 文件；无新增、删除或整文件迁移，tracked 文件数保持 1365。资源加载、状态、clock、提交和推进仍由现有 Runtime／adapter 管理，本批未重构其内部合同。E01～E04 尚未整体接收。
+
+
+### 6.161 Panda effort 静态准入职责拆分
+
+复核 ENTRY-01／02、CTRL-01、SUBJ-02、RUN-01：正式 PickCube 解析 effort 配置此前导入 candidate 构建模块，该模块同时校验 Controller 选项、provider source 和 Task 参数。现由现有 Controller owner 解释 drive／reset 选项，Runtime source adapter 校验 provider、部署、USD／MJCF source 与 reset 能力，Task 校验任务力、期限及其限定配置。Panda source 身份限制仍保留；已声明 Robot／Controller profile 的早期匹配继续执行。仅静态解析不再加载两个 physical candidate 构建器；正式 physical 构建仍会使用它们，其实现与 source 合同尚需继续迁移，E01～E04 不能据此判为完成。
+
+三个版本诊断中直接调用 candidate builder 的入口已改为正式配置和共同绑定；新增验证检查静态解析不导入候选构建器、无 provider 能力时拒绝 reset selection。最终输入版本诊断 238 项通过。新增拒绝测试首次因未设置当前 in-process 解释器而在更早检查处失败，修正输入后通过，未启动物理。
+
+最终冻结输入下 MuJoCo CPU 直接 effort 和 joint-reference effort 分别完成正式构建、reset、一次非零 step、共同提交、二次 reset 与重复 close，各观测 5 个显式 native 子步；Isaac CUDA joint-reference effort 从已安装 USD 构建，完成 reset、非零 step、二次 reset、重复 Env close 和 App close，观察 5 个显式子步，隐式启动推进未知。先前两条 MuJoCo 共 10 子步属于修正 Panda 限定前的输入；一次 Isaac 排查在启动后发现并补回 Panda 限定，因此其输入并未完整冻结，另观察 5 个显式子步，仅作为排查记录，不计作最终输入通过。实际计划、输入、结果和双锁见 ignored `workspace/maintenance/v211_effort_admission_20261112/`。GeoPhys、其他任务、renderer 和完整 Solution 本批未复验；先前证据仅按原输入与范围参考。
+
+生产代码修改 3 文件 +42／−38，净增 4 行；版本诊断修改 3 文件 +64／−20；本文修改 1 文件；无新增、删除或整文件迁移，tracked 文件数保持 1365。source 查找、状态、clock、提交与物理推进继续由已有 Runtime／adapter 承担，本批没有重构 renderer。E01～E04 尚未整体接收。

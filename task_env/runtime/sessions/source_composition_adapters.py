@@ -9,6 +9,23 @@ class SourceCompositionCapabilityUnavailable(ValueError):
     """The selected provider/backend has no registered source composer."""
 
 
+def validate_effort_source_route(*, provider, backend, deployment, source_delivery_manifest,
+                                 drive, kind, reset_selection):
+    """Admit the source and reset capabilities before native materialization."""
+    if deployment != 'in_process':
+        raise ValueError('physical profile currently requires explicit in_process execution')
+    if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
+        raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
+    if provider == 'isaacsim':
+        if source_delivery_manifest is None:
+            raise ValueError('Isaac physical control requires its USD delivery')
+    elif source_delivery_manifest is not None:
+        raise ValueError('MJCF physical profile does not consume a USD source delivery')
+    if reset_selection and ((provider, backend) != ('mujoco', 'cpu') or drive != 'disabled'
+                            or kind not in {'joint', 'r3-pose'}):
+        raise ValueError('physical reset selection requires an isolated MuJoCo reference Controller')
+
+
 def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive,
                                  gripper_force_limit_N=None):
     """Bind a Robot's effort channels using the source format's native facts."""

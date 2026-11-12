@@ -43,10 +43,22 @@ def test_compiled_action_contract_requires_a_real_physical_execution():
         binding.bind_compiled_control({'physical_execution': object()})
 
 
+def _formal_isaac_joint_config():
+    import sys
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    return resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                      'physics_device': 'cuda:0', 'deployment': 'in_process',
+                      'interpreter': sys.executable, 'source_delivery_manifest': 'declared'},
+        'episode': {'horizon': 8},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+    })
+
+
 def test_usd_effort_binding_does_not_request_position_source_composition(monkeypatch):
     from task_env.observations.selected_reference import selected_reference_observation_spaces
-    from task_env.tasks.pick_cube.specialization import _configuration
-    from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv, physical_observation
     from task_env.tasks.pick_cube import specialization
 
@@ -54,32 +66,27 @@ def test_usd_effort_binding_does_not_request_position_source_composition(monkeyp
         pytest.fail('physical construction must not create a Position binding')
     monkeypatch.setattr(specialization, 'make_reference_binding', reject_position_binding)
 
-    binding = make_isaac_physical_binding(delivery_manifest='unused-until-build',
-        horizon=8, drive_mode='effort-only', control_kind='joint',
-        task_config=_configuration(), resolved_config=None)
+    binding = PickCubeReferenceEnv._build_selected_binding(_formal_isaac_joint_config())
     assert binding.scalar_control_binding is None
     assert binding.observation_projection.func is physical_observation
     assert binding.observation_space_factory.func is selected_reference_observation_spaces
-    assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding
+    assert binding.compose_robot_source is None
 
 
 def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     from task_env.tasks.pick_cube import specialization
-    from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
     calls = []
     monkeypatch.setattr(specialization, 'build_isaac_reference',
                         lambda **kwargs: calls.append(kwargs) or kwargs)
-    task_config = specialization._configuration()
-    resolved = object()
-    binding = make_isaac_physical_binding(delivery_manifest='declared',
-        horizon=8, drive_mode='effort-only', control_kind='joint',
-        task_config=task_config, resolved_config=resolved)
+    config = _formal_isaac_joint_config()
+    binding = PickCubeReferenceEnv._build_selected_binding(config)
     result = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     assert result['task_seed'] == 42
     assert result['horizon'] == 8
-    assert result['task_config'] is task_config
-    assert result['resolved_config'] is resolved
+    assert result['resolved_config'] is config.environment
+    assert result['robot'] is binding.robot
     with pytest.raises(ValueError, match='Isaac CUDA'):
         binding.build_for_request('mujoco', 'cpu', 42, 8)
     with pytest.raises(ValueError, match='horizon'):

@@ -66,15 +66,20 @@ def test_canonical_source_owns_and_validates_input_snapshot(monkeypatch):
     assert not snapshot.exists()
 
 
-def test_effort_construction_accepts_task_scene_without_historical_hash():
+def test_effort_construction_accepts_task_scene_without_historical_hash(monkeypatch):
     from copy import deepcopy
-    from task_env.tasks.pick_cube.physical_candidate import make_physical_binding
-    from task_env.tasks.pick_cube.specialization import _configuration, _environment_config
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
-    task_config = deepcopy(_configuration())
+    task_config = deepcopy(PickCubeReferenceEnv.selected_task_configuration())
     task_config['recipe']['scene']['table_half_size'][0] = .29
-    binding = make_physical_binding(drive_mode='coexist', control_kind='direct',
-        task_config=task_config, resolved_config=_environment_config(task_config))
+    monkeypatch.setattr(PickCubeReferenceEnv, 'selected_task_configuration', staticmethod(lambda: task_config))
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv._build_selected_binding(config)
     try:
         value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         source = value['source']
