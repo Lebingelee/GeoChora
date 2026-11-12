@@ -172,6 +172,32 @@ def build_usd_task_runtime_input(*, schema_version, task_source, artifact, sourc
         source.scene_source.loaded_delivery.manifest_bytes_sha256, policy)
 
 
+def compile_usd_task_runtime_input(*, loaded, task_source, artifact, scene, options,
+                                   joints, bodies, frames, free_joints, seed, horizon,
+                                   schema_version, profile, controller_profile,
+                                   horizon_min, horizon_max, provider_build_identity):
+    """Compile a USD delivery and reset into a source-bound input.
+
+    The task supplies its scene and semantic mappings; the provider owner
+    controls delivery admission, native representation and execution profile.
+    """
+    from ...environment.task_source import sample_episode_reset_plan
+    from .source import build_usd_runtime_source
+
+    source = build_usd_runtime_source(
+        loaded=loaded, provider='isaacsim', provider_build_identity=provider_build_identity,
+        options=options, task_source_identity_sha256=task_source.identity_hash,
+        artifact=artifact, scene=scene, joints=joints, bodies=bodies, frames=frames,
+        free_joints=free_joints, joint_targets=joints)
+    reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=seed)
+    execution = isaac_cuda_execution_spec(profile=profile, seed=seed)
+    return build_usd_task_runtime_input(
+        schema_version=schema_version, task_source=task_source,
+        artifact=artifact, source=source, execution=execution, reset_plan=reset_plan,
+        controller_profile=controller_profile, horizon=horizon,
+        horizon_min=horizon_min, horizon_max=horizon_max)
+
+
 class RuntimeSession(Protocol):
     @property
     def provider_materialization_id(self) -> str: ...

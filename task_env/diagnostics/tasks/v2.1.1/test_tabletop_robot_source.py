@@ -117,12 +117,12 @@ def test_pickcube_task_definition_uses_frozen_artifact_semantics(monkeypatch):
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
 def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
+    from task_env.controllers.canonical import execution
     from task_env.controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold
     from task_env.tasks.pick_cube import specialization as pickcube
     from task_env.tasks.nut_assembly import specialization as nut
 
-    module = pickcube if task_name == 'pickcube' else nut
-    original = module.build_reference_position_controller
+    original = execution.build_reference_position_controller
     constructed = []
     profiles = []
     profile = ReferenceExecutionController.identity_profile
@@ -135,7 +135,7 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
         controller = original(artifact, source, **kwargs)
         constructed.append((controller, artifact, source, kwargs['profile_id']))
         return controller
-    monkeypatch.setattr(module, 'build_reference_position_controller', capture)
+    monkeypatch.setattr(execution, 'build_reference_position_controller', capture)
     value = (pickcube.build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
              if task_name == 'pickcube' else nut.build_reference(provider='mujoco', include_solution=False))
     try:

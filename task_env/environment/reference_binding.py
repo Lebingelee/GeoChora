@@ -40,9 +40,13 @@ class SourceBoundTaskBuilder:
     """Construct a task source and derive each episode's reset plan."""
 
     def __init__(self, compile_source, reset_plan, *, backend, reuse_source=False,
-                 allow_sampled_reset=True, compile_control=None):
+                 allow_sampled_reset=True, compile_control=None,
+                 controller_factory=None, controller_options=None):
         self.compile_source, self.reset_plan = compile_source, reset_plan
         self.compile_control = compile_control
+        if (controller_factory is None) != (controller_options is None):
+            raise ValueError('Controller factory and options must be supplied together')
+        self.controller_factory, self.controller_options = controller_factory, controller_options
         self.backend, self.reuse_source = backend, reuse_source
         self.allow_sampled_reset = allow_sampled_reset
         self._cached = self._route = None
@@ -68,6 +72,11 @@ class SourceBoundTaskBuilder:
                 if callable(assert_fresh):
                     assert_fresh()
         try:
+            if fresh and self.controller_factory is not None:
+                options = self.controller_options(value, request)
+                selection = self.controller_factory(
+                    value['artifact'], value['source'], **options)
+                value = {**value, '_controller_selection': selection}
             if fresh and self.compile_control is not None:
                 value = self.compile_control(value, request)
             plan = self.reset_plan(value, request) if self.reset_plan is not None else None

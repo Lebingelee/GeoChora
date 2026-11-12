@@ -24,7 +24,6 @@ from ...assembly.compiler import (
 from ...assembly.source import TaskSceneSource
 from ...controllers.canonical.contracts import (digest, REFERENCE_POSE_ACTION_SCHEMA,
     reference_pose_action, reference_pose_action_space)
-from ...controllers.canonical.execution import build_reference_position_controller
 from ...controllers.canonical.production_r3 import (
     R3_PROFILE_PATH, load_r3_dynamic_profile,
 )
@@ -352,17 +351,12 @@ def _compile_reference_source(request, *, resolved_config=None, lift_height_m=No
             '_contact_profile': contact_profile}
 
 
-def _bind_reference_controller(value, request, *, include_solution, resolved_config=None):
+def _bind_reference_controller(value, request, *, include_solution, dynamic):
     from ...controllers.canonical.contracts import digest
     artifact, source = value['artifact'], value['source']
     task_config, contact_profile = value['_task_config'], value['_contact_profile']
     recipe, provider = task_config['recipe'], request.provider
-    dynamic = load_r3_dynamic_profile()
-    controller_profile = (resolved_config.control.profile_id if resolved_config is not None
-                          else NutAssemblyReferenceEnv.selected_default_controller_profile())
-    execution_controller = build_reference_position_controller(
-        artifact, source, profile_id=controller_profile, dynamic_profile=dynamic,
-        force_limit_N=recipe['controller']['force_cap_N'])
+    execution_controller = value.pop('_controller_selection')
     execution_profile = execution_controller.identity_profile()
     controller = execution_controller.hold.controller
     settings = dict(recipe["solution"]["config"])
@@ -447,13 +441,21 @@ def _bind_reference_controller(value, request, *, include_solution, resolved_con
 def _reference_builder(*, include_solution, resolved_config=None, lift_height_m=None,
                        task_config=None, robot=None):
     from ...environment.reference_binding import SourceBoundTaskBuilder
+    from ...controllers.canonical.execution import build_reference_position_controller
     backend = resolved_config.runtime.backend if resolved_config is not None else 'cpu'
+    dynamic = load_r3_dynamic_profile()
+    profile = (resolved_config.control.profile_id if resolved_config is not None
+               else NutAssemblyReferenceEnv.selected_default_controller_profile())
     return SourceBoundTaskBuilder(
         lambda request: _compile_reference_source(request, resolved_config=resolved_config,
             lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         None, backend=backend,
+        controller_factory=build_reference_position_controller,
+        controller_options=lambda value, request: dict(
+            profile_id=profile, dynamic_profile=dynamic,
+            force_limit_N=value['_task_config']['recipe']['controller']['force_cap_N']),
         compile_control=lambda value, request: _bind_reference_controller(value, request,
-            include_solution=include_solution, resolved_config=resolved_config))
+            include_solution=include_solution, dynamic=dynamic))
 
 
 def _build_reference(*, provider, include_solution, resolved_config=None, lift_height_m=None,

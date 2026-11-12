@@ -142,7 +142,7 @@ def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_
     return factory(kind, **(dynamic_parameters or {}))
 
 
-def compile_panda_effort_selection(robot, scene, artifact, source, *, intent,
+def compile_panda_effort_selection(artifact, source, *, robot, scene, intent,
                                    controller_profile, kind, **factory_options):
     """Compile and verify an effort Controller against its admitted Robot source."""
     factory = prepare_panda_source_effort_factory(robot, scene, artifact, source,
