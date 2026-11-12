@@ -3238,13 +3238,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
                     solution_identity=self.value.get('solution_identity'), control_request_mode='position')
                 action = self.bind_physical_action(proposal.action)
-                from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
-                operations = prepare_selected_control_action(
-                    self, action, proposal=proposal, observer_solution=solution)
             except BaseException as error:
                 self._latch_fault('physical_external_solution_proposal', error, before_state=self.state)
                 raise
-            return self._episode_execution_state().execute_interval(**operations)
+            return self._step(action, proposal=proposal, observer_solution=solution)
         try:
             self._require_published_execution_info()
         except BaseException as error:
@@ -3272,7 +3269,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     proposal.action, scene=self.position_scene, plan=self.position_plan,
                     profile=self.position_profiles[0],
                 )
-                return self._step_position_profile(
+                return self._step(
                     request, proposal=proposal, observer_solution=solution,
                 )
             except BaseException as error:
@@ -3286,12 +3283,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def switch_position_controller(self, candidate):
         """Controller changes are admitted only while resetting an episode."""
         raise StageUnavailableError('Controller switching is only supported at reset')
-
-    def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
-        from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
-        operations = prepare_selected_control_action(
-            self, request, proposal=proposal, observer_solution=observer_solution)
-        return self._episode_execution_state().execute_interval(**operations)
 
     def _prepare_position_profile(self, request, *, proposal=None, observer_solution=None, caller_driven=False):
         """Run one source-bound Position interval through the selected lifecycle latch."""
@@ -3545,7 +3536,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as error:
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
                 raise
-            return self._step_position_profile(
+            return self._step(
                 request, proposal=proposal, observer_solution=self.solution,
             )
         return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)

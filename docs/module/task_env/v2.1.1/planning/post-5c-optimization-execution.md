@@ -1306,3 +1306,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 5 文件 +13／−21，净减 8 行；版本诊断修改 1 文件 +32／−0，检查两任务按请求消费 provider、使用所选 Robot 并拒绝不一致 backend；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 工作树差异为 134 文件（新增 12、删除 20、修改 102），+7693／−14659，净减 6966 行；包含较早历史目录退休与诊断搬迁，不能将其归因于本批。
 
 最终输入下版本诊断 187 项通过；MuJoCo Pendulum、双轮车均完成 reset、一次控制推进、再次 reset 和重复 close，各观测 25 个 native 子步。GeoPhys Pendulum 完成同样短程，native 子步未观测，按 50 预留；GeoPhys 双轮车在上一输入 `fceb727f` 已短程通过，本批两任务使用共同 builder，当前差异将请求中相同 provider 直接传入原有 source 编译并核对 backend，但未按最终输入重复运行该路线。Isaac、renderer、两个桌面任务与完整 Solution 本批未复验。冻结输入、双锁、预算与收据在 ignored `workspace/maintenance/v211_effort_request_20261112/`。E01～E04 仍未整体接收。
+
+
+### 6.134 Solution 与普通动作共享 interval 作用域
+
+输入 `90225da0`；实施前复核 GOV、ENV-03／05、SUBJ、CTRL-01／02／05 及四任务当前执行链。普通 action 已经经过共同 interval 作用域，但 position Solution 与可切换 physical Solution 分支直接准备并执行 interval，绕过该作用域；它们虽然使用同一提交器，任务力等 interval 资源仍可能被漏掉。现在这两条 Solution 分支在完成各自必要的动作转换后调用共同 `_step`，与其他 Solution 共享任务／caller 力作用域、控制准备、故障锁存和 interval 执行；删除仅供旧分支使用的 `_step_position_profile`。Solution 已执行 `act` 后失败仍 fault，typed position／effort 及提交 owner 不变。本项未消除所有 Position／physical 的合法能力分派。
+
+生产修改 1 文件 +3／−12，净减 9 行；版本诊断修改 1 文件 +13／−1，实测可切换 effort Solution 进入共同作用域、提交与录制；本文新增记录。无新增、删除或整文件迁移；项目 tracked 文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 134 文件（新增 12、删除 20、修改 102），+7708／−14671，净减 6963 行，含此前历史目录退休与诊断迁移，不代表本批贡献。
+
+最终输入版本诊断 187 项通过；其中的 MuJoCo 可切换 R3 effort Solution 验证了该路径一个真实 interval 和 recorder，未单独统计 native 子步。双锁冻结探针中，MuJoCo PickCube R3 与 NutAssembly 各完成一次正式 Solution 推进、再次 reset、close，分别观测 5 个 native 子步，均非完整 Solution。附加任务力探针误填 `panda` case，脚本实际选择普通任务并在调用不存在的任务力工厂前失败，native 推进 0，不是产品失败也不作为有效功能证据；输入与记录位于 `workspace/maintenance/v211_solution_interval_20261112/`。Isaac position Solution、GeoPhys、renderer、完整 Solution 本批未复验；其原有证据保留原输入和范围。E01～E04 仍未整体接收。

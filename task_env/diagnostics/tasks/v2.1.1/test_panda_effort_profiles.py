@@ -378,7 +378,8 @@ def test_effort_reset_rebuilds_plan_for_requested_seed(switchable):
         env.close()
 
 
-def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path):
+def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path, monkeypatch):
+    from contextlib import contextmanager
     import sys
     from task_env import make_env
     from task_env.artifacts.state import CanonicalStatePublicationV2
@@ -398,7 +399,18 @@ def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path):
         assert 'pickcube_position_execution_info_v1' in info
         env.start_recording(tmp_path / 'solution.h5')
         before = env.state.control_step
+        original_scope = env._selected_com_wrench_scope
+        scoped = []
+
+        @contextmanager
+        def capture_scope(requests):
+            scoped.append(requests)
+            with original_scope(requests):
+                yield
+
+        monkeypatch.setattr(env, '_selected_com_wrench_scope', capture_scope)
         env.step_with_solution(solution)
+        assert scoped == [None]
         assert env.state.control_step == before + 1
         assert env.controller is env._physical_reset_selection.current.execution.controllers[0]
         assert env.session._last_control_submission['status'] == 'acknowledged'
