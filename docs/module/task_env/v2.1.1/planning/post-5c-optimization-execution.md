@@ -1096,3 +1096,13 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 输入 `c4a5195e`。将 `lift_height_m` 从正式任务配置传至 Position 和 effort 的 MJCF／USD 任务声明、Artifact、reset 与任务评价；移除共同配置层对 Isaac 所有任务参数的笼统拒绝，PickCube 仍明确拒绝其 Isaac source 不支持的 Task force。旧 Isaac 入口对 lift 的拒绝和 builder 对参数的遗漏得到纠正，不扩大 provider 原生能力或任务范围。
 
 生产修改 4 文件 +25／−19，净增 6 行；版本诊断修改 2 文件 +61／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。145 项版本检查通过，包括两个控制模式在 MJCF 与 USD Artifact 的非默认任务语义，以及 USD reset 对同一 Artifact 的身份绑定。MuJoCo Position Solution 单步和直接 effort 分别完成 5 个 native 子步及再次 reset。Isaac Position 以 0.17 米 lift 完成 reset、非零 action、第二次 reset、同步 RGB 和独立三帧读回，观察 41 次 physics callback，订阅前启动推进未知；Runtime 和 reader 退出码均为 0，日志有只读目录、USD 包、渲染预热警告。首次 Isaac 尝试因诊断脚本在 SimulationApp 启动前加载 USD 引起扩展初始化冲突并退出 139，未进入物理推进；重试将 Artifact 身份移到独立进程计算，完整失败及预算记录保留。Isaac effort 本轮仅完成 USD Artifact／reset 合同检查，真实 CUDA effort 和完整 Solution 尚未复验。冻结 diff、预算和收据分别位于 ignored `workspace/maintenance/v211_lift_config_cpu_20261112_u4on4_61/` 与 `workspace/maintenance/v211_isaac_lift_20261112_svcug385/`。E01～E04 未整体接收。
+
+### 6.106 PickCube TaskDefinition 退出旧索引诊断
+
+输入 `a265736c`。`PickCubeTaskDefinition` 此前同时保留 Artifact 绑定的具名状态和只由旧诊断调用的 `TaskReferences` 索引式评价，后者再区分单行／批量并从本地默认 recipe 获取语义。删除旧 references、索引和批量 predicate 分支后，正式 TaskDefinition 直接消费同一个 Artifact 的语义及具名 Runtime 状态；保留已知成功判据、缺失状态和非有限值检查，不再为构造定义重复读取 recipe。G06 尚未实现，此处不声称具名批量状态已交付。
+
+生产修改 1 文件 +23／−78，净减 55 行；版本诊断修改 1 文件 +25／−0，本文和当前状态文档修改 2 文件；无新增、删除或整文件迁移，tracked 文件数保持 1356。新增检查以冻结的 Artifact 验证非默认 lift 的 reset、评价和 predicate，且禁止构造时重载 recipe。此项只消除任务语义的旧诊断分流；Robot／Controller 的所有构造尚未统一。provider adapter 仍向相同 Runtime 状态及时间边界发布，renderer 合同未改。
+
+146 项版本检查通过。当前源码下 MuJoCo Position 的 Solution 单步与直接 effort 各完成 5 个 native 子步及第二次 reset；GeoPhys joint effort 完成 reset、step、第二次 reset 和关闭，native 子步未直接计数。Isaac Position 非默认 lift 完成相同生命周期、RGB 及独立读回，观察 41 次 physics callback，订阅前启动推进未知；SDK 日志保留只读目录、USD 包和渲染预热警告。本项之前的 `a265736c` 还真实验证了 Isaac 直接 effort 在 0.17 米 lift 下的非零力矩、第二次 reset、RGB 和独立读回，观察 41 次 callback；该证据只对应 `a265736c`，当前 TaskDefinition 改动后没有再次重跑 Isaac effort。完整 Solution 未运行。
+
+Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误用 Position 专属断言；第二次暴露真实 recorder 限制——`selected_recording_metadata` 调用的 `provider_build_identity` 不接受 `isaacsim`，`start_recording` 因而报 `ValueError('unknown provider')`。去掉录制后 effort 控制路线通过；不能把它当作录制能力通过，录制修复留待 E10。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_pickcube_named_final_20261112_tzr8tscd/`、`workspace/maintenance/v211_named_pickcube_isaac_20261112_rchuh6qq/`、`workspace/maintenance/v211_isaac_effort_lift_20261112_u8rdr1rn/` 和 `workspace/maintenance/v211_isaac_effort_state_20261112_wzke9iah/`。E01～E04 未整体接收。

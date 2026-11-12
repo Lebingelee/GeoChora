@@ -68,6 +68,31 @@ def test_source_rejects_robot_outside_task_composition():
             agents=(SimpleNamespace(uid='foreign-robot'),))
 
 
+def test_pickcube_task_definition_uses_frozen_artifact_semantics(monkeypatch):
+    from dataclasses import replace
+    from task_env.artifacts import CanonicalStateView, PoseWorld
+    from task_env.environment.task_definition import TaskEvaluationContextV1
+    from task_env.tasks.pick_cube import task
+    from task_env.tasks.pick_cube.specialization import build_artifact
+
+    artifact = build_artifact(lift_height_m=.17)
+    monkeypatch.setattr(task, '_recipe', lambda: pytest.fail('Task definition reloaded the recipe'))
+    definition = task.PickCubeTaskDefinition.from_artifact(artifact)
+    rest = artifact.semantics.parameters_si['rest_height']
+    fingers = {'panda-v1/finger_joint1': .01, 'panda-v1/finger_joint2': .01}
+    def state(height):
+        return CanonicalStateView('canonical-state-v0', 'SI_right_handed_z_up_wxyz', 0, 0.,
+            fingers, {key: 0. for key in fingers}, {
+                'cube-v1': PoseWorld((0., 0., rest + height), (1., 0., 0., 0.)),
+                'panda-v1/ee': PoseWorld((0., 0., rest + height), (1., 0., 0., 0.))})
+    assert not definition.reset(state(.16)).success
+    assert definition.evaluate(state=state(.18)).success
+    result = definition.evaluate_predicates(TaskEvaluationContextV1(state(.18)))
+    assert result.predicates['cube_lifted'].value is True
+    with pytest.raises(ValueError, match='unsupported PickCube success definition'):
+        task.PickCubeTaskDefinition(replace(artifact.semantics, success_definition='other'))
+
+
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
 def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
     from task_env.controllers.canonical.execution import ReferenceExecutionController, StableArmTargetHold

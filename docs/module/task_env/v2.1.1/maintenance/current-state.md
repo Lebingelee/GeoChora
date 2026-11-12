@@ -225,3 +225,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 PickCube effort 现在消费正式解析的任务与环境配置；MuJoCo／GeoPhys 短程已复验，Isaac effort 仍需真实 CUDA 复验。详见[实施记录 6.104](../planning/post-5c-optimization-execution.md#6104-pickcube-effort-消费已解析配置)。
 
 PickCube 的 `lift_height_m` 已贯通 Position／effort 的 MJCF 与 USD 任务 Artifact；MuJoCo 两种控制及 Isaac Position 非默认值短程已验证。详见[实施记录 6.105](../planning/post-5c-optimization-execution.md#6105-pickcube-lift-参数贯通-position-与-effort)。
+
+PickCube TaskDefinition 已移除仅供旧诊断使用的索引式评价，改为只消费 Artifact 与具名状态；受影响 MuJoCo、GeoPhys、Isaac Position 短程已复验。Isaac effort 控制曾通过短程，但其 recorder 当前不识别 Isaac provider，待 E10 处理。详见[实施记录 6.106](../planning/post-5c-optimization-execution.md#6106-pickcube-taskdefinition-退出旧索引诊断)。
