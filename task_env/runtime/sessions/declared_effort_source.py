@@ -5,10 +5,9 @@ from dataclasses import replace
 import xml.etree.ElementTree as ET
 
 from ...artifacts import ExecutionSpecV1, RendererSelectionV1
-from ...assembly.assets import _source_closure_digest
 from ...assembly.compiler import compile_reference_source
 from ...assembly.source import TaskSceneSource
-from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
+from .source import project_mjcf_scene_source
 
 
 def declared_effort_scene(robot, *, provider, source_delivery_manifest):
@@ -27,9 +26,8 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
     """Map Robot topology and declared transmissions to the chosen source adapter."""
     xml = robot.source_xml
     source_id = f'scene-definition-v3:{scene.identity_hash}'
-    projected = project_scene_definition_v3_to_mjcf(xml, scene)
-    closure = _source_closure_digest({'scene.xml': projected.encode(),
-                                      **source_asset_bytes(base_dir, projected)})
+    scene_source = TaskSceneSource(xml, base_dir, source_id)
+    _, _, closure = project_mjcf_scene_source(scene_source, scene)
     subject, declarations = robot.physical_subject_declaration(
         source_id=source_id, source_closure_sha256=closure)
     root = ET.fromstring(xml)
@@ -84,7 +82,7 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
         closure = source.source_closure_digest
     else:
         source = compile_reference_source(
-            artifact=artifact, scene_source=TaskSceneSource(xml, base_dir, source_id),
+            artifact=artifact, scene_source=scene_source,
             composition=composition, config=config, joints=joints, bodies=body_names,
             frames={}, free_joints={}, joint_targets={}, open_actuators=(),
             scene_definition=scene, source_closure_digest=closure,

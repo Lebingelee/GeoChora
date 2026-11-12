@@ -1232,3 +1232,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `ba1eb932`；实施前复核优化台账 GOV-01／02、ENTRY-01／02、TASK-01／02、ENV-01～03、SUBJ 和 CTRL 条目。PickCube 的一体 Panda 正式 Position 和 effort 构建现使用同一 MJCF Task Scene 与 TaskArtifact 编译，规范 source 将快照交给共同 Env 生命周期；Robot Position 绑定消费实际 source Scene，而非另造不同身份的 Scene。控制提交仍核验 Scene、Artifact、闭包和 Controller 身份。首次真实 Position 提交因不同 Scene 身份被拒绝、未推进，随后修正并保留该失败收据。装配 Panda 的替换式 source 暂仍使用旧构建，Isaac 路线另有适配；本批没有完成四主体统一，也没有关闭 E01～E04。
 
 生产修改 3 文件 +44／−27，版本诊断修改 3 文件 +20／−14，本文新增记录；无新增、删除或整文件迁移，tracked 文件数保持 1357。代码段从 physical candidate 收敛到 Task 共同编译，不按整文件迁移计算。175 项版本合同检查通过。正式 `make_env` 在 MuJoCo CPU 完成一体 Position、任务 RGB、一体 Position Solution 单步及装配 Panda 各一次 reset／控制推进／再次 reset／close，各观测 5 个 native 子步；Solution 非完整执行。GeoPhys CPU 一体 Position 完成同一短程生命周期，native 子步未观测，按 50 预留。GeoPhys 日志报告 Taichi 四线程，即使探针限制了 BLAS／OMP 线程，不能称为两线程运行。MJCF 导入保留语义诊断。Isaac、完整 Solution 和其他未受影响路线本批未复验。输入冻结、失败与成功收据位于 ignored `workspace/maintenance/v211_position_formal_wdu7jxv_/`。
+
+
+### 6.124 共享 MJCF Scene 投影与 source 闭包
+
+输入 `d018abaf`；实施前复核台账 GOV-01／02、ENTRY-01／02、ENV-01～03、SUBJ-01～03、CTRL-01／02 及 source owner 边界。正式 PickCube Position 和 effort 的共同 MJCF Scene 绑定此前从 MuJoCo composition 模块取得，即使实际 provider 是 GeoPhys；简单主体 effort source 又独立计算相同的投影与资产闭包。将 Scene 投影、资产读取和闭包计算归入共同 Runtime source，PickCube 的快照绑定、简单主体的 source 编译以及 adapter 的闭包复核实际调用同一实现。MuJoCo 特有物化仍由 MuJoCo adapter 执行；Scene、source 闭包、受管快照和 native 校验均未删减。
+
+生产修改 5 文件 +37／−47，净减 10 行；共同绑定函数从 MuJoCo composition 迁入既有 Runtime source，属于代码段迁移，无整文件迁移。版本诊断和测试本批无源码变化；本文新增记录，无新增或删除文件，tracked 文件数保持 1357。最终代码下 175 项版本合同检查通过。MuJoCo 正式 PickCube Position 和 Pendulum 分别完成构建、reset、一次非零控制、第二次 reset、关闭，观测 5 和 25 个 native 子步；PickCube MJCF 导入保留语义诊断。本批未复跑 GeoPhys、Isaac、renderer 或完整 Solution；此前对应证据保留其原代码和范围。冻结输入、双锁预算及收据位于 ignored `workspace/maintenance/v211_shared_mjcf_source_3jk6quiw/`。装配 Panda 的替换式 source 及四任务共同构建仍待收敛，E01～E04 未整体接收。

@@ -374,25 +374,41 @@ def source_asset_bytes(base_dir, source_xml: str) -> dict[str, bytes]:
     return assets
 
 
+def project_mjcf_scene_source(scene_source, scene_definition):
+    """Project one MJCF Scene and calculate its bounded source closure."""
+    if not isinstance(scene_source, TaskSceneSource):
+        raise TypeError('MJCF Scene lowering requires the public TaskSceneSource value')
+    if not isinstance(scene_definition, SceneDefinition):
+        raise TypeError('MJCF Scene lowering requires the canonical SceneDefinition')
+    projected = project_scene_definition_v3_to_mjcf(scene_source.xml, scene_definition)
+    assets = source_asset_bytes(scene_source.base_dir, projected)
+    closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'), **assets})
+    return projected, assets, closure
+
+
 def verify_projected_scene_source(scene_source, scene_definition, expected_closure_digest: str):
     """Project a canonical Scene and verify its XML and asset closure."""
-
-    if not isinstance(scene_source, TaskSceneSource):
-        raise TypeError('MuJoCo Scene lowering requires the public TaskSceneSource value')
-    if not isinstance(scene_definition, SceneDefinition):
-        raise TypeError('MuJoCo Scene lowering requires the canonical SceneDefinition')
     if not re.fullmatch(r'[0-9a-f]{64}', str(expected_closure_digest)):
-        raise ValueError('MuJoCo Scene lowering requires a source closure SHA-256')
-    source_xml = project_scene_definition_v3_to_mjcf(scene_source.xml, scene_definition)
-    assets = source_asset_bytes(scene_source.base_dir, source_xml)
-    from ...assembly.assets import _source_closure_digest
-    measured_closure = _source_closure_digest({
-        'scene.xml': source_xml.encode('utf-8'),
-        **assets,
-    })
-    if measured_closure != expected_closure_digest:
+        raise ValueError('MJCF Scene lowering requires a source closure SHA-256')
+    projected, assets, closure = project_mjcf_scene_source(scene_source, scene_definition)
+    if closure != expected_closure_digest:
         raise ValueError('MuJoCo canonical source closure digest mismatch')
-    return source_xml, assets
+    return projected, assets
+
+
+def bind_reference_scene_source(source, *, artifact, scene, bodies, frames):
+    """Bind a declared Scene to its owned MJCF snapshot without native I/O."""
+    from dataclasses import replace
+    receipt = source.execution_source_receipt
+    receipt.validate_snapshot()
+    scene_source = TaskSceneSource(receipt.importer_xml.decode('utf-8'), receipt.snapshot_root,
+                                   f'scene-definition-v3:{scene.identity_hash}')
+    projected, _, closure = project_mjcf_scene_source(scene_source, scene)
+    bound = replace(source, task_artifact_hash=artifact.identity_hash,
+        scene_source=scene_source, scene_definition=scene, source_closure_digest=closure,
+        execution_source_receipt=None, source_snapshot_receipt=receipt,
+        bodies=bodies, frames=frames)
+    return bound, projected, closure
 
 
 def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):

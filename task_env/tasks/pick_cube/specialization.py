@@ -298,7 +298,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         if robot_recipe.mode == 'reference-task-source':
             task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
                 task_config, source.agents[0], artifact)
-            from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
+            from ...runtime.sessions.source import bind_reference_scene_source
             source, _, _ = bind_reference_scene_source(source, artifact=artifact,
                 scene=scene, bodies=bodies, frames=frames)
             reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=task_seed)

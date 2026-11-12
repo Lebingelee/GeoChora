@@ -54,30 +54,6 @@ def checked_panda_effort_source_limits(source, scene):
     return panda_effort_source_limits(ET.fromstring(source.scene_source.xml))
 
 
-def bind_reference_scene_source(source, *, artifact, scene, bodies, frames):
-    """Bind declared Scene names to a verified MJCF snapshot without native I/O.
-
-    The caller retains the original owned receipt until the binding is retired.
-    """
-    from dataclasses import replace
-    from ...assembly.assets import _source_closure_digest
-    from ...assembly.source import TaskSceneSource
-    from .source import project_scene_definition_v3_to_mjcf, source_asset_bytes
-    receipt = source.execution_source_receipt
-    receipt.validate_snapshot()
-    destination = receipt.snapshot_root
-    xml = receipt.importer_xml.decode('utf-8')
-    projected = project_scene_definition_v3_to_mjcf(xml, scene)
-    closure = _source_closure_digest({'scene.xml': projected.encode('utf-8'),
-                                      **source_asset_bytes(destination, projected)})
-    bound = replace(source, task_artifact_hash=artifact.identity_hash,
-        scene_source=TaskSceneSource(xml, destination, f'scene-definition-v3:{scene.identity_hash}'),
-        scene_definition=scene, source_closure_digest=closure, execution_source_receipt=None,
-        source_snapshot_receipt=receipt,
-        bodies=bodies, frames=frames)
-    return bound, projected, closure
-
-
 def extract_task_world_mjcf(*, task_xml: str, expected_xml_sha256: str,
                             retained_roots: tuple[str, ...],
                             replaced_robot_roots: tuple[str, ...]) -> str:

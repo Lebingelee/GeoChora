@@ -172,7 +172,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         robot = original.agents[0]
         task_source, scene, artifact, bodies, frames = compile_pickcube_mjcf_task(
             task_config, robot, legacy_artifact)
-        from ...runtime.sessions.mujoco_composition import bind_reference_scene_source
+        from ...runtime.sessions.source import bind_reference_scene_source
         source, projected, closure = bind_reference_scene_source(original, artifact=artifact,
             scene=scene, bodies=bodies, frames=frames)
         def build_physical(kind, **parameters):
