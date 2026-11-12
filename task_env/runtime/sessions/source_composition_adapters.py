@@ -214,10 +214,14 @@ def validate_effort_robot_intent(intent, source, execution, *, controller_profil
     if type(intent) is not SourceCompositionIntentV1 or type(execution) is not PhysicalControlExecutionV1:
         raise TypeError('effort composition requires typed intent and physical execution')
     receipt = source_resource_receipt(source)
-    if (receipt is None or receipt.source_id != intent.task_source_id
-            or receipt.source_closure_digest != intent.task_source_closure_sha256):
-        raise ValueError('effort source snapshot differs from the composition intent')
-    receipt.validate_snapshot()
+    if receipt is not None:
+        if (receipt.source_id != intent.task_source_id
+                or receipt.source_closure_digest != intent.task_source_closure_sha256):
+            raise ValueError('effort source snapshot differs from the composition intent')
+        receipt.validate_snapshot()
+    elif (source.source_id != intent.task_source_id
+          or source.source_closure_digest != intent.task_source_closure_sha256):
+        raise ValueError('effort source differs from the composition intent')
     entities = {entity.entity_id for entity in execution.scene.entities}
     if entities != set(intent.task_entity_ids) | set(intent.existing_robot_entity_ids):
         raise ValueError('effort Scene ownership differs from the composition intent')
@@ -268,7 +272,7 @@ def validate_robot_source_request(source, *, robot, composition_intent, task_ent
     """Check the selected source, intent, and Robot recipe before composition."""
     from ...assembly.source_composition import SourceCompositionIntentV1
     from ...robots.source_recipe import RobotSourceRecipeV1
-    from .source import RuntimeSource
+    from .source import RuntimeSource, UsdRuntimeSourceV1
 
     recipe_method = getattr(robot, 'source_recipe', None)
     profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
@@ -278,7 +282,7 @@ def validate_robot_source_request(source, *, robot, composition_intent, task_ent
         raise ValueError('Robot composition requires the selected provider-neutral recipe')
     if type(composition_intent) is not SourceCompositionIntentV1:
         raise TypeError('Robot source requires a frozen composition intent')
-    if type(source) is not RuntimeSource:
+    if type(source) not in (RuntimeSource, UsdRuntimeSourceV1):
         raise TypeError('Robot composition requires a typed RuntimeSource')
     if (type(task_entities) is not tuple or type(task_body_names) is not tuple
             or type(task_site_transfers) is not tuple or set(dict(task_body_names)) != set(task_entities)):
@@ -294,7 +298,9 @@ def validate_robot_source_request(source, *, robot, composition_intent, task_ent
             or composition_intent.mode != expected_mode
             or composition_intent.task_site_transfers != task_site_transfers):
         raise ValueError('composition intent differs from Task/Robot declarations')
-    if source.execution_source_receipt is not None:
+    if isinstance(source, UsdRuntimeSourceV1):
+        source.scene_source.assert_fresh()
+    elif source.execution_source_receipt is not None:
         source.execution_source_receipt.validate_snapshot()
     elif source.scene_definition is not None and recipe.mode == 'reference-task-source':
         from .source import verify_projected_scene_source

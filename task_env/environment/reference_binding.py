@@ -517,6 +517,8 @@ class ExistingSubjectEffortTask:
         import hashlib
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
+        from ..runtime.sessions.source_composition_adapters import (
+            prepare_robot_source_intent, validate_effort_robot_intent)
 
         def compile_source(request):
             provider, seed = request.provider, request.seed
@@ -529,8 +531,12 @@ class ExistingSubjectEffortTask:
                 composition=self.composition, config=config, provider=provider,
                 source_delivery=delivery, seed=seed)
             profile_id = config.control.profile_id
+            intent, _recipe = prepare_robot_source_intent(source, robot=robot,
+                controller_profile=profile_id, existing_robot_entity=robot.uid,
+                task_body_names=(), task_site_transfers=())
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)
+            validate_effort_robot_intent(intent, source, physical, controller_profile=profile_id)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0], 'solution': None, 'physical_execution': physical,
                 'construction_id': self.construction_id,
@@ -539,7 +545,8 @@ class ExistingSubjectEffortTask:
                 'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
                                   'projected_closure': closure},
                 'resolved_configuration': {'physics_dt': artifact.timebase.physics_dt,
-                                           'control_substeps': artifact.timebase.control_substeps}}
+                    'control_substeps': artifact.timebase.control_substeps,
+                    'source_composition_intent_v1_sha256': intent.identity_hash}}
 
         def reset_seed(seed):
             if type(seed) is not int or seed < 0:

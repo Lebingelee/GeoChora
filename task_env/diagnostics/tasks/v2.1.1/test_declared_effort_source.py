@@ -12,6 +12,40 @@ from task_env.tasks.pendulum import PendulumEnv
 from task_env.tasks.two_wheel_balance import TwoWheelBalanceEnv
 
 
+@pytest.mark.parametrize(('uid', 'robot_type', 'controlled_joints'), [
+    ('pendulum-v1', PendulumEntity, ('pendulum_hinge',)),
+    ('two-wheel-balance-v1', TwoWheelBalanceEntity, ('left_wheel_hinge', 'right_wheel_hinge')),
+])
+def test_simple_robot_source_intent_controls_compiled_subject(uid, robot_type, controlled_joints, monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.runtime.sessions import source_composition_adapters
+
+    intents = []
+    validate = source_composition_adapters.validate_effort_robot_intent
+    def capture(intent, source, execution, **kwargs):
+        intents.append(intent)
+        return validate(intent, source, execution, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'validate_effort_robot_intent', capture)
+    env = make_env(uid, config={'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'}})
+    try:
+        intent, = intents
+        assert intent.robot_uid == uid and intent.task_entity_ids == ()
+        assert intent.controlled_joints == controlled_joints
+        assert env.value['resolved_configuration']['source_composition_intent_v1_sha256'] == intent.identity_hash
+    finally:
+        env.close()
+
+    original = robot_type.source_recipe
+    def foreign_writer(robot):
+        recipe = original(robot)
+        return replace(recipe, resource_writers=tuple((entity, actuator, 'foreign-writer')
+                                                       for entity, actuator, _ in recipe.resource_writers))
+    monkeypatch.setattr(robot_type, 'source_recipe', foreign_writer)
+    with pytest.raises(ValueError, match='writer resources differ'):
+        make_env(uid, config={'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'}})
+
+
 @pytest.mark.parametrize(('robot', 'env_type'), [
     (PendulumEntity(), PendulumEnv),
     (TwoWheelBalanceEntity(), TwoWheelBalanceEnv),

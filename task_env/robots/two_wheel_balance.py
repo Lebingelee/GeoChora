@@ -109,6 +109,16 @@ class TwoWheelBalanceEntity(RobotComponent):
     def actuator_names(self):
         return (self.left_actuator_name, self.right_actuator_name)
 
+    def source_recipe(self):
+        """Declare the inline source and its paired wheel writers."""
+        from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
+        revision = hashlib.sha256(self.source_xml.encode()).hexdigest()
+        return RobotSourceRecipeV1(self.uid, 'reference-task-source', (
+            RobotSourceReferenceV1(f'{self.uid}/inline', 'inline://task-env/two-wheel-balance',
+                                   revision, (self.uid,)),), (),
+            (self.left_wheel_joint_name, self.right_wheel_joint_name), self.controller_profiles,
+            tuple((self.uid, actuator, 'two-wheel-direct-effort') for actuator in self.actuator_names))
+
     def scene_definition(self, *, source_revision=None):
         identity = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
         asset = AssetDefinition('asset-definition-v1', 'two-wheel-inline', 'v1',

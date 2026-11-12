@@ -105,6 +105,15 @@ class PendulumEntity(RobotComponent):
     def state_joint_names(self):
         return (self.joint_name,)
 
+    def source_recipe(self):
+        """Declare the inline source and its Controller-owned hinge writer."""
+        from .source_recipe import RobotSourceRecipeV1, RobotSourceReferenceV1
+        revision = hashlib.sha256(self.source_xml.encode()).hexdigest()
+        return RobotSourceRecipeV1(self.uid, 'reference-task-source', (
+            RobotSourceReferenceV1(f'{self.uid}/inline', 'inline://task-env/pendulum',
+                                   revision, (self.uid,)),), (), (self.joint_name,),
+            self.controller_profiles, ((self.uid, self.actuator_name, 'pendulum-direct-effort'),))
+
     def physical_subject_declaration(self, *, source_id, source_closure_sha256):
         """Describe the task-owned hinge before constructing a control binding."""
         from ..artifacts import FrameReference
