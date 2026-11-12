@@ -394,3 +394,26 @@ def test_legacy_parallel_factory_is_not_advertised_for_formal_tasks(uid):
 
     importlib.import_module('task_env.tasks')
     assert not PARALLEL_ENV_REGISTRY.contains(uid)
+
+
+@pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
+@pytest.mark.parametrize('profile', ['direct_joint_effort_v1', 'velocity_damped_joint_effort_v1'])
+def test_formal_effort_action_space_comes_from_compiled_controller(uid, profile):
+    from dataclasses import replace
+    import sys
+    from task_env import make_env
+
+    env = make_env(uid, config={
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                      'deployment': 'in_process', 'interpreter': sys.executable},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    try:
+        physical = env.value['physical_execution']
+        assert env.binding.action_space_factory.__self__ is physical
+        assert env.action_space == physical.action_space()
+        invalid = replace(env.binding.external_action_contract, high=env.binding.external_action_contract.high / 2)
+        with pytest.raises(ValueError, match='bounds or units'):
+            replace(env.binding, external_action_contract=invalid).bind_compiled_control(env.value)
+    finally:
+        env.close()

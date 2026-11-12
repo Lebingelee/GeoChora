@@ -1493,3 +1493,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 对照 SUBJ-01／02 与共同 Robot 构造链：四任务正式入口选择的 Robot 经 Task binding 进入 Runtime 时，运行句柄此前从 source 组合请求或第一个主体实体推断 UID，未保留实际声明。现在 `RobotRuntime` 持有用于构建的同一声明并使用其 UID；已有 source 组合请求或 Task 返回 Robot 时核对身份，受控主体与 Controller 仍来自已编译 source。无绑定声明的高级输入仍保留原有推断，不把外观对齐写成完整构造机制统一。
 
 生产代码修改 2 文件 +15／−4，净增 11；版本诊断修改 2 文件 +6 行；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断 213 项通过。最终输入下 MuJoCo 正式 PickCube 一体及装配 Panda、NutAssembly、Pendulum、双轮车五条短程路线均完成 reset、非零 step、再次 reset、重绑定和重复 close，明确核对二次 reset 后仍使用同一 Robot 声明；各观测子步分别 5、5、5、25、25。首轮字段顺序调整前同样执行五条路线，另观测 65 子步；两个输入和结果均保留在 ignored `workspace/maintenance/v211_robot_identity_20261112/`。Nut 只验证 Solution 单步；GeoPhys、Isaac 原生、renderer 及完整 Solution 本批未复验。E01～E04 仍未整体接收。
+
+
+### 6.155 普通 Robot 动作空间归 Controller
+
+对照 SUBJ-01、CTRL-01／03 和 E02／E04，Pendulum 与双轮车此前在共同 Task binding 中依任务动作合同重新创建 `torque` space，而实际 physical Controller 再创建一份。现由已编译 Controller 的 action space 作为 Env 的动作空间，绑定时核对公开动作维度、上下界与物理通道单位；二次 reset 后绑定到新 Controller。任务仍保留原对外 action schema、动作含义和 reset／reward 语义，不将该改动扩写为所有 Robot action 格式统一。
+
+生产代码修改 1 文件 +21／−5；版本诊断修改 2 文件 +26／−0；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断最终输入 217 项通过；首次四项纯检查因把 `gym_compat.Dict` 工厂误当类型而失败，物理未启动，改用 Gymnasium 实际类型后四项通过。MuJoCo 下 Pendulum 与双轮车的 direct 和 velocity-damped 四条正式路线均完成 reset、非零 step、再次 reset、重建 Controller 动作空间核对与重复 close，各观测 25 个 native 子步。冻结输入、双锁和原始结果在 ignored `workspace/maintenance/v211_controller_action_space_20261112/`。GeoPhys、Isaac、renderer、tabletop Solution 本批未复验，E01～E04 尚未整体接收。

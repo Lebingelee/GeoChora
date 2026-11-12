@@ -322,6 +322,9 @@ try:
             assert env.controller is active.controllers[0]
         result['robot_rebound_after_reset']=True
         if args.case in {'pendulum','two-wheel'}:
+            assert env.binding.action_space_factory.__self__ is env.value['physical_execution']
+            assert env.action_space == env.value['physical_execution'].action_space()
+            result['action_space_uses_rebuilt_controller'] = True
             assert info['reset_parameters']==first_reset_parameters
             np.testing.assert_allclose(observation['state']['proprioception'],first_observation,atol=1e-6)
             observation,info=env.reset(seed=None)

@@ -320,7 +320,8 @@ class ReferenceTaskBinding:
             raise TypeError('physical ignore_done policy must be a boolean')
         if type(self.build_receives_binding) is not bool:
             raise TypeError('build_receives_binding must be a boolean')
-        compiled_physical_action = self.action_schema is None and self.action_space_factory is None
+        compiled_physical_action = self.action_space_factory is None and (
+            self.action_schema is None or self.external_action_contract is not None)
         if (not callable(self.prepare_action) or (not compiled_physical_action and (
                 not callable(self.action_space_factory)
                 or not isinstance(self.action_schema, dict) or not self.action_schema))):
@@ -421,6 +422,24 @@ class ReferenceTaskBinding:
         """
         physical = value.get('physical_execution')
         declared = self.action_schema
+        if self.external_action_contract is not None:
+            from ..runtime.sessions.physical_control import PhysicalControlExecutionV1
+            from gymnasium.spaces import Box, Dict
+            import numpy as np
+
+            if type(physical) is not PhysicalControlExecutionV1 or len(physical.controllers) != 1:
+                raise ValueError('declared Robot action requires one compiled physical Controller')
+            space = physical.action_space()
+            contract = self.external_action_contract
+            if not isinstance(space, Dict) or len(space.spaces) != 1:
+                raise ValueError('compiled Controller action tree differs from its declared action')
+            component = next(iter(space.spaces.values()))
+            if (not isinstance(component, Box) or component.shape != (contract.dimension,)
+                    or not np.array_equal(component.low, np.full(component.shape, contract.low, dtype=component.dtype))
+                    or not np.array_equal(component.high, np.full(component.shape, contract.high, dtype=component.dtype))
+                    or any(channel.unit != contract.unit for channel in physical.compiled.binding.channels)):
+                raise ValueError('compiled Controller action bounds or units differ from its declared action')
+            return replace(self, action_space_factory=physical.action_space)
         if declared is not None and declared.get('schema_version') != 'physical-control-actions-v1':
             return self
         if physical is None:
@@ -456,8 +475,6 @@ class ExistingSubjectEffortTask:
     def bind(self, config, *, source_delivery_manifest=None):
         """Build one Task binding; native resource ownership stays with Runtime."""
         import hashlib
-        import numpy as np
-        from .gym_compat import Box, Dict
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
@@ -503,8 +520,7 @@ class ExistingSubjectEffortTask:
                 'schema_version': action.schema_version, 'mode': action.mode,
                 'components': list(action.components), 'low': action.low, 'high': action.high,
                 'unit': action.unit},
-            action_space_factory=lambda: Dict({'torque': Box(action.low, action.high,
-                                                             (action.dimension,), dtype=np.float32)}),
+            action_space_factory=None,
             prepare_action=lambda value: value, observation_space_factory=self.observation_space_factory,
             observation_projection=observe_task_definition,
             physical_direct_effort_feedback=(config.control.profile_id == 'direct_joint_effort_v1'),
