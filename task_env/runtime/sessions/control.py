@@ -923,7 +923,6 @@ def materialize_control(
         raise ValueError('native feedback control requires a source-owned subject binding')
     declared_execution = execution
     from .api import _session_admission_input_route
-    f04_native = False
     admission_route = _session_admission_input_route(session_admission_input)
     f06_pickcube_isaac_input = session_admission_input if admission_route == 'f06_pickcube' else None
     f06_pickcube_isaac = admission_route == 'f06_pickcube'
@@ -948,39 +947,10 @@ def materialize_control(
         actual_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
     elif (type(declared_execution) is ExecutionSpecV1
           and getattr(declared_execution, 'physics_provider', None) == 'isaacsim'):
-        from .api import F04_ISAAC_POSITION_PROFILE, _validate_f04_isaac_position_source
-        from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
-
-        _validate_f04_isaac_position_source(artifact, declared_execution, source)
-        if manifest is not None:
-            raise ValueError('F04 Isaac control admission cannot combine with other admission authorities')
-        execution = ExecutionSpec(
-            declared_execution.physics_provider, declared_execution.physics_profile,
-            'none', declared_execution.physics_backend,
-            declared_execution.provider_seed, declared_execution.determinism_mode,
-        )
-        # The F04 local Panda cell also owns the delivered free cube.  The
-        # source-bound admission below is authoritative for that requirement;
-        # include it in the exact-cell manifest instead of making the manifest
-        # weaker than the RuntimeSource it is about to admit.
-        f04_capabilities = sorted(
-            set(CONTROL_REQUIRED.names)
-            | set(artifact.required_capabilities.names)
-            | set(declared_source_capabilities(source).names)
-        )
-        actual_manifest = ProviderCapabilityManifest(
-            'provider-capability-v0', 'isaacsim', '6.2.0.0',
-            'f04-isaac-panda-native-runtime-io-v1', 'cuda',
-            F04_ISAAC_POSITION_PROFILE, 'none', 'best_effort',
-            tuple(CapabilityClaim(capability, 'implemented', 'f04-exact-panda-profile')
-                  for capability in f04_capabilities),
-            ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
-            'bounded F04 Panda Position adapter; no provider-wide qualification',
-        )
-        f04_native = True
+        raise ValueError('Isaac Position control requires its admitted task source input')
     else:
         execution = legacy_execution_projection(execution)
-    if not (f04_native or f06_pickcube_isaac):
+    if not f06_pickcube_isaac:
         actual_manifest = provider_manifest(execution.physics_provider)
     source_requirements = declared_source_capabilities(source)
     if manifest is not None:
@@ -1007,7 +977,7 @@ def materialize_control(
                 generation = getattr(profile, 'generation', None)
                 if generation is not None and (type(generation) is not int or generation < 0):
                     raise ValueError('materialized Position Controller generation must be nonnegative')
-            if (not f04_native and not f06_pickcube_isaac
+            if (not f06_pickcube_isaac
                     and (execution.physics_provider not in {'geophys', 'mujoco'}
                                 or execution.backend != 'cpu')):
                 raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
@@ -1034,7 +1004,7 @@ def materialize_control(
                 profile._validate_source(source)
                 expected_targets.update(profile._target_bindings)
                 expected_open.append(profile.open_actuator)
-            if f04_native or f06_pickcube_isaac:
+            if f06_pickcube_isaac:
                 # Native Position drives are verified after materialization;
                 # source-specific mapping and identity were admitted above.
                 joint_ids = {f'{profile.entity_id}/{joint}' for profile in profiles
@@ -1089,46 +1059,12 @@ def materialize_control(
         materialization_authority = _DUAL_POSITION_MATERIALIZATION_AUTHORITY
     session = materialize(
         artifact, declared_execution, source=source,
-        manifest=None if f04_native else admission_manifest,
+        manifest=admission_manifest,
         _materialization_authority=materialization_authority,
         _session_admission_input=session_admission_input,
         _observer_render_request=observer_render_request,
         _task_render_requested=task_render_requested,
     )
-    if f04_native:
-        try:
-            receipt = getattr(session, '_drive_receipt', None)
-            from .leaf_control import IsaacNamedPositionDriveReceiptV1
-            io_provenance = getattr(
-                getattr(session, '_native_io', None),
-                'execution_provenance_kind', 'native_runtime',
-            )
-            expected_receipt_provenance = (
-                'synthetic_fixture' if io_provenance == 'synthetic_fixture' else 'native_runtime'
-            )
-            if (type(receipt) is not IsaacNamedPositionDriveReceiptV1
-                    or receipt.provenance_kind != expected_receipt_provenance
-                    or dict(source.joint_targets) != {
-                        f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
-                        for item in receipt.drives
-                    }):
-                raise ValueError('F04 native receipt differs from the exact verified RuntimeSource target map')
-        except BaseException as admission_error:
-            try:
-                session.close()
-            except BaseException as cleanup_error:
-                admission_error.add_note(
-                    f'F04 RuntimeSession cleanup after receipt admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            try:
-                session.close_runtime_owner()
-            except BaseException as cleanup_error:
-                admission_error.add_note(
-                    f'F04 App owner cleanup after receipt admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            raise
     session._control_binding = binding
     if controller_binding_plan is not None:
         force_required = any(

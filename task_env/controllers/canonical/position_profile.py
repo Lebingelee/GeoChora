@@ -355,11 +355,10 @@ class PandaPositionServoProfileV1:
             if not (source.scene_source.source_verified or source.scene_source.locally_validated):
                 raise ValueError('deferred native receipt requires a loader-verified upstream or fixed local F04 USD source')
             if execution.physics_profile not in {
-                    'isaac-gpu-physx-f04-position-v1',
                     'geophys-usd-position-f05-native-v1',
                     'isaac-gpu-physx-f05-dg04-native-mimic-v1',
                     'isaac-gpu-physx-pickcube-f06-v1'}:
-                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG04 or F06 profile')
+                raise ValueError('deferred native receipt requires an exact admitted F05, DG04 or F06 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,

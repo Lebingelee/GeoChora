@@ -12,8 +12,6 @@ from ...artifacts import (
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
-from ...artifacts.contracts import UsdAssetDeliveryLocalV1
-from ...assembly.usd_delivery import variant_selection_hash
 from ...artifacts.execution import (
     EpisodeResetPlanV1, RealizedInitialState, ResetPlanV1, ResetSample,
     legacy_execution_projection,
@@ -27,7 +25,6 @@ from .source import RuntimeSource, UsdRuntimeSourceV1, UsdRuntimeInputV1
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
-F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
 F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
 
@@ -112,7 +109,6 @@ def validate_selected_position_route(execution):
              execution.physics_device, execution.determinism_mode,
              execution.physics_profile)
     if route not in {
-        ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', F06_PICKCUBE_ISAAC_PROFILE),
         ('isaacsim', 'cuda', 'cuda:0', 'best_effort', G05_ISAAC_EFFORT_PROFILE),
     }:
@@ -123,20 +119,6 @@ _F06_DELIVERY_MANIFEST_SHA256_V1 = '6cb07d216689d1e0b6f31ef127d9a511906be90c2acb
 _F06_REPRESENTATION_V1 = 'isaacsim-6.2.0.0-pickcube-desktop-v1'
 # Digest of the task-owned USD binding and limits admitted with this delivery.
 _F06_TASK_POLICY_SHA256_V1 = '153dc47bf2993efa78e1efe835eced90c82c80284aef8ec532495b2fa2ea4fcb'
-_F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
-    'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
-    'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
-)
-_F04_MENAGERIE_PANDA_SOURCE_REFERENCE = (
-    'mujoco-menagerie://franka_emika_panda/panda.xml'
-)
-_F04_MENAGERIE_PANDA_REVISION = 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7'
-_F04_OFFICIAL_PANDA_LOCAL_REVISION = 's3-prefix-last-modified-2026-10-07T01:07:07Z-through-2026-10-07T01:07:09Z'
-_F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256 = '7ba946a0b02623525dc6b92db9f1000f85fb2e9ea140a0ec6fabb6f818f6c072'
-_F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256 = 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'
-_F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc28dc00e77ec23'
-_F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
-_F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 
 
@@ -218,110 +200,6 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
         known_unsupported=('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
         evidence_reference='implementation_only_no_qualification',
     )
-
-
-def _validate_f04_source_family(delivery) -> None:
-    """Bind the two F04 source families to their exact stable source identities."""
-    definition = delivery.asset_definition
-    if definition.source_reference not in {
-            _F04_OFFICIAL_PANDA_SOURCE_REFERENCE,
-            _F04_MENAGERIE_PANDA_SOURCE_REFERENCE,
-    }:
-        raise ValueError('F04 production materialization is limited to the two frozen Panda source families')
-    if (definition.source_reference == _F04_MENAGERIE_PANDA_SOURCE_REFERENCE
-            and (definition.source_revision != _F04_MENAGERIE_PANDA_REVISION
-                 or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION)):
-        raise ValueError('F04 Menagerie Panda source must bind the current frozen provider Gitlink')
-    if type(delivery) is UsdAssetDeliveryLocalV1:
-        if delivery.provenance_kind != 'local-validated':
-            raise ValueError('F04 local Panda route requires explicit local-validated provenance')
-        selected_source_variants = dict(delivery.source_variant_selections)
-        if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
-            expected_variants = {
-                '/panda#Gripper': 'alternatefinger',
-                '/panda#Mesh': 'performance',
-                '/panda#Physics': 'physx',
-            }
-            if selected_source_variants != expected_variants:
-                raise ValueError('F04 local official Panda report must bind the exact F01 source variants')
-            if delivery.source_entry_sha256 != 'cbdbfc4481e0420aa30c2e57c39cce91006cb29b93bc2e06becaf4304c20ea30':
-                raise ValueError('F04 local official Panda report binds an unexpected source entry byte')
-            if (delivery.source_revision != _F04_OFFICIAL_PANDA_LOCAL_REVISION
-                    or delivery.source_closure_sha256 != _F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256):
-                raise ValueError('F04 local official Panda report differs from the frozen S3 prefix inventory')
-        else:
-            if selected_source_variants:
-                raise ValueError('F04 local Menagerie report does not admit unreviewed source variants')
-            if (delivery.source_entry_sha256 != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'
-                    or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION
-                    or delivery.source_closure_sha256 != _F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256):
-                raise ValueError('F04 local Menagerie report differs from the frozen Panda XML/gitlink')
-        if delivery.source_variant_selection_sha256 != variant_selection_hash(selected_source_variants):
-            raise ValueError('F04 local report source variant identity is inconsistent')
-        if delivery.recipe_path != 'metadata/physx_task_scene_recipe.json':
-            raise ValueError('F04 local delivery must use the frozen task-scene/PhysX recipe path')
-        expected_recipe_sha = (
-            _F04_OFFICIAL_LOCAL_RECIPE_SHA256
-            if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE
-            else _F04_MENAGERIE_LOCAL_RECIPE_SHA256
-        )
-        if (delivery.recipe_sha256 != expected_recipe_sha
-                or delivery.checker_sha256 != _F04_LOCAL_CHECKER_SHA256):
-            raise ValueError('F04 local delivery differs from the exact reviewed source recipe/checker bytes')
-        if delivery.entry_prim != '/panda' or delivery.variant_selections:
-            raise ValueError('F04 local derived stage must be a flattened selected scene rooted at /panda')
-    elif definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
-        expected_variants = {
-            '/panda#Gripper': 'alternatefinger',
-            '/panda#Mesh': 'performance',
-            '/panda#Physics': 'physx',
-        }
-        if dict(delivery.variant_selections) != expected_variants:
-            raise ValueError('F04 official Panda source must bind the exact F01 gripper/mesh/physics variants')
-
-
-def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
-    """Admit only the exact F04 Panda/source/runtime intersection."""
-    if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
-        raise TypeError('F04 Isaac materialization requires TaskArtifactV1 and ExecutionSpecV1')
-    execution.validate()
-    source.validate()
-    delivery = source.scene_source.loaded_delivery
-    definition = delivery.delivery.asset_definition
-    if not (delivery.source_verified or source.scene_source.locally_validated):
-        raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
-    if source.scene_source.locally_validated:
-        if (not delivery.locally_validated or delivery.report.provenance_kind != 'local-validated'
-                or delivery.report.recipe_id != 'f04-physx-task-scene-overlay-v2'
-                or delivery.report.checker_id != 'geochora-f04-local-usd-checker-v2'
-                or delivery.report.checker_sha256 != _F04_LOCAL_CHECKER_SHA256
-                or delivery.report.recipe_sha256 != delivery.delivery.recipe_sha256
-                or not delivery.report.passed):
-            raise ValueError('F04 local source lacks the loader-verified local validation report')
-    _validate_f04_source_family(delivery.delivery)
-    if source.scene_source.representation.provider != 'isaacsim':
-        raise ValueError('F04 adapter requires the exact Isaac Sim representation')
-    if (source.scene_source.representation.provider_build_identity,
-            source.scene_source.representation.representation_format,
-            source.scene_source.representation.runtime_admitted) != (
-            'isaacsim-6.2.0.0', 'usd', False):
-        raise ValueError('F04 source representation must be USD prepared for Isaac Sim 6.2.0.0')
-    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
-            execution.determinism_mode, execution.physics_profile) != (
-            'isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE):
-        raise ValueError('unsupported Isaac provider/build/backend/device/profile intersection')
-    if (execution.render_default.provider, execution.render_default.backend,
-            execution.render_default.profile, execution.render_default.device,
-            execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
-        raise ValueError('F04 Isaac Position profile is state-only and does not admit task cameras')
-    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-            artifact.timebase.control_dt) != (0.002, 5, 0.01):
-        raise ValueError('F04 Isaac Position profile requires 100 Hz / five 2 ms physics steps')
-    if (source.task_artifact.identity_hash != artifact.identity_hash
-            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
-        raise ValueError('F04 USD source does not bind the exact TaskArtifact and Scene')
-    if not (set(artifact.required_capabilities.names) <= set(CAPABILITIES)):
-        raise ValueError('F04 Isaac profile does not implement every TaskArtifact capability')
 
 
 def _validate_usd_task_policy(input_v1, expected_sha256):
@@ -632,7 +510,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if not declared_execution.physics_provider == 'isaacsim':
             raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
         if manifest is not None or _materialization_authority is not None:
-            raise ValueError('F04 Isaac materialization does not accept caller-supplied admission authorities')
+            raise ValueError('Isaac materialization does not accept caller-supplied admission authorities')
         from .isaac_native_io import create_isaac_native_runtime_io
         from .native_io import UsdCoreRuntimeSession
         if declared_execution.physics_profile == G05_ISAAC_EFFORT_PROFILE:
@@ -655,22 +533,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             session._declared_execution_spec_v1 = declared_execution
             session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
             return session
-        _validate_f04_isaac_position_source(artifact, declared_execution, source)
-        native_io = None
-        try:
-            native_io = create_isaac_native_runtime_io(artifact, declared_execution, source)
-            session = UsdCoreRuntimeSession(
-                artifact, declared_execution, source, native_io, drive_receipt=None,
-            )
-        except BaseException as materialization_error:
-            _close_failed_native_materialization(
-                materialization_error, native_io, io_label='Isaac native-I/O',
-                runtime_owner_label='Isaac App owner',
-            )
-            raise
-        session._declared_execution_spec_v1 = declared_execution
-        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
-        return session
+        raise ValueError('unsupported Isaac USD execution profile')
     execution = legacy_execution_projection(execution)
     if source.mixed_actuator_plan is not None:
         actual = _mixed_actuator_manifest(artifact, execution, source)

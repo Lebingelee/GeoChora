@@ -293,3 +293,20 @@ def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, m
     binding = PickCubeReferenceEnv._build_selected_binding(config)
     with pytest.raises(ValueError, match='stale local USD original source'):
         binding.build_for_request('isaacsim', 'cuda', 31, 8)
+
+
+def test_retired_f04_profile_is_rejected_before_native_initialization(monkeypatch):
+    from types import SimpleNamespace
+    from task_env.runtime.sessions.api import validate_selected_position_route
+    from task_env.runtime.sessions import isaac_native_io
+
+    execution = SimpleNamespace(physics_provider='isaacsim', physics_backend='cuda',
+        physics_device='cuda:0', determinism_mode='best_effort',
+        physics_profile='isaac-gpu-physx-f04-position-v1')
+    with pytest.raises(ValueError, match='unsupported provider execution route'):
+        validate_selected_position_route(execution)
+    monkeypatch.setattr(isaac_native_io, '_process_app_owner', lambda **_kwargs:
+                        pytest.fail('retired profile must not create an Isaac App'))
+    source = SimpleNamespace(assert_fresh=lambda: None)
+    with pytest.raises(ValueError, match='unsupported Isaac native execution profile'):
+        isaac_native_io.create_isaac_native_runtime_io(object(), execution, source)

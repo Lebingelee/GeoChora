@@ -3418,6 +3418,8 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
     source.assert_fresh()
     f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
     g05_simple_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
+    if not (f06_pickcube or g05_simple_effort):
+        raise ValueError('unsupported Isaac native execution profile')
     if (f06_pickcube != (f06_pickcube_input is not None)
             or g05_simple_effort != bool(g05_effort)
             or (f06_pickcube and g05_simple_effort)):
