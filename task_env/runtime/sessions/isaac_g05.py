@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ...artifacts import TaskArtifactV1, SceneDefinition
 from ...assembly.usd_delivery import (
-    LoadedUsdDeliveryV1, load_usd_asset_delivery, resolve_provider_representation,
+    LoadedUsdDeliveryV1, load_usd_asset_delivery,
 )
 from .source import UsdRuntimeSourceV1, build_usd_runtime_source
 
@@ -68,13 +68,9 @@ def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
     declared = {(item.asset_id, item.asset_version): item for item in scene.assets}
     if declared.get((asset.asset_id, asset.asset_version)) != asset:
         raise ValueError('G05 USD delivery AssetDefinition differs from the task Scene asset')
-    representation = resolve_provider_representation(
-        loaded,
-        provider='isaacsim',
+    source = build_usd_runtime_source(loaded=loaded, provider='isaacsim',
         provider_build_identity=G05_ISAAC_BUILD_IDENTITY,
         options={'task_route': 'g05-5c-simple-effort-v1'},
-    )
-    source = build_usd_runtime_source(loaded=loaded, representation=representation,
         task_source_identity_sha256=task_source_identity_sha256, artifact=artifact, scene=scene,
         joints=joints, bodies=_usd_articulation_bodies(articulation, body_names),
         frames=frames or {}, free_joints=free_joints or {},

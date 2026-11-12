@@ -839,10 +839,14 @@ class UsdRuntimeSourceV1:
         self.scene_source.assert_fresh()
 
 
-def build_usd_runtime_source(*, loaded, representation, task_source_identity_sha256,
-                             scene, artifact, joints, bodies, frames, free_joints,
-                             joint_targets):
+def build_usd_runtime_source(*, loaded, provider, provider_build_identity, options,
+                             task_source_identity_sha256, scene, artifact, joints,
+                             bodies, frames, free_joints, joint_targets):
     """Bind admitted USD bytes and declared native mappings to a Task source."""
+    from ...assembly.usd_delivery import resolve_provider_representation
+
+    representation = resolve_provider_representation(
+        loaded, provider=provider, provider_build_identity=provider_build_identity, options=options)
     scene_source = UsdTaskSceneSourceV1('usd-task-scene-source-v1', loaded, representation,
                                         task_source_identity_sha256, scene.identity_hash)
     return UsdRuntimeSourceV1('usd-runtime-source-v1', artifact, scene, scene_source,

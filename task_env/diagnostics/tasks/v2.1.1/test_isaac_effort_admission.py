@@ -73,8 +73,12 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
     calls = []
-    monkeypatch.setattr(specialization, 'build_isaac_reference',
-                        lambda **kwargs: calls.append(kwargs) or kwargs)
+    def capture_builder(**kwargs):
+        def build(request):
+            calls.append(request)
+            return {**kwargs, 'task_seed': request.seed, 'horizon': request.horizon}
+        return build
+    monkeypatch.setattr(specialization, '_isaac_reference_builder', capture_builder)
     config = _formal_isaac_joint_config()
     binding = PickCubeReferenceEnv._build_selected_binding(config)
     result = binding.build_for_request('isaacsim', 'cuda', 42, 8)
@@ -82,6 +86,7 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     assert result['horizon'] == 8
     assert result['resolved_config'] is config.environment
     assert result['robot'] is binding.robot
+    assert calls[0].binding is binding
     with pytest.raises(ValueError, match='provider differs'):
         binding.build_for_request('mujoco', 'cpu', 42, 8)
     with pytest.raises(ValueError, match='horizon'):
@@ -256,6 +261,32 @@ def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
         _session_admission_input_route(value)
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(object())
+
+
+def test_usd_controller_failure_releases_temporary_task_source(monkeypatch):
+    from pathlib import Path
+    from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
+    from task_env.runtime.sessions import source as source_module
+    from task_env.tasks.pick_cube.specialization import build_isaac_reference
+
+    root = Path(__file__).resolve().parents[4]
+    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    if not manifest.is_file():
+        pytest.skip('verified Isaac source delivery is unavailable')
+    receipts = []
+    original = source_module.snapshot_legacy_mjcf_source
+    def capture(*args, **kwargs):
+        source = original(*args, **kwargs)
+        receipts.append(source_module.source_resource_receipt(source))
+        return source
+    def reject(*args, **kwargs):
+        assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
+        raise RuntimeError('USD Controller rejected')
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(PandaPositionServoProfileV1, 'from_usd_source', reject)
+    with pytest.raises(RuntimeError, match='USD Controller rejected'):
+        build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
+    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
 def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, monkeypatch):
