@@ -1274,3 +1274,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `b21ae9d0`；实施前复核台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 和 source 边界。PickCube Position 正式构建之前创建所选 Robot 来判断 source recipe，却由 Panda box 编译器另造一个默认 Robot；引用式路线现在将同一所选实例交给 Task Artifact／source 编译及后续 Scene 声明，source 组合继续复用该实例。装配 Panda 仍需要原 Task 中的参考 source 供替换式 composer 使用，保留其现有路径和身份校验；这不是四主体完整统一。
 
 生产修改 2 文件 +12／−12，净变化 0；版本诊断修改 1 文件 +19／−0，检查所选 Robot 与实际 source 实例相同；本文新增记录。无新增、删除或整文件迁移，tracked 文件数保持 1357。最终代码 177 项版本合同检查通过。MuJoCo 正式一体 Panda Solution 单步及装配 Panda 短程均完成 reset、控制、再次 reset 和关闭，各观测 5 个 native 子步；非完整 Solution。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer 本批未复验；先前证据保持原输入和范围。冻结输入、双锁预算及收据位于 ignored `workspace/maintenance/v211_selected_robot_identity_btzsoime/`。E01～E04 尚未整体接收。
+
+
+### 6.130 装配 Robot 声明关节与 actuator 所有权
+
+输入 `372eed00`；实施前重新核对 GOV、ENTRY、TASK、ENV、SUBJ-02／03、CTRL-01／02 和 source 组合边界。MuJoCo composer 原先直接枚举装配 Panda 的臂关节、手指和 actuator，并自行指定打开 actuator；现在装配 Robot 一处声明这些部件关系，Robot 主体编译和 provider composer 同时消费。composer 按该声明将 Task source 关节映射到实际 native 名称，并核验每个关节以及打开 actuator；固定附件、source 闭包、writer 和实际 native 模型校验仍由原 owner 负责。这个变化减少 adapter 对特定 Robot 通道的硬编码，替换式 source 与一体 source 的其余差异仍未消除。
+
+生产修改 2 文件 +27／−13，净增 14 行；Robot 关节／actuator 声明从 adapter 收敛到 Robot，属于代码段迁移，无整文件迁移。版本诊断修改 1 文件 +23／−0，验证错误 Task 关节映射在 native 之前拒绝并释放 source；本文新增记录。无新增或删除文件，tracked 文件数保持 1357。最终代码 178 项版本合同检查通过。正式 MuJoCo 装配 Panda 完成 reset、双 writer 控制、第二次 reset 和关闭，观测 5 个 native 子步；provider 的原生名称、固定连接和资源核对仍有效。本批未复验其他 provider、renderer 或完整 Solution。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_robot_joint_ownership_h_1kc72h/`。E01～E04 尚未整体接收。

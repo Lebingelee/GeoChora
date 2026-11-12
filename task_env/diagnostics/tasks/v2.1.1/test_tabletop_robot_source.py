@@ -560,3 +560,26 @@ def test_position_robot_composes_checked_canonical_task_source(provider):
             compose(tampered, artifact=artifact, controller=controller)
     finally:
         binding.close_task_resources()
+
+
+def test_assembled_robot_rejects_foreign_task_joint_mapping_and_releases_source(monkeypatch):
+    from dataclasses import replace
+    from task_env import make_env
+    from task_env.tasks.pick_cube import specialization
+
+    prepare = specialization._prepare_reference_source
+    receipts = []
+    def altered(*args, **kwargs):
+        prepared = prepare(*args, **kwargs)
+        receipts.append(source_resource_receipt(prepared.source))
+        joints = dict(prepared.source.joints)
+        joints['panda-v1/joint1'] = 'foreign_joint'
+        return prepared._replace(source=replace(prepared.source, joints=joints))
+    monkeypatch.setattr(specialization, '_prepare_reference_source', altered)
+    with pytest.raises(ValueError, match='Task joint binding differs from the declared Robot source'):
+        make_env('pick-cube-p16-reference-v1', config={
+            'execution': {'physics_provider': 'mujoco'},
+            'robot': {'uid': 'panda-arm-hand-v1'},
+            'controller': {'profile_id': 'r1_split'},
+        })
+    assert receipts and all(not receipt.snapshot_root.exists() for receipt in receipts)

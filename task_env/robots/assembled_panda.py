@@ -67,14 +67,28 @@ class AssembledPandaAgent(BaseAgent):
             (0., 0., 0., -1.57079, 0., 1.57079, -.7853, .038, .038), strict=True)),
             notes=('Source names refer to the verified fixed-attachment lowering.',))
 
+    def position_source_joint_ownership(self, attachment):
+        """Declare component joints and their source actuators for Position control."""
+        return (
+            (attachment.parent_entity_id, tuple(f'joint{i}' for i in range(1, 8)),
+             tuple(f'actuator{i}' for i in range(1, 8))),
+            (attachment.child_entity_id, ('finger_joint1', 'finger_joint2'),
+             ('actuator8', 'actuator8')),
+        )
+
+    def position_open_actuators(self, attachment):
+        """Declare source actuators that hold the Robot's open posture."""
+        return ((attachment.child_entity_id, 'actuator8'),)
+
     def compile_position_binding(self, declaration, *, artifact, controller, task_closure_sha256):
         """Compile the exact arm and hand as nested position subjects."""
         from .panda_position_binding import compile_panda_position_subjects
         fixed = declaration.attachment_plan
         arm, hand = fixed.parent_entity_id, fixed.child_entity_id
+        ownership = self.position_source_joint_ownership(fixed)
         return compile_panda_position_subjects(source_scene=declaration.scene,
-            components=((arm, fixed.parent_root.frame_id, tuple(f'joint{i}' for i in range(1, 8)), None),
-                        (hand, fixed.child_root.frame_id, ('finger_joint1', 'finger_joint2'), arm)),
+            components=((arm, fixed.parent_root.frame_id, ownership[0][1], None),
+                        (hand, fixed.child_root.frame_id, ownership[1][1], arm)),
             site_entity=hand, site_name='nutassembly_ee_site',
             groups=((arm, 'arm-position'), (hand, 'hand-position')),
             source_id=declaration.parent_source.source_id,

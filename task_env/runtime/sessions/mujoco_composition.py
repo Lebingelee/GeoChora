@@ -521,9 +521,7 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
         for entity, actuator, _ in control_plan.resource_writers), tuple(
         (f'{existing_robot_entity}/{name}', entity, name,
          fixed.native_joint_names[f'{entity}/{name}'], actuator)
-        for entity, names, actuator_names in (
-            (arm, tuple(f'joint{i}' for i in range(1, 8)), tuple(f'actuator{i}' for i in range(1, 8))),
-            (hand, ('finger_joint1', 'finger_joint2'), ('actuator8', 'actuator8')))
+        for entity, names, actuator_names in robot.position_source_joint_ownership(fixed)
         for name, actuator in zip(names, actuator_names, strict=True)), subjects=subjects)
     robot_sources = tuple(CompositionSourceV1(
         declaration.source_by_entity[entity].source_id, fixed.source_closure_sha256, (entity,))
@@ -562,20 +560,22 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
         raise ValueError('resolved Panda resource writers differ from its pre-parse recipe')
 
     joints = dict(source.joints)
-    for index in (1, 2):
-        key, expected = f'{existing_robot_entity}/finger_joint{index}', f'finger_joint{index}'
-        if joints.get(key) != expected:
-            raise ValueError('Task finger binding differs from the declared Panda source')
-        joints[key] = fixed.native_joint_names[f'{hand}/{expected}']
+    for semantic, _entity, declared_joint, native_joint, _actuator in position.joint_native_ownership:
+        if joints.get(semantic) != declared_joint:
+            raise ValueError('Task joint binding differs from the declared Robot source')
+        joints[semantic] = native_joint
     frames = dict(source.frames)
     for source_body, site, _target_body in task_site_transfers:
         matching = [key for key, native in frames.items() if native == site]
         if len(matching) != 1 or not matching[0].startswith(existing_robot_entity + '/'):
             raise ValueError('Task site binding does not uniquely belong to its Robot')
         frames[matching[0]] = fixed.namespace_prefix + site
-    if source.open_actuators != ('actuator8',):
-        raise ValueError('Task gripper binding differs from the declared Panda source')
+    open_actuators = robot.position_open_actuators(fixed)
+    if source.open_actuators != tuple(actuator for _entity, actuator in open_actuators):
+        raise ValueError('Task open actuators differ from the declared Robot source')
+    native_open_actuators = tuple(fixed.native_actuator_names[f'{entity}/{actuator}']
+                                  for entity, actuator in open_actuators)
     return replace(source, joints=joints, frames=frames,
-        open_actuators=(fixed.native_actuator_names[f'{hand}/actuator8'],),
+        open_actuators=native_open_actuators,
         composition_runtime_input=composition, position_subject_binding=position,
         source_composition_request=request, source_composition_intent=composition_intent)
