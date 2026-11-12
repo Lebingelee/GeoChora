@@ -88,6 +88,13 @@ def panda_reset_action_schema(kind):
     raise ValueError('unsupported physical controller reset selection')
 
 
+def panda_effort_reset_capability(initial_kind, space_policy):
+    """Declare the reset selection supported by Panda reference Controllers."""
+    from .reset_selection import PhysicalResetCapability
+    return PhysicalResetCapability(initial_kind, PANDA_SWITCHABLE_EFFORT_KINDS,
+                                   space_policy, panda_reset_action_schema)
+
+
 class ConstrainedPairEffortControllerV1:
     """Project two finger efforts onto the declared equal-motion constraint."""
     def __init__(self, servo):

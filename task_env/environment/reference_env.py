@@ -1363,8 +1363,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         """Initialize task-declared metadata before the selected Env is published."""
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
-        if self.binding.physical_reset_selection_factory is not None:
-            self._physical_reset_selection = self.binding.physical_reset_selection_factory(self.value)
+        if self.binding.physical_reset_capability is not None:
+            self._physical_reset_selection = self.binding.physical_reset_capability.bind(self.value)
         self._bind_selected_controller(self.value)
         self._bind_selected_task_definition()
         self.dual_entity_position = len(self.position_profiles) == 2
@@ -1922,9 +1922,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 physical_selection.commit(physical_candidate)
                 self.action_space = physical_selection.action_space()
                 self.metadata['physical_action_spec_v1'] = physical_selection.describe()
-                schema_factory = getattr(self.binding, 'physical_reset_action_schema', None)
-                if schema_factory is not None:
-                    self.metadata['action_schema'] = schema_factory(physical_candidate.kind)
+                capability = self.binding.physical_reset_capability
+                if capability is not None:
+                    self.metadata['action_schema'] = capability.action_schema(physical_candidate.kind)
                 else:
                     self.metadata['action_schema'] = dict(physical_selection.describe())
                 observe_action = getattr(self.binding, 'physical_action_observer', None)

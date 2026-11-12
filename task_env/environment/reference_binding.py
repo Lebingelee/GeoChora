@@ -338,8 +338,7 @@ class ReferenceTaskBinding:
     physical_observation_binding: Callable | None = None
     physical_sequence_v2_observation: bool = False
     position_physical_mixed: bool = False
-    physical_reset_action_schema: Callable | None = None
-    physical_reset_selection_factory: Callable | None = None
+    physical_reset_capability: object | None = None
     physical_action_observer: Callable | None = None
     task_com_wrench_factory: Callable | None = None
     physical_direct_effort_feedback: bool = False
@@ -399,10 +398,10 @@ class ReferenceTaskBinding:
             raise TypeError('physical sequence V2 observation capability must be bool')
         if self.physical_observation_binding is not None and not callable(self.physical_observation_binding):
             raise ValueError('physical observation binding must be callable when supplied')
-        if self.physical_reset_action_schema is not None and not callable(self.physical_reset_action_schema):
-            raise ValueError('physical reset action schema must be callable when supplied')
-        if self.physical_reset_selection_factory is not None and not callable(self.physical_reset_selection_factory):
-            raise ValueError('physical reset selection must be constructed by its declared owner')
+        if self.physical_reset_capability is not None:
+            from ..controllers.canonical.reset_selection import PhysicalResetCapability
+            if type(self.physical_reset_capability) is not PhysicalResetCapability:
+                raise TypeError('physical reset requires a Controller capability')
         if self.physical_action_observer is not None and not callable(self.physical_action_observer):
             raise ValueError('physical action observer must be callable when supplied')
         if self.close_task_resources is not None and not callable(self.close_task_resources):

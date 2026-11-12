@@ -10,6 +10,24 @@ from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
 
 
 @dataclass(frozen=True)
+class PhysicalResetCapability:
+    """Controller-owned policy for reset-time selection and action semantics."""
+    initial_kind: str
+    allowed_kinds: tuple[str, ...]
+    space_policy: str
+    action_schema: object
+
+    def __post_init__(self):
+        if not callable(self.action_schema):
+            raise TypeError('physical reset capability requires an action schema')
+
+    def bind(self, value):
+        return PhysicalResetSelection(value['_physical_controller_factory'],
+            initial_kind=self.initial_kind, allowed_kinds=self.allowed_kinds,
+            space_policy=self.space_policy, declaration=value['physical_execution'])
+
+
+@dataclass(frozen=True)
 class PreparedPhysicalSelection:
     """An uncommitted controller selection, bound to its predecessor generation."""
     owner: object

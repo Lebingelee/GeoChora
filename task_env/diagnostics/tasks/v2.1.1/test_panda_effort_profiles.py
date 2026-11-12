@@ -53,6 +53,11 @@ def test_switchable_controllers_reuse_source_binding_and_recheck_snapshot(monkey
                        'parameters': {'reset_selection': True}},
     })
     try:
+        from task_env.controllers.canonical.reset_selection import PhysicalResetCapability
+        capability = env.binding.physical_reset_capability
+        assert type(capability) is PhysicalResetCapability
+        assert capability.action_schema('joint')['controller_kind'] == 'absolute_joint'
+        assert capability.bind(env.value) is not env._physical_reset_selection
         selection = env._physical_reset_selection
         first = selection.prepare('joint')
         second = selection.prepare('r3-pose')
