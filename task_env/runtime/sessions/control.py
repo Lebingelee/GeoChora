@@ -783,26 +783,6 @@ def _validate_feedback_requirements(scene, binding, entity_ids, *, frame_grants=
 
 
 
-def single_position_action_request(action, *, scene, plan, profile):
-    """Project one eight-component pose/gripper action onto its bound groups."""
-    import numpy as np
-    from ...controllers.canonical.contracts import ControlGroupActionV1, StructuredActionRequestV1
-
-    vector = np.asarray(action, dtype=float)
-    if vector.shape != (8,) or not np.isfinite(vector).all():
-        raise ValueError('Position expert requires a finite eight-dimensional planned action')
-    schema_id = profile.controller_binding().action_schema.schema_id
-    request = StructuredActionRequestV1(
-        'structured-action-request-v1', scene.identity_hash, plan.identity_hash,
-        (ControlGroupActionV1('control-group-action-v1', profile.entity_id, 'arm', schema_id,
-                              tuple(float(value) for value in vector[:7])),
-         ControlGroupActionV1('control-group-action-v1', profile.entity_id, 'gripper', schema_id,
-                              (float(vector[7]),))),
-    )
-    request.validate()
-    return request
-
-
 def prepare_structured_action(
     plan: ControlBindingPlanV1,
     request: StructuredActionRequestV1,

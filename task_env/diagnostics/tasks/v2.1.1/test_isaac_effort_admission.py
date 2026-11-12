@@ -191,6 +191,13 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     assert value['controller'].source is value['source'] is value['session_admission_input'].runtime_source
     assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
     assert selected.selection_matches[0].subject_ids == (robot.subjects[0].subject_id,)
+    from task_env.runtime.sessions.control import prepare_structured_action
+    request = selected.controller.prepare_action_request(
+        [.4, 0., .4, 1., 0., 0., 0., 1.], scene=value['source'].scene_definition, plan=plan)
+    projections = prepare_structured_action(plan, request)
+    assert len(projections) == 1
+    with pytest.raises(ValueError, match='finite eight-dimensional'):
+        selected.controller.prepare_action_request([0.], scene=value['source'].scene_definition, plan=plan)
     from task_env.runtime.sessions.api import _validate_usd_task_policy, _F06_TASK_POLICY_SHA256_V1
     input_v1 = value['session_admission_input']
     changed_targets = dict(value['source'].joint_targets)

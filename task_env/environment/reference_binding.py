@@ -302,7 +302,6 @@ class ReferenceTaskBinding:
     observation_projection: Callable | None = None
     position_execution_info: Callable | None = None
     position_execution_info_key: str | None = None
-    legacy_position_expert_admission: Callable | None = None
     reset_runtime_input: Callable | None = None
     position_control_binding: Callable | None = None
     physical_observation_binding: Callable | None = None
@@ -377,9 +376,6 @@ class ReferenceTaskBinding:
             raise ValueError('physical reset selection must be constructed by its declared owner')
         if self.physical_action_observer is not None and not callable(self.physical_action_observer):
             raise ValueError('physical action observer must be callable when supplied')
-        if (self.legacy_position_expert_admission is not None
-                and not callable(self.legacy_position_expert_admission)):
-            raise ValueError('legacy Position expert admission must be callable when supplied')
         if self.close_task_resources is not None and not callable(self.close_task_resources):
             raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:

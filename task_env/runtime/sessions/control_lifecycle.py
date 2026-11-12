@@ -44,8 +44,13 @@ def has_declared_position_control_capability(env) -> bool:
     )
 
 
-# Kept as a source-compatible alias for callers of the pre-v2 capability helper.
-has_canonical_position_control_capability = has_declared_position_control_capability
+def project_position_action(env, action):
+    """Use the admitted Controller's own projection into typed control groups."""
+    profiles = env.position_profiles
+    prepare = getattr(profiles[0], 'prepare_action_request', None) if len(profiles) == 1 else None
+    if not callable(prepare):
+        raise TypeError('Position action requires one Controller with an action projection')
+    return prepare(action, scene=env.position_scene, plan=env.position_plan)
 
 
 def _dispatch_record(env, command_kind, controller_identities, generation):
@@ -132,15 +137,11 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             env._stopped = True
             raise RuntimeError('selected position-control horizon is exhausted')
         from ...controllers.canonical.contracts import StructuredActionRequestV1
-        admit_legacy_action = getattr(env.binding, 'legacy_position_expert_admission', None)
-        if (not isinstance(action, StructuredActionRequestV1)
-                and len(profiles) == 1
-                and callable(admit_legacy_action) and admit_legacy_action(env.value)):
-            from .control import single_position_action_request
-            action = single_position_action_request(
-                action, scene=env.position_scene, plan=env.position_plan,
-                profile=profiles[0])
         from ...controllers.canonical.position_sequence import PositionActionSequenceV1
+        if (not isinstance(action, (StructuredActionRequestV1, PositionActionSequenceV1))
+                and len(profiles) == 1
+                and env.binding.external_actions):
+            action = project_position_action(env, action)
         if type(action) is PositionActionSequenceV1:
             if len(profiles) != 1 or proposal is not None or observer_solution is not None:
                 raise ValueError('Position sequences require one external Controller without Solution')
@@ -170,9 +171,4 @@ def prepare_selected_control_action(env, action, *, proposal=None, observer_solu
             env.session._control_lifecycle_dispatch = replace(current, stage='prepared')
         return result
 
-    from ...controllers.canonical.contracts import StructuredActionRequestV1
-    if isinstance(action, StructuredActionRequestV1):
-        raise TypeError('structured ControllerGroup actions require a compiled position capability')
-    if proposal is None or caller_driven:
-        env._episode_mode = 'external'
-    return env._prepare_reference_step(action, **context)
+    raise TypeError('selected Controller must declare a common control submission capability')

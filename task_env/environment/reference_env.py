@@ -2887,11 +2887,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     solution_identity=self.value.get('solution_identity'),
                     control_request_mode='position',
                 )
-                from ..runtime.sessions.control import single_position_action_request
-                request = single_position_action_request(
-                    action.action, scene=self.position_scene, plan=self.position_plan,
-                    profile=self.position_profiles[0],
-                )
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                request = project_position_action(self, action.action)
                 from ..runtime.sessions.control_lifecycle import prepare_selected_control_action
                 return prepare_selected_control_action(self, request, proposal=action, caller_driven=True)
             self._require_published_execution_info()
@@ -3276,12 +3273,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         add_note(f'external Solution abort after proposal failure also failed: {abort_error!r}')
             raise
         if getattr(self, 'position_profile', False):
-            from ..runtime.sessions.control import single_position_action_request
             try:
-                request = single_position_action_request(
-                    proposal.action, scene=self.position_scene, plan=self.position_plan,
-                    profile=self.position_profiles[0],
-                )
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                request = project_position_action(self, proposal.action)
                 return self._step(
                     request, proposal=proposal, observer_solution=solution,
                 )
@@ -3516,8 +3510,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
         if getattr(self, 'position_profile', False):
-            admit_legacy = self.binding.legacy_position_expert_admission
-            if admit_legacy is None or not admit_legacy(self.value):
+            if not self.binding.external_solution_actions or len(self.position_profiles) != 1:
                 raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
         elif hasattr(self.solution, 'readiness_config'):
             try:
@@ -3540,12 +3533,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
             raise
         if getattr(self, 'position_profile', False):
-            from ..runtime.sessions.control import single_position_action_request
             try:
-                request = single_position_action_request(
-                    proposal.action, scene=self.position_scene, plan=self.position_plan,
-                    profile=self.position_profiles[0],
-                )
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                request = project_position_action(self, proposal.action)
             except BaseException as error:
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
                 raise
@@ -3621,7 +3611,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             lifecycle = getattr(self.session, '_control_lifecycle_dispatch', None)
             if (lifecycle is None
                     or getattr(lifecycle, 'command_kind', None) != 'position-target'):
-                return lower()
+                raise RuntimeError('Position control requires the common submission lifecycle')
             source = self.value['source']
             from ..artifacts.state import StateSampleClock
             boundary = self.session.state_boundary_identity()

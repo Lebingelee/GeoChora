@@ -1414,3 +1414,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 7 文件 +65／−31，净增 34 行；版本诊断修改 1 文件 +16／−0，检查选择身份确实改变 direct 与 joint-reference Controller 摘要，并检查 R3 模型需求进入匹配；本文新增记录。无新增、删除或整文件迁移，项目 tracked 文件数保持 1358。相对 `1f1359ee` 的 task_env 差异 139 文件（新增 13、删除 20、修改 106），+8221／−14790，净减 6569 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 203 项通过。MuJoCo PickCube direct、joint→R3 reset 切换、R3 effort 和 R3 mass effort 均完成短程 reset／推进／再次 reset／关闭，分别观测 5／10／5／5 native 子步；GeoPhys direct 同样完成短程，native 子步不可观测并按 50 预留。Isaac 的 USD 构造通过版本诊断但未重跑原生执行，renderer、其他任务和完整 Solution 未复验。冻结输入、双锁、预算与收据在 ignored `workspace/maintenance/v211_effort_constructor_identity_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.146 移除 selected 控制提交旁路
+
+输入 `9ec61d97`；实施前重新审阅台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 和实施顺序，并核对四任务实际控制路径。selected 控制此前在没有声明 Position／physical 提交能力时仍退回直接执行，Position 提交内部也有缺少 lifecycle 时直接 lower 的分支。现缺失共同提交能力在 Controller 计算和物理推进前拒绝，Position lower 必须处于共同提交生命周期。PickCube 原按 F06 输入专门许可 Position Solution 与向量动作；现使用 Task 已声明的动作能力，并由 Position Controller 自己将 pose 动作投影为具名 typed 控制组。普通 action、Env Solution 和 caller ExpertAction 复用该投影；typed Position 序列保持独立语义，不被当作 pose 向量处理。此项不代表全部 source、renderer 或 E04 其他路线已经收口。
+
+生产修改 6 文件 +39／−61，净减 22 行，其中约 19 行 Panda 动作投影从 Runtime 通用控制模块迁入原 Controller owner；版本诊断修改 2 文件、新增 1 文件，+53／−0；本文新增记录。新增 1、删除 0、整文件迁移 0；项目 tracked 文件数 1358→1359。相对 `1f1359ee` 的 task_env 差异 140 文件（新增 14、删除 20、修改 106），+8310／−14848，净减 6538 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 205 项通过，包括无提交能力时无旁路、Position 序列不被重新投影以及真实 USD source 的 Controller 投影和 typed 请求检查。MuJoCo PickCube R1、R3 Solution 单步、Nut Solution 单步、装配 Panda、PickCube effort、Pendulum 和双轮车各完成 reset／推进／再次 reset／关闭并核对共同提交，分别观测 5／5／5／5／5／25／25 native 子步；GeoPhys PickCube R1 同样通过，native 子步不可观测并按 50 预留。Solution 均仅单步；Isaac 原生、renderer 和真实 Position 序列本批未复验。首轮真实运行通过后发现序列分派缺陷，修正并保留首轮记录；最终冻结输入、双锁、预算及收据在 ignored `workspace/maintenance/v211_no_control_bypass_v2_20261112/`，首轮在相邻无 v2 目录。E01～E04 尚未整体接收。

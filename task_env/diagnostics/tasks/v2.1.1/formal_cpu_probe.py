@@ -222,6 +222,13 @@ try:
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
         stepped=env.step_with_solution(solution) if args.case=='nut' or args.solution else env.step(action)
+        dispatch = env.session._control_lifecycle_dispatch
+        submission = env.session._last_control_submission
+        assert dispatch.stage == 'committed' and submission['status'] == 'acknowledged'
+        assert tuple(submission['controller_identities']) == dispatch.controller_identities
+        result['common_control_submission'] = {
+            'command_kind': dispatch.command_kind, 'status': submission['status'],
+            'controller_identities': list(dispatch.controller_identities)}
         if args.case=='nut' or args.solution:
             assert not solution.failed
             result['solution_step']={'identity':solution.identity,'failed':bool(solution.failed)}

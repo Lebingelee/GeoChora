@@ -527,6 +527,25 @@ class PandaPositionServoProfileV1:
             nullspace_reference_gain=nullspace_reference_gain,
         )
 
+    def prepare_action_request(self, action, *, scene, plan):
+        """Project this Controller's pose action into its bound control groups."""
+        import numpy as np
+        from .contracts import ControlGroupActionV1, StructuredActionRequestV1
+
+        vector = np.asarray(action, dtype=float)
+        if vector.shape != (8,) or not np.isfinite(vector).all():
+            raise ValueError('Position Controller requires a finite eight-dimensional planned action')
+        schema_id = self.controller_binding().action_schema.schema_id
+        request = StructuredActionRequestV1(
+            'structured-action-request-v1', scene.identity_hash, plan.identity_hash,
+            (ControlGroupActionV1('control-group-action-v1', self.entity_id, 'arm', schema_id,
+                                  tuple(float(value) for value in vector[:7])),
+             ControlGroupActionV1('control-group-action-v1', self.entity_id, 'gripper', schema_id,
+                                  (float(vector[7]),))),
+        )
+        request.validate()
+        return request
+
     def controller_binding(self):
         return ControllerBindingV1(
             'controller-binding-v1', self.writer_id, _action_schema(),
