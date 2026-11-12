@@ -288,17 +288,18 @@ def test_failed_robot_composition_releases_canonical_source_snapshot():
         'episode': {'horizon': 8},
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
-    try:
-        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
-        snapshot = value['source'].source_snapshot_receipt.snapshot_root
-        def fail(*args, **kwargs):
-            raise ValueError('composition rejected')
-        strategy = replace(binding, compose_robot_source=fail).reset_reconstruction_strategy('mujoco', 'cpu', 8)
-        with pytest.raises(ValueError, match='composition rejected'):
-            strategy._compose(value)
-        assert not snapshot.exists()
-    finally:
-        source_resource_receipt(value['source']).close()
+    snapshots = []
+    build = binding.build
+    def capture(request):
+        value = build(request)
+        snapshots.append(value['source'].source_snapshot_receipt.snapshot_root)
+        return value
+    def fail(*args, **kwargs):
+        raise ValueError('composition rejected')
+    binding = replace(binding, build=capture, compose_robot_source=fail)
+    with pytest.raises(ValueError, match='composition rejected'):
+        binding.build_for_request('mujoco', 'cpu', 31, 8)
+    assert len(snapshots) == 1 and not snapshots[0].exists()
 
 
 def test_rejected_robot_composer_does_not_prepare_a_source(monkeypatch):

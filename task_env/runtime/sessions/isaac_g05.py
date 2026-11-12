@@ -8,11 +8,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...artifacts import TaskArtifactV1, SceneDefinition
-from ...assembly.source import UsdTaskSceneSourceV1
 from ...assembly.usd_delivery import (
     LoadedUsdDeliveryV1, load_usd_asset_delivery, resolve_provider_representation,
 )
-from .source import UsdRuntimeSourceV1
+from .source import UsdRuntimeSourceV1, build_usd_runtime_source
 
 
 G05_ISAAC_EFFORT_PROFILE = 'isaac-gpu-physx-g05-5c-effort-v1'
@@ -75,15 +74,11 @@ def build_g05_isaac_runtime_source(*, delivery: LoadedUsdDeliveryV1,
         provider_build_identity=G05_ISAAC_BUILD_IDENTITY,
         options={'task_route': 'g05-5c-simple-effort-v1'},
     )
-    scene_source = UsdTaskSceneSourceV1(
-        'usd-task-scene-source-v1', loaded, representation,
-        task_source_identity_sha256, scene.identity_hash,
-    )
-    source = UsdRuntimeSourceV1(
-        'usd-runtime-source-v1', artifact, scene, scene_source,
-        joints, _usd_articulation_bodies(articulation, body_names), frames or {}, free_joints or {},
-        joint_targets if joint_targets is not None else joints,
-    )
+    source = build_usd_runtime_source(loaded=loaded, representation=representation,
+        task_source_identity_sha256=task_source_identity_sha256, artifact=artifact, scene=scene,
+        joints=joints, bodies=_usd_articulation_bodies(articulation, body_names),
+        frames=frames or {}, free_joints=free_joints or {},
+        joint_targets=joint_targets if joint_targets is not None else joints)
     source.validate()
     return source
 

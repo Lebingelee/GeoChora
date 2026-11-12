@@ -839,6 +839,16 @@ class UsdRuntimeSourceV1:
         self.scene_source.assert_fresh()
 
 
+def build_usd_runtime_source(*, loaded, representation, task_source_identity_sha256,
+                             scene, artifact, joints, bodies, frames, free_joints,
+                             joint_targets):
+    """Bind admitted USD bytes and declared native mappings to a Task source."""
+    scene_source = UsdTaskSceneSourceV1('usd-task-scene-source-v1', loaded, representation,
+                                        task_source_identity_sha256, scene.identity_hash)
+    return UsdRuntimeSourceV1('usd-runtime-source-v1', artifact, scene, scene_source,
+                              joints, bodies, frames, free_joints, joint_targets)
+
+
 def validate_usd_task_reset_identities(task_source, artifact, source, reset_plan, *, error_message):
     """Check the shared source/scene/artifact/reset identity closure.
 

@@ -40,8 +40,9 @@ class SourceBoundTaskBuilder:
     """Construct a task source and derive each episode's reset plan."""
 
     def __init__(self, compile_source, reset_plan, *, backend, reuse_source=False,
-                 allow_sampled_reset=True):
+                 allow_sampled_reset=True, compile_control=None):
         self.compile_source, self.reset_plan = compile_source, reset_plan
+        self.compile_control = compile_control
         self.backend, self.reuse_source = backend, reuse_source
         self.allow_sampled_reset = allow_sampled_reset
         self._cached = self._route = None
@@ -57,7 +58,9 @@ class SourceBoundTaskBuilder:
         fresh = self._cached is None
         value = self.compile_source(request) if fresh else self._cached
         try:
-            plan = self.reset_plan(value, request)
+            if fresh and self.compile_control is not None:
+                value = self.compile_control(value, request)
+            plan = self.reset_plan(value, request) if self.reset_plan is not None else None
         except BaseException as error:
             if fresh:
                 from ..runtime.sessions.source import source_resource_receipt
@@ -70,7 +73,7 @@ class SourceBoundTaskBuilder:
             raise
         if self.reuse_source and fresh:
             self._cached, self._route = value, route
-        return {**value, 'reset_plan': plan}
+        return value if self.reset_plan is None else {**value, 'reset_plan': plan}
 
 
 class _StandardResetReconstruction:
@@ -90,44 +93,8 @@ class _StandardResetReconstruction:
         return self._build(seed, sampled)
 
     def _build(self, seed, sampled):
-        value = self.binding.build_for_request(self.provider, self.backend, seed,
-                                               self.horizon, sampled)
-        return self._compose(value)
-
-    def _compose(self, value):
-        """Attach the declared Robot source before the value enters the Env."""
-        compose = self.binding.compose_robot_source
-        if compose is None:
-            return value
-        source = value['source']
-        try:
-            adapted = compose(source, artifact=value['artifact'], controller=value['controller'])
-            from ..assembly.compiler import reference_task_identity_fields
-            from ..controllers.canonical.contracts import digest
-            result = dict(value)
-            result['source'] = adapted
-            resolved = dict(value['resolved_configuration'])
-            resolved.update(reference_task_identity_fields(value['artifact'], adapted, value['controller']))
-            composition = adapted.composition_runtime_input
-            reference = adapted.source_reference_plan
-            resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
-                                                         else reference.identity_hash)
-            if adapted.source_composition_request is not None:
-                resolved['source_composition_request_v2_sha256'] = adapted.source_composition_request.identity_hash
-            if adapted.source_composition_intent is not None:
-                resolved['source_composition_intent_v1_sha256'] = adapted.source_composition_intent.identity_hash
-            result['resolved_configuration'] = resolved
-            result['recipe_identity'] = digest(resolved)
-            return result
-        except BaseException as error:
-            from ..runtime.sessions.source import source_resource_receipt
-            receipt = source_resource_receipt(source)
-            if receipt is not None:
-                try:
-                    receipt.close()
-                except BaseException as cleanup_error:
-                    error.add_note(f'Robot source cleanup also failed: {cleanup_error!r}')
-            raise
+        return self.binding.build_for_request(self.provider, self.backend, seed,
+                                              self.horizon, sampled)
 
     def use_binding(self, binding):
         """Use the Env's currently admitted task binding without changing policy."""
@@ -162,6 +129,43 @@ class _StandardResetReconstruction:
                     error.add_note(f'rebuilt source cleanup also failed: {cleanup_error!r}')
             raise
         return ResetReconstructionResult(value, artifact, seed, solution)
+
+
+def _compose_robot_source(binding, value):
+    """Attach the declared Robot source as part of the task build."""
+    compose = binding.compose_robot_source
+    if compose is None:
+        return value
+    source = value['source']
+    try:
+        adapted = compose(source, artifact=value['artifact'], controller=value['controller'])
+        from ..assembly.compiler import reference_task_identity_fields
+        from ..controllers.canonical.contracts import digest
+        result = dict(value)
+        result['source'] = adapted
+        resolved = dict(value['resolved_configuration'])
+        resolved.update(reference_task_identity_fields(value['artifact'], adapted, value['controller']))
+        composition = adapted.composition_runtime_input
+        reference = adapted.source_reference_plan
+        resolved['source_composition_plan_sha256'] = (composition.plan.identity_hash if composition
+                                                     else reference.identity_hash)
+        if adapted.source_composition_request is not None:
+            resolved['source_composition_request_v2_sha256'] = adapted.source_composition_request.identity_hash
+        if adapted.source_composition_intent is not None:
+            resolved['source_composition_intent_v1_sha256'] = adapted.source_composition_intent.identity_hash
+        result['resolved_configuration'] = resolved
+        result['recipe_identity'] = digest(resolved)
+        return result
+    except BaseException as error:
+        from ..runtime.sessions.source import source_resource_receipt
+        receipt = source_resource_receipt(source)
+        if receipt is not None:
+            try:
+                receipt.close()
+            except BaseException as cleanup_error:
+                error.add_note(f'Robot source cleanup also failed: {cleanup_error!r}')
+        raise
+
 
 def legacy_position_physical_observation_binding(env):
     """Compatibility projection for selected callers that still publish V1 state."""
@@ -453,7 +457,7 @@ class ReferenceTaskBinding:
             if declared != profile:
                 raise ValueError('selected Controller profile differs from its execution')
             value = {**value, 'selected_controller_profile_id': profile}
-        return value
+        return _compose_robot_source(self, value)
 
     def bind_compiled_control(self, value):
         """Bind the physical action contract to the Controllers actually compiled.
@@ -530,6 +534,18 @@ class ExistingSubjectEffortTask:
                 robot=robot, scene=scene, artifact=artifact, task_source=task_source,
                 composition=self.composition, config=config, provider=provider,
                 source_delivery=delivery, seed=seed)
+            return {'artifact': artifact, 'task_source': task_source, 'source': source,
+                'construction_id': self.construction_id,
+                'source_revision': scene.assets[0].source_revision or self.source_revision,
+                'execution_spec_v1': execution_spec, '_scene': scene,
+                '_subject': subject, '_declarations': declarations,
+                'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
+                                  'projected_closure': closure}}
+
+        def compile_control(value, request):
+            robot, source, artifact = self.robot, value['source'], value['artifact']
+            scene = value.pop('_scene')
+            subject, declarations = value.pop('_subject'), value.pop('_declarations')
             profile_id = config.control.profile_id
             intent, _recipe = prepare_robot_source_intent(source, robot=robot,
                 controller_profile=profile_id, existing_robot_entity=robot.uid,
@@ -537,13 +553,8 @@ class ExistingSubjectEffortTask:
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)
             validate_effort_robot_intent(intent, source, physical, controller_profile=profile_id)
-            return {'artifact': artifact, 'task_source': task_source, 'source': source,
-                'controller': physical.controllers[0], 'solution': None, 'physical_execution': physical,
-                'construction_id': self.construction_id,
-                'source_revision': scene.assets[0].source_revision or self.source_revision,
-                'execution_spec_v1': execution_spec, 'selected_controller_profile_id': profile_id,
-                'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
-                                  'projected_closure': closure},
+            return {**value, 'controller': physical.controllers[0], 'solution': None,
+                'physical_execution': physical, 'selected_controller_profile_id': profile_id,
                 'resolved_configuration': {'physics_dt': artifact.timebase.physics_dt,
                     'control_substeps': artifact.timebase.control_substeps,
                     'source_composition_intent_v1_sha256': intent.identity_hash}}
@@ -558,7 +569,7 @@ class ExistingSubjectEffortTask:
             build=SourceBoundTaskBuilder(compile_source,
                 lambda value, request: self.reset_plan(value['artifact'], value['source'],
                                                        request.seed, request.sampled_reset),
-                backend=config.runtime.backend),
+                backend=config.runtime.backend, compile_control=compile_control),
             task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,
             task_definition_factory=self.definition_factory, task_state_projection=self.state_projection,
             task_observation_schema=self.observation_schema, external_action_contract=action,

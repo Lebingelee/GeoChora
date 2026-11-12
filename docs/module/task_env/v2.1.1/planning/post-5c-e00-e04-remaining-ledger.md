@@ -184,10 +184,12 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 
 | 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
 | --- | --- | --- | --- |
-| U1 | 本次只完成静态重评，未恢复实施 | 输入 b94；本账本及审计快照 | R01～R08 |
+| U1 | IN_PROGRESS：四任务部分路径已接入 source／Controller 构建阶段；Robot source 组合移至构建请求，R3 身份和 USD 主体绑定归各自 owner | 当前冻结输入及 [CPU／Isaac 计划](../../../../../workspace/maintenance/v211_u1_common_build_20261112_001/plan.json)，版本诊断 282 项通过；受影响路线按原始结果分别判断 | R01～R08 尚未逐格收口；Task 内剩余编排和 USD 整体构建仍需继续迁移，不能以阶段回调视为统一完成 |
 | U2 | 既有机制保全，待单元收口 | 现有 reset／worker 诊断及执行记录，尚未作最终继承判断 | R09～R14 |
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+
+本批冻结输入的 MuJoCo 七条受影响短程均完成第二次 reset 与重复 close；Isaac Position／effort 各完成 5 个显式子步及 Env／App close 收据，重跑日志未见 traceback。首次 Isaac Position 运行的结果路径误指目录，5 个显式子步后最终收据写入失败；原始日志、修正重跑及预算见 [Isaac 计划](../../../../../workspace/maintenance/v211_u1_common_build_20261112_001/gpu-plan.json)，隐式启动推进数未知。Nut CPU 使用受限 Solution 单步。
 
 每格完成只写最终行为、真实 owner／提交／证据和残余限制；过程及失败日志保存在各单元原始输出，不在此逐次追加。目标是让下一次恢复直接读本表及当前单元，而非重走全仓发现流程。

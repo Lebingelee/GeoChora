@@ -142,6 +142,17 @@ def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_
     return factory(kind, **(dynamic_parameters or {}))
 
 
+def compile_panda_effort_selection(robot, scene, artifact, source, *, intent,
+                                   controller_profile, kind, **factory_options):
+    """Compile and verify an effort Controller against its admitted Robot source."""
+    factory = prepare_panda_source_effort_factory(robot, scene, artifact, source,
+                                                  **factory_options)
+    execution = factory(kind)
+    validate_effort_robot_intent(intent, source, execution,
+                                 controller_profile=controller_profile)
+    return factory, execution
+
+
 @dataclass(frozen=True)
 class SourceCompositionAdapterV1:
     provider: str

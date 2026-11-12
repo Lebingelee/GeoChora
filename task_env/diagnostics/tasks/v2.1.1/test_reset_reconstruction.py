@@ -42,6 +42,22 @@ def test_failed_first_reset_plan_releases_only_new_source(monkeypatch):
     assert receipt.closed and builder._cached is None
 
 
+def test_failed_controller_compilation_releases_new_source(monkeypatch):
+    from task_env.runtime.sessions import source as source_module
+
+    receipt = SimpleNamespace(closed=False)
+    receipt.close = lambda: setattr(receipt, 'closed', True)
+    monkeypatch.setattr(source_module, 'source_resource_receipt', lambda source: source)
+    def reject(_value, _request):
+        raise ValueError('invalid Controller')
+    builder = SourceBoundTaskBuilder(lambda _request: {'source': receipt},
+        lambda _value, _request: None, backend='cpu', reuse_source=True,
+        compile_control=reject)
+    with pytest.raises(ValueError, match='invalid Controller'):
+        builder(TaskBuildRequest('mujoco', 'cpu', 31, 8, None, None))
+    assert receipt.closed and builder._cached is None
+
+
 def test_reconstruction_replaces_source_only_after_validation(monkeypatch):
     from task_env.runtime.sessions import source as source_module
 

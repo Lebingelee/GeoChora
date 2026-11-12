@@ -4,6 +4,26 @@ from __future__ import annotations
 from dataclasses import replace
 
 
+def bind_position_subjects_to_runtime_input(runtime_input, robot, controller, *,
+                                            entity_id, end_frame_id):
+    """Bind a Position Controller to the Runtime's admitted source and subject."""
+    from .source import PositionSubjectPlanV1
+
+    source = runtime_input.runtime_source
+    plan, identity, subjects = compile_position_subjects(
+        source_scene=source.scene_definition,
+        layout=robot.position_subject_layout(entity_id=entity_id, end_frame_id=end_frame_id),
+        source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
+        task_closure_sha256=source.source_closure_digest,
+        artifact=runtime_input.artifact, controller=controller)
+    controller._validate_plan(plan)
+    source = replace(source, position_subject_plan=PositionSubjectPlanV1(plan, identity, subjects))
+    runtime_input = replace(runtime_input, runtime_source=source)
+    runtime_input.validate()
+    controller.source = source
+    return runtime_input
+
+
 def compile_reference_position_source(robot, source, *, artifact, controller, entity_id, recipe):
     """Compile the source-owned Panda position subject and its native mapping."""
     from ...assembly.source_composition import PositionSubjectControlBindingV1

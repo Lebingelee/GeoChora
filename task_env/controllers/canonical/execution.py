@@ -200,6 +200,38 @@ class ReferenceExecutionController:
     def __getattr__(self, name):
         return getattr(self.hold, name)
 
+    def identity_profile(self):
+        """Describe the execution owners and cadence included in R3 identity."""
+        import hashlib
+        import inspect
+        from pathlib import Path
+
+        if self.gripper_rate_hz != 500:
+            raise ValueError('R3 reference identity requires the native 500 Hz gripper')
+        def source_hash(owner):
+            return hashlib.sha256(Path(inspect.getsourcefile(owner)).read_bytes()).hexdigest()
+        return {
+            'arm_execution_profile': 'controller-owned-hold-and-linear-native-ramp-v1',
+            'arm_execution_request_profile': ARM_HOLD_RAMP_PROFILE,
+            'gripper_cadence': 'native-gripper-500hz-v1',
+            'gripper_control_hz': 500, 'gripper_feedback_hz': 500,
+            'outer_controller_hz': 100,
+            'execution_support_sha256': {
+                'arm_and_execution_wrapper': source_hash(type(self.hold)),
+                'execution_controller': source_hash(type(self)),
+                'gripper_servo': source_hash(type(self.inner)),
+            },
+        }
+
+    def bind_identity_provenance(self, provenance):
+        """Bind task-provided provenance to this execution's base Controller."""
+        from .contracts import digest
+        base = self.hold.controller
+        if provenance.get('base_controller_identity') != base.identity:
+            raise ValueError('execution provenance differs from its base Controller')
+        base.identity = digest(provenance)
+        return base.identity
+
     def reset(self, state, feedback):
         self.inner.reset()
         return self.hold.reset(state, feedback)
