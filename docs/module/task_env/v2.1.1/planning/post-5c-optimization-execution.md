@@ -1525,3 +1525,14 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 最终输入版本诊断 222 项通过，包含实际已验证 USD delivery 的单次加载与 source 身份检查、无 `h5py` 的 episode 导入及离线导出可用性。Isaac CUDA 正式 Pendulum 重跑完成构造、两次 reset、非零 step、25 个显式子步、重复 Env close 和 App close；每次构造／重建各加载一次，启动隐式物理推进数未知。MuJoCo CPU Pendulum 对受影响共同构造复验通过，观测 25 子步。两次 Isaac 共观察 50 个显式子步；失败不并入成功记录。冻结输入、预算、双锁和结果在 ignored `workspace/maintenance/v211_shared_usd_delivery_20261112/`。二轮均无 renderer；双轮车、PickCube 和完整 Solution 本批未作原生复验。
 
 生产代码修改 4 文件 +42／−44，净减 2；版本诊断修改 1 文件、新增 1 文件 +56／−1；无删除或整文件迁移，tracked 文件数由 1362 增至 1363。E01～E04 仍未整体接收。
+
+
+### 6.159 Isaac 已安装资产查找与 App 启动顺序
+
+复核 ENTRY-01／02、ENV-01／05、SRC-04：新增独立 USD 资产缓存，维护者可将已验证 delivery 完整复制并再次验证到 provider／Robot 位置；普通 Isaac 配置在未显式给出 manifest 时按所选 Robot 查找已安装资产，不查历史 workspace。静态配置查找不导入 Isaac、Omni 或 USD SDK；不同资产不会覆盖已有缓存。显式 manifest 仍是现行高级输入。当前尚无自动生成或分发资产，首次安装仍需维护者提供已验证清单，故 E01 尚未完成；selected 构建等后续结构债务也没有由本批解决。
+
+首次 PickCube 无渲染验证在 App 启动之前加载 USD，随后 PhysX 扩展动态链接失败，未生成成功收据；该失败日志与输入保留。共同 Isaac source 准备现在在 USD 检查前开启进程 App，按渲染需求选择现有 profile，并在本次构建失败时只关闭自己打开的 App。无渲染沿用现有 F06 命名 profile，其历史命名及更广泛 profile 整理仍待后续处理，不代表 provider／renderer 全面统一。
+
+最终版本诊断 230 项通过，包括三个已验证 Robot 资产的复制／查找、拒绝覆盖或损坏、无 SDK 的配置解析，以及有／无渲染的 App 先于 source 检查和失败清理。正式 PickCube Isaac CUDA 无显式 manifest 重试完成 reset、一次非零 step、5 个显式子步、再次 reset、重复 Env close 和 App close；正式 Pendulum 在同一共同启动变更后完成相同生命周期，25 个显式子步。改动前的缓存 Pendulum 输入也完成 25 个显式子步；三次成功合计观察 55 个显式子步，各次隐式启动推进未知。PickCube 成功输入冻结后仅增加了纯诊断测试，生产 diff 未变。冻结输入、预算、双锁、失败和成功日志位于 ignored `workspace/maintenance/v211_installed_usd_assets_20261112/`。本批未复验双轮车、NutAssembly、renderer 或完整 Solution，历史证据只在各自原输入和范围内参考。
+
+生产代码修改 2 文件、新增 1 文件，+98／−7，净增 91 行；版本诊断新增 1 文件 +111 行；API 与本文各修改 1 个文档文件；无文件删除或整文件迁移，tracked 文件数由 1363 增至 1365。本机新安装的三个独立资产包占 41,696,232 字节，属于缓存空间增加，并非仓库文件收敛。E01～E04 尚未整体接收。

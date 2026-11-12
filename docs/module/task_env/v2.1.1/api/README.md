@@ -54,7 +54,9 @@ finally:
 
 相机可用世界 CameraSpec 声明，在编译后生成绑定几何；底层 advanced CameraGeometry 仍校验 Artifact。observer／task camera 身份必须不同，输出限原 HWC float32 RGB，renderer／physics pairing 和历史观察路线限制继续拒绝。本批只验证声明与生命周期合同，未新增真实 RGB 结论。
 
-旧 PickCube physical candidate、Isaac physical candidate 和 Position candidate UID 已退休，不再接收旧输入或 `source_workspace`。请使用本页正式 UID 和 `controller.profile_id`；历史候选的证据与身份按原记录保留。当前受支持的 Isaac 路线仍要求 `execution.source_delivery_manifest` 指向相应已验证 USD delivery，这项用户入口限制尚待优化；不得将历史 workspace 路径当作通用默认值。
+旧 PickCube physical candidate、Isaac physical candidate 和 Position candidate UID 已退休，不再接收旧输入或 `source_workspace`。请使用本页正式 UID 和 `controller.profile_id`；历史候选的证据与身份按原记录保留。Isaac 路线可自动查找已安装的 Robot USD 资产，普通 `make_env` 配置不必填写内部 manifest；显式 `execution.source_delivery_manifest` 仍可用于选择已验证的高级输入。当前资产包仍需预先安装，项目尚未提供自动生成或发行包安装；不会从历史 workspace 隐式查找。
+
+维护者可以使用 `python -m task_env.assembly.usd_cache --provider isaacsim --robot <robot-uid> --manifest <已验证交付清单>` 预装本地 delivery。安装复制并重新验证完整闭包，不覆盖同位置的不同资产；默认位置为用户缓存，也可通过 `GEOCHORA_USD_ASSET_ROOT` 选择位置。此维护命令当前仍需要清单路径，不代表资产分发已经完成。
 
 正式 PickCube（含物理配置）、NutAssembly、Pendulum、双轮车现在共用 TaskDefinition 构造与语义 lifecycle；reset 会绑定本次重建 Artifact。`CanonicalTaskStateView` 引用原具名 canonical state；组件数组格式保留，不制造 native 索引。公共 Gym info 仍包含 typed ObservationSchema／只读评价 mapping；框架在 Solution reset／act／observe 的输入边界生成值 payload，原数值、身份和时钟检查不变。普通已准入 native 路线使用现有 live source／Controller scene interval binding。本轮有五条 MuJoCo CPU 短程证据，其中 Nut 仅一个 Solution interval；不是完整 Solution、任务成功或新 GeoPhys／Isaac 能力结论。详见[TaskDefinition API](../../../../../task_env/doc/api/semantics/task_definition.md)与[实施记录 6.4](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。
 

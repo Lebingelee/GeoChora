@@ -463,17 +463,18 @@ def _process_app_owner(*, launch_profile_id: str | None = None) -> IsaacSimAppOw
 
 @contextmanager
 def prepare_isaac_source(*, rendering):
-    """Prepare SDK source inspection with the process App's rendering profile.
+    """Open the process App before any SDK source inspection.
 
     A successful construction transfers App lifetime to the normal Runtime
     leases. Failure closes only an App opened by this preparation.
     """
     owner, opened_here = None, False
     try:
-        if rendering:
-            owner = _process_app_owner(launch_profile_id=V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1)
-            opened_here = owner.app is None
-            owner.open(f06_compatibility=True)
+        profile = (V211_ISAAC_RENDER_APP_LAUNCH_PROFILE_V1 if rendering
+                   else F06_ISAAC_APP_LAUNCH_PROFILE_V1)
+        owner = _process_app_owner(launch_profile_id=profile)
+        opened_here = owner.app is None
+        owner.open(f06_compatibility=True)
         yield
     except BaseException as error:
         if opened_here:

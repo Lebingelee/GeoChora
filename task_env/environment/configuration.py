@@ -460,8 +460,11 @@ def _resolve_selected_config(environment_type, config):
     manifest = execution_defaults.get("source_delivery_manifest")
     if provider == "isaacsim":
         profiles = getattr(environment_type, 'selected_isaac_controller_profiles', frozenset())
-        if not environment_type.selected_supports_isaac or manifest is None or profile not in profiles:
-            raise ValueError("Isaac requires a declared Controller profile and an explicit source delivery manifest")
+        if not environment_type.selected_supports_isaac or profile not in profiles:
+            raise ValueError("Isaac requires a declared supported Controller profile")
+        if manifest is None:
+            from ..assembly.usd_cache import installed_usd_manifest
+            manifest = str(installed_usd_manifest(provider, robot_uid))
     elif manifest is not None:
         raise ValueError("source_delivery_manifest requires the supported Isaac route")
     seed = sections['episode'].get('seed', base.episode.seed)
