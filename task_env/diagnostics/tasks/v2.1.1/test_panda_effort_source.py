@@ -96,12 +96,12 @@ def test_position_freezes_input_intent_before_scene_import(monkeypatch):
 @pytest.mark.parametrize('profile', ('panda-direct-effort-v1', 'panda-joint-effort-reference-v1'))
 def test_effort_without_solution_does_not_prepare_position_readiness(monkeypatch, profile):
     from task_env import make_env
-    from task_env.tasks.pick_cube import specialization
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessConfig
 
-    def unexpected_readiness(**_kwargs):
+    def unexpected_readiness(*_args, **_kwargs):
         raise AssertionError('effort construction selected a Position Solution')
 
-    monkeypatch.setattr(specialization, '_prepare_reference_source', unexpected_readiness)
+    monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', unexpected_readiness)
     env = make_env('pick-cube-p16-reference-v1', config={
         'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
         'controller': {'profile_id': profile},
@@ -309,7 +309,7 @@ def test_rejected_robot_composer_does_not_prepare_a_source(monkeypatch):
         pytest.fail('binding admission must not prepare a Task source')
     def reject(cls, binding, config):
         raise ValueError('source composition rejected')
-    monkeypatch.setattr(specialization, '_prepare_reference_source', unexpected_source)
+    monkeypatch.setattr(specialization, '_prepare_mjcf_source', unexpected_source)
     monkeypatch.setattr(specialization.PickCubeReferenceEnv, '_bind_robot_source_composer', classmethod(reject))
     with pytest.raises(ValueError, match='source composition rejected'):
         specialization.PickCubeReferenceEnv._build_selected_binding(config)

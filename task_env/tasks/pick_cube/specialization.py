@@ -267,20 +267,22 @@ def _resolve_readiness_declaration(task_config, controller_profile, resolved_con
     return config, is_r3_profile, dynamic_profile, profile_source
 
 
-def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
-                              lift_height_m=None, task_config=None, robot=None):
-    """Prepare the Task source and readiness for a Position Solution."""
+def _prepare_mjcf_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
+                         lift_height_m=None, task_config=None, robot=None, require_readiness=True):
+    """Compile one Task/Robot source; resolve readiness only when the route needs it."""
 
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
     config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
         task_config, controller_profile, resolved_config)
     declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
-    artifact = compile_panda_box_artifact(declaration, robot=robot)
-    from .solution import PickCubeReadinessConfig
-    readiness = PickCubeReadinessConfig.from_resolved_config(
-        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
-                                               dynamic_profile=dynamic_profile))
+    artifact = readiness = None
+    if require_readiness:
+        artifact = compile_panda_box_artifact(declaration, robot=robot)
+        from .solution import PickCubeReadinessConfig
+        readiness = PickCubeReadinessConfig.from_resolved_config(
+            artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+                                                   dynamic_profile=dynamic_profile))
     compiled = compile_panda_box_task(declaration, config=config, artifact=artifact,
                                       robot=robot, backend=backend, own_snapshot=True)
     return _PreparedReferenceSource(task_config, recipe, compiled.source.config, is_r3_profile,
@@ -291,20 +293,12 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
                                 lift_height_m, robot):
     """Compile PickCube declarations through the shared Task/Robot source owners."""
     from ...runtime.sessions.source import close_execution_source_on_failure
-    backend = request.backend
-    if reset_switch:
-        # The switchable route admits the R3 Solution, so it needs its
-        # readiness data; the other effort profiles do not select R3.
-        prepared = _prepare_reference_source(
-            backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
-            resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
-        legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
-    else:
-        compiled = compile_panda_box_task(
-            _declaration(lift_height_m=lift_height_m, task_config=task_config),
-            config=_nut_aligned_environment_config(resolved_config), robot=robot,
-            backend=backend, own_snapshot=True)
-        legacy_artifact, original, readiness = compiled.artifact, compiled.source, None
+    prepared = _prepare_mjcf_source(
+        backend=request.backend, controller_profile='r3_continuous_v1' if reset_switch else 'r1',
+        task_config=task_config, resolved_config=(resolved_config if reset_switch
+            else _nut_aligned_environment_config(resolved_config)), lift_height_m=lift_height_m,
+        robot=robot, require_readiness=reset_switch)
+    legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     with close_execution_source_on_failure(original):
         from ...runtime.sessions.provenance import construction_revision
         revision = construction_revision(Path(__file__).resolve().parents[3])
@@ -312,7 +306,7 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
         return (CompiledReferenceTaskV1(legacy_artifact, original),
-                _EffortSourceContext(task_config, original.agents[0], readiness,
+                _EffortSourceContext(prepared.task_config, original.agents[0], readiness,
                     solution_identity if reset_switch else None,
                     float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
                     revision, original.source_closure_digest))
@@ -356,7 +350,7 @@ def _compile_reference_position_source(request, *, controller_profile, resolved_
                     else selected_robot.source_recipe())
     reference_robot = selected_robot if robot_recipe.mode == 'reference-task-source' else None
     (task_config, recipe, config, is_r3_profile, dynamic_profile, profile_source,
-     artifact, source, readiness) = _prepare_reference_source(
+     artifact, source, readiness) = _prepare_mjcf_source(
         backend=request.backend, controller_profile=controller_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
     return (CompiledReferenceTaskV1(artifact, source),
