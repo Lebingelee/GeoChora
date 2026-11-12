@@ -31,7 +31,8 @@ def make_physical_binding(*, native_drive, control_kind,
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...environment import sample_episode_reset_plan
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _prepare_reference_source, compile_reference_robot_task
+    from .specialization import (_compile_task_source, _nut_aligned_environment_config,
+                                 _prepare_reference_source, compile_reference_robot_task)
     from .task import (physical_task_binding_fields,
                        physical_execution_info, observe_physical_action)
 
@@ -39,7 +40,7 @@ def make_physical_binding(*, native_drive, control_kind,
     from ...controllers.canonical.reset_selection import PhysicalResetSelection
     from ...controllers.canonical.r3_effort import (PANDA_SWITCHABLE_EFFORT_KINDS,
                                                     panda_reset_action_schema)
-    from ...runtime.sessions.source import close_execution_source_on_failure
+    from ...runtime.sessions.source import close_execution_source_on_failure, snapshot_legacy_mjcf_source
 
     # The common construction request owns the source, not the Task binding.
     # Resets of this admitted route reuse its immutable source and build a new
@@ -53,11 +54,18 @@ def make_physical_binding(*, native_drive, control_kind,
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
         if prepared_value is None:
-            prepared = _prepare_reference_source(
-                backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
-                resolved_config=resolved_config, lift_height_m=lift_height_m,
-                include_readiness=reset_switch, robot=robot)
-            legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
+            if reset_switch:
+                # The switchable route admits the R3 Solution, so it needs its
+                # readiness data; the other effort profiles do not select R3.
+                prepared = _prepare_reference_source(
+                    backend=backend, controller_profile='r3_continuous_v1', task_config=task_config,
+                    resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
+                legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
+            else:
+                _, legacy_artifact, source = _compile_task_source(
+                    backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
+                    lift_height_m=lift_height_m, task_config=task_config, robot=robot)
+                original, readiness = snapshot_legacy_mjcf_source(source), None
             with close_execution_source_on_failure(original):
                 import subprocess
                 revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),

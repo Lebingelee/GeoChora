@@ -8,6 +8,26 @@ from task_env.runtime.sessions.mujoco_composition import panda_effort_source_lim
 from task_env.runtime.sessions.source import source_resource_receipt
 
 
+@pytest.mark.parametrize('profile', ('panda-direct-effort-v1', 'panda-joint-effort-reference-v1'))
+def test_effort_without_solution_does_not_prepare_position_readiness(monkeypatch, profile):
+    from task_env import make_env
+    from task_env.tasks.pick_cube import specialization
+
+    def unexpected_readiness(**_kwargs):
+        raise AssertionError('effort construction selected a Position Solution')
+
+    monkeypatch.setattr(specialization, '_prepare_reference_source', unexpected_readiness)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': profile},
+    })
+    try:
+        assert env.value['physical_execution'].controllers == env.robot.controllers
+        assert env.value['solution'] is None
+    finally:
+        env.close()
+
+
 def test_formal_position_and_effort_share_task_and_robot_scene():
     from task_env import make_env
 
