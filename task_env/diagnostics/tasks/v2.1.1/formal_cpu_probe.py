@@ -137,6 +137,8 @@ try:
         table = ET.fromstring(env.value['source'].scene_source.xml).find(".//geom[@name='grasp_table_geom']")
         assert float(table.get('size').split()[0]) == args.table_half_x
     robot=env.robot
+    assert robot.declaration is env.binding.robot
+    assert robot.uid == robot.declaration.uid
     if args.annotate_robot_source:
         import hashlib
         source = env.value['source']
@@ -311,6 +313,7 @@ try:
         assert reset['episode_id']!=first['episode_id']
         result['second_reset']=reset
         assert env.robot is not robot
+        assert env.robot.declaration is robot.declaration is env.binding.robot
         assert env.robot.controller is env.controller
         physical_execution = env.value.get('physical_execution')
         if physical_execution is not None:

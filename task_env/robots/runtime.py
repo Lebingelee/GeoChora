@@ -84,9 +84,10 @@ class RobotRuntime:
     world: RobotFrameReference | None = None
     subjects: tuple = ()
     controllers: tuple = ()
+    declaration: object | None = None
 
     @classmethod
-    def from_selected(cls, value, selected, *, physical_selection=None):
+    def from_selected(cls, value, selected, *, robot=None, physical_selection=None):
         """Expose the admitted subjects and their actual Controller owners.
 
         No native resource, state copy, or Controller is created by this view.
@@ -115,8 +116,17 @@ class RobotRuntime:
             return None
         roots = tuple(subject for subject in subjects if subject.parent_subject_id is None)
         request = getattr(source, 'source_composition_request', None)
-        uid = request.robot_uid if request is not None else subjects[0].entity_id
-        return cls(uid=uid, controller=controller, subjects=subjects,
+        built_robot = value.get('robot')
+        if robot is not None and built_robot is not None and built_robot is not robot:
+            raise ValueError('built Task source differs from the selected Robot declaration')
+        declaration = robot if robot is not None else built_robot
+        if declaration is not None:
+            uid = declaration.uid
+            if request is not None and request.robot_uid != uid:
+                raise ValueError('Robot source composition differs from the selected declaration')
+        else:
+            uid = request.robot_uid if request is not None else subjects[0].entity_id
+        return cls(uid=uid, declaration=declaration, controller=controller, subjects=subjects,
                    controllers=controllers, base=roots[0].root_frame if len(roots) == 1 else None,
                    world=RobotFrameReference('world', 'world', None, 'world'))
 

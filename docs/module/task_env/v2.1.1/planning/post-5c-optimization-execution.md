@@ -1486,3 +1486,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产代码修改 3 文件、新增 1 文件，+74／−26，净增 48 行；版本诊断新增 1 文件 +25 行；无删除或整文件迁移。项目 tracked 文件数由 1360 增至 1362。新增合同使公共提交层移除 Panda 类和 writer 常量依赖，新增行数主要是显式 writer 输出与 Controller 侧验证；原有 source、资源冲突和一次 interval 检查保留。
 
 最终输入版本诊断 213 项通过，含不同 writer 名称的合法合同及重复、错误身份和过期目标拒绝。MuJoCo 的正式 PickCube 装配 Panda R1 双 writer 和一体 Panda R3 单 writer 各完成 reset、非零 step、共同提交、二次 reset 和重复 close，各观测 5 个 native 子步；装配路线核对两个 writer 及其 Controller 实际身份。冻结输入、预算、双锁与原始结果在 ignored `workspace/maintenance/v211_position_outputs_20261112/`。GeoPhys、Isaac、renderer 和完整 Solution 本批未复验；旧证据属于不同输入。E01～E04 未整体接收。
+
+
+### 6.154 Robot 运行句柄与声明身份
+
+对照 SUBJ-01／02 与共同 Robot 构造链：四任务正式入口选择的 Robot 经 Task binding 进入 Runtime 时，运行句柄此前从 source 组合请求或第一个主体实体推断 UID，未保留实际声明。现在 `RobotRuntime` 持有用于构建的同一声明并使用其 UID；已有 source 组合请求或 Task 返回 Robot 时核对身份，受控主体与 Controller 仍来自已编译 source。无绑定声明的高级输入仍保留原有推断，不把外观对齐写成完整构造机制统一。
+
+生产代码修改 2 文件 +15／−4，净增 11；版本诊断修改 2 文件 +6 行；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断 213 项通过。最终输入下 MuJoCo 正式 PickCube 一体及装配 Panda、NutAssembly、Pendulum、双轮车五条短程路线均完成 reset、非零 step、再次 reset、重绑定和重复 close，明确核对二次 reset 后仍使用同一 Robot 声明；各观测子步分别 5、5、5、25、25。首轮字段顺序调整前同样执行五条路线，另观测 65 子步；两个输入和结果均保留在 ignored `workspace/maintenance/v211_robot_identity_20261112/`。Nut 只验证 Solution 单步；GeoPhys、Isaac 原生、renderer 及完整 Solution 本批未复验。E01～E04 仍未整体接收。

@@ -1026,7 +1026,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self._selected_controller_binding = selected
         from ..robots.runtime import RobotRuntime
         self._robot = RobotRuntime.from_selected(
-            value, selected, physical_selection=getattr(self, '_physical_reset_selection', None))
+            value, selected, robot=self.binding.robot,
+            physical_selection=getattr(self, '_physical_reset_selection', None))
         if self._robot is None:
             raise ValueError('task construction requires a source-owned Robot subject binding')
 

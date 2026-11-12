@@ -190,6 +190,9 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
         select_binding=binding.position_control_binding, value=value,
         capabilities=selected.position_capabilities)
     assert robot.uid == 'panda-v1'
+    assert robot.declaration is value['robot']
+    with pytest.raises(ValueError, match='selected Robot declaration'):
+        RobotRuntime.from_selected(value, selected, robot=SimpleNamespace(uid='panda-v1'))
     assert robot.subjects == value['source'].position_subject_plan.subjects
     assert robot.controller is value['controller']
     assert plan is value['source'].position_subject_plan.plan
