@@ -1080,3 +1080,13 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +9／−6，净增 3 行，其中 profile 检查随共同组合调用迁移；版本诊断修改 1 文件 +30／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。新增版本检查直接证明 PickCube 与 NutAssembly 的 Artifact／source Robot 和 MuJoCo source adapter 使用同一实例；不等于任务声明、装配 Panda 的替换 source 和其他主体已统一构造。provider 仍通过既有 source recipe、intent 和 adapter 合同组合，状态、clock、控制提交和 renderer 资源合同未改。
 
 139 项版本检查通过。PickCube、NutAssembly 与装配 Panda 的 MuJoCo 短程分别完成 5 个 native 子步、第二次 reset 和关闭；两个 tabletop 的隔离 MuJoCo worker 完成 reset、step、再次 reset 和关闭，worker native 子步未直接计数。NutAssembly GeoPhys 完成同类生命周期和 Solution 单步，native 子步未直接计数；MJCF 导入有语义诊断。Isaac source 没有注册本次更改涉及的 composer，未重跑；完整 Solution 未重跑。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_source_robot_owner_20261112_oy7kp_rd/`。E01～E04 未因此整体接收。
+
+### 6.104 PickCube effort 消费已解析配置
+
+输入 `95ed3490`。PickCube 的正式 Position 路线使用解析时冻结的任务配置和环境配置，effort 路线却重新读取默认任务配置并丢弃已解析环境配置。现在 MJCF 与 Isaac effort 的绑定都接收正式解析所得的任务配置及环境配置，MJCF 构建不再二次读取任务配置；Isaac seeded 重建也沿同一 binding 传递它们。这样正式配置与执行实际消费的配置保持一致，旧配置重读路径退出；source、Controller 身份可能随实际配置变化，历史证据仍只对应原输入。
+
+生产修改 2 文件 +17／−10，净增 7 行；版本诊断修改 2 文件 +30／−2，本文和当前状态文档修改 2 文件；无新增、删除或整文件迁移，tracked 文件数保持 1356。版本检查验证 MJCF effort 不会重载任务配置，并保留实际 profile 与 horizon；Isaac 纯合同检查验证 seeded builder 传入同一任务与环境配置。此次只收敛 PickCube effort 的配置所有权，没有取消其任务专属物理构建路径，也没有完成四任务统一构造。provider adapter 的 source 合同按输入的实际配置构建，状态、clock、提交与 renderer 合同未改。
+
+140 项版本检查通过。MuJoCo 直接 effort 完成 5 个 native 子步和第二次 reset，MuJoCo joint effort 的 Controller reset 与 H5 读回完成 10 个子步；GeoPhys joint effort 完成 reset、step、第二次 reset 和关闭，native 子步未直接计数。MJCF 导入有语义诊断。受影响的 Isaac effort 本轮仅检查配置传递，未做真实 CUDA 复验；完整 Solution 未运行。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_effort_config_owner_20261112_1qrzc718/`。
+
+复核还发现：Isaac Position 的正式配置可以包含 `lift_height_m`，但 `make_reference_binding` 调用 USD builder 时未传该值，USD Artifact 仍按默认值构造；effort 当前则拒绝该参数。这是尚未解决的配置语义分叉，不因本条收敛而消失，需在后续共同任务构建中修复并按影响验证。E01～E04 未整体接收。

@@ -58,6 +58,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
 def physical_binding_from_config(config):
     import json
     options = json.loads(config.controller_parameters_json)
+    task_config = json.loads(config.task_configuration_json)
     kind = PandaAgent.effort_controller_profiles()[config.controller_profile]
     drive = config.native_drive or ('position' if kind == 'direct' else 'disabled')
     if config.physics_provider == 'isaacsim':
@@ -65,13 +66,14 @@ def physical_binding_from_config(config):
         return make_isaac_physical_binding(delivery_manifest=config.source_delivery_manifest,
             seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
             horizon=config.environment.episode.horizon,
-            drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind)
+            drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
+            task_config=task_config, resolved_config=config.environment)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(provider=config.physics_provider,
         horizon=config.environment.episode.horizon, seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
-        cube_force_z_N=force)
+        cube_force_z_N=force, task_config=task_config, resolved_config=config.environment)
 
 
 def _direct_physical_observation_spaces(env):
@@ -145,19 +147,20 @@ def _pickcube_mjcf_scene(task_config, robot):
 
 
 def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
-                          reset_switch=False, space_policy='dynamic', cube_force_z_N=None):
+                          task_config, resolved_config, reset_switch=False,
+                          space_policy='dynamic', cube_force_z_N=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...artifacts import FrameReference
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import adapt_legacy_recipe_task_source, compile_task_artifact_v1, sample_episode_reset_plan
     from ...environment.task_definition import as_task_state_view
     from ...environment.reference_binding import ReferenceTaskBinding
-    from .specialization import _configuration, _prepare_reference_source, evaluate
+    from .specialization import _prepare_reference_source, evaluate
     from .task import PickCubeTaskDefinition
 
-    task_config = _configuration()
     prepared = _prepare_reference_source(
-        backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config)
+        backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
+        resolved_config=resolved_config)
     legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(original):
@@ -287,7 +290,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             else:
                 env._last_physical_opening_target = float(action[-1])
         from .specialization import _validate_external_readiness_solution, make_reference_binding
-        task_com_factory = (make_reference_binding(cube_force_z_N=cube_force_z_N).task_com_wrench_factory
+        task_com_factory = (make_reference_binding(cube_force_z_N=cube_force_z_N,
+            task_config=task_config, resolved_config=resolved_config).task_com_wrench_factory
                             if cube_force_z_N is not None else None)
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         owned_resources = ExitStack()

@@ -44,11 +44,13 @@ def test_compiled_action_contract_requires_a_real_physical_execution():
 
 
 def test_usd_effort_binding_does_not_request_position_source_composition():
+    from task_env.tasks.pick_cube.specialization import _configuration
     from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     binding = make_isaac_physical_binding(delivery_manifest='unused-until-build', seed=31,
-        horizon=8, drive_mode='effort-only', control_kind='joint')
+        horizon=8, drive_mode='effort-only', control_kind='joint',
+        task_config=_configuration(), resolved_config=None)
     assert binding.scalar_control_binding is None
     assert PickCubeReferenceEnv._bind_robot_source_composer(binding, object()) is binding
 
@@ -60,11 +62,16 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     calls = []
     monkeypatch.setattr(specialization, 'build_isaac_reference',
                         lambda **kwargs: calls.append(kwargs) or kwargs)
+    task_config = specialization._configuration()
+    resolved = object()
     binding = make_isaac_physical_binding(delivery_manifest='declared', seed=31,
-        horizon=8, drive_mode='effort-only', control_kind='joint')
+        horizon=8, drive_mode='effort-only', control_kind='joint',
+        task_config=task_config, resolved_config=resolved)
     result = binding.build_seeded('isaacsim', 'cuda', 42, 8)
     assert result['task_seed'] == 42
     assert result['horizon'] == 8
+    assert result['task_config'] is task_config
+    assert result['resolved_config'] is resolved
     with pytest.raises(ValueError, match='Isaac CUDA'):
         binding.build_seeded('mujoco', 'cpu', 42, 8)
 

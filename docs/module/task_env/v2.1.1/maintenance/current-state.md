@@ -221,3 +221,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 两个 tabletop Solution 现在使用 Controller 所有的共同 arm hold／ramp 请求，MuJoCo 两条 Solution 和 GeoPhys NutAssembly 已复验单步。详见[实施记录 6.102](../planning/post-5c-optimization-execution.md#6102-共用-arm-hold-与-ramp-请求合同)。
 
 默认 tabletop source 组合现在使用任务 source 已声明的同一 Robot，装配主体仍按选择替换；MuJoCo、GeoPhys 和两个 MuJoCo worker 的受影响短程已复验。详见[实施记录 6.103](../planning/post-5c-optimization-execution.md#6103-source-组合复用已声明的-robot)。
+
+PickCube effort 现在消费正式解析的任务与环境配置；MuJoCo／GeoPhys 短程已复验，Isaac effort 仍需真实 CUDA 复验。Isaac Position 的 `lift_height_m` 未传至 USD Artifact，仍待修复。详见[实施记录 6.104](../planning/post-5c-optimization-execution.md#6104-pickcube-effort-消费已解析配置)。

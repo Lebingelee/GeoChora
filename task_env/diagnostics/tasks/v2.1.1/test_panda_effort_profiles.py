@@ -106,6 +106,27 @@ def test_panda_effort_controller_rejects_foreign_writer():
         task_binding.close_task_resources()
 
 
+def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkeypatch):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube import specialization
+
+    config = resolve_task_env_config(specialization.PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-direct-effort-v1'},
+        'episode': {'horizon': 8},
+    })
+    def unexpected_reload():
+        pytest.fail('effort construction reloaded the Task configuration')
+    monkeypatch.setattr(specialization, '_configuration', unexpected_reload)
+    binding = specialization.PickCubeReferenceEnv.selected_binding(config)
+    try:
+        value = binding.build('mujoco')
+        assert value['source'].config.control.profile_id == config.controller_profile
+        assert value['source'].config.episode.horizon == 8
+    finally:
+        binding.close_task_resources()
+
+
 @pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
 @pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
     'panda-r3-effort-reference-v1', 'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
