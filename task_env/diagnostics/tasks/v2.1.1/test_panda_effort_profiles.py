@@ -405,3 +405,33 @@ def test_switchable_r3_solution_uses_physical_state_and_control(tmp_path):
         assert receipt['observation_count'] == 2
     finally:
         env.close()
+
+
+@pytest.mark.parametrize(('profile', 'requires_kinematics'), [
+    ('panda-joint-effort-reference-v1', False),
+    ('panda-r3-effort-reference-v1', True),
+    ('panda-r3-mass-effort-v1', True),
+])
+def test_effort_controller_constructs_only_its_required_source_model(profile, requires_kinematics, monkeypatch):
+    from task_env.controllers.canonical.kinematics import PandaKinematics
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions.source import project_scene_definition_v3_to_mjcf
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    original = PandaKinematics.__init__
+    used_sources = []
+    def capture(self, source_xml, *args, **kwargs):
+        used_sources.append(source_xml)
+        original(self, source_xml, *args, **kwargs)
+    monkeypatch.setattr(PandaKinematics, '__init__', capture)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        source = binding.build('mujoco')['source']
+        expected = project_scene_definition_v3_to_mjcf(source.scene_source.xml, source.scene_definition)
+        assert used_sources == ([expected] if requires_kinematics else [])
+    finally:
+        binding.close_task_resources()

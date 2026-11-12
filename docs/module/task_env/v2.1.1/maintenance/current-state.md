@@ -247,3 +247,5 @@ reference effort 的共同 binding 检查和状态需求已从普通 PD 构造�
 旧 Position 诊断双相机入口及专用 consumer 已退出公共 Env；MuJoCo effort／`CameraSpec` 的元数据问题已修复，R3 Position／RGB 因正式 source 缺少 Scene 仍未解决。详见[实施记录 6.117](../planning/post-5c-optimization-execution.md#6117-task-rgb-相机几何由-renderer-采集结果提供)。
 
 PickCube 的 MJCF effort 与 USD 现共用 Task Source／Artifact 编译；MJCF Position 仍待切入完整 Scene 和 Artifact，Position／RGB 问题仍未解决。详见[实施记录 6.118](../planning/post-5c-optimization-execution.md#6118-pickcube-跨-source-共用-task-artifact-编译)。
+
+Panda effort 的运动学模型按 Controller profile 在共同构造处创建；MJCF／USD Task binding 不再分别决定模型。Position／RGB 的旧 source 身份和生命周期仍待统一。详见[实施记录 6.119](../planning/post-5c-optimization-execution.md#6119-panda-effort-运动学模型归-controller-构造)。

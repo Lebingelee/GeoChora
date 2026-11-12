@@ -1195,3 +1195,12 @@ R3 Position／RGB 的另一个失败仍在：当前 MJCF reference Task source �
 输入 `8ed86886`。MJCF effort binding 和 USD source 原先各自将 PickCube 任务配置、旧语义、Scene 和帧别名编译为 `TaskArtifactV1`，造成任务编译藏在两条不同控制／source 路径。将同一 Task Source、Artifact 编译、cube 身份绑定及 Scene 验证归到 PickCube Task 的共同编译函数；MJCF 和 USD 只提供各自真实 Scene 与帧声明。MJCF Scene 组合也从 physical candidate 私有函数归到 Task 声明处，消费所选 Robot 的真实主体。此项是接入共同 Task 声明的中间步骤：MJCF Position 仍使用旧 Artifact 与 source，Position／RGB 缺口没有解决；四任务 Robot／Controller 构造未整体统一。provider 和 renderer 执行合同未改。
 
 生产修改 2 文件 +41／−40，净增 1 行；其中 MJCF Scene 声明从 candidate 移至现有 Task 文件，属于代码段迁移，不是整文件迁移。版本诊断修改 1 文件 +25／−0，比较 MJCF／USD 的 Task Source、初始化、时间和任务语义及各自完整 Scene 帧。本文和当前状态文档各修改 1 文件；无新增、删除或整文件迁移，tracked 文件保持 1356。168 项版本检查通过；受影响 USD source／Artifact 的静态检查通过，未进行本次 Isaac 原生复验。MuJoCo effort／CameraSpec／RGB 完成 reset、step、第二次 reset、关闭与 5 个子步；GeoPhys effort 完成同样生命周期，native 子步未计数；MuJoCo R3 Position Solution 完成单步与 5 个子步，非完整 Solution。MuJoCo effort 与前次验证的 Scene、reset 样本和 Controller 身份一致，MJCF 导入有语义诊断。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_pickcube_shared_artifact_xsz4wlmz/`。E01～E04 尚未整体接收。
+
+
+### 6.119 Panda effort 运动学模型归 Controller 构造
+
+输入 `26c13acc`。MJCF 和 USD 的 PickCube physical binding 原先各自检查 R3 profile 并构造 Panda 运动学模型；现在它们传递各自已核验的 source XML 和 Task 指定的 TCP，公共 Controller 构造只在所选 pose reference 实际需要时创建模型。joint／direct profile 不构造该模型。Task reference 参数仍由 Task 声明，Panda source、传动范围、Controller 身份和 source 闭包检查保留。删除 Task helper 中已不使用的 source 参数及重复 direct 分支；这减少两条任务接线的 Controller 决策，但 Position 和 effort 仍未汇入同一完整构造。
+
+生产修改 4 文件 +15／−19，净减 4 行；版本诊断修改 1 文件 +30／−0，检查 joint 不创建运动学模型、R3 从实际绑定的 MJCF source 创建。本文和当前状态文档各修改 1 文件；无新增、删除或整文件迁移，tracked 文件保持 1356。171 项版本检查通过，包括 USD source 构造的静态检查；未进行本次 Isaac 原生复验。MuJoCo 的 R3 effort、R3 mass 各完成 reset、step、第二次 reset、关闭和 5 个子步；动态 reset 切换与记录完成 10 个子步；GeoPhys R3 effort 完成相同短程生命周期，native 子步未计数。MuJoCo 两个 R3 Controller 身份与此前相同；MJCF 导入有语义诊断。renderer 及完整 Solution 本轮未复验。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_effort_model_owner_77375rld/`。
+
+MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭包绑定；要切入完整 Scene／Artifact，需让共同 source 构建与生命周期拥有同一受验证资源，不能只为 renderer 添加投影。此项仍未解决，E01～E04 尚未整体接收。

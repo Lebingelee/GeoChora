@@ -137,7 +137,7 @@ class R3ReferenceEffortControllerV1:
 
 
 def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_id,
-                               model=None, config=None, artifact_hash=None, r3_profile=None,
+                               source_xml=None, tcp_profile=None, config=None, artifact_hash=None, r3_profile=None,
                                joint_velocity_limit_rad_s=None, mass_model=None,
                                dynamic_parameters=None):
     """Compose a Panda effort profile from source-admitted controller inputs."""
@@ -148,6 +148,8 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
     reference = None
     if kind in {'r3-pose', 'r3-mass-pose'}:
         from .production_r3 import ProductionCanonicalPandaControllerR3
+        from .kinematics import PandaKinematics
+        model = PandaKinematics(source_xml, tcp_profile=tcp_profile)
         reference = ProductionCanonicalPandaControllerR3.create_arm_reference(
             model, artifact_hash=artifact_hash, config=config, control_dt=cadence_s,
             profile=r3_profile, joint_velocity_limit_rad_s=joint_velocity_limit_rad_s)
