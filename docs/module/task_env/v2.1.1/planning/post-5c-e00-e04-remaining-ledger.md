@@ -64,7 +64,7 @@
 | R05 改 | Nut `specialization._build_reference/build_runtime_source/_binding` 仍组织 source、Controller execution wrapper 和带 Solution 信息的 Controller identity | 将本体 source／Controller 执行准备接入 R02 的相同阶段。Nut 保留抓取／接触／reset、Solution 和严格反馈语义；接触参数可以由 Task 声明，由 adapter 应用。无需在本单元重写全部 Nut guard／stream 类型 | Nut 不再是一条另有 source＋Controller 编排的构造主线；当前 guarded ExpertAction 仍有效；两任务共用机制，任务策略分别保留 |
 | R06 改 | 简单主体的 `task_binding` 已很薄；`ExistingSubjectEffortTask.bind` 仍有 source→主体→physical execution 的内部构造流程 | 让这条流程消费 R02 相同阶段；该类可以保留为声明适配，不能持有另一套运行／reset 生命周期。保留各自 MJCF、USD 及传动 lowering，不为“统一”套 Panda source 方案 | Pendulum／双轮车和 Panda 在构建阶段使用相同请求、主体／Controller 编译合同及结果交接；差异限声明和有职责的 adapter／capability |
 | R07 IN_PROGRESS | `compile_position_subjects`、`build_declared_effort_execution`、`bind_selected_controller` 已有真实主体匹配；`_compose` 可能在 Task Controller 创建后才组合 source | 对一体／装配 Panda、简单主体列出 Controller 通道 → Scene writer 资源 → native Joint/DOF/actuator/transmission 三层映射。确认组合／替换 source 后 Controller 与最终 source 同源；若存在先算后绑，说明其合法依赖并最终重验 | 原始声明、编译结果和实际 source 映射能对应；不靠相同字符串或事后 RobotRuntime 证明完成；保留耦合手指和双 writer 约束 |
-| R08 核 | 四 Task 已有 `task_definition_factory/task_state_projection`，RobotRuntime 只是视图 | 对共同构造和 reset 证明 TaskDefinition、空间、任务状态、Robot declaration 和 live Controller 来自 R02～R07 的实际结果。TaskDefinition 可有不同子类和语义 hook，不要求同一个类或完全相同参数 | 四任务构造对照及装配 Panda 子例；简单主体无虚假 gripper／ee；实际对象和状态来源匹配，非仅视图一致 |
+| R08 IN_PROGRESS | 四 Task 已有 `task_definition_factory/task_state_projection`，RobotRuntime 只是视图 | 对共同构造和 reset 证明 TaskDefinition、空间、任务状态、Robot declaration 和 live Controller 来自 R02～R07 的实际结果。TaskDefinition 可有不同子类和语义 hook，不要求同一个类或完全相同参数 | 四任务构造对照及装配 Panda 子例；简单主体无虚假 gripper／ee；实际对象和状态来源匹配，非仅视图一致 |
 
 **单元退出：**R01～R08 均有确定结果；四正式构造实际消费共同阶段；对应的旧编排已处理；至少完成本单元受影响的正式构造／代表短程与必要错误检查。原生执行在有效授权与资源内进行；最终 U5 可以复用本单元完整覆盖的结果，不能重复增加 smoke。交付本单元净变化及 Task 内还留哪些构造知识、为何合法。
 
@@ -80,6 +80,17 @@
 | `two-wheel-balance-v1` | `two-wheel-balance-v1` | `direct_joint_effort_v1` | GeoPhys／CPU | 400 |
 
 `test_formal_configuration.py` 覆盖四任务 resolve-once、等价 mapping／YAML、预解析身份重验和 component 输入拒绝；本批版本诊断 283 项通过。范围外 component caller 仍存在，不以全仓移除为本格条件。
+
+### R07／R08：主体到执行的当前对照
+
+| 主体／任务 | Controller 通道与 Scene writer | source／原生映射及 TaskDefinition |
+| --- | --- | --- |
+| 一体 Panda／PickCube、Nut | 七个 arm Joint 与两个 finger Joint；Scene 中七个 arm actuator 和一个耦合 gripper actuator | Robot recipe 和 position／effort compiler 给出主体；MuJoCo 的 `check_mujoco_named_layout` 核对模型 Joint、actuator 和 tendon；Isaac 的 `check_isaac_named_layout` 核对公开 DOF／state view。任务各自从实际 Artifact 创建定义 |
+| 装配 Panda／PickCube 子例 | arm 与 hand 作为嵌套主体，`r1_split` 使用各自 writer | source composition 校验 arm／hand 资源及 attachment；Position 编译后的主体与 Controller 在 Runtime 绑定。仅覆盖现有受支持装配 |
+| Pendulum | hinge 经 `pendulum_torque`，一个 effort writer，限幅 ±2 N·m | Robot 声明引用已有主体，source adapter 校验传动；TaskDefinition 使用该任务状态投影 |
+| 双轮车 | 左右轮 Joint 分别经各自 actuator，单个 effort writer，每轴限幅 ±1.5 N·m；chassis pitch 为状态轴 | 与 Pendulum 共同消费声明式 effort 编译和绑定，保留不同 MJCF／USD lowering；TaskDefinition 使用该任务状态投影 |
+
+`bind_selected_controller` 对最终 Artifact／source／Controller 匹配，Position source 组合后重编译或核验主体绑定；物理执行通过 `validate_source` 再核验。MuJoCo／Isaac 的实际 readback 和短程结果按各自计划判断，不能把声明相等扩大为任意模型支持。四任务的构造诊断已检查 `RobotRuntime` 引用选中的声明、主体与 Controller，并检查 TaskLifecycle 使用实际创建的 TaskDefinition；二次 reset 的覆盖仍依赖各真实运行收据，最终按当前代码身份对账。
 
 ### 2.1 六项实现调整的接收方
 
@@ -202,6 +213,8 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 | U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+
+source 缓存复用前现会验证 MJCF 快照或 USD source；失效时在 reset 计划前拒绝。72 项相关诊断、四任务及装配主体构造检查通过；[缓存验证](../../../../../workspace/maintenance/v211_u1_cached_source_freshness_20261112_001/plan.json)在 MuJoCo 关节 effort 完成 5 个显式子步、第二次 reset 与重复 close。
 
 当前 MJCF source owner 调整后，110 项受影响诊断与 MuJoCo option 额外检查通过；PickCube Position／两种 effort／装配 Panda 和 NutAssembly 的 MuJoCo CPU 短程各完成 5 个显式子步、第二次 reset 与重复 close。GeoPhys CPU PickCube effort 完成短程与重复 close，native 子步未独立计数。MuJoCo 计划中的 source 配置哈希与 submodule 身份在运行启动后补记；GeoPhys 计划在运行前记录。USD 控制／lowering 未因本批改变而重跑。
 

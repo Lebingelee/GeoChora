@@ -702,6 +702,10 @@ def test_formal_construction_uses_one_selected_robot_declaration(uid):
         assert selected.uid == env.resolved_public_config.robot_uid
         assert env.value['source'].agents == (selected,)
         assert env.value['source'].composition.agent_uids == (selected.uid,)
+        assert env.robot.declaration is selected
+        assert env.robot.controllers and env.robot.subjects
+        assert env._task_definition is not None
+        assert env._task_lifecycle.task_definition is env._task_definition
     finally:
         env.close()
 

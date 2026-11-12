@@ -57,6 +57,16 @@ class SourceBoundTaskBuilder:
             raise ValueError('reused task source differs from the requested provider/backend')
         fresh = self._cached is None
         value = self.compile_source(request) if fresh else self._cached
+        if not fresh:
+            from ..runtime.sessions.source import source_resource_receipt
+            source = value.get('source')
+            receipt = source_resource_receipt(source)
+            if receipt is not None:
+                receipt.validate_snapshot()
+            else:
+                assert_fresh = getattr(getattr(source, 'scene_source', None), 'assert_fresh', None)
+                if callable(assert_fresh):
+                    assert_fresh()
         try:
             if fresh and self.compile_control is not None:
                 value = self.compile_control(value, request)

@@ -42,6 +42,45 @@ def test_failed_first_reset_plan_releases_only_new_source(monkeypatch):
     assert receipt.closed and builder._cached is None
 
 
+def test_cached_builder_rejects_closed_execution_source_before_reset_plan():
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1
+
+    xml = b'<mujoco/>'
+    receipt = ExecutionSourceReceiptV1.create(source_id='test-source', canonical_xml=xml,
+        importer_xml=xml, closure_files={'canonical-source.xml': xml})
+    source = SimpleNamespace(execution_source_receipt=receipt)
+    plans = []
+    builder = SourceBoundTaskBuilder(lambda _request: {'source': source},
+        lambda _value, request: plans.append(request.seed), backend='cpu', reuse_source=True)
+    request = lambda seed: TaskBuildRequest('mujoco', 'cpu', seed, 8, None, None)
+    try:
+        builder(request(31))
+        builder(request(32))
+        receipt.close()
+        with pytest.raises(ValueError, match='snapshot is missing'):
+            builder(request(33))
+        assert plans == [31, 32]
+    finally:
+        receipt.close()
+
+
+def test_cached_builder_rejects_stale_usd_source_before_reset_plan():
+    stale = False
+    def assert_fresh():
+        if stale:
+            raise ValueError('USD source is stale')
+    source = SimpleNamespace(scene_source=SimpleNamespace(assert_fresh=assert_fresh))
+    plans = []
+    builder = SourceBoundTaskBuilder(lambda _request: {'source': source},
+        lambda _value, request: plans.append(request.seed), backend='cuda', reuse_source=True)
+    request = lambda seed: TaskBuildRequest('isaacsim', 'cuda', seed, 8, None, None)
+    builder(request(31))
+    stale = True
+    with pytest.raises(ValueError, match='USD source is stale'):
+        builder(request(32))
+    assert plans == [31]
+
+
 def test_failed_controller_compilation_releases_new_source(monkeypatch):
     from task_env.runtime.sessions import source as source_module
 
