@@ -80,20 +80,16 @@ class AssembledPandaAgent(BaseAgent):
         """Declare source actuators that hold the Robot's open posture."""
         return ((attachment.child_entity_id, 'actuator8'),)
 
-    def compile_position_binding(self, declaration, *, artifact, controller, task_closure_sha256):
-        """Compile the exact arm and hand as nested position subjects."""
-        from .panda_position_binding import compile_panda_position_subjects
-        fixed = declaration.attachment_plan
+    def position_subject_layout(self, *, attachment, end_frame_id):
+        """Declare nested arm and hand subjects without compiling a source."""
+        from .source_recipe import PositionSubjectLayoutV1
+        fixed = attachment
         arm, hand = fixed.parent_entity_id, fixed.child_entity_id
         ownership = self.position_source_joint_ownership(fixed)
-        return compile_panda_position_subjects(source_scene=declaration.scene,
-            components=((arm, fixed.parent_root.frame_id, ownership[0][1], None),
-                        (hand, fixed.child_root.frame_id, ownership[1][1], arm)),
-            site_entity=hand, site_name='nutassembly_ee_site',
-            groups=((arm, 'arm-position'), (hand, 'hand-position')),
-            source_id=declaration.parent_source.source_id,
-            robot_closure_sha256=fixed.source_closure_sha256, task_closure_sha256=task_closure_sha256,
-            artifact=artifact, controller=controller, attachment=fixed)
+        return PositionSubjectLayoutV1(
+            ((arm, fixed.parent_root.frame_id, ownership[0][1], None),
+             (hand, fixed.child_root.frame_id, ownership[1][1], arm)),
+            hand, end_frame_id, ((arm, 'arm-position'), (hand, 'hand-position')))
 
     def supported_controller_kinds(self):
         # The component-runtime controller route is not admitted by this slice.

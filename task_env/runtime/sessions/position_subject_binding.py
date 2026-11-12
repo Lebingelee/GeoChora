@@ -1,4 +1,4 @@
-"""Panda-owned declaration of common position subjects and Controller binding."""
+"""Compile declared Robot position subjects into Runtime control bindings."""
 from __future__ import annotations
 
 from dataclasses import replace
@@ -6,8 +6,8 @@ from dataclasses import replace
 
 def compile_reference_position_source(robot, source, *, artifact, controller, entity_id, recipe):
     """Compile the source-owned Panda position subject and its native mapping."""
-    from ..assembly.source_composition import PositionSubjectControlBindingV1
-    from ..runtime.sessions.source_scene_import import declare_panda_scene
+    from ...assembly.source_composition import PositionSubjectControlBindingV1
+    from .source_scene_import import declare_panda_scene
 
     if entity_id != robot.uid or not recipe.sources or any(
             item.entity_ids != (entity_id,) for item in recipe.sources):
@@ -16,10 +16,11 @@ def compile_reference_position_source(robot, source, *, artifact, controller, en
     if scene is None:
         scene = declare_panda_scene(robot, entity_id=entity_id, scene_id='integrated-panda-position')
     joints = tuple(recipe.controlled_joints)
-    plan, subject_identity, subjects = compile_panda_position_subjects(
-        source_scene=scene, components=((entity_id, 'link0', joints, None),),
-        site_entity=entity_id, site_name='nutassembly_ee_site',
-        groups=((entity_id, 'arm'), (entity_id, 'gripper')),
+    layout = robot.position_subject_layout(entity_id=entity_id, end_frame_id='nutassembly_ee_site')
+    if layout.components[0][2] != joints:
+        raise ValueError('position subject joints differ from the selected Robot recipe')
+    plan, subject_identity, subjects = compile_position_subjects(
+        source_scene=scene, layout=layout,
         source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
         task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
     if source.open_actuators != ('actuator8',):
@@ -31,23 +32,27 @@ def compile_reference_position_source(robot, source, *, artifact, controller, en
               for i, name in enumerate(joints)), subjects=subjects)
 
 
-def compile_panda_position_subjects(*, source_scene, components, site_entity, site_name,
-                                     groups, source_id, robot_closure_sha256,
-                                     task_closure_sha256, artifact, controller, attachment=None):
+def compile_position_subjects(*, source_scene, layout, source_id, robot_closure_sha256,
+                              task_closure_sha256, artifact, controller, attachment=None):
     """Compile single-entity or nested Panda components through the same owners.
 
     Components are (entity, root_frame, joint_names, parent_entity) declarations.
     The source attachment is checked against the original robot source scene.
     """
-    from ..artifacts import (FrameDefinition, FrameReference, LogicalAssemblyV1,
+    from ...artifacts import (FrameDefinition, FrameReference, LogicalAssemblyV1,
         LogicalAssemblyScenePinV1, LogicalAssemblyNestedMemberV1)
-    from ..artifacts.logical_assembly_resolution import existing_entity_joint_members
-    from ..artifacts.state import StateFieldRequirement, StateRequirements
-    from ..environment.types import ActionModeSpec
-    from ..runtime.sessions.control import (ControllerBindingV1, ControlGroupActionProjectionV1,
+    from ...artifacts.logical_assembly_resolution import existing_entity_joint_members
+    from ...artifacts.state import StateFieldRequirement, StateRequirements
+    from ...environment.types import ActionModeSpec
+    from .control import (ControllerBindingV1, ControlGroupActionProjectionV1,
         compile_control_binding_plan, validate_position_control_subjects)
-    from ..runtime.sessions.physical_control import ControlledSubjectV1
+    from .physical_control import ControlledSubjectV1
 
+    from ...robots.source_recipe import PositionSubjectLayoutV1
+    if type(layout) is not PositionSubjectLayoutV1:
+        raise TypeError('position compilation requires a Robot subject layout')
+    components, site_entity, site_name, groups = (layout.components, layout.site_entity,
+                                                   layout.site_name, layout.groups)
     scene = source_scene
     if not any(f.entity_id == site_entity and f.frame_id == site_name for f in scene.frames):
         scene = replace(scene, frames=(*scene.frames,

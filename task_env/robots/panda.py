@@ -76,22 +76,12 @@ class PandaAgent(BaseAgent):
             'referenced_articulation', 'arm_hand_finger_collision', {},
         )
 
-    def compile_reference_position_source(self, source, *, artifact, controller, entity_id, recipe):
-        """Bind the Panda already present in a checked task source."""
-        from .panda_position_binding import compile_reference_position_source
-        return compile_reference_position_source(
-            self, source, artifact=artifact, controller=controller, entity_id=entity_id, recipe=recipe)
-
-    def compile_position_subjects(self, source, *, artifact, controller, entity_id, end_frame_id):
-        """Compile a source-bound Panda and its selected Position Controller."""
-        from .panda_position_binding import compile_panda_position_subjects
-        return compile_panda_position_subjects(
-            source_scene=source.scene_definition,
-            components=((entity_id, 'link0', self.physical_joint_names(), None),),
-            site_entity=entity_id, site_name=end_frame_id,
-            groups=((entity_id, 'arm'), (entity_id, 'gripper')),
-            source_id=source.source_id, robot_closure_sha256=source.source_closure_digest,
-            task_closure_sha256=source.source_closure_digest, artifact=artifact, controller=controller)
+    def position_subject_layout(self, *, entity_id, end_frame_id):
+        """Declare the existing Panda subject and its position control groups."""
+        from .source_recipe import PositionSubjectLayoutV1
+        return PositionSubjectLayoutV1(
+            ((entity_id, 'link0', self.physical_joint_names(), None),),
+            entity_id, end_frame_id, ((entity_id, 'arm'), (entity_id, 'gripper')))
 
     @staticmethod
     def physical_joint_names():

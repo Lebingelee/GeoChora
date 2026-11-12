@@ -186,7 +186,10 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              root / "task_env/environment/lifecycle.py",
              root / "task_env/runtime/sessions/api.py",
              root / "task_env/runtime/sessions/control.py",
+             root / "task_env/runtime/sessions/position_subject_binding.py",
              root / "task_env/runtime/sessions/source_composition_adapters.py",
+             root / "task_env/robots/panda.py", root / "task_env/robots/assembled_panda.py",
+             root / "task_env/robots/source_recipe.py",
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/utils/_paths.py",
@@ -447,9 +450,14 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                 arm_joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"],
                 entity_id="panda-v1", hand_frame_id="ee", tcp_profile=PANDA_PICKCUBE_EE_TCP_V1,
             )
-            position_plan, subject_identity, position_subjects = robot.compile_position_subjects(
-                runtime_input.runtime_source, artifact=runtime_input.artifact,
-                controller=controller, entity_id='panda-v1', end_frame_id='ee')
+            from ...runtime.sessions.position_subject_binding import compile_position_subjects
+            robot_source = runtime_input.runtime_source
+            position_plan, subject_identity, position_subjects = compile_position_subjects(
+                source_scene=robot_source.scene_definition,
+                layout=robot.position_subject_layout(entity_id='panda-v1', end_frame_id='ee'),
+                source_id=robot_source.source_id, robot_closure_sha256=robot_source.source_closure_digest,
+                task_closure_sha256=robot_source.source_closure_digest,
+                artifact=runtime_input.artifact, controller=controller)
             controller._validate_plan(position_plan)
             from ...runtime.sessions.source import PositionSubjectPlanV1
             source = replace(runtime_input.runtime_source, position_subject_plan=PositionSubjectPlanV1(

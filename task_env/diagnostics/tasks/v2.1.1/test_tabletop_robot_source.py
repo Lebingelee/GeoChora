@@ -699,12 +699,12 @@ def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monke
     from task_env import make_env
     from task_env.robots.assembled_panda import AssembledPandaAgent
 
-    original = AssembledPandaAgent.compile_position_binding
+    original = AssembledPandaAgent.position_subject_layout
     compiled = []
     def capture(robot, *args, **kwargs):
         compiled.append(robot)
         return original(robot, *args, **kwargs)
-    monkeypatch.setattr(AssembledPandaAgent, 'compile_position_binding', capture)
+    monkeypatch.setattr(AssembledPandaAgent, 'position_subject_layout', capture)
     env = make_env('pick-cube-p16-reference-v1', config={
         'execution': {'physics_provider': 'mujoco'},
         'robot': {'uid': 'panda-arm-hand-v1'},
@@ -713,5 +713,32 @@ def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monke
     try:
         assert compiled == [env.binding.robot]
         assert env.value['source'].source_composition_request.robot_uid == env.binding.robot.uid
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize(('robot_uid', 'profile', 'component_count'), [
+    ('panda-v1', 'r3_continuous_v1', 1),
+    ('panda-arm-hand-v1', 'r1_split', 2),
+])
+def test_robot_position_layout_is_compiled_by_runtime(robot_uid, profile, component_count, monkeypatch):
+    from task_env import make_env
+    from task_env.runtime.sessions import position_subject_binding
+    from task_env.robots.source_recipe import PositionSubjectLayoutV1
+
+    calls = []
+    compile_subjects = position_subject_binding.compile_position_subjects
+    def capture(**kwargs):
+        calls.append(kwargs['layout'])
+        return compile_subjects(**kwargs)
+    monkeypatch.setattr(position_subject_binding, 'compile_position_subjects', capture)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'robot': {'uid': robot_uid}, 'controller': {'profile_id': profile},
+    })
+    try:
+        assert len(calls) == 1 and type(calls[0]) is PositionSubjectLayoutV1
+        assert len(calls[0].components) == component_count
+        assert len(env.robot.subjects) == component_count
     finally:
         env.close()

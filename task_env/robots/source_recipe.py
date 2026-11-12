@@ -17,6 +17,39 @@ def _token(value: str, label: str) -> None:
 
 
 @dataclass(frozen=True)
+class PositionSubjectLayoutV1:
+    """Robot-owned subject topology and control groups, independent of source parsing."""
+    components: tuple[tuple[str, str, tuple[str, ...], str | None], ...]
+    site_entity: str
+    site_name: str
+    groups: tuple[tuple[str, str], ...]
+
+    def __post_init__(self):
+        if type(self.components) is not tuple or not self.components:
+            raise ValueError('position layout requires subject components')
+        entities = []
+        for entity, root, joints, parent in self.components:
+            _token(entity, 'subject entity')
+            _token(root, 'subject root')
+            if type(joints) is not tuple or not joints or len(set(joints)) != len(joints):
+                raise ValueError('position subject requires distinct joints')
+            for joint in joints:
+                _token(joint, 'subject joint')
+            if parent is not None and parent not in entities:
+                raise ValueError('position subject parent must precede its child')
+            entities.append(entity)
+        if len(set(entities)) != len(entities) or self.site_entity not in entities:
+            raise ValueError('position layout requires unique subjects and an owned site')
+        _token(self.site_name, 'position site')
+        if type(self.groups) is not tuple or len(self.groups) != 2:
+            raise ValueError('position layout requires arm and gripper control groups')
+        for entity, group in self.groups:
+            if entity not in entities:
+                raise ValueError('position control group belongs to a foreign subject')
+            _token(group, 'position control group')
+
+
+@dataclass(frozen=True)
 class RobotSourceReferenceV1:
     source_id: str
     source_reference: str

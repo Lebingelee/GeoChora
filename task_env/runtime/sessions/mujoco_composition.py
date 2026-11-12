@@ -517,9 +517,14 @@ def compose_robot_source(source, *, robot, composition_intent, artifact, control
         task_hand_name=task_hand, source_hand_name=source_hand)
     fixed = declaration.attachment_plan
     arm, hand = fixed.parent_entity_id, fixed.child_entity_id
-    control_plan, subject_identity, subjects = robot.compile_position_binding(
-        declaration, artifact=artifact, controller=controller,
-        task_closure_sha256=source.source_closure_digest)
+    from .position_subject_binding import compile_position_subjects
+    control_plan, subject_identity, subjects = compile_position_subjects(
+        source_scene=declaration.scene,
+        layout=robot.position_subject_layout(attachment=fixed, end_frame_id=_site),
+        source_id=declaration.parent_source.source_id,
+        robot_closure_sha256=fixed.source_closure_sha256,
+        task_closure_sha256=source.source_closure_digest,
+        artifact=artifact, controller=controller, attachment=fixed)
     position = PositionSubjectControlBindingV1(control_plan, subject_identity, tuple(
         (entity, actuator, fixed.native_actuator_names[f'{entity}/{actuator}'])
         for entity, actuator, _ in control_plan.resource_writers), tuple(

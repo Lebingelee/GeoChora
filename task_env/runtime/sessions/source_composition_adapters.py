@@ -255,8 +255,9 @@ def _compose_checked_reference_source(source, *, robot, recipe, composition_inte
     from dataclasses import replace
     from ...assembly.source_composition import (CompositionSourceV1, CompositionSourceV2,
         SourceCompositionPlanV1, SourceCompositionRequestV2)
-    position = robot.compile_reference_position_source(
-        source, artifact=artifact, controller=controller,
+    from .position_subject_binding import compile_reference_position_source
+    position = compile_reference_position_source(
+        robot, source, artifact=artifact, controller=controller,
         entity_id=existing_robot_entity, recipe=recipe)
     plan, subject_identity = position.plan, position.subject_identity_sha256
     legacy_task = CompositionSourceV1(source.source_id, source.source_closure_digest,
