@@ -18,6 +18,34 @@ PANDA_EFFORT_PROFILE_KINDS = MappingProxyType({
 PANDA_SWITCHABLE_EFFORT_KINDS = ('joint', 'r3-pose')
 
 
+class PandaEffortProfileFactory:
+    """Create fresh Controllers against one source-checked physical binding."""
+
+    def __init__(self, execution, *, cadence_s, end_frame_id, source_xml, config,
+                 artifact_hash, task_settings, validate_source, dynamic_parameters):
+        if not callable(task_settings) or not callable(validate_source):
+            raise TypeError('effort Controller factory requires settings and source validation')
+        self.execution = execution
+        self.cadence_s = cadence_s
+        self.end_frame_id = end_frame_id
+        self.source_xml = source_xml
+        self.config = config
+        self.artifact_hash = artifact_hash
+        self.task_settings = task_settings
+        self.validate_source = validate_source
+        self.dynamic_parameters = dynamic_parameters
+
+    def __call__(self, kind, **parameters):
+        if parameters and not self.dynamic_parameters:
+            raise ValueError('Controller parameters require reset-scoped selection')
+        self.validate_source()
+        return build_panda_effort_profile(self.execution, kind=kind,
+            cadence_s=self.cadence_s, end_frame_id=self.end_frame_id,
+            source_xml=self.source_xml, config=self.config, artifact_hash=self.artifact_hash,
+            dynamic_parameters=parameters if self.dynamic_parameters else None,
+            **self.task_settings(kind))
+
+
 def build_panda_direct_effort_controller(binding, writer, *, entity_id, joint_names,
                                          cadence_s, model_id, finger_action_id):
     """Bind the Panda's arm and paired finger action to declared effort channels."""

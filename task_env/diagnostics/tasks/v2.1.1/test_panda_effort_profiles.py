@@ -37,6 +37,38 @@ def test_panda_declares_shared_immutable_effort_profiles():
         profiles['panda-joint-effort-reference-v1'] = 'direct'
 
 
+def test_switchable_controllers_reuse_source_binding_and_recheck_snapshot(monkeypatch):
+    from task_env import make_env
+    from task_env.runtime.sessions import source_composition_adapters
+
+    calls = []
+    compile_execution = source_composition_adapters.build_panda_effort_execution
+    def capture(*args, **kwargs):
+        calls.append(1)
+        return compile_execution(*args, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_effort_execution', capture)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+    })
+    try:
+        selection = env._physical_reset_selection
+        first = selection.prepare('joint')
+        second = selection.prepare('r3-pose')
+        assert calls == [1]
+        assert first.execution.compiled is second.execution.compiled
+        assert first.execution.controllers[0] is not second.execution.controllers[0]
+        receipt = source_resource_receipt(env.value['source'])
+        source_file = receipt.snapshot_root / 'canonical-source.xml'
+        source_file.chmod(0o600)
+        source_file.write_bytes(source_file.read_bytes() + b' ')
+        with pytest.raises(ValueError, match='snapshot bytes changed'):
+            selection.prepare('joint')
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('profile,controller_type,dimension', [
     ('panda-joint-effort-reference-v1', 'ConstrainedPairEffortControllerV1', 8),
     ('panda-r3-effort-reference-v1', 'R3ReferenceEffortControllerV1', 8),

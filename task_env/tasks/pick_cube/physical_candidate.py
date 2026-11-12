@@ -79,15 +79,13 @@ def make_physical_binding(*, native_drive, control_kind,
                 task_source, scene, artifact, source, projected, closure = compile_reference_robot_task(
                     task_config, selected_robot, legacy_artifact, original)
 
-                def build_physical(kind, **parameters):
-                    from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
-                    from .specialization import panda_effort_task_settings
-                    return build_panda_source_effort_profile(selected_robot, scene, artifact, source,
-                        native_drive=native_drive, kind=kind, config=source.config.action,
-                        source_xml=projected, end_frame_id='nutassembly_ee_site',
-                        task_settings=panda_effort_task_settings(kind),
-                        gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None,
-                        dynamic_parameters=parameters if reset_switch else None)
+                from ...runtime.sessions.source_composition_adapters import prepare_panda_source_effort_factory
+                from .specialization import panda_effort_task_settings
+                build_physical = prepare_panda_source_effort_factory(
+                    selected_robot, scene, artifact, source, native_drive=native_drive,
+                    config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
+                    task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
+                    gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None)
 
                 physical = build_physical(control_kind)
                 candidate = {'artifact': artifact, 'task_source': task_source, 'source': source,

@@ -102,19 +102,44 @@ def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive
     raise TypeError('Robot effort construction requires an admitted RuntimeSource')
 
 
+def prepare_panda_source_effort_factory(robot, scene, artifact, source, *, native_drive,
+                                        config, source_xml, end_frame_id, task_settings,
+                                        dynamic_parameters=False, gripper_force_limit_N=None):
+    """Compile one source-bound Robot and prepare fresh Controller selections."""
+    from ...controllers.canonical.r3_effort import PandaEffortProfileFactory
+    from .source import RuntimeSource, source_resource_receipt
+
+    physical = build_panda_effort_execution(robot, scene, artifact, source,
+        native_drive=native_drive, gripper_force_limit_N=gripper_force_limit_N)
+
+    def validate_source():
+        receipt = source_resource_receipt(source)
+        if receipt is not None:
+            receipt.validate_snapshot()
+        if isinstance(source, RuntimeSource):
+            from .mujoco_composition import checked_panda_effort_source_limits
+            checked_panda_effort_source_limits(source, scene)
+        else:
+            source.scene_source.assert_fresh()
+        physical.validate_source(scene=scene, artifact_sha256=artifact.identity_hash,
+            source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+
+    return PandaEffortProfileFactory(physical, cadence_s=artifact.timebase.control_dt,
+        end_frame_id=end_frame_id, source_xml=source_xml, config=config,
+        artifact_hash=artifact.identity_hash, task_settings=task_settings,
+        validate_source=validate_source, dynamic_parameters=dynamic_parameters)
+
+
 def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_drive,
                                       kind, config, source_xml, end_frame_id,
                                       task_settings, dynamic_parameters=None,
                                       gripper_force_limit_N=None):
-    """Bind an admitted Robot source and compose its declared effort Controller."""
-    from ...controllers.canonical.r3_effort import build_panda_effort_profile
-
-    physical = build_panda_effort_execution(robot, scene, artifact, source,
-        native_drive=native_drive, gripper_force_limit_N=gripper_force_limit_N)
-    return build_panda_effort_profile(physical, kind=kind,
-        cadence_s=artifact.timebase.control_dt, end_frame_id=end_frame_id,
-        source_xml=source_xml, config=config, artifact_hash=artifact.identity_hash,
-        dynamic_parameters=dynamic_parameters, **task_settings)
+    """Build one Controller through the same source-bound factory."""
+    factory = prepare_panda_source_effort_factory(robot, scene, artifact, source,
+        native_drive=native_drive, config=config, source_xml=source_xml, end_frame_id=end_frame_id,
+        task_settings=lambda _kind: task_settings, dynamic_parameters=dynamic_parameters is not None,
+        gripper_force_limit_N=gripper_force_limit_N)
+    return factory(kind, **(dynamic_parameters or {}))
 
 
 @dataclass(frozen=True)
