@@ -1056,3 +1056,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +25／−21，净增 4 行，其中部分是移除旧条件后的缩进迁移；版本诊断修改 1 文件 +14／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务和 worker 现在读取同一执行选择，删除旧的无执行请求补建分流；环境配置与执行请求仍为不同职责的数据结构，其他构建分流尚未收敛。provider／renderer 的实际 source、状态、clock、提交和资源合同未改。
 
 131 项版本检查通过，包括单一执行选择存储及缺少执行请求的拒绝。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 Position／固定任务 RGB 完成两次 reset、一次非零外部 action、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_single_execution_config_20261112_xivc3c1e/` 和 `workspace/maintenance/v211_single_execution_config_isaac_20261112_wobwghqv/`；E01～E04 仍未接收。
+
+### 6.101 正式任务不再直接进入 component 构造
+
+输入 `d999fbff`。Pendulum 和双轮车虽然经 `make_env` 使用共同正式配置与 Task binding，类本身仍声明旧 component 构造；四个正式类也可通过直接实例化绕过统一入口。移除两个旧标志，并让四个正式类在缺少正式 Task binding 的直接实例化时明确拒绝；`make_env`／正式解析和共同 Task binding 继续是普通构建链。非本次四任务的 component 代码没有借此删除。旧 parallel factory 仍依赖早期 component 装配，未作为 G06 可用能力接收，后续并行工作需要接入新的共同合同。
+
+生产修改 3 文件 +2／−2，净变化 0；版本诊断修改 1 文件 +15／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。消除四个正式类直接调用旧构造的分流，未宣称所有历史组件代码或四任务的主体构造已收敛；provider／renderer 的 source、状态、clock、提交和资源合同未改。
+
+135 项版本检查通过，包括四个正式类拒绝直接旧构造及正式工厂配置。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑；旧证据仍只证明原受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_formal_construction_only_20261112_fwrdgypq/`；E01～E04 仍未接收。

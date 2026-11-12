@@ -648,7 +648,6 @@ class _PendulumSceneComposer:
 class PendulumEnv(BaseTaskEnv):
     """Single Pendulum with a shared source-bound physical runtime."""
 
-    uses_component_task_config = True
     uses_selected_public_config = True
     physical_task_timebase = (.002, 25)
     selected_physical_controller_profiles = (

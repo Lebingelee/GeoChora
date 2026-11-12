@@ -356,3 +356,18 @@ def test_execution_selection_has_one_owner():
     assert resolved.render_default == resolved.execution_spec_v2.render_default
     with pytest.raises(TypeError, match='must be ExecutionSpecV2'):
         replace(resolved, execution_spec_v2=None)
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_formal_class_does_not_enter_component_construction(uid):
+    from task_env.environment.configuration import resolve_env_config
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get(uid)
+    old = resolve_env_config(task_uid=uid, scene_uid='tabletop-v1')
+    with pytest.raises(TypeError, match='through make_env'):
+        task(config=old, build_runtime=False)
+    with pytest.raises(TypeError, match='through make_env'):
+        task()

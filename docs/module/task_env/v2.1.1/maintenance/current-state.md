@@ -215,3 +215,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 已解析 Controller profile 现在由 control 配置单独存储；四任务 MuJoCo、两个 worker 和 GeoPhys NutAssembly 短程通过。详见[实施记录 6.99](../planning/post-5c-optimization-execution.md#699-controller-profile-只有一个配置-owner)。
 
 正式配置的 provider、设备和默认 renderer 已统一由必需执行请求持有；MuJoCo、GeoPhys、Isaac 及两个 MuJoCo worker 的受影响短程已复验。详见[实施记录 6.100](../planning/post-5c-optimization-execution.md#6100-执行选择由同一请求持有)。
+
+四个正式类不再允许直接进入旧 component 构造；共同工厂、MuJoCo 两个 worker 和 GeoPhys NutAssembly 短程已复验。详见[实施记录 6.101](../planning/post-5c-optimization-execution.md#6101-正式任务不再直接进入-component-构造)。

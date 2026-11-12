@@ -1402,6 +1402,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                  _binding=None,
                  camera_observation_config=None, _execution_spec_v1=None,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
+        if getattr(type(self), 'uses_selected_public_config', False) and _binding is None:
+            raise TypeError('construct formal tasks through make_env and its resolved configuration')
         self._uses_component_assembly = bool(
             (getattr(type(self), 'uses_component_task_config', False) and _binding is None)
             or config is not None

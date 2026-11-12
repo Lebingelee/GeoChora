@@ -536,7 +536,6 @@ class _TwoWheelBalanceSceneComposer:
 class TwoWheelBalanceEnv(BaseTaskEnv):
     """Source-bound articulated two-wheel balance environment."""
 
-    uses_component_task_config = True
     uses_selected_public_config = True
     physical_task_timebase = (.002, 25)
     selected_physical_controller_profiles = (
