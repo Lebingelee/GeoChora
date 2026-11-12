@@ -22,7 +22,7 @@ from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
                                    compile_panda_box_source, compile_panda_box_task)
-from ...assembly.compiler import reference_task_identity_fields
+from ...assembly.compiler import CompiledReferenceTaskV1, reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
 from ...controllers.canonical.execution import (
@@ -222,6 +222,39 @@ class _PreparedReferenceSource(NamedTuple):
     readiness: object
 
 
+class _PositionSourceContext(NamedTuple):
+    task_config: dict
+    robot: object
+    reference_robot: object
+    is_r3_profile: bool
+    dynamic_profile: object
+    profile_source: object
+    readiness: object
+    composition: object = None
+
+
+class _EffortSourceContext(NamedTuple):
+    task_config: dict
+    robot: object
+    readiness: object
+    solution_identity: str | None
+    finger_position: float
+    source_revision: str
+    original_closure: str
+    composition: object = None
+
+
+class _UsdSourceContext(NamedTuple):
+    runtime_input: object
+    robot: object
+    action_config: object
+    task_config: dict
+    config: object
+    readiness: object
+    dynamic_profile: object
+    source_sha256: dict
+
+
 def _compile_task_source(*, backend, resolved_config, lift_height_m, task_config, robot):
     """Compile the declared Task and Robot without selecting a Controller."""
     if backend not in {"cpu", "cuda"}:
@@ -307,40 +340,39 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
         if reset_switch:
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-        return {'artifact': legacy_artifact, 'source': original,
-            '_robot': original.agents[0], '_readiness': readiness,
-            '_solution_identity': solution_identity if reset_switch else None,
-            '_finger_position': float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
-            'construction_id': 'pickcube-mjcf-physical-v1',
-            'source_revision': revision, 'source_sha256': {
-                'original_closure': original.source_closure_digest}}
+        return (CompiledReferenceTaskV1(legacy_artifact, original),
+                _EffortSourceContext(task_config, original.agents[0], readiness,
+                    solution_identity if reset_switch else None,
+                    float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
+                    revision, original.source_closure_digest))
 
 
-def _bind_mjcf_effort_control(value, request, *, native_drive, control_kind,
+def _bind_mjcf_effort_control(compiled, context, selection, request, *, native_drive, control_kind,
                               reset_switch, cube_force_z_N):
     """Bind task semantics and provenance to the compiled effort capability."""
-    intent = value.pop('_intent')
-    for name in ('_robot', '_scene', '_projected'):
-        value.pop(name)
-    readiness = value.pop('_readiness')
-    solution_identity = value.pop('_solution_identity')
-    finger_position = value.pop('_finger_position')
-    factory, physical = value.pop('_controller_selection')
+    composition = context.composition
+    readiness, solution_identity = context.readiness, context.solution_identity
+    factory, physical = selection
+    source_sha256 = {'original_closure': context.original_closure,
+                     'projected_closure': compiled.source.source_closure_digest}
     if reset_switch:
         from .solution import PickCubeReadinessSolution
-    return {**value, 'controller': physical.controllers[0], 'solution': None,
+    return {'artifact': compiled.artifact, 'source': compiled.source,
+        'task_source': composition.task_source, 'construction_id': 'pickcube-mjcf-physical-v1',
+        'source_revision': context.source_revision, 'source_sha256': source_sha256,
+        'controller': physical.controllers[0], 'solution': None,
         **({'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
             'solution_identity': solution_identity, 'readiness': readiness,
             '_physical_controller_factory': factory} if reset_switch else {}),
         'physical_execution': physical,
         'resolved_configuration': {'provider': request.provider, 'backend': request.backend,
-            'source_composition_intent_v1_sha256': intent.identity_hash,
-            'finger_initial_position_m': finger_position,
+            'source_composition_intent_v1_sha256': composition.intent.identity_hash,
+            'finger_initial_position_m': context.finger_position,
             'drive_mode': 'effort-only' if native_drive == 'disabled' else 'coexist',
             'control_kind': control_kind,
             **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
                if cube_force_z_N is not None else {}),
-            **value['source_sha256'], 'physical_binding': physical.compiled.binding.identity_hash}}
+            **source_sha256, 'physical_binding': physical.compiled.binding.identity_hash}}
 
 
 def _compile_reference_position_source(request, *, controller_profile, resolved_config,
@@ -356,21 +388,18 @@ def _compile_reference_position_source(request, *, controller_profile, resolved_
      artifact, source, readiness) = _prepare_reference_source(
         backend=request.backend, controller_profile=controller_profile, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
-    return {'artifact': artifact, 'source': source, '_task_config': task_config,
-        '_robot': selected_robot, '_reference_robot': reference_robot,
-        '_recipe': recipe, '_is_r3_profile': is_r3_profile,
-        '_dynamic_profile': dynamic_profile, '_profile_source': profile_source,
-        '_readiness': readiness}
+    return (CompiledReferenceTaskV1(artifact, source),
+            _PositionSourceContext(task_config, selected_robot, reference_robot,
+                is_r3_profile, dynamic_profile, profile_source, readiness))
 
 
-def _bind_reference_position_control(value, request, *, controller_profile, include_solution):
+def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile, include_solution):
     from .solution import PickCubeReadinessSolution
-    artifact, source = value['artifact'], value['source']
-    task_config, recipe = value['_task_config'], value['_recipe']
-    is_r3_profile = value['_is_r3_profile']
-    profile_source, readiness = value['_profile_source'], value['_readiness']
-    source_intent, reset_plan = value['_intent'], value['_reset_plan']
-    controller = value.pop('_controller_selection')
+    artifact, source = compiled.artifact, compiled.source
+    task_config, recipe = context.task_config, context.task_config['recipe']
+    is_r3_profile = context.is_r3_profile
+    profile_source, readiness = context.profile_source, context.readiness
+    source_intent, reset_plan = context.composition.intent, context.composition.reset_plan
     if is_r3_profile:
         execution_controller = controller
         controller = execution_controller.hold.controller
@@ -429,31 +458,41 @@ def _bind_reference_position_control(value, request, *, controller_profile, incl
 
 
 
+def _compose_reference_source(compiled, context, request, *, controller_profile,
+                               reference_robot, sample_reset):
+    """Bind Task declarations to the source owner's explicit composition result."""
+    from ...runtime.sessions.source_composition_adapters import compose_declared_reference_source
+    composition = compose_declared_reference_source(
+        compiled, robot=context.robot, controller_profile=controller_profile,
+        existing_robot_entity='panda-v1', task_body_names=PickCubeReferenceEnv.robot_source_roots,
+        task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
+        compile_declaration=(lambda: compile_pickcube_mjcf_task(
+            context.task_config, reference_robot, compiled.artifact))
+            if reference_robot is not None else None,
+        reset_seed=request.seed if sample_reset else None)
+    return composition.compiled, context._replace(composition=composition)
+
+
 def _position_reference_builder(*, backend, include_solution, controller_profile,
                                 resolved_config, lift_height_m, task_config, robot_uid, robot):
     from ...environment.reference_binding import SourceBoundTaskBuilder
     from ...controllers.canonical.execution import build_reference_position_controller
-    from ...runtime.sessions.source_composition_adapters import compose_declared_reference_source
     return SourceBoundTaskBuilder(
         lambda request: _compile_reference_position_source(request,
             controller_profile=controller_profile, resolved_config=resolved_config,
             lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, robot=robot),
         None, backend=backend, allow_sampled_reset=False,
-        source_composer=lambda value, request: compose_declared_reference_source(
-            value, robot=value['_robot'], controller_profile=controller_profile,
-            existing_robot_entity='panda-v1', task_body_names=PickCubeReferenceEnv.robot_source_roots,
-            task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
-            compile_declaration=(lambda: compile_pickcube_mjcf_task(
-                value['_task_config'], value['_reference_robot'], value['artifact']))
-                if value['_reference_robot'] is not None else None,
-            reset_seed=request.seed),
+        source_composer=lambda compiled, context, request: _compose_reference_source(
+            compiled, context, request, controller_profile=controller_profile,
+            reference_robot=context.reference_robot, sample_reset=True),
         controller_factory=build_reference_position_controller,
-        controller_options=lambda value, request: dict(
-            profile_id=controller_profile, dynamic_profile=value['_dynamic_profile'],
+        controller_options=lambda compiled, context, request: dict(
+            profile_id=controller_profile, dynamic_profile=context.dynamic_profile,
             force_limit_N=10.0,
             joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']),
-        compile_control=lambda value, request: _bind_reference_position_control(
-            value, request, controller_profile=controller_profile, include_solution=include_solution))
+        compile_control=lambda compiled, context, selection, request: _bind_reference_position_control(
+            compiled, context, selection, request,
+            controller_profile=controller_profile, include_solution=include_solution))
 
 
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
@@ -479,38 +518,32 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
     with close_execution_source_on_failure(prepared.source):
         source_ids = _source_identity_files(None, PickCubeReadinessSolution,
                                             profile_source=prepared.profile_source)
-        legacy = {'readiness': prepared.readiness, 'source_sha256': source_ids,
-            'dynamic_profile': prepared.dynamic_profile,
-            'resolved_configuration': {'runtime_config': asdict(prepared.config),
-                'task_recipe': prepared.task_config,
-                'resolved_controller_gripper': asdict(prepared.config.robot.gripper)}}
         robot = prepared.source.agents[0]
         action_config = prepared.source.config.action
         runtime_input = build_pickcube_isaac_runtime_input_v1(
             delivery_manifest, task_seed=request.seed, horizon=request.horizon, task_config=task_config,
             physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m)
         runtime_input.runtime_source.scene_source.assert_fresh()
-        result = {'artifact': runtime_input.artifact, 'source': runtime_input.runtime_source,
-            '_runtime_input': runtime_input, '_robot': robot, '_action_config': action_config,
-            '_legacy': legacy}
+        result = (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
+                  _UsdSourceContext(runtime_input, robot, action_config, prepared.task_config,
+                      prepared.config, prepared.readiness, prepared.dynamic_profile, source_ids))
     # Readiness uses a temporary MJCF snapshot; the USD source owns its bytes.
     prepared.source.execution_source_receipt.close()
     return result
 
 
-def _bind_isaac_reference_control(value, request, *, include_solution, resolved_config):
+def _bind_isaac_reference_control(compiled, context, selection, request, *, include_solution, resolved_config):
     from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
     from .solution import PickCubeReadinessSolution
-    runtime_input, controller, physical = value.pop('_controller_selection')
-    robot = value['_robot']
-    action_config, legacy = value['_action_config'], value['_legacy']
+    runtime_input, controller, physical = selection
+    robot, action_config = context.robot, context.action_config
     scene_source = runtime_input.runtime_source.scene_source
     loaded, panda_xml = scene_source.loaded_delivery, scene_source.xml
     manifest_path = loaded.manifest_path
-    readiness = legacy["readiness"]
+    readiness = context.readiness
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
-    source_ids = dict(legacy["source_sha256"])
+    source_ids = dict(context.source_sha256)
     if physical is not None:
         source_ids.pop("task_env/controllers/canonical/position_profile.py", None)
     identity_paths = (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
@@ -530,7 +563,7 @@ def _bind_isaac_reference_control(value, request, *, include_solution, resolved_
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
                                        text=True).strip()
-    effective_config = (legacy["resolved_configuration"]["runtime_config"]
+    effective_config = (asdict(context.config)
                         if resolved_config is None else asdict(resolved_config))
     # Keep historical F06 source/configuration identity when the additive
     # gravity option is disabled; F06 does not yet admit the enabled route.
@@ -540,13 +573,13 @@ def _bind_isaac_reference_control(value, request, *, include_solution, resolved_
         effective_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     resolved = {
         "construction_id": "pickcube-p16-reference-construction-v2",
-        "task_recipe": legacy["resolved_configuration"]["task_recipe"],
+        "task_recipe": context.task_config,
         "artifact": runtime_input.artifact.to_mapping(),
         "artifact_sha256": runtime_input.artifact.identity_hash,
         "runtime_config": effective_config,
         "runtime_config_sha256": effective_config_sha,
         "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
-        "resolved_controller_gripper": legacy["resolved_configuration"]["resolved_controller_gripper"],
+        "resolved_controller_gripper": asdict(context.config.robot.gripper),
         "controller_identity": controller.identity,
         "solution_identity": solution_identity,
         "source_revision": revision,
@@ -599,16 +632,17 @@ def _isaac_reference_builder(*, delivery_manifest, include_solution, controller_
             physical_fixture=physical_fixture, robot=robot),
         None, backend='cuda', allow_sampled_reset=False,
         controller_factory=build_usd_panda_control,
-        controller_options=lambda value, request: dict(
-            runtime_input=value['_runtime_input'], robot=value['_robot'],
-            controller_profile=controller_profile, action_config=value['_action_config'],
-            dynamic_profile=value['_legacy']['dynamic_profile'],
+        controller_options=lambda compiled, context, request: dict(
+            runtime_input=context.runtime_input, robot=context.robot,
+            controller_profile=controller_profile, action_config=context.action_config,
+            dynamic_profile=context.dynamic_profile,
             velocity_limit=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'],
             tcp_profile=PANDA_PICKCUBE_EE_TCP_V1, end_frame_id='ee', physical_kind=physical_kind,
             native_drive=physical_drive,
             effort_settings=panda_effort_task_settings(physical_kind) if physical_kind is not None else None),
-        compile_control=lambda value, request: _bind_isaac_reference_control(
-            value, request, include_solution=include_solution, resolved_config=resolved_config))
+        compile_control=lambda compiled, context, selection, request: _bind_isaac_reference_control(
+            compiled, context, selection, request,
+            include_solution=include_solution, resolved_config=resolved_config))
 
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
@@ -741,30 +775,26 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         if not runtime_input:
             from ...environment.reference_binding import SourceBoundTaskBuilder
             from ...runtime.sessions.source_composition_adapters import (
-                compile_panda_effort_selection, compose_declared_reference_source)
+                compile_panda_effort_selection)
             build = SourceBoundTaskBuilder(build,
                 lambda value, request: sample_episode_reset_plan(
                     value['task_source'], value['source'].scene_definition,
                     value['artifact'], task_seed=request.seed),
                 backend=resolved_config.runtime.backend, reuse_source=True, allow_sampled_reset=False,
-                source_composer=lambda value, request: compose_declared_reference_source(
-                    value, robot=value['_robot'], controller_profile=physical_profile_id,
-                    existing_robot_entity=value['_robot'].uid,
-                    task_body_names=PickCubeReferenceEnv.robot_source_roots,
-                    task_site_transfers=PickCubeReferenceEnv.robot_source_site_transfers,
-                    compile_declaration=lambda: compile_pickcube_mjcf_task(
-                        task_config, value['_robot'], value['artifact'])),
+                source_composer=lambda compiled, context, request: _compose_reference_source(
+                    compiled, context, request, controller_profile=physical_profile_id,
+                    reference_robot=context.robot, sample_reset=False),
                 controller_factory=compile_panda_effort_selection,
-                controller_options=lambda value, request: dict(
-                    robot=value['_robot'], scene=value['_scene'], intent=value['_intent'],
+                controller_options=lambda compiled, context, request: dict(
+                    robot=context.robot, scene=context.composition.scene, intent=context.composition.intent,
                     controller_profile=physical_profile_id, native_drive=physical_drive,
-                    kind=physical_kind, config=value['source'].config.action,
-                    source_xml=value['_projected'], end_frame_id='nutassembly_ee_site',
+                    kind=physical_kind, config=compiled.source.config.action,
+                    source_xml=context.composition.projected_xml, end_frame_id='nutassembly_ee_site',
                     task_settings=panda_effort_task_settings, dynamic_parameters=reset_switch,
-                    gripper_force_limit_N=(value['source'].config.robot.gripper.force_limit_N
+                    gripper_force_limit_N=(compiled.source.config.robot.gripper.force_limit_N
                                            if reset_switch else None)),
-                compile_control=lambda value, request: _bind_mjcf_effort_control(
-                    value, request, native_drive=physical_drive, control_kind=physical_kind,
+                compile_control=lambda compiled, context, selection, request: _bind_mjcf_effort_control(
+                    compiled, context, selection, request, native_drive=physical_drive, control_kind=physical_kind,
                     reset_switch=reset_switch, cube_force_z_N=cube_force_z_N))
         return physical_task_binding(build=build, task_config=task_config, lift_height_m=lift_height_m,
             hand_frame_id='ee' if runtime_input else 'hand', runtime_input=runtime_input,

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from task_env.assembly.compiler import CompiledReferenceTaskV1
 from task_env.environment.reference_binding import (
     SourceBoundTaskBuilder, TaskBuildRequest, _StandardResetReconstruction,
 )
@@ -14,7 +15,7 @@ def test_shared_source_builder_resamples_and_rejects_foreign_route():
     compiled = []
     def compile_source(request):
         compiled.append(request.provider)
-        return {'source': source}
+        return CompiledReferenceTaskV1(None, source), None
     builder = SourceBoundTaskBuilder(compile_source, lambda value, request: (value['source'], request.seed),
                                     backend='cpu', reuse_source=True)
     request = lambda provider, seed: TaskBuildRequest(provider, 'cpu', seed, 8, None, None)
@@ -35,7 +36,7 @@ def test_failed_first_reset_plan_releases_only_new_source(monkeypatch):
     monkeypatch.setattr(source_module, 'source_resource_receipt', lambda source: source)
     def reject(_value, _request):
         raise ValueError('invalid reset')
-    builder = SourceBoundTaskBuilder(lambda _request: {'source': receipt}, reject,
+    builder = SourceBoundTaskBuilder(lambda _request: (CompiledReferenceTaskV1(None, receipt), None), reject,
                                     backend='cpu', reuse_source=True)
     with pytest.raises(ValueError, match='invalid reset'):
         builder(TaskBuildRequest('mujoco', 'cpu', 31, 8, None, None))
@@ -50,7 +51,7 @@ def test_cached_builder_rejects_closed_execution_source_before_reset_plan():
         importer_xml=xml, closure_files={'canonical-source.xml': xml})
     source = SimpleNamespace(execution_source_receipt=receipt)
     plans = []
-    builder = SourceBoundTaskBuilder(lambda _request: {'source': source},
+    builder = SourceBoundTaskBuilder(lambda _request: (CompiledReferenceTaskV1(None, source), None),
         lambda _value, request: plans.append(request.seed), backend='cpu', reuse_source=True)
     request = lambda seed: TaskBuildRequest('mujoco', 'cpu', seed, 8, None, None)
     try:
@@ -71,7 +72,7 @@ def test_cached_builder_rejects_stale_usd_source_before_reset_plan():
             raise ValueError('USD source is stale')
     source = SimpleNamespace(scene_source=SimpleNamespace(assert_fresh=assert_fresh))
     plans = []
-    builder = SourceBoundTaskBuilder(lambda _request: {'source': source},
+    builder = SourceBoundTaskBuilder(lambda _request: (CompiledReferenceTaskV1(None, source), None),
         lambda _value, request: plans.append(request.seed), backend='cuda', reuse_source=True)
     request = lambda seed: TaskBuildRequest('isaacsim', 'cuda', seed, 8, None, None)
     builder(request(31))
@@ -87,9 +88,9 @@ def test_failed_controller_compilation_releases_new_source(monkeypatch):
     receipt = SimpleNamespace(closed=False)
     receipt.close = lambda: setattr(receipt, 'closed', True)
     monkeypatch.setattr(source_module, 'source_resource_receipt', lambda source: source)
-    def reject(_value, _request):
+    def reject(_compiled, _context, _selection, _request):
         raise ValueError('invalid Controller')
-    builder = SourceBoundTaskBuilder(lambda _request: {'source': receipt},
+    builder = SourceBoundTaskBuilder(lambda _request: (CompiledReferenceTaskV1(None, receipt), None),
         lambda _value, _request: None, backend='cpu', reuse_source=True,
         compile_control=reject)
     with pytest.raises(ValueError, match='invalid Controller'):

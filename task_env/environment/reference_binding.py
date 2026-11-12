@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, replace
 from collections.abc import Mapping
-from typing import Callable
+from typing import Callable, NamedTuple
 
 
 def _identity_seed(seed):
@@ -37,7 +37,13 @@ class TaskBuildRequest:
 
 
 class SourceBoundTaskBuilder:
-    """Construct a task source and derive each episode's reset plan."""
+    """Construct a source and Controller, then derive each episode's reset plan.
+
+    Source stages pass ``(CompiledReferenceTaskV1, task_context)``. Controller
+    options consume that pair; ``compile_control`` receives the selection as a
+    separate argument and returns the Env's construction mapping. Only this
+    finished mapping is cached. Task context never enters the Runtime value.
+    """
 
     def __init__(self, compile_source, reset_plan, *, backend, reuse_source=False,
                  allow_sampled_reset=True, compile_control=None,
@@ -61,8 +67,10 @@ class SourceBoundTaskBuilder:
         if self._cached is not None and route != self._route:
             raise ValueError('reused task source differs from the requested provider/backend')
         fresh = self._cached is None
-        value = self.compile_source(request) if fresh else self._cached
-        if not fresh:
+        if fresh:
+            compiled, context = self.compile_source(request)
+        else:
+            value = self._cached
             from ..runtime.sessions.source import source_resource_receipt
             source = value.get('source')
             receipt = source_resource_receipt(source)
@@ -74,19 +82,20 @@ class SourceBoundTaskBuilder:
                     assert_fresh()
         try:
             if fresh and self.source_composer is not None:
-                value = self.source_composer(value, request)
-            if fresh and self.controller_factory is not None:
-                options = self.controller_options(value, request)
-                selection = self.controller_factory(
-                    value['artifact'], value['source'], **options)
-                value = {**value, '_controller_selection': selection}
-            if fresh and self.compile_control is not None:
-                value = self.compile_control(value, request)
+                compiled, context = self.source_composer(compiled, context, request)
+            if fresh:
+                selection = None
+                if self.controller_factory is not None:
+                    options = self.controller_options(compiled, context, request)
+                    selection = self.controller_factory(compiled.artifact, compiled.source, **options)
+                value = (self.compile_control(compiled, context, selection, request)
+                         if self.compile_control is not None
+                         else {'artifact': compiled.artifact, 'source': compiled.source})
             plan = self.reset_plan(value, request) if self.reset_plan is not None else None
         except BaseException as error:
             if fresh:
                 from ..runtime.sessions.source import source_resource_receipt
-                receipt = source_resource_receipt(value.get('source'))
+                receipt = source_resource_receipt(compiled.source)
                 if receipt is not None:
                     try:
                         receipt.close()
@@ -522,6 +531,15 @@ class ReferenceTaskBinding:
         return replace(self, action_schema=schema, action_space_factory=physical.action_space)
 
 
+class _ExistingSubjectSource(NamedTuple):
+    scene: object
+    task_source: object
+    execution_spec: object
+    closure: str
+    subject: object
+    declarations: tuple
+
+
 @dataclass(frozen=True)
 class ExistingSubjectEffortTask:
     """Task declarations consumed by the shared existing-subject construction path."""
@@ -541,6 +559,7 @@ class ExistingSubjectEffortTask:
     def bind(self, config, *, source_delivery_manifest=None):
         """Build one Task binding; native resource ownership stays with Runtime."""
         import hashlib
+        from ..assembly.compiler import CompiledReferenceTaskV1
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
         from ..runtime.sessions.source_composition_adapters import (
@@ -556,26 +575,27 @@ class ExistingSubjectEffortTask:
                 robot=robot, scene=scene, artifact=artifact, task_source=task_source,
                 composition=self.composition, config=config, provider=provider,
                 source_delivery=delivery, seed=seed)
-            return {'artifact': artifact, 'task_source': task_source, 'source': source,
-                'construction_id': self.construction_id,
-                'source_revision': scene.assets[0].source_revision or self.source_revision,
-                'execution_spec_v1': execution_spec, '_scene': scene,
-                '_subject': subject, '_declarations': declarations,
-                'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
-                                  'projected_closure': closure}}
+            return (CompiledReferenceTaskV1(artifact, source),
+                    _ExistingSubjectSource(scene, task_source, execution_spec, closure, subject, declarations))
 
-        def compile_control(value, request):
-            robot, source, artifact = self.robot, value['source'], value['artifact']
-            scene = value.pop('_scene')
-            subject, declarations = value.pop('_subject'), value.pop('_declarations')
+        def compile_control(compiled, context, _selection, request):
+            robot, source, artifact = self.robot, compiled.source, compiled.artifact
+            scene = context.scene
             profile_id = config.control.profile_id
             intent, _recipe = prepare_robot_source_intent(source, robot=robot,
                 controller_profile=profile_id, existing_robot_entity=robot.uid,
                 task_body_names=(), task_site_transfers=())
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
-                source=source, profile_id=profile_id, subject=subject, declarations=declarations)
+                source=source, profile_id=profile_id, subject=context.subject,
+                declarations=context.declarations)
             validate_effort_robot_intent(intent, source, physical, controller_profile=profile_id)
-            return {**value, 'controller': physical.controllers[0], 'solution': None,
+            return {'artifact': artifact, 'task_source': context.task_source, 'source': source,
+                'construction_id': self.construction_id,
+                'source_revision': scene.assets[0].source_revision or self.source_revision,
+                'execution_spec_v1': context.execution_spec,
+                'source_sha256': {'original': hashlib.sha256(robot.source_xml.encode()).hexdigest(),
+                                  'projected_closure': context.closure},
+                'controller': physical.controllers[0], 'solution': None,
                 'physical_execution': physical, 'selected_controller_profile_id': profile_id,
                 'resolved_configuration': {'physics_dt': artifact.timebase.physics_dt,
                     'control_substeps': artifact.timebase.control_substeps,

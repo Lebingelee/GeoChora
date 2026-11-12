@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import subprocess
+from typing import NamedTuple
 
 import numpy as np
 from ...environment.task_definition import as_task_state_view
@@ -18,6 +19,7 @@ from ...artifacts import (
 from ...artifacts.execution import ResetSample
 from ...assembly.nut_assembly import build_nut_assembly_model_xml
 from ...assembly.compiler import (
+    CompiledReferenceTaskV1,
     ReferenceTaskDeclarationV1,
     reference_task_identity_fields,
 )
@@ -338,6 +340,11 @@ def _source_identity_files():
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
+class _NutSourceContext(NamedTuple):
+    task_config: dict
+    contact_profile: object
+
+
 def _compile_reference_source(request, *, resolved_config=None, lift_height_m=None,
                               task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
@@ -347,16 +354,14 @@ def _compile_reference_source(request, *, resolved_config=None, lift_height_m=No
     source, contact_profile = build_runtime_source(
         artifact, request.provider, backend=request.backend, resolved_config=resolved_config,
         lift_height_m=lift_height_m, task_config=task_config, robot=robot)
-    return {'artifact': artifact, 'source': source, '_task_config': task_config,
-            '_contact_profile': contact_profile}
+    return CompiledReferenceTaskV1(artifact, source), _NutSourceContext(task_config, contact_profile)
 
 
-def _bind_reference_controller(value, request, *, include_solution, dynamic):
+def _bind_reference_controller(compiled, context, execution_controller, request, *, include_solution, dynamic):
     from ...controllers.canonical.contracts import digest
-    artifact, source = value['artifact'], value['source']
-    task_config, contact_profile = value['_task_config'], value['_contact_profile']
+    artifact, source = compiled.artifact, compiled.source
+    task_config, contact_profile = context
     recipe, provider = task_config['recipe'], request.provider
-    execution_controller = value.pop('_controller_selection')
     execution_profile = execution_controller.identity_profile()
     controller = execution_controller.hold.controller
     settings = dict(recipe["solution"]["config"])
@@ -451,10 +456,11 @@ def _reference_builder(*, include_solution, resolved_config=None, lift_height_m=
             lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         None, backend=backend,
         controller_factory=build_reference_position_controller,
-        controller_options=lambda value, request: dict(
+        controller_options=lambda compiled, context, request: dict(
             profile_id=profile, dynamic_profile=dynamic,
-            force_limit_N=value['_task_config']['recipe']['controller']['force_cap_N']),
-        compile_control=lambda value, request: _bind_reference_controller(value, request,
+            force_limit_N=context.task_config['recipe']['controller']['force_cap_N']),
+        compile_control=lambda compiled, context, selection, request: _bind_reference_controller(
+            compiled, context, selection, request,
             include_solution=include_solution, dynamic=dynamic))
 
 

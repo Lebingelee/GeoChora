@@ -1,8 +1,9 @@
 """Capability dispatch for provider-owned Robot source composition."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import import_module
+from typing import NamedTuple
 
 
 class SourceCompositionCapabilityUnavailable(ValueError):
@@ -262,28 +263,34 @@ def prepare_reference_task_robot_source(source, *, robot, controller_profile,
     return intent, (task_source, scene, artifact, bound, projected, closure)
 
 
-def compose_declared_reference_source(value, *, robot, controller_profile,
+class DeclaredReferenceSource(NamedTuple):
+    """Source-stage result; no Task scratch fields are added to Runtime values."""
+    compiled: object
+    intent: object
+    task_source: object = None
+    scene: object = None
+    projected_xml: str | None = None
+    reset_plan: object = None
+
+
+def compose_declared_reference_source(compiled, *, robot, controller_profile,
                                       existing_robot_entity, task_body_names,
                                       task_site_transfers, compile_declaration,
                                       reset_seed=None):
     """Compose the declared Robot before the shared Controller build stage."""
-    source = value['source']
-    intent, compiled = prepare_reference_task_robot_source(
-        source, robot=robot, controller_profile=controller_profile,
+    intent, declaration = prepare_reference_task_robot_source(
+        compiled.source, robot=robot, controller_profile=controller_profile,
         existing_robot_entity=existing_robot_entity, task_body_names=task_body_names,
         task_site_transfers=task_site_transfers, compile_declaration=compile_declaration)
-    result = {**value, '_intent': intent, '_robot': robot}
-    if compiled is None:
-        return {**result, '_reset_plan': None}
-    task_source, scene, artifact, bound, projected, closure = compiled
-    result.update(artifact=artifact, source=bound, task_source=task_source,
-                  _scene=scene, _projected=projected)
-    if 'source_sha256' in result:
-        result['source_sha256'] = {**result['source_sha256'], 'projected_closure': closure}
+    if declaration is None:
+        return DeclaredReferenceSource(compiled, intent)
+    task_source, scene, artifact, bound, projected, _closure = declaration
+    reset_plan = None
     if reset_seed is not None:
         from ...environment.task_source import sample_episode_reset_plan
-        result['_reset_plan'] = sample_episode_reset_plan(task_source, scene, artifact, task_seed=reset_seed)
-    return result
+        reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=reset_seed)
+    return DeclaredReferenceSource(replace(compiled, artifact=artifact, source=bound), intent,
+                                   task_source, scene, projected, reset_plan)
 
 
 def validate_effort_robot_intent(intent, source, execution, *, controller_profile):

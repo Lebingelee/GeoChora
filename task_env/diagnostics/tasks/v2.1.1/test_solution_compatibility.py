@@ -8,7 +8,8 @@ from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.planners.contracts import ExpertAction
 
 
-def test_solution_proposal_is_projected_once_and_remains_caller_owned():
+@pytest.mark.parametrize('phase', ['proposal', 'physical_external_solution_proposal'])
+def test_solution_proposal_is_projected_once_and_remains_caller_owned(phase):
     boundary = {'episode': 'episode-1'}
     proposal = ExpertAction(np.array([0.2]), 'move', request_boundary=boundary,
                             solution_identity='solution-1')
@@ -16,13 +17,37 @@ def test_solution_proposal_is_projected_once_and_remains_caller_owned():
     solution = SimpleNamespace(act=lambda obs, info: calls.append(('act', obs)) or proposal)
     env = SimpleNamespace(obs={'state': 1}, info={'state_boundary_identity': boundary},
         typed_state=SimpleNamespace(view=SimpleNamespace(boundary=SimpleNamespace(to_mapping=lambda: boundary))),
-        value={'solution_identity': 'solution-1'}, position_profile=False,
+        value={'solution_identity': 'solution-1'}, position_profile=True,
         bind_physical_action=lambda action: calls.append(('bind', action)) or 'bound')
     action, returned = SelectedReferenceEnv._prepare_solution_action(
         env, solution, public_observation=True, physical=True,
-        proposal_phase='proposal', action_phase='action', abort_on_error=False)
+        proposal_phase=phase, action_phase='action', abort_on_error=False,
+        strict_proposal_type=True, action_projector=env.bind_physical_action)
     assert action == 'bound' and returned is proposal
     assert [item[0] for item in calls] == ['act', 'bind']
+
+
+@pytest.mark.parametrize('strict', [False, True])
+def test_proposal_subclass_policy_is_explicit_and_independent_of_error_phase(strict):
+    class DerivedAction(ExpertAction):
+        pass
+
+    proposal = DerivedAction(np.array([0.2]), 'move')
+    faults = []
+    env = SimpleNamespace(position_profile=False, state=object(),
+        binding=SimpleNamespace(abort_solution_on_runtime_error=False),
+        _latch_fault=lambda phase, error, **kwargs: faults.append(phase))
+    solution = SimpleNamespace(act=lambda: proposal)
+    kwargs = dict(public_observation=False, physical=False,
+        proposal_phase='physical_external_solution_proposal', action_phase='action',
+        abort_on_error=False, strict_proposal_type=strict)
+    if strict:
+        with pytest.raises(TypeError, match='ExpertAction'):
+            SelectedReferenceEnv._prepare_solution_action(env, solution, **kwargs)
+        assert faults == ['physical_external_solution_proposal']
+    else:
+        _, returned = SelectedReferenceEnv._prepare_solution_action(env, solution, **kwargs)
+        assert returned is proposal and faults == []
 
 
 def test_bad_solution_proposal_faults_after_act_and_preserves_abort_error():

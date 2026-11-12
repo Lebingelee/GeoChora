@@ -3287,7 +3287,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             solution, public_observation=True, physical=physical,
             proposal_phase=('physical_external_solution_proposal' if physical else 'external_solution_proposal'),
             action_phase=('physical_external_solution_proposal' if physical else 'external_solution_action_validation'),
-            abort_on_error=not physical)
+            abort_on_error=not physical, strict_proposal_type=physical,
+            action_projector=self.bind_physical_action if physical else None,
+            proposal_label='physical external Solution' if physical else 'external Solution act()')
         return self._step(action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):
@@ -3528,22 +3530,22 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.solution, public_observation=(physical_selection is not None
                                               or self.binding.expert_uses_public_observation),
             physical=physical_selection is not None, proposal_phase='expert_proposal',
-            action_phase='expert_action_validation', abort_on_error=True)
+            action_phase='expert_action_validation', abort_on_error=True,
+            proposal_label='expert Solution act()')
         return self._step(action, proposal=proposal, observer_solution=self.solution)
 
     def _prepare_solution_action(self, solution, *, public_observation, physical,
-                                 proposal_phase, action_phase, abort_on_error):
+                                 proposal_phase, action_phase, abort_on_error,
+                                 strict_proposal_type=False, action_projector=None,
+                                 proposal_label='Solution act()'):
         """Admit one compatibility Solution proposal and project its action once."""
         try:
             proposal = (solution.act(self.obs, task_info_for_solution(self.info))
                         if public_observation else solution.act())
             from ..planners.contracts import ExpertAction
-            external_physical = proposal_phase == 'physical_external_solution_proposal'
             if (not isinstance(proposal, ExpertAction)
-                    or (external_physical and type(proposal) is not ExpertAction)):
-                label = ('expert Solution act()' if proposal_phase == 'expert_proposal' else
-                         'physical external Solution' if external_physical else 'external Solution act()')
-                raise TypeError(f'{label} must return ExpertAction')
+                    or (strict_proposal_type and type(proposal) is not ExpertAction)):
+                raise TypeError(f'{proposal_label} must return ExpertAction')
             if physical:
                 from ..planners.contracts import validate_caller_solution_action
                 validate_caller_solution_action(proposal,
@@ -3561,8 +3563,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         add_note(f'Solution abort after proposal failure also failed: {abort_error!r}')
             raise
         try:
-            if proposal_phase == 'physical_external_solution_proposal':
-                action = self.bind_physical_action(proposal.action)
+            if action_projector is not None:
+                action = action_projector(proposal.action)
             elif getattr(self, 'position_profile', False):
                 from ..runtime.sessions.control_lifecycle import project_position_action
                 action = project_position_action(self, proposal.action)
