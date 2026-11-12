@@ -21,20 +21,34 @@ EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 
 
-def physical_execution_info(env):
-    """Project the task's measured gripper readiness at the current boundary."""
+def _gripper_execution_info(state, target, *, clamp_default):
+    """Project one measured boundary into the Task's readiness contract."""
     from .solution import PickCubePositionExecutionInfoV1
 
-    state = env.state
     opening = sum(float(state.joint_position[name]) for name in FINGERS)
     if -1e-6 <= opening < 0.:
         opening = 0.
     speed = sum(abs(float(state.joint_velocity[name])) for name in FINGERS)
-    target = getattr(env, '_last_physical_opening_target', None)
-    target = min(.08, max(0., opening)) if target is None else target
+    if target is None:
+        target = min(.08, max(0., opening)) if clamp_default else opening
     return PickCubePositionExecutionInfoV1('pickcube-position-execution-info-v1',
         int(state.control_step), float(state.simulation_time), opening, speed, target,
         bool(target <= .045 and opening <= .045 and speed <= .005))
+
+
+def physical_execution_info(env):
+    """Project physical feedback, preserving its bounded fallback target."""
+    return _gripper_execution_info(env.state,
+        getattr(env, '_last_physical_opening_target', None), clamp_default=True)
+
+
+def position_execution_info(state, last_position_transition):
+    """Project the exact Position boundary and validate its target/readback."""
+    target = (None if last_position_transition is None
+              else float(last_position_transition[1].target.gripper.opening_m))
+    result = _gripper_execution_info(state, target, clamp_default=False)
+    result.validate()
+    return result
 
 
 def observe_physical_action(env, action, spec):

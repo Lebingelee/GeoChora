@@ -8,6 +8,30 @@ from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.planners.contracts import ExpertAction
 
 
+def test_pickcube_position_and_physical_readiness_share_measured_boundary():
+    from task_env.tasks.pick_cube.task import physical_execution_info, position_execution_info
+
+    state = SimpleNamespace(joint_position={'panda-v1/finger_joint1': .02,
+                                            'panda-v1/finger_joint2': .02},
+        joint_velocity={'panda-v1/finger_joint1': .002, 'panda-v1/finger_joint2': -.002},
+        control_step=3, simulation_time=.03)
+    env = SimpleNamespace(state=state, _last_physical_opening_target=.07)
+    transition = (None, SimpleNamespace(target=SimpleNamespace(gripper=SimpleNamespace(opening_m=.07))))
+    assert position_execution_info(state, transition) == physical_execution_info(env)
+    assert not physical_execution_info(env).close_ready
+    env._last_physical_opening_target = None
+    assert position_execution_info(state, None) == physical_execution_info(env)
+    assert physical_execution_info(env).close_ready
+
+    state.joint_position = {'panda-v1/finger_joint1': .041, 'panda-v1/finger_joint2': .041}
+    assert physical_execution_info(env).target_opening_m == .08
+    with pytest.raises(ValueError, match='invalid PickCube Position'):
+        position_execution_info(state, None)
+    state.joint_position = {'panda-v1/finger_joint1': -2e-7, 'panda-v1/finger_joint2': 0.}
+    assert position_execution_info(state, None).measured_opening_m == 0.
+    assert physical_execution_info(env).measured_opening_m == 0.
+
+
 @pytest.mark.parametrize('backend', ['cpu', 'cuda'])
 @pytest.mark.parametrize('profile', ['r1', 'r3_continuous_v1'])
 def test_external_pickcube_solution_matches_source_without_constructing_one(backend, profile, monkeypatch):
