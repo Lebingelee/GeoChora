@@ -242,10 +242,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 env._last_physical_opening_target = .04 * (float(np.clip(action[-1], -1., 1.)) + 1.)
             else:
                 env._last_physical_opening_target = float(action[-1])
-        from .specialization import _validate_external_readiness_solution, make_reference_binding
-        task_com_factory = (make_reference_binding(cube_force_z_N=cube_force_z_N,
-            task_config=task_config, resolved_config=resolved_config).task_com_wrench_factory
-                            if cube_force_z_N is not None else None)
+        from .specialization import _validate_external_readiness_solution
+        from .task import task_com_wrench_factory
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         owned_resources = ExitStack()
         binding = ReferenceTaskBinding(build=build, build_seeded=build_seeded,
@@ -256,7 +254,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
             task_definition_factory=PickCubeTaskDefinition.from_artifact,
             task_state_projection=as_task_state_view,
             object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',
-            task_com_wrench_factory=task_com_factory,
+            task_com_wrench_factory=task_com_wrench_factory(cube_force_z_N),
             recorder_mode='execution', close_task_resources=owned_resources.close,
             action_schema=physical.action_schema(),
             action_space_factory=physical.action_space, prepare_action=reference_pose_action,

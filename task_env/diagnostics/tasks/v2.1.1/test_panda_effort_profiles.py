@@ -437,3 +437,31 @@ def test_effort_controller_constructs_only_its_required_source_model(profile, re
         assert used_sources == ([expected] if requires_kinematics else [])
     finally:
         binding.close_task_resources()
+
+
+def test_task_force_uses_the_same_declaration_for_position_and_effort(monkeypatch):
+    from types import SimpleNamespace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube import specialization
+
+    def config(profile):
+        return resolve_task_env_config(specialization.PickCubeReferenceEnv, {
+            'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+            'controller': {'profile_id': profile}, 'task': {'cube_force_z_N': 1.5},
+        })
+
+    position = specialization.PickCubeReferenceEnv.selected_binding(config('r1'))
+    def unexpected_position_binding(*_args, **_kwargs):
+        pytest.fail('effort construction must not construct a Position task binding')
+    monkeypatch.setattr(specialization, 'make_reference_binding', unexpected_position_binding)
+    effort = specialization.PickCubeReferenceEnv.selected_binding(config('panda-direct-effort-v1'))
+    try:
+        env = SimpleNamespace(artifact=SimpleNamespace(timebase=SimpleNamespace(control_substeps=5)))
+        left, = position.task_com_wrench_factory(env)
+        right, = effort.task_com_wrench_factory(env)
+        left.validate()
+        right.validate()
+        assert left == right
+        assert (left.force_world_N, left.start_substep, left.end_substep) == ((0., 0., 1.5), 0, 5)
+    finally:
+        effort.close_task_resources()

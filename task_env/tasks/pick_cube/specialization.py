@@ -75,7 +75,7 @@ PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
     "postclose_hold_s": 0.1,
 }
 
-from .task import PickCubeTaskDefinition, semantic_definition, evaluate, sample_reset
+from .task import PickCubeTaskDefinition, semantic_definition, evaluate, sample_reset, task_com_wrench_factory
 
 def _configuration() -> dict:
     data = load_yaml_mapping(CONFIG_PATH)
@@ -620,13 +620,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             )
         return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed))
 
-    def task_com_wrenches(env):
-        from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
-        return (ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
-            'pickcube-task-writer-v1', 'pickcube-task-cube-force-v1', 'cube-v1',
-            0, env.artifact.timebase.control_substeps,
-            (0., 0., cube_force_z_N), (0., 0., 0.)),)
-
     return ReferenceTaskBinding(
         build=build,
         **reference_pose_action_binding(), **selected_observation_binding(),
@@ -653,7 +646,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True,
         external_solution_actions=True,
-        task_com_wrench_factory=task_com_wrenches if cube_force_z_N is not None else None,
+        task_com_wrench_factory=task_com_wrench_factory(cube_force_z_N),
         interval_mode=(
             "native"
             if interval_provider in {"mujoco", "geophys"}

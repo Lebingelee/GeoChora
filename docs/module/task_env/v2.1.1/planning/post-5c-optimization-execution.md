@@ -1246,3 +1246,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `a961ae5d`；实施前复核优化台账 GOV-01／02、ENTRY-01／02、ENV-01～03、SUBJ 和 CTRL-01／02。PickCube、NutAssembly 及 PickCube 物理切换的 caller-owned Solution 原先分别声明 `build_external`，其实际 builder 与普通构建相同；共同 reset 现在在有 seeded 能力时调用 seeded builder，否则调用同一个普通 builder。删除多余 binding 字段和两任务的重复声明；外部 Solution 是否受支持仍由任务提供的验证函数决定，旧 source 验证、seed、失败清理及唯一提交路径保留。LIBERO caller 中对该字段的重复声明同步移除；该 caller 还含已有未迁移 binding 字段，本次未验证或宣称 LIBERO 路线可运行。
 
 生产修改 6 文件 +4／−23，净减 19 行；版本诊断修改 1 文件 +10／−1，覆盖有 seed 和无 seed 的 Solution 采用共同 builder。本文新增记录，无新增、删除或整文件迁移，tracked 文件数保持 1357。176 项版本合同检查通过；正式 MuJoCo PickCube 与 NutAssembly 各以 caller-owned Solution 完成 reset、单次控制推进、再次 reset 和关闭，各观测 5 个 native 子步，非完整 Solution。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer 和其他任务本批未复验；既有证据保留原范围。冻结输入、预算和收据位于 ignored `workspace/maintenance/v211_shared_solution_build_xsrk4d3b/`。装配 Panda source、四主体统一与完整控制验收仍未完成，E01～E04 未整体接收。
+
+
+### 6.126 PickCube 任务力声明脱离 Position binding
+
+输入 `681a1b0d`；实施前重新审阅 GOV-01／02、ENTRY、TASK-01／02、ENV-01～03、SUBJ、CTRL 和 source 边界。PickCube effort 路线为了取得任务 COM 力，原先额外构造 Position `ReferenceTaskBinding` 再从中提取 callback。现在 Task 直接声明同一个可选力贡献；Position 与 effort 两条真实构建链直接消费，力、单位、资源、interval 子步范围与共同提交不变。effort 不再构造 Position binding。此项只消除该依赖，不代表两个路线的 Robot/source 构建已经完全统一。
+
+生产修改 3 文件 +20／−14，净增 6 行；原力贡献实现从 Position specialization 迁到现有 Task 语义，属代码段迁移，无整文件迁移。版本诊断修改 2 文件 +34／−0，检查两路线声明一致及 effort 不再构造 Position binding，并支持正式短程输入；本文新增记录。无新增或删除文件，tracked 文件数保持 1357。最终代码 177 项版本合同检查通过。MuJoCo 正式 R1 Position 和 direct effort 分别以 1.5 N 的任务力完成 reset、一次控制、再次 reset、关闭，各观测 5 个 native 子步；此检查不替代或重开原 COM 历史判据。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer、完整 Solution 本批未复验。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_task_force_owner_xom0_foa/`。E01～E04 仍未整体接收。

@@ -151,6 +151,21 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
+def task_com_wrench_factory(cube_force_z_N):
+    """Declare the Task's optional vertical force for the common control interval."""
+    if cube_force_z_N is None:
+        return None
+
+    def contributions(env):
+        from ...controllers.canonical.physical_commands import ExternalComWrenchSumSegmentV1
+        return (ExternalComWrenchSumSegmentV1('external-com-wrench-sum-segment-v1',
+            'pickcube-task-writer-v1', 'pickcube-task-cube-force-v1', 'cube-v1',
+            0, env.artifact.timebase.control_substeps,
+            (0., 0., cube_force_z_N), (0., 0., 0.)),)
+
+    return contributions
+
+
 def sample_reset(artifact: TaskArtifact, task_seed: int, *, lift_height_m=None, task_config=None) -> ResetSample:
     """Sample the selected PCG64-v0 reset distribution at the task boundary."""
     if not isinstance(artifact, TaskArtifact) or artifact.identity_hash != build_artifact(lift_height_m=lift_height_m, task_config=task_config).identity_hash:

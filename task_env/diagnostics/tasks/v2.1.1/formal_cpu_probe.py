@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
 parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
+parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
 plan=json.loads(Path(args.plan).read_text())
@@ -47,6 +48,7 @@ try:
         return make_env(uid, config=config, **camera_options)
     if args.case in {'panda-r3','panda-gravity','panda-effort','panda-joint','assembled-unreset','assembled-live','nut'}:
         config={'execution':{'physics_provider':args.provider,'physics_backend':'cpu','physics_device':'cpu','deployment':'in_process','interpreter':sys.executable},'episode':{'horizon':8}}
+        if args.cube_force_z is not None:config['task']={'cube_force_z_N':args.cube_force_z}
         if args.case=='panda-gravity':config['controller']={'gravity_compensation':True}
         if args.case=='panda-r3' and args.profile:config['controller']={'profile_id':args.profile}
         if args.case=='panda-effort':config['controller']={'profile_id':'panda-direct-effort-v1'}
@@ -152,6 +154,10 @@ try:
                 PhysicalActionSliceV1(0,midpoint,((identity,values),)),
                 PhysicalActionSliceV1(midpoint,spec['control_substeps'],((identity,tuple(-v for v in values)),))))
             result['physical_sequence_spec']=spec
+        if args.cube_force_z is not None:
+            force,=env.binding.task_com_wrench_factory(env)
+            assert force.force_world_N == (0.,0.,args.cube_force_z)
+            result['task_force']=force.to_mapping()
         time_before=float(env.state.simulation_time)
         if args.case=='panda-joint' and args.record:action=env.bind_physical_action(action)
         stepped=env.step_with_solution(solution) if args.case=='nut' or args.solution else env.step(action)
