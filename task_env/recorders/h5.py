@@ -1116,6 +1116,29 @@ def load_physical_recording_h5(path: Path | str) -> dict[str, Any]:
                     or command['source_closure_sha256'] != result['env_meta']['reference_profile']['source_closure_digest']):
                 raise ValueError('physical command was not submitted at its recorded boundary')
     with h5py.File(Path(path), 'r') as root:
+        schema = result['env_meta'].get('observation_schema')
+        if not isinstance(schema, Mapping) or not isinstance(schema.get('order'), list):
+            raise ValueError('physical recording lacks an observation schema')
+        expected_paths = set()
+        for group_name in schema['order']:
+            group = schema.get(group_name)
+            if not isinstance(group, Mapping) or not isinstance(group.get('leaves'), Mapping):
+                raise ValueError('physical recording observation schema is incomplete')
+            for leaf_name, spec in group['leaves'].items():
+                leaf_path = str(group_name) + ('/' + str(leaf_name) if leaf_name else '')
+                if leaf_path in expected_paths or not isinstance(spec, Mapping):
+                    raise ValueError('physical recording observation schema has duplicate or invalid leaves')
+                expected_paths.add(leaf_path)
+                dataset = root.get('obs/' + leaf_path)
+                if (not isinstance(dataset, h5py.Dataset)
+                        or dataset.shape != (count, *tuple(spec['shape']))
+                        or dataset.dtype != np.dtype(spec['dtype'])):
+                    raise ValueError(f'physical observation differs from its declared schema: {leaf_path}')
+        actual_paths = set()
+        root['obs'].visititems(lambda name, item: actual_paths.add(name)
+                               if isinstance(item, h5py.Dataset) else None)
+        if actual_paths != expected_paths:
+            raise ValueError('physical observation leaves differ from their declared schema')
         def read_tree(group):
             return {name: read_tree(value) if isinstance(value, h5py.Group) else np.asarray(value)
                     for name, value in group.items()}

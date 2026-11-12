@@ -38,3 +38,26 @@ def test_real_physical_record_and_boundary_tamper(name, dimension, rgb, tmp_path
         dataset[()] = json.dumps(contexts)
     with pytest.raises(ValueError):
         load_physical_recording_h5(tampered)
+
+
+@pytest.mark.parametrize('damage', ['shape', 'dtype', 'missing', 'extra'])
+def test_real_physical_record_rejects_observation_schema_drift(damage, tmp_path):
+    directory = os.environ.get('TASK_ENV_PHYSICAL_RECORDINGS')
+    if not directory:
+        pytest.skip('explicit bounded native recording directory is required')
+    source = Path(directory) / 'two-wheel' / 'episode.h5'
+    path = tmp_path / 'wrong-observation.h5'
+    shutil.copyfile(source, path)
+    with h5py.File(path, 'r+') as handle:
+        key = 'obs/state/proprioception'
+        original = handle[key][()]
+        if damage != 'extra':
+            del handle[key]
+        if damage == 'shape':
+            handle.create_dataset(key, data=original[:, :1])
+        elif damage == 'dtype':
+            handle.create_dataset(key, data=original.astype(np.float64))
+        elif damage == 'extra':
+            handle.create_dataset('obs/state/unexpected', data=original)
+    with pytest.raises(ValueError, match='observation'):
+        load_physical_recording_h5(path)
