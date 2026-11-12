@@ -16,7 +16,8 @@ from ...controllers.canonical.physical_commands import (
     PhysicalJointBuildReceiptV1,
 )
 from .physical_control import (PhysicalControlExecutionV1, ResolvedPhysicalBatchV1,
-                               prepare_physical_command_batch, resolve_body_wrench_at_poses)
+                               prepare_physical_command_batch, resolve_body_wrench_at_poses,
+                               uniform_native_drive_mode)
 
 
 def _same(a, b):
@@ -56,16 +57,13 @@ class MuJoCoPhysicalPort:
             raise ValueError('physical port requires a scalar MuJoCo session')
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
         artifact_id = getattr(session._artifact, 'artifact_id', None)
-        drive_mode = ('disabled' if artifact_id in {'pickcube-mjcf-physical-effort-no-drive-v1',
-                                                    'pickcube-mjcf-physical-effort-task-v1'}
-                      else 'position')
+        drive_mode = uniform_native_drive_mode(binding)
         direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
                         and all(c.native_drive == 'disabled' for c in binding.channels))
         if direct_motor:
             if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
                     != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
                 raise ValueError('physical motor bindings must exactly cover the source actuators')
-            drive_mode = 'disabled'
             for subject in execution.subjects:
                 if subject.root_mode == 'fixed':
                     root_id = int(model.body(subject.root_frame.frame_id).id)
@@ -154,7 +152,7 @@ class MuJoCoPhysicalPort:
             else:
                 raise ValueError('unsupported compiled physical transmission')
         if drive_mode == 'disabled':
-            if direct_motor and actuator_ids != set(range(int(model.nu))):
+            if actuator_ids != set(range(int(model.nu))):
                 raise ValueError('global drive isolation requires every actuator to be declared')
             bit = int(mj.mjtDisableBit.mjDSBL_ACTUATION)
             before = int(model.opt.disableflags)

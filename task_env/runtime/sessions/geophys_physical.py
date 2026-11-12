@@ -7,7 +7,8 @@ from ...artifacts.contracts import CapabilityAssessmentRowV1, CapabilityAssessme
 from ...controllers.canonical.physical_commands import (
     PhysicalControlReceiptV1, PhysicalJointBuildReceiptV1,
 )
-from .physical_control import PhysicalControlExecutionV1, ResolvedPhysicalBatchV1, prepare_physical_command_batch
+from .physical_control import (PhysicalControlExecutionV1, ResolvedPhysicalBatchV1,
+                               prepare_physical_command_batch, uniform_native_drive_mode)
 
 
 def preflight_physical_geophys(execution, artifact, source):
@@ -39,8 +40,7 @@ class GeoPhysPhysicalPort:
         joints = {j['name']: j for j in model['joints']}
         actuators = {a['name']: a for a in model['actuators']}
         definitions = {(a.entity_id, j.joint_id): j for a in execution.scene.articulations or () for j in a.joints}
-        drive_mode = ('disabled' if getattr(session._artifact, 'artifact_id', None)
-                      == 'pickcube-mjcf-physical-effort-no-drive-v1' else 'position')
+        drive_mode = uniform_native_drive_mode(binding)
         source = session._source
         direct_motor = (bool(getattr(source, 'torque_actuators', {})) and not getattr(source, 'position_actuators', {})
                         and all(c.native_drive == 'disabled' for c in binding.channels))
@@ -48,7 +48,6 @@ class GeoPhysPhysicalPort:
             if ({f'{c.entity_id}/{c.joint_id}': c.native_actuator for c in binding.channels}
                     != dict(source.torque_actuators) or source.joint_targets or source.open_actuators):
                 raise ValueError('physical motor bindings must exactly cover the source actuators')
-            drive_mode = 'disabled'
             bodies = {row['name']: row for row in model['bodies']}
             for subject in execution.subjects:
                 if subject.root_mode == 'fixed':

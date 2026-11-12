@@ -115,6 +115,16 @@ class SubjectJointDeclarationV1:
     native_drive: str
 
 
+def uniform_native_drive_mode(binding):
+    """Admit the drive mode declared by all channels of a physical binding."""
+    modes = {channel.native_drive for channel in binding.channels}
+    if not modes:
+        return 'position'
+    if len(modes) != 1 or not modes <= {'position', 'disabled'}:
+        raise ValueError('physical adapter requires one supported native drive mode')
+    return next(iter(modes))
+
+
 def compile_existing_subject_assembly(*, scene, artifact_sha256, source_id,
                                       source_closure_sha256, subject, declarations,
                                       assembly_id, nested_component_id=None):

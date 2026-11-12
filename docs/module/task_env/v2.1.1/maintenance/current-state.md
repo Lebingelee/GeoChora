@@ -233,3 +233,5 @@ Pendulum 和双轮车旧 component scene／reset 工厂、专用 torque adapter 
 PickCube 无 Solution 的直接／joint effort 不再准备 R3 Solution readiness；需要的 R3 控制动力学与 reset 选择保留。详见[实施记录 6.108](../planning/post-5c-optimization-execution.md#6108-effort-构建不再准备未使用的-solution)。
 
 Isaac Panda effort 的 USD source 与传动准入已归 Runtime physical adapter，任务侧传递驱动选择；Isaac 直接 effort 已做真实短程复验。详见[实施记录 6.109](../planning/post-5c-optimization-execution.md#6109-isaac-effort-source-准入归-runtime-adapter)。
+
+MuJoCo／GeoPhys physical adapter 现在读取控制 binding 声明的 native drive，MuJoCo 全局关闭前核对完整 actuator 覆盖；受影响短程已复验。详见[实施记录 6.110](../planning/post-5c-optimization-execution.md#6110-native-drive-模式由控制-binding-声明)。

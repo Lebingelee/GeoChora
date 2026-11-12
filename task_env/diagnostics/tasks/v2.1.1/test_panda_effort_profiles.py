@@ -106,6 +106,33 @@ def test_panda_effort_controller_rejects_foreign_writer():
         task_binding.close_task_resources()
 
 
+@pytest.mark.parametrize(('profile', 'expected'), [
+    ('panda-direct-effort-v1', 'position'),
+    ('panda-joint-effort-reference-v1', 'disabled'),
+])
+def test_adapter_drive_mode_follows_bound_channels(profile, expected):
+    from dataclasses import replace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.runtime.sessions.physical_control import uniform_native_drive_mode
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    task_binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        binding = task_binding.build('mujoco')['physical_execution'].compiled.binding
+        assert uniform_native_drive_mode(binding) == expected
+        opposite = 'disabled' if expected == 'position' else 'position'
+        mixed = replace(binding, channels=(replace(binding.channels[0], native_drive=opposite),
+                                           *binding.channels[1:]))
+        with pytest.raises(ValueError, match='one supported native drive'):
+            uniform_native_drive_mode(mixed)
+    finally:
+        task_binding.close_task_resources()
+
+
 def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube import specialization
