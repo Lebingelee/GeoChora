@@ -62,7 +62,7 @@ def position_record_metadata(self):
         {'path': 'state.hand_pose', 'semantic': 'provider_measured_panda_hand_pose'},
         {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
     ]
-    if self.value.get('f06_pickcube_isaac_input') is not None:
+    if self.value.get('session_admission_input') is not None:
         # F06's position profile binds its historical hand_pose field to the
         # source ee frame; it is not the physical hand-origin frame.
         for field in observation_leaf_specs:
@@ -105,7 +105,7 @@ def position_record_metadata(self):
             'force_feedback': 'not_consumed',
         },
     }
-    f06_input = self.value.get('f06_pickcube_isaac_input')
+    f06_input = self.value.get('session_admission_input')
     if f06_input is not None:
         native_facts = self.session.build_layout_facts
         native_metadata = native_facts['native_runtime_metadata']
@@ -181,7 +181,7 @@ def record_position_transition(self, request, canonical, target, applied, *, ter
     applied_payload = applied.to_mapping()
     if 'gravity_compensation_v1' in self.info:
         applied_payload['gravity_compensation_v1'] = self.info['gravity_compensation_v1']
-    if self.value.get('f06_pickcube_isaac_input') is not None:
+    if self.value.get('session_admission_input') is not None:
         evidence = self.session.native_interval_evidence
         native_ack = evidence['position_ack']
         native_advances = evidence['advances']
@@ -312,6 +312,6 @@ def position_record_reset_info(self):
             # observation. Generic H5 v3 consumes this only for the
             # bounded versioned typed-state witness extension.
             'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-        } if self.value.get('f06_pickcube_isaac_input') is not None else {}),
+        } if self.value.get('session_admission_input') is not None else {}),
     }
     return info

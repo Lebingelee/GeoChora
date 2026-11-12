@@ -1461,3 +1461,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产代码改动 3 文件，+36／−29，净 +7 行；版本诊断改动 1 文件，+6／−1，净 +5 行；无新增、删除或迁移文件。新增断言禁止物理 binding 调用 Position binding。新增共享声明使任务语义有单一位置，文件数未下降；物理 source 构建、provider／renderer adapter 的后续归位仍待处理。
 
 版本诊断 210 项通过。当前冻结输入下，MuJoCo PickCube effort 正式入口完成 reset、一次非零 step、再次 reset、Robot 重绑定与重复 close，实测 5 个 native 子步；具体身份、状态和双锁收据见 ignored `workspace/maintenance/v211_physical_task_binding_20261112/`。首次使用错误解释器时缺少 NumPy，物理未启动，该失败记录保留。USD 真实交付的构建和 Controller 绑定在诊断中验证，本批未复验 Isaac 原生推进、renderer 或完整 Solution，不将此前不同输入的证据当作本批通过。
+
+
+### 6.151 PickCube Runtime 准入字段收敛
+
+复核 ENTRY-01／02、ENV-02／03／05：PickCube Isaac 构建结果此前同时保存 `f06_pickcube_isaac_input` 和指向同一对象的 `session_admission_input`；Position reset、控制绑定、公共观测和记录器还读取前者。本批移除旧键，相关调用者统一消费 Runtime 准入字段，保留实际 USD 类型、source 身份及 native 准入校验。该字段目前在正式任务构建中仅由 PickCube Isaac 路线提供；尚未因此宣称 provider admission 已通用化。
+
+生产代码修改 3 文件，+8／−9，净减 1 行；版本诊断修改 1 文件，+2／−0；无新增、删除或整文件迁移，tracked 总数 1360 不变。共享 observation 和 recorder 原有功能仍有专用路径，本批只取消重复数据键，不代表完成 ENV／adapter 整体归位。
+
+版本诊断 210 项通过，包括真实交付构建和 Position 准入对象、source／Controller 绑定的检查。MuJoCo PickCube R3 正式入口通过 reset、非零 step、共同提交、记录逻辑读回、第二次 reset、Robot 重绑定和重复 close，观测 5 个 native 子步；冻结输入、双锁和收据见 ignored `workspace/maintenance/v211_admission_binding_20261112/`。这次未复验 Isaac 原生、renderer 或完整 Solution；历史 Isaac 运行属于不同代码输入，不能替代本批记录器与观测的原生验证。E01～E04 仍未整体接收。

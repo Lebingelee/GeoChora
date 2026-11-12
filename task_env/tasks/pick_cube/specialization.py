@@ -523,7 +523,6 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
             "resolved_configuration": resolved,
             "execution_spec_v1": runtime_input.execution,
             "reset_plan": runtime_input.reset_plan,
-            "f06_pickcube_isaac_input": runtime_input,
             "session_admission_input": runtime_input,
             "f06_delivery_manifest_path": str(manifest_path),
             "kinematics_source_xml": panda_xml,
@@ -622,12 +621,12 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         scalar_control_binding=panda_reference_control_binding(),
         position_execution_info=lambda env: (
             position_execution_info(env.state, env.last_position_transition)
-            if env.value.get('f06_pickcube_isaac_input') is not None else None
+            if env.value.get('session_admission_input') is not None else None
         ),
         position_execution_info_key='pickcube_position_execution_info_v1',
-        reset_runtime_input=lambda value: value.get('f06_pickcube_isaac_input'),
+        reset_runtime_input=lambda value: value.get('session_admission_input'),
         position_control_binding=lambda value: ControlBinding(
-            'panda-v1/gripper' if value.get('f06_pickcube_isaac_input') is not None
+            'panda-v1/gripper' if value.get('session_admission_input') is not None
             else 'panda-main/gripper', 0.08
         ),
         validate_external_solution=_validate_external_readiness_solution,

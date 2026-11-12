@@ -176,7 +176,7 @@ def build_selected_observation(self, state):
         info['state_boundary_identity'] = boundary.to_mapping()
         info['state_boundary_id'] = boundary.boundary_id
         info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-        if self.value.get('f06_pickcube_isaac_input') is not None:
+        if self.value.get('session_admission_input') is not None:
             # The admitted USD route exposes the Core-owned typed
             # publication used by observations and Position control.
             info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()

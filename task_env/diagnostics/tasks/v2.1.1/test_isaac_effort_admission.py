@@ -194,6 +194,8 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     assert robot.controller is value['controller']
     assert plan is value['source'].position_subject_plan.plan
     assert value['controller'].source is value['source'] is value['session_admission_input'].runtime_source
+    assert binding.reset_runtime_input(value) is value['session_admission_input']
+    assert binding.position_control_binding(value).gripper_semantic_id == 'panda-v1/gripper'
     assert robot.subjects[0].controller_writers == (robot.controller.writer_id,)
     assert selected.selection_matches[0].subject_ids == (robot.subjects[0].subject_id,)
     from task_env.runtime.sessions.control import prepare_structured_action
