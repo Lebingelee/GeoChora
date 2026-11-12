@@ -3275,54 +3275,20 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if getattr(self, '_physical_reset_selection', None) is not None:
             if self.physical_action_spec()['kind'] != 'r3-pose':
                 raise ValueError('the selected Solution requires the R3 pose input spec')
-            from ..planners.contracts import ExpertAction, validate_caller_solution_action
+            physical = True
+        else:
+            physical = False
             try:
-                proposal = solution.act(self.obs, task_info_for_solution(self.info))
-                if type(proposal) is not ExpertAction:
-                    raise TypeError('physical external Solution must return ExpertAction')
-                validate_caller_solution_action(proposal,
-                    boundary=lambda: self.info.get('state_boundary_identity'),
-                    state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
-                    solution_identity=self.value.get('solution_identity'), control_request_mode='position')
-                action = self.bind_physical_action(proposal.action)
+                self._require_published_execution_info()
             except BaseException as error:
-                self._latch_fault('physical_external_solution_proposal', error, before_state=self.state)
+                self._latch_fault('public_execution_readiness', error, before_state=self.state)
                 raise
-            return self._step(action, proposal=proposal, observer_solution=solution)
-        try:
-            self._require_published_execution_info()
-        except BaseException as error:
-            self._latch_fault('public_execution_readiness', error, before_state=self.state)
-            raise
-        try:
-            proposal = solution.act(self.obs, task_info_for_solution(self.info))
-            from ..planners.contracts import ExpertAction
-            if not isinstance(proposal, ExpertAction):
-                raise TypeError('external Solution act() must return ExpertAction')
-        except BaseException as error:
-            self._latch_fault('external_solution_proposal', error, before_state=self.state)
-            if self.binding.abort_solution_on_runtime_error:
-                try:
-                    solution.abort('runtime_error')
-                except BaseException as abort_error:
-                    add_note = getattr(error, 'add_note', None)
-                    if callable(add_note):
-                        add_note(f'external Solution abort after proposal failure also failed: {abort_error!r}')
-            raise
-        if getattr(self, 'position_profile', False):
-            try:
-                from ..runtime.sessions.control_lifecycle import project_position_action
-                request = project_position_action(self, proposal.action)
-                return self._step(
-                    request, proposal=proposal, observer_solution=solution,
-                )
-            except BaseException as error:
-                # act() has already run and may have advanced Solution state;
-                # execution itself may already have recorded a richer fault.
-                if self._episode_execution_state().fault is None:
-                    self._latch_fault('external_solution_action_validation', error, before_state=self.state)
-                raise
-        return self._step(proposal.action, proposal=proposal, observer_solution=solution)
+        action, proposal = self._prepare_solution_action(
+            solution, public_observation=True, physical=physical,
+            proposal_phase=('physical_external_solution_proposal' if physical else 'external_solution_proposal'),
+            action_phase=('physical_external_solution_proposal' if physical else 'external_solution_action_validation'),
+            abort_on_error=not physical)
+        return self._step(action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):
         """Controller changes are admitted only while resetting an episode."""
@@ -3558,46 +3524,54 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as error:
                 self._latch_fault('public_execution_readiness', error, before_state=self.state)
                 raise
+        action, proposal = self._prepare_solution_action(
+            self.solution, public_observation=(physical_selection is not None
+                                              or self.binding.expert_uses_public_observation),
+            physical=physical_selection is not None, proposal_phase='expert_proposal',
+            action_phase='expert_action_validation', abort_on_error=True)
+        return self._step(action, proposal=proposal, observer_solution=self.solution)
+
+    def _prepare_solution_action(self, solution, *, public_observation, physical,
+                                 proposal_phase, action_phase, abort_on_error):
+        """Admit one compatibility Solution proposal and project its action once."""
         try:
-            proposal = (self.solution.act(self.obs, task_info_for_solution(self.info))
-                        if physical_selection is not None or self.binding.expert_uses_public_observation
-                        else self.solution.act())
+            proposal = (solution.act(self.obs, task_info_for_solution(self.info))
+                        if public_observation else solution.act())
             from ..planners.contracts import ExpertAction
-            if not isinstance(proposal, ExpertAction):
-                raise TypeError('expert Solution act() must return ExpertAction')
-            if physical_selection is not None:
+            external_physical = proposal_phase == 'physical_external_solution_proposal'
+            if (not isinstance(proposal, ExpertAction)
+                    or (external_physical and type(proposal) is not ExpertAction)):
+                label = ('expert Solution act()' if proposal_phase == 'expert_proposal' else
+                         'physical external Solution' if external_physical else 'external Solution act()')
+                raise TypeError(f'{label} must return ExpertAction')
+            if physical:
                 from ..planners.contracts import validate_caller_solution_action
                 validate_caller_solution_action(proposal,
                     boundary=lambda: self.info.get('state_boundary_identity'),
                     state_boundary=lambda: self.typed_state.view.boundary.to_mapping(),
                     solution_identity=self.value.get('solution_identity'), control_request_mode='position')
         except BaseException as error:
-            self._latch_fault('expert_proposal', error, before_state=self.state)
-            if self.binding.abort_solution_on_runtime_error:
+            self._latch_fault(proposal_phase, error, before_state=self.state)
+            if abort_on_error and self.binding.abort_solution_on_runtime_error:
                 try:
-                    self.solution.abort('runtime_error')
+                    solution.abort('runtime_error')
                 except BaseException as abort_error:
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
-                        add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
+                        add_note(f'Solution abort after proposal failure also failed: {abort_error!r}')
             raise
-        if getattr(self, 'position_profile', False):
-            try:
-                from ..runtime.sessions.control_lifecycle import project_position_action
-                request = project_position_action(self, proposal.action)
-            except BaseException as error:
-                self._latch_fault('expert_action_validation', error, before_state=self.state)
-                raise
-            return self._step(
-                request, proposal=proposal, observer_solution=self.solution,
-            )
         try:
-            action = (self.bind_physical_action(proposal.action)
-                      if physical_selection is not None else proposal.action)
+            if proposal_phase == 'physical_external_solution_proposal':
+                action = self.bind_physical_action(proposal.action)
+            elif getattr(self, 'position_profile', False):
+                from ..runtime.sessions.control_lifecycle import project_position_action
+                action = project_position_action(self, proposal.action)
+            else:
+                action = self.bind_physical_action(proposal.action) if physical else proposal.action
         except BaseException as error:
-            self._latch_fault('expert_action_validation', error, before_state=self.state)
+            self._latch_fault(action_phase, error, before_state=self.state)
             raise
-        return self._step(action, proposal=proposal, observer_solution=self.solution)
+        return action, proposal
 
     def _step(self, action, *, proposal=None, observer_solution=None, caller_driven=False):
         from ..runtime.sessions.control_lifecycle import prepare_selected_control_action

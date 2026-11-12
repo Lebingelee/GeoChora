@@ -191,6 +191,21 @@ Isaac 成功 reset 与 App close 参考 U1 的冻结运行：U2 改动仅影响�
 
 **单元退出：**R15 支持表中的每条现行路径都有去向，R16 的重复处理已实际收敛，R17～R21 有与风险匹配的证据。现有 Unit4/G04 物理语义保留；一项通过不升级全表。
 
+### U3 动作输入与当前处理边界
+
+| 输入／调用 | 准入和转换 | 提交与限制 |
+| --- | --- | --- |
+| 普通 Position／typed request | 声明 Position capability 的 Controller 投影；typed request 先验绑定 | `prepare_selected_control_action` → Position interval → `submit_control_command`；装配 Panda 使用已声明双 writer |
+| 简单主体 torque／Panda effort | 对已绑定 physical execution，Controller 生成有单位和 source／generation 身份的命令 | 同一 submit owner 后推进 Runtime；reset-scoped 选择要求当前 action identity，stale 输入预检拒绝 |
+| 调用方 `ExpertAction` | Task 声明允许时校验 Solution identity 和已发布 boundary；Position 再投影 | `env.step` 进入相同 lifecycle；调用方自行 `observe`。Nut 不开放普通裸数组 |
+| `step_with_solution`／`step_expert` | 受限兼容入口调用同一提案处理，按当前 Controller 能力投影；前者要求 reset 接受的同一实例 | 两者委托 `_step`；`act` 已发生后失败锁存 fault。标准调用仍是调用方持有 Solution 并 `act → env.step → observe` |
+| Position／physical sequence | 现有 typed 片段必须覆盖完整 interval，不得重叠；不为四任务扩展全部组合 | Position 单 Controller 且不接 Recorder／Solution／task RGB；physical sequence 不支持 reset-scoped Controller 切换 |
+| mixed／COM wrench | 仅已声明的 binding、writer、资源和 SI 单位；COM 外力受 MuJoCo CPU 与生命周期约束 | mixed 不支持 reset-scoped 切换或 Solution；writer／effect 冲突和 replay guard 保留，不宣称任意组合 |
+
+R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_step`，caller-owned 标准调用不额外调用 `act` 或 `observe`；native 检查中 caller-owned 在一次提交后由调用方 observe 一次。[兼容 Solution 与 caller-owned 路线](../../../../../workspace/maintenance/v211_u3_solution_20261112_001/plan.json)、[Position expert](../../../../../workspace/maintenance/v211_u3_expert_20261112_001/plan.json)、[可切换 R3 expert](../../../../../workspace/maintenance/v211_u3_expert_20261112_002/plan.json)均为单 interval，不能当作任务成功或完整 Solution。expert 首次可切换探针在完成 5 子步后误要求相同 R3 profile 的 Controller identity 改变，导致断言失败；已在第二次按实际前提修正，失败结果及锁释放记录保留。
+
+[真实失败边界](../../../../../workspace/maintenance/v211_u3_failure_native_20261112_001/plan.json)验证 stale action 不改变 boundary、不 fault，Solution.act 后无效提案 latch fault，以及可切换 R3 expert 提交；三项合计 10 显式子步。[typed 控制短程](../../../../../workspace/maintenance/v211_u3_typed_control_20261112_001/plan.json)覆盖一条 effort sequence 和一条 Position gravity；12 项纯合同检查覆盖提案、Position sequence 准入、资源冲突及部分写入后跳过推进。具体推进由 session 完成，dispatch／submission 校验 source、boundary、generation 和实际 Controller identity；测试不推断 solver 间轨迹等价。Position sequence、mixed／COM 的其余组合及真实部分写入失败没有在本轮复验，保留现有能力限制及历史证据，不扩大结论。
+
 ## 5. U4：只收口本范围的 caller 与版本诊断
 
 **对应：E01～E04 的受影响兼容、测试和记录。依赖：U1～U3。** 不是提前执行完整 E11/E12。
@@ -263,7 +278,7 @@ Isaac 成功 reset 与 App close 参考 U1 的冻结运行：U2 改动仅影响�
 | --- | --- | --- | --- |
 | U1 | 实施者自评 PASS，独立主审及维护者接收待完成：`253e1efe` 与 `a5483e63` 将桌面 Position／effort 的 source 和 Controller 能力接入共同阶段；四任务构建结果交接见第 2 节。Task 继续提供任务参数和语义映射 | [MuJoCo 计划](../../../../../workspace/maintenance/v211_u1_shared_source_native_20261112_001/plan.json)：Position、effort、装配 Panda 各 5 个显式子步、二次 reset 和重复 close；[剩余任务计划](../../../../../workspace/maintenance/v211_u1_remaining_tasks_native_20261112_001/plan.json)：Nut、Pendulum、双轮车各完成对应短程。[Isaac 重试计划](../../../../../workspace/maintenance/v211_u1_usd_shared_native_20261112_002/plan.json)：Position、effort 各 5 个显式子步、二次 reset、App close receipt 完成，启动隐式推进 unknown；首次启动失败和早前 MuJoCo 运行偏差分别保留原始日志与[偏差记录](../../../../../workspace/maintenance/v211_u1_continuation_20261112_001/verification-notes.md) | R01～R08 均有实施者结论；U2 可沿现有结果开展生命周期核对。后续事件和全台账未完成 |
 | U2 | 实施者自评完成，独立主审及维护者接收待定：修复失败 reset 的旧 Runtime owner 遗失及预检拒绝后的 RNG 变化；保全 source、worker 与 camera 清理合同 | 第 3 节资源／阶段表、30 项纯合同检查与 [MuJoCo 最终冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)；Isaac 的成功路径沿用 U1 证据并保留日志限制 | R09～R14 均有实施者结论；U3 可继续，真实 Isaac 失败与真实 camera 失败未复验 |
-| U3 | 共同提交保全，重复入口和支持表待收口 | 当前 control lifecycle／submission 与既有短程证据 | R15～R21 |
+| U3 | 实施者自评完成，独立主审及维护者接收待定：兼容入口共用提案处理，保留调用方持有 Solution 的标准调用、现有 typed 语义和唯一提交 owner | 第 4 节支持表、12 项纯合同检查及 MuJoCo Solution／expert／故障／typed 控制冻结证据；部分 mixed／COM 交集未复验 | R15～R21 均有实施者结论；U4 可继续。完整 Solution 保留 E13 |
 | U4 | 尚未执行本轮 caller／诊断收口 | 本次只静态定位相关检查 | R22～R25 |
 | U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
 

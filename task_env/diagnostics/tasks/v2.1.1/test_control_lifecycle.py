@@ -82,3 +82,31 @@ def test_unsupported_physical_preflight_rejects_before_native_import(monkeypatch
     execution = object.__new__(PhysicalControlExecutionV1)
     with pytest.raises(StageUnavailableError, match='not implemented'):
         execution.preflight(provider='mujoco', backend='cuda', artifact=object(), source=object())
+
+
+def test_overlapping_scene_writers_are_rejected_before_submission():
+    from task_env.runtime.sessions.control_submission import _validate_resource_intervals
+
+    with pytest.raises(ValueError, match='overlap'):
+        _validate_resource_intervals((('arm', 'joint', 0, 3), ('hand', 'joint', 2, 5)),
+            writer_resources=(('arm', ('joint',)), ('hand', ('joint',))), substeps=5)
+
+
+def test_partial_control_write_preserves_error_and_skips_advance():
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    events = []
+    error = RuntimeError('partial write')
+    def apply():
+        events.append('write')
+        raise error
+    def on_failure(phase, received):
+        assert received is error
+        events.append(phase)
+    state = EpisodeExecutionState()
+    with pytest.raises(RuntimeError, match='partial write') as caught:
+        state.execute_interval(apply_control=apply, advance=lambda _: events.append('advance'),
+            read_state=lambda: None, evaluate=lambda _: None, observe=lambda _: None,
+            publish=lambda *_: None, on_failure=on_failure)
+    assert caught.value is error
+    assert events == ['write', 'control_application']
