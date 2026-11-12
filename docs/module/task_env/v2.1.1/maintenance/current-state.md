@@ -201,3 +201,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 共同 Env 构造现在要求真实 Robot 主体；缺失绑定时拒绝并清理 source，四任务 MuJoCo 短程通过。详见[实施记录 6.92](../planning/post-5c-optimization-execution.md#692-正式构造要求真实-robot-主体)。
 
 共同 Controller 选择现核对 source 主体 plan 中的一体／多 owner 身份；MuJoCo 进程内及隔离 worker、GeoPhys NutAssembly 短程通过。详见[实施记录 6.93](../planning/post-5c-optimization-execution.md#693-controller-选择核对主体计划中的实际-owner)。
+
+四任务默认 Robot UID 已在共同配置解析阶段确定；MuJoCo、GeoPhys 和 Isaac 受影响短程及两个 MuJoCo worker 已复验。详见[实施记录 6.94](../planning/post-5c-optimization-execution.md#694-默认-robot-在共同配置中确定)。

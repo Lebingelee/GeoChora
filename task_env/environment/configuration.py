@@ -350,14 +350,17 @@ def _resolve_selected_config(environment_type, config):
         if native_drive not in (None, 'position', 'disabled'):
             raise ValueError('unsupported Robot native drive selection')
         robot_uid = robot_selection.get('uid')
-    if robot_uid is not None:
-        if type(robot_uid) is not str or not robot_uid.strip() or robot_uid != robot_uid.strip():
-            raise ValueError('selected robot uid must be a nonempty trimmed string')
-        choices = getattr(environment_type, 'selected_robot_uids', ())
-        if robot_uid not in choices:
-            raise ValueError('selected task does not admit the requested robot')
-        from ..registry import AGENT_REGISTRY
-        AGENT_REGISTRY.get(robot_uid)
+    choices = getattr(environment_type, 'selected_robot_uids', ())
+    if robot_uid is None:
+        robot_uid = getattr(environment_type, 'default_robot_source_uid', None)
+        if robot_uid is None and len(choices) == 1:
+            robot_uid = next(iter(choices))
+    if type(robot_uid) is not str or not robot_uid.strip() or robot_uid != robot_uid.strip():
+        raise ValueError('selected robot uid must be a nonempty trimmed string')
+    if robot_uid not in choices:
+        raise ValueError('selected task does not admit the requested robot')
+    from ..registry import AGENT_REGISTRY
+    AGENT_REGISTRY.get(robot_uid)
     controller = values.get('controller', {})
     if not isinstance(controller, Mapping) or set(controller) - {'profile_id', 'gravity_compensation', 'parameters'}:
         raise ValueError('unsupported selected Controller fields')
@@ -491,14 +494,8 @@ def _resolve_selected_config(environment_type, config):
     if gravity_compensation and (provider, backend, selection.deployment) != ('mujoco', 'cpu', 'in_process'):
         raise ValueError('gravity compensation currently requires in-process MuJoCo CPU')
     if gravity_compensation:
-        declared_robots = getattr(environment_type, 'selected_robot_uids', ())
-        default_robot = getattr(environment_type, 'default_robot_source_uid', None)
-        if default_robot is None and len(declared_robots) == 1:
-            default_robot = next(iter(declared_robots))
-        selected_robot = robot_uid or default_robot
-        from ..registry import AGENT_REGISTRY
-        if (selected_robot is None or 'position_drive_gravity_compensation' not in
-                getattr(AGENT_REGISTRY.get(selected_robot), 'control_capabilities', ())):
+        if ('position_drive_gravity_compensation' not in
+                getattr(AGENT_REGISTRY.get(robot_uid), 'control_capabilities', ())):
             raise ValueError('selected Robot does not declare position-drive gravity compensation')
     for name in ("host", "engine", "solver_family", "solver_algorithm", "coupler"):
         if getattr(selection, name) != route_defaults[name]:

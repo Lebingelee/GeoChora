@@ -1000,3 +1000,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 1 文件 +13／−0；版本诊断修改 1 文件 +24／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。新增代码核对实际主体 plan 与 Controller owner，不能单独证明 E02 全部构造职责已经统一；provider／renderer 的状态、clock、提交和资源生命周期未改。
 
 120 项版本检查通过，包含一体与装配 Panda 的 Controller 被替换后拒绝。四个正式任务和装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑，不能以这些短程结果替代完整成功证据。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_controller_source_match_final_20261112_idjnahua/`；E01～E04 仍未接收。
+
+### 6.94 默认 Robot 在共同配置中确定
+
+输入 `e9b2a1bd`。四个正式任务此前在配置解析后仍由任务 binding 或 source composer 各自补默认 Robot，`robot_uid=None` 同时表示尚未填默认值。现在共同解析器根据任务声明选择并注册校验实际 Robot UID，默认与显式选择相同 Robot 得到同一个已解析配置；Pendulum、双轮车和 source composer 直接消费该 UID。reset 配置切换保留已选择的 Robot。PickCube split 控制的 Robot／profile 适配继续由实际 Robot recipe 准入，不再要求用户仅为消除空值而重复显式选择。Isaac 的默认 Panda 使用其实际 USD 主体路线；不因此扩展其他 Robot 的 provider 能力。
+
+生产修改 7 文件 +19／−23，净减 4 行；版本诊断修改 1 文件 +16／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。本批删除多个默认 Robot 回退点，使四任务配置结果直接携带实际选择；构建链中的其他任务／source 分流仍需处理。provider／renderer 的状态、clock、提交和资源合同未改。
+
+124 项版本检查通过，包括四任务默认与显式 Robot 的配置等价和已解析配置重建。四个正式任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 Panda Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_resolved_robot_uid_20261112_ri21v2z_/` 和 `workspace/maintenance/v211_resolved_robot_uid_isaac_20261112_pta2301d/`；E01～E04 仍未接收。

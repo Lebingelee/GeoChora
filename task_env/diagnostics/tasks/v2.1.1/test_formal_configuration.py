@@ -295,3 +295,19 @@ def test_formal_constructor_revalidates_supplied_resolved_config():
     forged = replace(resolved, environment=replace(resolved.environment, runtime=forged_runtime))
     with pytest.raises(ValueError, match='unsupported overrides'):
         task.from_resolved_config(forged)
+
+
+@pytest.mark.parametrize(('uid', 'robot_uid'), [
+    ('pick-cube-p16-reference-v1', 'panda-v1'),
+    ('nut-assembly-outcome-reference-v1', 'panda-v1'),
+    ('pendulum-v1', 'pendulum-v1'),
+    ('two-wheel-balance-v1', 'two-wheel-balance-v1'),
+])
+def test_default_robot_is_resolved_once_and_matches_explicit_selection(uid, robot_uid):
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get(uid)
+    default = resolve_task_env_config(task, {})
+    explicit = resolve_task_env_config(task, {'robot': {'uid': robot_uid}})
+    assert default.robot_uid == robot_uid
+    assert default == explicit
+    assert resolve_task_env_config(task, default) == default

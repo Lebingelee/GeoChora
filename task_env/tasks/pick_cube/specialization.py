@@ -744,8 +744,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):
             raise ValueError('PickCube Task COM force requires the MuJoCo CPU R1 grouped interval')
-        if profile == 'r1_split' and config.robot_uid is None:
-            raise ValueError('split Position Controllers require an explicitly selected Robot source recipe')
         environment = (_nut_aligned_environment_config(config.environment)
                        if profile in _PICKCUBE_R3_PROFILES else config.environment)
         binding = make_reference_binding(

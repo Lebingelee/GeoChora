@@ -676,7 +676,7 @@ class PendulumEnv(BaseTaskEnv):
         from .pendulum_physical import task_binding
         return task_binding(config.environment, provider=config.physics_provider,
                             backend=config.environment.runtime.backend,
-                            robot_uid=config.robot_uid or 'pendulum-v1',
+                            robot_uid=config.robot_uid,
                             source_delivery_manifest=config.source_delivery_manifest)
 
     uid = PENDULUM_ENV_ID

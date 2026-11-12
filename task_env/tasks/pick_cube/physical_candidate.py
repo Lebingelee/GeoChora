@@ -27,7 +27,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
         raise ValueError('physical profile currently requires explicit in_process execution')
     if (provider, backend) not in {('mujoco', 'cpu'), ('geophys', 'cpu'), ('isaacsim', 'cuda')}:
         raise ValueError('physical control requires an admitted CPU or Isaac CUDA route')
-    if robot_uid not in (None, 'panda-v1') or gravity_compensation or reset_profile is not None:
+    if robot_uid != 'panda-v1' or gravity_compensation or reset_profile is not None:
         raise ValueError('physical profile requires its declared Panda source without Position-only options')
     if provider == 'isaacsim':
         if source_delivery_manifest is None or parameters or task_parameters:

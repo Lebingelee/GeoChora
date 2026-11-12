@@ -81,6 +81,7 @@ def prepare_switch_reset(environment_type, current, seed, rng_state, execution):
         'execution': target,
         'episode': {'horizon': current.environment.episode.horizon},
         'controller': {'profile_id': current.controller_profile},
+        'robot': {'uid': current.robot_uid},
         'task': dict(current.task_parameters),
     })
     if seed is not None:

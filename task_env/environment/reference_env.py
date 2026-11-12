@@ -835,11 +835,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         )
         try:
             composer = declared_robot_source_composer(config,
-                robot_uid=config.robot_uid or cls.default_robot_source_uid,
+                robot_uid=config.robot_uid,
                 existing_robot_entity=cls.default_robot_source_uid, task_body_names=roots,
                 task_site_transfers=cls.robot_source_site_transfers)
         except SourceCompositionCapabilityUnavailable:
-            if config.robot_uid is not None:
+            if config.robot_uid != cls.default_robot_source_uid:
                 raise
             return binding
         return replace(binding, compose_robot_source=composer)
