@@ -240,18 +240,19 @@ def _environment_config(*, backend='cpu', task_config=None):
         render=replace(config.render, camera_obs=False))
 
 
-def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu',
-                         resolved_config=None,
-                         lift_height_m=None, task_config=None, robot=None):
+def _compile_reference_source(request, *, resolved_config=None, lift_height_m=None,
+                              task_config=None, robot=None):
+    """Compile the declared Task and Robot through the common source stage."""
     task_config = _configuration() if task_config is None else task_config
     robot = make_agent(task_config['recipe']['agent_uids'][0]) if robot is None else robot
-    if provider not in {"geophys", "mujoco"}:
+    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot)
+    if request.provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
-    if backend != 'cpu':
+    if request.backend != 'cpu':
         raise ValueError('NutAssembly reference source requires CPU')
     recipe = task_config["recipe"]
     source_config = recipe["controller"]
-    config = (_environment_config(backend=backend, task_config=task_config)
+    config = (_environment_config(backend=request.backend, task_config=task_config)
               if resolved_config is None else resolved_config)
     config = replace(config,
         action=replace(config.action, **source_config["action_overrides"]),
@@ -260,13 +261,14 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
     composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
         tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
-    return compile_nut_assembly_source(
+    source, contact_profile = compile_nut_assembly_source(
         artifact=artifact,
         artifact_declaration=_artifact_declaration(lift_height_m=lift_height_m,
                                                    task_config=task_config, robot=robot),
         composition=composition, scene=recipe['scene'], asset=recipe['asset'],
-        physics_dt=recipe['physics_dt'], robot=robot, config=config, provider=provider,
+        physics_dt=recipe['physics_dt'], robot=robot, config=config, provider=request.provider,
         provider_options=recipe['providers'], eef_semantic=EEF)
+    return CompiledReferenceTaskV1(artifact, source), _NutSourceContext(task_config, contact_profile)
 
 
 def _source_identity_files():
@@ -292,18 +294,6 @@ def _source_identity_files():
 class _NutSourceContext(NamedTuple):
     task_config: dict
     contact_profile: object
-
-
-def _compile_reference_source(request, *, resolved_config=None, lift_height_m=None,
-                              task_config=None, robot=None):
-    task_config = _configuration() if task_config is None else task_config
-    recipe = task_config['recipe']
-    robot = make_agent(recipe['agent_uids'][0]) if robot is None else robot
-    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot)
-    source, contact_profile = build_runtime_source(
-        artifact, request.provider, backend=request.backend, resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config, robot=robot)
-    return CompiledReferenceTaskV1(artifact, source), _NutSourceContext(task_config, contact_profile)
 
 
 def _bind_reference_controller(compiled, context, execution_controller, request, *, include_solution, dynamic):

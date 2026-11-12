@@ -163,9 +163,9 @@ def _reset_seed(seed):
 
 from .specialization import (
     NutAssemblyReferenceEnv, REFERENCE_ENV_ID, _configuration, _recipe,
-    build_artifact, build_reference, build_runtime_source, build_outcome_solution,
+    build_artifact, build_reference, build_outcome_solution,
 )
 
 __all__ = ["NutAssemblyTaskDefinition", "NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
-           "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
+           "build_reference", "build_outcome_solution", "evaluate",
            "sample_reset", "semantic_definition"]

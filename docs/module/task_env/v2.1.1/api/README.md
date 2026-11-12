@@ -8,7 +8,7 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 当前（2026-11-11）：G01～G05 已各自有界接收，5c 单元 1～9 收口，现进入[代码与项目优化](../planning/post-5c-optimization-execution.md)。受测能力、正式入口尚存的迁移工作和限制以[当前摘要](../maintenance/current-state.md)及[单元 9 主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)为准。本页下面的历史设计／实现记录不把未实现目标升级为 API。
 
-PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需要独立 Solution 时可使用 `task_env.tasks.pick_cube.build_readiness_solution`。旧的 PickCube `build_reference`、`build_isaac_reference` 和 `build_runtime_source` 直接构造入口已退休，历史诊断中的这些调用需迁到正式构建入口。
+PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需要独立 Solution 时可使用 `task_env.tasks.pick_cube.build_readiness_solution`。旧的 PickCube `build_reference`、`build_isaac_reference` 和 `build_runtime_source` 直接构造入口已退休，历史诊断中的这些调用需迁到正式构建入口。NutAssembly 的独立 `build_runtime_source` 同样已退休；使用正式 `make_env` 和配置构建，独立 Solution 入口保持可用。
 
 历史记录：3b attempt001 已通过公开 factory 在三条指定路线完成 seed31 的10步与独立读回，整体仍为 PARTIAL、待 Sol 复审：三路线短窗正向位移均未过冻结门。PickCube F06 的 `env.step` 接受既有8维绝对世界位姿与开口动作，并复用已绑定 Controller 的结构化投影；其 Recorder 保存该运行的请求、模型和原生确认。其他 Position 路线仍按各自声明要求 typed action。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。
 
@@ -18,7 +18,7 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ## 5c 后优化：当前正式构造增量
 
-正式 PickCube、NutAssembly、Pendulum 和双轮车经 `make_env` 使用同一正式配置解析与 `SelectedReferenceEnv.from_resolved_config` 构建链。正式入口不接受旧 component resolved 配置；其他保留的 component caller 有其独立范围。E00～E04 的共同构建、生命周期和控制链已完成本轮实施及主审余项修复，维护者最终接收待完成；完整 source/adapter 整理仍属后续事件，实际状态见[当前摘要](../maintenance/current-state.md)。
+正式 PickCube、NutAssembly、Pendulum 和双轮车经 `make_env` 使用同一正式配置解析与 `SelectedReferenceEnv.from_resolved_config` 构建链。正式入口不接受旧 component resolved 配置；其他保留的 component caller 有其独立范围。E00～E04 的共同构建、生命周期和控制链已获维护者有界接收；完整 source/adapter 整理仍属后续事件，实际状态见[当前摘要](../maintenance/current-state.md)。
 
 四个正式任务均使用 `config={"controller": {"profile_id": ...}}` 选择受支持的 Controller，例如 PickCube 的 `r3_continuous_v1`，或 Pendulum／双轮车的 `direct_joint_effort_v1` 和限定路线的 `velocity_damped_joint_effort_v1`。`control.profile_id` 与 `task.controller_profile` 不是正式输入；Mapping 与 YAML 使用同一解析。各任务和所选 Robot 的能力范围仍分别检查。
 
