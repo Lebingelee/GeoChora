@@ -323,6 +323,16 @@ class DeclaredReferenceSource(NamedTuple):
     reset_plan: object = None
 
 
+class PandaReferenceSourcePlan(NamedTuple):
+    """Task-owned source inputs prepared before any native source is created."""
+    task_config: dict
+    config: object
+    declaration: object
+    artifact: object
+    scene_recipe_sha256: str | None
+    facts: object
+
+
 def compose_declared_reference_source(compiled, *, robot, controller_profile,
                                       existing_robot_entity, task_body_names,
                                       task_site_transfers, compile_declaration,
@@ -344,7 +354,10 @@ def compose_declared_reference_source(compiled, *, robot, controller_profile,
 
 
 def build_panda_reference_stages(*, source_format, backend, controller_profile,
-                                 compile_source, compile_control, physical_kind=None,
+                                 prepare_source, source_context, compile_control,
+                                 robot_uid, robot=None, delivery_manifest=None,
+                                 build_task_scene=None, compile_task_artifact=None,
+                                 physical_kind=None,
                                  native_drive=None, reset_selection=False, task_settings=None,
                                  existing_robot_entity=None, task_body_names=(),
                                  task_site_transfers=(), scene_compiler=None,
@@ -355,6 +368,39 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
     native Controller selection and episode reset materialization.
     """
     from ...environment.reference_binding import SourceBoundTaskBuilder
+    from ...assembly.compiler import CompiledReferenceTaskV1
+
+    def compile_source(request):
+        from ...registry import make_agent
+        from .source import close_execution_source_on_failure
+
+        selected = make_agent(robot_uid) if robot is None else robot
+        if selected.uid != robot_uid:
+            raise ValueError('selected Robot differs from the requested identity')
+        reference = (reference_task_source_robot(selected, controller_profile)
+                     if source_format == 'mjcf' and physical_kind is None else selected)
+        plan = prepare_source(request, selected, reference)
+        if type(plan) is not PandaReferenceSourcePlan:
+            raise TypeError('Panda source preparation must return its declared source plan')
+        if source_format == 'usd':
+            from .isaac_usd_admission import compile_f06_task_input
+            runtime_input = compile_f06_task_input(
+                delivery_manifest=delivery_manifest, legacy_artifact=plan.artifact, robot=selected,
+                task_config=plan.task_config, build_task_scene=build_task_scene,
+                compile_task_artifact=compile_task_artifact,
+                task_scene_recipe_sha256=plan.scene_recipe_sha256,
+                seed=request.seed, horizon=request.horizon, physical_drive=native_drive)
+            compiled = CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source)
+            with close_execution_source_on_failure(compiled.source):
+                if compiled.artifact.timebase != plan.artifact.timebase:
+                    raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
+                return compiled, source_context(plan, compiled, runtime_input, selected, reference)
+        from ...assembly.panda_box import compile_panda_box_task
+        output = compile_panda_box_task(plan.declaration, config=plan.config, artifact=plan.artifact,
+                                        robot=reference, backend=request.backend, own_snapshot=True)
+        compiled = CompiledReferenceTaskV1(output.artifact, output.source)
+        with close_execution_source_on_failure(compiled.source):
+            return compiled, source_context(plan, compiled, None, selected, reference)
 
     if source_format == 'usd':
         from .isaac_usd_admission import validate_f06_controller_profile

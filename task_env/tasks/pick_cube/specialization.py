@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from functools import partial
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, replace
 import hashlib
 import inspect
 import json
@@ -12,45 +12,25 @@ import math
 from pathlib import Path
 from typing import NamedTuple
 
-import numpy as np
-
-from ...artifacts import (
-    ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
-    PoseWorld, SemanticDefinition, TaskArtifact,
-    Timebase, UniformDimension,
-)
-from ...artifacts.execution import ResetSample
-from ...assembly import TaskReferences
+from ...artifacts import TaskArtifact, Timebase
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
                                    compile_panda_box_mjcf_task, compile_panda_box_task)
-from ...assembly.compiler import CompiledReferenceTaskV1, reference_task_identity_fields
-from ...controllers.canonical import ProductionCanonicalPandaController
+from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
 from ...controllers.canonical.execution import (
     REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES)
-from ...environment import (
-    RuntimeSnapshot,
-    TaskCompositionSpec,
-    TaskEvaluation,
-    TaskEvaluationContextV1,
-    TaskPredicateEvaluationV1,
-    TaskPredicateResultV1,
-)
 from ...environment.configuration import (
     load_yaml_mapping,
     overlay_public_env_config,
     resolve_env_config,
 )
-from ...registry import make_agent, make_object, make_scene, register_env
+from ...registry import make_agent, register_env
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import position_control_binding_from_selected
 from ...robots.panda import PandaAgent, panda_reference_control_binding
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
-from ...objects.pick_cube import (
-    CUBE_CONTACT_MARGIN, CUBE_DIAG_INERTIA, CUBE_HALF_SIZE, CUBE_MASS,
-    EE_SITE_NAME, PickCubeSceneComposer,
-)
+from ...objects.pick_cube import PickCubeSceneComposer
 from ...observations.selected_reference import selected_observation_binding
 
 
@@ -183,14 +163,12 @@ def _r3_dynamic_profile():
     return load_r3_dynamic_profile(), R3_PROFILE_PATH
 
 
-class _PreparedReferenceSource(NamedTuple):
-    task_config: dict
+class _TaskSourceFacts(NamedTuple):
     is_r3_profile: bool
     dynamic_profile: object
     profile_source: object
-    artifact: object
-    source: object
     readiness: object
+    source_sha256: object
 
 
 class _PositionSourceContext(NamedTuple):
@@ -275,46 +253,58 @@ def _resolve_readiness_declaration(task_config, controller_profile, resolved_con
     return config, is_r3_profile, dynamic_profile, profile_source
 
 
-def _prepare_mjcf_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
-                         lift_height_m=None, task_config=None, robot=None, require_readiness=True):
-    """Compile one Task/Robot source; resolve readiness only when the route needs it."""
+def _prepare_reference_source(request, selected_robot, source_robot, *, source_format,
+                              controller_profile, physical, reset_switch,
+                              resolved_config, lift_height_m, task_config):
+    """Prepare task semantics before the source adapter creates a resource."""
+    from ...runtime.sessions.source_composition_adapters import PandaReferenceSourcePlan
 
     task_config = _configuration() if task_config is None else task_config
+    readiness_profile = ('r3_continuous_v1' if reset_switch else 'r1') if physical and source_format == 'mjcf' else controller_profile
+    if physical and source_format == 'mjcf' and not reset_switch:
+        resolved_config = _nut_aligned_environment_config(resolved_config)
     config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
-        task_config, controller_profile, resolved_config)
-    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
-    artifact = readiness = None
-    if require_readiness:
-        artifact = compile_panda_box_artifact(declaration, robot=robot)
+        task_config, readiness_profile, resolved_config)
+    declaration = (None if source_format == 'usd' else
+                   _declaration(lift_height_m=lift_height_m, task_config=task_config))
+    artifact = readiness = source_ids = None
+    if source_format == 'usd':
+        config = replace(config, runtime=replace(config.runtime, backend='cpu'))
+        artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
+    elif not physical or reset_switch:
+        artifact = compile_panda_box_artifact(declaration, robot=source_robot)
+    if artifact is not None:
         readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
                                      dynamic_profile=dynamic_profile)
-    compiled = compile_panda_box_task(declaration, config=config, artifact=artifact,
-                                      robot=robot, backend=backend, own_snapshot=True)
-    return _PreparedReferenceSource(task_config, is_r3_profile,
-        dynamic_profile, profile_source, compiled.artifact, compiled.source, readiness)
+    if source_format == 'usd':
+        from .solution import PickCubeReadinessSolution
+        source_ids = _source_identity_files(None, PickCubeReadinessSolution,
+                                            profile_source=profile_source, provider='isaacsim')
+    recipe_hash = (hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
+                   if source_format == 'usd' else None)
+    return PandaReferenceSourcePlan(task_config, config, declaration, artifact, recipe_hash,
+        _TaskSourceFacts(is_r3_profile, dynamic_profile, profile_source, readiness, source_ids))
 
 
-def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_config,
-                                lift_height_m, robot):
-    """Compile PickCube declarations through the shared Task/Robot source owners."""
-    from ...runtime.sessions.source import close_execution_source_on_failure
-    prepared = _prepare_mjcf_source(
-        backend=request.backend, controller_profile='r3_continuous_v1' if reset_switch else 'r1',
-        task_config=task_config, resolved_config=(resolved_config if reset_switch
-            else _nut_aligned_environment_config(resolved_config)), lift_height_m=lift_height_m,
-        robot=robot, require_readiness=reset_switch)
-    legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
-    with close_execution_source_on_failure(original):
-        from ...runtime.sessions.provenance import construction_revision
-        revision = construction_revision(Path(__file__).resolve().parents[3])
-        if reset_switch:
-            from .solution import PickCubeReadinessSolution
-            solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-        return (CompiledReferenceTaskV1(legacy_artifact, original),
-                _EffortSourceContext(prepared.task_config, original.agents[0], readiness,
-                    solution_identity if reset_switch else None,
-                    float(legacy_artifact.initialization.joint_position['panda-v1/finger_joint1']),
-                    revision, original.source_closure_digest))
+def _reference_source_context(plan, compiled, runtime_input, selected_robot, source_robot, *,
+                              source_format, physical, reset_switch):
+    """Attach task readiness and identity to the adapter's compiled source."""
+    facts = plan.facts
+    if source_format == 'usd':
+        return _UsdSourceContext(runtime_input, selected_robot, plan.config.action,
+            plan.task_config, plan.config, facts.readiness, facts.dynamic_profile, facts.source_sha256)
+    if not physical:
+        return _PositionSourceContext(plan.task_config, selected_robot, source_robot,
+            facts.is_r3_profile, facts.dynamic_profile, facts.profile_source, facts.readiness)
+    from ...runtime.sessions.provenance import construction_revision
+    revision = construction_revision(Path(__file__).resolve().parents[3])
+    solution_identity = None
+    if reset_switch:
+        from .solution import PickCubeReadinessSolution
+        solution_identity = PickCubeReadinessSolution.identity_for_config(facts.readiness)
+    return _EffortSourceContext(plan.task_config, compiled.source.agents[0], facts.readiness,
+        solution_identity, float(compiled.artifact.initialization.joint_position['panda-v1/finger_joint1']),
+        revision, compiled.source.source_closure_digest)
 
 
 def _bind_mjcf_effort_control(compiled, context, selection, request, *, native_drive, control_kind,
@@ -343,22 +333,6 @@ def _bind_mjcf_effort_control(compiled, context, selection, request, *, native_d
             **({'task_com_force_v1': {'cube_force_z_N': cube_force_z_N}}
                if cube_force_z_N is not None else {}),
             **source_sha256, 'physical_binding': physical.compiled.binding.identity_hash}}
-
-
-def _compile_reference_position_source(request, *, controller_profile, resolved_config,
-                                       lift_height_m, task_config, robot_uid, robot):
-    from ...runtime.sessions.source_composition_adapters import reference_task_source_robot
-    selected_robot = make_agent(robot_uid) if robot is None else robot
-    if selected_robot.uid != robot_uid:
-        raise ValueError('selected Robot differs from the requested identity')
-    reference_robot = reference_task_source_robot(selected_robot, controller_profile)
-    prepared = _prepare_mjcf_source(
-        backend=request.backend, controller_profile=controller_profile, resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config, robot=reference_robot)
-    return (CompiledReferenceTaskV1(prepared.artifact, prepared.source),
-            _PositionSourceContext(prepared.task_config, selected_robot, reference_robot,
-                prepared.is_r3_profile, prepared.dynamic_profile, prepared.profile_source,
-                prepared.readiness))
 
 
 def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile):
@@ -403,36 +377,6 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         "recipe_identity": digest(resolved), "resolved_configuration": resolved,
     }
 
-
-
-def _compile_isaac_reference_source(request, *, delivery_manifest, controller_profile,
-                                    resolved_config, task_config, lift_height_m,
-                                    physical_drive, robot):
-    """Compile Task readiness and the admitted USD source before Controller binding."""
-    from .solution import PickCubeReadinessSolution
-
-    task_config = _configuration() if task_config is None else task_config
-    config, is_r3_profile, dynamic_profile, profile_source = _resolve_readiness_declaration(
-        task_config, controller_profile, resolved_config)
-    config = replace(config, runtime=replace(config.runtime, backend='cpu'))
-    artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
-    readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
-                                 dynamic_profile=dynamic_profile)
-    source_ids = _source_identity_files(None, PickCubeReadinessSolution,
-                                        profile_source=profile_source, provider='isaacsim')
-    robot = make_agent('panda-v1') if robot is None else robot
-    from ...runtime.sessions.isaac_usd_admission import compile_f06_task_input
-    runtime_input = compile_f06_task_input(
-        delivery_manifest=delivery_manifest, legacy_artifact=artifact, robot=robot,
-        task_config=task_config, build_task_scene=build_pickcube_scene,
-        compile_task_artifact=compile_pickcube_task_artifact,
-        task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        seed=request.seed, horizon=request.horizon, physical_drive=physical_drive)
-    if runtime_input.artifact.timebase != artifact.timebase:
-        raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
-    return (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
-            _UsdSourceContext(runtime_input, robot, config.action, task_config, config,
-                              readiness, dynamic_profile, source_ids))
 
 
 def _bind_isaac_reference_control(compiled, context, selection, request, *, resolved_config):
@@ -546,30 +490,27 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
         from ...runtime.sessions.isaac_usd_admission import F06_PICKCUBE_CONTROLLER_PROFILE
         profile = F06_PICKCUBE_CONTROLLER_PROFILE if physical else controller_profile
-        compile_source = partial(_compile_isaac_reference_source,
-            delivery_manifest=source_delivery_manifest, controller_profile=profile,
-            resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-            physical_drive=physical_drive, robot=robot)
         finish = partial(_bind_isaac_reference_control, resolved_config=resolved_config)
         source_format, tcp_profile = 'usd', PANDA_PICKCUBE_EE_TCP_V1
     else:
         source_format, tcp_profile = 'mjcf', None
         if physical:
             profile = physical_profile_id
-            compile_source = partial(_compile_mjcf_effort_source, reset_switch=reset_switch,
-                task_config=task_config, resolved_config=resolved_config,
-                lift_height_m=lift_height_m, robot=robot)
             finish = partial(_bind_mjcf_effort_control, native_drive=physical_drive,
                 control_kind=physical_kind, reset_switch=reset_switch, cube_force_z_N=cube_force_z_N)
         else:
             profile = controller_profile
-            compile_source = partial(_compile_reference_position_source,
-                controller_profile=controller_profile, resolved_config=resolved_config,
-                lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, robot=robot)
             finish = partial(_bind_reference_position_control, controller_profile=controller_profile)
+    prepare = partial(_prepare_reference_source, source_format=source_format,
+        controller_profile=profile, physical=physical, reset_switch=reset_switch,
+        resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config)
+    source_context = partial(_reference_source_context, source_format=source_format,
+                             physical=physical, reset_switch=reset_switch)
     builder = build_panda_reference_stages(
         source_format=source_format, backend=backend, controller_profile=profile,
-        compile_source=compile_source, compile_control=finish,
+        prepare_source=prepare, source_context=source_context, compile_control=finish,
+        robot_uid=robot_uid, robot=robot, delivery_manifest=source_delivery_manifest,
+        build_task_scene=build_pickcube_scene, compile_task_artifact=compile_pickcube_task_artifact,
         physical_kind=physical_kind, native_drive=physical_drive, reset_selection=reset_switch,
         task_settings=panda_effort_task_settings, existing_robot_entity='panda-v1',
         task_body_names=PickCubeReferenceEnv.robot_source_roots,

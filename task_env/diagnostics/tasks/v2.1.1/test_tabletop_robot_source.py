@@ -31,15 +31,16 @@ def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
 
 
 def test_pickcube_reference_compiles_the_selected_robot_instance(monkeypatch):
+    from task_env import registry
     from task_env.tasks.pick_cube import specialization
 
-    create = specialization.make_agent
+    create = registry.make_agent
     selected = []
     def capture(uid):
         robot = create(uid)
         selected.append(robot)
         return robot
-    monkeypatch.setattr(specialization, 'make_agent', capture)
+    monkeypatch.setattr(registry, 'make_agent', capture)
     value = specialization.make_reference_binding().build_for_request('mujoco', 'cpu', 31, 8)
     try:
         assert len(selected) == 1
@@ -243,7 +244,8 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     built, declared, bound = [], [], []
-    original_source = specialization.compile_panda_box_task
+    from task_env.assembly import panda_box
+    original_source = panda_box.compile_panda_box_task
     original_scene = source_scene_import.declare_panda_scene
     from task_env.runtime.sessions import source_composition_adapters
     original_control = source_composition_adapters.build_panda_direct_effort_execution
@@ -265,7 +267,7 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
         raise AssertionError('effort source preparation must not construct a reference Controller')
 
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_reference)
-    monkeypatch.setattr(specialization, 'compile_panda_box_task', source)
+    monkeypatch.setattr(panda_box, 'compile_panda_box_task', source)
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', scene)
     monkeypatch.setattr(source_composition_adapters, 'build_panda_direct_effort_execution', control)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
@@ -296,7 +298,8 @@ def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
     def fail(*args, **kwargs):
         raise failure
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
-    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected)
+    from task_env.assembly import panda_box
+    monkeypatch.setattr(panda_box, 'compile_panda_box_task', unexpected)
     monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', fail)
     with pytest.raises(RuntimeError) as raised:
         specialization.make_reference_binding(
@@ -338,13 +341,12 @@ def test_readiness_failure_does_not_create_a_source_snapshot(monkeypatch):
     monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', fail_readiness)
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
     with pytest.raises(RuntimeError) as raised:
-        specialization._prepare_mjcf_source(controller_profile='r3_continuous_v1')
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1').build_for_request('mujoco', 'cpu', 31, 8)
     assert raised.value is failure
 
 
 def test_position_rejects_unsupported_robot_profile_before_source_snapshot(monkeypatch):
     from dataclasses import replace
-    from task_env.environment.reference_binding import TaskBuildRequest
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import specialization
 
@@ -355,11 +357,9 @@ def test_position_rejects_unsupported_robot_profile_before_source_snapshot(monke
     def unexpected_snapshot(_source):
         pytest.fail('unsupported Robot profile must not allocate a snapshot')
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
-    request = TaskBuildRequest('mujoco', 'cpu', 31, 8, None, None)
     with pytest.raises(ValueError, match='does not declare this Controller profile'):
-        specialization._compile_reference_position_source(request, controller_profile='r1',
-            resolved_config=None, lift_height_m=None, task_config=None,
-            robot_uid='panda-v1', robot=robot)
+        specialization.make_reference_binding(controller_profile='r1', robot=robot).build_for_request(
+            'mujoco', 'cpu', 31, 8)
 
 
 def test_panda_box_compiler_rejects_foreign_artifact_before_snapshot(monkeypatch):
@@ -665,17 +665,17 @@ def test_position_robot_composes_checked_canonical_task_source(provider):
 def test_assembled_robot_rejects_foreign_task_joint_mapping_and_releases_source(monkeypatch):
     from dataclasses import replace
     from task_env import make_env
-    from task_env.tasks.pick_cube import specialization
+    from task_env.assembly import panda_box
 
-    prepare = specialization._prepare_mjcf_source
+    compile_source = panda_box.compile_panda_box_task
     receipts = []
     def altered(*args, **kwargs):
-        prepared = prepare(*args, **kwargs)
-        receipts.append(source_resource_receipt(prepared.source))
-        joints = dict(prepared.source.joints)
+        compiled = compile_source(*args, **kwargs)
+        receipts.append(source_resource_receipt(compiled.source))
+        joints = dict(compiled.source.joints)
         joints['panda-v1/joint1'] = 'foreign_joint'
-        return prepared._replace(source=replace(prepared.source, joints=joints))
-    monkeypatch.setattr(specialization, '_prepare_mjcf_source', altered)
+        return replace(compiled, source=replace(compiled.source, joints=joints))
+    monkeypatch.setattr(panda_box, 'compile_panda_box_task', altered)
     with pytest.raises(ValueError, match='Task joint binding differs from the declared Robot source'):
         make_env('pick-cube-p16-reference-v1', config={
             'execution': {'physics_provider': 'mujoco'},

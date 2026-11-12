@@ -51,7 +51,8 @@ def test_external_pickcube_solution_matches_source_without_constructing_one(back
 
     def unexpected_source(*args, **kwargs):
         pytest.fail('external Solution must not construct a RuntimeSource')
-    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected_source)
+    from task_env.assembly import panda_box
+    monkeypatch.setattr(panda_box, 'compile_panda_box_task', unexpected_source)
     solution = specialization.build_readiness_solution(backend=backend, controller_profile=profile)
     assert solution.identity == expected_identity
     assert solution.readiness_config == expected_readiness

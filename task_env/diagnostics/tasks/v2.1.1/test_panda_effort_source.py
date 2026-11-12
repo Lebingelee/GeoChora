@@ -364,7 +364,7 @@ def test_rejected_robot_composer_does_not_prepare_a_source(monkeypatch):
         pytest.fail('binding admission must not prepare a Task source')
     def reject(cls, binding, config):
         raise ValueError('source composition rejected')
-    monkeypatch.setattr(specialization, '_prepare_mjcf_source', unexpected_source)
+    monkeypatch.setattr(specialization, '_prepare_reference_source', unexpected_source)
     monkeypatch.setattr(specialization.PickCubeReferenceEnv, '_bind_robot_source_composer', classmethod(reject))
     with pytest.raises(ValueError, match='source composition rejected'):
         specialization.PickCubeReferenceEnv._build_selected_binding(config)

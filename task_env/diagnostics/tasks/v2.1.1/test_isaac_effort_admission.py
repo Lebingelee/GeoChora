@@ -156,8 +156,8 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
     result = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     assert result['task_seed'] == 42
     assert result['horizon'] == 8
-    assert result['compile_source'].keywords['resolved_config'] is config.environment
-    assert result['compile_source'].keywords['robot'] is binding.robot
+    assert result['prepare_source'].keywords['resolved_config'] is config.environment
+    assert result['robot'] is binding.robot
     assert calls[0].binding is binding
     with pytest.raises(ValueError, match='provider differs'):
         binding.build_for_request('mujoco', 'cpu', 42, 8)
@@ -193,7 +193,8 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
 
     def unexpected_mjcf(*args, **kwargs):
         pytest.fail('USD task construction must not compile an extra MJCF RuntimeSource')
-    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected_mjcf)
+    from task_env.assembly import panda_box
+    monkeypatch.setattr(panda_box, 'compile_panda_box_task', unexpected_mjcf)
 
     dynamic_profiles = []
     original_profile = specialization._r3_dynamic_profile
@@ -317,7 +318,7 @@ def test_usd_readiness_rejects_foreign_artifact_timebase(monkeypatch):
     from task_env.runtime.sessions import isaac_usd_admission
     from task_env.tasks.pick_cube import specialization
 
-    foreign = SimpleNamespace(artifact=SimpleNamespace(timebase=object()))
+    foreign = SimpleNamespace(artifact=SimpleNamespace(timebase=object()), runtime_source=None)
     monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input',
                         lambda *args, **kwargs: foreign)
     with pytest.raises(ValueError, match='timebase differs'):
@@ -491,7 +492,8 @@ def test_usd_stages_reject_unsupported_profile_before_source_build():
 
     with pytest.raises(ValueError, match='F06 Isaac freezes'):
         build_panda_reference_stages(source_format='usd', backend='cuda', controller_profile='r1',
-                                     compile_source=unexpected, compile_control=unexpected)
+                                     prepare_source=unexpected, source_context=unexpected,
+                                     compile_control=unexpected, robot_uid='panda-v1')
 
 
 def test_usd_controller_rejects_mismatched_compiled_source():
