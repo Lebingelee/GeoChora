@@ -240,4 +240,4 @@ Panda 的 gripper force cap 由 Robot 声明，MuJoCo adapter 核对实际 sourc
 
 PickCube effort 不再使用旧诊断的 0.02 m 手指初值；MuJoCo、GeoPhys、Isaac 受影响短程已核对正式 Task 初值。详见[实施记录 6.112](../planning/post-5c-optimization-execution.md#6112-删除-effort-路线的诊断手指初值)。
 
-MJCF effort 已沿用正式 Task ID；固定质量矩阵的历史校准不覆盖正式 0.04 m 手指初态，两条 mass profile 当前明确拒绝构建，待真实模型或重新校准，不能视为已保全。详见[实施记录 6.113](../planning/post-5c-optimization-execution.md#6113-mjcf-effort-使用正式-task-id并显式暴露质量模型缺口)。
+MJCF effort 已沿用正式 Task ID；历史固定质量矩阵不覆盖正式 0.04 m 初态。MuJoCo 两条 mass profile 改用当前 source 的实时质量矩阵并通过短程运行；GeoPhys／Isaac 尚无相应 source dynamics，明确拒绝该控制模式。实时矩阵与旧固定矩阵的输出不保证数值相同。详见[实施记录 6.114](../planning/post-5c-optimization-execution.md#6114-质量矩阵控制使用-provider-的实时-source-模型)。

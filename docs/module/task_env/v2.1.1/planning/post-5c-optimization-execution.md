@@ -1154,3 +1154,12 @@ Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误�
 实际复验暴露了 6.112 的遗漏：质量模型以手指 0.02 m 为名义、容差 0.019 m，正式初态为 0.04 m。MuJoCo mass effort 原先能构建，但第一次 step 因状态超出模型范围而拒绝，观察到 0 个 native 子步；这是一项实际能力缺口，不是成功。现在将同一范围检查从首次计算提前到构建阶段，明确报告模型不覆盖声明的初态；未扩大或修改模型校准范围，也未恢复诊断专用初态。两种固定质量矩阵 profile 目前不可用于正式初态，需要后续取得真实 source 模型能力或重新校准，E04 因此仍未完成。
 
 生产修改 2 文件 +22／−16，净增 6 行；版本诊断修改 1 文件 +56／−3，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1355。155 项版本检查通过，包含 Task ID 一致、错误 Artifact／source 拒绝和两个质量模型 profile 对正式初态的明确拒绝；这不代表质量模型可运行。MuJoCo 直接 effort 和 Controller reset 切换分别完成 5／10 个 native 子步，GeoPhys joint effort 完成 reset、step、再次 reset 和关闭，native 子步未直接计数。Isaac 和完整 Solution 本轮未重跑。失败证据在 ignored `workspace/maintenance/v211_task_artifact_effort_20261112_k54h6618/`；修正后的冻结 diff、预算及其他路线收据在 ignored `workspace/maintenance/v211_formal_artifact_mass_boundary_20261112_yt31_3u_/`。该 CPU 窗口后仅添加了错误 Artifact／source 的版本合同检查。
+
+
+### 6.114 质量矩阵控制使用 provider 的实时 source 模型
+
+输入 `49fb6f3d`。6.113 指出的固定校准模型不覆盖正式初态；此处移除 PickCube 任务内固定模型加载和相关专属校验，质量矩阵 Controller 在 MuJoCo 使用当前 source、episode 和状态绑定的 provider dynamics。它在独立 scratch 状态计算矩阵，不推进现场物理；保持 `M × PD`、成对手指投影和超限拒绝，不加入动力学 bias。矩阵现在随状态更新，和旧固定名义矩阵不保证数值相同，因此这是明确的控制行为变化，不是旧模型数值等价的证明。保留 source closure、Artifact／状态边界和矩阵正定性检查。历史校准文件暂留作证据，不再用于正式构建。
+
+GeoPhys 和 Isaac 当前没有 provider-owned source dynamics，故质量矩阵 profile 在其 physical preflight 明确拒绝；Isaac 的 preflight 不保证早于 App 启动。其他 effort profile 保持各自语义。此项没有恢复 GeoPhys／Isaac 的质量矩阵能力，也没有完成四任务统一构建；renderer 未改，source、状态、clock、提交及物理推进仍由各自 Runtime session 管理。
+
+生产代码修改 6 文件 +43／−57，净减 14 行；版本诊断修改 1 文件 +12／−22；无新增、删除或整文件迁移，tracked 文件数保持 1355。本文和当前状态文档各修改 1 文件。156 项版本检查通过，包含两个正式 mass profile、foreign source 拒绝和 GeoPhys preflight 拒绝。MuJoCo CPU 两个 mass profile 各完成正式 0.04 m 初态 reset、一次控制 step、第二次 reset、关闭与 5 个 native 子步；原动态控制器 reset 切换与记录完成 10 个子步。MJCF 导入有语义诊断。GeoPhys／Isaac 的 mass profile 未进行原生运行；Isaac preflight 的同类拒绝由代码检查支持，完整 Solution 未运行。冻结 diff、预算和原始收据位于 ignored `workspace/maintenance/v211_live_mass_ovikmdb1/`。E01～E04 尚未整体接收。

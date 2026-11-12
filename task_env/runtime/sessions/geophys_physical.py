@@ -17,6 +17,9 @@ def preflight_physical_geophys(execution, artifact, source):
         raise TypeError('physical session requires an exact execution profile')
     execution.validate_source(scene=source.scene_definition, artifact_sha256=artifact.identity_hash,
         source_id=source.source_id, source_closure_sha256=source.source_closure_digest, source=source)
+    if execution.requires_source_dynamics:
+        from ...environment.types import StageUnavailableError
+        raise StageUnavailableError('GeoPhys physical adapter has no source dynamics model')
     if execution.compiled.binding.bodies:
         raise ValueError('GeoPhys physical port does not admit body wrench')
 

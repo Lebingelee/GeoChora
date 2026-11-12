@@ -159,7 +159,10 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
             r3_reference=reference, end_frame_id=end_frame_id, **dynamic_parameters)
     if kind in {'joint-mass', 'r3-mass-pose'}:
         if mass_model is None:
-            raise ValueError('mass effort profile requires a source-admitted model')
+            return build_dynamic_reference_effort_execution(
+                direct_execution, reference_kind='r3-pose' if kind == 'r3-mass-pose' else 'joint',
+                cadence_s=cadence_s, r3_reference=reference, end_frame_id=end_frame_id,
+                kp=20., kd=2., mass_only=True)
         from .mass_matrix_effort import build_mass_effort_execution
         return build_mass_effort_execution(
             direct_execution, **mass_model, use_pose_reference=kind == 'r3-mass-pose',
@@ -236,14 +239,15 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
 
 def build_dynamic_reference_effort_execution(direct_execution, *, reference_kind, cadence_s,
                                              r3_reference=None, end_frame_id='ee',
-                                             kp=120., kd=22., finger_kp=1200., finger_kd=35.):
+                                             kp=120., kd=22., finger_kp=1200., finger_kd=35.,
+                                             mass_only=False):
     """Build a source-dynamics joint or R3 reference from the existing binding."""
     from dataclasses import replace
     from .dynamic_mass_effort import DynamicMassEffortControllerV1
     template = build_reference_effort_execution(direct_execution, reference_kind=reference_kind,
                                                 r3_reference=r3_reference, end_frame_id=end_frame_id)
     servo = DynamicMassEffortControllerV1(direct_execution.compiled.binding, cadence_s=cadence_s,
-        kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd)
+        kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd, mass_only=mass_only)
     if reference_kind == 'r3-pose':
         controller = R3ReferenceEffortControllerV1(r3_reference, servo,
             entity_id=direct_execution.compiled.binding.channels[0].entity_id,

@@ -10,10 +10,12 @@ class DynamicMassEffortControllerV1:
     """Source-bound inverse dynamics with an injected model and constrained pair.
 
     The model is supplied after actual reset by the selected runtime and must
-    compute from supplied state without advancing physics. Output is explicitly
-    clipped at the typed command admission boundary; it is not measured force.
+    compute from supplied state without advancing physics. Inverse dynamics uses
+    clipped output; mass-only reference control rejects out-of-range commands.
+    Neither output represents measured force.
     """
-    def __init__(self, binding, *, cadence_s, kp=120., kd=22., finger_kp=1200., finger_kd=35.):
+    def __init__(self, binding, *, cadence_s, kp=120., kd=22., finger_kp=1200., finger_kd=35.,
+                 mass_only=False):
         if type(binding) is not PhysicalControlBindingV1:
             raise TypeError('dynamic effort requires a typed binding')
         channels = tuple(binding.channels)
@@ -26,13 +28,20 @@ class DynamicMassEffortControllerV1:
         gains = (cadence_s,kp,kd,finger_kp,finger_kd)
         if not all(math.isfinite(float(x)) and float(x)>0 for x in gains):
             raise ValueError('dynamic effort gains and cadence must be positive and finite')
+        if type(mass_only) is not bool:
+            raise TypeError('mass_only must be a boolean')
         self.binding, self._channels, self.writer_id = binding, channels, channels[0].owner_ids[0]
         self._cadence,self._kp,self._kd,self._finger_kp,self._finger_kd = map(float,gains)
         self._model = None
-        self.identity = digest({'schema':'dynamic-mass-effort-v1','binding':binding.identity_hash,
+        self._mass_only = mass_only
+        identity = {'schema':'dynamic-mass-effort-v1','binding':binding.identity_hash,
             'cadence_s':self._cadence,'kp':self._kp,'kd':self._kd,'finger_kp':self._finger_kp,
             'finger_kd':self._finger_kd,'model':'source-bound-live-state-no-step-v1',
-            'limit_order':'clip_after_sum','finger_projection':'equal-pair-half-effort'})
+            'limit_order':'reject_outside' if mass_only else 'clip_after_sum',
+            'finger_projection':'equal-pair-half-effort'}
+        if mass_only:
+            identity['algorithm'] = 'mass-times-reference-acceleration-v1'
+        self.identity = digest(identity)
 
     @property
     def action_shape(self): return (8,)
@@ -71,16 +80,22 @@ class DynamicMassEffortControllerV1:
             raise ValueError('dynamic source model returned invalid or stale facts')
         reduced_q=np.r_[q[:7],.5*(q[7]+q[8])];reduced_v=np.r_[velocity[:7],.5*(velocity[7]+velocity[8])]
         acceleration=self._kp*(refs-reduced_q)-self._kd*reduced_v
-        force=matrix@acceleration+bias
-        # The pair is controlled in its single independent coordinate. The
-        # finger term provides the specified contact effort inside source limits.
-        force[7]=self._finger_kp*(refs[7]-reduced_q[7])-self._finger_kd*reduced_v[7]+bias[7]
+        if self._mass_only:
+            if (not np.allclose(matrix, matrix.T, rtol=0., atol=1e-6)
+                    or np.min(np.linalg.eigvalsh((matrix + matrix.T) * .5)) <= 0.):
+                raise ValueError('source mass model must be symmetric and positive definite')
+            force=matrix@acceleration
+        else:
+            force=matrix@acceleration+bias
+            # The pair is controlled in its single independent coordinate.
+            force[7]=self._finger_kp*(refs[7]-reduced_q[7])-self._finger_kd*reduced_v[7]+bias[7]
         if not np.isfinite(force).all():raise ValueError('dynamic effort produced nonfinite values')
         values=np.r_[force[:7],.5*force[7],.5*force[7]]
         commands=[]
         for i,c in enumerate(self._channels):
             policy=ContributionPolicyV1('physical-contribution-policy-v1',f'{self.writer_id}/channel-{i}',
-                f'{self.writer_id}/effect-{i}',self.writer_id,'exclusive','clip_after_sum','one_interval')
+                f'{self.writer_id}/effect-{i}',self.writer_id,'exclusive',
+                'reject_outside' if self._mass_only else 'clip_after_sum','one_interval')
             commands.append(JointEffortV1('joint-effort-v1',context,policy,c.entity_id,c.joint_id,c.dof_id,
                 c.kind,c.axis,c.axis_frame,c.sign,c.unit,float(values[i]),c.effort_range,'explicit_full_pd'))
         return PhysicalCommandBatchV1('physical-command-batch-v1',context,tuple(commands),(),())

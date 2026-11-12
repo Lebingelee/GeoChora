@@ -438,6 +438,10 @@ class PhysicalControlExecutionV1:
             rows.append((controller.writer_id, controller.identity, generation))
         return tuple(rows)
 
+    @property
+    def requires_source_dynamics(self):
+        return any(callable(getattr(controller, 'bind_model', None)) for controller in self.controllers)
+
     def initialize_controllers(self, session, publication):
         """Initialize the Controllers owned by this execution from one realized view."""
         from ...artifacts.state import CanonicalStatePublicationV2
@@ -445,10 +449,8 @@ class PhysicalControlExecutionV1:
             raise TypeError('physical Controller initialization requires typed V2 state')
         publication.view.validate_against_scene(self.scene)
         publication.view.validate_requirements(self.requirements)
-        needs_model = any(callable(getattr(controller, 'bind_model', None))
-                          for controller in self.controllers)
         source_model = getattr(session, 'physical_source_dynamics_model', None)
-        if needs_model and not callable(source_model):
+        if self.requires_source_dynamics and not callable(source_model):
             from ...environment.types import StageUnavailableError
             raise StageUnavailableError('selected session has no source dynamics model')
         for controller in self.controllers:
