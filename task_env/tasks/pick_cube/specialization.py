@@ -551,7 +551,7 @@ def _isaac_reference_builder(*, delivery_manifest, controller_profile,
             controller_profile=controller_profile, action_config=context.action_config,
             dynamic_profile=context.dynamic_profile,
             velocity_limit=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s'],
-            tcp_profile=PANDA_PICKCUBE_EE_TCP_V1, end_frame_id='ee', physical_kind=physical_kind,
+            tcp_profile=PANDA_PICKCUBE_EE_TCP_V1, physical_kind=physical_kind,
             native_drive=physical_drive,
             effort_settings=panda_effort_task_settings(physical_kind) if physical_kind is not None else None),
         compile_control=lambda compiled, context, selection, request: _bind_isaac_reference_control(

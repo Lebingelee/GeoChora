@@ -465,7 +465,24 @@ def test_usd_controller_rejects_mismatched_compiled_source():
     with pytest.raises(ValueError, match='differs from the compiled Artifact or source'):
         build_usd_panda_control(artifact, source, runtime_input=runtime_input, robot=None,
             controller_profile='r3_continuous_v1', action_config=None, dynamic_profile=None,
-            velocity_limit=2., tcp_profile=None, end_frame_id='ee')
+            velocity_limit=2., tcp_profile=None)
+
+
+def test_usd_controller_rejects_missing_or_foreign_robot_frame():
+    from task_env.artifacts import FrameReference
+    from task_env.runtime.sessions.source_composition_adapters import build_usd_panda_control
+
+    robot = SimpleNamespace(uid='panda-v1')
+    source = SimpleNamespace(frames={})
+    artifact = SimpleNamespace(legacy_frame_bindings={'panda-v1/ee': FrameReference('other', 'ee')})
+    runtime_input = SimpleNamespace(artifact=artifact, runtime_source=source)
+    options = dict(runtime_input=runtime_input, robot=robot, controller_profile='r3_continuous_v1',
+                   action_config=None, dynamic_profile=None, velocity_limit=2., tcp_profile=None)
+    with pytest.raises(ValueError, match='Robot end frame'):
+        build_usd_panda_control(artifact, source, **options)
+    artifact.legacy_frame_bindings['panda-v1/ee'] = FrameReference('panda-v1', 'ee')
+    with pytest.raises(ValueError, match='Robot end frame'):
+        build_usd_panda_control(artifact, source, **options)
 
 
 def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, monkeypatch):

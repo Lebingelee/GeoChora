@@ -186,11 +186,18 @@ def compile_panda_effort_selection(artifact, source, *, robot, composition,
 
 
 def build_usd_panda_control(artifact, source, *, runtime_input, robot, controller_profile, action_config,
-                            dynamic_profile, velocity_limit, tcp_profile, end_frame_id,
+                            dynamic_profile, velocity_limit, tcp_profile,
                             physical_kind=None, native_drive=None, effort_settings=None):
     """Bind the selected Position or effort capability to the admitted USD source."""
     if runtime_input.runtime_source is not source or runtime_input.artifact is not artifact:
         raise ValueError('USD Controller input differs from the compiled Artifact or source')
+    from ...artifacts import FrameReference
+    frame_key = f'{robot.uid}/ee'
+    frame = artifact.legacy_frame_bindings.get(frame_key)
+    if (type(frame) is not FrameReference or frame.entity_id != robot.uid
+            or frame_key not in source.frames):
+        raise ValueError('USD Controller requires the Robot end frame bound by its Artifact and source')
+    end_frame_id = frame.frame_id
     if physical_kind is None:
         if native_drive is not None or effort_settings is not None:
             raise ValueError('Position capability does not accept effort settings')
