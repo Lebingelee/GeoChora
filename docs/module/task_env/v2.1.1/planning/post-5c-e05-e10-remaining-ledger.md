@@ -28,7 +28,7 @@
 
 | 范围 | tracked 文件（排除 gitlink） | Python 文本行 |
 | --- | ---: | ---: |
-| 全项目／task_env | 1,366／976 | 不用整仓总行数推断本轮效果 |
+| 全项目／task_env | 1,366／979 | 不用整仓总行数推断本轮效果 |
 | assembly | 15 | 4,321 |
 | runtime | 52 | 27,166 |
 | render | 43 | 7,996 |
@@ -243,8 +243,8 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 | U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`，提交 `73eebf37`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 使用固定 pin 已有的公开初始化 facade，原缺口判断已更正；旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
 | U3／S13～S18 | IMPLEMENTED | 输入 `73eebf37`，提交 `ff5309d0`；[实施结果、字段来源、证据与限制](../maintenance/20261112_e05_e10_u3_observation_delivery.md)。Robot 与 Task 拥有各自投影，renderer 在 adapter 声明状态需求；四任务 schema、非 Position RGB 和跨 provider reset 已定向复验。光学 readback、重复 render、Isaac 采集与 Recorder metadata 分别留 U4/U6/U7；结果为实施者自评，E07/E08 尚未接收。 |
 | U4／S19～S25 | IMPLEMENTED | 输入 `ff5309d0`，提交 `1ce601fa`；[实施结果、真实采集与窗口证据](../maintenance/20261112_e05_e10_u4_renderer_delivery.md)。renderer capability 与 factory 对齐，Isaac task/observer 请求和故障分离，展示与相机输入走公开合同；三家原生及 cross 路线分别按影响复验。U3 简单任务附加 RGB schema 遗漏已修复，设备限制及先前失败保留；S19 后续将 observer 准入统一至 Robot 能力与 renderer 合同并接入真实 factory；42 组纯配置对照及三条受影响原生路线见[后续结果](../maintenance/20261113_e05_e10_u7_delivery.md#s19observer-准入与物理状态采集2026-11-13)；结果为实施者自评，E08 尚未接收。 |
-| U5／S26～S30 | PARTIAL | 输入 `1ce601fa`，初始提交 `5cb0d470`；[实施结果、四任务调用与后续证据](../maintenance/20261113_e05_e10_u7_delivery.md)。Nut 通用反馈／guard 与 provider source 归位，严格任务策略保留；PickCube source、Controller 和 reset 的阶段装配已由共同 source adapter 承担，F06 固定 profile 属 Isaac admission，九条 source 身份及受影响原生路线已对照。source 编译、共同 Runtime 结果及 physical／USD provenance 已迁入 adapter；Position 构造身份仍由 Task 回调组装，S27／E09 未闭合；此为实施者自评。 |
+| U5／S26～S30 | IMPLEMENTED | 输入 `1ce601fa`，初始提交 `5cb0d470`；[最终效果、四任务调用和证据](../maintenance/20261113_e05_e10_u7_delivery.md)。PickCube Task 声明任务及 readiness，source adapter 实际编译与组合 MJCF／USD、绑定 Controller 并交付 Runtime，source inventory 由 Task、资产、Robot 和 provider owner 提供；Nut 通用 feedback／guard 归公共 owner，严格任务策略保留。S26～S30 按受测范围实施完成；独立主审及维护者接收待完成。 |
 | U6／S31～S36 | IMPLEMENTED | 输入 `5cb0d470`，提交 `f83c0601`；[实施结果与证据](../maintenance/20261113_e05_e10_u6_recording_delivery.md)。旧 Judge 与 codec 分层、只读 inspect；Pendulum 和双轮车进入 v3 物理记录，Pendulum 同次状态／动作／clock／RGB／outcome 已独立读回。图片字节没有独立摘要；GeoPhys／Isaac 受影响路线与最终对账留 U7。本结果为实施者自评。 |
-| U7／S37～S40 | PARTIAL | 已完成影响对账与定向复验，[六事件结果、证据与限制](../maintenance/20261113_e05_e10_u7_delivery.md)。GeoPhys 的公开初始化接口已接入并定向复验；observer 准入的 S19 已完成本轮有界复验；Task 构造的 S27／E09 仍有明确实现欠账；其余结果为实施者自评，独立主审与维护者接收待完成。 |
+| U7／S37～S40 | IMPLEMENTED | [六事件实施者结果、证据和限制](../maintenance/20261113_e05_e10_u7_delivery.md)已按最终影响对账，S19 与 S27 的受测缺口已补；独立主审及维护者接收待完成，完整 Solution 留 E13，E11～E16 未提前关闭。 |
 
 每行最终结果可链接一份按模块压缩的实现摘要及机器可复核证据；S格的最终owner/判断可放同一摘要的40行表，不另建40份报告。没有对应最终调用与证据的格子仍为OPEN。
