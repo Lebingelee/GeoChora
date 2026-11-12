@@ -1452,3 +1452,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 4 文件 +75／−45，净增 30 行；其中约 25 行任务投影迁回 Task，其余新增为共用 Controller 选项及 schema 合同。版本诊断修改 1 文件 +20／−0；本文与当前摘要各修改 1 文件。无新增、删除或整文件迁移，项目 tracked 文件数保持 1360。相对 `1f1359ee` 的 task_env 差异 141 文件（新增 15、删除 20、修改 106），+8472／−14881，净减 6409 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 210 项通过，覆盖选项解析、非法 drive／action policy／增益拒绝以及已有 USD source 的纯构造。MuJoCo PickCube direct、joint→R3 reset 切换和 R3 mass 分别完成 reset／推进／再次 reset／关闭，观测 5／10／5 native 子步；GeoPhys direct 同样完成短程，native 子步不可观测并按 50 预留。Isaac 原生、renderer、其他任务和完整 Solution 本批未复验。冻结输入、双锁、预算及收据在 ignored `workspace/maintenance/v211_effort_owners_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.150 PickCube 物理任务绑定收敛
+
+对照优化台账和当前调用链，Isaac effort 不再先构造 Position binding 再覆盖其控制和观测字段；MJCF 与 USD 物理 binding 共用 PickCube 的任务语义字段，各自仍声明其 source 与 Controller 构建。此批消除一处无关 Position 构造依赖，不代表四任务已完成同一 Robot 构建链，E01～E04 继续实施。
+
+生产代码改动 3 文件，+36／−29，净 +7 行；版本诊断改动 1 文件，+6／−1，净 +5 行；无新增、删除或迁移文件。新增断言禁止物理 binding 调用 Position binding。新增共享声明使任务语义有单一位置，文件数未下降；物理 source 构建、provider／renderer adapter 的后续归位仍待处理。
+
+版本诊断 210 项通过。当前冻结输入下，MuJoCo PickCube effort 正式入口完成 reset、一次非零 step、再次 reset、Robot 重绑定与重复 close，实测 5 个 native 子步；具体身份、状态和双锁收据见 ignored `workspace/maintenance/v211_physical_task_binding_20261112/`。首次使用错误解释器时缺少 NumPy，物理未启动，该失败记录保留。USD 真实交付的构建和 Controller 绑定在诊断中验证，本批未复验 Isaac 原生推进、renderer 或完整 Solution，不将此前不同输入的证据当作本批通过。

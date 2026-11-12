@@ -1,12 +1,10 @@
 """Task binding for the existing Isaac physical source."""
-from dataclasses import replace
-from functools import partial
-
-
 def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, control_kind,
                                 task_config, resolved_config, lift_height_m=None, robot=None):
     """Declare source and Controller bindings; Env and Runtime own lifecycle."""
-    from .specialization import build_isaac_reference, make_reference_binding
+    from .specialization import build_isaac_reference, _validate_external_readiness_solution
+    from .task import physical_task_binding_fields
+    from ...environment.reference_binding import ReferenceTaskBinding
     from ...runtime.sessions.source_composition_adapters import build_panda_effort_execution
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('Isaac physical source horizon must be in [1, 1000]')
@@ -18,9 +16,6 @@ def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, contr
             native_drive='disabled' if drive_mode == 'effort-only' else 'position')
         return build_pickcube_effort_profile(physical, artifact, kind=control_kind,
             config=action_config, source_xml=panda_xml, end_frame_id='ee')
-    base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest,
-                                  task_config=task_config, resolved_config=resolved_config,
-                                  lift_height_m=lift_height_m, robot=robot)
     def build(provider, backend, actual_seed, actual_horizon, sampled):
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
@@ -32,12 +27,12 @@ def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, contr
                                      include_solution=False, physical_fixture=drive_mode,
                                      controller_builder=build_controller, task_config=task_config,
                                      resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
-    from .task import physical_observation
-    from ...observations.selected_reference import selected_reference_observation_spaces
-    return replace(base, build=build,
-        scalar_control_binding=None, action_space_factory=None,
-        observation_space_factory=partial(selected_reference_observation_spaces, include_robot_state=True),
-        observation_projection=partial(physical_observation, hand_frame_id='ee'),
-        physical_sequence_v2_observation=True,
-        action_schema=None,
-        recorder_mode='execution', interval_mode='grouped')
+    return ReferenceTaskBinding(build=build,
+        **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                                       hand_frame_id='ee'),
+        action_schema=None, action_space_factory=None,
+        reset_runtime_input=lambda value: value.get('session_admission_input'),
+        validate_external_solution=_validate_external_readiness_solution,
+        external_solution_actions=True,
+        reset_expert_kwargs=lambda env: {'execution_info': env.expert_execution_info()},
+        observe_expert_kwargs=lambda env, _samples: {'execution_info': env.expert_execution_info()})

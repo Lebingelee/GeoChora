@@ -43,11 +43,16 @@ def test_compiled_action_contract_requires_a_real_physical_execution():
         binding.bind_compiled_control({'physical_execution': object()})
 
 
-def test_usd_effort_binding_does_not_request_position_source_composition():
+def test_usd_effort_binding_does_not_request_position_source_composition(monkeypatch):
     from task_env.observations.selected_reference import selected_reference_observation_spaces
     from task_env.tasks.pick_cube.specialization import _configuration
     from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv, physical_observation
+    from task_env.tasks.pick_cube import specialization
+
+    def reject_position_binding(*args, **kwargs):
+        pytest.fail('physical construction must not create a Position binding')
+    monkeypatch.setattr(specialization, 'make_reference_binding', reject_position_binding)
 
     binding = make_isaac_physical_binding(delivery_manifest='unused-until-build',
         horizon=8, drive_mode='effort-only', control_kind='joint',

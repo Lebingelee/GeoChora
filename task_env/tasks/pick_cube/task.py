@@ -237,6 +237,24 @@ def task_binding_fields(*, task_config=None, lift_height_m=None, reset_sampler=N
     }
 
 
+def physical_task_binding_fields(*, task_config, lift_height_m, hand_frame_id,
+                                 reset_sampler=None, cube_force_z_N=None):
+    """Declare task semantics shared by the admitted physical source formats."""
+    from functools import partial
+    from ...controllers.canonical.contracts import reference_pose_action
+    from ...observations.selected_reference import selected_reference_observation_spaces
+
+    return {
+        **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                              reset_sampler=reset_sampler, cube_force_z_N=cube_force_z_N),
+        'external_actions': True, 'interval_mode': 'grouped', 'recorder_mode': 'execution',
+        'prepare_action': reference_pose_action,
+        'observation_space_factory': partial(selected_reference_observation_spaces, include_robot_state=True),
+        'observation_projection': partial(physical_observation, hand_frame_id=hand_frame_id),
+        'physical_sequence_v2_observation': True,
+    }
+
+
 def task_com_wrench_factory(cube_force_z_N):
     """Declare the Task's optional vertical force for the common control interval."""
     if cube_force_z_N is None:

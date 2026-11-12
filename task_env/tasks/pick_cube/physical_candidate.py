@@ -68,13 +68,10 @@ def make_physical_binding(*, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None, robot=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
-    from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import sample_episode_reset_plan
     from ...environment.reference_binding import ReferenceTaskBinding
-    from functools import partial
-    from ...observations.selected_reference import selected_reference_observation_spaces
     from .specialization import _prepare_reference_source, compile_pickcube_mjcf_task
-    from .task import (physical_observation, task_binding_fields,
+    from .task import (physical_task_binding_fields,
                        physical_execution_info, observe_physical_action)
 
     prepared = _prepare_reference_source(
@@ -142,15 +139,13 @@ def make_physical_binding(*, drive_mode, control_kind,
         from ...controllers.canonical.r3_effort import panda_reset_action_schema
         owned_resources = ExitStack()
         binding = ReferenceTaskBinding(build=build,
-            **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+            **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                hand_frame_id='hand',
                 cube_force_z_N=cube_force_z_N, reset_sampler=lambda _artifact, actual_seed:
                     sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed).reset_sample),
-            external_actions=True, interval_mode='grouped',
-            recorder_mode='execution', close_task_resources=owned_resources.close,
+            close_task_resources=owned_resources.close,
             action_schema=physical.action_schema(),
-            action_space_factory=physical.action_space, prepare_action=reference_pose_action,
-            observation_space_factory=partial(selected_reference_observation_spaces, include_robot_state=True),
-            observation_projection=physical_observation,
+            action_space_factory=physical.action_space,
             validate_external_solution=_validate_external_readiness_solution if reset_switch else None,
             position_execution_info=physical_execution_info if reset_switch else None,
             position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
@@ -159,7 +154,6 @@ def make_physical_binding(*, drive_mode, control_kind,
                 initial_kind=control_kind, allowed_kinds=('joint', 'r3-pose'), space_policy=space_policy,
                 declaration=physical))
                 if reset_switch else None,
-            physical_action_observer=observe_physical_action if reset_switch else None,
-            physical_sequence_v2_observation=True)
+            physical_action_observer=observe_physical_action if reset_switch else None)
         owned_resources.callback(resources.pop_all().close)
         return binding
