@@ -9,6 +9,40 @@ from task_env.environment.configuration import resolve_task_env_config
 from task_env.registry import ENV_REGISTRY
 
 
+@pytest.mark.parametrize(('uid', 'profile'), [
+    ('pick-cube-p16-reference-v1', 'r3_continuous_v1'),
+    ('pick-cube-p16-reference-v1', 'panda-direct-effort-v1'),
+    ('nut-assembly-outcome-reference-v1', 'r3_continuous_v1'),
+    ('pendulum-v1', 'direct_joint_effort_v1'),
+    ('two-wheel-balance-v1', 'direct_joint_effort_v1'),
+])
+def test_formal_tasks_construct_from_common_request(uid, profile, monkeypatch):
+    from task_env import make_env
+    from task_env.environment import reference_binding
+
+    requests = []
+    request_type = reference_binding.TaskBuildRequest
+
+    def record(*args):
+        request = request_type(*args)
+        requests.append(request)
+        return request
+
+    monkeypatch.setattr(reference_binding, 'TaskBuildRequest', record)
+    env = make_env(uid, config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    try:
+        assert len(requests) == 1
+        request = requests[0]
+        assert (request.provider, request.backend, request.horizon) == ('mujoco', 'cpu', 8)
+        assert request.binding.robot.uid == env.robot.uid
+        assert request.sampled_reset is None
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize('uid', [
     'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
     'pendulum-v1', 'two-wheel-balance-v1',

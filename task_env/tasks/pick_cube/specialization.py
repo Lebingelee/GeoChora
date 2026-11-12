@@ -626,7 +626,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             value['recipe_identity'] = digest(resolved)
         return value
 
-    def build(provider, backend, seed, horizon, sampled):
+    def build(request):
+        provider, backend, seed, horizon, sampled = (request.provider, request.backend,
+            request.seed, request.horizon, request.sampled_reset)
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
         if physical and (provider, backend) != ('isaacsim', 'cuda'):

@@ -25,6 +25,17 @@ class ResetReconstructionResult:
     solution: object
 
 
+@dataclass(frozen=True)
+class TaskBuildRequest:
+    """Inputs to every task construction and reset reconstruction callback."""
+    provider: str
+    backend: str
+    seed: int
+    horizon: int
+    sampled_reset: object
+    binding: object
+
+
 class _StandardResetReconstruction:
     """Rebuild one task through its binding and manage source replacement."""
     def __init__(self, binding, provider, backend, horizon):
@@ -297,7 +308,6 @@ class ReferenceTaskBinding:
     physical_direct_effort_feedback: bool = False
     physical_terminate_on_success: bool = False
     physical_ignore_done: bool = False
-    build_receives_binding: bool = False
     compose_robot_source: Callable | None = None
     robot: object | None = None
 
@@ -318,8 +328,6 @@ class ReferenceTaskBinding:
             raise TypeError('physical termination policy must be a boolean')
         if type(self.physical_ignore_done) is not bool:
             raise TypeError('physical ignore_done policy must be a boolean')
-        if type(self.build_receives_binding) is not bool:
-            raise TypeError('build_receives_binding must be a boolean')
         compiled_physical_action = self.action_space_factory is None and (
             self.action_schema is None or self.external_action_contract is not None)
         if (not callable(self.prepare_action) or (not compiled_physical_action and (
@@ -380,20 +388,20 @@ class ReferenceTaskBinding:
         """
         if not callable(compiler):
             raise TypeError('selected task compiler must be callable')
-        if 'build' in binding_fields or 'build_receives_binding' in binding_fields:
+        if 'build' in binding_fields:
             raise ValueError('compiled binding owns its build callback')
         metadata = None if metadata is None else dict(metadata)
 
-        def build(_provider, _backend, _seed, _horizon, sampled, binding):
-            if sampled is not None:
+        def build(request):
+            if request.sampled_reset is not None:
                 raise ValueError('provider-free compiler does not accept sampled reset input')
             from ..assembly.compiler import reference_construction_value
             return reference_construction_value(
                 compiler(), task_id=task_id, construction_schema=construction_schema,
-                owners=(compiler,), binding=binding, metadata=metadata,
+                owners=(compiler,), binding=request.binding, metadata=metadata,
             )
 
-        return cls(build=build, build_receives_binding=True, **binding_fields)
+        return cls(build=build, **binding_fields)
 
     def reset_reconstruction_strategy(self, provider, backend, horizon):
         """Select task-owned reconstruction once when a configuration is admitted."""
@@ -401,10 +409,7 @@ class ReferenceTaskBinding:
 
     def build_for_request(self, provider, backend, seed, horizon, sampled=None):
         """Build from one explicit Task/Robot/Runtime request."""
-        if self.build_receives_binding:
-            value = self.build(provider, backend, seed, horizon, sampled, self)
-        else:
-            value = self.build(provider, backend, seed, horizon, sampled)
+        value = self.build(TaskBuildRequest(provider, backend, seed, horizon, sampled, self))
         execution = value.get('physical_execution')
         profile = getattr(execution, 'selection_profile_id', None)
         if profile is not None:
@@ -477,7 +482,9 @@ class ExistingSubjectEffortTask:
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
-        def build(provider, backend, seed, _horizon, sampled):
+        def build(request):
+            provider, backend, seed, sampled = (request.provider, request.backend,
+                                                 request.seed, request.sampled_reset)
             if backend != config.runtime.backend:
                 raise ValueError('build request backend differs from resolved configuration')
             robot = self.robot

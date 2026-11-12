@@ -47,8 +47,10 @@ def make_physical_binding(*, native_drive, control_kind,
     # task reset plan; Env.close releases the source receipt once.
     prepared_value = None
 
-    def build(provider, backend, actual_seed, _horizon, sampled):
+    def build(request):
         nonlocal prepared_value
+        provider, backend, actual_seed, sampled = (request.provider, request.backend,
+                                                   request.seed, request.sampled_reset)
         if backend != resolved_config.runtime.backend:
             raise ValueError('requested backend differs from the declared Robot source')
         if sampled is not None:

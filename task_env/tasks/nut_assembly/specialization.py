@@ -479,7 +479,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None, robot=N
         build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         task_config['recipe']['reset'],
     )
-    return ReferenceTaskBinding(build=lambda provider, _backend, _seed, _horizon, _sampled: build_reference(provider=provider, include_solution=False,
+    return ReferenceTaskBinding(build=lambda request: build_reference(provider=request.provider, include_solution=False,
                                                                       resolved_config=resolved_config,
                                                                       lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
