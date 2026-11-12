@@ -131,20 +131,15 @@ def test_formal_position_and_effort_share_task_and_robot_scene():
     assert declarations[0] == declarations[1]
 
 
-def test_public_solution_factory_releases_its_preparation_source(monkeypatch):
+def test_public_solution_factory_does_not_allocate_a_preparation_source(monkeypatch):
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import build_readiness_solution
 
-    captured = []
-    snapshot = source_module.snapshot_legacy_mjcf_source
-    def capture(source):
-        result = snapshot(source)
-        captured.append(result.execution_source_receipt.snapshot_root)
-        return result
-    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    def unexpected_snapshot(source):
+        pytest.fail('a standalone Solution does not need a source snapshot')
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected_snapshot)
     solution = build_readiness_solution(controller_profile='r3_continuous_v1')
     assert solution.identity
-    assert len(captured) == 1 and not captured[0].exists()
 
 
 def test_formal_env_releases_its_source_once(monkeypatch):

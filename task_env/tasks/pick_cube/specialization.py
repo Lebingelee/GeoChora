@@ -635,13 +635,26 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
 
 
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
-    """Build the task-owned PickCube readiness Solution for an external driver."""
-    value = build_reference(backend=backend, controller_profile=controller_profile)
-    from ...runtime.sessions.source import source_resource_receipt
-    receipt = source_resource_receipt(value['source'])
-    if receipt is not None:
-        receipt.close()
-    return value['solution']
+    """Build the external Solution from Task and Robot declarations, without a source lease."""
+    from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
+
+    robot = make_agent('panda-v1')
+    robot.source_recipe_for_profile(controller_profile)
+    task_config = _configuration()
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    is_r3_profile = controller_profile in _PICKCUBE_R3_PROFILES
+    dynamic_profile, _ = _r3_dynamic_profile() if is_r3_profile else (None, None)
+    config = _environment_config(task_config)
+    if is_r3_profile:
+        config = _nut_aligned_environment_config(config)
+    if backend not in {'cpu', 'cuda'}:
+        raise ValueError('PickCube reference backend must be cpu or cuda')
+    artifact = build_artifact(task_config=task_config)
+    readiness = PickCubeReadinessConfig.from_resolved_config(
+        artifact, config, **_readiness_options(artifact, is_r3_profile=is_r3_profile,
+                                               dynamic_profile=dynamic_profile))
+    return PickCubeReadinessSolution(config=readiness)
 
 
 def _validate_external_readiness_solution(value, solution):

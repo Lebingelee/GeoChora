@@ -8,6 +8,36 @@ from task_env.environment.reference_env import SelectedReferenceEnv
 from task_env.planners.contracts import ExpertAction
 
 
+@pytest.mark.parametrize('backend', ['cpu', 'cuda'])
+@pytest.mark.parametrize('profile', ['r1', 'r3_continuous_v1'])
+def test_external_pickcube_solution_matches_source_without_constructing_one(backend, profile, monkeypatch):
+    from task_env.tasks.pick_cube import specialization
+    from task_env.runtime.sessions.source import source_resource_receipt
+
+    built = specialization.build_reference(backend=backend, controller_profile=profile)
+    try:
+        expected_identity = built['solution_identity']
+        expected_readiness = built['readiness']
+    finally:
+        source_resource_receipt(built['source']).close()
+
+    def unexpected_source(*args, **kwargs):
+        pytest.fail('external Solution must not construct a RuntimeSource')
+    monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected_source)
+    solution = specialization.build_readiness_solution(backend=backend, controller_profile=profile)
+    assert solution.identity == expected_identity
+    assert solution.readiness_config == expected_readiness
+
+
+def test_external_pickcube_solution_keeps_robot_and_backend_admission():
+    from task_env.tasks.pick_cube.specialization import build_readiness_solution
+
+    with pytest.raises(ValueError, match='Panda does not declare this Controller profile'):
+        build_readiness_solution(controller_profile='r1_split')
+    with pytest.raises(ValueError, match='backend must be cpu or cuda'):
+        build_readiness_solution(backend='unsupported')
+
+
 @pytest.mark.parametrize('phase', ['proposal', 'physical_external_solution_proposal'])
 def test_solution_proposal_is_projected_once_and_remains_caller_owned(phase):
     boundary = {'episode': 'episode-1'}
