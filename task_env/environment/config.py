@@ -584,7 +584,6 @@ class ResolvedSelectedConfig:
     task_uid: str
     physics_provider: str
     physics_device: str
-    controller_profile: str | None = None
     source_delivery_manifest: str | None = None
     task_parameters: tuple[tuple[str, float], ...] = ()
     task_configuration_json: str | None = None
@@ -598,6 +597,11 @@ class ResolvedSelectedConfig:
     robot_uid: str | None = None
     native_drive: str | None = None
     controller_parameters_json: str = '{}'
+
+    @property
+    def controller_profile(self) -> str | None:
+        """The selected profile is owned by the resolved control configuration."""
+        return self.environment.control.profile_id
 
     def __post_init__(self) -> None:
         if self.native_drive not in (None, 'position', 'disabled'):

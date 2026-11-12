@@ -329,3 +329,16 @@ def test_solution_diagnostic_alias_is_not_a_controller_profile():
         resolve_task_env_config(ENV_REGISTRY.get('pick-cube-p16-reference-v1'), {
             'controller': {'profile_id': 'r3_continuous_v1_pose_path_x20'},
         })
+
+
+def test_resolved_controller_profile_has_one_owner():
+    from dataclasses import asdict, replace
+    importlib.import_module('task_env.tasks')
+    task = ENV_REGISTRY.get('pick-cube-p16-reference-v1')
+    resolved = resolve_task_env_config(task, {'controller': {'profile_id': 'r1'}})
+    assert 'controller_profile' not in asdict(resolved)
+    assert asdict(resolved)['environment']['control']['profile_id'] == 'r1'
+    changed = replace(resolved, environment=replace(
+        resolved.environment, control=replace(resolved.environment.control, profile_id='r3_continuous_v1')))
+    assert changed.controller_profile == 'r3_continuous_v1'
+    assert resolve_task_env_config(task, changed) == changed

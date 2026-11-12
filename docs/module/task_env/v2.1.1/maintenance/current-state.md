@@ -211,3 +211,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 只改变 Solution 姿态绕行的历史别名已退出正式 Controller 选择；正常 R3 的受影响 MuJoCo、GeoPhys 和 Isaac 短程已复验。详见[实施记录 6.97](../planning/post-5c-optimization-execution.md#697-solution-诊断别名退出-controller-配置)。
 
 已退休姿态绕行的 Solution 分支及配置已清除，正常预算保留；PickCube Solution 的 MuJoCo／GeoPhys 单步与 Isaac 外部 action 短程已复验。详见[实施记录 6.98](../planning/post-5c-optimization-execution.md#698-清除退休姿态绕行的-solution-分支)。
+
+已解析 Controller profile 现在由 control 配置单独存储；四任务 MuJoCo、两个 worker 和 GeoPhys NutAssembly 短程通过。详见[实施记录 6.99](../planning/post-5c-optimization-execution.md#699-controller-profile-只有一个配置-owner)。

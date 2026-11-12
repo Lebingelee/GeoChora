@@ -522,7 +522,6 @@ def _resolve_selected_config(environment_type, config):
         task_uid=environment_type.uid,
         physics_provider=provider,
         physics_device=device,
-        controller_profile=profile,
         gravity_compensation=gravity_compensation,
         reset_profile=reset_profile,
         robot_uid=robot_uid,

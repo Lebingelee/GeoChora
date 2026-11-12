@@ -1040,3 +1040,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 2 文件 +6／−65，净减 59 行；版本诊断修改 1 文件 +7／−5，增加正式 PickCube Solution 单步探针；本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。移除的是退休诊断的 Task／Solution 分流，Robot／Controller、provider／renderer 的 source、状态、clock、提交和资源合同未变。
 
 129 项版本检查通过。四个正式任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube 正式 R3 Solution 在 MuJoCo 完成 reset、一个 Solution step、H5 逻辑读回及再次 reset，观察 5 个子步；GeoPhys 同一 Solution 完成 reset、单步和再次 reset，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。PickCube MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，按 50 保守预算记账。Isaac CUDA 默认 R3 Position／同步 RGB 完成两次 reset、一次非零外部 action、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。上述 Solution 证据均为单步，本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_retire_posture_detour_20261112_8wuqh_ao/` 和 `workspace/maintenance/v211_retire_posture_detour_isaac_20261112_al0n6izh/`；E01～E04 仍未接收。
+
+### 6.99 Controller profile 只有一个配置 owner
+
+输入 `ff99e9ea`。`ResolvedSelectedConfig` 此前同时保存外层 `controller_profile` 和 `environment.control.profile_id`，解析时需要维护两份值。现在实际值只存于已解析 control 配置，外层同名读取属性直接返回它；构造器不再接受第二份 Controller profile。直接使用 dataclass 序列化时外层不再产生重复字段，正式记录配置仍从该属性写入规范 `controller.profile_id`。
+
+生产修改 2 文件 +5／−2，净增 3 行；版本诊断修改 1 文件 +13／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。四任务及 reset／worker 均消费相同的 Controller 选择；这消除一个重复配置权威，不表示其余配置类型或构建链已经全部合并。provider／renderer 的 source、状态、clock、提交和资源合同未改。
+
+130 项版本检查通过，包括 Controller profile 的单一存储、替换后的读取和已解析配置重建。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期及 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑；旧证据仍只证明原受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_single_controller_config_20261112_x65s60e1/`；E01～E04 仍未接收。
