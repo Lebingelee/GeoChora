@@ -1655,8 +1655,6 @@ def build_libero_selected_candidate(
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
         build_mixed_control_profile=build_value,
-        build_external=(lambda provider: build_value(provider, 'cpu'))
-        if solution_profile and not panda_gripper_delta_replay else None,
         validate_external_solution=validate_external_solution
         if solution_profile and not panda_gripper_delta_replay else None,
         reset_sample_with_options=reset_with_options,

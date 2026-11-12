@@ -1720,7 +1720,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         RuntimeSession is reconstructed. A faulted Env may request this explicit
         rebuild; the fault remains latched until reset publication completes.
         """
-        if self.binding.build_external is None or self.binding.validate_external_solution is None:
+        if self.binding.validate_external_solution is None:
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
         self._episode_execution_state().require_open('environment is closed')
         self.binding.validate_external_solution(self.value, solution)

@@ -1239,3 +1239,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `d018abaf`；实施前复核台账 GOV-01／02、ENTRY-01／02、ENV-01～03、SUBJ-01～03、CTRL-01／02 及 source owner 边界。正式 PickCube Position 和 effort 的共同 MJCF Scene 绑定此前从 MuJoCo composition 模块取得，即使实际 provider 是 GeoPhys；简单主体 effort source 又独立计算相同的投影与资产闭包。将 Scene 投影、资产读取和闭包计算归入共同 Runtime source，PickCube 的快照绑定、简单主体的 source 编译以及 adapter 的闭包复核实际调用同一实现。MuJoCo 特有物化仍由 MuJoCo adapter 执行；Scene、source 闭包、受管快照和 native 校验均未删减。
 
 生产修改 5 文件 +37／−47，净减 10 行；共同绑定函数从 MuJoCo composition 迁入既有 Runtime source，属于代码段迁移，无整文件迁移。版本诊断和测试本批无源码变化；本文新增记录，无新增或删除文件，tracked 文件数保持 1357。最终代码下 175 项版本合同检查通过。MuJoCo 正式 PickCube Position 和 Pendulum 分别完成构建、reset、一次非零控制、第二次 reset、关闭，观测 5 和 25 个 native 子步；PickCube MJCF 导入保留语义诊断。本批未复跑 GeoPhys、Isaac、renderer 或完整 Solution；此前对应证据保留其原代码和范围。冻结输入、双锁预算及收据位于 ignored `workspace/maintenance/v211_shared_mjcf_source_3jk6quiw/`。装配 Panda 的替换式 source 及四任务共同构建仍待收敛，E01～E04 未整体接收。
+
+
+### 6.125 Solution 重建使用共同 builder
+
+输入 `a961ae5d`；实施前复核优化台账 GOV-01／02、ENTRY-01／02、ENV-01～03、SUBJ 和 CTRL-01／02。PickCube、NutAssembly 及 PickCube 物理切换的 caller-owned Solution 原先分别声明 `build_external`，其实际 builder 与普通构建相同；共同 reset 现在在有 seeded 能力时调用 seeded builder，否则调用同一个普通 builder。删除多余 binding 字段和两任务的重复声明；外部 Solution 是否受支持仍由任务提供的验证函数决定，旧 source 验证、seed、失败清理及唯一提交路径保留。LIBERO caller 中对该字段的重复声明同步移除；该 caller 还含已有未迁移 binding 字段，本次未验证或宣称 LIBERO 路线可运行。
+
+生产修改 6 文件 +4／−23，净减 19 行；版本诊断修改 1 文件 +10／−1，覆盖有 seed 和无 seed 的 Solution 采用共同 builder。本文新增记录，无新增、删除或整文件迁移，tracked 文件数保持 1357。176 项版本合同检查通过；正式 MuJoCo PickCube 与 NutAssembly 各以 caller-owned Solution 完成 reset、单次控制推进、再次 reset 和关闭，各观测 5 个 native 子步，非完整 Solution。MJCF 导入保留语义诊断。GeoPhys、Isaac、renderer 和其他任务本批未复验；既有证据保留原范围。冻结输入、预算和收据位于 ignored `workspace/maintenance/v211_shared_solution_build_xsrk4d3b/`。装配 Panda source、四主体统一与完整控制验收仍未完成，E01～E04 未整体接收。

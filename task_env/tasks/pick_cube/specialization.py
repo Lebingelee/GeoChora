@@ -607,17 +607,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             )
         return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid))
 
-    def build_external(provider):
-        if provider == "isaacsim":
-            return build_isaac_reference(
-                delivery_manifest=source_delivery_manifest, include_solution=False,
-                controller_profile=controller_profile, lift_height_m=lift_height_m,
-                **({"resolved_config": resolved_config} if resolved_config is not None else {}),
-                **({"task_config": task_config} if task_config is not None else {}),
-            )
-        return adapt(build_reference(backend="cpu", include_solution=False,
-                               controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid))
-
     def build_seeded(provider, backend, seed, horizon):
         if provider == "isaacsim":
             if backend != "cuda" or source_delivery_manifest is None:
@@ -642,7 +631,6 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         build=build,
         **reference_pose_action_binding(), **selected_observation_binding(),
         scalar_control_binding=panda_reference_control_binding(),
-        build_external=build_external,
         build_seeded=build_seeded,
         position_execution_info=lambda env: (
             position_execution_info(env.state, env.last_position_transition)

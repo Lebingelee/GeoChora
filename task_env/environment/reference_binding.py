@@ -122,7 +122,7 @@ class _StandardResetReconstruction(_ResetReconstruction):
         if external_solution is not None:
             if self.binding.build_seeded is not None:
                 return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
-            return self._compose(self.binding.build_external(self.provider))
+            return self._compose(self.binding.build_for_provider(self.provider))
         if self.binding.build_sampled is not None:
             return self._compose(self.binding.build_sampled(
                 self.provider, self.backend, seed, self.horizon, self.sampled_reset))
@@ -291,7 +291,6 @@ class ReferenceTaskBinding:
     control_request_required: bool = False
     external_solution_actions: bool = False
     expert_uses_public_observation: bool = False
-    build_external: Callable | None = None
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
     build_seeded: Callable | None = None
@@ -368,8 +367,8 @@ class ReferenceTaskBinding:
                          or not isinstance(self.position_execution_info_key, str)
                          or not self.position_execution_info_key))):
             raise ValueError('position execution info requires a callable and nonempty result key')
-        if (self.build_external is None) != (self.validate_external_solution is None):
-            raise ValueError('external Solution construction and validation must be supplied together')
+        if self.validate_external_solution is not None and not callable(self.validate_external_solution):
+            raise TypeError('external Solution validation must be callable')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.reset_runtime_input is not None and not callable(self.reset_runtime_input):

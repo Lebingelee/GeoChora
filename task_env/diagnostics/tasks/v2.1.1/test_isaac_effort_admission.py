@@ -81,9 +81,18 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
 
     binding = SimpleNamespace(compose_robot_source=None,
         build_seeded=lambda provider, backend, seed, horizon: (provider, backend, seed, horizon),
-        build_external=lambda provider: pytest.fail('seedless builder used for a seeded Solution'))
+        build_for_provider=lambda provider: pytest.fail('seedless builder used for a seeded Solution'))
     strategy = _StandardResetReconstruction(binding, 'isaacsim', 'cuda', 8)
     assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
+
+
+def test_solution_reconstruction_uses_the_normal_builder_without_seeded_capability():
+    from task_env.environment.reference_binding import _StandardResetReconstruction
+
+    binding = SimpleNamespace(compose_robot_source=None, build_seeded=None,
+        build_for_provider=lambda provider: {'provider': provider})
+    strategy = _StandardResetReconstruction(binding, 'mujoco', 'cpu', 8)
+    assert strategy.build_reset({}, 42, object()) == {'provider': 'mujoco'}
 
 
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1',
