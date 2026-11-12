@@ -297,6 +297,33 @@ def test_usd_rejects_unsupported_task_force():
         })
 
 
+def test_position_binding_uses_selected_controller_identity_and_recorded_owner():
+    import hashlib
+    from pathlib import Path
+    from task_env.recorders.position_metadata import position_control_binding_provenance
+    from task_env.runtime.sessions import control
+
+    class PositionController:
+        def __init__(self, entity):
+            self.entity_id = entity
+            self.gripper_semantic_id = f'{entity}/gripper'
+        def selected_position_capability(self):
+            return control.SelectedPositionCapabilityV1(self)
+
+    selector = control.position_control_binding_from_selected
+    first, second = PositionController('robot-a'), PositionController('robot-b')
+    binding = selector({'controller': [second, first]})
+    assert binding.gripper_semantic_id == 'robot-a/gripper'
+    provenance = position_control_binding_provenance(binding, selector)
+    assert provenance['binding']['gripper_semantic_id'] == binding.gripper_semantic_id
+    assert provenance['selector_source_sha256'] == hashlib.sha256(
+        Path(control.__file__).read_bytes()).hexdigest()
+    with pytest.raises(ValueError, match='distinct Entities'):
+        selector({'controller': [first, first]})
+    with pytest.raises(TypeError, match='Controller capabilities'):
+        selector({'controller': object()})
+
+
 def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypatch):
     from dataclasses import replace
     from pathlib import Path

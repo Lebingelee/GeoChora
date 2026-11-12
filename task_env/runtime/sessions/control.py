@@ -862,6 +862,19 @@ class ControlBinding:
         return ScalarRuntimeBuilder(self)
 
 
+def position_control_binding_from_selected(value):
+    """Use the selected Position Controller's declared gripper identity."""
+    raw = value['controller']
+    profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
+    if not profiles or len(profiles) > 2 or any(
+            _selected_position_capability(profile) is None for profile in profiles):
+        raise TypeError('Position control requires selected Position Controller capabilities')
+    profiles = tuple(sorted(profiles, key=lambda profile: profile.entity_id))
+    if len({profile.entity_id for profile in profiles}) != len(profiles):
+        raise ValueError('Position Controllers must bind distinct Entities')
+    return ControlBinding(profiles[0].gripper_semantic_id, .08)
+
+
 def prepare_position_control_materialization(
     *, source, artifact, profiles, plan, select_binding, value,
     capabilities=None,

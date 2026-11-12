@@ -43,7 +43,7 @@ from ...environment.configuration import (
 )
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...planners import AbsolutePosePlannerConfig
-from ...runtime.sessions.control import ControlBinding
+from ...runtime.sessions.control import position_control_binding_from_selected
 from ...robots.panda import PandaAgent, panda_reference_control_binding
 from ...runtime.sessions.source import RuntimeSource
 from ...environment.reference_binding import ReferenceTaskBinding
@@ -788,10 +788,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         ),
         position_execution_info_key='pickcube_position_execution_info_v1',
         reset_runtime_input=lambda value: value.get('session_admission_input'),
-        position_control_binding=lambda value: ControlBinding(
-            'panda-v1/gripper' if value.get('session_admission_input') is not None
-            else 'panda-main/gripper', 0.08
-        ),
+        position_control_binding=position_control_binding_from_selected,
         validate_external_solution=_validate_external_readiness_solution,
         **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
                               cube_force_z_N=cube_force_z_N),
