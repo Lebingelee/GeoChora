@@ -235,7 +235,8 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     built, declared, bound = [], [], []
     original_reference = specialization._prepare_reference_source
     original_scene = source_scene_import.declare_panda_scene
-    original_control = PandaAgent.build_direct_effort_execution
+    from task_env.runtime.sessions import source_composition_adapters
+    original_control = source_composition_adapters.build_panda_direct_effort_execution
 
     def reference(*args, **kwargs):
         value = original_reference(*args, **kwargs)
@@ -256,7 +257,7 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_reference)
     monkeypatch.setattr(specialization, '_prepare_reference_source', reference)
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', scene)
-    monkeypatch.setattr(PandaAgent, 'build_direct_effort_execution', control)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_direct_effort_execution', control)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco'},
         'controller': {'profile_id': 'panda-direct-effort-v1'},

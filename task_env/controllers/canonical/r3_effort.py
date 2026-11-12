@@ -18,6 +18,20 @@ PANDA_EFFORT_PROFILE_KINDS = MappingProxyType({
 PANDA_SWITCHABLE_EFFORT_KINDS = ('joint', 'r3-pose')
 
 
+def build_panda_direct_effort_controller(binding, writer, *, entity_id, joint_names,
+                                         cadence_s, model_id, finger_action_id):
+    """Bind the Panda's arm and paired finger action to declared effort channels."""
+    from .physical_controller import LinearEffortControllerV1
+
+    keys = tuple(f'{entity_id}/{name}' for name in joint_names)
+    action_names = tuple(f'arm-effort-{i}' for i in range(1, 8)) + (finger_action_id,)
+    matrix = tuple(tuple((1. if i == j else 0.) if i < 7 else (0.5 if j == 7 else 0.)
+                         for j in range(8)) for i in range(len(joint_names)))
+    return LinearEffortControllerV1.zero_bias(binding, writer_id=writer,
+        channel_keys=keys, action_names=action_names, action_to_effort=matrix,
+        cadence_s=cadence_s, model_id=model_id, selection_profile_id='panda-direct-effort-v1')
+
+
 def resolve_panda_effort_options(profile_id, native_drive, parameters):
     """Resolve Controller-owned drive and reset options without provider policy."""
     kind = PANDA_EFFORT_PROFILE_KINDS[profile_id]

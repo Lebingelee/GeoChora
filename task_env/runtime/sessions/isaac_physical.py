@@ -32,8 +32,9 @@ def build_isaac_panda_effort_execution(robot, scene, artifact, source, *, native
         tuple(f'f06-arm-{i+1}' if i < 7 else 'f06-mimic-pair' for i in range(9)),
         'f06-panda-direct-effort-assembly', 'f06-panda-direct-effort-components',
         'f06-direct-effort-zero-bias-v1', 'finger-pair-effort')
-    return robot.build_direct_effort_execution(
-        scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
+    from .source_composition_adapters import build_panda_direct_effort_execution
+    return build_panda_direct_effort_execution(
+        robot, scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
         native_ranges=((-250., 250.),) * 7 + ((-5., 5.),), layout=layout,
         joint_bindings=position_joint_bindings_from_artifact(scene, artifact, source),
         frame_bindings=position_frame_bindings_from_artifact(artifact, source))

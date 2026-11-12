@@ -98,21 +98,22 @@ def test_panda_subject_rejects_incomplete_native_transmission_declaration():
 @pytest.mark.parametrize(('drive', 'limit'), [('position', 10.), ('disabled', -1.), ('disabled', float('nan'))])
 def test_panda_rejects_invalid_gripper_force_override(drive, limit):
     from task_env.robots.panda import PandaAgent
+    from task_env.runtime.sessions.source_composition_adapters import build_panda_direct_effort_execution
 
     with pytest.raises(ValueError, match='positive limit and isolated drives'):
-        PandaAgent().build_direct_effort_execution(None, None, None, entity_id='panda-v1',
+        build_panda_direct_effort_execution(PandaAgent(), None, None, None, entity_id='panda-v1',
             native_drive=drive, native_ranges=((-5., 5.),) * 8, gripper_force_limit_N=limit)
 
 
 def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.robots.panda import PandaAgent
-    from task_env.runtime.sessions import source_scene_import
+    from task_env.runtime.sessions import source_composition_adapters, source_scene_import
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
     used = []
     declare = source_scene_import.declare_panda_scene
-    build = PandaAgent.build_direct_effort_execution
+    build = source_composition_adapters.build_panda_direct_effort_execution
 
     def capture_declaration(robot, *args, **kwargs):
         used.append(('scene', robot))
@@ -123,7 +124,7 @@ def test_formal_effort_scene_and_execution_use_same_robot(monkeypatch):
         return build(robot, *args, **kwargs)
 
     monkeypatch.setattr(source_scene_import, 'declare_panda_scene', capture_declaration)
-    monkeypatch.setattr(PandaAgent, 'build_direct_effort_execution', capture_execution)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_direct_effort_execution', capture_execution)
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
         'controller': {'profile_id': 'panda-direct-effort-v1'}, 'episode': {'horizon': 8},

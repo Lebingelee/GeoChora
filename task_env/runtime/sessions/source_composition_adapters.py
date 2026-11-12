@@ -28,6 +28,60 @@ def validate_effort_source_route(*, provider, backend, deployment, source_delive
         raise ValueError('physical reset selection requires an isolated MuJoCo reference Controller')
 
 
+def build_panda_direct_effort_execution(robot, scene, artifact, source, *, entity_id,
+                                        native_drive, native_ranges, layout=None,
+                                        joint_bindings=None, frame_bindings=None,
+                                        gripper_force_limit_N=None):
+    """Compile a source-admitted Panda declaration and bind its effort Controller."""
+    import math
+    from ...artifacts import FrameReference
+    from ...controllers.canonical.r3_effort import build_panda_direct_effort_controller
+    from .physical_control import build_declared_effort_execution
+    from ...robots.panda import PandaEffortSourceLayout
+
+    if native_drive not in {'position', 'disabled'}:
+        raise ValueError('Panda effort profile requires a declared native drive mode')
+    if gripper_force_limit_N is not None:
+        if (native_drive != 'disabled' or type(gripper_force_limit_N) not in (int, float)
+                or not math.isfinite(gripper_force_limit_N) or gripper_force_limit_N <= 0
+                or len(native_ranges) != 8):
+            raise ValueError('Panda gripper force limit requires a positive limit and isolated drives')
+        native_ranges = (*native_ranges[:7], (-gripper_force_limit_N, gripper_force_limit_N))
+    names = robot.physical_joint_names()
+    definitions = {j.joint_id: j for a in scene.articulations or ()
+                   if a.entity_id == entity_id for j in a.joints}
+    if any(name not in definitions or source.joints.get(f'{entity_id}/{name}') != name for name in names):
+        raise ValueError('Panda effort profile requires the exact nine named source joints')
+    layout = robot.effort_source_layout() if layout is None else layout
+    if not isinstance(layout, PandaEffortSourceLayout):
+        raise TypeError('Panda effort construction requires a source layout')
+    subject, declarations = robot.physical_subject_declaration(
+        entity_id=entity_id, source_id=source.source_id,
+        source_closure_sha256=source.source_closure_digest, native_ranges=native_ranges,
+        native_drive=native_drive, native_actuators=layout.native_actuators,
+        transmission_ids=layout.transmission_ids)
+
+    def make_controller(binding, writer):
+        return build_panda_direct_effort_controller(binding, writer, entity_id=entity_id,
+            joint_names=names, cadence_s=artifact.timebase.control_dt,
+            model_id=layout.model_id, finger_action_id=layout.finger_action_id)
+
+    definitions_by_native = {j.joint_id: j for a in scene.articulations or ()
+                             for j in a.joints if j.kind != 'fixed'}
+    if joint_bindings is None:
+        joint_bindings = {semantic: definitions_by_native[native]
+                          for semantic, native in (*source.joints.items(), *source.free_joints.items())}
+    if frame_bindings is None:
+        frame_bindings = {name: (artifact.legacy_frame_bindings[name]
+                                 if name in artifact.legacy_frame_bindings
+                                 else FrameReference(*name.split('/', 1)))
+                          for name in (*source.bodies, *source.frames)}
+    return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
+        subject=subject, declarations=declarations, assembly_id=layout.assembly_id,
+        nested_component_id=layout.nested_component_id, controller_factory=make_controller,
+        state_joint_names=names, joint_bindings=joint_bindings, frame_bindings=frame_bindings)
+
+
 def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive,
                                  gripper_force_limit_N=None):
     """Bind a Robot's effort channels using the source format's native facts."""
@@ -36,8 +90,8 @@ def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive
     if isinstance(source, RuntimeSource):
         from .mujoco_composition import checked_panda_effort_source_limits
         limits = checked_panda_effort_source_limits(source, scene)
-        return robot.build_direct_effort_execution(
-            scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
+        return build_panda_direct_effort_execution(
+            robot, scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
             native_ranges=tuple(limits), gripper_force_limit_N=gripper_force_limit_N)
     if isinstance(source, UsdRuntimeSourceV1):
         if gripper_force_limit_N is not None:

@@ -34,7 +34,7 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## 正式入口及当前实施
 
-截至代码基线 `870bba74` 及本次冻结输入，四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；当前具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。Git 当前 HEAD 以实际工作树为准，不把此输入当作实时 HEAD。
+截至代码基线 `857d7452` 及本次冻结输入，四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；当前具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。Git 当前 HEAD 以实际工作树为准，不把此输入当作实时 HEAD。
 
 | 事件 | 当前状态 | 实际进展和剩余边界 |
 | --- | --- | --- |
