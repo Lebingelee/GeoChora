@@ -1338,7 +1338,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             task_definition=self._task_definition, horizon=self.horizon,
             ignore_done=self.binding.physical_ignore_done))
 
-    def _initialize_selected_value(self, *, camera_observation_config):
+    def _initialize_selected_value(self):
         """Initialize task-declared metadata before the selected Env is published."""
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
@@ -1350,11 +1350,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if (not self.position_profile and self._physical_execution() is None):
             if type(self.binding.scalar_control_binding) is not ControlBinding:
                 raise TypeError('selected scalar control requires its declared ControlBinding')
-        if camera_observation_config is not None and not self.position_profile:
-            raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
-        self.camera_observation_config = camera_observation_config
-        self._camera_consumer = None
-        self._camera_session_factory = None
         self._task_rgb_state_binding = None
         self._task_rgb_typed_state = None
         self.typed_state = None
@@ -1368,39 +1363,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         self.metadata['action_schema'] = dict(self.binding.action_schema)
         self.action_space = self.binding.action_space_factory()
         observation_spaces = self.binding.observation_space_factory(self)
-        if camera_observation_config is not None:
-            from ..observations.selected_reference import position_camera_observation_declaration
-
-            camera_spaces, self.camera_observation_schema = position_camera_observation_declaration(
-                self.binding, camera_observation_config,
-            )
-            observation_spaces.update(camera_spaces)
-            self.metadata['observation_schema'] = {
-                'schema_version': 'position-camera-observation-v1',
-                'leaf_specs': tuple({
-                    'path': field.name,
-                    'shape': field.shape,
-                    'dtype': field.dtype,
-                    'semantic': field.semantic,
-                    'unit': field.unit,
-                    'frame': field.frame,
-                    'time_reference': field.time_reference,
-                } for field in self.camera_observation_schema.fields),
-            }
-            self.metadata['camera_observation_schema'] = 'camera-observation-boundary-v1'
-            self.metadata['info_schema'] = {
-                'camera_observation_v1': {
-                    'schema_version': 'camera-observation-boundary-v1',
-                    'required': True,
-                    'same_boundary_as_observation': True,
-                },
-            }
         self.observation_space = Dict(observation_spaces)
 
     def __init__(self, config=None, *, render_mode=None, build_runtime=True,
                  provider='geophys', backend='cpu', horizon=6000,
                  _binding=None,
-                 camera_observation_config=None, _execution_spec_v1=None,
+                 _execution_spec_v1=None,
                  _initial_value=None, task_rgb_camera=None, task_renderer=None):
         if getattr(type(self), 'uses_selected_public_config', False) and _binding is None:
             raise TypeError('construct formal tasks through make_env and its resolved configuration')
@@ -1426,13 +1394,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 raise ValueError('selected reference rendering and component runtime options require a component task')
             if type(horizon) is not int or not 1 <= horizon <= 6000:
                 raise ValueError('selected reference horizon is outside its admitted range')
-            if camera_observation_config is not None:
-                from ..observations.canonical_camera.consumer import CameraObservationConfigV1
-
-                if not isinstance(camera_observation_config, CameraObservationConfigV1):
-                    raise TypeError('camera observation opt-in requires CameraObservationConfigV1')
-                camera_observation_config.validate_production_envelope()
-                camera_observation_config.capacity(horizon)
             if _binding is not None:
                 if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
                     raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
@@ -1464,9 +1425,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.value = _initial_value
             else:
                 self.value = self._reset_reconstruction.initial()
-            self._initialize_selected_value(
-                camera_observation_config=camera_observation_config,
-            )
+            self._initialize_selected_value()
             self.session = None
             self._external_solution_owner = None
             self._active_native_interval_receipt = None
@@ -2791,12 +2750,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return session.visual_body_pose(entity_id, frame_id)
 
     def _close_camera_consumer(self):
-        consumer, self._camera_consumer = self._camera_consumer, None
         task_consumer = getattr(self, '_task_rgb_consumer', None)
         self._task_rgb_consumer = None
         visual, self._visual_state_session = getattr(self, '_visual_state_session', None), None
         first = None
-        for resource in (task_consumer, consumer, visual):
+        for resource in (task_consumer, visual):
             if resource is not None:
                 try:
                     resource.close()
@@ -4292,10 +4250,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.recording_path, self.recorder = begin_structured_recording(
                 path, horizon=self.horizon, observation=self.obs,
                 reset_info=self._position_reset_info, metadata_factory=metadata_factory,
-                max_buffer_bytes=(
-                    self.camera_observation_config.max_recording_buffer_bytes
-                    if self.camera_observation_config is not None else None
-                ),
             )
             return
         path = Path(path)
@@ -4363,7 +4317,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.stop(str(reason))
             return finalize_structured_recording(
                 self.recorder, self.recording_path, self._position_episode_end, reason, position=True,
-                camera=self.camera_observation_config is not None,
             )
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')

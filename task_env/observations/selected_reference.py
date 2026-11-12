@@ -105,46 +105,6 @@ def selected_observation_binding():
             'observation_projection': build_selected_observation}
 
 
-def position_camera_observation_declaration(binding, config):
-    """Declare the existing single-Panda Position camera observation leaves."""
-    from ..environment.types import ObservationFieldSpec, ObservationSchema
-    from .state import camera_observation_field_specs
-
-    camera_fields = camera_observation_field_specs(config)
-    groups = OrderedDict((name, OrderedDict()) for name in ('rgb', 'depth', 'entity_mask'))
-    for field in camera_fields:
-        group, camera_id = field.name.split('.', 1)
-        if group == 'rgb':
-            space = Box(0.0, 1.0, field.shape, dtype=np.float32)
-        elif group == 'depth':
-            space = Box(0.0, np.inf, field.shape, dtype=np.float32)
-        else:
-            space = Box(0, np.iinfo(np.uint32).max, field.shape, dtype=np.uint32)
-        groups[group][camera_id] = space
-    fields = [
-        ObservationFieldSpec('state.ee_pose', (7,), 'float32', 'hand-origin TCP pose',
-                             'm + unit quaternion', 'world'),
-        ObservationFieldSpec('state.joint_position', (9,), 'float32',
-                             'required Panda joint positions', 'rad + m', 'canonical joint coordinates'),
-        ObservationFieldSpec('state.hand_pose', (7,), 'float32',
-                             'provider-measured Panda hand pose', 'm + unit quaternion', 'world'),
-        ObservationFieldSpec('state.boundary_identity_sha256', (32,), 'uint8',
-                             'state boundary identity digest', 'uint8[0,255]', 'identity'),
-    ]
-    fields.extend(
-        ObservationFieldSpec(
-            f'privileged_state.{key}_body_pose', (1, 7), 'float32',
-            f'{key} measured world pose', 'm + unit quaternion', 'world',
-        ) for _, key in binding.object_poses
-    )
-    fields.extend(camera_fields)
-    schema = ObservationSchema(
-        'position-camera-observation-v1', tuple(fields),
-        groups=('state', 'privileged_state', 'rgb', 'depth', 'entity_mask'),
-    )
-    return OrderedDict((name, Dict(values)) for name, values in groups.items()), schema
-
-
 def _position_task_evaluation_state(state, adapted):
     """Merge Position publication fields into the existing v0 task-state contract."""
     return CanonicalStateView(
@@ -220,21 +180,6 @@ def build_selected_observation(self, state):
             # The admitted USD route exposes the Core-owned typed
             # publication used by observations and Position control.
             info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
-        if self.camera_observation_config is not None:
-            from .capture import DynamicCameraObservationConsumerV1
-
-            if self._camera_consumer is None:
-                self._camera_consumer = DynamicCameraObservationConsumerV1(
-                    config=self.camera_observation_config,
-                    task_artifact_hash=self.artifact.identity_hash,
-                    runtime_source=self.value['source'],
-                    horizon=self.horizon,
-                    session_factory=self._camera_session_factory,
-                )
-            leaves, capture_boundary = self._camera_consumer.capture(self.typed_state.view)
-            obs.update(leaves)
-            info['camera_observation_v1'] = capture_boundary.to_mapping()
-            self.camera_observation_schema.validate(obs)
     if getattr(getattr(self, 'resolved_public_config', None), 'reset_profile', None) == 'pickcube-state-only-switch-v1':
         names = tuple(f'panda-v1/joint{i}' for i in range(1, 8)) + (
             'panda-v1/finger_joint1', 'panda-v1/finger_joint2')

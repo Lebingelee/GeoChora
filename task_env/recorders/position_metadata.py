@@ -80,18 +80,6 @@ def position_record_metadata(self):
         {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
         for _, key in self.binding.object_poses
     )
-    if self.camera_observation_config is not None:
-        from ..observations.state import camera_observation_field_specs
-
-        observation_leaf_specs.extend({
-            'path': field.name,
-            'shape': field.shape,
-            'dtype': field.dtype,
-            'semantic': field.semantic,
-            'unit': field.unit,
-            'frame': field.frame,
-            'time_reference': field.time_reference,
-        } for field in camera_observation_field_specs(self.camera_observation_config))
     env_metadata = {
         'env_name': 'SelectedReferenceEnv.PositionServoV1',
         'task_name': self.artifact.task_id,
@@ -158,17 +146,12 @@ def position_record_metadata(self):
         'resolved_config': {
             'provider': self.provider, 'backend': self.backend, 'horizon': self.horizon,
             'controller_profile': profile.profile_id,
-            **({'camera_observation': self.camera_observation_config.to_mapping()}
-               if self.camera_observation_config is not None else {}),
         },
         'candidate_identity': {
             'task_artifact_identity_hash': self.artifact.identity_hash,
             'source_closure_digest': self.value['source'].source_closure_digest,
             'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
         },
-        **({
-            'camera_observation_contract_v1': self.camera_observation_config.to_mapping(),
-        } if self.camera_observation_config is not None else {}),
     }
     if self.dual_entity_position:
         env_metadata['candidate_identity']['scene_identity_hash'] = self.position_scene.identity_hash
@@ -330,8 +313,5 @@ def position_record_reset_info(self):
             # bounded versioned typed-state witness extension.
             'canonical_state_view_v1': self.info['canonical_state_view_v1'],
         } if self.value.get('f06_pickcube_isaac_input') is not None else {}),
-        **({
-            'camera_observation_v1': self.info['camera_observation_v1'],
-        } if self.camera_observation_config is not None else {}),
     }
     return info

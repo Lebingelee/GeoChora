@@ -243,3 +243,5 @@ PickCube effort 不再使用旧诊断的 0.02 m 手指初值；MuJoCo、GeoPhys�
 MJCF effort 已沿用正式 Task ID；历史固定质量矩阵不覆盖正式 0.04 m 初态。MuJoCo 两条 mass profile 改用当前 source 的实时质量矩阵并通过短程运行；GeoPhys／Isaac 尚无相应 source dynamics，明确拒绝该控制模式。实时矩阵与旧固定矩阵的输出不保证数值相同。详见[实施记录 6.114](../planning/post-5c-optimization-execution.md#6114-质量矩阵控制使用-provider-的实时-source-模型)。
 
 reference effort 的共同 binding 检查和状态需求已从普通 PD 构造中分离，动态／质量矩阵 profile 不再创建并丢弃 PD Controller；实际任务专属构建仍待收敛。详见[实施记录 6.115](../planning/post-5c-optimization-execution.md#6115-reference-effort-共享绑定合同直接构建-controller)。
+
+旧 Position 诊断双相机入口及专用 consumer 已退出公共 Env；正式 task RGB 保留，但本轮发现 MuJoCo 的 R3 Position／RGB source Scene 与 `CameraSpec` 元数据路径各有未解决失败。详见[实施记录 6.116](../planning/post-5c-optimization-execution.md#6116-退休旧-position-诊断相机入口)。

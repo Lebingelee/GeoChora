@@ -1170,3 +1170,12 @@ GeoPhys 和 Isaac 当前没有 provider-owned source dynamics，故质量矩阵 
 输入 `795b679b`。实时质量矩阵和动态 effort Controller 先前调用普通 reference effort builder，完整创建 affine PD model、profile 和 Controller 后立即丢弃，只借用其绑定验证与状态需求。现在三种 reference effort 路线共同校验已有 physical binding 并声明 pose 状态需求，各自直接构造实际选用的 Controller；保留驱动隔离、主体和 writer 校验、状态需求与命令语义。此项减少不参与执行的对象构造，但尚未消除 PickCube 的任务专属 physical binding，也不表明 E02／E04 已完成。provider／renderer adapter、source、clock 和提交接口未修改。
 
 生产修改 1 文件 +33／−26，净增 7 行；原有绑定校验及 pose 需求代码移至同文件内共同函数，非新的一套控制路径。版本诊断修改 1 文件 +20／−0；本文与当前状态文档修改 2 文件；无新增、删除或整文件迁移，tracked 文件数保持 1355。158 项版本检查通过，包括禁止构造未使用 PD servo 时仍能构造两种 mass profile。MuJoCo CPU 的 joint／R3 普通 reference 以及 joint／R3 mass 各完成 reset、step、第二次 reset、close 与 5 个 native 子步；动态 reset 选择及记录完成 10 个子步。MJCF 导入有语义诊断。GeoPhys／Isaac 和完整 Solution 本轮未运行，先前证据仍只对应原源码；renderer 未改。冻结 diff、预算和原始收据位于 ignored `workspace/maintenance/v211_effort_contract_vz7nh1hu/`。E01～E04 尚未整体接收。
+
+
+### 6.116 退休旧 Position 诊断相机入口
+
+输入 `144b1b54`。正式四任务的 `make_env`／`from_task_binding` 不传入旧 `camera_observation_config`；该入口服务已退休的 Position 诊断，额外在公共 Env、观测、关闭与记录元数据中维护 RGB／depth／mask 双相机 consumer。删除此诊断入口及专用 consumer、观测拼接和写入分支；5c 正式 `task_rgb_camera` 及其同步采集和关闭保留。历史相机合同和 H5 读取代码保留以读取既有证据。此项不宣称统一所有 renderer 或完成 E03／E04。
+
+生产代码修改 4 文件 +5／−330，净减 325 行；版本诊断修改 probe 1 文件 +27／−3，并新增 1 文件 158 行，将正式 task RGB 合同检查从旧诊断中摘录至版本目录并补充关闭检查；旧文件未删除，不能计作整文件迁移。本文和当前状态文档修改 2 文件；tracked 文件数 1355→1356。158 项既有版本检查及 9 项 RGB 合同检查通过。MuJoCo CPU 的正式 joint effort／CameraGeometry／native RGB 完成 reset、step、第二次 reset、关闭和 5 个 native 子步；正式 R3 Position 记录完成 reset、step、第二次 reset、关闭与 5 个子步。MJCF 导入有语义诊断。
+
+本轮还发现两个独立于旧诊断入口的正式相机问题，均在首次 step 前退出，尚未归因或修复：R3 Position／RGB 在 reset 的 source 检查处缺少 Scene 声明；joint effort 使用公开 `CameraSpec` 时实际采集后尝试调用 MuJoCo session 不提供的 `task_camera_binding`。上述 CameraGeometry 通过不能代表 CameraSpec 或 Position／RGB 已通过。GeoPhys／Isaac、完整 Solution 及历史 H5 独立读回本轮未复验。预算、冻结输入和失败／成功收据位于 ignored `workspace/maintenance/v211_retire_position_camera_ch77m4u5/`。E01～E04 尚未整体接收。
