@@ -80,6 +80,21 @@ class AssembledPandaAgent(BaseAgent):
         """Declare source actuators that hold the Robot's open posture."""
         return ((attachment.child_entity_id, 'actuator8'),)
 
+    @staticmethod
+    def reference_observation_spaces(env, *, include_robot_state=False):
+        from .panda_observation import reference_observation_spaces
+        return reference_observation_spaces(env, include_robot_state=include_robot_state)
+
+    @staticmethod
+    def reference_observation_field_metadata(env):
+        from .panda_observation import reference_observation_field_metadata
+        return reference_observation_field_metadata(env)
+
+    @staticmethod
+    def reference_observation_state(env, adapted):
+        from .panda_observation import reference_observation_state
+        return reference_observation_state(env, adapted)
+
     def position_subject_layout(self, *, attachment, end_frame_id):
         """Declare nested arm and hand subjects without compiling a source."""
         from .source_recipe import PositionSubjectLayoutV1

@@ -10,43 +10,17 @@ from ..artifacts import CanonicalStateView
 from ..environment.reference_binding import evaluate_task_definition
 
 
-def switch_observation_space():
-    """The opt-in, provider-independent PickCube state projection."""
-    return Dict({
-        'state': Dict({
-            'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-            'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
-        }),
-        'privileged_state': Dict({'cube_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)}),
-    })
-
-
 def selected_reference_observation_spaces(env, *, include_robot_state=False):
-    """Build the existing Panda reference projection; mixed tasks own their spaces."""
+    """Compose the selected Robot projection with Task object spaces."""
     keys = [key for _, key in env.binding.object_poses]
-    state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
-    if env.position_profile or include_robot_state:
-        state_spaces.update({
-            'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-            'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-            'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
-        })
-        if env.dual_entity_position:
-            state_spaces['entities'] = Dict({
-                profile.entity_id: Dict({
-                    'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
-                    'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                })
-                for profile in env.position_profiles
-            })
+    state_spaces = env.binding.robot.reference_observation_spaces(
+        env, include_robot_state=include_robot_state)
     observation_spaces = OrderedDict((
-        ('state', Dict(state_spaces)),
-        ('privileged_state', Dict({
-            k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
+        ('state', Dict(OrderedDict(state_spaces))),
+        ('privileged_state', Dict(OrderedDict(
+            (k + '_body_pose', Box(-np.inf, np.inf, (1, 7), dtype=np.float32))
             for k in keys
-        })),
+        ))),
     ))
     return observation_spaces
 
@@ -64,8 +38,22 @@ def selected_reference_observation_schema(env, observation=None):
     if set(root_names) != set(spaces):
         raise ValueError('selected observation projection differs from its declared top-level space')
 
+    binding = getattr(env, 'binding', None)
+    robot = getattr(binding, 'robot', None)
+    describe_robot = getattr(robot, 'reference_observation_field_metadata', None)
+    metadata = dict(describe_robot(env)) if callable(describe_robot) else {}
+    for _semantic, key in getattr(binding, 'object_poses', ()):
+        metadata[f'privileged_state.{key}_body_pose'] = (
+            'task object pose [x,y,z,qw,qx,qy,qz]', 'm + unit quaternion', 'world')
+    metadata.update((getattr(binding, 'observation_metadata', None) or {}).get('field_metadata', {}))
+    metadata['task_rgb'] = ('synchronized task RGB image', 'normalized RGB [0,1]', 'camera pixel grid')
+
     def visit(path, value, space):
         nested = getattr(space, 'spaces', None)
+        if nested is not None and value is declared_only:
+            for name, child in nested.items():
+                visit(f'{path}.{name}' if path else str(name), declared_only, child)
+            return
         if isinstance(value, Mapping):
             if nested is None or set(value) != set(nested):
                 raise ValueError(f'selected observation mapping {path!r} differs from its declared space')
@@ -80,14 +68,8 @@ def selected_reference_observation_schema(env, observation=None):
             array = np.asarray(value)
             if array.shape != tuple(space.shape) or np.dtype(array.dtype) != np.dtype(space.dtype):
                 raise ValueError(f'selected observation leaf {path!r} differs from its declared shape/dtype')
-        if path == 'task_rgb':
-            semantic, unit, frame = ('synchronized task RGB image', 'normalized RGB [0,1]', 'camera pixel grid')
-        elif path.endswith('ee_pose') or path.endswith('hand_pose'):
-            semantic, unit, frame = ('measured pose [x,y,z,qw,qx,qy,qz]', 'm + unit quaternion', 'world')
-        elif path.endswith('boundary_identity_sha256'):
-            semantic, unit, frame = ('state boundary identity digest', 'uint8[0,255]', 'identity')
-        else:
-            semantic, unit, frame = (f'task-declared observation leaf {path}', 'task-defined', 'task-defined')
+        semantic, unit, frame = metadata.get(
+            path, (f'task-declared observation leaf {path}', 'task-defined', 'task-defined'))
         fields.append(ObservationFieldSpec(
             path, tuple(space.shape), str(np.dtype(space.dtype)), semantic, unit, frame,
         ))
@@ -123,47 +105,11 @@ def build_selected_observation(self, state):
         adapted = self.position_profiles[0]._adapt_publication(self.typed_state)
         evaluation_state = _position_task_evaluation_state(state, adapted)
         evaluation = evaluate_task_definition(self, evaluation_state)
-        ee = adapted.pose_world['panda-v1/ee']
     else:
         evaluation = evaluate_task_definition(self, state)
-        ee = state.pose_world['panda-v1/ee']
-    state_obs = {'ee_pose': np.array((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)}
+        adapted = state
+    state_obs = self.binding.robot.reference_observation_state(self, adapted)
     obs = {'state': state_obs, 'privileged_state': {}}
-    if getattr(self, 'position_profile', False):
-        view = self.typed_state.view
-        boundary = view.boundary
-        entity_states = {}
-        for profile in self.position_profiles:
-            joints = {
-                value.joint_id: value for value in view.joints
-                if value.entity_id == profile.entity_id
-            }
-            hand = next(
-                value for value in view.frames
-                if value.frame.entity_id == profile.entity_id
-                and value.frame.frame_id == profile.hand_frame_id
-            )
-            entity_states[profile.entity_id] = {
-                'joint_position': np.asarray([
-                    joints[name].position[0]
-                    for name in (*profile.joint_ids, *profile.finger_joint_ids)
-                ], dtype=np.float32),
-                'hand_pose': np.asarray(
-                    (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz),
-                    dtype=np.float32,
-                ),
-            }
-        primary_entity = self.position_profiles[0].entity_id
-        identity_hex = boundary.boundary_id.removeprefix('state-boundary-')
-        state_obs.update({
-            'joint_position': entity_states[primary_entity]['joint_position'],
-            'hand_pose': entity_states[primary_entity]['hand_pose'],
-        })
-        state_obs['boundary_identity_sha256'] = np.frombuffer(
-            bytes.fromhex(identity_hex), dtype=np.uint8,
-        ).copy()
-        if self.dual_entity_position:
-            state_obs['entities'] = entity_states
     for semantic, key in self.binding.object_poses:
         pose = state.pose_world[semantic]
         obs['privileged_state'][key + '_body_pose'] = np.array(
@@ -180,28 +126,4 @@ def build_selected_observation(self, state):
             # The admitted USD route exposes the Core-owned typed
             # publication used by observations and Position control.
             info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
-    if getattr(getattr(self, 'resolved_public_config', None), 'reset_profile', None) == 'pickcube-state-only-switch-v1':
-        names = tuple(f'panda-v1/joint{i}' for i in range(1, 8)) + (
-            'panda-v1/finger_joint1', 'panda-v1/finger_joint2')
-        if self.position_profile:
-            joint_positions = state_obs['joint_position'].copy()
-            boundary = self.typed_state.view.boundary
-            velocities = {f'{j.entity_id}/{j.joint_id}': j.velocity[0]
-                          for j in self.typed_state.view.joints}
-        else:
-            joint_positions = np.asarray([state.joint_position[name] for name in names], dtype=np.float32)
-            velocities = state.joint_velocity
-            boundary = self.session.state_boundary_identity()
-        ee_pose = state_obs['ee_pose'].copy()
-        obs = {'state': {'ee_pose': ee_pose, 'joint_position': joint_positions,
-                         'hand_pose': ee_pose.copy(),
-                         'boundary_identity_sha256': np.frombuffer(
-                             bytes.fromhex(boundary.boundary_id.removeprefix('state-boundary-')),
-                             dtype=np.uint8).copy()},
-               'privileged_state': {'cube_body_pose': obs['privileged_state']['cube_v1_body_pose'].copy()}}
-        info['state_boundary_identity'] = boundary.to_mapping()
-        info['state_boundary_id'] = boundary.boundary_id
-        info['measured_joint_velocity'] = [float(velocities[name]) for name in names]
-        info['measured_joint_velocity_units'] = ['rad/s'] * 7 + ['m/s'] * 2
-        info['observation_schema'] = 'pickcube-state-only-switch-v1'
     return obs, info, evaluation

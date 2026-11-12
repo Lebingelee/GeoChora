@@ -388,7 +388,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         return {'execution_info':ExpertExecutionInfo('expert-execution-info-v1',env.state.control_step,
             env.state.simulation_time,env.controller.readiness(env.state,env.feedback))}
 
-    from task_env.robots.panda import panda_reference_control_binding
+    from task_env.robots.panda import PandaAgent, panda_reference_control_binding
     from task_env.controllers.canonical.contracts import (
         REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
     )
@@ -398,7 +398,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces,observation_projection=build_selected_observation,
         scalar_control_binding=panda_reference_control_binding(),
-        object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
+        robot=PandaAgent(), object_poses=(('cube-v1','cube_v1'),),external_actions=True,external_solution_actions=True,
         interval_mode='grouped',recorder_mode='canonical',
         reset_expert_kwargs=execution_info,observe_expert_kwargs=lambda env,guard:execution_info(env))
     return CompiledTask(artifact,binding,spec_hash,artifact.identity_hash,spec.horizon,

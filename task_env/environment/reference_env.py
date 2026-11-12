@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass, replace
 from contextlib import contextmanager
 from typing import Any
+from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 import hashlib
@@ -1249,7 +1250,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def _configure_component_task_rgb_space(self) -> None:
         camera, _renderer, _generation = self._component_task_rgb
-        spaces = dict(self.observation_space.spaces)
+        spaces = OrderedDict(self.observation_space.spaces)
         if "task_rgb" in spaces:
             raise ValueError("task observation already declares the reserved task_rgb key")
         spaces["task_rgb"] = Box(
@@ -1551,47 +1552,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if getattr(self, '_task_rgb_config', None) is None:
             self._task_rgb_state_binding = None
             return None
-        from ..artifacts import StateFieldRequirement, StateRequirements
-        from ..render.camera.api import prepare_task_rgb_render_source
-        from ..runtime.sessions.source import (
-            position_frame_bindings_from_artifact,
-            position_joint_bindings_from_artifact,
-        )
+        from ..render.camera.api import prepare_task_rgb_state_binding
 
-        source = self.value.get('source')
-        scene = getattr(source, 'scene_definition', None)
-        if scene is None or getattr(source, 'source_closure_digest', None) is None:
-            raise ValueError('selected task RGB requires a canonical Scene and source closure')
-        if getattr(source, 'task_artifact_hash', None) != self.artifact.identity_hash:
-            raise ValueError('selected task RGB source differs from its Task Artifact')
-        joint_bindings = position_joint_bindings_from_artifact(scene, self.artifact, source)
-        frame_bindings = position_frame_bindings_from_artifact(self.artifact, source)
-        render_source = prepare_task_rgb_render_source(
-            self._task_rgb_config[1], source, artifact=self.artifact,
-            joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        result = prepare_task_rgb_state_binding(
+            self._task_rgb_config[1], self.value.get('source'), artifact=self.artifact,
         )
-        requirements = []
-        for definition in joint_bindings.values():
-            for field_name in ('joint_position', 'joint_velocity'):
-                requirements.append(StateFieldRequirement(
-                    'state-field-requirement-v1', field_name, 'joint',
-                    definition.parent_frame.entity_id, definition.joint_id,
-                    'required', 'evaluation_boundary', 'joint-definition',
-                    'joint_state_query',
-                ))
-        for reference in frame_bindings.values():
-            requirements.append(StateFieldRequirement(
-                'state-field-requirement-v1', 'frame_pose_world', 'frame',
-                reference.entity_id, reference.frame_id, 'required',
-                'evaluation_boundary', 'meter+quaternion_wxyz', 'frame_pose_query',
-            ))
-        state_requirements = StateRequirements(
-            'state-requirements-v1', 'renderer', 'selected-task-rgb-v1',
-            tuple(requirements),
-        )
-        state_requirements.validate()
-        result = (source, self.artifact.identity_hash, scene, joint_bindings,
-                  frame_bindings, state_requirements, render_source)
         self._task_rgb_state_binding = result
         return result
 
@@ -2596,7 +2561,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
             if getattr(self, '_observer_render_request', None) is None:
                 self._observer_render_request = request
-        spaces = dict(self.observation_space.spaces)
+        spaces = OrderedDict(self.observation_space.spaces)
         spaces['task_rgb'] = Box(0., 1., shape=(camera.height, camera.width, 3), dtype=np.float32)
         self.observation_space = Dict(spaces)
         self._task_rgb_config = (camera, renderer)

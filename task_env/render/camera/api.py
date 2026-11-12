@@ -44,6 +44,40 @@ def prepare_task_rgb_render_source(renderer, source, *, artifact, joint_bindings
     return result
 
 
+def prepare_task_rgb_state_binding(renderer, source, *, artifact):
+    """Declare and bind the renderer's source and evaluation-boundary state needs."""
+    from ...artifacts import StateFieldRequirement, StateRequirements
+    from ...runtime.sessions.source import (
+        position_frame_bindings_from_artifact, position_joint_bindings_from_artifact,
+    )
+
+    scene = getattr(source, 'scene_definition', None)
+    if scene is None or getattr(source, 'source_closure_digest', None) is None:
+        raise ValueError('selected task RGB requires a canonical Scene and source closure')
+    if getattr(source, 'task_artifact_hash', None) != artifact.identity_hash:
+        raise ValueError('selected task RGB source differs from its Task Artifact')
+    joints = position_joint_bindings_from_artifact(scene, artifact, source)
+    frames = position_frame_bindings_from_artifact(artifact, source)
+    visual = prepare_task_rgb_render_source(
+        renderer, source, artifact=artifact, joint_bindings=joints, frame_bindings=frames,
+    )
+    fields = [StateFieldRequirement(
+        'state-field-requirement-v1', field, 'joint', definition.parent_frame.entity_id,
+        definition.joint_id, 'required', 'evaluation_boundary', 'joint-definition',
+        'joint_state_query',
+    ) for definition in joints.values() for field in ('joint_position', 'joint_velocity')]
+    fields.extend(StateFieldRequirement(
+        'state-field-requirement-v1', 'frame_pose_world', 'frame', reference.entity_id,
+        reference.frame_id, 'required', 'evaluation_boundary', 'meter+quaternion_wxyz',
+        'frame_pose_query',
+    ) for reference in frames.values())
+    requirements = StateRequirements(
+        'state-requirements-v1', 'renderer', 'selected-task-rgb-v1', tuple(fields),
+    )
+    requirements.validate()
+    return source, artifact.identity_hash, scene, joints, frames, requirements, visual
+
+
 def render_manifest(provider):
     if provider not in ('geophys','mujoco'):
         raise CapabilityAdmissionError(f'unsupported render provider: {provider}')

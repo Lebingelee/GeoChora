@@ -316,6 +316,7 @@ def _source_identity_files():
         "task_env/recorders/reference_provenance.py", "task_env/utils/_paths.py",
         "task_env/recorders/position_metadata.py",
         "task_env/observations/selected_reference.py",
+        "task_env/robots/panda_observation.py",
         "task_env/planners/completion.py",
         "task_env/runtime/sessions/api.py", "task_env/runtime/sessions/control.py",
         "task_env/runtime/sessions/position_subject_binding.py",

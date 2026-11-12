@@ -48,6 +48,6 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
 
-## 当前实施范围：E05～E10（U1～U2 已实施）
+## 当前实施范围：E05～E10（U1～U3 已实施）
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U2 已实施，结果及边界见专用账本第 13 节，U3 待实施。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U3 已实施，结果及边界见专用账本第 13 节，U4 待实施。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。

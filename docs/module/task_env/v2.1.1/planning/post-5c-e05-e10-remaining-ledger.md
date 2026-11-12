@@ -240,8 +240,8 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 | 单元 | 状态 | 最终效果／提交／证据／未完成项 |
 | --- | --- | --- |
 | U1／S01～S06 | IMPLEMENTED | 输入 `5dd3d29a`，提交 `1a2bc947`；[实施结果、四任务调用、模式边界和证据](../maintenance/20261112_e05_e10_u1_source_delivery.md)。Scene、Robot 和 MJCF adapter 分别接收桌面、主体声明及物化；USD 路径按声明绑定；source snapshot 的创建与失败释放归编译 owner；两实体 attachment 与受限 Panda 资产 profile 分开，严格准入保留。三原生代表路线及 GeoPhys × MuJoCo RGB 按实际影响复验，具体范围见记录；本结果为实施者自评，E05 与整个优化尚未接收。 |
-| U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 初始化 facade 的 provider 缺口、旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
-| U3／S13～S18 | OPEN | 尚未实施 |
+| U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`，提交 `73eebf37`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 初始化 facade 的 provider 缺口、旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
+| U3／S13～S18 | IMPLEMENTED | 输入 `73eebf37`；[实施结果、字段来源、证据与限制](../maintenance/20261112_e05_e10_u3_observation_delivery.md)。Robot 与 Task 拥有各自投影，renderer 在 adapter 声明状态需求；四任务 schema、非 Position RGB 和跨 provider reset 已定向复验。光学 readback、重复 render、Isaac 采集与 Recorder metadata 分别留 U4/U6/U7；结果为实施者自评，E07/E08 尚未接收。 |
 | U4／S19～S25 | OPEN | 尚未实施 |
 | U5／S26～S30 | OPEN | 尚未实施 |
 | U6／S31～S36 | OPEN | 尚未实施 |

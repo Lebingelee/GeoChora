@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import inspect
@@ -188,6 +189,8 @@ def _source_identity_files(controller, solution_type, *, profile_source=None, pr
              root / "task_env/runtime/sessions/source_composition_adapters.py",
              root / "task_env/robots/panda.py", root / "task_env/robots/assembled_panda.py",
              root / "task_env/robots/source_recipe.py",
+             root / "task_env/robots/panda_observation.py",
+             root / "task_env/tasks/pick_cube/observation.py",
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/utils/_paths.py",
@@ -961,13 +964,16 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         )
 
         if config.reset_profile is not None:
-            from ...observations.selected_reference import switch_observation_space
+            from .observation import build_switch_observation, switch_observation_space
             from ...environment.reset_switch import prepare_switch_reset
             binding = replace(binding,
                 prepare_reset_switch=prepare_switch_reset,
-                observation_space_factory=lambda _env: dict(switch_observation_space().spaces),
+                observation_space_factory=lambda _env: OrderedDict(switch_observation_space().spaces),
+                observation_projection=build_switch_observation,
                 observation_metadata={
                     'schema_version': config.reset_profile,
+                    'field_metadata': {'privileged_state.cube_body_pose': (
+                        'task object pose [x,y,z,qw,qx,qy,qz]', 'm + unit quaternion', 'world')},
                     'hand_pose_frame': 'panda-v1/ee',
                     'joint_order': [*(f'panda-v1/joint{i}' for i in range(1, 8)),
                                     'panda-v1/finger_joint1', 'panda-v1/finger_joint2'],

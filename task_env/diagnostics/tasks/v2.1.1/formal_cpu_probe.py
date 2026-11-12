@@ -1,7 +1,7 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
-parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
+parser=argparse.ArgumentParser();parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--table-half-x',type=float,default=None)
@@ -116,6 +116,10 @@ try:
             if args.record:config['controller']['parameters']={'reset_selection':True}
         if args.case.startswith('assembled'):config.update(robot={'uid':'panda-arm-hand-v1'},controller={'profile_id':'r1_split'})
         if args.gravity:config.setdefault('controller',{})['gravity_compensation']=True
+        if args.reset_switch:
+            if args.case != 'panda-r3' or args.provider != 'mujoco':
+                raise ValueError('reset switch probe requires MuJoCo Panda R3')
+            config['execution']['reset_profile'] = 'pickcube-state-only-switch-v1'
         uid='nut-assembly-outcome-reference-v1' if args.case=='nut' else 'pick-cube-p16-reference-v1'
         if args.robot_uid is not None:config['robot']={'uid':args.robot_uid}
         env=construct(uid,config)
@@ -198,6 +202,9 @@ try:
                 assert env.physical_action_spec()['parameters'] == {'kp': args.controller_kp}
                 result['controller_reset_parameters'] = env.physical_action_spec()['parameters']
         assert env.observation_space.contains(observation)
+        if args.validate_schema:
+            info['observation_schema'].validate(observation)
+            result['observation_fields'] = list(info['observation_schema'].leaf_field_names)
         layout = env.session.build_layout_facts
         assert layout['materialization_id'] == env.session.provider_materialization_id
         assert layout['source_closure'] == env.value['source'].source_closure_digest
@@ -304,6 +311,8 @@ try:
         time_after=float(env.state.simulation_time)
         result['steps'].append({'before':first,'after':second,'time_before':time_before,'time_after':time_after,'reward':float(stepped[1]),'terminated':bool(stepped[2]),'truncated':bool(stepped[3])})
         assert env.observation_space.contains(stepped[0])
+        if args.validate_schema:
+            info['observation_schema'].validate(stepped[0])
         if args.record:
             result['recording']=env.finish_recording('external_stop')
             if 'transition_count' in result['recording']:
@@ -347,8 +356,18 @@ try:
             assert env.session._last_control_submission['status'] == 'acknowledged'
             result['switched_controller_advanced']=True
         else:
-            observation,info=env.reset(seed=19 if args.case=='nut' else 31)
+            options = {'execution': {'physics_provider': 'geophys', 'deployment': 'in_process',
+                                     'interpreter': sys.executable}} if args.reset_switch else None
+            observation,info=env.reset(seed=19 if args.case=='nut' else 31, options=options)
+        if args.reset_switch:
+            assert env.provider == 'geophys'
+            assert set(observation['privileged_state']) == {'cube_body_pose'}
+            assert info['measured_joint_velocity_units'] == ['rad/s'] * 7 + ['m/s'] * 2
+            result['switched_provider'] = env.provider
         assert env.observation_space.contains(observation)
+        if args.validate_schema:
+            info['observation_schema'].validate(observation)
+            result['schema_validated_reset_step_reset'] = True
         assert type(env._task_definition) is task_definition_type
         assert env._task_lifecycle.task_definition is env._task_definition
         artifact_hash = getattr(env._task_definition, 'artifact_hash', None)
