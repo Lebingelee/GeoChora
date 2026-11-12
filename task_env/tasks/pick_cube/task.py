@@ -197,10 +197,9 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
-def physical_observation(env, state, *, hand_frame_id="hand"):
+def physical_observation(env, state):
     """Project the physical publication without requiring a Position controller."""
-    adapted, subject, subject_info = env.binding.robot.physical_reference_observation(
-        env, state, hand_frame_id=hand_frame_id)
+    adapted, subject, subject_info = env.binding.robot.physical_reference_observation(env, state)
     from ...environment.reference_binding import evaluate_task_definition
     evaluation = evaluate_task_definition(env, adapted)
     cube = state.pose_world['cube-v1']
@@ -229,7 +228,7 @@ def task_binding_fields(*, task_config=None, lift_height_m=None, reset_sampler=N
     }
 
 
-def physical_task_binding_fields(*, task_config, lift_height_m, hand_frame_id,
+def physical_task_binding_fields(*, task_config, lift_height_m,
                                  reset_sampler=None, cube_force_z_N=None):
     """Declare task semantics shared by the admitted physical source formats."""
     from functools import partial
@@ -242,18 +241,18 @@ def physical_task_binding_fields(*, task_config, lift_height_m, hand_frame_id,
         'external_actions': True, 'interval_mode': 'grouped', 'recorder_mode': 'execution',
         'prepare_action': reference_pose_action,
         'observation_space_factory': partial(selected_reference_observation_spaces, include_robot_state=True),
-        'observation_projection': partial(physical_observation, hand_frame_id=hand_frame_id),
+        'observation_projection': physical_observation,
         'physical_sequence_v2_observation': True,
     }
 
 
-def physical_task_binding(*, build, task_config, lift_height_m, hand_frame_id,
+def physical_task_binding(*, build, task_config, lift_height_m,
                           validate_solution, reset_capability=None,
                           cube_force_z_N=None, runtime_input=False):
     """Bind PickCube semantics to a source-bound physical Controller."""
     from ...environment.reference_binding import ReferenceTaskBinding
     fields = physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
-        hand_frame_id=hand_frame_id, cube_force_z_N=cube_force_z_N)
+        cube_force_z_N=cube_force_z_N)
     if runtime_input:
         return ReferenceTaskBinding(build=build, **fields,
             reset_runtime_input=lambda value: value.get('session_admission_input'),

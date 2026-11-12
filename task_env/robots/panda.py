@@ -108,9 +108,9 @@ class PandaAgent(BaseAgent):
         from .panda_observation import reference_observation_state
         return reference_observation_state(env, adapted)
 
-    def physical_reference_observation(self, env, state, *, hand_frame_id):
+    def physical_reference_observation(self, env, state):
         from .panda_observation import physical_reference_observation
-        return physical_reference_observation(self, env, state, hand_frame_id=hand_frame_id)
+        return physical_reference_observation(self, env, state)
 
     def position_subject_layout(self, *, entity_id, end_frame_id):
         """Declare the existing Panda subject and its position control groups."""

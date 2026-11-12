@@ -1,11 +1,46 @@
 """Pure admission checks for the Panda transmission used by formal PickCube."""
 
 import xml.etree.ElementTree as ET
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from task_env.runtime.sessions.mujoco_composition import panda_effort_source_limits
 from task_env.runtime.sessions.source import source_resource_receipt
+
+
+@pytest.mark.parametrize(('frames', 'expected'), [
+    (('hand', 'ee'), 'hand'),
+    (('ee',), 'ee'),
+    (('hand', 'hand'), None),
+    ((), None),
+])
+def test_panda_physical_observation_uses_published_robot_frame(frames, expected):
+    from task_env.artifacts import PoseWorld
+    from task_env.robots.panda import PandaAgent
+
+    robot = PandaAgent()
+    poses = {'hand': PoseWorld((1., 2., 3.), (1., 0., 0., 0.)),
+             'ee': PoseWorld((4., 5., 6.), (1., 0., 0., 0.))}
+    view = SimpleNamespace(
+        joints=[SimpleNamespace(entity_id=robot.uid, joint_id=name, position=(0.,), velocity=(0.,))
+                for name in robot.physical_joint_names()],
+        frames=[SimpleNamespace(frame=SimpleNamespace(entity_id=robot.uid, frame_id=name),
+                                pose_world=poses[name]) for name in frames],
+        boundary=SimpleNamespace(boundary_id='state-boundary-' + 'a' * 64,
+                                 to_mapping=lambda: {}),
+        sample_clock=SimpleNamespace(to_mapping=lambda: {}))
+    env = SimpleNamespace(typed_state=SimpleNamespace(view=view))
+    state = SimpleNamespace(convention='SI_right_handed_z_up_wxyz', control_step=0,
+                            simulation_time=0., joint_position={}, joint_velocity={},
+                            pose_world={'panda-v1/ee': poses['ee']})
+    if expected is None:
+        with pytest.raises(ValueError, match='one declared hand or end frame'):
+            robot.physical_reference_observation(env, state)
+        return
+    _, observation, _ = robot.physical_reference_observation(env, state)
+    np.testing.assert_array_equal(observation['hand_pose'][:3], poses[expected].position)
 
 
 def test_formal_position_and_effort_share_task_binding_factory(monkeypatch):

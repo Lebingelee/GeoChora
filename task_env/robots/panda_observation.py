@@ -80,7 +80,7 @@ def reference_observation_state(self, adapted):
     return state_obs
 
 
-def physical_reference_observation(robot, env, state, *, hand_frame_id):
+def physical_reference_observation(robot, env, state):
     """Project the declared physical Panda without a Position Controller."""
     from ..artifacts import CanonicalStateView
 
@@ -90,9 +90,14 @@ def physical_reference_observation(robot, env, state, *, hand_frame_id):
     names = robot.physical_joint_names()
     if any(name not in joints for name in names):
         raise ValueError('Panda observation requires its named joints')
-    hands = [v for v in view.frames if v.frame.entity_id == entity and v.frame.frame_id == hand_frame_id]
+    parent_frame, end_frame = robot.reference_frame_parents()['ee']
+    hands = []
+    for frame_id in (parent_frame, end_frame):
+        hands = [v for v in view.frames if v.frame.entity_id == entity and v.frame.frame_id == frame_id]
+        if hands:
+            break
     if len(hands) != 1:
-        raise ValueError('Panda observation requires one hand frame')
+        raise ValueError('Panda observation requires one declared hand or end frame')
     hand = hands[0].pose_world
     adapted = CanonicalStateView(
         schema_version='canonical-state-v0', convention=state.convention,

@@ -665,7 +665,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         from .task import physical_task_binding
         from ...controllers.canonical.r3_effort import panda_effort_reset_capability
         return physical_task_binding(build=build, task_config=task_config, lift_height_m=lift_height_m,
-            hand_frame_id='ee' if runtime_input else 'hand', runtime_input=runtime_input,
+            runtime_input=runtime_input,
             validate_solution=_validate_external_readiness_solution,
             reset_capability=(panda_effort_reset_capability(physical_kind, space_policy)
                               if reset_switch else None), cube_force_z_N=cube_force_z_N)
