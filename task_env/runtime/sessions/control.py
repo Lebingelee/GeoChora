@@ -1177,19 +1177,15 @@ def position_subject_interval(session, target, state, *, controller=None):
         raise ValueError('position subject interval requires its declared binding')
     split_bundle = None
     if len(binding.plan.controller_bindings) != 1:
-        from ...controllers.canonical.split_panda_position import (
-            PandaArmPositionControllerV1, PandaHandPositionControllerV1,
-            SplitPandaPositionControllerV1, SplitPositionBundleV1,
-        )
-        if type(controller) is not SplitPandaPositionControllerV1:
-            raise TypeError('multiple position subjects require their actual split Controller owners')
-        split_bundle = controller.last_split_bundle
-        if (type(split_bundle) is not SplitPositionBundleV1
-                or type(controller.arm) is not PandaArmPositionControllerV1
-                or type(controller.hand) is not PandaHandPositionControllerV1
-                or controller.arm.identity != split_bundle.arm_identity
-                or controller.hand.identity != split_bundle.hand_identity):
-            raise ValueError('split Position outputs do not belong to the live Controller owners')
+        from ...controllers.canonical.position_outputs import PositionOutputBundleV1
+        produce = getattr(controller, 'position_output_bundle', None)
+        if not callable(produce):
+            raise TypeError('multiple position subjects require their actual Controller owners')
+        if getattr(controller, 'identity', None) != target.controller_identity:
+            raise ValueError('Position target differs from the live Controller identity')
+        split_bundle = produce(target, binding.plan)
+        if type(split_bundle) is not PositionOutputBundleV1:
+            raise TypeError('multiple position subjects require a typed output bundle')
         split_bundle.validate_target(target, binding.plan)
     current = session.snapshot()
     if current.to_mapping() != state.to_mapping():
@@ -1238,9 +1234,9 @@ def validate_target(session,target):
             if bindings[0].controller_identity != target.controller_identity:
                 raise ValueError('position target Controller identity differs from subject binding')
         else:
-            from ...controllers.canonical.split_panda_position import SplitPositionBundleV1
+            from ...controllers.canonical.position_outputs import PositionOutputBundleV1
             bundle = getattr(session, '_subject_position_split_bundle', None)
-            if type(bundle) is not SplitPositionBundleV1:
+            if type(bundle) is not PositionOutputBundleV1:
                 raise ValueError('position target lacks its admitted component outputs')
             bundle.validate_target(target, binding_plan)
         if {writer for _, _, writer in binding_plan.resource_writers} != {item.writer_id for item in bindings}:

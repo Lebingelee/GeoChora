@@ -393,9 +393,9 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
         if plan.controller_bindings[0].controller_identity != target.controller_identity:
             raise ValueError('scene subject interval differs from its bound Controller')
     else:
-        from ...controllers.canonical.split_panda_position import SplitPositionBundleV1
+        from ...controllers.canonical.position_outputs import PositionOutputBundleV1
         split_bundle = getattr(session, '_subject_position_split_bundle', None)
-        if type(split_bundle) is not SplitPositionBundleV1:
+        if type(split_bundle) is not PositionOutputBundleV1:
             raise ValueError('scene subject interval lacks its component outputs')
         split_bundle.validate_target(target, plan)
     expected = tuple(sorted((writer, tuple(sorted(f'{entity}/{actuator}'
@@ -435,17 +435,14 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
             ('rad', 'm'), 'controller-managed' if execution_mode == 'native-feedback' else 'exclusive',
             None, writer, target.controller_identity, None, target.identity_hash, resources, 0, count),)
     else:
-        from ...controllers.canonical.split_panda_position import ARM_WRITER, HAND_WRITER
         if execution_mode != 'boundary-hold':
-            raise ValueError('split Position owners require boundary-held output')
+            raise ValueError('multiple Position owners require boundary-held output')
         owners = dict(expected)
-        contributions = (
-            SceneCommandContributionV1('robot-controller', 'arm-position-target', ('rad',),
-                'exclusive', None, ARM_WRITER, split_bundle.arm_identity, None, split_bundle.arm_hash,
-                owners[ARM_WRITER], 0, count),
-            SceneCommandContributionV1('robot-controller', 'hand-position-target', ('m',),
-                'exclusive', None, HAND_WRITER, split_bundle.hand_identity, None, split_bundle.hand_hash,
-                owners[HAND_WRITER], 0, count),
+        contributions = tuple(
+            SceneCommandContributionV1('robot-controller', output.kind, output.units,
+                'exclusive', None, output.writer_id, output.controller_identity, None,
+                output.output_hash, owners[output.writer_id], 0, count)
+            for output in split_bundle.outputs
         )
     return SceneCommandIntervalV1('scene-command-interval-v1', source_id,
         source_closure_sha256, artifact_sha256, boundary, sample_clock, binding.identity_hash,

@@ -145,6 +145,25 @@ class SplitPandaPositionControllerV1:
         self.artifact_hash = artifact.identity_hash
         self.last_split_bundle = None
 
+    def position_output_bundle(self, target, plan):
+        """Publish both live Controller outputs through the common writer contract."""
+        from .position_outputs import PositionOutputBundleV1, PositionWriterOutputV1
+
+        bundle = self.last_split_bundle
+        if (type(bundle) is not SplitPositionBundleV1
+                or type(self.arm) is not PandaArmPositionControllerV1
+                or type(self.hand) is not PandaHandPositionControllerV1
+                or self.arm.identity != bundle.arm_identity
+                or self.hand.identity != bundle.hand_identity):
+            raise ValueError('split Position outputs do not belong to the live Controller owners')
+        bundle.validate_target(target, plan)
+        return PositionOutputBundleV1(target.identity_hash, target.controller_identity, (
+            PositionWriterOutputV1(ARM_WRITER, bundle.arm_identity, bundle.arm_hash,
+                                   'arm-position-target', ('rad',)),
+            PositionWriterOutputV1(HAND_WRITER, bundle.hand_identity, bundle.hand_hash,
+                                   'hand-position-target', ('m',)),
+        ))
+
     def reset(self, state, feedback):
         self.hand.reset(state, feedback)
         self.arm.reset(state)
