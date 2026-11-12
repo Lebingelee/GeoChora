@@ -2,6 +2,8 @@
 
 状态：`IMPLEMENTED`（实施者自评）；输入 `1a2bc947`。本页记录代码、调用方和验证边界，独立主审及维护者接收待后续整体工作；不代表 E06 或整个优化已经接收。
 
+**后续更正（2026-11-13）：**此前关于固定 pin 缺少正式 backend 初始化 facade 的判断错误。GeoPhys 已在其 `docs/reference/runtime-initialization.md` 将 `geophys.init_taichi` 定义为稳定公开入口；TaskEnv 的 `provider_bootstrap` 已改为调用它，并保留旧 helper 的 backend 规范化及环境设置。同进程重复调用遵循 provider 的首次成功初始化生效语义，不推断会检查后续 backend 是否一致。[定向检查](../../../../../workspace/maintenance/v211_e05_e10_s09_public_bootstrap_20261113_001/contracts/result.json) 7 项通过；[GeoPhys CPU Pendulum 短程](../../../../../workspace/maintenance/v211_e05_e10_s09_public_bootstrap_20261113_001/native/native-results.json) 完成构造、reset、非零 interval、第二次 reset 和重复 close，日志报告 `arch=x64`，native 子步未独立计数。旧 SDK 日志和 G06 batch 限制不变。以 `eb5a491e` 为输入，本次项目 tracked blob 1392→1393、task_env 文件 996→997；新增一份版本诊断，无文件删除或迁移，生产代码 +13／−5、诊断 +36／−0。下文当时的缺口及交接方案保留为历史记录。
+
 | 责任 | 实际 owner 与范围 |
 | --- | --- |
 | 通用 Runtime | `sessions/api.py` 保留公开协议、共同分派和薄兼容导出；既有 typed submit、state boundary、clock、fault 与 session close 不因 source 准入迁移而更换。 |

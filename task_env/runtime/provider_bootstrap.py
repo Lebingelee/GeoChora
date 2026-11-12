@@ -6,11 +6,19 @@ from typing import Any
 
 
 def init_task_env_backend(arch: str = "cpu", **kwargs: Any) -> None:
-    """Initialize the selected GeoPhys/Taichi backend lazily."""
+    """Initialize GeoPhys through its documented process-wide public facade."""
+    import os
+    from geophys import init_taichi
 
-    from geophys.test_runtime import init_test_backend
-
-    init_test_backend(arch, **kwargs)
+    # Preserve the TaskEnv backend selection and environment contract that was
+    # previously supplied by GeoPhys's test/demo convenience wrapper.
+    normalized = str("cuda" if arch is None else arch).strip().lower()
+    if normalized not in {"cpu", "cuda", "vulkan", "gpu"}:
+        raise ValueError(f"unsupported runtime arch: {arch}")
+    os.environ["GEOPHYS_TAICHI_ARCH"] = normalized
+    if normalized == "vulkan":
+        os.environ.setdefault("GEOPHYS_VULKAN_SPARSE_EXPERIMENTAL", "0")
+    init_taichi(arch=normalized, **kwargs)
 
 
 def materialize_task_scene(compiled, runtime_config, *, create_render_source: bool):
