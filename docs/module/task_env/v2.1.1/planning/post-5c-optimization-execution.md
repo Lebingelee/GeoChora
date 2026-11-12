@@ -1,6 +1,6 @@
 # 5c 后代码与项目优化：执行安排
 
-日期：2026-11-11。状态：`E00_E04_IMPLEMENTING`。维护者已直接要求本会话实施 E00～E04。当前事实见[唯一当前摘要](../maintenance/current-state.md)，范围与退出证据以[60 项优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)为准；本文负责依赖、具体改动落点和实施包安排。
+日期：2026-11-12。当前 E00～E04 已完成实施自评及独立主审，主审余项按维护者授权在本轮修复；维护者最终接收待完成。当前效果见第 6 节及[专用账本](post-5c-e00-e04-remaining-ledger.md)。第 1～5 节保留 2026-11-11 的历史启动安排，不作为新的剩余工作或实时状态。
 
 ## 1. 启动边界
 
@@ -102,50 +102,29 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 
 检查日志和[摘要](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/validation-summary.json)保存在本轮 ignored 输出目录；本地提交按当前阶段分支归属，仅包含本轮文档。后续实施前重新核对其实际输出 HEAD 与 dirty 归属。
 
+<a id="6-e00e04-实施记录"></a>
 ## 6. E00～E04 实施记录
 
-本节按模块维护当前效果、限制和证据入口，不再逐批追加过程日志。此前逐批历史可从提交 `69f4380e` 的本文件第 6 节恢复；原始诊断与运行结果仍保存在对应的 ignored `workspace/maintenance/` 目录。历史证据只证明其自身输入和范围，不合并为当前代码的最终验收。继续逐事件对照[优化台账](post-5c-code-project-optimization-diagnostic-ledger.md)；G06／G07 未开始。
+当前以[专用账本](post-5c-e00-e04-remaining-ledger.md)和[独立主审](../maintenance/reviews/20261112_e00_e04_independent_review_76536d2a.md)对照；后者审查生产 `76536d2a`，建议有界接收并指出四项代码/资料余项。本轮维护者授权这些余项的一轮实施测试，现已完成，生产提交 `912416e6`，详见[实施返包](../maintenance/20261112_e00_e04_review_fix_delivery_912416e6.md)。这不代替维护者最终接收，也不启动 E05 或 G06。
 
-| 事件／模块 | 当前效果 | 尚需完成 |
+| 事件 | 最终效果及本轮补充 | 仍保留的边界 |
 | --- | --- | --- |
-| E00 基线 | 5c 接收与优化输入 `1f1359ee`、保护文件和两个 submodule pin 已记录。 | 按实际 HEAD、工作树和证据继续对账；E00 基线不证明架构已接收。 |
-| E01 入口与配置 | 四个正式任务使用 `make_env`、同一规范配置语义及默认值调用；mapping／YAML 对齐。共同 Task binding 以同一个构建请求传递 provider、backend、seed、horizon 和 reset 样本，构造与重建不再切换两种回调签名。Position candidate、两个 PickCube 旧物理 UID 及只服务历史诊断的 F04 Isaac Position 物化入口已退休；正式 PickCube Position／effort 共用 Task binding 工厂，原 MJCF physical candidate 文件已退休；USD 与普通 Robot effort 准入仍保留。 | 旧 component 路径仍有其他 caller；Isaac 资产必须预装，自动生成／发行尚未完成。 |
-| E02 Task／Robot／Controller | 四任务的已选 Robot 进入声明、source、Controller 和 live 绑定；一体／装配 Panda 与两个普通 Robot 的主体能力保留；一体和装配 Panda 声明位置主体布局，由 Runtime 消费布局并编译绑定。两个普通 Robot 的 MJCF／USD source 使用共同 source 意图并核对已编译主体、受控关节与 writer；普通 Robot 动作空间来自已编译 Controller；PickCube 的 MJCF Position／effort 在 Scene 导入前通过同一函数冻结 Task／Robot source 意图；effort 的已编译主体、关节和 writer 必须匹配意图，两者共用 Task／Robot 场景编译；不使用 Solution 的 effort 不再通过 Position profile 准备 source；Isaac Position／effort 使用同一 Task binding 工厂并分别绑定 Controller；MJCF／USD Panda effort 共用 source／Controller 组合：Robot 提供主体和传动声明，source adapter 编译主体，Controller 构造动作映射并校验 reset 增益及可切换类型；reset 切换复用 Runtime 已验证的主体绑定，重新核验 source 并创建独立 Controller；可切换种类、动作 schema 和选择器创建由 Controller 能力声明；普通 Robot 的 MJCF 传动检查和 USD 层级映射分别由 source 导入层与 Isaac adapter 负责。 | Panda 与普通 Robot 的 source 物化仍有不同路径；不能仅凭共同运行视图认定统一构造完成。Task 内具体 source 接线仍需按 owner 收敛。 |
-| E03 Env／生命周期 | TaskDefinition 生命周期、reset 重建、部分故障处理和 source／Env 关闭已收敛到共同 owner；PickCube effort 与两个普通 Robot 的 source 构建和逐 episode reset 计划由共同构建 owner 协调，分别保留 source 复用和重建策略；MJCF effort source 在共同构建请求中准备并由 RuntimeSource／Env 负责释放，Task binding 不再提前持有同一快照；隔离 worker 在构造失败和关闭时也按同一顺序释放 session、Runtime owner、source 与 Task 资源，并在关闭响应中传递失败；Isaac App 在共同构造边界按 provider 准备，不依赖 Task UID 或由普通 Robot source 再次启动。 | 继续核对各受影响路径的构造失败、reset、fault、共享 App／renderer 及 close 所有权。 |
-| E04 控制／推进 | 已受测的 action、Solution 单步和 Position／effort 均进入共同场景提交；可切换 R3 effort 的调用方 Solution 通过 `env.step(ExpertAction)` 消费当前 Controller 身份；调用方自己执行 `observe`。`step_expert` 仅为受限兼容入口，计划废弃。未声明 Task 载荷的可切换 effort 过期动作在提交前无故障拒绝，Solution 产生无效提案则锁存故障；保留 typed 命令、writer 资源、单位、boundary 和 clock。 | 按实际 caller 完成已支持 ExpertAction／序列及失败语义核对；完整 Solution、所有 provider／renderer 及任意组合均不能由短程结果推断。 |
+| E00 基线与度量 | 实际输入 `e25f37c5`、原 dirty、四保护输入和 pins 冻结；生产、诊断、文档分开计量 | 代码身份、原始证据和文档提交身份分别记录；不以行数推导质量 |
+| E01 正式入口与配置 | 四任务共用 `make_env`、规范配置、Robot 选择和 `TaskBuildRequest`；旧 Position candidate 和 PickCube physical UID 已退休 | 范围外 component 有独立 caller；Isaac 需要预装资产 |
+| E02 构造与主体 | 共同 builder 复用 `CompiledReferenceTaskV1`，各任务使用不可变具名 context；source composition 返回具名结果，Controller 选择单独传给最终绑定，不再在 Runtime value 填充/弹出临时键 | 保留 MJCF/USD、Position/effort、单层/嵌套的合法差异；不承诺任意组合 |
+| E03 生命周期 | 共同 reset、source cache/lease、publication、worker/App/camera 清理保全；RNG 预检回滚和失败 Runtime owner 保留的修复继续有效 | fake 失败检查不升级为真实 SDK 失败注入；资源/关闭日志限制保留 |
+| E04 控制与推进 | 标准外部 `act → env.step → observe` 保留；兼容 helper 由显式投影与类型策略决定行为，错误阶段只负责 fault 标签，进入原共同提交和推进 owner | typed 单位/资源/clock/generation 检查不弱化；完整 Solution 留 E13 |
 
-### 6.1 累计文件与代码变化
+### 6.1 本轮验证与影响
 
-以 `1f1359ee` 为比较基线、当前冻结代码输入为范围，`git diff --no-renames` 中 `task_env` 跟踪文件由 980 减至 978；整个项目跟踪文件由 1363 保持为 1363。生产 Python 涉及 109 个文件，+5,343／−14,441，净减 9,098 行，其中新增 4、删除 17、修改 88；诊断新增 17 个文件，+4,270／−0；其他 `task_env` 文本（含文档及资产）修改 8、删除 6 个文件，+28／−917。Git 检测到 1 个文件从 Robot 目录迁至 Runtime：位置绑定编译消费 Robot 的主体布局声明；按职责拆分的代码不伪装为原样迁移。旧目录中本阶段的 12 个诊断文件修改已撤回到优化启动基线；仍有效的 adapter 准入检查在 v2.1.1 目录维护，旧诊断不再作为兼容目标。
+精确计划和结果见[本轮冻结输入](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/input-snapshot.json)、[受影响 source/caller 检查](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/source-contract-plan.json)、[USD 离线检查](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/usd-source-plan.json)和[CPU 短程计划](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/native-plan.json)。217 项受影响检查通过，76 项纯/fake 精确检查通过（有重叠，不相加）。MuJoCo 七条短程 75 显式子步，测试另 40，合计 115；GeoPhys 两条短程通过，native 子步未独立计数。首轮六项 USD 因守卫误拦 OpenUSD 失败，放开离线 OpenUSD 后只补六项，全部通过，首轮记录保留。
 
-这些是累计文本 diff，不是对实现质量或最终接收的证明；历史台账、原始输出、四个未跟踪保护输入和其他用户修改不计入新增／删除。项目其他目录的跟踪文件变化包含文档和示例。每个事件最终接收时仍需按目标表提供该事件的精确对账及 diff。
+验证输入为 `e25f37c5` 加保存的生产 patch，逐文件 SHA 与 `912416e6` 生产/诊断字节一致；运行的 source_revision 仍是 e25，不写成提交后裸 HEAD 重跑。本轮修改 5 个生产文件，+208/−143，净 +65；修改 2 个版本诊断文件，+35/−9，净 +26。没有新增/删除/整文件迁移生产文件；具名阶段 context 和显式提案策略是新增代码的职责。文档/Skill 的变更及项目文件数另见返包，不与原累计净减少相加冒充本轮成果。
 
-### 6.2 受影响路线和证据
+共同 builder 的内部交接发生变化，需复验四任务、装配 Panda 和受影响 Solution caller。USD 使用真实 delivery 的离线 source/Controller 检查；本轮没有启动 Isaac App/GPU。renderer adapter、状态/RGB publication、physics clock 与资源合同未改；此前 `76536d2a` 的两条 RGB 有界证据按接口及 source 对照复用，不改称本轮重跑。完整 Solution、全部 provider/renderer 交集和真实 SDK 失败注入仍未由本轮证明。
 
-- 最新冻结代码输入的版本诊断为 281 项通过，涵盖正式配置、Robot／Controller 绑定、资源故障边界和已验证 USD source 字节；它不等于原生运行或任务成功。
-- 四任务及装配 Panda 的 MuJoCo CPU 短程路线曾在 [共同配置默认值输入](../../../../../workspace/maintenance/v211_task_defaults_20261112/plan.json)下完成 reset、非零 action 或 Nut 单个 Solution interval、共同提交、再次 reset 和重复关闭；代码身份不同于本批，按改动影响参考。
-- PickCube 的 MuJoCo 直接 effort、关节参考和 R3 参考以及 Isaac CUDA 关节参考曾在 [共同 source／Controller 组合输入](../../../../../workspace/maintenance/v211_shared_effort_builder_20261112/plan.json)下完成短程运行。每条观测 5 个显式子步；这不是完整 Solution 或全部 provider 的结论。
-- 此前冻结输入的 PickCube Position 与关节 effort 的 Isaac CUDA 运行、预算和原始结果见 [USD source 验证计划](../../../../../workspace/maintenance/v211_pickcube_usd_source_20261112/plan.json)。两次均完成 reset、5 个显式子步、再次 reset、重复 Env close 和 App close 收据；关节 effort 路线的 SDK 关闭日志另有 Isaac 菜单回调访问空 USD context 的 `AttributeError`，因此不能称整个 SDK 关闭过程无异常。App 隐式启动推进数未知。
-- Pendulum／双轮车的 MJCF 传动检查及 USD 层级映射归位后，MuJoCo CPU 与 Isaac CUDA 的正式短程验证分别见 [CPU 计划](../../../../../workspace/maintenance/v211_effort_source_lowering_20261112/plan.json)和 [Isaac 计划](../../../../../workspace/maintenance/v211_effort_source_lowering_20261112/isaac-plan.json)。四条路线各完成 25 个显式子步、再次 reset 和重复 Env close，Isaac App close 收据均完成；Pendulum 的 SDK 关闭日志另有菜单回调空 USD context `AttributeError`，不能据收据称整个关闭过程无异常。各项不扩展为完整任务成功。
-- PickCube 与 NutAssembly 在 MuJoCo CPU 隔离 worker 下完成 reset、单个控制 interval、再次 reset 和重复关闭，见 [worker 资源验证](../../../../../workspace/maintenance/v211_worker_resource_lifecycle_20261112/plan.json)。Nut 为一个 Solution interval；worker 子步没有独立实测，按每条 50 子步保守计费。故障注入另核对构造失败、session 已物化后失败和关闭响应中的资源释放，并验证原异常及清理失败附注跨 worker 传递；原生短程输入之后仅增加错误序列化代码及其诊断，正常运行路径未变。
-- Isaac App 统一准备后，Pendulum 和双轮车的进程内 CUDA 路线复验见 [App owner 计划](../../../../../workspace/maintenance/v211_isaac_app_owner_20261112/plan.json)；两条路线各完成 25 个显式子步、再次 reset、重复 Env close 和 App close；本次日志未出现此前记录的菜单回调异常。worker 在不同 Task 选择下的启动及失败清理由版本诊断覆盖，未作 Isaac 隔离 worker 原生复验；不表示 physical execution 已支持隔离 worker。
-- 退休 F04 独立准入后，PickCube 的 MuJoCo、Isaac Position／effort 和 Pendulum 的 Isaac effort 复验见 [CPU 计划](../../../../../workspace/maintenance/v211_retire_f04_route_20261112/cpu-plan.json)与 [Isaac 计划](../../../../../workspace/maintenance/v211_retire_f04_route_20261112/isaac-plan.json)。三条 PickCube 路线各完成 5 个显式子步，Pendulum 完成 25 个；三条 Isaac 路线均完成第二次 reset、重复 Env close 和 App close，日志未见 traceback 或 `[Error]`，隐式启动推进数未知。F04 历史结果仍按原时点保留，不转化为现行能力。
-- MJCF Task／Robot 场景合并后的 PickCube R3 Position、直接 effort 与关节 effort 见[本批 MuJoCo 计划](../../../../../workspace/maintenance/v211_shared_pickcube_task_scene_20261112/plan.json)：均完成 reset、5 个显式子步、第二次 reset 和重复 close；正式构建检查另确认 Position／effort 的 Task Artifact、场景与实体映射一致。本批未重跑 Isaac 或 GeoPhys；改变的共享场景步骤仅用于 MJCF 输入。
-- Isaac 共同 Task binding 改动后的 Position 与关节 effort 实际路线见[本批计划](../../../../../workspace/maintenance/v211_shared_usd_task_binding_20261112/plan.json)：均完成 reset、5 个显式子步、再次 reset、重复 Env close 和 App close；Position 的 SDK 关闭日志出现两次菜单回调访问空 USD context 的 `AttributeError`，effort 日志未见 traceback 或 `[Error]`。App 隐式启动推进数未知。
-- Panda effort 的主体编译与 Controller 构造归位后，正式 MuJoCo 关节／R3 切换与直接 effort 分别完成 10 和 5 个显式子步，见[CPU 计划](../../../../../workspace/maintenance/v211_panda_effort_owner_20261112/cpu-plan.json)；Isaac 关节 effort 完成 5 个显式子步、再次 reset、重复 Env close 和 App close，日志未见 traceback 或 `[Error]`，见[Isaac 计划](../../../../../workspace/maintenance/v211_panda_effort_owner_20261112/isaac-plan.json)。Isaac 隐式启动推进数未知。
-- [当前控制生命周期验证](../../../../../workspace/maintenance/v211_expert_control_lifecycle_20261112/plan.json)在 MuJoCo 下拒绝过期 Controller generation 且不锁存故障，随后执行关节 effort，再切换 R3 effort 并通过兼容入口 `step_expert` 提交，总计 10 个显式子步；版本诊断另检查 Solution 提案失效后锁存故障。
-- [当前 caller-owned Solution 与 source 验证](../../../../../workspace/maintenance/v211_caller_solution_source_owner_20261112/plan.json)在 MuJoCo 完成关节 effort 后切换 R3 effort，由调用方依次执行 `Solution.act`、`env.step`、`Solution.observe`，总计 10 个显式子步；直接 effort 另完成 5 个。版本诊断验证错误 Solution 身份在推进前拒绝、调用方自行 observe、构造失败及 source 重复关闭边界。
-- [Task source 分离验证](../../../../../workspace/maintenance/v211_pickcube_task_source_split_20261112/plan.json)覆盖 MuJoCo 直接 effort、Position R3 和关节 effort 切换调用方 Solution：分别完成 5、5、10 个显式子步及 reset／close；版本诊断确认不需要 Solution 的 effort 不再准备 Position readiness。
-- [共同构建请求验证](../../../../../workspace/maintenance/v211_common_task_build_request_20261112/plan.json)在 MuJoCo CPU 覆盖 PickCube Position／effort、NutAssembly、Pendulum、双轮车，分别完成 5、5、5、25、25 个显式子步及 reset／close；Nut 使用受限兼容 Solution 入口。
-- [Robot 位置布局验证](../../../../../workspace/maintenance/v211_robot_position_layout_final_20261112/plan.json)在 MuJoCo CPU 覆盖一体 Panda、装配 Panda 和 NutAssembly，各完成 5 个显式子步及 reset／close；Isaac USD 一体 Panda 完成 5 个显式子步、二次 reset 和关闭，隐式启动推进数未知。
-- [effort 绑定复用验证](../../../../../workspace/maintenance/v211_reuse_effort_binding_20261112/plan.json)覆盖 MuJoCo 关节／R3 切换及调用方 Solution、直接 effort，分别完成 10 和 5 个显式子步；Isaac CUDA 关节 effort 完成 5 个显式子步、二次 reset 和 Env／App 关闭收据；SDK 关闭日志有两次菜单回调访问空 USD context 的 `AttributeError`，隐式启动推进数未知。
-- [共同 source 与 reset 构建验证](../../../../../workspace/maintenance/v211_source_bound_task_builder_20261112/plan.json)覆盖 MuJoCo 关节／R3 切换、直接 effort、Pendulum、双轮车，分别完成 10、5、25、25 个显式子步；Isaac Pendulum 完成 25 个显式子步、二次 reset 和 Env／App 关闭，日志未见 traceback；隐式启动推进数未知。
-- [PickCube 共同 binding 验证](../../../../../workspace/maintenance/v211_retire_pickcube_effort_candidate_20261112/plan.json)覆盖 MuJoCo Position、直接 effort、关节／R3 切换及调用方 Solution，分别完成 5、5、10 个显式子步；Isaac Position／effort 各完成 5 个显式子步、二次 reset 和 Env／App 关闭，日志未见 traceback；隐式启动推进数未知。
-- [Controller reset 能力验证](../../../../../workspace/maintenance/v211_controller_reset_capability_20261112/plan.json)在 MuJoCo CPU 覆盖关节／R3 切换、过期动作拒绝及调用方 Solution，完成 10 个显式子步；本批未改变其他 provider 或 renderer。
-- [source 意图验证](../../../../../workspace/maintenance/v211_preparse_robot_intent_20261112/plan.json)覆盖 MuJoCo 一体／装配 Panda、直接／切换 effort 和 Nut 短程；GeoPhys CPU 直接 effort 完成 reset、非零 step、二次 reset 与 close，子步未独立计数。冻结意图发生在 Scene 导入前，快照本身仍会解析 XML。
-- [普通 Robot source 意图验证](../../../../../workspace/maintenance/v211_simple_robot_source_intent_20261112/plan.json)覆盖 Pendulum 和双轮车的 MuJoCo CPU 与 Isaac CUDA 真实短程，各完成 25 个显式子步、二次 reset 与重复 Env close，Isaac App close 收据均完成；双轮车 SDK 关闭日志出现菜单回调访问空 USD context 的 `AttributeError`，隐式启动推进数未知。
-- 5c 已接收的原生渲染及跨组合证据保留原有有界结论；本次未重新验证 renderer。完整 Solution 的单 seed 和记录读回留待 E13，G07 三 seed 矩阵不属于本次实现范围。
+### 6.2 资料保全与恢复
 
-### 6.3 USD source 与资产边界
+修改前 dirty 文件是与 Goal 相同角色的提示文本，SHA `af50897d…`；本轮先按完整字节保存为[执行记录修改前副本](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/execution-record-before.md)及[原 dirty patch](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/existing-dirty.patch)，再从 Git 中恢复本页执行计划角色并更新第 6 节。独立的 [Goal 文件](post-5c-e00-e04-goal.md)保留。不是将旧 dirty 静默丢弃，也不将跨时点的不同文本写成从未变化。
 
-PickCube 的 USD 构造使用已验证的 `UsdTaskSceneSourceV1` 原始 source 字节，不再重复加载交付并自行从路径读取 MJCF；source owner 在 Controller 绑定前仍检查所有受验证字节的新鲜度。诊断验证三种 Controller 配置共用同一加载结果，并在原始 source 变更后拒绝。先前新增的本地 USD 缓存仍需预装，未变为资产发行方案。各项运行证据按其实际代码输入分别标记。
+旧执行摘要可从 `b94e8625`、`3b5023e8` 的相应记录/账本恢复，更早逐批记录见 `69f4380e`。初始 `1f1359ee → 76536d2a` 的累计统计及 U1～U5 原始 native/失败记录保留在专用账本，不与本轮增量混算。COM 历史失败、R05c NOT_REQUALIFIED、Isaac shutdown 日志及未计数启动推进限制保留；本轮没有整理 refs、worktree 或原始证据。

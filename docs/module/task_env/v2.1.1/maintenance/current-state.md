@@ -18,7 +18,7 @@
 | GeoPhys／Menagerie | `c1ea3cc9fb99ccbd1d31c36d6fc7b84aa936b3d7`／`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` |
 | 工作树 | 启动时 tracked clean；四个既有 untracked 输入原样保护，含优化台账 |
 | 执行窗口 | 单元 9 已有返包及释放记录；启动观察未见本仓库 native worker，前序协调 chat 为 idle；启动时当前 chat 仅写 O0 文档；后续直接实施 E00～E04 的资源使用按其运行计划及释放记录核对 |
-| 当前改动 | 启动文档之后维护者已直接授权 E00～E04；实施状态及首批代码／CPU 证据见执行计划第 6 节。其余优化与最终接收尚未完成，不沿用启动表充当实时锁 |
+| 当前改动 | E00～E04 已完成实施、基线独立主审及本轮主审余项修复；最终维护者接收待完成。当前生产 `912416e6`，精确验证输入及限制见执行计划第 6 节；不沿用启动表充当实时锁 |
 
 保护输入为 `MUJOCO_LOG.TXT`、2026-10-30 runtime route handoff、stage3 gravity proposal 和用户优化台账。精确大小／SHA-256 与原工作树状态在 ignored [输入快照](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json)。没有将它们加入本轮提交，也没有清理原始输出、改动 pins、merge／push／tag。
 
@@ -34,16 +34,16 @@ COM 原严格判据失败、维护者有界采纳、原 N08 FAIL、R05c `NOT_REQ
 
 ## 正式入口及当前实施
 
-截至代码基线 `22c9c579` 及本次冻结输入，四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；当前具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。Git 当前 HEAD 以实际工作树为准，不把此输入当作实时 HEAD。
+当前生产为 `912416e6`；四个正式任务使用 `task_env.make_env`：`pick-cube-p16-reference-v1`、`nut-assembly-outcome-reference-v1`、`pendulum-v1`、`two-wheel-balance-v1`。mapping 与 YAML 进入共同配置解析及构建请求；具体支持的 Robot、Controller 和 provider 组合以配置准入及相应证据为准。基线生产 `76536d2a` 已有[独立主审建议](reviews/20261112_e00_e04_independent_review_76536d2a.md)；本轮按维护者授权改进四项代码/资料余项并自检，不将本次自检写成另一份独立主审或最终人工接收。
 
 | 事件 | 当前状态 | 实际进展和剩余边界 |
 | --- | --- | --- |
-| E00 基线与度量 | 基线已记录；持续对账 | 输入身份、保护文件和项目统计有记录；当前摘要及实施记录需随变化维护。 |
-| E01 入口与配置 | 实施中 | 四任务共同解析、选择 Robot 和构建；历史 Position candidate UID、输入与专属构建已退休。旧 component 纯构建属于其他保留 caller，不能由此称所有入口均已统一；PickCube 的有效物理能力仍有任务内 candidate 文件待归位。 |
-| E02 模块与主体 | 实施中 | 正式入口选一次 Robot，Task、source 与 Controller 使用该声明；四主体已有受测的主体与绑定链。装配／一体 source 的不同物化路径和 Task 内部分构造职责仍需收敛，不能将共同运行视图当作完整统一。 |
-| E03 Env 生命周期 | 实施中 | reset、资源清理和 source 快照已部分归共同 owner；构造、故障及剩余专用状态仍需逐路径核对。 |
-| E04 控制与推进 | 实施中 | 正式受测动作进入共同场景提交；Panda effort 已接入主体／通道匹配，Position 投影由 Controller 提供。其他已支持序列、故障、模型及 provider／renderer 受影响路径仍需按实际代码和证据核对。 |
+| E00 基线与度量 | 本轮实施收口，待维护者接收 | 输入/证据/保护/统计已核对；旧 dirty 已完整保全，再恢复执行记录角色及有效索引。 |
+| E01 入口与配置 | 本轮实施收口，待维护者接收 | 四任务共用正式解析与请求；Position candidate 和两个旧 PickCube physical UID 已退休；范围外 component 不进入这四条正式链。 |
+| E02 模块与主体 | 本轮实施收口，待维护者接收 | 共同 builder 消费 source、主体和 Controller 阶段；复用 CompiledReferenceTaskV1 与具名 context，去除 20 种阶段临时字典键；合法 typed lowerer 差异保留。 |
+| E03 Env 生命周期 | 本轮实施收口，待维护者接收 | 共同 reset/fault/close、source lease/cache、worker/App/camera owner 已按受影响范围核对；保留真实失败注入未测边界。 |
+| E04 控制与推进 | 本轮实施收口，待维护者接收 | 当前支持输入进入共同 dispatcher/submission；兼容提案以显式投影和类型策略决定行为，错误阶段不再决定控制路径。 |
 
-本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。本次冻结代码输入的版本诊断 264 项通过；四任务、Panda 物理控制与 Isaac USD 的实际运行证据、输入身份及限制集中见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。其中 Solution 仅作单步验证；未重新验证的 renderer 和完整 Solution 不能由此推断通过。旧逐批记录可从 `69f4380e` 的同一文件恢复，原始输出按各自输入保留。
+本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。本轮 217 项受影响 source/caller 检查通过，另有 76 项纯/fake 精确检查通过（与前者有重叠，不相加）；六项 USD 检查为真实 delivery 的离线构造，不启动 Isaac App。MuJoCo 七条短程共 75 个显式子步，GeoPhys effort/Pendulum 两条短程通过；加上测试中的 40 个，本轮共 115 个显式 MuJoCo 子步。冻结输入为 `e25f37c5` 加保存的生产 patch，与 `912416e6` 对应生产字节相同，运行的 source_revision 仍为 e25，不改称提交后重跑。详情见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。renderer 未重跑，完整 Solution 仍留 E13；旧逐批记录从历史提交和原始输出恢复。
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。

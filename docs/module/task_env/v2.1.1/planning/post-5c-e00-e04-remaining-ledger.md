@@ -1,8 +1,8 @@
 # E00～E04 剩余实施账本
 
-日期：2026-11-12。核查输入：`b94e86250140bffebc27bf92b2e8aec60688b7e4`，分支 `codex/v211-stage5-diagnostic`。状态：`REPLAN_ONLY_IMPLEMENTATION_NOT_RESUMED`。
+更新：2026-11-12。分支 `codex/v211-stage5-diagnostic`。当前状态：`IMPLEMENTATION_REVIEW_FIXES_PENDING_MAINTAINER`。原重评输入为 `b94e8625`；原实施生产 `76536d2a`、结果记录 `3b5023e8` 已经[独立主审](../maintenance/reviews/20261112_e00_e04_independent_review_76536d2a.md)，建议本轮代码目标有界接收。维护者随后授权代码/资料余项的一轮实施测试，当前结果见[执行记录第 6 节](post-5c-optimization-execution.md#6-e00e04-实施记录)。维护者最终接收待完成，不自动启动后续事件。
 
-本账本是[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)在 E00～E04 范围的实施视图。它承接维护者最新的四任务、退休入口及版本诊断要求；不替代总台账，不重置原执行历史、attempt 或资源账，不启动暂停中的 Goal。可替换旧提示的[调整后 Goal](post-5c-e00-e04-goal.md)与本文配套。
+本账本是[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)在 E00～E04 范围的实施视图。它承接维护者的四任务、退休入口及版本诊断要求；不替代总台账，不重置原执行历史、attempt 或资源账。原[调整后 Goal](post-5c-e00-e04-goal.md)作为当时实施提示保留；第 1 节是 b94 规划输入快照，其“待办/未运行”描述不覆盖后来的实施、主审和验证结果。
 
 ## 0. 使用方法与剩余工作量
 
@@ -14,7 +14,7 @@
 
 单元内只读本账本、本单元实际代码及必要规范；完成大单元后，再对照第 9 节列出的总台账条目一次。发现范围外问题集中进入第 8 节，不据此跳到另一个小补丁。只有会破坏当前单元正确性的真实依赖或故障才立即处理。
 
-## 1. 冻结现状与需要保留的成果
+## 1. 规划输入与需要保留的成果（b94e8625，历史）
 
 ### 1.1 输入、统计与可信边界
 
@@ -27,7 +27,7 @@
 
 原始冻结信息、dirty patch、保护输入及已读源码摘要见[本次输入快照](../../../../../workspace/maintenance/v211_e00_e04_replan_20261112_001/input-snapshot.json)。文档提交后的 HEAD 不冒充上述生产输入。
 
-### 1.2 事件判断
+### 1.2 规划时点事件判断（历史）
 
 | 事件 | 当前判断 | 保留内容 | 真正剩余 |
 | --- | --- | --- | --- |
@@ -171,7 +171,7 @@ U1 首个可操作顺序为 R01 确认已有输入 → R02 定阶段及字段交
 | 破坏／重建 | `EpisodeExecutionState` 停止旧 episode；Env 清除 publication、关闭旧 camera／session；reconstruction 验证 source、重绑 Controller／TaskDefinition，再由 RuntimeBuilder 物化。此后失败 latch fault，清理异常附注到原异常 |
 | 初态／发布 | initializer 执行 reset，session 读回状态，Task 生成 observation；publication 成功才完成 episode commit。RGB 延后采集时校验同一 boundary／clock，失败仍 latch fault；Controller 的 reset selection 在旧 session 关闭后提交 |
 
-R09～R14 实施者核对完成，独立主审及维护者接收待定。版本化纯合同检查 30 项通过，覆盖 source、worker、相机和 RNG；不将 fake 当作真实 App。最终代码的 [MuJoCo 冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)覆盖四任务及 Panda effort／装配，每条完成构造、reset、一个非零 interval、第二次 reset 和重复 close；Pendulum／双轮车额外核对连续 RNG。前一轮等价实现的 002 也通过；001 因缺少 `scene` 模块在物理推进前失败，锁已释放。另一次误将含真实 source 构造的配置测试模块作为纯测运行，未按 native／source 窗口冻结或持锁，且桌面用例因缺少 `scene` 模块失败；不作为验证证据，详见[偏差记录](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/verification-notes.md)。
+R09～R14 的原实施核对完成；基线独立主审已完成，当前余项/维护者状态见第 10 节。版本化纯合同检查 30 项通过，覆盖 source、worker、相机和 RNG；不将 fake 当作真实 App。最终代码的 [MuJoCo 冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)覆盖四任务及 Panda effort／装配，每条完成构造、reset、一个非零 interval、第二次 reset 和重复 close；Pendulum／双轮车额外核对连续 RNG。前一轮等价实现的 002 也通过；001 因缺少 `scene` 模块在物理推进前失败，锁已释放。另一次误将含真实 source 构造的配置测试模块作为纯测运行，未按 native／source 窗口冻结或持锁，且桌面用例因缺少 `scene` 模块失败；不作为验证证据，详见[偏差记录](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/verification-notes.md)。
 
 Isaac 成功 reset 与 App close 参考 U1 的冻结运行：U2 改动仅影响失败后 owner 保留和有 Task sampler 的预检拒绝，未改其 provider／renderer 实现；U2 未重跑 Isaac 失败路径。U1 的 Position 关闭日志曾含 SDK 菜单回调警告，App receipt 和日志分别保留，无法仅凭 receipt 断言 SDK 无异常。GeoPhys、真实 camera 失败与跨 renderer 不扩大为本单元已复验范围。
 
@@ -243,7 +243,7 @@ R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_s
 | R29 核 | 按事件给出最终 owner／调用链、输入输出 HEAD、文件新增删除迁移、生产＋诊断＋文档 diff、复用／新证据与限制；区分阶段内移动和项目净减少 | 统计与结果可复算；净减 9098 行只作为本次输入基线，后续新增有职责说明；不规定任意删行／文件下降比例，不用全文件搬迁冒充 owner 收敛 |
 | R30 核 | 对本账本 30 格及第 9 节总账映射一次收口，分别判断 E00、E01、E02、E03、E04；将 E05 以后未完成内容明确保留 | 实施者结论、独立主审、维护者接收分列；无未解释的 in-scope OPEN 才提请该事件接收。完成 E00～E04 不等于全部代码／项目优化接收，也不自动进入 E05 或 G06 |
 
-### U5 事件结果、验证与变更度量
+### U5 原实施结果、验证与变更度量（76536d2a）
 
 | 事件 | 实施者结果与实际 owner | 限制 |
 | --- | --- | --- |
@@ -261,7 +261,7 @@ R28：[MuJoCo borrowed RGB](../../../../../workspace/maintenance/v211_u5_rendere
 
 R29：以 `1f1359ee` 的 stage 5 接收点到 `76536d2a` 的已跟踪文件为统计范围，文件由 1,361 增至 1,364；不检测重命名时新增 26、删除 23、修改 115；`git diff -M` 识别其中一组 64% 相似度的 Robot binding 迁移，不能把它计作净删除。按路径分类：生产／其他 +5,564／−15,220，净 −9,656；诊断 +4,776／−0；文档 +882／−131，净 +751；项目合计净 −4,129 行。诊断增加含新版本诊断及既有文件迁移，行数不是独立新增功能数量。以上不含原有未跟踪文件、dirty 执行记录及 ignored 输出，也不包含本次 U5 记录提交。以本次重评输入 `b94e8625` 为基准到同一生产 HEAD：生产／其他 +996／−687，诊断 +529／−23，文档 +379／−0，分别净 +309、+506、+379；项目文件数 1,361→1,364。本轮新增代码主要用于共同 source／Controller 构建、失败资源归属与对应诊断，不能描述成全为精简。
 
-R30：R01～R30 已有实施者结果和所列证据，**独立主审及维护者最终接收均待完成**；不得把实施者自评写成正式接收。E05 及以后、完整单 seed Solution（E13）、项目证据整理、分支清理与 G06 均未完成或自动启动。历史 COM 原判据失败、R05c 资格限制及既有偏差继续保留。
+R30：R01～R30 已有实施者结果和所列证据，基线独立主审已完成，本轮余项与维护者最终接收状态见第 10 节；不得把实施者自评写成正式接收。E05 及以后、完整单 seed Solution（E13）、项目证据整理、分支清理与 G06 均未完成或自动启动。历史 COM 原判据失败、R05c 资格限制及既有偏差继续保留。
 
 ### 6.1 验证复用和命令选择
 
@@ -306,22 +306,18 @@ R30：R01～R30 已有实施者结果和所列证据，**独立主审及维护�
 | U4 | TEST-01～03、CALL-01～04、DOC 的本次直接变化部分 | 不表示整个诊断库、文档库和 benchmark 已治理完成 |
 | U5 | GOV-01／02、TEST-04、V01～V07 和 V09／V10 的本次实际覆盖；E00～E04 原事件出口 | V08 完整 Solution 留 E13，项目清理及 G06 未启动 |
 
-## 10. 后续实施时覆盖更新的当前效果表
+## 10. 当前效果与接收状态
 
-| 单元 | 当前结果 | 最终 owner／提交／证据 | 剩余格 |
-| --- | --- | --- | --- |
-| U1 | 实施者自评 PASS，独立主审及维护者接收待完成：`253e1efe` 与 `a5483e63` 将桌面 Position／effort 的 source 和 Controller 能力接入共同阶段；四任务构建结果交接见第 2 节。Task 继续提供任务参数和语义映射 | [MuJoCo 计划](../../../../../workspace/maintenance/v211_u1_shared_source_native_20261112_001/plan.json)：Position、effort、装配 Panda 各 5 个显式子步、二次 reset 和重复 close；[剩余任务计划](../../../../../workspace/maintenance/v211_u1_remaining_tasks_native_20261112_001/plan.json)：Nut、Pendulum、双轮车各完成对应短程。[Isaac 重试计划](../../../../../workspace/maintenance/v211_u1_usd_shared_native_20261112_002/plan.json)：Position、effort 各 5 个显式子步、二次 reset、App close receipt 完成，启动隐式推进 unknown；首次启动失败和早前 MuJoCo 运行偏差分别保留原始日志与[偏差记录](../../../../../workspace/maintenance/v211_u1_continuation_20261112_001/verification-notes.md) | R01～R08 均有实施者结论；U2 可沿现有结果开展生命周期核对。后续事件和全台账未完成 |
-| U2 | 实施者自评完成，独立主审及维护者接收待定：修复失败 reset 的旧 Runtime owner 遗失及预检拒绝后的 RNG 变化；保全 source、worker 与 camera 清理合同 | 第 3 节资源／阶段表、30 项纯合同检查与 [MuJoCo 最终冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)；Isaac 的成功路径沿用 U1 证据并保留日志限制 | R09～R14 均有实施者结论；U3 可继续，真实 Isaac 失败与真实 camera 失败未复验 |
-| U3 | 实施者自评完成，独立主审及维护者接收待定：兼容入口共用提案处理，保留调用方持有 Solution 的标准调用、现有 typed 语义和唯一提交 owner | 第 4 节支持表、12 项纯合同检查及 MuJoCo Solution／expert／故障／typed 控制冻结证据；部分 mixed／COM 交集未复验 | R15～R21 均有实施者结论；U4 可继续。完整 Solution 保留 E13 |
-| U4 | 实施者自评完成，独立主审及维护者接收待定：示例按控制能力选动作，Nut caller-owned Solution 接受正式 schema，版本诊断标明真实成本并增加配置 import／资产守卫 | 第 5 节分类、11 项精确纯检查及[四任务示例计划](../../../../../workspace/maintenance/v211_u4_cli_20261112_003/plan.json)；LIBERO 静态核对 | R22～R25 均有实施者结论；批处理／训练与完整 benchmark 不在本单元 |
-| U5 | 实施者自评完成；最终事件结果及 provider／renderer 影响表见第 6 节 | 生产 HEAD `76536d2a` 的 MuJoCo、GeoPhys 和两条 RGB 短程；Isaac 复用 U1 有界证据并标明 diff 和日志限制 | R26～R30 均有实施者结果；独立主审和维护者接收待完成 |
+R01～R30 的原定位/动作表是实施依据，不能将其中历史问题重新当成当前未实现项。原生产 `76536d2a` 的[独立主审](../maintenance/reviews/20261112_e00_e04_independent_review_76536d2a.md)已经逐格核对；本轮在 `e25f37c5` 上按维护者授权改进主审的四项余项，生产提交为 `912416e6`。本轮结果是实施后自检，不冒充对新提交的另一次独立主审。
 
-当前 Controller owner 调整后，119 项受影响诊断通过；[冻结输入](../../../../../workspace/maintenance/v211_u1_position_controller_owner_20261112_002/plan.json)下 MuJoCo PickCube／Nut 和 Isaac Position／effort 各完成 5 个显式子步、二次 reset 与 close，Isaac 日志未见 traceback，隐式启动推进数未知。先前运行期间发生源码输入漂移，两条 Isaac 各消耗 5 个显式子步的结果未作为冻结输入证据；一次锁冲突未推进，均保留原始输出并计入计划。
+| 单元 | 当前最终效果 | 证据与剩余边界 |
+| --- | --- | --- |
+| U1／R01～R08 | 四任务使用共同正式配置、请求、source/Controller 阶段和最终 binding；本轮复用 `CompiledReferenceTaskV1` 与具名 context，去掉 20 种阶段临时字典键，Controller selection 单独传入；source/Controller 实现仍在原 owner | 217 项受影响 source/caller 检查通过；MuJoCo 四任务、装配与 effort 的 Artifact、source 闭包和 native 映射与前次结果一致；不是任意组合支持 |
+| U2／R09～R14 | 共同 reset/fault/close 和 source lease/cache 保全，原 RNG/失败 Runtime owner 修复保留；阶段数据不再用原地 `pop` 交接 | 76 项精确纯/fake 检查与相关 source 失败检查通过；native 正常 reset/close 通过；真实 Isaac/camera 失败注入未增加 |
+| U3／R15～R21 | 标准 caller-owned Solution 与共同 submit/推进保留；兼容 helper 的 strict proposal type 和 projector 显式选择，错误阶段只描述 fault | 兼容 Position/Solution、可切换 physical Solution/expert、stale 和 act 后失败有受影响检查；序列/COM 与完整 Solution 不外推 |
+| U4／R22～R25 | 原 dirty 的完整字节/patch 已保全，执行记录角色和第 6 节锚点恢复；账本、current-state、API 和 Skill 按当前 owner/退休事实同步，历史输入与当前结果分列 | 三处实施记录断链修复；R25 资料余项已修复。历史失败和原始证据不改写 |
+| U5／R26～R30 | 本轮生产/诊断结果、身份、统计与影响范围归并；基线独立主审、后续实施自检和最终维护者决定分列 | R26～R29 有结果；R30 只剩维护者最终接收，不写成已人工接收，也不自动进入 E05/G06 |
 
-USD delivery 精确身份及 policy 由 provider admission 持有；[先前 USD 准入验证](../../../../../workspace/maintenance/v211_u1_usd_admission_owner_20261112_001/plan.json)及[Joint／执行合同验证](../../../../../workspace/maintenance/v211_u1_joint_execution_contract_20261112_001/plan.json)按其输入身份参考。后者的 Isaac Position 关闭日志含 SDK 菜单回调空 USD context `AttributeError`。
+本轮冻结计划、计数、受影响 provider/renderer 复用及文件度量见[实施返包](../maintenance/20261112_e00_e04_review_fix_delivery_912416e6.md)和[执行记录第 6 节](post-5c-optimization-execution.md#6-e00e04-实施记录)。MuJoCo 七条短程共 75 显式子步；受影响检查另有 40，共 115。GeoPhys effort/Pendulum 仅按 interval/state/clock 验证，native 子步未独立计数。USD 六项是离线 source/Controller 检查，本轮没有启动 Isaac/GPU。
 
-PickCube 与 NutAssembly 的 arm／gripper actuator 由所选 Panda 声明，[MuJoCo 短程](../../../../../workspace/maintenance/v211_u1_robot_actuation_20261112_001/plan.json)覆盖 Position、两种 effort、装配 Panda 与 Nut 单个受限 Solution interval；[GeoPhys effort](../../../../../workspace/maintenance/v211_u1_mjcf_source_owner_20261112_001/geophys-plan.json)子步未独立计数。旧记录的 source 哈希如在启动后补记，已在对应计划中标明，不能当作启动前冻结。
-
-缓存 source 复用前验证快照或 USD 新鲜度；[缓存验证](../../../../../workspace/maintenance/v211_u1_cached_source_freshness_20261112_001/plan.json)覆盖关节 effort 的 reset 与 close。各短程不代表完整 Solution、所有 provider／renderer 或 U1 最终接收。
-
-每格完成只写最终行为、真实 owner／提交／证据和残余限制；过程及失败日志保存在各单元原始输出，不在此逐次追加。目标是让下一次恢复直接读本表及当前单元，而非重走全仓发现流程。
+原 U1～U5 的 native、RGB、失败/重试及 source 漂移材料按各自原始身份保留；完整旧索引可从 `3b5023e8` 的本账本恢复，不在当前效果表继续逐次追加。E05～E16、完整 E13 Solution、全部优化台账及 G06/G07 尚未接收。

@@ -10,13 +10,13 @@ Phase C 的标准方向是外部 Solution 读取 observation 并产生 action，
 
 ## 5c 后优化：当前正式构造增量
 
-正式 PickCube、NutAssembly、Pendulum 和双轮车经 `make_env` 使用同一正式配置解析与 `SelectedReferenceEnv.from_resolved_config` 构建链。正式入口不接受旧 component resolved 配置；其他保留的 component caller 有其独立范围。共同 Robot 构造与 adapter 的后续收敛仍在实施，实际状态见[当前摘要](../maintenance/current-state.md)。
+正式 PickCube、NutAssembly、Pendulum 和双轮车经 `make_env` 使用同一正式配置解析与 `SelectedReferenceEnv.from_resolved_config` 构建链。正式入口不接受旧 component resolved 配置；其他保留的 component caller 有其独立范围。E00～E04 的共同构建、生命周期和控制链已完成本轮实施及主审余项修复，维护者最终接收待完成；完整 source/adapter 整理仍属后续事件，实际状态见[当前摘要](../maintenance/current-state.md)。
 
 四个正式任务均使用 `config={"controller": {"profile_id": ...}}` 选择受支持的 Controller，例如 PickCube 的 `r3_continuous_v1`，或 Pendulum／双轮车的 `direct_joint_effort_v1` 和限定路线的 `velocity_damped_joint_effort_v1`。`control.profile_id` 与 `task.controller_profile` 不是正式输入；Mapping 与 YAML 使用同一解析。各任务和所选 Robot 的能力范围仍分别检查。
 
 四主体的 MuJoCo CPU 正式构造提供同一 `env.robot` 视图：`subjects`、`controllers` 和 `root_frames` 引用实际准入的声明与 owner，`controller` 与 Env 当前 Controller 是同一对象；reset 重绑后返回当前视图。装配 Panda 保留 arm／hand 两个 subject 及两个 Controller，不把它们压成一个控制器。视图不创建 Runtime、第二个推进者或状态副本。旧组件 Panda 的 `references`／`gripper`／`ee` 便利投影继续保留；当前 selected 视图未声明这些投影时相应字段为 None，使用共同 subject／Frame 声明，不为 Pendulum／双轮车制造 Panda 属性。
 
-两个简单任务的 TaskDefinition 通过既有 TaskLifecycleAdapter 消费公开 Runtime 具名状态，Env 负责随机流、reset transaction 和资源生命周期；任务模块保留自己的采样范围、奖励、成功语义及状态投影。`build_runtime=False` 继续保留无 provider 构建的组件兼容合同，不代表 native batch。该批真实复验为五条 MuJoCo CPU 短程路线及简单任务 RNG 序列；后续 Isaac RGB 和 GeoPhys／MuJoCo worker 的受限实测见实施记录，不据此宣称完整 Solution 或任意组合。
+两个简单任务的 TaskDefinition 通过既有 TaskLifecycleAdapter 消费公开 Runtime 具名状态，Env 负责随机流、reset transaction 和资源生命周期；任务模块保留自己的采样范围、奖励、成功语义及状态投影。这四个正式类不接受 `build_runtime=False` 的旧组件构造；范围外的组件 caller 有各自兼容合同，不代表 native batch。最新短程及历史 Isaac RGB、GeoPhys／MuJoCo worker 证据按[实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)的输入身份区分，不据此宣称完整 Solution 或任意组合。
 
 ### 正式 PickCube 的 MJCF 物理配置
 
