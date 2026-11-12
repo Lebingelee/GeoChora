@@ -213,7 +213,7 @@ def build_f06_task_scene(task_config, *, robot, build_task_scene):
                             table_frame='top')
 
 
-def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_fixture):
+def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_drive):
     """Validate the exact F06 request before Task/Robot source construction."""
     from pathlib import Path
 
@@ -221,25 +221,25 @@ def prepare_f06_task_delivery(delivery_manifest, *, seed, horizon, physical_fixt
         raise ValueError('F06 PickCube task_seed must be a nonnegative integer')
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('F06 PickCube horizon must be an integer in [1, 1000]')
-    if physical_fixture not in (False, 'coexist', 'effort-only'):
-        raise ValueError('F06 physical fixture must select coexist or effort-only')
+    if physical_drive not in (None, 'position', 'disabled'):
+        raise ValueError('F06 physical drive must select position or disabled')
     loaded = load_f06_isaac_delivery(Path(delivery_manifest).resolve(strict=True))
-    variant = (None if not physical_fixture else
-        'pickcube-f06-physical-effort-fixture-v1' if physical_fixture == 'coexist' else
+    variant = (None if physical_drive is None else
+        'pickcube-f06-physical-effort-fixture-v1' if physical_drive == 'position' else
         'pickcube-f06-physical-effort-no-drive-v1')
     return loaded, variant
 
 
 def compile_f06_task_input(*, delivery_manifest, task_config, legacy_artifact, robot,
                            build_task_scene, compile_task_artifact, task_scene_recipe_sha256,
-                           seed, horizon, physical_fixture):
+                           seed, horizon, physical_drive):
     """Admit the delivery and lower Task/Robot declarations to the exact USD input."""
     from dataclasses import replace
     from ...artifacts import FrameReference
     from .source import bind_declared_usd_paths
 
     loaded, variant = prepare_f06_task_delivery(
-        delivery_manifest, seed=seed, horizon=horizon, physical_fixture=physical_fixture)
+        delivery_manifest, seed=seed, horizon=horizon, physical_drive=physical_drive)
     if variant is not None:
         legacy_artifact = replace(legacy_artifact, artifact_id=variant)
     scene = build_f06_task_scene(task_config, robot=robot, build_task_scene=build_task_scene)

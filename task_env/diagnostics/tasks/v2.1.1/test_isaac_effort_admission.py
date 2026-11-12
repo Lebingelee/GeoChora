@@ -7,6 +7,17 @@ import pytest
 from task_env.runtime.sessions.api import G05_ISAAC_EFFORT_PROFILE, _validate_g05_isaac_effort_source
 
 
+def test_f06_rejects_unknown_drive_before_loading_delivery(monkeypatch):
+    from task_env.runtime.sessions import isaac_usd_admission
+
+    def unexpected_load(_path):
+        pytest.fail('invalid drive must not load the delivery')
+    monkeypatch.setattr(isaac_usd_admission, 'load_f06_isaac_delivery', unexpected_load)
+    with pytest.raises(ValueError, match='physical drive'):
+        isaac_usd_admission.prepare_f06_task_delivery(
+            'unused', seed=31, horizon=8, physical_drive='foreign')
+
+
 def test_f06_capability_manifest_stays_source_bounded(monkeypatch):
     from task_env.runtime.sessions.api import _f06_pickcube_isaac_capability_manifest
 

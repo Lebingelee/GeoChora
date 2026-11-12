@@ -472,7 +472,7 @@ def _position_reference_builder(*, backend, controller_profile,
 
 def _compile_isaac_reference_source(request, *, delivery_manifest, controller_profile,
                                     resolved_config, task_config, lift_height_m,
-                                    physical_fixture, robot):
+                                    physical_drive, robot):
     """Compile Task readiness and the admitted USD source before Controller binding."""
     from .solution import PickCubeReadinessSolution
 
@@ -492,7 +492,7 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
         task_config=task_config, build_task_scene=build_pickcube_scene,
         compile_task_artifact=compile_pickcube_task_artifact,
         task_scene_recipe_sha256=hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest(),
-        seed=request.seed, horizon=request.horizon, physical_fixture=physical_fixture)
+        seed=request.seed, horizon=request.horizon, physical_drive=physical_drive)
     if runtime_input.artifact.timebase != artifact.timebase:
         raise ValueError('USD Artifact timebase differs from the Task readiness declaration')
     return (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
@@ -559,7 +559,7 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, reso
 
 
 def _isaac_reference_builder(*, delivery_manifest, controller_profile,
-                             resolved_config, task_config, lift_height_m, physical_fixture,
+                             resolved_config, task_config, lift_height_m,
                              physical_kind, physical_drive, robot):
     if controller_profile != 'r3_continuous_v1':
         raise ValueError('F06 Isaac freezes the existing r3_continuous_v1 profile')
@@ -570,7 +570,7 @@ def _isaac_reference_builder(*, delivery_manifest, controller_profile,
         lambda request: _compile_isaac_reference_source(request,
             delivery_manifest=delivery_manifest, controller_profile=controller_profile,
             resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-            physical_fixture=physical_fixture, robot=robot),
+            physical_drive=physical_drive, robot=robot),
         None, backend='cuda', allow_sampled_reset=False,
         controller_factory=build_usd_panda_control,
         controller_options=lambda compiled, context, request: dict(
@@ -675,8 +675,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             delivery_manifest=source_delivery_manifest,
             controller_profile='r3_continuous_v1' if physical else controller_profile,
             resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-            robot=robot, physical_fixture=(('effort-only' if physical_drive == 'disabled' else 'coexist')
-                                           if physical else False),
+            robot=robot,
             physical_kind=physical_kind, physical_drive=physical_drive)
     elif physical:
         from ...environment.reference_binding import SourceBoundTaskBuilder
