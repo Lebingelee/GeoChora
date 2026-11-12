@@ -43,6 +43,26 @@ def test_formal_panda_effort_profile_source_contract(profile, controller_type, d
         binding.close_task_resources()
 
 
+@pytest.mark.parametrize('profile', ['panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
+def test_source_dynamics_profile_does_not_construct_unused_pd_servo(profile, monkeypatch):
+    from task_env.controllers.canonical.effort_servo import JointReferenceEffortControllerV1
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    def unexpected_servo(*args, **kwargs):
+        pytest.fail('source dynamics constructed an unused affine PD servo')
+    monkeypatch.setattr(JointReferenceEffortControllerV1, '__init__', unexpected_servo)
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        assert binding.build('mujoco')['physical_execution'].requires_source_dynamics
+    finally:
+        binding.close_task_resources()
+
+
 def test_panda_subject_rejects_incomplete_native_transmission_declaration():
     from task_env.robots.panda import PandaAgent
 

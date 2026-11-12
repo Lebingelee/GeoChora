@@ -1163,3 +1163,10 @@ Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误�
 GeoPhys 和 Isaac 当前没有 provider-owned source dynamics，故质量矩阵 profile 在其 physical preflight 明确拒绝；Isaac 的 preflight 不保证早于 App 启动。其他 effort profile 保持各自语义。此项没有恢复 GeoPhys／Isaac 的质量矩阵能力，也没有完成四任务统一构建；renderer 未改，source、状态、clock、提交及物理推进仍由各自 Runtime session 管理。
 
 生产代码修改 6 文件 +43／−57，净减 14 行；版本诊断修改 1 文件 +12／−22；无新增、删除或整文件迁移，tracked 文件数保持 1355。本文和当前状态文档各修改 1 文件。156 项版本检查通过，包含两个正式 mass profile、foreign source 拒绝和 GeoPhys preflight 拒绝。MuJoCo CPU 两个 mass profile 各完成正式 0.04 m 初态 reset、一次控制 step、第二次 reset、关闭与 5 个 native 子步；原动态控制器 reset 切换与记录完成 10 个子步。MJCF 导入有语义诊断。GeoPhys／Isaac 的 mass profile 未进行原生运行；Isaac preflight 的同类拒绝由代码检查支持，完整 Solution 未运行。冻结 diff、预算和原始收据位于 ignored `workspace/maintenance/v211_live_mass_ovikmdb1/`。E01～E04 尚未整体接收。
+
+
+### 6.115 reference effort 共享绑定合同直接构建 Controller
+
+输入 `795b679b`。实时质量矩阵和动态 effort Controller 先前调用普通 reference effort builder，完整创建 affine PD model、profile 和 Controller 后立即丢弃，只借用其绑定验证与状态需求。现在三种 reference effort 路线共同校验已有 physical binding 并声明 pose 状态需求，各自直接构造实际选用的 Controller；保留驱动隔离、主体和 writer 校验、状态需求与命令语义。此项减少不参与执行的对象构造，但尚未消除 PickCube 的任务专属 physical binding，也不表明 E02／E04 已完成。provider／renderer adapter、source、clock 和提交接口未修改。
+
+生产修改 1 文件 +33／−26，净增 7 行；原有绑定校验及 pose 需求代码移至同文件内共同函数，非新的一套控制路径。版本诊断修改 1 文件 +20／−0；本文与当前状态文档修改 2 文件；无新增、删除或整文件迁移，tracked 文件数保持 1355。158 项版本检查通过，包括禁止构造未使用 PD servo 时仍能构造两种 mass profile。MuJoCo CPU 的 joint／R3 普通 reference 以及 joint／R3 mass 各完成 reset、step、第二次 reset、close 与 5 个 native 子步；动态 reset 选择及记录完成 10 个子步。MJCF 导入有语义诊断。GeoPhys／Isaac 和完整 Solution 本轮未运行，先前证据仍只对应原源码；renderer 未改。冻结 diff、预算和原始收据位于 ignored `workspace/maintenance/v211_effort_contract_vz7nh1hu/`。E01～E04 尚未整体接收。

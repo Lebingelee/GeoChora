@@ -173,20 +173,10 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
         direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id)
 
 
-def build_reference_effort_execution(direct_execution, *, reference_kind, r3_reference=None,
-                                     end_frame_id='ee', opening_range_m=.08,
-                                     kp=(20., 20., 20., 20., 10., 10., 10., 50., 50.),
-                                     kd=(2., 2., 2., 2., 1., 1., 1., 4., 4.)):
-    """Build one named joint-reference or R3 pose-reference effort writer.
-
-    The exact native drive isolation remains a session admission requirement;
-    constructing this provider-free profile does not prove it occurred.
-    """
-    from dataclasses import replace
+def _reference_effort_contract(direct_execution, reference_kind, r3_reference, end_frame_id):
+    """Validate the shared binding and declare the state required by a reference."""
     from ...artifacts.state import StateFieldRequirement, StateRequirements
-    from .model import AffineJointBiasModelV1, ControllerModelRequirementV1
-    from .effort_servo import JointReferenceEffortProfileV1
-    from ..canonical.production_r3 import _ProductionR3ArmReference
+    from .production_r3 import _ProductionR3ArmReference
     from ...runtime.sessions.physical_control import PhysicalControlExecutionV1
     if type(direct_execution) is not PhysicalControlExecutionV1:
         raise TypeError('reference effort profile requires a typed direct execution')
@@ -205,9 +195,33 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
     owner = channels[0].owner_ids[0]
     if any(c.owner_ids != (owner,) for c in channels):
         raise ValueError('reference effort profile requires one common writer')
+    requirements = direct_execution.requirements
+    if reference_kind == 'r3-pose':
+        frame_requirement = StateFieldRequirement('state-field-requirement-v1', 'frame_pose_world',
+            'frame', entity, end_frame_id, 'required', 'evaluation_boundary',
+            'meter+quaternion_wxyz', 'frame_pose_query')
+        requirements = StateRequirements('state-requirements-v1', 'controller', owner,
+                                          (*requirements.requirements, frame_requirement))
+    return binding, channels, entity, owner, requirements
+
+
+def build_reference_effort_execution(direct_execution, *, reference_kind, r3_reference=None,
+                                     end_frame_id='ee', opening_range_m=.08,
+                                     kp=(20., 20., 20., 20., 10., 10., 10., 50., 50.),
+                                     kd=(2., 2., 2., 2., 1., 1., 1., 4., 4.)):
+    """Build one named joint-reference or R3 pose-reference effort writer.
+
+    The exact native drive isolation remains a session admission requirement;
+    constructing this provider-free profile does not prove it occurred.
+    """
+    from dataclasses import replace
+    from .model import AffineJointBiasModelV1, ControllerModelRequirementV1
+    from .effort_servo import JointReferenceEffortProfileV1
+    binding, channels, entity, owner, requirements = _reference_effort_contract(
+        direct_execution, reference_kind, r3_reference, end_frame_id)
     if len(kp) != 9 or len(kd) != 9:
         raise ValueError('reference effort gains must cover nine channels')
-    keys = tuple(f'{entity}/{name}' for name in expected)
+    keys = tuple(f'{entity}/{channel.joint_id}' for channel in channels)
     units = ('N*m',)*7 + ('N',)*2
     source = binding.source_id
     cadence = direct_execution.controllers[0].model.requirement.cadence_s
@@ -223,13 +237,7 @@ def build_reference_effort_execution(direct_execution, *, reference_kind, r3_ref
     model = AffineJointBiasModelV1('affine-joint-bias-model-v1', requirement,
         (0.,)*9, tuple(-x for x in kp), tuple(-x for x in kd))
     servo = ConstrainedPairEffortControllerV1(JointReferenceEffortControllerV1(profile, binding, model))
-    requirements = direct_execution.requirements
     if reference_kind == 'r3-pose':
-        frame_requirement = StateFieldRequirement('state-field-requirement-v1', 'frame_pose_world',
-            'frame', entity, end_frame_id, 'required', 'evaluation_boundary',
-            'meter+quaternion_wxyz', 'frame_pose_query')
-        requirements = StateRequirements('state-requirements-v1', 'controller', owner,
-                                          (*requirements.requirements, frame_requirement))
         controller = R3ReferenceEffortControllerV1(r3_reference, servo, entity_id=entity,
             end_frame_id=end_frame_id, opening_range_m=opening_range_m)
     else:
@@ -244,14 +252,13 @@ def build_dynamic_reference_effort_execution(direct_execution, *, reference_kind
     """Build a source-dynamics joint or R3 reference from the existing binding."""
     from dataclasses import replace
     from .dynamic_mass_effort import DynamicMassEffortControllerV1
-    template = build_reference_effort_execution(direct_execution, reference_kind=reference_kind,
-                                                r3_reference=r3_reference, end_frame_id=end_frame_id)
-    servo = DynamicMassEffortControllerV1(direct_execution.compiled.binding, cadence_s=cadence_s,
+    binding, _, entity, _, requirements = _reference_effort_contract(
+        direct_execution, reference_kind, r3_reference, end_frame_id)
+    servo = DynamicMassEffortControllerV1(binding, cadence_s=cadence_s,
         kp=kp, kd=kd, finger_kp=finger_kp, finger_kd=finger_kd, mass_only=mass_only)
     if reference_kind == 'r3-pose':
         controller = R3ReferenceEffortControllerV1(r3_reference, servo,
-            entity_id=direct_execution.compiled.binding.channels[0].entity_id,
-            end_frame_id=end_frame_id, opening_range_m=.08)
+            entity_id=entity, end_frame_id=end_frame_id, opening_range_m=.08)
     else:
         controller = servo
-    return replace(template, controllers=(controller,))
+    return replace(direct_execution, controllers=(controller,), requirements=requirements)
