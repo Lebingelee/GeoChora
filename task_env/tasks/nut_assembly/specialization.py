@@ -508,7 +508,7 @@ def _binding(resolved_config=None, lift_height_m=None, task_config=None):
 class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
     uses_selected_public_config = True
-    selected_controller_profiles = frozenset()
+    selected_controller_profiles = frozenset(('r3_continuous_v1',))
     selected_parameter_limits = {"lift_height_m": (0.01, 0.15)}
     selected_supports_isaac = False
     selected_robot_uids = frozenset(('panda-v1',))
@@ -532,7 +532,7 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
 
     @staticmethod
     def selected_default_controller_profile(task_config=None):
-        return None
+        return 'r3_continuous_v1'
 
     @classmethod
     def selected_binding(cls, config):

@@ -492,7 +492,7 @@ class ExistingSubjectEffortTask:
                 composition=self.composition, config=config, provider=provider,
                 source_delivery_manifest=source_delivery_manifest, seed=seed,
                 base_dir=self.source_base_dir)
-            profile_id = config.control.profile_id or 'direct_joint_effort_v1'
+            profile_id = config.control.profile_id
             physical = build_existing_subject_effort(robot, scene=scene, artifact=artifact,
                 source=source, profile_id=profile_id, subject=subject, declarations=declarations)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
@@ -529,5 +529,5 @@ class ExistingSubjectEffortTask:
                                                              (action.dimension,), dtype=np.float32)}),
             prepare_action=lambda value: value, observation_space_factory=self.observation_space_factory,
             observation_projection=observe_task_definition,
-            physical_direct_effort_feedback=(config.control.profile_id in (None, 'direct_joint_effort_v1')),
+            physical_direct_effort_feedback=(config.control.profile_id == 'direct_joint_effort_v1'),
             physical_terminate_on_success=True, physical_ignore_done=config.episode.ignore_done)

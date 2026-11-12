@@ -1008,3 +1008,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 7 文件 +19／−23，净减 4 行；版本诊断修改 1 文件 +16／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。本批删除多个默认 Robot 回退点，使四任务配置结果直接携带实际选择；构建链中的其他任务／source 分流仍需处理。provider／renderer 的状态、clock、提交和资源合同未改。
 
 124 项版本检查通过，包括四任务默认与显式 Robot 的配置等价和已解析配置重建。四个正式任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac CUDA 默认 Panda Position／同步 RGB 完成两次 reset、一次非零 step、三帧独立读回和关闭，观察 41 次 physics callback，订阅前启动推进未知；callback 取消订阅仍报告 AttributeError，SDK 日志有只读目录、渲染预热及关闭异常，进程和读回成功。本批未执行完整 Solution。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_resolved_robot_uid_20261112_ri21v2z_/` 和 `workspace/maintenance/v211_resolved_robot_uid_isaac_20261112_pta2301d/`；E01～E04 仍未接收。
+
+### 6.95 Controller profile 在共同配置中确定
+
+输入 `0f916410`。NutAssembly 的配置此前记录空 Controller profile，实际构造却固定使用 R3；Pendulum 与双轮车的共同 effort builder 也会在解析后再次补默认 profile。现在 NutAssembly 声明其实际使用的 `r3_continuous_v1`，四任务的共同解析均要求已声明的非空 profile，共同 effort builder 直接消费解析结果。NutAssembly 仍使用其既有 R3 参数和 native-feedback 控制语义，此变化不表示支持其他 Controller 或 provider 组合。
+
+生产修改 3 文件 +5／−5，净变化 0；版本诊断修改 1 文件 +11／−1，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。本批使四任务已解析配置表达实际 Controller 选择，消除两个普通任务构造时的默认回退；其他任务构造职责尚未收敛。provider／renderer 的 source、状态、clock、提交和资源合同未改变。
+
+128 项版本检查通过，包括四任务空 profile 拒绝及 NutAssembly R3 的 YAML／mapping／已解析配置往返。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成相同生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 的既有默认 R3 选择未改，本批未重跑 Isaac 或完整 Solution；旧证据仍只证明各自受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_resolved_controller_profile_20261112_g4vcow4m/`；E01～E04 仍未接收。

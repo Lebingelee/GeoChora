@@ -437,7 +437,7 @@ def _resolve_selected_config(environment_type, config):
     default_profile = (environment_type.selected_default_controller_profile(task_configuration)
                        if configuration_loader is not None else environment_type.selected_default_controller_profile())
     profile = controller.get('profile_id', default_profile)
-    if profile is not None and profile not in environment_type.selected_controller_profiles:
+    if profile not in environment_type.selected_controller_profiles:
         raise ValueError(f"unsupported selected controller profile: {profile!r}")
     profile_routes = getattr(environment_type, 'controller_profile_routes', {})
     if profile in profile_routes and (provider, backend) not in profile_routes[profile]:

@@ -42,7 +42,7 @@ def test_unavailable_damped_controller_route_rejects_before_construction(uid):
 
 @pytest.mark.parametrize(('uid', 'profile'), [
     ('pick-cube-p16-reference-v1', 'r3_continuous_v1'),
-    ('nut-assembly-outcome-reference-v1', None),
+    ('nut-assembly-outcome-reference-v1', 'r3_continuous_v1'),
     ('pendulum-v1', 'direct_joint_effort_v1'),
     ('two-wheel-balance-v1', 'direct_joint_effort_v1'),
 ])
@@ -311,3 +311,13 @@ def test_default_robot_is_resolved_once_and_matches_explicit_selection(uid, robo
     assert default.robot_uid == robot_uid
     assert default == explicit
     assert resolve_task_env_config(task, default) == default
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_formal_controller_profile_cannot_be_null(uid):
+    importlib.import_module('task_env.tasks')
+    with pytest.raises(ValueError, match='unsupported selected controller profile'):
+        resolve_task_env_config(ENV_REGISTRY.get(uid), {'controller': {'profile_id': None}})
