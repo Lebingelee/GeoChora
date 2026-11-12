@@ -46,6 +46,21 @@ def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive
     raise TypeError('Robot effort construction requires an admitted RuntimeSource')
 
 
+def build_panda_source_effort_profile(robot, scene, artifact, source, *, native_drive,
+                                      kind, config, source_xml, end_frame_id,
+                                      task_settings, dynamic_parameters=None,
+                                      gripper_force_limit_N=None):
+    """Bind an admitted Robot source and compose its declared effort Controller."""
+    from ...controllers.canonical.r3_effort import build_panda_effort_profile
+
+    physical = build_panda_effort_execution(robot, scene, artifact, source,
+        native_drive=native_drive, gripper_force_limit_N=gripper_force_limit_N)
+    return build_panda_effort_profile(physical, kind=kind,
+        cadence_s=artifact.timebase.control_dt, end_frame_id=end_frame_id,
+        source_xml=source_xml, config=config, artifact_hash=artifact.identity_hash,
+        dynamic_parameters=dynamic_parameters, **task_settings)
+
+
 @dataclass(frozen=True)
 class SourceCompositionAdapterV1:
     provider: str

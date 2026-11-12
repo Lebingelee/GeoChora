@@ -649,6 +649,18 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
 REFERENCE_ENV_ID = _recipe()["reference_env_id"]
 
 
+def panda_effort_task_settings(kind):
+    """Supply PickCube's TCP and reference tuning to the shared Controller builder."""
+    from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
+
+    r3_profile = velocity_limit = None
+    if kind in {'r3-pose', 'r3-mass-pose'}:
+        r3_profile, _ = _r3_dynamic_profile()
+        velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
+    return {'tcp_profile': PANDA_PICKCUBE_EE_TCP_V1, 'r3_profile': r3_profile,
+            'joint_velocity_limit_rad_s': velocity_limit}
+
+
 @register_env()
 class PickCubeReferenceEnv(SelectedReferenceEnv):
     """Public selected P1.6 route, registered beside its task definition."""

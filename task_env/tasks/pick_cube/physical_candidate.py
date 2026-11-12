@@ -64,14 +64,14 @@ def make_physical_binding(*, drive_mode, control_kind,
             validate_reset_effort_parameters(parameters)
             if parameters and not reset_switch:
                 raise ValueError('controller parameters require physical reset selection')
-            from ...runtime.sessions.source_composition_adapters import build_panda_effort_execution
+            from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
+            from .specialization import panda_effort_task_settings
             native_drive = 'disabled' if drive_mode == 'effort-only' else 'position'
-            physical = build_panda_effort_execution(
-                robot, scene, artifact, source, native_drive=native_drive, gripper_force_limit_N=(
-                    source.config.robot.gripper.force_limit_N if reset_switch else None))
-            from .physical_reference_profile import build_pickcube_effort_profile
-            return build_pickcube_effort_profile(physical, artifact, kind=kind,
-                config=source.config.action, source_xml=projected, end_frame_id='nutassembly_ee_site',
+            return build_panda_source_effort_profile(robot, scene, artifact, source,
+                native_drive=native_drive, kind=kind, config=source.config.action,
+                source_xml=projected, end_frame_id='nutassembly_ee_site',
+                task_settings=panda_effort_task_settings(kind),
+                gripper_force_limit_N=source.config.robot.gripper.force_limit_N if reset_switch else None,
                 dynamic_parameters=parameters if reset_switch else None)
 
         physical = build_physical(control_kind)

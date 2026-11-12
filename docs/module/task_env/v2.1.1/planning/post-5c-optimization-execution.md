@@ -1556,3 +1556,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 最终冻结输入下 MuJoCo CPU 直接 effort 和 joint-reference effort 分别完成正式构建、reset、一次非零 step、共同提交、二次 reset 与重复 close，各观测 5 个显式 native 子步；Isaac CUDA joint-reference effort 从已安装 USD 构建，完成 reset、非零 step、二次 reset、重复 Env close 和 App close，观察 5 个显式子步，隐式启动推进未知。先前两条 MuJoCo 共 10 子步属于修正 Panda 限定前的输入；一次 Isaac 排查在启动后发现并补回 Panda 限定，因此其输入并未完整冻结，另观察 5 个显式子步，仅作为排查记录，不计作最终输入通过。实际计划、输入、结果和双锁见 ignored `workspace/maintenance/v211_effort_admission_20261112/`。GeoPhys、其他任务、renderer 和完整 Solution 本批未复验；先前证据仅按原输入与范围参考。
 
 生产代码修改 3 文件 +42／−38，净增 4 行；版本诊断修改 3 文件 +64／−20；本文修改 1 文件；无新增、删除或整文件迁移，tracked 文件数保持 1365。source 查找、状态、clock、提交与物理推进继续由已有 Runtime／adapter 承担，本批没有重构 renderer。E01～E04 尚未整体接收。
+
+
+### 6.162 MJCF／USD Panda effort 共用 source 与 Controller 组合
+
+复核 TASK-01／02、SUBJ-02、CTRL-01／02：PickCube 的 MJCF 和 USD 物理构造此前各自先调用 Panda effort source 绑定，再调用任务专有 profile 模块组合 Controller。现由已有 Runtime source adapter 的共同函数完成这两步，分别仍使用各自 source 的 native 映射与准入；PickCube 只给出自己的 TCP、R3 profile 和速度限额。删除独立的 `physical_reference_profile.py`：其任务参数声明分解到 Task specialization，组合动作由 Runtime adapter 调用现有 Controller owner；不是将整份候选构建器搬入其他目录。两条 Task 构建仍分别调用剩余 candidate 模块，普通 Robot 与 Panda 也未因此完成同一 source 物化，E01～E04 仍待完成。
+
+版本诊断 238 项通过；MJCF 与 USD 的实际构建检查均观察到同一 source／Controller 组合函数，并继续校验 source 身份、传动和绑定。最终冻结输入下，MuJoCo CPU 直接 effort、joint-reference effort、R3-reference effort 各完成正式 reset、非零 step、共同提交、再次 reset 和重复 close，各观测 5 个显式 native 子步；Isaac CUDA joint-reference effort 完成正式 reset、非零 step、再次 reset、重复 Env close 和 App close，观测 5 个显式子步，隐式启动推进未知。计划、冻结输入、双锁、结果在 ignored `workspace/maintenance/v211_shared_effort_builder_20261112/`。其他任务、GeoPhys、renderer 和完整 Solution 本批未复验；旧结果只在原输入和范围内参考。
+
+生产代码修改 4 文件、删除 1 文件，+41／−33，净增 8 行；删除文件的 19 行职责按 Task 声明与 Runtime／Controller 组合拆分，非整文件迁移；版本诊断修改 2 文件 +4／−4，本文修改 1 文件；无新增文件，tracked 文件数由 1365 减至 1364。共同 source adapter 仍按实际表示调用现有 MJCF／USD 路线，状态、clock、提交和推进未改，renderer 未改。E01～E04 尚未整体接收。

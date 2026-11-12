@@ -116,11 +116,11 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     from task_env.runtime.sessions import source_composition_adapters
 
     calls = []
-    build = source_composition_adapters.build_panda_effort_execution
+    build = source_composition_adapters.build_panda_source_effort_profile
     def record(*args, **kwargs):
         calls.append(args[3])
         return build(*args, **kwargs)
-    monkeypatch.setattr(source_composition_adapters, 'build_panda_effort_execution', record)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_source_effort_profile', record)
 
     root = Path(__file__).resolve().parents[4]
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'

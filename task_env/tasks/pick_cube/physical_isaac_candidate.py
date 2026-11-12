@@ -2,20 +2,20 @@
 def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, control_kind,
                                 task_config, resolved_config, lift_height_m=None, robot=None):
     """Declare source and Controller bindings; Env and Runtime own lifecycle."""
-    from .specialization import build_isaac_reference, _validate_external_readiness_solution
+    from .specialization import (build_isaac_reference, _validate_external_readiness_solution,
+                                 panda_effort_task_settings)
     from .task import physical_task_binding_fields
     from ...environment.reference_binding import ReferenceTaskBinding
-    from ...runtime.sessions.source_composition_adapters import build_panda_effort_execution
+    from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('Isaac physical source horizon must be in [1, 1000]')
     manifest = delivery_manifest
     def build_controller(robot, runtime_input, panda_xml, action_config):
-        from .physical_reference_profile import build_pickcube_effort_profile
         source, artifact = runtime_input.runtime_source, runtime_input.artifact
-        physical = build_panda_effort_execution(robot, source.scene_definition, artifact, source,
-            native_drive='disabled' if drive_mode == 'effort-only' else 'position')
-        return build_pickcube_effort_profile(physical, artifact, kind=control_kind,
-            config=action_config, source_xml=panda_xml, end_frame_id='ee')
+        return build_panda_source_effort_profile(robot, source.scene_definition, artifact, source,
+            native_drive='disabled' if drive_mode == 'effort-only' else 'position',
+            kind=control_kind, config=action_config, source_xml=panda_xml, end_frame_id='ee',
+            task_settings=panda_effort_task_settings(control_kind))
     def build(provider, backend, actual_seed, actual_horizon, sampled):
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
