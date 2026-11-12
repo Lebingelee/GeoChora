@@ -11,6 +11,38 @@ from task_env.runtime.sessions.declared_effort_source import compile_declared_ef
 from task_env.tasks import pendulum_physical, two_wheel_physical
 
 
+@pytest.mark.parametrize('uid', ['pendulum-v1', 'two-wheel-balance-v1'])
+def test_effort_build_uses_provider_from_request_and_selected_robot(uid, monkeypatch):
+    from task_env import make_env
+    from task_env.runtime.sessions import declared_effort_source
+
+    seen = []
+    original = declared_effort_source.declared_effort_scene
+    intercept = False
+
+    class CapturedRequest(Exception):
+        pass
+
+    def capture(robot, *, provider, source_delivery_manifest):
+        if not intercept:
+            return original(robot, provider=provider, source_delivery_manifest=source_delivery_manifest)
+        seen.append((robot, provider))
+        raise CapturedRequest
+
+    monkeypatch.setattr(declared_effort_source, 'declared_effort_scene', capture)
+    env = make_env(uid)
+    intercept = True
+    try:
+        with pytest.raises(CapturedRequest):
+            env.binding.build_for_request('geophys', env.backend, 31, env.horizon)
+        assert seen == [(env.binding.robot, 'geophys')]
+        with pytest.raises(ValueError, match='backend differs'):
+            env.binding.build_for_request('geophys', 'wrong-backend', 31, env.horizon)
+        assert len(seen) == 1
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize(('robot', 'task', 'expected_bodies'), [
     (PendulumEntity(), pendulum_physical, {
         'pendulum-v1/pendulum_anchor': 'Geometry/pendulum_anchor',

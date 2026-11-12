@@ -53,18 +53,15 @@ def reset_metadata(sample):
         'theta_dot_rad_s': sample.joint_velocity[JOINT]}
 
 
-def task_binding(config, *, provider, backend, robot_uid, robot=None, source_delivery_manifest=None):
+def task_binding(config, *, robot, source_delivery_manifest=None):
     """Declare Pendulum semantics for the common Robot construction path."""
-    if robot is None:
-        from ..registry import make_agent
-        robot = make_agent(robot_uid)
     task = ExistingSubjectEffortTask(
         robot=robot, compile_declaration=_declaration, reset_plan=_reset_plan,
-        composition=TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID, (robot_uid,), (),
+        composition=TaskCompositionSpec(PENDULUM_TASK_UID, PENDULUM_SCENE_UID, (robot.uid,), (),
                                         success_definition=PENDULUM_SUCCESS_DEFINITION),
         construction_id='pendulum-shared-physical-v1', source_revision='pendulum-inline-v1',
         source_base_dir=Path(__file__).resolve().parent, reset_sampler=PENDULUM_TASK_SEMANTICS.sample_reset,
         reset_metadata=reset_metadata, definition_factory=lambda _artifact: PendulumTaskDefinition(qpos_id=0, qvel_id=0),
         state_projection=_task_state, observation_schema=PendulumObservationBuilder(qpos_id=0, qvel_id=0).schema,
         observation_space_factory=_observation_spaces, action_contract=PENDULUM_ACTION_CONTRACT)
-    return task.bind(config, provider=provider, backend=backend, source_delivery_manifest=source_delivery_manifest)
+    return task.bind(config, source_delivery_manifest=source_delivery_manifest)

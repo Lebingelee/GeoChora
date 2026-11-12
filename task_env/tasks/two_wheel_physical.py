@@ -65,14 +65,11 @@ def reset_metadata(sample):
         'wheel_position_range_rad': [-.02, .02], 'wheel_rate_range_rad_s': [-.30, .30]}
 
 
-def task_binding(config, *, provider, backend, robot_uid, robot=None, source_delivery_manifest=None):
+def task_binding(config, *, robot, source_delivery_manifest=None):
     """Declare balance-task semantics for the common Robot construction path."""
-    if robot is None:
-        from ..registry import make_agent
-        robot = make_agent(robot_uid)
     task = ExistingSubjectEffortTask(
         robot=robot, compile_declaration=_declaration, reset_plan=_reset_plan,
-        composition=TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID, (robot_uid,), (),
+        composition=TaskCompositionSpec(TWO_WHEEL_BALANCE_TASK_UID, TWO_WHEEL_BALANCE_SCENE_UID, (robot.uid,), (),
                                         success_definition=TWO_WHEEL_BALANCE_SUCCESS_DEFINITION),
         construction_id='two-wheel-shared-physical-v1', source_revision='two-wheel-inline-v1',
         source_base_dir=Path(__file__).resolve().parent, reset_sampler=sample_reset,
@@ -80,4 +77,4 @@ def task_binding(config, *, provider, backend, robot_uid, robot=None, source_del
         state_projection=_task_state, observation_schema=TwoWheelBalanceObservationBuilder(
             joint_ids={'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}).schema,
         observation_space_factory=_observation_spaces, action_contract=TWO_WHEEL_ACTION_CONTRACT)
-    return task.bind(config, provider=provider, backend=backend, source_delivery_manifest=source_delivery_manifest)
+    return task.bind(config, source_delivery_manifest=source_delivery_manifest)

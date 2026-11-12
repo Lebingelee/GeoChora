@@ -593,9 +593,7 @@ class PendulumEnv(BaseTaskEnv):
     @classmethod
     def selected_binding(cls, config, *, robot=None):
         from .pendulum_physical import task_binding
-        return task_binding(config.environment, provider=config.physics_provider,
-                            backend=config.environment.runtime.backend,
-                            robot=robot, robot_uid=config.robot_uid,
+        return task_binding(config.environment, robot=robot,
                             source_delivery_manifest=config.source_delivery_manifest)
 
     uid = PENDULUM_ENV_ID

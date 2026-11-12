@@ -466,7 +466,7 @@ class ExistingSubjectEffortTask:
     observation_space_factory: Callable
     action_contract: object
 
-    def bind(self, config, *, provider, backend, source_delivery_manifest=None):
+    def bind(self, config, *, source_delivery_manifest=None):
         """Build one Task binding; native resource ownership stays with Runtime."""
         import hashlib
         import numpy as np
@@ -474,7 +474,9 @@ class ExistingSubjectEffortTask:
         from ..runtime.sessions.declared_effort_source import declared_effort_scene, compile_declared_effort_source
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
-        def build(seed, sampled=None):
+        def build(provider, backend, seed, _horizon, sampled):
+            if backend != config.runtime.backend:
+                raise ValueError('build request backend differs from resolved configuration')
             robot = self.robot
             scene = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
@@ -505,7 +507,7 @@ class ExistingSubjectEffortTask:
 
         action = self.action_contract
         return ReferenceTaskBinding(
-            build=lambda _provider, _backend, seed, _horizon, sampled: build(seed, sampled),
+            build=build,
             task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,
             task_definition_factory=self.definition_factory, task_state_projection=self.state_projection,
             task_observation_schema=self.observation_schema, external_action_contract=action,

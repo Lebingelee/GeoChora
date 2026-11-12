@@ -1297,3 +1297,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 本批生产修改 15 文件 +83／−57，净增 26 行；版本诊断修改 1 文件 +39／−0，检查四任务绑定所选 Robot 身份及装配调用；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。代码段跨文件传递与调整未单独计为整文件迁移，本批未实现净精简。以 `1f1359ee` 为起点的 task_env 工作树差异为 134 文件（新增 12、删除 20、修改 102）及 +7669／−14659，净减 6990 行；其中包含历史目录退休和诊断搬迁，不能将全部减少归因于本批。
 
 最终代码版本诊断 185 项通过。正式 GeoPhys Pendulum 与双轮车分别完成 reset、一次控制推进、再次 reset 和重复 close；native 子步未观测，双锁和每项 50 子步预留记录在 `workspace/maintenance/v211_robot_source_bridge_20261112/`。本批较早冻结输入下，MuJoCo PickCube、NutAssembly、Pendulum、双轮及装配 Panda 分别观测 5／5／25／25／5 子步并完成短程 reset、控制、再 reset、关闭；前两项为 Solution 单步而非完整 Solution；隔离 worker PickCube 短程通过但 native 子步未观测。较早输入及其锁、预算和收据在 `workspace/maintenance/v211_common_robot_owner_k0dsflgd/`；最终输入额外增加共同 GeoPhys 编译边界和示例 caller 签名，MuJoCo 未按最终字节重跑，证据按输入区别引用。先前 GeoPhys Pendulum 因既有主体错误进入外部资产解析而失败，修正后重新运行通过。MJCF 导入保留语义诊断；Isaac、renderer 与完整 Solution 本批未复验。E01～E04 仍未整体接收。
+
+
+### 6.133 普通任务消费实际共同构建请求
+
+输入 `fceb727f`；实施前再次对照台账 GOV、ENTRY、TASK、ENV-01～03、SUBJ 和 CTRL，并复核当前正式构建链。Pendulum／双轮车的共同 effort binding 原先忽略构建请求中的 provider，改用绑定时闭包保存的 provider；两个任务还各自保留 Robot 未传入时重新从 registry 创建的分支。现在 source 编译直接消费每次共同请求的 provider，backend 与已解析配置不一致时在资源物化前拒绝；Robot 由共同入口提供并用于 composition，不再在任务侧重复选择。episode horizon 仍归 Env 生命周期，当前 source 编译不消费它。此项不声称其他 Task 构造、source 组合或 renderer 已全部统一。
+
+生产修改 5 文件 +13／−21，净减 8 行；版本诊断修改 1 文件 +32／−0，检查两任务按请求消费 provider、使用所选 Robot 并拒绝不一致 backend；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 工作树差异为 134 文件（新增 12、删除 20、修改 102），+7693／−14659，净减 6966 行；包含较早历史目录退休与诊断搬迁，不能将其归因于本批。
+
+最终输入下版本诊断 187 项通过；MuJoCo Pendulum、双轮车均完成 reset、一次控制推进、再次 reset 和重复 close，各观测 25 个 native 子步。GeoPhys Pendulum 完成同样短程，native 子步未观测，按 50 预留；GeoPhys 双轮车在上一输入 `fceb727f` 已短程通过，本批两任务使用共同 builder，当前差异将请求中相同 provider 直接传入原有 source 编译并核对 backend，但未按最终输入重复运行该路线。Isaac、renderer、两个桌面任务与完整 Solution 本批未复验。冻结输入、双锁、预算与收据在 ignored `workspace/maintenance/v211_effort_request_20261112/`。E01～E04 仍未整体接收。
