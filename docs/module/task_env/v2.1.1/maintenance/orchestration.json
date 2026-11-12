@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-11",
-  "status": "POST_5C_E00_E04_IMPLEMENTING",
+  "updated_date": "2026-11-12",
+  "status": "POST_5C_E00_E04_ACCEPTED_E05_E10_PLANNED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "Continue E01/E02 common construction and subject facade migration and remaining E03/E04 ownership work under direct maintainer scope; first common reset/close/control fixes verified, whole objective not complete. No G06.",
+  "next_action": "E00-E04 explicitly accepted by maintainer. E05-E10 static replan ready: use its remaining ledger and Goal; implementation/native not started. No G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2082,17 +2082,15 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "E00_E04_IMPLEMENTING",
-    "date": "2026-11-11",
-    "authority": "Maintainer explicitly confirmed: 现在我们正式进入5c之后的优化阶段。",
+    "status": "E00_E04_ACCEPTED_E05_E10_PLANNED",
+    "date": "2026-11-12",
+    "authority": "2026-11-12 current conversation: maintainer explicitly accepted E00-E04 and requested E05-E10 detailed planning and Goal; no implementation started.",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
-    "production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
-    "current_step": "E00-E04",
-    "next_step": "Canonical execution/configuration, remaining subject/registry and reset/control/deployment audit; duplicate Isaac initial compilation and affected native factory verification",
-    "implementation_attempt_count": 1,
-    "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
+    "production_head": "912416e6299558cb2eacb5e94f4e0f8f092dcf16",
+    "current_step": "E05-E10 planning ready",
+    "next_step": "Use post-5c-e05-e10-remaining-ledger.md U1-U7/S01-S40 when execution is started; preserve accepted E00-E04.",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
@@ -2103,39 +2101,69 @@
     "snapshot_ref": "../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json",
     "refs_reorganized_this_kickoff": false,
     "events": {
-      "E00": "BASELINE_RECORDED",
-      "E01": "IMPLEMENTING_COMMON_DECLARED_CONSTRUCTION_AND_TWO_LEGACY_UIDS_MIGRATED",
-      "E02": "IMPLEMENTING_FORMAL_TASKDEFINITION_COMMON_OWNER_AND_FOUR_SUBJECT_VIEW_VERIFIED",
-      "E03": "IMPLEMENTING_TYPED_INFO_SOLUTION_PAYLOAD_AND_RESET_SEMANTIC_REBIND_VERIFIED",
-      "E04": "IMPLEMENTING_ORDINARY_NATIVE_LIVE_SOURCE_CONTROLLER_INTERVAL_VERIFIED"
+      "E00": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E01": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E02": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E03": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E04": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E05": "PLANNED_NOT_STARTED",
+      "E06": "PLANNED_NOT_STARTED",
+      "E07": "PLANNED_NOT_STARTED",
+      "E08": "PLANNED_NOT_STARTED",
+      "E09": "PLANNED_NOT_STARTED",
+      "E10": "PLANNED_NOT_STARTED"
     },
-    "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
-    "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
-    "event_native_cpu_runs": 36,
-    "event_native_substeps": 290,
-    "event_implementation_complete": false,
-    "event_native_cpu_failed_runs": 8,
-    "event_native_failure_reason": "Eight preserved failures across the CPU window; the latest four are typed info rejected by Solution at reset (twice, including readback), ordinary native route lacking a live interval binding, and a zero-step edited-module indentation/import failure. Final affected intersections pass; no full Solution claim.",
-    "latest_increment_input_head": "4b0a413a13016463baa06e91c846925816442260",
-    "latest_increment_pure_unique_nodes": 152,
-    "latest_increment_evidence": "implementation-metrics-005.json; cpu-independent-readback-005.json",
-    "event_native_failure_summaries": [
-      "cpu-002-pendulum: independent oracle float64 vs declared float32; production sampler unchanged",
-      "cpu-004-joint: assessment did not compose Position constructor owner with physical port; owner checks repaired",
-      "cpu-005-pose: R3 wrapper incorrectly exposed dynamic-model binding for nominal servo; capability forwarding repaired",
-      "cpu-006-reset-selection: probe continued after deliberate stale-action fault; explicit-reset oracle recovery corrected, production fault behavior unchanged",
-      "cpu-010-nut: public typed info rejected by original Solution finite guard before step",
-      "cpu-011-nut: exact input type/identity readback confirms typed info rejection",
-      "cpu-012-nut: ordinary admitted native source lacks live scene interval binding; actual Controller/source installation repaired",
-      "cpu-013-nut: edited control module indentation/import failure, observed zero native steps; AST repair before cpu-014 pass"
-    ],
-    "event_unlocked_pytest_reset_exception": {
-      "failed_nodes": 3,
-      "observed_substeps": null,
-      "conservative_budget_charge_substeps": 150,
-      "raw_log": "shared-binding-004.log",
-      "scope": "One mistakenly selected real MuJoCo pytest process; failed before normal step. Not passing evidence; corrected through supervised locked probes."
+    "e00_e04_prior_increment_snapshot": {
+      "implementation_attempt_count": 1,
+      "implementation_executor": "Current chat, directly authorized by maintainer; one writer, no external agent dispatch.",
+      "event_input_head": "21577d320959867efc7066d5686f9c48ac1301e0",
+      "event_evidence_ref": "../../../../../workspace/maintenance/v211_post5c_e00_e04_20261111_001",
+      "event_native_cpu_runs": 36,
+      "event_native_substeps": 290,
+      "event_implementation_complete": false,
+      "event_native_cpu_failed_runs": 8,
+      "event_native_failure_reason": "Eight preserved failures across the CPU window; the latest four are typed info rejected by Solution at reset (twice, including readback), ordinary native route lacking a live interval binding, and a zero-step edited-module indentation/import failure. Final affected intersections pass; no full Solution claim.",
+      "latest_increment_input_head": "4b0a413a13016463baa06e91c846925816442260",
+      "latest_increment_pure_unique_nodes": 152,
+      "latest_increment_evidence": "implementation-metrics-005.json; cpu-independent-readback-005.json",
+      "event_native_failure_summaries": [
+        "cpu-002-pendulum: independent oracle float64 vs declared float32; production sampler unchanged",
+        "cpu-004-joint: assessment did not compose Position constructor owner with physical port; owner checks repaired",
+        "cpu-005-pose: R3 wrapper incorrectly exposed dynamic-model binding for nominal servo; capability forwarding repaired",
+        "cpu-006-reset-selection: probe continued after deliberate stale-action fault; explicit-reset oracle recovery corrected, production fault behavior unchanged",
+        "cpu-010-nut: public typed info rejected by original Solution finite guard before step",
+        "cpu-011-nut: exact input type/identity readback confirms typed info rejection",
+        "cpu-012-nut: ordinary admitted native source lacks live scene interval binding; actual Controller/source installation repaired",
+        "cpu-013-nut: edited control module indentation/import failure, observed zero native steps; AST repair before cpu-014 pass"
+      ],
+      "event_unlocked_pytest_reset_exception": {
+        "failed_nodes": 3,
+        "observed_substeps": null,
+        "conservative_budget_charge_substeps": 150,
+        "raw_log": "shared-binding-004.log",
+        "scope": "One mistakenly selected real MuJoCo pytest process; failed before normal step. Not passing evidence; corrected through supervised locked probes."
+      },
+      "event_cumulative_physics_budget_charge_substeps": 440
     },
-    "event_cumulative_physics_budget_charge_substeps": 440
+    "startup_production_head": "a53bf19d2526c6c336dd5d0d7108eb0f643f80bd",
+    "e00_e04_acceptance": {
+      "date": "2026-11-12",
+      "authority": "Explicit maintainer acceptance in current conversation: 我目前统一接收E00-E04。",
+      "production_commit": "912416e6299558cb2eacb5e94f4e0f8f092dcf16",
+      "implementation_ref": "20261112_e00_e04_review_fix_delivery_912416e6.md",
+      "review_ref": "reviews/20261112_e00_e04_independent_review_76536d2a.md",
+      "scope": "Bounded E00-E04 only; subsequent code/project optimization remains pending."
+    },
+    "e05_e10_plan": {
+      "status": "PLANNED_NOT_STARTED",
+      "input_head": "67cb643f24a06dad2056a277110e14ba8d13ff31",
+      "ledger_ref": "../planning/post-5c-e05-e10-remaining-ledger.md",
+      "goal_ref": "../planning/post-5c-e05-e10-goal.md",
+      "units": 7,
+      "checkpoints": 40,
+      "implementation_started": false,
+      "native_runs": 0,
+      "snapshot_ref": "../../../../../workspace/maintenance/v211_e05_e10_replan_20261112_001/input-snapshot.json"
+    }
   }
 }

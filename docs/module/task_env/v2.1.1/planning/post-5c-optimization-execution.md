@@ -1,6 +1,6 @@
 # 5c 后代码与项目优化：执行安排
 
-日期：2026-11-12。当前 E00～E04 已完成实施自评及独立主审，主审余项按维护者授权在本轮修复；维护者最终接收待完成。当前效果见第 6 节及[专用账本](post-5c-e00-e04-remaining-ledger.md)。第 1～5 节保留 2026-11-11 的历史启动安排，不作为新的剩余工作或实时状态。
+日期：2026-11-12。E00～E04 已完成实施、独立主审及后续余项修复，维护者已在本次对话统一接收。当前效果见第 6 节及[专用账本](post-5c-e00-e04-remaining-ledger.md)。第 1～5 节保留 2026-11-11 的历史启动安排，不作为新的剩余工作或实时状态。
 
 ## 1. 启动边界
 
@@ -105,7 +105,7 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 <a id="6-e00e04-实施记录"></a>
 ## 6. E00～E04 实施记录
 
-当前以[专用账本](post-5c-e00-e04-remaining-ledger.md)和[独立主审](../maintenance/reviews/20261112_e00_e04_independent_review_76536d2a.md)对照；后者审查生产 `76536d2a`，建议有界接收并指出四项代码/资料余项。本轮维护者授权这些余项的一轮实施测试，现已完成，生产提交 `912416e6`，详见[实施返包](../maintenance/20261112_e00_e04_review_fix_delivery_912416e6.md)。这不代替维护者最终接收，也不启动 E05 或 G06。
+当前以[专用账本](post-5c-e00-e04-remaining-ledger.md)和[独立主审](../maintenance/reviews/20261112_e00_e04_independent_review_76536d2a.md)对照；后者审查生产 `76536d2a`，建议有界接收并指出四项代码/资料余项。本轮维护者授权这些余项的一轮实施测试，现已完成，生产提交 `912416e6`，详见[实施返包](../maintenance/20261112_e00_e04_review_fix_delivery_912416e6.md)。维护者现已统一接收 E00～E04；原主审及后续自检的身份/证据边界保留。E05～E10 仅完成专用规划，G06 未启动。
 
 | 事件 | 最终效果及本轮补充 | 仍保留的边界 |
 | --- | --- | --- |
@@ -128,3 +128,9 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 修改前 dirty 文件是与 Goal 相同角色的提示文本，SHA `af50897d…`；本轮先按完整字节保存为[执行记录修改前副本](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/execution-record-before.md)及[原 dirty patch](../../../../../workspace/maintenance/v211_e00_e04_review_fixes_20261112_001/existing-dirty.patch)，再从 Git 中恢复本页执行计划角色并更新第 6 节。独立的 [Goal 文件](post-5c-e00-e04-goal.md)保留。不是将旧 dirty 静默丢弃，也不将跨时点的不同文本写成从未变化。
 
 旧执行摘要可从 `b94e8625`、`3b5023e8` 的相应记录/账本恢复，更早逐批记录见 `69f4380e`。初始 `1f1359ee → 76536d2a` 的累计统计及 U1～U5 原始 native/失败记录保留在专用账本，不与本轮增量混算。COM 历史失败、R05c NOT_REQUALIFIED、Isaac shutdown 日志及未计数启动推进限制保留；本轮没有整理 refs、worktree 或原始证据。
+
+## 7. E05～E10 后续规划
+
+维护者统一接收 E00～E04 后，下一范围为 E05～E10。使用[专用剩余账本](post-5c-e05-e10-remaining-ledger.md)及[实施 Goal](post-5c-e05-e10-goal.md)，按 U1 source → U2 provider → U3 状态/相机 → U4 renderer → U5 Task → U6 Recorder/replay → U7 定向复验与对账推进。一次完整结束大单元后才对照总账相应条目；不再逐函数反复重评全部范围。
+
+本次核查输入 `67cb643f`、生产 `912416e6`，tracked clean、四保护输入和 pins 保全。仅静态核查、规划及直接状态索引同步，E05～E10 尚未实施，未运行 pytest/native/资产解析。完整 Solution 和完整同次记录读回仍归 E13；本次不清理输出、refs/worktree，不启动 G06。
