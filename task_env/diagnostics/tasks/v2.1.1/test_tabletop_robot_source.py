@@ -11,7 +11,7 @@ from task_env.runtime.sessions.source import source_resource_receipt
 
 @pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
 def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
-    from task_env.tasks.pick_cube.specialization import build_reference as build_pickcube
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
     from task_env.tasks.nut_assembly.specialization import build_reference as build_nut
 
     original = PandaAgent.artifact_entity
@@ -20,7 +20,7 @@ def test_artifact_and_runtime_source_share_robot(task_name, monkeypatch):
         used.append(robot)
         return original(robot, *args, **kwargs)
     monkeypatch.setattr(PandaAgent, 'artifact_entity', capture)
-    value = (build_pickcube(backend='cpu', include_solution=False)
+    value = (make_reference_binding().build_for_request('mujoco', 'cpu', 31, 8)
              if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
     source = value['source']
     try:
@@ -40,7 +40,7 @@ def test_pickcube_reference_compiles_the_selected_robot_instance(monkeypatch):
         selected.append(robot)
         return robot
     monkeypatch.setattr(specialization, 'make_agent', capture)
-    value = specialization.build_reference(backend='cpu', include_solution=False)
+    value = specialization.make_reference_binding().build_for_request('mujoco', 'cpu', 31, 8)
     try:
         assert len(selected) == 1
         assert value['source'].agents == (selected[0],)
@@ -54,13 +54,13 @@ def test_reference_source_composition_reuses_the_task_robot(task_name, monkeypat
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.runtime.sessions import mujoco_composition
     from task_env.runtime.sessions.source_composition_adapters import declared_robot_source_composer
-    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_reference as build_pickcube
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, make_reference_binding
     from task_env.tasks.nut_assembly.specialization import NutAssemblyReferenceEnv, build_reference as build_nut
 
     cls = PickCubeReferenceEnv if task_name == 'pickcube' else NutAssemblyReferenceEnv
     config = resolve_task_env_config(cls, {'execution': {'physics_provider': 'mujoco',
         'physics_backend': 'cpu', 'physics_device': 'cpu'}})
-    value = (build_pickcube(backend='cpu', include_solution=False, controller_profile=config.controller_profile)
+    value = (make_reference_binding(controller_profile=config.controller_profile).build_for_request('mujoco', 'cpu', 31, 8)
              if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
     original = mujoco_composition.compose_robot_source
     seen = []
@@ -136,7 +136,7 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
         constructed.append((controller, artifact, source, kwargs['profile_id']))
         return controller
     monkeypatch.setattr(execution, 'build_reference_position_controller', capture)
-    value = (pickcube.build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+    value = (pickcube.make_reference_binding(controller_profile='r3_continuous_v1').build_for_request('mujoco', 'cpu', 31, 8)
              if task_name == 'pickcube' else nut.build_reference(provider='mujoco', include_solution=False))
     try:
         controller = value['controller']
@@ -157,10 +157,10 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
 def test_both_tabletop_controllers_use_the_same_hold_ramp_contract(task_name):
     from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
     from task_env.controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
-    from task_env.tasks.pick_cube.specialization import build_reference as build_pickcube
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
     from task_env.tasks.nut_assembly.specialization import build_reference as build_nut
 
-    value = (build_pickcube(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+    value = (make_reference_binding(controller_profile='r3_continuous_v1').build_for_request('mujoco', 'cpu', 31, 8)
              if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
     try:
         controller = value['controller']
@@ -299,11 +299,11 @@ def test_usd_build_failure_does_not_create_mjcf_source(physical, monkeypatch):
     monkeypatch.setattr(specialization, 'compile_panda_box_task', unexpected)
     monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', fail)
     with pytest.raises(RuntimeError) as raised:
-        specialization.build_isaac_reference(
-            delivery_manifest='unused', include_solution=False,
+        specialization.make_reference_binding(
+            controller_profile='r3_continuous_v1', source_delivery_manifest='unused',
             physical_kind='direct' if physical else None,
             physical_drive='disabled' if physical else None,
-        )
+        ).build_for_request('isaacsim', 'cuda', 31, 8)
     assert raised.value is failure
 
 
@@ -320,7 +320,8 @@ def test_usd_readiness_failure_prevents_delivery_construction(monkeypatch):
     monkeypatch.setattr(PickCubeReadinessConfig, 'from_resolved_config', fail)
     monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input', unexpected)
     with pytest.raises(RuntimeError) as raised:
-        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1',
+            source_delivery_manifest='unused').build_for_request('isaacsim', 'cuda', 31, 8)
     assert raised.value is failure
 
 
@@ -361,7 +362,7 @@ def test_reference_controller_failure_releases_task_source(task_name, monkeypatc
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', fail_controller)
     with pytest.raises(RuntimeError) as raised:
         if task_name == 'pickcube':
-            pickcube.build_reference(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+            pickcube.make_reference_binding(controller_profile='r3_continuous_v1').build_for_request('mujoco', 'cpu', 31, 8)
         else:
             nut.build_reference(provider='mujoco', include_solution=False)
     assert raised.value is failure
@@ -419,26 +420,22 @@ def test_assembled_position_builds_controller_from_selected_source(monkeypatch):
         source_resource_receipt(value['source']).close()
 
 
-def test_usd_source_identity_failure_releases_task_source(monkeypatch):
+def test_usd_source_identity_failure_does_not_allocate_task_source(monkeypatch):
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import specialization
 
-    receipts = []
-    original = source_module.snapshot_legacy_mjcf_source
     failure = RuntimeError('source identity failed')
-    def capture(*args, **kwargs):
-        source = original(*args, **kwargs)
-        receipts.append(source_resource_receipt(source))
-        return source
+    def unexpected(*args, **kwargs):
+        pytest.fail('USD identity preparation must not allocate an MJCF source')
     def fail_identity(*args, **kwargs):
         raise failure
-    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', capture)
+    monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
     monkeypatch.setattr(specialization, '_source_identity_files', fail_identity)
     with pytest.raises(RuntimeError) as raised:
-        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False,
-                                              physical_kind='direct', physical_drive='disabled')
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1',
+            source_delivery_manifest='unused', physical_kind='direct', physical_drive='disabled'
+            ).build_for_request('isaacsim', 'cuda', 31, 8)
     assert raised.value is failure
-    assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
 def test_failed_controller_cleanup_preserves_original_error(monkeypatch):
@@ -456,8 +453,8 @@ def test_failed_controller_cleanup_preserves_original_error(monkeypatch):
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', fail_controller)
     monkeypatch.setattr(ExecutionSourceReceiptV1, 'close', fail_close)
     with pytest.raises(RuntimeError) as raised:
-        specialization.build_reference(backend='cpu', include_solution=False,
-                                       controller_profile='r3_continuous_v1')
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1'
+            ).build_for_request('mujoco', 'cpu', 31, 8)
     assert raised.value is failure
     assert any('cleanup failed' in note for note in raised.value.__notes__)
 

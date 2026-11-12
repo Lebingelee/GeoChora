@@ -8,6 +8,8 @@ v3 记录要求运行环境能够导入 `h5py`，缺少依赖时启动记录会�
 
 当前（2026-11-11）：G01～G05 已各自有界接收，5c 单元 1～9 收口，现进入[代码与项目优化](../planning/post-5c-optimization-execution.md)。受测能力、正式入口尚存的迁移工作和限制以[当前摘要](../maintenance/current-state.md)及[单元 9 主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)为准。本页下面的历史设计／实现记录不把未实现目标升级为 API。
 
+PickCube 环境通过 `task_env.make_env` 和正式配置构造；调用方需要独立 Solution 时可使用 `task_env.tasks.pick_cube.build_readiness_solution`。旧的 PickCube `build_reference`、`build_isaac_reference` 和 `build_runtime_source` 直接构造入口已退休，历史诊断中的这些调用需迁到正式构建入口。
+
 历史记录：3b attempt001 已通过公开 factory 在三条指定路线完成 seed31 的10步与独立读回，整体仍为 PARTIAL、待 Sol 复审：三路线短窗正向位移均未过冻结门。PickCube F06 的 `env.step` 接受既有8维绝对世界位姿与开口动作，并复用已绑定 Controller 的结构化投影；其 Recorder 保存该运行的请求、模型和原生确认。其他 Position 路线仍按各自声明要求 typed action。详见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。
 
 阶段3历史实现：阶段3前限定核心收尾及G03的3a–3c均已按各自范围接收，详见[3c独立主审及阶段收尾](../maintenance/reviews/20261106_3c_attempt001_sol_review.md)；生命周期R1已获[Sol有限接收](../maintenance/reviews/20261105_lifecycle_unification_sol_review.md)。当前可调用入口以 [TaskEnv 当前 API](../../../../../task_env/doc/api/index.md)和源码为准；selected 环境实现已迁至 `task_env.environment.reference_env`，旧导入保留兼容。`BaseTaskEnv` 已是 `SelectedReferenceEnv` 同对象兼容出口，三个组件任务使用共同 episode owner；源码与无引擎契约已复核，后续的[CPU 代表回归](../maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)按实际源码提交和路线记录，不扩展到其他组合。本页下表是阶段3–6的设计目标，并非当前能力；已有行为及证据不因本页或导入成功而扩展。

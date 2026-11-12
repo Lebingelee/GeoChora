@@ -11,10 +11,14 @@ from task_env.planners.contracts import ExpertAction
 @pytest.mark.parametrize('backend', ['cpu', 'cuda'])
 @pytest.mark.parametrize('profile', ['r1', 'r3_continuous_v1'])
 def test_external_pickcube_solution_matches_source_without_constructing_one(backend, profile, monkeypatch):
+    from dataclasses import replace
     from task_env.tasks.pick_cube import specialization
     from task_env.runtime.sessions.source import source_resource_receipt
 
-    built = specialization.build_reference(backend=backend, controller_profile=profile)
+    config = specialization._environment_config()
+    config = replace(config, runtime=replace(config.runtime, backend=backend))
+    built = specialization.make_reference_binding(controller_profile=profile, resolved_config=config
+        ).build_for_request('mujoco', backend, 31, 8)
     try:
         expected_identity = built['solution_identity']
         expected_readiness = built['readiness']

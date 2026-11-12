@@ -386,11 +386,9 @@ def compile_pickcube_task_artifact(task_config, scene, legacy_artifact, *, frame
 # Existing imports remain a thin bridge while repository callers migrate.
 from .specialization import (
     REFERENCE_ENV_ID, PickCubeReferenceEnv, _configuration, _recipe, build_artifact,
-    build_runtime_source, build_reference, build_isaac_reference,
     build_readiness_solution, make_reference_binding,
 )
 
 __all__ = ["PickCubeReferenceEnv", "PickCubeTaskDefinition", "REFERENCE_ENV_ID",
-           "build_artifact", "build_readiness_solution", "build_reference",
-           "build_runtime_source", "evaluate", "make_reference_binding", "sample_reset",
-           "semantic_definition", "build_isaac_reference"]
+           "build_artifact", "build_readiness_solution", "evaluate", "make_reference_binding",
+           "sample_reset", "semantic_definition"]

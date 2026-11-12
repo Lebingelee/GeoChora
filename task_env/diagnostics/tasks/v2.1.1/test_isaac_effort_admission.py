@@ -261,11 +261,12 @@ def test_custom_action_config_produces_same_mjcf_and_usd_readiness():
     config = specialization._environment_config()
     changed = replace(config, action=replace(config.action,
         ik_position_deadband=config.action.ik_position_deadband * 2))
-    mjcf = specialization.build_reference(controller_profile='r3_continuous_v1',
-                                           resolved_config=changed, include_solution=False)
+    mjcf = specialization.make_reference_binding(controller_profile='r3_continuous_v1',
+        resolved_config=changed).build_for_request('mujoco', 'cpu', 31, 8)
     try:
-        usd = specialization.build_isaac_reference(delivery_manifest=manifest, horizon=8,
-                                                   resolved_config=changed, include_solution=False)
+        usd = specialization.make_reference_binding(controller_profile='r3_continuous_v1',
+            source_delivery_manifest=manifest, resolved_config=changed
+            ).build_for_request('isaacsim', 'cuda', 31, 8)
         assert mjcf['readiness'].identity == usd['readiness'].identity
         default_solution = specialization.build_readiness_solution()
         assert mjcf['readiness'].identity != default_solution.readiness_config.identity
@@ -282,7 +283,8 @@ def test_usd_readiness_rejects_foreign_artifact_timebase(monkeypatch):
     monkeypatch.setattr(isaac_usd_admission, 'compile_f06_task_input',
                         lambda *args, **kwargs: foreign)
     with pytest.raises(ValueError, match='timebase differs'):
-        specialization.build_isaac_reference(delivery_manifest='unused', include_solution=False)
+        specialization.make_reference_binding(controller_profile='r3_continuous_v1',
+            source_delivery_manifest='unused').build_for_request('isaacsim', 'cuda', 31, 8)
 
 
 def test_usd_rejects_unsupported_task_force():
@@ -331,7 +333,7 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     from task_env.runtime.sessions.control import (bind_selected_controller,
         position_subject_identity, prepare_position_control_materialization)
     from task_env.runtime.sessions.source import PositionSubjectPlanV1
-    from task_env.tasks.pick_cube.specialization import build_isaac_reference, make_reference_binding
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     root = Path(__file__).resolve().parents[4]
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
@@ -341,8 +343,8 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     def reject_unused_controller(*args, **kwargs):
         pytest.fail('USD Position must not construct an unused MJCF Controller')
     monkeypatch.setattr(ReferenceExecutionController, 'from_source', reject_unused_controller)
-    value = build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
     binding = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest)
+    value = binding.build_for_request('isaacsim', 'cuda', 31, 8)
     selected = bind_selected_controller(value, binding=binding, provider='isaacsim', backend='cuda')
     robot = RobotRuntime.from_selected(value, selected)
     plan, _, _, _ = prepare_position_control_materialization(
@@ -417,7 +419,7 @@ def test_usd_controller_failure_does_not_allocate_mjcf_snapshot(monkeypatch):
     from pathlib import Path
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
     from task_env.runtime.sessions import source as source_module
-    from task_env.tasks.pick_cube.specialization import build_isaac_reference
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     root = Path(__file__).resolve().parents[4]
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
@@ -430,7 +432,8 @@ def test_usd_controller_failure_does_not_allocate_mjcf_snapshot(monkeypatch):
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
     monkeypatch.setattr(PandaPositionServoProfileV1, 'from_usd_source', reject)
     with pytest.raises(RuntimeError, match='USD Controller rejected'):
-        build_isaac_reference(delivery_manifest=manifest, horizon=8, include_solution=False)
+        make_reference_binding(controller_profile='r3_continuous_v1',
+            source_delivery_manifest=manifest).build_for_request('isaacsim', 'cuda', 31, 8)
 
 
 def test_usd_position_factory_rejects_unsupported_profile_before_materialization():

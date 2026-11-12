@@ -21,8 +21,7 @@ from ...artifacts import (
 from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
-                                   compile_panda_box_mjcf_task, compile_panda_box_source,
-                                   compile_panda_box_task)
+                                   compile_panda_box_mjcf_task, compile_panda_box_task)
 from ...assembly.compiler import CompiledReferenceTaskV1, reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
@@ -45,7 +44,6 @@ from ...registry import make_agent, make_object, make_scene, register_env
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import position_control_binding_from_selected
 from ...robots.panda import PandaAgent, panda_reference_control_binding
-from ...runtime.sessions.source import RuntimeSource
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
 from ...objects.pick_cube import (
@@ -156,21 +154,13 @@ def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
     return compile_panda_box_artifact(_declaration(lift_height_m=lift_height_m, task_config=task_config))
 
 
-def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_config=None, lift_height_m=None, task_config=None) -> RuntimeSource:
-    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
-    if artifact.identity_hash != compile_panda_box_artifact(declaration).identity_hash:
-        raise ValueError("selected P1.6 TaskArtifact required")
-    config = _environment_config() if resolved_config is None else resolved_config
-    return compile_panda_box_source(declaration, artifact, config, own_snapshot=True, backend=backend)
-
-
 def _source_identity_files(controller, solution_type, *, profile_source=None, provider=None, robot=None):
     root = Path(__file__).resolve().parents[3]
     from ...runtime.sessions.provenance import (construction_source_inventory,
                                                 selected_reference_construction_sources)
     files = {Path(__file__).resolve(), Path(__file__).with_name("task.py").resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
-             Path(inspect.getsourcefile(compile_panda_box_source)).resolve(),
+             Path(inspect.getsourcefile(compile_panda_box_task)).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
              root / "task_env/robots/panda.py", root / "task_env/robots/assembled_panda.py",
              root / "task_env/robots/source_recipe.py",
@@ -383,7 +373,7 @@ def _compile_reference_position_source(request, *, controller_profile, resolved_
                 is_r3_profile, dynamic_profile, profile_source, readiness))
 
 
-def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile, include_solution):
+def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile):
     from .solution import PickCubeReadinessSolution
     artifact, source = compiled.artifact, compiled.source
     task_config, recipe = context.task_config, context.task_config['recipe']
@@ -394,7 +384,6 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         execution_controller = controller
         controller = execution_controller.hold.controller
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     base_controller_identity = None
     execution_profile = None
     if is_r3_profile:
@@ -441,7 +430,7 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
         **({'reset_plan': reset_plan} if reset_plan is not None else {}),
         "readiness": readiness, "controller": controller,
-        "solution": solution,
+        "solution": None,
         "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
         "solution_identity": solution_identity,
         "source_revision": revision, "source_sha256": source_ids,
@@ -467,7 +456,7 @@ def _compose_reference_source(compiled, context, request, *, controller_profile,
     return composition.compiled, context._replace(composition=composition)
 
 
-def _position_reference_builder(*, backend, include_solution, controller_profile,
+def _position_reference_builder(*, backend, controller_profile,
                                 resolved_config, lift_height_m, task_config, robot_uid, robot):
     from ...environment.reference_binding import SourceBoundTaskBuilder
     from ...controllers.canonical.execution import build_reference_position_controller
@@ -486,17 +475,7 @@ def _position_reference_builder(*, backend, include_solution, controller_profile
             joint_velocity_limit_rad_s=PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']),
         compile_control=lambda compiled, context, selection, request: _bind_reference_position_control(
             compiled, context, selection, request,
-            controller_profile=controller_profile, include_solution=include_solution))
-
-
-def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
-                    lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31, robot=None):
-    """Construct the selected Position route using the common build stages."""
-    from ...environment.reference_binding import TaskBuildRequest
-    builder = _position_reference_builder(backend=backend, include_solution=include_solution,
-        controller_profile=controller_profile, resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, robot=robot)
-    return builder(TaskBuildRequest('mujoco', backend, task_seed, 1000, None, None))
+            controller_profile=controller_profile))
 
 
 def _compile_isaac_reference_source(request, *, delivery_manifest, controller_profile,
@@ -531,7 +510,7 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
                               readiness, dynamic_profile, source_ids))
 
 
-def _bind_isaac_reference_control(compiled, context, selection, request, *, include_solution, resolved_config):
+def _bind_isaac_reference_control(compiled, context, selection, request, *, resolved_config):
     from ...controllers.canonical.kinematics import PANDA_PICKCUBE_EE_TCP_V1
     from .solution import PickCubeReadinessSolution
     runtime_input, controller, physical = selection
@@ -541,7 +520,6 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
     manifest_path = loaded.manifest_path
     readiness = context.readiness
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
     from ...runtime.sessions.isaac_usd_admission import f06_construction_source_inventory
     from ...runtime.sessions.provenance import construction_revision
     source_ids = f06_construction_source_inventory(
@@ -580,7 +558,7 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
         "readiness": readiness,
         "controller": controller,
         **({} if physical is None else {"physical_execution": physical}),
-        "solution": solution,
+        "solution": None,
         "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
         "solution_identity": solution_identity,
         "source_revision": revision,
@@ -595,7 +573,7 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
     }
 
 
-def _isaac_reference_builder(*, delivery_manifest, include_solution, controller_profile,
+def _isaac_reference_builder(*, delivery_manifest, controller_profile,
                              resolved_config, task_config, lift_height_m, physical_fixture,
                              physical_kind, physical_drive, robot):
     if controller_profile != 'r3_continuous_v1':
@@ -620,21 +598,7 @@ def _isaac_reference_builder(*, delivery_manifest, include_solution, controller_
             effort_settings=panda_effort_task_settings(physical_kind) if physical_kind is not None else None),
         compile_control=lambda compiled, context, selection, request: _bind_isaac_reference_control(
             compiled, context, selection, request,
-            include_solution=include_solution, resolved_config=resolved_config))
-
-
-def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
-                          include_solution=True, controller_profile='r3_continuous_v1',
-                          resolved_config=None, task_config=None, lift_height_m=None,
-                          physical_fixture=False, physical_kind=None, physical_drive=None, robot=None):
-    """Build the admitted USD route through the common construction stages."""
-    from ...environment.reference_binding import TaskBuildRequest
-    builder = _isaac_reference_builder(delivery_manifest=delivery_manifest,
-        include_solution=include_solution, controller_profile=controller_profile,
-        resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
-        physical_fixture=physical_fixture, physical_kind=physical_kind,
-        physical_drive=physical_drive, robot=robot)
-    return builder(TaskBuildRequest('isaacsim', 'cuda', task_seed, horizon, None, None))
+            resolved_config=resolved_config))
 
 
 def build_readiness_solution(*, backend="cpu", controller_profile="r3_continuous_v1"):
@@ -724,7 +688,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         if source_delivery_manifest is None:
             raise ValueError('F06 Isaac PickCube requires CUDA and its explicit source delivery')
         builder = _isaac_reference_builder(
-            delivery_manifest=source_delivery_manifest, include_solution=False,
+            delivery_manifest=source_delivery_manifest,
             controller_profile='r3_continuous_v1' if physical else controller_profile,
             resolved_config=resolved_config, task_config=task_config, lift_height_m=lift_height_m,
             robot=robot, physical_fixture=(('effort-only' if physical_drive == 'disabled' else 'coexist')
@@ -758,7 +722,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 reset_switch=reset_switch, cube_force_z_N=cube_force_z_N))
     else:
         builder = _position_reference_builder(
-            backend=backend, include_solution=False, controller_profile=controller_profile,
+            backend=backend, controller_profile=controller_profile,
             resolved_config=resolved_config, lift_height_m=lift_height_m,
             task_config=task_config, robot_uid=robot_uid, robot=robot)
 
