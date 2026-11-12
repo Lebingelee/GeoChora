@@ -207,7 +207,6 @@ def snapshot_legacy_mjcf_source(source):
     receipt snapshot and its bytes are consumed directly by the adapter.
     """
     from dataclasses import replace
-    from ...utils._paths import MUJOCO_MENAGERIE_ROOT
     if source.scene_definition is not None or source.execution_source_receipt is not None:
         return source
     xml = source.scene_source.xml
@@ -215,7 +214,12 @@ def snapshot_legacy_mjcf_source(source):
     compiler = root.find('compiler')
     if compiler is None:
         raise ValueError('selected MJCF source has no compiler')
-    allowed = (MUJOCO_MENAGERIE_ROOT / 'franka_emika_panda' / 'assets').resolve()
+    allowed = []
+    for component in (*source.agents, *source.objects):
+        manifest = component.asset_manifest()
+        if manifest.owner_uid != component.uid:
+            raise ValueError('MJCF component asset manifest has a foreign owner')
+        allowed.extend(path.resolve() for path in manifest.asset_roots)
     files = {'canonical-source.xml': xml.encode('utf-8')}
     total = 0
     for node in root.iter():
@@ -228,14 +232,15 @@ def snapshot_legacy_mjcf_source(source):
         if rel.is_absolute() or '\\' in raw or any(part in {'', '.', '..'} for part in rel.parts):
             raise ValueError(f'unsafe MJCF asset reference: {raw!r}')
         attr = 'texturedir' if node.tag == 'texture' else 'meshdir'
-        directory = Path(compiler.get(attr, compiler.get('meshdir', ''))).resolve()
-        if directory != allowed:
-            raise ValueError(f'selected MJCF {attr} differs from pinned Panda assets')
+        directory = Path(compiler.get(attr, compiler.get('meshdir', '')))
+        if not directory.is_absolute():
+            directory = source.scene_source.base_dir / directory
+        directory = directory.resolve()
+        if not any(directory.is_relative_to(root) for root in allowed):
+            raise ValueError(f'MJCF {attr} is outside declared component asset roots')
         path = (directory / rel).resolve()
-        try:
-            path.relative_to(allowed)
-        except ValueError as exc:
-            raise ValueError('MJCF asset escaped pinned Panda assets') from exc
+        if not path.is_relative_to(directory):
+            raise ValueError('MJCF asset escaped its declared directory')
         if not path.is_file():
             raise ValueError(f'MJCF asset is missing: {raw!r}')
         data = path.read_bytes()

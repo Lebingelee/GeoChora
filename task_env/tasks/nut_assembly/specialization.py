@@ -269,7 +269,8 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
         "freejoint_armature": recipe["asset"]["freejoint_armature"]}
     scene_xml, base = build_nut_assembly_model_xml(scene_parameters,
         nut_mass_kg=float(recipe["asset"]["nut_mass_kg"]),
-        nut_diagonal_inertia_kg_m2=tuple(recipe["asset"]["nut_diagonal_inertia_kg_m2"]))
+        nut_diagonal_inertia_kg_m2=tuple(recipe["asset"]["nut_diagonal_inertia_kg_m2"]),
+        robot_source=robot.single_mjcf_source())
     contact_profile = None
     if provider == "mujoco":
         overrides = recipe["providers"]["mujoco"]["option_overrides"]

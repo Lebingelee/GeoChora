@@ -8,7 +8,6 @@ from copy import deepcopy
 from math import isfinite
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from ..robots.panda import PANDA_ASSET_ROOT
 from ..objects.nut_assembly import NUT_ASSET_ROOT
 ARM_DOF = 7
 ARM_FORCE_RANGE = 250.0
@@ -397,6 +396,7 @@ def build_nut_assembly_model_xml(
     *,
     nut_mass_kg: float,
     nut_diagonal_inertia_kg_m2: tuple[float, float, float],
+    robot_source,
 ) -> tuple[str, Path]:
     """Build task-owned NutAssemblySquare MJCF for a declared asset profile."""
 
@@ -404,7 +404,7 @@ def build_nut_assembly_model_xml(
     if len(values) != 4 or not all(isfinite(value) and value > 0.0 for value in values):
         raise ValueError("nut mass and diagonal inertia must be positive")
 
-    panda_xml = PANDA_ASSET_ROOT / "panda.xml"
+    panda_xml = Path(robot_source)
     root = _load_xml(panda_xml)
     _ensure_panda_compiler(root, panda_xml)
     _ensure_option(root, scene["physics_dt"])

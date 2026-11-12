@@ -585,6 +585,47 @@ def test_assembled_robot_rejects_foreign_task_joint_mapping_and_releases_source(
     assert receipts and all(not receipt.snapshot_root.exists() for receipt in receipts)
 
 
+@pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
+def test_tabletop_build_uses_selected_robot_source_root(uid, tmp_path, monkeypatch):
+    from dataclasses import replace
+    from shutil import copytree
+    from task_env import make_env
+
+    original = PandaAgent.asset_manifest
+    manifest = original(PandaAgent())
+    root = tmp_path / 'robot'
+    copytree(manifest.asset_roots[0], root)
+    relocated = replace(manifest, asset_roots=(root,), mjcf_sources=(root / 'panda.xml',))
+    monkeypatch.setattr(PandaAgent, 'asset_manifest', lambda self: relocated)
+    env = make_env(uid, config={'execution': {'physics_provider': 'mujoco'}})
+    try:
+        source = env.value['source']
+        assert source.agents[0] is env.binding.robot
+        receipt = source_resource_receipt(source)
+        receipt.validate_snapshot()
+        import xml.etree.ElementTree as ET
+        compiler = ET.fromstring(receipt.closure_files['canonical-source.xml']).find('compiler')
+        assert compiler.get('meshdir') == str(root / 'assets')
+        assert receipt.snapshot_root.is_dir()
+    finally:
+        env.close()
+
+
+def test_source_snapshot_rejects_assets_outside_component_roots(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from task_env.assembly.panda_box import compile_panda_box_task
+    from task_env.runtime.sessions.source import snapshot_legacy_mjcf_source
+    from task_env.tasks.pick_cube.specialization import _declaration, _environment_config
+
+    robot = PandaAgent()
+    source = compile_panda_box_task(_declaration(), config=_environment_config(), robot=robot).source
+    manifest = robot.asset_manifest()
+    monkeypatch.setattr(PandaAgent, 'asset_manifest',
+                        lambda self: replace(manifest, asset_roots=(tmp_path,)))
+    with pytest.raises(ValueError, match='outside declared component asset roots'):
+        snapshot_legacy_mjcf_source(source)
+
+
 def test_assembled_robot_composer_uses_declared_asset_root(tmp_path, monkeypatch):
     from dataclasses import replace
     from task_env import make_env

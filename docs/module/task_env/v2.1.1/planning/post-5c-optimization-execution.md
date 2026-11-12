@@ -1342,3 +1342,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 2 文件 +3／−31，净减 28 行；版本诊断修改 2 文件 +36／−0，验证替换 Task 桌面声明仍生成 source、实际 snapshot 身份和 Controller，并为真实探针提供同一声明；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 134 文件（新增 12、删除 20、修改 102），+7749／−14676，净减 6927 行；包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终输入版本诊断 190 项通过；其中保留 source 变化／snapshot 不一致拒绝与错误 tendon 传动拒绝。使用内部 Task 声明将桌面半宽改为 0.29 的正式 PickCube direct effort，在 MuJoCo 和 GeoPhys 上分别完成 reset、控制推进、再次 reset 和重复 close；MuJoCo 观测 5 native 子步，GeoPhys 未观测，按 50 预留。默认 MuJoCo joint effort 也完成短程并观测 5 子步。声明通过诊断注入，并非宣称新公开配置字段；不扩大任意资产或组件组合支持。Isaac、renderer、其他任务及完整 Solution 本批未复验；历史证据按原 source 身份保留。冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_task_scene_declaration_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.138 桌面 source 消费 Robot 资产声明
+
+输入 `bece0df4`；实施前重审台账 GOV、ENTRY、TASK、ENV、SUBJ-02／03、CTRL 和 SRC。PickCube／Nut 的 source builder 此前固定读取仓库 Panda 路径，MJCF 快照器也只接受同一个固定 assets 路径，即使所选 Robot manifest 声明了不同根目录。现在 Agent 的单 MJCF source 从其 manifest 解析并核对 owner／源文件与根目录，两个桌面 Task composer 接受这个实际源；快照器按 source 中组件的 manifest 收集允许根目录，解析相对路径并拒绝越界、路径逃逸、缺失与冲突，继续以真实字节建立快照和 closure。装配 Panda 的参考替换边界仍存在；本项不声称任意 Robot、任意外部 MJCF 或 source 组合都受支持。
+
+生产修改 6 文件 +36／−19，净增 17 行；版本诊断修改 2 文件 +56／−7，检查两任务重定位 Robot source、快照完整性、未声明根目录拒绝及真实探针；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7832／−14693，净减 6861 行；包含先前旧路径退休及诊断迁移，不归因于本批。
+
+最终生产输入版本诊断 193 项通过；随后仅修正探针输出变量，不影响 pytest 覆盖的生产代码。MuJoCo PickCube 和 Nut 分别使用实际复制到独立目录、由所选 Robot 声明的 Panda MJCF／资产完成 Solution 单步、再次 reset 和重复 close，各观测 5 个 native 子步，非完整 Solution；MuJoCo 装配 Panda 短程完成并观测 5 子步。GeoPhys PickCube Solution 短程通过，native 子步未观测，按 50 预留。首次重定位探针在成功构造后因诊断变量未定义而失败，native 推进 0；修正后使用单独目录重跑通过，保留初次输入和结果。Isaac、renderer、普通任务和完整 Solution 本批未复验。冻结输入、双锁和收据在 ignored `workspace/maintenance/v211_declared_tabletop_source_20261112/`。E01～E04 未整体接收。

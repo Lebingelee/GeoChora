@@ -67,6 +67,16 @@ class RobotComponent(DefaultCanonicalControllerMixin, ABC):
 class AgentComponent(RobotComponent):
     """Legacy source-component capabilities for Robots that provide them."""
 
+    def single_mjcf_source(self):
+        """Resolve an explicitly declared single-file Robot source."""
+        manifest = self.asset_manifest()
+        if manifest.owner_uid != self.uid or len(manifest.mjcf_sources) != 1:
+            raise ValueError('Robot must declare one MJCF source under its own identity')
+        source = manifest.mjcf_sources[0].resolve()
+        if not any(source.is_relative_to(root.resolve()) for root in manifest.asset_roots):
+            raise ValueError('Robot MJCF source is outside its declared asset roots')
+        return source
+
     @abstractmethod
     def asset_manifest(self) -> AssetManifest:
         """返回机器人资产声明。"""

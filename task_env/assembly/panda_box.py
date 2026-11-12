@@ -126,13 +126,13 @@ def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact
                            controller_factory=None, robot=None):
     """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
+    from ..registry import make_agent
+    robot = make_agent('panda-v1') if robot is None else robot
     composer = PickCubeSceneComposer(
         table_half_size=d.table_half_size, table_top_z=d.table_top_z,
         table_center_xy=d.table_center_xy, cube_world_pos=d.source_box_position,
-        cube_world_quat=d.source_box_quaternion_wxyz,
+        cube_world_quat=d.source_box_quaternion_wxyz, robot_source=robot.single_mjcf_source(),
     )
-    from ..registry import make_agent
-    robot = make_agent('panda-v1') if robot is None else robot
     reference = _panda_box_reference_declaration(d, robot=robot)
     if artifact is not None:
         expected = reference.artifact.compile()

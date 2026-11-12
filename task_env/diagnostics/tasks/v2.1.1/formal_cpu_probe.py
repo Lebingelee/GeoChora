@@ -39,12 +39,14 @@ try:
         specialization.PickCubeReferenceEnv.selected_task_configuration = staticmethod(lambda: task_config)
         result['declared_table_half_x'] = args.table_half_x
     if args.relocate_robot_assets:
-        if args.case != 'assembled-live':
-            raise ValueError('relocated Robot source probe requires assembled-live')
+        if args.case not in {'assembled-live', 'panda-r3', 'nut'}:
+            raise ValueError('relocated Robot source probe requires a tabletop task')
         from dataclasses import replace
         from task_env.robots.assembled_panda import AssembledPandaAgent
+        from task_env.robots.panda import PandaAgent
         from task_env.runtime.sessions.source import source_asset_bytes
-        manifest = AssembledPandaAgent().asset_manifest()
+        robot_type = AssembledPandaAgent if args.case == 'assembled-live' else PandaAgent
+        manifest = robot_type().asset_manifest()
         root = Path('declared-robot-assets').resolve()
         root.mkdir()
         for source in manifest.mjcf_sources:
@@ -56,7 +58,7 @@ try:
         (root / 'LICENSE').write_bytes((manifest.asset_roots[0] / 'LICENSE').read_bytes())
         relocated = replace(manifest, asset_roots=(root,),
             mjcf_sources=tuple(root / source.name for source in manifest.mjcf_sources))
-        AssembledPandaAgent.asset_manifest = lambda _self: relocated
+        robot_type.asset_manifest = lambda _self: relocated
         result['declared_robot_asset_root'] = str(root)
     def construct(uid, config):
         camera_options = {}
@@ -126,9 +128,15 @@ try:
         assert env.controller is robot.controller is physical_execution.controllers[0]
         assert robot.controllers == physical_execution.controllers
     if args.relocate_robot_assets:
-        declaration = env.value['source'].composition_runtime_input.fixed_declaration
-        assert declaration.parent_source.base_dir == root
-        result['resolved_robot_asset_root'] = str(declaration.parent_source.base_dir)
+        if args.case == 'assembled-live':
+            declaration = env.value['source'].composition_runtime_input.fixed_declaration
+            assert declaration.parent_source.base_dir == root
+        else:
+            import xml.etree.ElementTree as ET
+            receipt = source_resource_receipt(env.value['source'])
+            compiler = ET.fromstring(receipt.closure_files['canonical-source.xml']).find('compiler')
+            assert compiler.get('meshdir') == str(root / 'assets')
+        result['resolved_robot_asset_root'] = str(root)
     subject_binding=getattr(env.value['source'],'position_subject_binding',None)
     if args.case in {'nut','panda-r3','assembled-live'}:
         assert subject_binding is not None and robot.subjects == subject_binding.subjects
