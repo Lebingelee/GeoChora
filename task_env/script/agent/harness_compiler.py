@@ -393,7 +393,7 @@ def compile_candidate(spec,catalog,*,provider='mujoco'):
         REFERENCE_POSE_ACTION_SCHEMA, reference_pose_action, reference_pose_action_space,
     )
     from task_env.observations.selected_reference import build_selected_observation, selected_reference_observation_spaces
-    binding=ReferenceTaskBinding(build=build,reset_sample=sample_reset,evaluate=evaluate_lift,
+    binding=ReferenceTaskBinding(build=lambda provider, _backend, _seed, _horizon, _sampled: build(provider),reset_sample=sample_reset,evaluate=evaluate_lift,
         action_schema=REFERENCE_POSE_ACTION_SCHEMA,action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action,
         observation_space_factory=selected_reference_observation_spaces,observation_projection=build_selected_observation,

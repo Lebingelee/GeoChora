@@ -593,19 +593,9 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             value['recipe_identity'] = digest(resolved)
         return value
 
-    def build(provider):
-        if provider == "isaacsim":
-            if source_delivery_manifest is None:
-                raise ValueError("F06 Isaac PickCube requires its explicit source_delivery_manifest")
-            return build_isaac_reference(
-                delivery_manifest=source_delivery_manifest, include_solution=False,
-                controller_profile=controller_profile, lift_height_m=lift_height_m,
-                **({"resolved_config": resolved_config} if resolved_config is not None else {}),
-                **({"task_config": task_config} if task_config is not None else {}),
-            )
-        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid))
-
-    def build_seeded(provider, backend, seed, horizon):
+    def build(provider, backend, seed, horizon, sampled):
+        if sampled is not None:
+            raise ValueError('PickCube does not accept an externally sampled reset')
         if provider == "isaacsim":
             if backend != "cuda" or source_delivery_manifest is None:
                 raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
@@ -616,13 +606,16 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
-        return adapt(build_reference(backend="cpu", include_solution=False, controller_profile=controller_profile, resolved_config=resolved_config, lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed))
+        if backend != 'cpu':
+            raise ValueError('PickCube MJCF construction requires the CPU backend')
+        return adapt(build_reference(backend=backend, include_solution=False,
+            controller_profile=controller_profile, resolved_config=resolved_config,
+            lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed))
 
     return ReferenceTaskBinding(
         build=build,
         **reference_pose_action_binding(), **selected_observation_binding(),
         scalar_control_binding=panda_reference_control_binding(),
-        build_seeded=build_seeded,
         position_execution_info=lambda env: (
             position_execution_info(env.state, env.last_position_transition)
             if env.value.get('f06_pickcube_isaac_input') is not None else None

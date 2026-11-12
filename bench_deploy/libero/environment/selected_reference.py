@@ -1644,7 +1644,7 @@ def build_libero_selected_candidate(
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
     binding = ReferenceTaskBinding(
-        build=lambda provider: build_value(provider, 'cpu'),
+        build=lambda provider, _backend, _seed, _horizon, _sampled: build_value(provider, 'cpu'),
         reset_sample=lambda artifact, seed: reset_with_options(
             artifact, seed, {'init_row_index': 0}, value_for_artifact(artifact)['source'],
         ),

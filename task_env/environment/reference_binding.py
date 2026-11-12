@@ -32,9 +32,12 @@ class _ResetReconstruction:
         self.sampled_reset = None
 
     def build_switch_candidate(self, seed):
-        if self.binding.build_seeded is None:
-            raise ValueError('configuration switch requires a seeded task builder')
-        return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
+        return self._build(seed, None)
+
+    def _build(self, seed, sampled):
+        value = self.binding.build_for_request(self.provider, self.backend, seed,
+                                               self.horizon, sampled)
+        return self._compose(value)
 
     def _compose(self, value):
         """Attach the declared Robot source before the value enters the Env."""
@@ -114,21 +117,11 @@ class _ResetReconstruction:
 
 class _StandardResetReconstruction(_ResetReconstruction):
     def initial(self, *, seed=31):
-        if self.binding.build_seeded is not None:
-            return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
-        return self._compose(self.binding.build_for_provider(self.provider))
+        return self._build(seed, None)
 
     def build_reset(self, current, seed, external_solution):
-        if external_solution is not None:
-            if self.binding.build_seeded is not None:
-                return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
-            return self._compose(self.binding.build_for_provider(self.provider))
-        if self.binding.build_sampled is not None:
-            return self._compose(self.binding.build_sampled(
-                self.provider, self.backend, seed, self.horizon, self.sampled_reset))
-        if self.binding.build_seeded is not None:
-            return self._compose(self.binding.build_seeded(self.provider, self.backend, seed, self.horizon))
-        return self._compose(self.binding.build_for_provider(self.provider))
+        sampled = None if external_solution is not None else self.sampled_reset
+        return self._build(seed, sampled)
 
     def _finish(self, value, artifact, seed, external_solution, artifact_for_reset, set_phase):
         selector = getattr(self.binding, 'reset_runtime_input', None)
@@ -198,8 +191,6 @@ def prepare_selected_reset(binding, *, seed, seed_unset, options, value, require
     if seed is seed_unset:
         seed = plan.reset_sample.task_seed if plan is not None else 19
     seed = binding.reset_seed(seed)
-    if plan is not None and binding.build_seeded is None and seed != plan.reset_sample.task_seed:
-        raise ValueError('selected reset seed must match its fixed EpisodeResetPlan')
     return seed
 
 
@@ -293,8 +284,6 @@ class ReferenceTaskBinding:
     expert_uses_public_observation: bool = False
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
-    build_seeded: Callable | None = None
-    build_sampled: Callable | None = None
     task_reset_sampler: Callable | None = None
     task_reset_metadata: Callable | None = None
     prepare_reset_switch: Callable | None = None
@@ -332,7 +321,7 @@ class ReferenceTaskBinding:
     def __post_init__(self):
         if self.compose_robot_source is not None and not callable(self.compose_robot_source):
             raise TypeError('Robot source composer must be callable')
-        sampling = (self.build_sampled, self.task_reset_sampler, self.task_reset_metadata)
+        sampling = (self.task_reset_sampler, self.task_reset_metadata)
         if any(value is not None for value in sampling) and not all(map(callable, sampling)):
             raise ValueError('sampled reset requires construction, RNG sampler and metadata projection')
         semantics = (self.task_definition_factory, self.task_state_projection)
@@ -414,7 +403,9 @@ class ReferenceTaskBinding:
             raise ValueError('compiled binding owns its build callback')
         metadata = None if metadata is None else dict(metadata)
 
-        def build(_provider, binding):
+        def build(_provider, _backend, _seed, _horizon, sampled, binding):
+            if sampled is not None:
+                raise ValueError('provider-free compiler does not accept sampled reset input')
             from ..assembly.compiler import reference_construction_value
             return reference_construction_value(
                 compiler(), task_id=task_id, construction_schema=construction_schema,
@@ -427,11 +418,11 @@ class ReferenceTaskBinding:
         """Select task-owned reconstruction once when a configuration is admitted."""
         return _StandardResetReconstruction(self, provider, backend, horizon)
 
-    def build_for_provider(self, provider):
-        """Build with this binding when the construction owner opts into it."""
+    def build_for_request(self, provider, backend, seed, horizon, sampled=None):
+        """Build from one explicit Task/Robot/Runtime request."""
         if self.build_receives_binding:
-            return self.build(provider, self)
-        return self.build(provider)
+            return self.build(provider, backend, seed, horizon, sampled, self)
+        return self.build(provider, backend, seed, horizon, sampled)
 
     def bind_compiled_control(self, value):
         """Bind the physical action contract to the Controllers actually compiled.
@@ -514,9 +505,7 @@ class ExistingSubjectEffortTask:
 
         action = self.action_contract
         return ReferenceTaskBinding(
-            build=lambda _provider: build(31),
-            build_seeded=lambda _provider, _backend, seed, _horizon: build(seed),
-            build_sampled=lambda _provider, _backend, seed, _horizon, sampled: build(seed, sampled),
+            build=lambda _provider, _backend, seed, _horizon, sampled: build(seed, sampled),
             task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,
             task_definition_factory=self.definition_factory, task_state_projection=self.state_projection,
             task_observation_schema=self.observation_schema, external_action_contract=action,

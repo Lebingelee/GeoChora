@@ -52,7 +52,7 @@ try:
         'execution': execution, 'controller': {'profile_id': 'r3_continuous_v1'},
         'episode': {'horizon': 8}})
     task_binding = task.PickCubeReferenceEnv.selected_binding(physical_config)
-    value = task_binding.build_seeded(args.provider, 'cpu', 31, 8)
+    value = task_binding.build_for_request(args.provider, 'cpu', 31, 8)
     artifact, source = value['artifact'], value['source']
     dynamic_profile, _ = task._r3_dynamic_profile()
     controller = build_reference_position_controller(artifact, source, profile_id='r3_continuous_v1',

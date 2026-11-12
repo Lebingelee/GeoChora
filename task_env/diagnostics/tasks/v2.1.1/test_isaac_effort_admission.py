@@ -48,7 +48,7 @@ def test_usd_effort_binding_does_not_request_position_source_composition():
     from task_env.tasks.pick_cube.physical_isaac_candidate import make_isaac_physical_binding
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
 
-    binding = make_isaac_physical_binding(delivery_manifest='unused-until-build', seed=31,
+    binding = make_isaac_physical_binding(delivery_manifest='unused-until-build',
         horizon=8, drive_mode='effort-only', control_kind='joint',
         task_config=_configuration(), resolved_config=None)
     assert binding.scalar_control_binding is None
@@ -64,35 +64,31 @@ def test_usd_effort_rebuild_uses_requested_episode_seed(monkeypatch):
                         lambda **kwargs: calls.append(kwargs) or kwargs)
     task_config = specialization._configuration()
     resolved = object()
-    binding = make_isaac_physical_binding(delivery_manifest='declared', seed=31,
+    binding = make_isaac_physical_binding(delivery_manifest='declared',
         horizon=8, drive_mode='effort-only', control_kind='joint',
         task_config=task_config, resolved_config=resolved)
-    result = binding.build_seeded('isaacsim', 'cuda', 42, 8)
+    result = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     assert result['task_seed'] == 42
     assert result['horizon'] == 8
     assert result['task_config'] is task_config
     assert result['resolved_config'] is resolved
     with pytest.raises(ValueError, match='Isaac CUDA'):
-        binding.build_seeded('mujoco', 'cpu', 42, 8)
+        binding.build_for_request('mujoco', 'cpu', 42, 8)
+    with pytest.raises(ValueError, match='horizon'):
+        binding.build_for_request('isaacsim', 'cuda', 42, 1001)
 
 
-def test_solution_reconstruction_uses_seeded_builder_when_available():
+def test_reset_reconstruction_passes_one_request_for_sampled_and_solution_paths():
     from task_env.environment.reference_binding import _StandardResetReconstruction
 
     binding = SimpleNamespace(compose_robot_source=None,
-        build_seeded=lambda provider, backend, seed, horizon: (provider, backend, seed, horizon),
-        build_for_provider=lambda provider: pytest.fail('seedless builder used for a seeded Solution'))
-    strategy = _StandardResetReconstruction(binding, 'isaacsim', 'cuda', 8)
-    assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
-
-
-def test_solution_reconstruction_uses_the_normal_builder_without_seeded_capability():
-    from task_env.environment.reference_binding import _StandardResetReconstruction
-
-    binding = SimpleNamespace(compose_robot_source=None, build_seeded=None,
-        build_for_provider=lambda provider: {'provider': provider})
+        build_for_request=lambda provider, backend, seed, horizon, sampled:
+            (provider, backend, seed, horizon, sampled))
     strategy = _StandardResetReconstruction(binding, 'mujoco', 'cpu', 8)
-    assert strategy.build_reset({}, 42, object()) == {'provider': 'mujoco'}
+    strategy.sampled_reset = (1., 2.)
+    assert strategy.initial(seed=31) == ('mujoco', 'cpu', 31, 8, None)
+    assert strategy.build_reset({}, 42, None) == ('mujoco', 'cpu', 42, 8, (1., 2.))
+    assert strategy.build_reset({}, 42, object()) == ('mujoco', 'cpu', 42, 8, None)
 
 
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1',
@@ -115,7 +111,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
         'task': {'lift_height_m': .17},
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
-    value = binding.build_seeded('isaacsim', 'cuda', 42, 8)
+    value = binding.build_for_request('isaacsim', 'cuda', 42, 8)
     artifact = value['artifact']
     assert artifact.semantics.parameters_si['lift_height'] == .17
     assert artifact.initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position

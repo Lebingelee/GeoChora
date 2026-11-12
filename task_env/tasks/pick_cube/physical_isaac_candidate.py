@@ -3,7 +3,7 @@ from dataclasses import replace
 from functools import partial
 
 
-def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode, control_kind,
+def make_isaac_physical_binding(*, delivery_manifest, horizon, drive_mode, control_kind,
                                 task_config, resolved_config, lift_height_m=None):
     """Declare source and Controller bindings; Env and Runtime own lifecycle."""
     from .specialization import build_isaac_reference, make_reference_binding
@@ -21,19 +21,19 @@ def make_isaac_physical_binding(*, delivery_manifest, seed, horizon, drive_mode,
     base = make_reference_binding(controller_profile='r3_continuous_v1', source_delivery_manifest=manifest,
                                   task_config=task_config, resolved_config=resolved_config,
                                   lift_height_m=lift_height_m)
-    def build(provider):
-        if provider != 'isaacsim':
-            raise ValueError('F06 physical candidate requires Isaac')
-        return build_seeded(provider, 'cuda', seed, horizon)
-    def build_seeded(provider, backend, actual_seed, actual_horizon):
+    def build(provider, backend, actual_seed, actual_horizon, sampled):
+        if sampled is not None:
+            raise ValueError('PickCube does not accept an externally sampled reset')
         if (provider, backend) != ('isaacsim', 'cuda'):
             raise ValueError('Isaac physical control requires Isaac CUDA')
+        if type(actual_horizon) is not int or not 1 <= actual_horizon <= 1000:
+            raise ValueError('Isaac physical source horizon must be in [1, 1000]')
         return build_isaac_reference(delivery_manifest=manifest, task_seed=actual_seed, horizon=actual_horizon,
                                      include_solution=False, physical_fixture=drive_mode,
                                      controller_builder=build_controller, task_config=task_config,
                                      resolved_config=resolved_config, lift_height_m=lift_height_m)
     from .physical_candidate import _direct_physical_observation, _direct_physical_observation_spaces
-    return replace(base, build=build, build_seeded=build_seeded,
+    return replace(base, build=build,
         scalar_control_binding=None, action_space_factory=None,
         observation_space_factory=_direct_physical_observation_spaces,
         observation_projection=partial(_direct_physical_observation, hand_frame_id='ee'),

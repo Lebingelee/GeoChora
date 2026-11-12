@@ -33,7 +33,7 @@ def test_formal_panda_effort_profile_source_contract(profile, controller_type, d
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         execution = value['physical_execution']
         assert type(execution.controllers[0]).__name__ == controller_type
         assert [subject.subject_id for subject in execution.subjects] == ['panda-v1']
@@ -60,7 +60,7 @@ def test_source_dynamics_profile_does_not_construct_unused_pd_servo(profile, mon
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        assert binding.build('mujoco')['physical_execution'].requires_source_dynamics
+        assert binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution'].requires_source_dynamics
     finally:
         binding.close_task_resources()
 
@@ -127,7 +127,7 @@ def test_panda_effort_controller_rejects_foreign_writer():
     })
     task_binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        execution = task_binding.build('mujoco')['physical_execution']
+        execution = task_binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution']
         profile = execution.controllers[0].profile
         with pytest.raises(ValueError, match='writer binding'):
             LinearEffortControllerV1.zero_bias(execution.compiled.binding, writer_id='foreign',
@@ -148,7 +148,7 @@ def test_effort_retains_formal_task_identity(profile):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert value['artifact'].artifact_id == build_artifact().artifact_id
     finally:
         binding.close_task_resources()
@@ -167,7 +167,7 @@ def test_mass_controller_requires_matching_source_dynamics(profile):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         execution = value['physical_execution']
         assert execution.requires_source_dynamics
         execution.preflight(provider='mujoco', backend='cpu', artifact=value['artifact'], source=value['source'])
@@ -196,7 +196,7 @@ def test_adapter_drive_mode_follows_bound_channels(profile, expected):
     })
     task_binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        binding = task_binding.build('mujoco')['physical_execution'].compiled.binding
+        binding = task_binding.build_for_request('mujoco', 'cpu', 31, 8)['physical_execution'].compiled.binding
         assert uniform_native_drive_mode(binding) == expected
         opposite = 'disabled' if expected == 'position' else 'position'
         mixed = replace(binding, channels=(replace(binding.channels[0], native_drive=opposite),
@@ -221,7 +221,7 @@ def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkey
     monkeypatch.setattr(specialization, '_configuration', unexpected_reload)
     binding = specialization.PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert value['source'].config.control.profile_id == config.controller_profile
         assert value['source'].config.episode.horizon == 8
     finally:
@@ -244,7 +244,7 @@ def test_effort_without_solution_does_not_prepare_solution_readiness(profile, mo
     monkeypatch.setattr(PickCubeReadinessConfig, 'from_source', unexpected)
     binding = specialization.PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert value['controller'] is value['physical_execution'].controllers[0]
         assert 'solution_factory' not in value
     finally:
@@ -265,7 +265,7 @@ def test_pickcube_position_and_effort_consume_the_same_lift(profile):
     binding = PickCubeReferenceEnv.selected_binding(config)
     value = None
     try:
-        value = binding.build_seeded('mujoco', 'cpu', 42, 8)
+        value = binding.build_for_request('mujoco', 'cpu', 42, 8)
         assert value['artifact'].semantics.parameters_si['lift_height'] == .17
         assert binding.task_definition_factory(value['artifact']).semantics.parameters_si['lift_height'] == .17
         assert value['artifact'].initialization.joint_position == build_artifact(lift_height_m=.17).initialization.joint_position
@@ -296,7 +296,7 @@ def test_fixed_effort_does_not_construct_position_controller(provider, profile, 
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build(provider)
+        value = binding.build_for_request(provider, 'cpu', 31, 8)
         assert value['controller'] is value['physical_execution'].controllers[0]
         assert binding.physical_observation_binding is None
         assert binding.physical_sequence_v2_observation is True
@@ -432,7 +432,7 @@ def test_effort_controller_constructs_only_its_required_source_model(profile, re
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        source = binding.build('mujoco')['source']
+        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
         expected = project_scene_definition_v3_to_mjcf(source.scene_source.xml, source.scene_definition)
         assert used_sources == ([expected] if requires_kinematics else [])
     finally:

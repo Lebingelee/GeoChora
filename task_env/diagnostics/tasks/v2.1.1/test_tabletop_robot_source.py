@@ -244,7 +244,7 @@ def test_mjcf_effort_reuses_robot_from_task_source(monkeypatch):
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        binding.build('mujoco')
+        binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert len(built) == len(declared) == len(bound) == 1
         assert built[0] is declared[0] is bound[0]
     finally:
@@ -519,7 +519,7 @@ def test_position_robot_composes_checked_canonical_task_source(provider):
     })
     binding = task.PickCubeReferenceEnv.selected_binding(physical_config)
     try:
-        value = binding.build(provider)
+        value = binding.build_for_request(provider, 'cpu', 31, 8)
         source, artifact = value['source'], value['artifact']
         dynamic_profile, _ = task._r3_dynamic_profile()
         controller = build_reference_position_controller(artifact, source,

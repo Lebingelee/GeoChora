@@ -40,7 +40,7 @@ def test_canonical_source_owns_and_validates_input_snapshot():
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        source = binding.build('mujoco')['source']
+        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
         receipt = source_resource_receipt(source)
         assert receipt is source.source_snapshot_receipt
         assert source.execution_source_receipt is None
@@ -66,7 +66,7 @@ def test_failed_robot_composition_releases_canonical_source_snapshot():
     })
     binding = PickCubeReferenceEnv.selected_binding(config)
     try:
-        value = binding.build('mujoco')
+        value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         snapshot = value['source'].source_snapshot_receipt.snapshot_root
         def fail(*args, **kwargs):
             raise ValueError('composition rejected')

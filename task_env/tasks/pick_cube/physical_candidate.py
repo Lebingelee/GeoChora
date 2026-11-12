@@ -65,13 +65,11 @@ def physical_binding_from_config(config):
     if config.physics_provider == 'isaacsim':
         from .physical_isaac_candidate import make_isaac_physical_binding
         return make_isaac_physical_binding(delivery_manifest=config.source_delivery_manifest,
-            seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
             horizon=config.environment.episode.horizon,
             drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
             task_config=task_config, resolved_config=config.environment, lift_height_m=lift_height_m)
     force = dict(config.task_parameters).get('cube_force_z_N')
-    return make_physical_binding(provider=config.physics_provider,
-        horizon=config.environment.episode.horizon, seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
+    return make_physical_binding(
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
         cube_force_z_N=force, task_config=task_config, resolved_config=config.environment,
@@ -136,7 +134,7 @@ def _direct_physical_observation(env, state, *, hand_frame_id="hand"):
     return obs, info, evaluation
 
 
-def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
+def make_physical_binding(*, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
                           space_policy='dynamic', cube_force_z_N=None, lift_height_m=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
@@ -194,7 +192,9 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                 dynamic_parameters=parameters if reset_switch else None)
 
         physical = build_physical(control_kind)
-        def build_seeded(_provider, _backend, actual_seed, _horizon):
+        def build(_provider, _backend, actual_seed, _horizon, sampled):
+            if sampled is not None:
+                raise ValueError('PickCube does not accept an externally sampled reset')
             reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed)
             return {'artifact': artifact, 'task_source': task_source, 'source': source,
                 'controller': physical.controllers[0],
@@ -213,8 +213,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                        if cube_force_z_N is not None else {}),
                     'original_closure': '02f12b11e8215af606d9eed7f22c411dc5bbd74f7d956331b74400b5a1e6963d',
                     'projected_closure': closure, 'physical_binding': physical.compiled.binding.identity_hash}}
-        def build(_provider):
-            return build_seeded(_provider, 'cpu', seed, horizon)
         def physical_execution_info(env):
             from .solution import PickCubePositionExecutionInfoV1
             state = env.state
@@ -244,7 +242,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         from .specialization import _validate_external_readiness_solution
         from ...controllers.canonical.reset_selection import PhysicalResetSelection
         owned_resources = ExitStack()
-        binding = ReferenceTaskBinding(build=build, build_seeded=build_seeded,
+        binding = ReferenceTaskBinding(build=build,
             **task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
                 cube_force_z_N=cube_force_z_N, reset_sampler=lambda _artifact, actual_seed:
                     sample_episode_reset_plan(task_source, scene, artifact, task_seed=actual_seed).reset_sample),
