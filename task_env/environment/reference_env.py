@@ -826,6 +826,15 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return cls(**values)
 
     @classmethod
+    def _build_selected_binding(cls, config, *, robot=None):
+        """Select one Robot declaration for task compilation and source composition."""
+        from ..registry import make_agent
+        if robot is None or robot.uid != config.robot_uid:
+            robot = make_agent(config.robot_uid)
+        binding = replace(cls.selected_binding(config, robot=robot), robot=robot)
+        return cls._bind_robot_source_composer(binding, config)
+
+    @classmethod
     def _bind_robot_source_composer(cls, binding, config):
         roots = getattr(cls, 'robot_source_roots', None)
         if roots is None or binding.scalar_control_binding is None:
@@ -837,7 +846,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             composer = declared_robot_source_composer(config,
                 robot_uid=config.robot_uid,
                 existing_robot_entity=cls.default_robot_source_uid, task_body_names=roots,
-                task_site_transfers=cls.robot_source_site_transfers)
+                task_site_transfers=cls.robot_source_site_transfers, robot=binding.robot)
         except SourceCompositionCapabilityUnavailable:
             if config.robot_uid != cls.default_robot_source_uid:
                 raise
@@ -906,7 +915,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 from ..runtime.sessions.isaac_native_io import prepare_isaac_source
                 preparation.enter_context(prepare_isaac_source(
                     rendering=render_mode is not None or camera is not None))
-            binding = cls._bind_robot_source_composer(cls.selected_binding(config), config)
+            binding = cls._build_selected_binding(config)
             horizon = environment.episode.horizon
             env = cls.from_task_binding(binding, provider=provider, backend=backend, horizon=horizon,
                 seed=environment.episode.seed if environment.episode.seed is not None else 31)
@@ -1778,8 +1787,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     raise ValueError('reset physics selection is incompatible with the fixed task RGB renderer')
             seed = switch_candidate.task_seed
             options = {}
-            candidate_binding = type(self)._bind_robot_source_composer(
-                type(self).selected_binding(switch_candidate.config), switch_candidate.config)
+            candidate_binding = type(self)._build_selected_binding(
+                switch_candidate.config, robot=self.binding.robot)
             candidate_reconstruction = candidate_binding.reset_reconstruction_strategy(
                 switch_candidate.config.physics_provider,
                 switch_candidate.config.environment.runtime.backend, self.horizon)

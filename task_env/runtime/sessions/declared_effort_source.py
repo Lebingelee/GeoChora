@@ -84,7 +84,7 @@ def compile_declared_effort_source(*, robot, scene, artifact, task_source, compo
         source = compile_reference_source(
             artifact=artifact, scene_source=scene_source,
             composition=composition, config=config, joints=joints, bodies=body_names,
-            frames={}, free_joints={}, joint_targets={}, open_actuators=(),
+            frames={}, free_joints={}, joint_targets={}, open_actuators=(), agents=(robot,),
             scene_definition=scene, source_closure_digest=closure,
             torque_actuators=torque_actuators,
             actuator_units={item.native_actuator: 'N*m' for item in declarations})

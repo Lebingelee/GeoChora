@@ -474,8 +474,15 @@ def compile_task_scene(
     scene_composer=None,
 ) -> CompiledTaskScene:
     from scene import import_scene_source
+    from ..environment.protocols import AgentComponent, RobotComponent
 
-    _validate_external_assets((*agents, *objects))
+    # Robots represented by the source already own their scene identities.
+    # Only components declaring the legacy asset/reference contract need the
+    # corresponding import-time name and initial-state resolution.
+    if any(not isinstance(agent, RobotComponent) for agent in agents):
+        raise TypeError('scene agents must be Robot components')
+    reference_agents = tuple(agent for agent in agents if isinstance(agent, AgentComponent))
+    _validate_external_assets((*reference_agents, *objects))
     source, adapter_name = _source_for_task(composition, agents, scene_composer)
     imported_scene = import_scene_source(source)
     scene_model = _build_scene_model(imported_scene, composition, scene_composer)
@@ -487,10 +494,10 @@ def compile_task_scene(
         scene_model=scene_model,
         semantic_geom_names=_semantic_geom_names(source),
         scene=scene,
-        agents=agents,
+        agents=reference_agents,
         objects=objects,
     )
-    initial_state = _initial_state(scene_model, agents, references)
+    initial_state = _initial_state(scene_model, reference_agents, references)
     return CompiledTaskScene(
         imported_scene=imported_scene,
         loader_result=loader_result,

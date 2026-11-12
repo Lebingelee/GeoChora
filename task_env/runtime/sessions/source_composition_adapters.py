@@ -50,7 +50,7 @@ def resolve_robot_source_adapter(provider, backend):
     return adapter
 
 
-def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, task_body_names, task_site_transfers):
+def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, task_body_names, task_site_transfers, robot=None):
     """Resolve the provider composer and bind the selected Robot per source."""
     from ...registry import AGENT_REGISTRY
     from ...assembly.source_composition import build_source_composition_intent_v1
@@ -63,16 +63,18 @@ def declared_robot_source_composer(config, *, robot_uid, existing_robot_entity, 
         existing = tuple(robot for robot in getattr(source, 'agents', ()) if robot.uid == robot_uid)
         if len(existing) > 1:
             raise ValueError('Task source contains multiple Robots with the selected identity')
-        robot = existing[0] if existing else AGENT_REGISTRY.create(robot_uid)
-        profile_recipe = getattr(robot, 'source_recipe_for_profile', None)
-        recipe = profile_recipe(profile) if profile is not None and callable(profile_recipe) else robot.source_recipe()
+        selected = robot if robot is not None else (existing[0] if existing else AGENT_REGISTRY.create(robot_uid))
+        if selected.uid != robot_uid or (existing and existing[0] is not selected):
+            raise ValueError('Task source differs from the selected Robot declaration')
+        profile_recipe = getattr(selected, 'source_recipe_for_profile', None)
+        recipe = profile_recipe(profile) if profile is not None and callable(profile_recipe) else selected.source_recipe()
         if profile is not None and profile not in recipe.control_profiles:
             raise ValueError('selected Robot does not declare this Controller profile')
         intent = build_source_composition_intent_v1(
             task_source=source, task_entity_ids=task_entities,
             existing_robot_entity_ids=(existing_robot_entity,), robot_recipe=recipe,
             task_site_transfers=task_site_transfers)
-        return adapter.compose_robot_source(source, robot=robot, composition_intent=intent,
+        return adapter.compose_robot_source(source, robot=selected, composition_intent=intent,
             artifact=artifact, controller=controller, robot_recipe=recipe,
             controller_profile=profile, task_entities=task_entities,
             existing_robot_entity=existing_robot_entity, task_body_names=task_body_names,

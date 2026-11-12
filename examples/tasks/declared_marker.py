@@ -70,12 +70,12 @@ class MarkerHeightEnv(SelectedReferenceEnv):
         return None
 
     @classmethod
-    def selected_binding(cls, config):
+    def selected_binding(cls, config, *, robot=None):
         declaration = cls.declaration()
         if declaration.task_id != cls.uid:
             raise ValueError('registered UID and declared task identity differ')
         return ReferenceTaskBinding.from_provider_free_compiler(
-            partial(compile_panda_box_task, declaration, config=config.environment,
+            partial(compile_panda_box_task, declaration, config=config.environment, robot=robot,
                     controller_factory=ProductionCanonicalPandaController.from_source),
             task_id=declaration.task_id,
             construction_schema='declared-panda-box-construction-v1',

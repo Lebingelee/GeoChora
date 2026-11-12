@@ -632,3 +632,42 @@ def test_assembled_robot_rejects_foreign_asset_manifest(monkeypatch):
             'robot': {'uid': 'panda-arm-hand-v1'},
             'controller': {'profile_id': 'r1_split'},
         })
+
+
+@pytest.mark.parametrize('uid', [
+    'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1',
+    'pendulum-v1', 'two-wheel-balance-v1',
+])
+def test_formal_construction_uses_one_selected_robot_declaration(uid):
+    from task_env import make_env
+
+    env = make_env(uid, config={'execution': {'physics_provider': 'mujoco'}})
+    try:
+        selected = env.binding.robot
+        assert selected.uid == env.resolved_public_config.robot_uid
+        assert env.value['source'].agents == (selected,)
+        assert env.value['source'].composition.agent_uids == (selected.uid,)
+    finally:
+        env.close()
+
+
+def test_assembled_composition_uses_the_robot_selected_by_the_common_entry(monkeypatch):
+    from task_env import make_env
+    from task_env.robots.assembled_panda import AssembledPandaAgent
+
+    original = AssembledPandaAgent.compile_position_binding
+    compiled = []
+    def capture(robot, *args, **kwargs):
+        compiled.append(robot)
+        return original(robot, *args, **kwargs)
+    monkeypatch.setattr(AssembledPandaAgent, 'compile_position_binding', capture)
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco'},
+        'robot': {'uid': 'panda-arm-hand-v1'},
+        'controller': {'profile_id': 'r1_split'},
+    })
+    try:
+        assert compiled == [env.binding.robot]
+        assert env.value['source'].source_composition_request.robot_uid == env.binding.robot.uid
+    finally:
+        env.close()

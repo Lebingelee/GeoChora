@@ -340,12 +340,12 @@ def _source_identity_files():
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
-def _build_reference(*, provider, include_solution, resolved_config=None, lift_height_m=None, task_config=None):
+def _build_reference(*, provider, include_solution, resolved_config=None, lift_height_m=None, task_config=None, robot=None):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
     task_config = _configuration() if task_config is None else task_config
     recipe = task_config["recipe"]
-    robot = make_agent(recipe['agent_uids'][0])
+    robot = make_agent(recipe['agent_uids'][0]) if robot is None else robot
     artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot)
     source, contact_profile = build_runtime_source(
         artifact, provider, resolved_config=resolved_config,
@@ -438,12 +438,12 @@ def _build_reference(*, provider, include_solution, resolved_config=None, lift_h
             "_contact_profile": contact_profile}
 
 
-def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None, task_config=None):
+def build_reference(*, provider="mujoco", include_solution=True, resolved_config=None, lift_height_m=None, task_config=None, robot=None):
     """Build the unchanged selected 100 Hz/500 Hz reference route."""
     return _build_reference(
         provider=provider, include_solution=include_solution,
         resolved_config=resolved_config,
-        lift_height_m=lift_height_m, task_config=task_config,
+        lift_height_m=lift_height_m, task_config=task_config, robot=robot,
     )
 
 
@@ -472,15 +472,15 @@ def _validate_external_solution(value, solution):
         raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
 
 
-def _binding(resolved_config=None, lift_height_m=None, task_config=None):
+def _binding(resolved_config=None, lift_height_m=None, task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
     declaration = NutAssemblyTaskDefinition.from_artifact(
-        build_artifact(lift_height_m=lift_height_m, task_config=task_config),
+        build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         task_config['recipe']['reset'],
     )
     return ReferenceTaskBinding(build=lambda provider, _backend, _seed, _horizon, _sampled: build_reference(provider=provider, include_solution=False,
                                                                       resolved_config=resolved_config,
-                                                                      lift_height_m=lift_height_m, task_config=task_config),
+                                                                      lift_height_m=lift_height_m, task_config=task_config, robot=robot),
         action_schema=REFERENCE_POSE_ACTION_SCHEMA, action_space_factory=reference_pose_action_space,
         prepare_action=reference_pose_action, scalar_control_binding=panda_reference_control_binding(),
         observation_space_factory=selected_reference_observation_spaces, observation_projection=build_selected_observation,
@@ -534,6 +534,6 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
         return 'r3_continuous_v1'
 
     @classmethod
-    def selected_binding(cls, config):
+    def selected_binding(cls, config, *, robot=None):
         return _binding(config.environment, dict(config.task_parameters).get("lift_height_m"),
-                        json.loads(config.task_configuration_json))
+                        json.loads(config.task_configuration_json), robot=robot)

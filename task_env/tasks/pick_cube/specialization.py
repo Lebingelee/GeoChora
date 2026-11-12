@@ -276,12 +276,14 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
 
 
 def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1", resolved_config=None,
-                    lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31):
+                    lift_height_m=None, task_config=None, robot_uid="panda-v1", task_seed=31, robot=None):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical.contracts import digest
     from .solution import PickCubeReadinessConfig, PickCubeReadinessSolution
 
-    selected_robot = make_agent(robot_uid)
+    selected_robot = make_agent(robot_uid) if robot is None else robot
+    if selected_robot.uid != robot_uid:
+        raise ValueError('selected Robot differs from the requested identity')
     profile_recipe = getattr(selected_robot, 'source_recipe_for_profile', None)
     robot_recipe = (profile_recipe(controller_profile) if callable(profile_recipe)
                     else selected_robot.source_recipe())
@@ -382,7 +384,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile="r3_continuous_v1",
                           resolved_config=None, task_config=None, lift_height_m=None, physical_fixture=False,
-                          controller_builder=None):
+                          controller_builder=None, robot=None):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
         raise ValueError("F06 Isaac freezes the existing r3_continuous_v1 profile")
@@ -394,7 +396,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     # separate MJCF Controller; the selected USD Controller is created below.
     prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
                                          resolved_config=resolved_config, task_config=task_config,
-                                         lift_height_m=lift_height_m)
+                                         lift_height_m=lift_height_m, robot=robot)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(prepared.source):
         source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
@@ -580,7 +582,7 @@ def position_execution_info(state, last_position_transition):
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None,
-                           cube_force_z_N=None, robot_uid="panda-v1"):
+                           cube_force_z_N=None, robot_uid="panda-v1", robot=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     def adapt(value):
@@ -602,7 +604,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
-                lift_height_m=lift_height_m,
+                lift_height_m=lift_height_m, robot=robot,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
@@ -610,7 +612,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             raise ValueError('PickCube MJCF construction requires the CPU backend')
         return adapt(build_reference(backend=backend, include_solution=False,
             controller_profile=controller_profile, resolved_config=resolved_config,
-            lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed))
+            lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed, robot=robot))
 
     return ReferenceTaskBinding(
         build=build,
@@ -705,11 +707,11 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
         return (_recipe() if task_config is None else task_config["recipe"])["default_controller_profile"]
 
     @classmethod
-    def selected_binding(cls, config):
+    def selected_binding(cls, config, *, robot=None):
         profile = config.controller_profile
         if profile in cls.panda_effort_profiles:
             from .physical_candidate import physical_binding_from_config
-            return physical_binding_from_config(config)
+            return physical_binding_from_config(config, robot=robot)
         cube_force_z_N = dict(getattr(config, 'task_parameters', ())).get('cube_force_z_N')
         if cube_force_z_N is not None and (config.physics_provider != 'mujoco'
                 or config.environment.runtime.backend != 'cpu' or profile != 'r1'):
@@ -722,7 +724,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
             lift_height_m=dict(config.task_parameters).get("lift_height_m"),
             task_config=json.loads(config.task_configuration_json),
             interval_provider=config.physics_provider,
-            cube_force_z_N=cube_force_z_N, robot_uid=config.robot_uid,
+            cube_force_z_N=cube_force_z_N, robot_uid=config.robot_uid, robot=robot,
         )
 
         if config.reset_profile is not None:

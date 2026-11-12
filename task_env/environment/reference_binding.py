@@ -317,6 +317,7 @@ class ReferenceTaskBinding:
     physical_ignore_done: bool = False
     build_receives_binding: bool = False
     compose_robot_source: Callable | None = None
+    robot: object | None = None
 
     def __post_init__(self):
         if self.compose_robot_source is not None and not callable(self.compose_robot_source):
@@ -450,7 +451,7 @@ class ReferenceTaskBinding:
 @dataclass(frozen=True)
 class ExistingSubjectEffortTask:
     """Task declarations consumed by the shared existing-subject construction path."""
-    robot_uid: str
+    robot: object
     compile_declaration: Callable
     reset_plan: Callable
     composition: object
@@ -474,8 +475,7 @@ class ExistingSubjectEffortTask:
         from ..runtime.sessions.physical_control import build_existing_subject_effort
 
         def build(seed, sampled=None):
-            from ..registry import make_agent
-            robot = make_agent(self.robot_uid)
+            robot = self.robot
             scene = declared_effort_scene(robot, provider=provider,
                                           source_delivery_manifest=source_delivery_manifest)
             task_source, artifact = self.compile_declaration(scene, robot)

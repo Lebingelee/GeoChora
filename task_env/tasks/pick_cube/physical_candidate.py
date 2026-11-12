@@ -55,7 +55,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
         raise ValueError('PickCube Task COM force requires MuJoCo direct coexist control')
 
 
-def physical_binding_from_config(config):
+def physical_binding_from_config(config, *, robot=None):
     import json
     options = json.loads(config.controller_parameters_json)
     task_config = json.loads(config.task_configuration_json)
@@ -67,13 +67,13 @@ def physical_binding_from_config(config):
         return make_isaac_physical_binding(delivery_manifest=config.source_delivery_manifest,
             horizon=config.environment.episode.horizon,
             drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
-            task_config=task_config, resolved_config=config.environment, lift_height_m=lift_height_m)
+            task_config=task_config, resolved_config=config.environment, lift_height_m=lift_height_m, robot=robot)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
         cube_force_z_N=force, task_config=task_config, resolved_config=config.environment,
-        lift_height_m=lift_height_m)
+        lift_height_m=lift_height_m, robot=robot)
 
 
 def _direct_physical_observation_spaces(env):
@@ -136,7 +136,7 @@ def _direct_physical_observation(env, state, *, hand_frame_id="hand"):
 
 def make_physical_binding(*, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
-                          space_policy='dynamic', cube_force_z_N=None, lift_height_m=None):
+                          space_policy='dynamic', cube_force_z_N=None, lift_height_m=None, robot=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...controllers.canonical.contracts import reference_pose_action
     from ...environment import sample_episode_reset_plan
@@ -146,7 +146,7 @@ def make_physical_binding(*, drive_mode, control_kind,
 
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
-        resolved_config=resolved_config, lift_height_m=lift_height_m, include_readiness=reset_switch)
+        resolved_config=resolved_config, lift_height_m=lift_height_m, include_readiness=reset_switch, robot=robot)
     legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(original):

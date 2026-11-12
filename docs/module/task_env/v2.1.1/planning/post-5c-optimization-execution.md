@@ -1288,3 +1288,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 输入 `1a1292f1`；实施前复核 GOV、ENTRY、TASK、ENV、SUBJ-02／03、CTRL 与 SRC-02／04。装配 Panda 的 provider composer 原先忽略所选 Robot 的资产路径，固定从仓库目录读取 arm／hand；现在它消费 Robot 的 `AssetManifest` 中两个 MJCF 和资产根目录，核对 manifest owner 与 recipe revision，原受支持 source 字节、license、资产闭包和 native 映射检查保留。实际声明的根目录贯穿固定附件编译与 provider 物化；从该生产构造移除仅服务旧顺序诊断的可选分支，不清除其他仍有调用的历史检查。
 
 生产修改 2 文件 +36／−35，净增 1 行；版本诊断修改 2 文件 +74／−0，验证重定位资产根和 foreign owner 拒绝，并支持真实运行输入；本文新增记录。无新增、删除或整文件迁移，tracked 文件数保持 1357。最终代码 180 项版本合同检查通过。正式 MuJoCo 使用复制到独立目录、由 Robot 明确声明的资产完成装配 Panda reset、双 writer 控制、第二次 reset 和关闭，观测 5 个 native 子步；这验证已支持的两源资产，不扩大为任意 Robot 组合。GeoPhys、Isaac、renderer 和完整 Solution 本批未复验。冻结输入、双锁预算与收据位于 ignored `workspace/maintenance/v211_declared_robot_source_61gx1xn_/`。替换式与引用式 source 的共同构造及四主体统一仍未完成，E01～E04 尚未整体接收。
+
+
+### 6.132 共同入口选择 Robot 并贯穿构建
+
+输入 `d41b09fb`；实施前重新审阅台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 与 SRC，核对四正式任务当前构造。共同入口选择一次 Robot，向 Task binding、编译、source 组合及 worker 传递同一声明；reset 切换若 Robot UID 不变则复用声明，运行时 Controller／物化仍按 episode 重新绑定。Pendulum 和双轮车 source 显式携带同一 Robot。装配 source 的参考主体与最终装配主体仍有替换边界，不能据此宣称 source 已统一。共同 GeoPhys 场景编译根据 Robot 是否声明资产／引用合同区分需要解析的组件和已包含在 source 的主体，不新增任务名分流；资产、引用、身份检查继续由各自合同负责。示例 caller 适配新 binding 参数，但未做其真实运行验收。
+
+本批生产修改 15 文件 +83／−57，净增 26 行；版本诊断修改 1 文件 +39／−0，检查四任务绑定所选 Robot 身份及装配调用；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。代码段跨文件传递与调整未单独计为整文件迁移，本批未实现净精简。以 `1f1359ee` 为起点的 task_env 工作树差异为 134 文件（新增 12、删除 20、修改 102）及 +7669／−14659，净减 6990 行；其中包含历史目录退休和诊断搬迁，不能将全部减少归因于本批。
+
+最终代码版本诊断 185 项通过。正式 GeoPhys Pendulum 与双轮车分别完成 reset、一次控制推进、再次 reset 和重复 close；native 子步未观测，双锁和每项 50 子步预留记录在 `workspace/maintenance/v211_robot_source_bridge_20261112/`。本批较早冻结输入下，MuJoCo PickCube、NutAssembly、Pendulum、双轮及装配 Panda 分别观测 5／5／25／25／5 子步并完成短程 reset、控制、再 reset、关闭；前两项为 Solution 单步而非完整 Solution；隔离 worker PickCube 短程通过但 native 子步未观测。较早输入及其锁、预算和收据在 `workspace/maintenance/v211_common_robot_owner_k0dsflgd/`；最终输入额外增加共同 GeoPhys 编译边界和示例 caller 签名，MuJoCo 未按最终字节重跑，证据按输入区别引用。先前 GeoPhys Pendulum 因既有主体错误进入外部资产解析而失败，修正后重新运行通过。MJCF 导入保留语义诊断；Isaac、renderer 与完整 Solution 本批未复验。E01～E04 仍未整体接收。
