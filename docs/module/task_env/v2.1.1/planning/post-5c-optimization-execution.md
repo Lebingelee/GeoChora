@@ -1500,3 +1500,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 对照 SUBJ-01、CTRL-01／03 和 E02／E04，Pendulum 与双轮车此前在共同 Task binding 中依任务动作合同重新创建 `torque` space，而实际 physical Controller 再创建一份。现由已编译 Controller 的 action space 作为 Env 的动作空间，绑定时核对公开动作维度、上下界与物理通道单位；二次 reset 后绑定到新 Controller。任务仍保留原对外 action schema、动作含义和 reset／reward 语义，不将该改动扩写为所有 Robot action 格式统一。
 
 生产代码修改 1 文件 +21／−5；版本诊断修改 2 文件 +26／−0；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断最终输入 217 项通过；首次四项纯检查因把 `gym_compat.Dict` 工厂误当类型而失败，物理未启动，改用 Gymnasium 实际类型后四项通过。MuJoCo 下 Pendulum 与双轮车的 direct 和 velocity-damped 四条正式路线均完成 reset、非零 step、再次 reset、重建 Controller 动作空间核对与重复 close，各观测 25 个 native 子步。冻结输入、双锁和原始结果在 ignored `workspace/maintenance/v211_controller_action_space_20261112/`。GeoPhys、Isaac、renderer、tabletop Solution 本批未复验，E01～E04 尚未整体接收。
+
+
+### 6.156 普通 Task 消费 Robot 动作声明
+
+对照 SUBJ-01／02、CTRL-01／03：Pendulum 与双轮车的 Task binding 原先各自导入固定 Robot 动作常量，再交给共同构造器。现在两个 Robot 自身公开各自动作声明，共同构造器从实际选定的 Robot 读取；Task 不再指定 Robot 专有动作常量。实际动作空间仍来自已编译 Controller，原维度、顺序、上下界及单位核对保留。这消除两条 Task 特定接线，不声称 Panda 与普通 Robot 已完全使用相同 source 物化。
+
+生产代码修改 5 文件 +5／−6，净减 1；版本诊断修改 1 文件 +26 行；无新增、删除或整文件迁移，tracked 文件数保持 1362。版本诊断 219 项通过；检查实际 Robot 声明变化会进入相应正式 Task 构造。MuJoCo Pendulum 与双轮车正式 direct Controller 路线完成 reset、非零 step、再次 reset 和重复 close，各观测 25 个 native 子步；冻结输入、双锁及结果在 ignored `workspace/maintenance/v211_robot_action_declaration_20261112/`。GeoPhys、Isaac、renderer、tabletop 和完整 Solution 本批未复验，原有不同输入证据不扩展为本批原生结论。E01～E04 仍未整体接收。

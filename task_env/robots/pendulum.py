@@ -77,6 +77,7 @@ class PendulumEntity(RobotComponent):
     source_xml = PENDULUM_MJCF_XML
     source_base_dir = Path(__file__).resolve().parent
     controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
+    action_contract = PENDULUM_ACTION_CONTRACT
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))

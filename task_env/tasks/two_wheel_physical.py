@@ -8,7 +8,6 @@ from ..environment.task_source import compile_existing_subject_effort_task, comp
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
-from ..robots.two_wheel_balance import TWO_WHEEL_ACTION_CONTRACT
 
 from .two_wheel_balance import (TWO_WHEEL_BALANCE_TASK_UID,
     TWO_WHEEL_BALANCE_SCENE_UID, TWO_WHEEL_BALANCE_SUCCESS_DEFINITION,
@@ -78,5 +77,5 @@ def task_binding(config, *, robot, source_delivery_manifest=None):
         reset_metadata=reset_metadata, definition_factory=lambda _artifact: TwoWheelBalanceTaskDefinition(0, 0, 1, 1, 2, 2),
         state_projection=_task_state, observation_schema=TwoWheelBalanceObservationBuilder(
             joint_ids={'pitch': (0, 0), 'left': (1, 1), 'right': (2, 2)}).schema,
-        observation_space_factory=_observation_spaces, action_contract=TWO_WHEEL_ACTION_CONTRACT)
+        observation_space_factory=_observation_spaces)
     return task.bind(config, source_delivery_manifest=source_delivery_manifest)

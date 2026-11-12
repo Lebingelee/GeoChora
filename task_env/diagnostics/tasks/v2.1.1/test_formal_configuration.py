@@ -417,3 +417,29 @@ def test_formal_effort_action_space_comes_from_compiled_controller(uid, profile)
             replace(env.binding, external_action_contract=invalid).bind_compiled_control(env.value)
     finally:
         env.close()
+
+
+@pytest.mark.parametrize(('uid', 'robot_type'), [
+    ('pendulum-v1', 'PendulumEntity'),
+    ('two-wheel-balance-v1', 'TwoWheelBalanceEntity'),
+])
+def test_formal_effort_task_consumes_selected_robot_action_declaration(uid, robot_type, monkeypatch):
+    from dataclasses import replace
+    import sys
+    from task_env import make_env
+    from task_env import robots
+
+    cls = getattr(robots, robot_type)
+    declared = replace(cls.action_contract, schema_id='robot-declared-effort-action-v1')
+    monkeypatch.setattr(cls, 'action_contract', declared)
+    env = make_env(uid, config={
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                      'deployment': 'in_process', 'interpreter': sys.executable},
+        'episode': {'horizon': 8},
+    })
+    try:
+        assert env.binding.external_action_contract is env.binding.robot.action_contract is declared
+        assert env.binding.action_schema['schema_id'] == declared.schema_id
+        assert env.binding.action_space_factory.__self__ is env.value['physical_execution']
+    finally:
+        env.close()

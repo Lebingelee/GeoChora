@@ -470,7 +470,6 @@ class ExistingSubjectEffortTask:
     state_projection: Callable
     observation_schema: object
     observation_space_factory: Callable
-    action_contract: object
 
     def bind(self, config, *, source_delivery_manifest=None):
         """Build one Task binding; native resource ownership stays with Runtime."""
@@ -508,7 +507,7 @@ class ExistingSubjectEffortTask:
                 raise ValueError('seed must be a nonnegative integer')
             return seed
 
-        action = self.action_contract
+        action = self.robot.action_contract
         return ReferenceTaskBinding(
             build=build,
             task_reset_sampler=self.reset_sampler, task_reset_metadata=self.reset_metadata,

@@ -8,7 +8,6 @@ from ..environment.task_source import compile_existing_subject_effort_task, comp
 from ..environment.types import TaskCompositionSpec, RuntimeSnapshot
 from ..environment.reference_binding import ExistingSubjectEffortTask
 from ..environment.gym_compat import Box, Dict
-from ..robots.pendulum import PENDULUM_ACTION_CONTRACT
 
 from .pendulum import (PENDULUM_TASK_UID, PENDULUM_SCENE_UID,
                        PENDULUM_SUCCESS_DEFINITION, PendulumTaskDefinition,
@@ -64,5 +63,5 @@ def task_binding(config, *, robot, source_delivery_manifest=None):
         reset_sampler=PENDULUM_TASK_SEMANTICS.sample_reset,
         reset_metadata=reset_metadata, definition_factory=lambda _artifact: PendulumTaskDefinition(qpos_id=0, qvel_id=0),
         state_projection=_task_state, observation_schema=PendulumObservationBuilder(qpos_id=0, qvel_id=0).schema,
-        observation_space_factory=_observation_spaces, action_contract=PENDULUM_ACTION_CONTRACT)
+        observation_space_factory=_observation_spaces)
     return task.bind(config, source_delivery_manifest=source_delivery_manifest)
