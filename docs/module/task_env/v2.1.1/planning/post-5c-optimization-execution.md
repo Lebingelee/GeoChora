@@ -1387,3 +1387,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 2 文件 +19／−24，净减 5 行；版本诊断修改 2 文件、新增 1 文件，+79／−0；本文新增记录。新增文件 1、删除 0、整文件迁移 0，项目 tracked 文件数 1357→1358。相对 `1f1359ee` 的 task_env 差异 138 文件（新增 13、删除 20、修改 105），+8018／−14776，净减 6758 行，包含此前历史路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 199 项通过；依赖来自第二资产根的摘要变化与越界拒绝由隔离导入检查验证。MuJoCo 与 GeoPhys PickCube direct effort 在 Robot 清单增加额外资产根的情况下完成 reset、推进、再次 reset 和关闭，MuJoCo 观测 5 个 native 子步，GeoPhys 不可观测并按 50 预留；原生探针没有实际从额外根加载网格。导入器仍报告一项已有语义诊断，不能据此扩大支持范围。Isaac、renderer、其他任务及完整 Solution 本批未复验。冻结输入、双锁、预算及收据位于 ignored `workspace/maintenance/v211_multiroot_20261112/`；`input.patch` 为运行时已跟踪代码差异，`full-input.patch` 另含新诊断文件。E01～E04 尚未整体接收。
+
+
+### 6.143 Panda effort source 适配归位
+
+输入 `19e3fee9`；实施前重读台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL 和 source 章节并核对四任务构建链。PickCube 的 MJCF 与 USD effort binding 原各自直接选用原生 source 适配器；现共同调用 Runtime 中的 Panda effort source 构造入口。MJCF 传动与已绑定闭包由 MuJoCo source adapter 验证，USD 源及对应原生传动继续由 Isaac adapter 准入；两者都由同一 Robot 声明生成 Controller 绑定。Task 保留任务 profile、动作和语义。该入口按真实 source 格式分派，不表示其他 Robot 或 provider 的 source 构造已经统一；后续仍需消除任务内不同构造路径和完成 E02／E04。被调用的适配 owner 加入已有 source 文件身份。
+
+上一批多资产根导入还存在逻辑摘要路径碰撞：两个不同文件若内容恰好相同会被合并。本批按真实路径拒绝碰撞，无论内容是否相同。生产修改 5 文件 +30／−8，净增 22 行；版本诊断修改 3 文件 +30／−2，净增 28 行；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1358。相对 `1f1359ee` 的 task_env 差异 138 文件（新增 13、删除 20、修改 105），+8068／−14776，净减 6708 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 199 项通过；真实 MJCF 和已有 USD delivery 的纯构造检查均核对共同适配入口、Controller 及 source 身份。MuJoCo direct effort、joint effort、R3 Solution 单步以及 GeoPhys direct effort 完成 reset、控制、再次 reset、重复 close；MuJoCo 各观测 5 个 native 子步，GeoPhys 不可观测并按 50 预留。R3 仅单步，并非完整 Solution；Isaac 原生执行、renderer、Nut 和普通任务未复验，历史证据仍按原输入及范围使用。冻结输入、双锁、预算与收据位于 ignored `workspace/maintenance/v211_effort_source_dispatch_20261112/`。E01～E04 尚未整体接收。

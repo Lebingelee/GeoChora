@@ -9,6 +9,26 @@ class SourceCompositionCapabilityUnavailable(ValueError):
     """The selected provider/backend has no registered source composer."""
 
 
+def build_panda_effort_execution(robot, scene, artifact, source, *, native_drive,
+                                 gripper_force_limit_N=None):
+    """Bind a Robot's effort channels using the source format's native facts."""
+    from .source import RuntimeSource, UsdRuntimeSourceV1
+
+    if isinstance(source, RuntimeSource):
+        from .mujoco_composition import checked_panda_effort_source_limits
+        limits = checked_panda_effort_source_limits(source, scene)
+        return robot.build_direct_effort_execution(
+            scene, artifact, source, entity_id=robot.uid, native_drive=native_drive,
+            native_ranges=tuple(limits), gripper_force_limit_N=gripper_force_limit_N)
+    if isinstance(source, UsdRuntimeSourceV1):
+        if gripper_force_limit_N is not None:
+            raise ValueError('USD effort source does not admit a gripper force override')
+        from .isaac_physical import build_isaac_panda_effort_execution
+        return build_isaac_panda_effort_execution(robot, scene, artifact, source,
+                                                  native_drive=native_drive)
+    raise TypeError('Robot effort construction requires an admitted RuntimeSource')
+
+
 @dataclass(frozen=True)
 class SourceCompositionAdapterV1:
     provider: str

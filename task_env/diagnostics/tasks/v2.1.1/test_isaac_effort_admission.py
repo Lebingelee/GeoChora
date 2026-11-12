@@ -96,11 +96,19 @@ def test_reset_reconstruction_passes_one_request_for_sampled_and_solution_paths(
 
 @pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1',
                                     'panda-joint-effort-reference-v1'])
-def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
+def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     import sys
     from pathlib import Path
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
+    from task_env.runtime.sessions import source_composition_adapters
+
+    calls = []
+    build = source_composition_adapters.build_panda_effort_execution
+    def record(*args, **kwargs):
+        calls.append(args[3])
+        return build(*args, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_effort_execution', record)
 
     root = Path(__file__).resolve().parents[4]
     manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
@@ -122,12 +130,16 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
     if profile != 'r3_continuous_v1':
         from task_env.runtime.sessions.isaac_physical import build_isaac_panda_effort_execution
         source = value['source']
+        assert calls == [source]
         assert 'task_env/runtime/sessions/isaac_physical.py' in value['source_sha256']
+        assert 'task_env/runtime/sessions/source_composition_adapters.py' in value['source_sha256']
         expected_drive = 'position' if profile == 'panda-direct-effort-v1' else 'disabled'
         assert {channel.native_drive for channel in value['physical_execution'].compiled.binding.channels} == {expected_drive}
         with pytest.raises(ValueError, match='drive differs'):
             build_isaac_panda_effort_execution(value['robot'], source.scene_definition,
                 artifact, source, native_drive='disabled' if expected_drive == 'position' else 'position')
+    else:
+        assert calls == []
 
 
 def test_usd_rejects_unsupported_task_force():

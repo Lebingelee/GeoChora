@@ -19,6 +19,7 @@ def import_agent_source_scene(manifest, *, owner_uid, entity_id, scene_id, scene
         cache=False,
     )
     files = {}
+    logical_paths = {}
     for raw in imported.dependency_paths:
         path = Path(raw).resolve(strict=True)
         matches = [(index, root) for index, root in enumerate(roots) if path.is_relative_to(root)]
@@ -28,9 +29,10 @@ def import_agent_source_scene(manifest, *, owner_uid, entity_id, scene_id, scene
         relative = path.relative_to(root).as_posix()
         logical = relative if index == 0 else f'root-{index}/{relative}'
         data = path.read_bytes()
-        if logical in files and files[logical] != data:
+        if logical in logical_paths and logical_paths[logical] != path:
             raise ValueError('Agent importer dependencies have conflicting logical paths')
         files[logical] = data
+        logical_paths[logical] = path
     if not files:
         raise ValueError('Agent importer returned an empty source closure')
     return scene_factory(imported, manifest, entity_id=entity_id, scene_id=scene_id,

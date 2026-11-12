@@ -41,3 +41,10 @@ def test_scene_import_hashes_dependencies_from_each_declared_root(tmp_path, monk
     with pytest.raises(ValueError, match='owned MJCF'):
         import_agent_source_scene(manifest, owner_uid='other', entity_id='robot',
                                   scene_id='scene', scene_factory=lambda *a, **kw: kw)
+
+    collision = first / 'root-1' / 'part.stl'
+    collision.parent.mkdir()
+    collision.write_bytes(mesh.read_bytes())
+    imported.dependency_paths = (source, mesh, collision)
+    with pytest.raises(ValueError, match='conflicting logical paths'):
+        declare()

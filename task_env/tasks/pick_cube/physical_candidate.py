@@ -111,12 +111,10 @@ def make_physical_binding(*, drive_mode, control_kind,
                 raise ValueError('unsupported or invalid physical controller parameters')
             if parameters and not reset_switch:
                 raise ValueError('controller parameters require physical reset selection')
-            from ...runtime.sessions.mujoco_composition import checked_panda_effort_source_limits
+            from ...runtime.sessions.source_composition_adapters import build_panda_effort_execution
             native_drive = 'disabled' if drive_mode == 'effort-only' else 'position'
-            limits = checked_panda_effort_source_limits(source, scene)
-            physical = robot.build_direct_effort_execution(
-                scene, artifact, source, entity_id='panda-v1', native_drive=native_drive,
-                native_ranges=tuple(limits), gripper_force_limit_N=(
+            physical = build_panda_effort_execution(
+                robot, scene, artifact, source, native_drive=native_drive, gripper_force_limit_N=(
                     source.config.robot.gripper.force_limit_N if reset_switch else None))
             from .physical_reference_profile import build_pickcube_effort_profile
             return build_pickcube_effort_profile(physical, artifact, kind=kind,

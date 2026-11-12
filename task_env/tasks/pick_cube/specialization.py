@@ -186,6 +186,7 @@ def _source_identity_files(controller, solution_type, *, profile_source=None):
              root / "task_env/environment/lifecycle.py",
              root / "task_env/runtime/sessions/api.py",
              root / "task_env/runtime/sessions/control.py",
+             root / "task_env/runtime/sessions/source_composition_adapters.py",
              Path(inspect.getsourcefile(TaskArtifact)).resolve(),
              root / "task_env/recorders/reference_provenance.py",
              root / "task_env/utils/_paths.py",
@@ -463,6 +464,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
             identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
         else:
             identity_paths += (Path(inspect.getsourcefile(controller_builder)),
+                               Path(__file__).parents[2] / "runtime/sessions/source_composition_adapters.py",
                                Path(__file__).parents[2] / "runtime/sessions/isaac_physical.py")
         for path in identity_paths:
             source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(

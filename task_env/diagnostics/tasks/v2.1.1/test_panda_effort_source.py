@@ -27,11 +27,19 @@ def test_panda_source_preserves_paired_transmission_and_signed_limits():
         panda_effort_source_limits(root)
 
 
-def test_canonical_source_owns_and_validates_input_snapshot():
+def test_canonical_source_owns_and_validates_input_snapshot(monkeypatch):
     from dataclasses import replace
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.runtime.sessions.source import source_resource_receipt
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+    from task_env.runtime.sessions import source_composition_adapters
+
+    calls = []
+    build = source_composition_adapters.build_panda_effort_execution
+    def record(*args, **kwargs):
+        calls.append(args[3])
+        return build(*args, **kwargs)
+    monkeypatch.setattr(source_composition_adapters, 'build_panda_effort_execution', record)
 
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
@@ -42,6 +50,7 @@ def test_canonical_source_owns_and_validates_input_snapshot():
     try:
         value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         source = value['source']
+        assert calls == [source]
         receipt = source_resource_receipt(source)
         assert receipt is source.source_snapshot_receipt
         assert value['source_sha256']['original_closure'] == receipt.source_closure_digest
