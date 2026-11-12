@@ -2,28 +2,38 @@
 from pathlib import Path
 import hashlib
 import json
+import math
 
 _MODEL_PATH = Path(__file__).with_name('assets') / 'v211_4b_nominal_reduced_mass.json'
 _MODEL_SHA256 = '6d2770cafd825586f99db600dde0afa630667c4cf061987f0800371c96252e65'
 
 
-def load_pickcube_mass_effort_model(artifact, source, *, kind):
+def load_pickcube_mass_effort_model(execution, artifact, source, *, kind):
     if kind not in {'joint-mass', 'r3-mass-pose'}:
         raise ValueError('unsupported bounded mass-model controller kind')
-    expected = {
-        'pickcube-mjcf-physical-effort-no-drive-v1': 'mjcf',
-        'pickcube-f06-physical-effort-no-drive-v1': 'f06',
-    }
-    family = expected.get(artifact.artifact_id)
-    if family is None:
-        raise ValueError('nominal mass model is restricted to its versioned isolated fixture')
+    binding = execution.compiled.binding
+    if (binding.artifact_sha256 != artifact.identity_hash or binding.source_id != source.source_id
+            or binding.source_closure_sha256 != source.source_closure_digest
+            or not binding.channels or any(channel.native_drive != 'disabled' for channel in binding.channels)):
+        raise ValueError('nominal mass model requires its source-bound isolated Controller')
     raw = _MODEL_PATH.read_bytes()
     if hashlib.sha256(raw).hexdigest() != _MODEL_SHA256:
         raise ValueError('nominal mass model bytes changed')
     model = json.loads(raw)
-    if (model.get('schema_version') != 'panda-pickcube-nominal-reduced-mass-v1'
-            or model['source_closures'][family] != source.source_closure_digest):
-        raise ValueError('nominal mass model source differs from selected fixture')
+    families = [family for family, closure in model['source_closures'].items()
+                if closure == source.source_closure_digest]
+    if model.get('schema_version') != 'panda-pickcube-nominal-reduced-mass-v1' or len(families) != 1:
+        raise ValueError('nominal mass model source differs from its declared closure')
+    family = families[0]
+    joints = artifact.initialization.joint_position
+    initial = tuple(float(joints[f'panda-v1/joint{i}']) for i in range(1, 8)) + (
+        .5 * (float(joints['panda-v1/finger_joint1']) + float(joints['panda-v1/finger_joint2'])),)
+    nominal, radius = model['nominal_position'], model['max_abs_deviation']
+    if (len(nominal) != len(initial) or len(radius) != len(initial)
+            or any(not math.isfinite(value) or abs(value - center) > bound
+                   for value, center, bound in zip(initial, nominal, radius, strict=True))):
+        from ...environment.types import StageUnavailableError
+        raise StageUnavailableError('nominal mass model does not cover the declared initial state')
     return dict(matrix=model['matrices'][family], nominal_position=model['nominal_position'],
                 max_abs_deviation=model['max_abs_deviation'], model_sha256=_MODEL_SHA256)
 
@@ -41,7 +51,7 @@ def build_pickcube_effort_profile(direct_execution, artifact, source, *, kind, c
         r3_profile, _ = _r3_dynamic_profile()
         velocity_limit = PICKCUBE_R3_CONTINUOUS_PROFILE_V1['joint_velocity_limit_rad_s']
     if kind in {'joint-mass', 'r3-mass-pose'}:
-        mass_model = load_pickcube_mass_effort_model(artifact, source, kind=kind)
+        mass_model = load_pickcube_mass_effort_model(direct_execution, artifact, source, kind=kind)
     return build_panda_effort_profile(direct_execution, kind=kind,
         cadence_s=artifact.timebase.control_dt, end_frame_id=end_frame_id,
         model=model, config=config, artifact_hash=artifact.identity_hash,

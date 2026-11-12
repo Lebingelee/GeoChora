@@ -1144,3 +1144,13 @@ Isaac effort 验证中的两次提前退出也保留：首次是验证脚本误�
 输入 `a97602fd`。PickCube 的 MJCF 非 reset-switch effort 和 Isaac effort 原先为了 force-observation fixture，把正式 Task 声明的两只手指初始位置从 0.04 m 私自改为 0.02 m，并替换 reset validity。删除这些初始化改写后，Position／effort 的 Artifact 消费相同 Task 初始化；当前用于 provider 准入和 Controller 模型身份的 physical Artifact ID 暂时保留，不能据此宣称完整构建链已经统一。source、Controller effort／Position 语义和驱动准入不变，实际任务初始状态恢复为正式声明。
 
 生产修改 2 文件 +2／−20，净减 18 行；版本诊断修改 3 文件 +10／−2，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1355。156 项版本检查通过，比较 MJCF／USD 的 Position 和 effort Artifact 与同一 Task 声明。MuJoCo 直接 effort 与 Controller reset 切换实际 reset 时两手指均为 0.04 m，分别完成 5／10 个 native 子步；GeoPhys joint effort 实际值约 0.04 m，完成 reset、非零 step、再次 reset 和关闭，native 子步未直接计数。Isaac CUDA 直接 effort 在 0.17 m lift 下实际 reset 到 0.04 m，完成非零力矩、第二次 reset、RGB 和独立读回，观察 41 次 physics callback，订阅前启动推进未知；worker 和 reader 退出码均为 0。MJCF／SDK 日志有既有导入与渲染诊断，Isaac recorder 限制仍在，完整 Solution 未运行。Artifact 身份改变，旧证据仍只对应原身份。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_task_initial_cpu_20261112_8m9rnycr/` 与 `workspace/maintenance/v211_task_initial_isaac_20261112_jn7fsiy6/`；Isaac 运行后只为 CPU 诊断补充了实际手指初值断言。E01～E04 未整体接收。
+
+**后续纠正：**6.112 未验证固定质量矩阵 Controller。其历史校准只覆盖手指名义 0.02 m ±0.019 m，正式 0.04 m 初态在范围外；6.112 的初始化收敛因此使这两条质量矩阵 profile 无法执行，详见 6.113。不能将当时直接／joint effort 的通过扩大到质量矩阵能力。
+
+### 6.113 MJCF effort 使用正式 Task ID，并显式暴露质量模型缺口
+
+输入 `f83c7b2a`。MuJoCo／GeoPhys adapter 已按控制 binding 的 native drive 选择行为，MJCF effort 不再需要生成控制专属 Artifact ID；现在直接沿用正式 Task ID。固定质量模型选择从 Artifact 名称改为核对物理 binding 的 Artifact、source、闭包和驱动隔离，并匹配模型文件内经哈希固定的 source closure。Task Artifact v0／v1 仍是不同表示，不能把 ID 一致说成完整构建链已合一。
+
+实际复验暴露了 6.112 的遗漏：质量模型以手指 0.02 m 为名义、容差 0.019 m，正式初态为 0.04 m。MuJoCo mass effort 原先能构建，但第一次 step 因状态超出模型范围而拒绝，观察到 0 个 native 子步；这是一项实际能力缺口，不是成功。现在将同一范围检查从首次计算提前到构建阶段，明确报告模型不覆盖声明的初态；未扩大或修改模型校准范围，也未恢复诊断专用初态。两种固定质量矩阵 profile 目前不可用于正式初态，需要后续取得真实 source 模型能力或重新校准，E04 因此仍未完成。
+
+生产修改 2 文件 +22／−16，净增 6 行；版本诊断修改 1 文件 +56／−3，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1355。155 项版本检查通过，包含 Task ID 一致、错误 Artifact／source 拒绝和两个质量模型 profile 对正式初态的明确拒绝；这不代表质量模型可运行。MuJoCo 直接 effort 和 Controller reset 切换分别完成 5／10 个 native 子步，GeoPhys joint effort 完成 reset、step、再次 reset 和关闭，native 子步未直接计数。Isaac 和完整 Solution 本轮未重跑。失败证据在 ignored `workspace/maintenance/v211_task_artifact_effort_20261112_k54h6618/`；修正后的冻结 diff、预算及其他路线收据在 ignored `workspace/maintenance/v211_formal_artifact_mass_boundary_20261112_yt31_3u_/`。该 CPU 窗口后仅添加了错误 Artifact／source 的版本合同检查。

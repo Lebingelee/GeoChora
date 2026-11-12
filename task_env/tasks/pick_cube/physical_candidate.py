@@ -172,10 +172,6 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         if reset_switch:
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-        if drive_mode == 'effort-only':
-            legacy_artifact = replace(legacy_artifact,
-                artifact_id=('pickcube-mjcf-physical-effort-task-v1' if reset_switch
-                             else 'pickcube-mjcf-physical-effort-no-drive-v1'))
         receipt = original.execution_source_receipt
     with ExitStack() as resources:
         resources.callback(receipt.close)

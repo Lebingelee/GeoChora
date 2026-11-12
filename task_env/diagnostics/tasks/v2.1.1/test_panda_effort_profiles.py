@@ -18,8 +18,6 @@ def test_panda_declares_shared_immutable_effort_profiles():
 @pytest.mark.parametrize('profile,controller_type,dimension', [
     ('panda-joint-effort-reference-v1', 'ConstrainedPairEffortControllerV1', 8),
     ('panda-r3-effort-reference-v1', 'R3ReferenceEffortControllerV1', 8),
-    ('panda-joint-mass-effort-v1', 'MassMatrixEffortControllerV1', 8),
-    ('panda-r3-mass-effort-v1', 'R3ReferenceEffortControllerV1', 8),
 ])
 def test_formal_panda_effort_profile_source_contract(profile, controller_type, dimension):
     from task_env.environment.configuration import resolve_task_env_config
@@ -113,6 +111,61 @@ def test_panda_effort_controller_rejects_foreign_writer():
                 action_to_effort=profile.action_to_effort, cadence_s=.01, model_id='foreign')
     finally:
         task_binding.close_task_resources()
+
+
+@pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1'])
+def test_effort_retains_formal_task_identity(profile):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        value = binding.build('mujoco')
+        assert value['artifact'].artifact_id == build_artifact().artifact_id
+    finally:
+        binding.close_task_resources()
+
+
+@pytest.mark.parametrize('profile', ['panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
+def test_mass_model_rejects_formal_initial_state_outside_calibration(profile):
+    from task_env.environment.types import StageUnavailableError
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+    })
+    with pytest.raises(StageUnavailableError, match='does not cover the declared initial state'):
+        PickCubeReferenceEnv.selected_binding(config)
+
+
+def test_mass_model_rejects_foreign_source_and_artifact():
+    from dataclasses import replace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.physical_reference_profile import load_pickcube_mass_effort_model
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'}, 'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    try:
+        value = binding.build('mujoco')
+        execution, artifact, source = value['physical_execution'], value['artifact'], value['source']
+        with pytest.raises(ValueError, match='source-bound isolated Controller'):
+            load_pickcube_mass_effort_model(execution, replace(artifact, artifact_id='foreign'),
+                                            source, kind='joint-mass')
+        with pytest.raises(ValueError, match='source-bound isolated Controller'):
+            load_pickcube_mass_effort_model(execution, artifact,
+                replace(source, source_closure_digest='f' * 64), kind='joint-mass')
+    finally:
+        binding.close_task_resources()
 
 
 @pytest.mark.parametrize(('profile', 'expected'), [
@@ -213,7 +266,7 @@ def test_pickcube_position_and_effort_consume_the_same_lift(profile):
 
 @pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
 @pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
-    'panda-r3-effort-reference-v1', 'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])
+    'panda-r3-effort-reference-v1'])
 def test_fixed_effort_does_not_construct_position_controller(provider, profile, monkeypatch):
     import sys
     from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1

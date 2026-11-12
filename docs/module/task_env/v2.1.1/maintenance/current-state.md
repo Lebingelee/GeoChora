@@ -239,3 +239,5 @@ MuJoCo／GeoPhys physical adapter 现在读取控制 binding 声明的 native dr
 Panda 的 gripper force cap 由 Robot 声明，MuJoCo adapter 核对实际 source 与配置后应用；reset 选择和直接 effort 已复验。详见[实施记录 6.111](../planning/post-5c-optimization-execution.md#6111-gripper-force-cap-由-robot-声明并由-adapter-核对)。
 
 PickCube effort 不再使用旧诊断的 0.02 m 手指初值；MuJoCo、GeoPhys、Isaac 受影响短程已核对正式 Task 初值。详见[实施记录 6.112](../planning/post-5c-optimization-execution.md#6112-删除-effort-路线的诊断手指初值)。
+
+MJCF effort 已沿用正式 Task ID；固定质量矩阵的历史校准不覆盖正式 0.04 m 手指初态，两条 mass profile 当前明确拒绝构建，待真实模型或重新校准，不能视为已保全。详见[实施记录 6.113](../planning/post-5c-optimization-execution.md#6113-mjcf-effort-使用正式-task-id并显式暴露质量模型缺口)。
