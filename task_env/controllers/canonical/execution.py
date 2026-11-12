@@ -14,6 +14,7 @@ from .gripper_execution import EqualRateGripperServo, NativeRateGripperServo
 
 R3_REFERENCE_POSITION_PROFILES = frozenset(('r3_continuous_v1',))
 REFERENCE_POSITION_CONTROLLER_PROFILES = R3_REFERENCE_POSITION_PROFILES | frozenset(('r1', 'r1_split'))
+ARM_HOLD_RAMP_PROFILE = 'r3-hold-ramp-v1'
 
 
 def build_reference_position_controller(artifact, source, *, profile_id, dynamic_profile=None,
@@ -46,16 +47,13 @@ class ArmTargetExecutionRequestV1:
 
     def validate(self):
         if (self.schema_version != "arm-target-execution-request-v1"
-                or self.profile_id not in {
-                    "nutassembly-r3-hold-ramp-v1",
-                    "pickcube-r3-hold-ramp-v1",
-                }):
+                or self.profile_id != ARM_HOLD_RAMP_PROFILE):
             raise ValueError("unsupported arm target execution request")
         if self.mode not in {"track", "hold_last_applied", "ramp_from_last_applied"}:
             raise ValueError("unsupported arm target execution mode")
 
 class StableArmTargetHold:
-    """Task-local arm hold wrapper; the underlying R3 source is unchanged."""
+    """Own arm hold and ramp state for the R3 Controller."""
     def __init__(self, controller):
         self.controller = controller
         self.locked = False
@@ -63,7 +61,7 @@ class StableArmTargetHold:
         self.last_target = None
         self.last_applied_arm = None
         self._request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", "track",
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, "track",
         )
         self._ramp_initial = None
 
@@ -75,7 +73,7 @@ class StableArmTargetHold:
         self.last_applied_arm = None
         self._ramp_initial = None
         self._request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", "track",
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, "track",
         )
         return self.controller.reset(state, feedback)
 

@@ -1064,3 +1064,11 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 生产修改 3 文件 +2／−2，净变化 0；版本诊断修改 1 文件 +15／−0，本文与当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。消除四个正式类直接调用旧构造的分流，未宣称所有历史组件代码或四任务的主体构造已收敛；provider／renderer 的 source、状态、clock、提交和资源合同未改。
 
 135 项版本检查通过，包括四个正式类拒绝直接旧构造及正式工厂配置。四任务及装配 Panda 的 MuJoCo 进程内短程通过，一体 Panda、装配 Panda、NutAssembly、Pendulum、双轮车分别观察 5、5、5、25、25 个 native 子步；PickCube 物理 Controller reset 切换与 H5 读回通过，观察 10 个子步。PickCube、NutAssembly 的 MuJoCo 隔离 worker 完成 reset、step、再次 reset 和关闭；worker native 子步未直接计数，每次按 50 保守预算记账。NutAssembly GeoPhys CPU 完成同类生命周期和 Solution 单步，控制时间从 0 推进至 0.01 秒，native 子步未计数，MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑；旧证据仍只证明原受测源码和路线。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_formal_construction_only_20261112_fwrdgypq/`；E01～E04 仍未接收。
+
+### 6.102 共用 arm hold 与 ramp 请求合同
+
+输入 `fce3a6ba`。两个 tabletop Solution 使用同一种 Controller hold／ramp 语义，但公共 Controller 硬编码两个任务专属请求标识，默认状态也写死 NutAssembly 名称。现在由 Controller 定义一个共同请求 profile，两条 Solution 及 PickCube Controller 身份元数据均引用它；保留请求 schema、三种模式、真实 applied acknowledgement、资源和有限数值检查。旧任务专属 profile 不再作为新请求兼容入口；历史记录仍按原身份解释。本次修改 Controller 源码及 PickCube 的身份元数据，不能将此前记录的 Controller 身份直接当作新源码身份。
+
+生产修改 4 文件 +11／−13，净减 2 行；版本诊断修改 1 文件 +37／−0，本文和当前状态文档修改 2 文件；没有新增、删除或整文件迁移，tracked 文件数仍为 1356。共同请求删除了 Controller 对任务名称的依赖，但没有改变配置构建入口，也没有证明四任务 Robot 构造已经统一；tabletop source 编译与组合分别创建 Robot 的问题仍待处理。provider／renderer 的 source、状态、clock、资源合同未变；两条 Solution 的 arm 请求仍进入已有 Controller 校验和共同提交链。
+
+137 项版本检查通过，包括两个 tabletop 的 hold、五个线性 ramp 子步、gripper 保持及先有反馈检查。PickCube、NutAssembly 的 MuJoCo 各完成一次 Solution 提交、5 个 native 子步、第二次 reset 和关闭；NutAssembly GeoPhys 完成同类生命周期及 Solution 单步，native 子步未直接计数。MJCF 导入有语义诊断。Isaac 和完整 Solution 本批未重跑，旧证据仍限定原源码身份；冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_shared_arm_request_20261112_q4uu7p3b/`。E01～E04 未因此整体接收。

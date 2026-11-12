@@ -67,6 +67,43 @@ def test_r3_execution_controller_owns_hold_and_gripper(task_name, monkeypatch):
         value['source'].execution_source_receipt.close()
 
 
+@pytest.mark.parametrize('task_name', ['pickcube', 'nut'])
+def test_both_tabletop_controllers_use_the_same_hold_ramp_contract(task_name):
+    from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
+    from task_env.controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
+    from task_env.tasks.pick_cube.specialization import build_reference as build_pickcube
+    from task_env.tasks.nut_assembly.specialization import build_reference as build_nut
+
+    value = (build_pickcube(backend='cpu', include_solution=False, controller_profile='r3_continuous_v1')
+             if task_name == 'pickcube' else build_nut(provider='mujoco', include_solution=False))
+    try:
+        controller = value['controller']
+        arm = tuple(f'panda-v1/joint{i}' for i in range(1, 8))
+        target = CanonicalControlTarget('canonical-control-v0', value['artifact'].identity_hash,
+            controller.identity, arm, {k: .4 for k in arm}, {k: .4 for k in arm},
+            GripperControlTarget('panda-v1/gripper', .08, 10., .08))
+        request = lambda mode: ArmTargetExecutionRequestV1(
+            'arm-target-execution-request-v1', ARM_HOLD_RAMP_PROFILE, mode)
+        with pytest.raises(ValueError, match='preceding applied'):
+            controller.validate_arm_execution_request(request('hold_last_applied'))
+        controller.applied(SimpleNamespace(arm_servo_position={k: .1 for k in arm}))
+        controller.request_arm_execution(request('hold_last_applied'))
+        assert controller.target(target, 0, 5).arm_servo_position == {k: .1 for k in arm}
+        controller.request_arm_execution(request('ramp_from_last_applied'))
+        controller.begin(target)
+        for i in range(5):
+            applied = controller.target(target, i, 5)
+            assert applied.arm_servo_position == {k: .1 + (i + 1) / 5 * (.4 - .1) for k in arm}
+            assert applied.gripper == target.gripper
+            controller.applied(SimpleNamespace(arm_servo_position=applied.arm_servo_position))
+        controller.request_arm_execution(request('track'))
+        assert controller.target(target, 0, 5) is target
+        with pytest.raises(ValueError, match='unsupported arm target execution'):
+            controller.request_arm_execution(request('unsupported'))
+    finally:
+        value['source'].execution_source_receipt.close()
+
+
 @pytest.mark.parametrize('uid', ['pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'])
 def test_each_public_environment_owns_its_binding_and_source(uid):
     import sys

@@ -23,7 +23,7 @@ from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAc
 from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
 from ...controllers.canonical.contracts import digest
-from ...controllers.canonical.execution import ArmTargetExecutionRequestV1
+from ...controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
 from ...objects.pick_cube import CUBE_HALF_SIZE
 
 
@@ -301,7 +301,7 @@ class PickCubeSolution:
                 )
             control_request = ArmTargetExecutionRequestV1(
                 "arm-target-execution-request-v1",
-                "pickcube-r3-hold-ramp-v1",
+                ARM_HOLD_RAMP_PROFILE,
                 mode,
             )
         self._awaiting_observation = True

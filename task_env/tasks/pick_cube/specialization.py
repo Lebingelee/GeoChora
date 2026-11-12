@@ -26,7 +26,7 @@ from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifa
 from ...assembly.compiler import reference_task_identity_fields
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
-from ...controllers.canonical.execution import (ReferenceExecutionController,
+from ...controllers.canonical.execution import (ARM_HOLD_RAMP_PROFILE, ReferenceExecutionController,
     REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES,
     build_reference_position_controller)
 from ...environment import (
@@ -311,7 +311,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
             }
             execution_profile = {
                 "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
-                "arm_execution_request_profile": "pickcube-r3-hold-ramp-v1",
+                "arm_execution_request_profile": ARM_HOLD_RAMP_PROFILE,
                 "gripper_cadence": "native-gripper-500hz-v1",
                 "gripper_control_hz": 500,
                 "gripper_feedback_hz": 500,

@@ -217,3 +217,5 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 正式配置的 provider、设备和默认 renderer 已统一由必需执行请求持有；MuJoCo、GeoPhys、Isaac 及两个 MuJoCo worker 的受影响短程已复验。详见[实施记录 6.100](../planning/post-5c-optimization-execution.md#6100-执行选择由同一请求持有)。
 
 四个正式类不再允许直接进入旧 component 构造；共同工厂、MuJoCo 两个 worker 和 GeoPhys NutAssembly 短程已复验。详见[实施记录 6.101](../planning/post-5c-optimization-execution.md#6101-正式任务不再直接进入-component-构造)。
+
+两个 tabletop Solution 现在使用 Controller 所有的共同 arm hold／ramp 请求，MuJoCo 两条 Solution 和 GeoPhys NutAssembly 已复验单步。详见[实施记录 6.102](../planning/post-5c-optimization-execution.md#6102-共用-arm-hold-与-ramp-请求合同)。

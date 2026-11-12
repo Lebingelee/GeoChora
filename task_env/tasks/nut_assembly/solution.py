@@ -18,7 +18,7 @@ import numpy as np
 
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import (
-    ArmTargetExecutionRequestV1, BoundaryWait, PoseStabilityWindow,
+    ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1, BoundaryWait, PoseStabilityWindow,
     ReferenceExecutionController,
 )
 from ...controllers.canonical.feedback import (
@@ -1200,7 +1200,7 @@ class NutAssemblyOutcomeSolutionV1:
         else:
             mode = "track"
         control_request = ArmTargetExecutionRequestV1(
-            "arm-target-execution-request-v1", "nutassembly-r3-hold-ramp-v1", mode,
+            "arm-target-execution-request-v1", ARM_HOLD_RAMP_PROFILE, mode,
         )
         control_request.validate()
         if self.require_native_feedback_contract:
