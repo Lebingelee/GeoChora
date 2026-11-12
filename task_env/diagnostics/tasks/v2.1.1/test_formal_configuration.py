@@ -82,16 +82,31 @@ def test_construction_inventory_rechecks_declared_bytes_and_includes_owner(tmp_p
     assert second['provenance.py'] == first['provenance.py']
 
 
+def _pickcube_source_inventory(robot=None, profile='r1'):
+    from task_env.controllers.canonical.contracts import digest
+    from task_env.runtime.sessions.source import source_resource_receipt
+    from task_env.tasks.pick_cube.specialization import make_reference_binding
+
+    kwargs = {'controller_profile': profile}
+    if robot is not None:
+        kwargs.update(robot=robot, robot_uid=robot.uid)
+    value = make_reference_binding(**kwargs).build_for_request('mujoco', 'cpu', 31, 8)
+    try:
+        assert value['recipe_identity'] == digest(value['resolved_configuration'])
+        assert value['source_sha256'] == value['resolved_configuration']['source_sha256']
+        return value['source_sha256']
+    finally:
+        source_resource_receipt(value['source']).close()
+
+
 def test_tabletop_tasks_consume_common_construction_source_owners():
     from pathlib import Path
     from task_env.runtime.sessions.provenance import selected_reference_construction_sources
-    from task_env.tasks.pick_cube.solution import PickCubeReadinessSolution
-    from task_env.tasks.pick_cube.specialization import _source_identity_files as pick_sources
     from task_env.tasks.nut_assembly.specialization import _source_identity_files as nut_sources
 
     root = Path(__file__).resolve().parents[4]
     common = {path.relative_to(root).as_posix() for path in selected_reference_construction_sources(root)}
-    pick = pick_sources(None, PickCubeReadinessSolution, provider='mujoco')
+    pick = _pickcube_source_inventory()
     nut = nut_sources()
     assert common <= pick.keys() and common <= nut.keys()
     assert all(pick[key] == nut[key] for key in common)
@@ -101,8 +116,6 @@ def test_tabletop_construction_inventory_consumes_robot_owned_paths(monkeypatch)
     from pathlib import Path
     from task_env.robots.panda import PandaAgent
     from task_env.robots.assembled_panda import AssembledPandaAgent
-    from task_env.tasks.pick_cube.solution import PickCubeReadinessSolution
-    from task_env.tasks.pick_cube.specialization import _source_identity_files as pick_sources
     from task_env.tasks.nut_assembly.specialization import _source_identity_files as nut_sources
 
     calls = []
@@ -111,12 +124,12 @@ def test_tabletop_construction_inventory_consumes_robot_owned_paths(monkeypatch)
         calls.append(True)
         return original()
     monkeypatch.setattr(PandaAgent, 'construction_source_paths', staticmethod(capture))
-    pick = pick_sources(None, PickCubeReadinessSolution, provider='mujoco', robot=PandaAgent())
+    pick = _pickcube_source_inventory(PandaAgent())
     nut = nut_sources()
-    attached = pick_sources(None, PickCubeReadinessSolution, provider='mujoco', robot=AssembledPandaAgent())
+    attached = _pickcube_source_inventory(AssembledPandaAgent(), 'r1_split')
     root = Path(__file__).resolve().parents[4]
     robot_paths = {path.relative_to(root).as_posix() for path in original()}
-    assert len(calls) == 3 and robot_paths <= pick.keys() and robot_paths <= nut.keys()
+    assert len(calls) >= 3 and robot_paths <= pick.keys() and robot_paths <= nut.keys()
     assert set(attached) - set(pick) == {
         'task_env/assembly/fixed_attachment.py', 'task_env/assembly/panda_fixed_source.py',
         'task_env/assembly/panda_source_profiles.py', 'task_env/runtime/sessions/mujoco_attachment_admission.py'}

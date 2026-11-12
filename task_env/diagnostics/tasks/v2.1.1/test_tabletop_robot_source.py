@@ -404,6 +404,18 @@ def test_reference_controller_failure_releases_task_source(task_name, monkeypatc
     assert len(receipts) == 1 and not receipts[0].snapshot_root.exists()
 
 
+def test_panda_source_stages_reject_missing_task_owner_before_build():
+    from task_env.runtime.sessions.source_composition_adapters import build_panda_reference_stages
+
+    def unexpected(*args, **kwargs):
+        pytest.fail('missing Task provenance must not build a source or Controller')
+
+    with pytest.raises(ValueError, match='inventory must include its declared owner'):
+        build_panda_reference_stages(source_format='mjcf', backend='cpu', controller_profile='r1',
+            prepare_source=unexpected, source_context=unexpected, compile_control=unexpected,
+            robot_uid='panda-v1', task_source_path=__file__, task_source_paths=())
+
+
 def test_task_result_cannot_override_runtime_source_and_releases_lease(monkeypatch):
     from task_env.runtime.sessions import source as source_module
     from task_env.tasks.pick_cube import specialization
@@ -510,7 +522,8 @@ def test_usd_source_identity_failure_does_not_allocate_task_source(monkeypatch):
     def fail_identity(*args, **kwargs):
         raise failure
     monkeypatch.setattr(source_module, 'snapshot_legacy_mjcf_source', unexpected)
-    monkeypatch.setattr(specialization, '_source_identity_files', fail_identity)
+    from task_env.runtime.sessions import provenance
+    monkeypatch.setattr(provenance, 'reference_source_inventory', fail_identity)
     with pytest.raises(RuntimeError) as raised:
         specialization.make_reference_binding(controller_profile='r3_continuous_v1',
             source_delivery_manifest='unused', physical_kind='direct', physical_drive='disabled'

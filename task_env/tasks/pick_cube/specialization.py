@@ -6,7 +6,6 @@ from collections import OrderedDict
 from functools import partial
 from dataclasses import asdict, replace
 import hashlib
-import inspect
 import json
 import math
 from pathlib import Path
@@ -14,8 +13,7 @@ from typing import NamedTuple
 
 from ...artifacts import TaskArtifact, Timebase
 from ...assembly.panda_box import (PandaBoxDeclaration, compile_panda_box_artifact,
-                                   compile_panda_box_mjcf_task, compile_panda_box_task)
-from ...assembly.compiler import reference_task_identity_fields
+                                   compile_panda_box_mjcf_task)
 from ...controllers.canonical.contracts import digest, reference_pose_action_binding
 from ...controllers.canonical.execution import (
     REFERENCE_POSITION_CONTROLLER_PROFILES, R3_REFERENCE_POSITION_PROFILES)
@@ -30,7 +28,6 @@ from ...runtime.sessions.control import position_control_binding_from_selected
 from ...robots.panda import PandaAgent, panda_reference_control_binding
 from ...environment.reference_binding import ReferenceTaskBinding
 from ...environment.reference_env import SelectedReferenceEnv
-from ...objects.pick_cube import PickCubeSceneComposer
 from ...observations.selected_reference import selected_observation_binding
 
 
@@ -135,27 +132,11 @@ def build_artifact(*, lift_height_m=None, task_config=None) -> TaskArtifact:
     return compile_panda_box_artifact(_declaration(lift_height_m=lift_height_m, task_config=task_config))
 
 
-def _source_identity_files(controller, solution_type, *, profile_source=None, provider=None, robot=None):
-    root = Path(__file__).resolve().parents[3]
-    from ...runtime.sessions.provenance import (construction_source_inventory,
-                                                selected_reference_construction_sources)
-    files = {Path(__file__).resolve(), Path(__file__).with_name("task.py").resolve(), CONFIG_PATH.resolve(),
-             Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
-             Path(inspect.getsourcefile(compile_panda_box_task)).resolve(),
-             Path(inspect.getsourcefile(solution_type)).resolve(),
-             root / "task_env/tasks/pick_cube/observation.py"}
-    files.update(selected_reference_construction_sources(root))
-    from ...runtime.sessions.source_composition_adapters import robot_construction_source_paths
-    files.update(robot_construction_source_paths(PandaAgent() if robot is None else robot))
-    if provider == 'mujoco':
-        files.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
-    if provider == 'isaacsim':
-        files.add(root / 'task_env/runtime/sessions/isaac_usd_admission.py')
-    if controller is not None:
-        files.add(Path(inspect.getsourcefile(type(controller))).resolve())
-    if profile_source is not None:
-        files.add(Path(profile_source).resolve())
-    return construction_source_inventory(root, files)
+def _task_construction_source_paths():
+    """Declare only the files that own PickCube task and Solution semantics."""
+    return (Path(__file__).resolve(), Path(__file__).with_name('task.py').resolve(),
+            CONFIG_PATH.resolve(), Path(__file__).with_name('solution.py').resolve(),
+            Path(__file__).with_name('observation.py').resolve())
 
 
 def _r3_dynamic_profile():
@@ -166,9 +147,7 @@ def _r3_dynamic_profile():
 class _TaskSourceFacts(NamedTuple):
     is_r3_profile: bool
     dynamic_profile: object
-    profile_source: object
     readiness: object
-    source_sha256: object
 
 
 class _PositionSourceContext(NamedTuple):
@@ -265,7 +244,7 @@ def _prepare_reference_source(request, selected_robot, source_robot, *, source_f
         task_config, readiness_profile, resolved_config)
     declaration = (None if source_format == 'usd' else
                    _declaration(lift_height_m=lift_height_m, task_config=task_config))
-    artifact = readiness = source_ids = None
+    artifact = readiness = None
     if source_format == 'usd':
         config = replace(config, runtime=replace(config.runtime, backend='cpu'))
         artifact = build_artifact(lift_height_m=lift_height_m, task_config=task_config)
@@ -274,14 +253,10 @@ def _prepare_reference_source(request, selected_robot, source_robot, *, source_f
     if artifact is not None:
         readiness = _build_readiness(artifact, config, is_r3_profile=is_r3_profile,
                                      dynamic_profile=dynamic_profile)
-    if source_format == 'usd':
-        from .solution import PickCubeReadinessSolution
-        source_ids = _source_identity_files(None, PickCubeReadinessSolution,
-                                            profile_source=profile_source, provider='isaacsim')
     recipe_hash = (hashlib.sha256(_canonical_task_recipe(task_config)).hexdigest()
                    if source_format == 'usd' else None)
-    return PandaReferenceSourcePlan(task_config, config, declaration, artifact, recipe_hash,
-        _TaskSourceFacts(is_r3_profile, dynamic_profile, profile_source, readiness, source_ids))
+    return PandaReferenceSourcePlan(task_config, config, declaration, artifact, recipe_hash, profile_source,
+        _TaskSourceFacts(is_r3_profile, dynamic_profile, readiness))
 
 
 def _reference_source_context(plan, compiled, runtime_input, selected_robot, source_robot, *,
@@ -290,10 +265,10 @@ def _reference_source_context(plan, compiled, runtime_input, selected_robot, sou
     facts = plan.facts
     if source_format == 'usd':
         return _UsdSourceContext(runtime_input, selected_robot, plan.config.action,
-            plan.task_config, plan.config, facts.readiness, facts.dynamic_profile, facts.source_sha256)
+            plan.task_config, plan.config, facts.readiness, facts.dynamic_profile, plan.source_inventory)
     if not physical:
         return _PositionSourceContext(plan.task_config, selected_robot, source_robot,
-            facts.is_r3_profile, facts.dynamic_profile, facts.profile_source, facts.readiness)
+            facts.is_r3_profile, facts.dynamic_profile, plan.profile_source, facts.readiness)
     solution_identity = None
     if reset_switch:
         from .solution import PickCubeReadinessSolution
@@ -316,44 +291,24 @@ def _bind_mjcf_effort_control(compiled, context, selection, request, *, reset_sw
 
 
 def _bind_reference_position_control(compiled, context, controller, request, *, controller_profile):
-    from ...controllers.canonical.execution import bind_reference_position_identity
+    """Return PickCube task semantics for the source-bound Controller."""
     from .solution import PickCubeReadinessSolution
-    artifact, source = compiled.artifact, compiled.source
-    task_config, recipe = context.task_config, context.task_config['recipe']
-    is_r3_profile = context.is_r3_profile
-    profile_source, readiness = context.profile_source, context.readiness
-    source_intent = context.composition.intent
-    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
-    controller_identity_fields = bind_reference_position_identity(
-        controller, profile_id=controller_profile, construction_id=recipe['construction_id'])
-    root = Path(__file__).resolve().parents[3]
-    from ...runtime.sessions.provenance import construction_revision
-    revision = construction_revision(root)
-    source_ids = _source_identity_files(controller, PickCubeReadinessSolution,
-        profile_source=profile_source, provider=request.provider, robot=context.robot)
-    construction_identity = reference_task_identity_fields(artifact, source, controller)
-    resolved = {
-        "construction_id": recipe["construction_id"], "task_recipe": task_config,
-        "input_source_composition_intent_v1_sha256": source_intent.identity_hash,
-        "task_parameters_v1": {"lift_height_m": artifact.semantics.parameters_si["lift_height"]},
-        "artifact": artifact.to_mapping(), **construction_identity,
-        "readiness": asdict(readiness), "resolved_controller_action": asdict(controller.config),
-        "resolved_controller_gripper": asdict(controller.gripper_config),
-        "solution_identity": solution_identity,
-        "source_revision": revision, "source_sha256": source_ids,
-        "qualification": "NOT_REQUALIFIED",
-    }
-    resolved.update(controller_identity_fields)
-    if is_r3_profile:
-        resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
-    return {
-        "construction_id": recipe["construction_id"], "readiness": readiness,
-        "solution_factory": lambda: PickCubeReadinessSolution(config=readiness),
-        "solution_identity": solution_identity,
-        "source_revision": revision, "source_sha256": source_ids,
-        "recipe_identity": digest(resolved), "resolved_configuration": resolved,
-    }
 
+    artifact = compiled.artifact
+    task_config, recipe = context.task_config, context.task_config['recipe']
+    readiness = context.readiness
+    solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
+    resolved = {
+        'construction_id': recipe['construction_id'], 'task_recipe': task_config,
+        'task_parameters_v1': {'lift_height_m': artifact.semantics.parameters_si['lift_height']},
+        'readiness': asdict(readiness), 'solution_identity': solution_identity,
+        'qualification': 'NOT_REQUALIFIED',
+    }
+    if context.is_r3_profile:
+        resolved['task_controller_profile'] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
+    return {'construction_id': recipe['construction_id'], 'readiness': readiness,
+        'solution_factory': lambda: PickCubeReadinessSolution(config=readiness),
+        'solution_identity': solution_identity, 'resolved_configuration': resolved}
 
 
 def _bind_isaac_reference_control(compiled, context, selection, request):
@@ -464,7 +419,8 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         prepare_source=prepare, source_context=source_context, compile_control=finish,
         robot_uid=robot_uid, robot=robot, delivery_manifest=source_delivery_manifest,
         build_task_scene=build_pickcube_scene, compile_task_artifact=compile_pickcube_task_artifact,
-        task_source_path=__file__, resolved_config=resolved_config,
+        task_source_path=__file__, task_source_paths=_task_construction_source_paths(),
+        resolved_config=resolved_config,
         physical_kind=physical_kind, native_drive=physical_drive, reset_selection=reset_switch,
         task_settings=panda_effort_task_settings, existing_robot_entity='panda-v1',
         task_body_names=PickCubeReferenceEnv.robot_source_roots,

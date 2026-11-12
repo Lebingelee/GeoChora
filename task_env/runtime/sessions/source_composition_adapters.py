@@ -330,7 +330,9 @@ class PandaReferenceSourcePlan(NamedTuple):
     declaration: object
     artifact: object
     scene_recipe_sha256: str | None
+    profile_source: object
     facts: object
+    source_inventory: object = None
 
 
 def compose_declared_reference_source(compiled, *, robot, controller_profile,
@@ -355,9 +357,10 @@ def compose_declared_reference_source(compiled, *, robot, controller_profile,
 
 def build_panda_reference_stages(*, source_format, backend, controller_profile,
                                  prepare_source, source_context, compile_control,
-                                 robot_uid, robot=None, delivery_manifest=None,
+                                 robot_uid, task_source_path, task_source_paths,
+                                 robot=None, delivery_manifest=None,
                                  build_task_scene=None, compile_task_artifact=None,
-                                 task_source_path=None, resolved_config=None,
+                                 resolved_config=None,
                                  physical_kind=None,
                                  native_drive=None, reset_selection=False, task_settings=None,
                                  existing_robot_entity=None, task_body_names=(),
@@ -370,6 +373,10 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
     """
     from ...environment.reference_binding import SourceBoundTaskBuilder
     from ...assembly.compiler import CompiledReferenceTaskV1
+    from pathlib import Path
+
+    if Path(task_source_path).resolve() not in {Path(path).resolve() for path in task_source_paths}:
+        raise ValueError('Task construction inventory must include its declared owner')
     physical = physical_kind is not None
 
     def compile_source(request):
@@ -385,7 +392,15 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
         if type(plan) is not PandaReferenceSourcePlan:
             raise TypeError('Panda source preparation must return its declared source plan')
         if source_format == 'usd':
+            from pathlib import Path
+            from ...assembly.panda_box import panda_box_construction_source_paths
             from .isaac_usd_admission import compile_f06_task_input
+            from .provenance import reference_source_inventory
+
+            inventory = reference_source_inventory(Path(__file__).resolve().parents[3],
+                task_paths=task_source_paths, asset_paths=panda_box_construction_source_paths(),
+                robot=selected, provider=request.provider, profile_source=plan.profile_source)
+            plan = plan._replace(source_inventory=inventory)
             runtime_input = compile_f06_task_input(
                 delivery_manifest=delivery_manifest, legacy_artifact=plan.artifact, robot=selected,
                 task_config=plan.task_config, build_task_scene=build_task_scene,
@@ -442,11 +457,27 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
             if reset_selection:
                 value['_physical_controller_factory'] = factory
         else:
+            from dataclasses import asdict
+            from pathlib import Path
+            from ...assembly.compiler import reference_task_identity_fields
+            from ...assembly.panda_box import panda_box_construction_source_paths
+            from ...controllers.canonical.contracts import digest
+            from ...controllers.canonical.execution import bind_reference_position_identity
+            from .provenance import construction_revision, reference_source_inventory
+
+            revision = construction_revision(Path(__file__).resolve().parents[3])
+            source_ids = reference_source_inventory(Path(__file__).resolve().parents[3],
+                task_paths=task_source_paths, asset_paths=panda_box_construction_source_paths(),
+                robot=context.robot, provider=request.provider, controller=selection,
+                profile_source=context.profile_source)
             value = {'artifact': compiled.artifact, 'source': compiled.source,
-                     'controller': selection, 'solution': None}
+                     'controller': selection, 'solution': None,
+                     'source_revision': revision, 'source_sha256': source_ids}
             if context.composition.reset_plan is not None:
                 value['reset_plan'] = context.composition.reset_plan
         task_value = compile_control(compiled, context, selection, request)
+        if value.keys() & task_value.keys():
+            raise ValueError('Task construction conflicts with source or Controller ownership')
         if source_format == 'usd':
             from ...controllers.canonical.contracts import digest
 
@@ -468,8 +499,23 @@ def build_panda_reference_stages(*, source_format, backend, controller_profile,
             if runtime_facts.keys() & task_facts.keys():
                 raise ValueError('Task configuration conflicts with Runtime construction facts')
             task_value = {**task_value, 'resolved_configuration': {**runtime_facts, **task_facts}}
-        if value.keys() & task_value.keys():
-            raise ValueError('Task construction conflicts with source or Controller ownership')
+        else:
+            identity = bind_reference_position_identity(selection, profile_id=controller_profile,
+                construction_id=task_value['construction_id'])
+            runtime_facts = {
+                'input_source_composition_intent_v1_sha256': context.composition.intent.identity_hash,
+                'artifact': compiled.artifact.to_mapping(),
+                **reference_task_identity_fields(compiled.artifact, compiled.source, selection),
+                'resolved_controller_action': asdict(selection.config),
+                'resolved_controller_gripper': asdict(selection.gripper_config),
+                'source_revision': revision, 'source_sha256': source_ids, **identity,
+            }
+            task_facts = task_value.get('resolved_configuration', {})
+            if runtime_facts.keys() & task_facts.keys():
+                raise ValueError('Task configuration conflicts with Runtime construction facts')
+            resolved = {**runtime_facts, **task_facts}
+            task_value = {**task_value, 'resolved_configuration': resolved,
+                          'recipe_identity': digest(resolved)}
         return {**value, **task_value}
 
     if source_format == 'usd':

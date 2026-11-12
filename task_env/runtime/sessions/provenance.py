@@ -37,6 +37,26 @@ def construction_source_inventory(root, paths):
             for path in sorted(sources)}
 
 
+def reference_source_inventory(root, *, task_paths, asset_paths, robot, provider,
+                               controller=None, profile_source=None):
+    """Combine declared Task, asset, Robot and provider construction owners."""
+    import inspect
+    from .source_composition_adapters import robot_construction_source_paths
+
+    root = Path(root).resolve()
+    paths = {*task_paths, *asset_paths, *selected_reference_construction_sources(root),
+             *robot_construction_source_paths(robot)}
+    if provider == 'mujoco':
+        paths.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
+    elif provider == 'isaacsim':
+        paths.add(root / 'task_env/runtime/sessions/isaac_usd_admission.py')
+    if controller is not None:
+        paths.add(Path(inspect.getsourcefile(type(controller))).resolve())
+    if profile_source is not None:
+        paths.add(Path(profile_source).resolve())
+    return construction_source_inventory(root, paths)
+
+
 def construction_revision(root):
     """Identify the checkout used for a construction without rewriting old receipts."""
     return subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()

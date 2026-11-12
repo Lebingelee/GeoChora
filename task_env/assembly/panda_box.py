@@ -21,6 +21,14 @@ PANDA_BOX_CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot',
                           'body_pose_query', 'frame_pose_query')
 
 
+def panda_box_construction_source_paths():
+    """Identify the asset and assembly owners used by this source recipe."""
+    from pathlib import Path
+    from ..objects import pick_cube
+
+    return (Path(__file__).resolve(), Path(pick_cube.__file__).resolve())
+
+
 @dataclass(frozen=True)
 class PandaBoxDeclaration:
     """Task identity, physical placement, and semantics for the shared box asset."""

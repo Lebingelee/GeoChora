@@ -496,7 +496,8 @@ def test_usd_stages_reject_unsupported_profile_before_source_build():
     with pytest.raises(ValueError, match='F06 Isaac freezes'):
         build_panda_reference_stages(source_format='usd', backend='cuda', controller_profile='r1',
                                      prepare_source=unexpected, source_context=unexpected,
-                                     compile_control=unexpected, robot_uid='panda-v1')
+                                     compile_control=unexpected, robot_uid='panda-v1',
+                                     task_source_path=__file__, task_source_paths=(__file__,))
 
 
 def test_usd_controller_rejects_mismatched_compiled_source():
