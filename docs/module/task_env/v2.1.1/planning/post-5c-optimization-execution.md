@@ -1179,3 +1179,12 @@ GeoPhys 和 Isaac 当前没有 provider-owned source dynamics，故质量矩阵 
 生产代码修改 4 文件 +5／−330，净减 325 行；版本诊断修改 probe 1 文件 +27／−3，并新增 1 文件 158 行，将正式 task RGB 合同检查从旧诊断中摘录至版本目录并补充关闭检查；旧文件未删除，不能计作整文件迁移。本文和当前状态文档修改 2 文件；tracked 文件数 1355→1356。158 项既有版本检查及 9 项 RGB 合同检查通过。MuJoCo CPU 的正式 joint effort／CameraGeometry／native RGB 完成 reset、step、第二次 reset、关闭和 5 个 native 子步；正式 R3 Position 记录完成 reset、step、第二次 reset、关闭与 5 个子步。MJCF 导入有语义诊断。
 
 本轮还发现两个独立于旧诊断入口的正式相机问题，均在首次 step 前退出，尚未归因或修复：R3 Position／RGB 在 reset 的 source 检查处缺少 Scene 声明；joint effort 使用公开 `CameraSpec` 时实际采集后尝试调用 MuJoCo session 不提供的 `task_camera_binding`。上述 CameraGeometry 通过不能代表 CameraSpec 或 Position／RGB 已通过。GeoPhys／Isaac、完整 Solution 及历史 H5 独立读回本轮未复验。预算、冻结输入和失败／成功收据位于 ignored `workspace/maintenance/v211_retire_position_camera_ch77m4u5/`。E01～E04 尚未整体接收。
+
+
+### 6.117 task RGB 相机几何由 renderer 采集结果提供
+
+输入 `05419455`。6.116 的 `CameraSpec` 失败源于 Env 在 renderer 已完成采集后，额外向物理 session 请求 `task_camera_binding`；MuJoCo 物理 session 没有该接口，独立 renderer 场景也不应要求物理 session 充当相机 owner。现由 RGB consumer 从实际捕获结果发布 `resolved_camera` 几何及边界元数据，Env 保留用户请求和 renderer 信息，不再请求物理 session。`resolved_camera` 是与该帧关联的解析几何，不声称是原生设备实测标定；先前 CameraSpec 回执中的 `realized_camera` 字段不再提供。source／状态／clock 身份和同步采集检查保留。
+
+生产修改 2 文件 +2／−2；版本诊断修改 2 文件 +13／−11；本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件保持 1356。167 项版本检查通过，包含物理 session 没有相机方法时由 renderer 结果提供边界几何的检查。MuJoCo CPU joint effort 分别使用公开 CameraSpec 和 CameraGeometry，均完成 reset、step、再次 reset、关闭与 5 个 native 子步，RGB 的解析几何分别对应 reset／step 边界；MJCF 导入有语义诊断。此项没有改动物理推进。GeoPhys／Isaac 和完整 Solution 本轮未运行。
+
+R3 Position／RGB 的另一个失败仍在：当前 MJCF reference Task source 不提供完整 `SceneDefinition`，其 Artifact 仍为旧表示；renderer 的 source 合同要求完整 Scene 和 `TaskArtifactV1`，不能以 Panda 局部 Scene 伪装整场景。需将正式 Position Task、Robot 与 source 构建汇入同一完整合同后复验。失败记录继续保留于 6.116；本项未接收 E01～E04。冻结 diff、预算及收据位于 ignored `workspace/maintenance/v211_rgb_camera_owner_upcla9eh/`。

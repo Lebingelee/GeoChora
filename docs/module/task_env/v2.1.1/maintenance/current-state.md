@@ -244,4 +244,4 @@ MJCF effort 已沿用正式 Task ID；历史固定质量矩阵不覆盖正式 0.
 
 reference effort 的共同 binding 检查和状态需求已从普通 PD 构造中分离，动态／质量矩阵 profile 不再创建并丢弃 PD Controller；实际任务专属构建仍待收敛。详见[实施记录 6.115](../planning/post-5c-optimization-execution.md#6115-reference-effort-共享绑定合同直接构建-controller)。
 
-旧 Position 诊断双相机入口及专用 consumer 已退出公共 Env；正式 task RGB 保留，但本轮发现 MuJoCo 的 R3 Position／RGB source Scene 与 `CameraSpec` 元数据路径各有未解决失败。详见[实施记录 6.116](../planning/post-5c-optimization-execution.md#6116-退休旧-position-诊断相机入口)。
+旧 Position 诊断双相机入口及专用 consumer 已退出公共 Env；MuJoCo effort／`CameraSpec` 的元数据问题已修复，R3 Position／RGB 因正式 source 缺少 Scene 仍未解决。详见[实施记录 6.117](../planning/post-5c-optimization-execution.md#6117-task-rgb-相机几何由-renderer-采集结果提供)。

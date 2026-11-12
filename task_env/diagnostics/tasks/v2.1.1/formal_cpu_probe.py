@@ -1,7 +1,7 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
-parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
+parser=argparse.ArgumentParser();parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--profile',default=None);parser.add_argument('--robot-uid',default=None);parser.add_argument('--record',action='store_true');parser.add_argument('--sequence',action='store_true');parser.add_argument('--yaml',action='store_true');parser.add_argument('--gravity',action='store_true');parser.add_argument('--solution',action='store_true');args=parser.parse_args()
 if args.solution and args.case != 'panda-r3':raise ValueError('Solution probe requires panda-r3')
@@ -30,13 +30,13 @@ try:
         if args.task_rgb:
             from task_env.environment.config import CameraSpec
             from task_env.observations.canonical_camera import CameraGeometry
-            preliminary = make_env(uid, config=config)
-            try:
-                camera = CameraGeometry.from_camera_spec(
-                    CameraSpec('task', width=64, height=48, depth=False),
-                    task_artifact_hash=preliminary.artifact.identity_hash)
-            finally:
-                preliminary.close()
+            camera = CameraSpec('task', width=64, height=48, depth=False)
+            if not args.camera_spec:
+                preliminary = make_env(uid, config=config)
+                try:
+                    camera = CameraGeometry.from_camera_spec(camera, task_artifact_hash=preliminary.artifact.identity_hash)
+                finally:
+                    preliminary.close()
             camera_options = {'task_rgb_camera': camera, 'task_renderer': 'mujoco'}
         if args.yaml:
             import yaml
@@ -111,6 +111,7 @@ try:
         if args.task_rgb:
             assert observation['task_rgb'].shape == (48, 64, 3)
             assert info['task_rgb_v1']['capture_identity']['capture_phase'] == 'reset_initial'
+            assert info['task_rgb_v1']['resolved_camera']['capture_control_step'] == 0
             result['rgb_reset_boundary'] = info['task_rgb_v1']['capture_identity']['state_boundary']
         if args.case in {'panda-effort','panda-joint'}:
             for finger in ('panda-v1/finger_joint1','panda-v1/finger_joint2'):
@@ -174,6 +175,7 @@ try:
         if args.task_rgb:
             assert stepped[0]['task_rgb'].shape == (48, 64, 3)
             assert stepped[4]['task_rgb_v1']['capture_identity']['capture_phase'] == 'post_control_step'
+            assert stepped[4]['task_rgb_v1']['resolved_camera']['capture_control_step'] == 1
             result['rgb_step_boundary'] = stepped[4]['task_rgb_v1']['capture_identity']['state_boundary']
         second=env.session.state_boundary_identity().to_mapping()
         time_after=float(env.state.simulation_time)

@@ -2498,10 +2498,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         image, receipt = self._task_rgb_consumer.capture(publication.view)
         camera = getattr(self, '_task_camera_spec', None)
         if camera is not None:
-            native = self.session.task_camera_binding(publication.view)['native']
             renderer = self._task_rgb_config[1]
             receipt = {**receipt, 'camera_name': camera.name,
-                'requested_camera': _json_value(asdict(camera)), 'realized_camera': _json_value(native),
+                'requested_camera': _json_value(asdict(camera)),
                 'renderer': renderer, 'render_backend': {
                     'mujoco': 'native-opengl', 'geophys': 'rasterizer', 'isaacsim': 'rtx'}[renderer],
                 'observation_boundary': {'episode_id': publication.view.boundary.episode_id,

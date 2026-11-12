@@ -50,8 +50,7 @@ def test_camera_spec_capture_metadata_uses_published_boundary_for_reset_and_step
     env._task_rgb_config = camera, 'mujoco'
     env._task_rgb_consumer = TaskRgbObservationConsumerV1(camera, selection,
         lambda _state: _Session(camera, selection), color_space='test')
-    env.session = SimpleNamespace(task_camera_binding=lambda view: {
-        'native': {'episode_id': view.boundary.episode_id, 'fov_y': 1.}})
+    env.session = SimpleNamespace()  # Renderer owns camera calibration, not physics.
     for step in (0, 1):
         view = _state(step)
         env._publish_task_rgb_typed_state = lambda _state: SimpleNamespace(view=view)
@@ -59,7 +58,8 @@ def test_camera_spec_capture_metadata_uses_published_boundary_for_reset_and_step
             SimpleNamespace(control_step=step, simulation_time=step * .01))
         assert image.shape == (3, 4, 3)
         assert receipt['requested_camera']['name'] == 'task'
-        assert receipt['realized_camera']['episode_id'] == view.boundary.episode_id
+        assert receipt['resolved_camera']['capture_control_step'] == step
+        assert receipt['resolved_camera']['camera']['camera_id'] == 'task'
         assert receipt['observation_boundary']['control_step'] == step
         assert receipt['render_backend'] == 'native-opengl'
 

@@ -94,6 +94,7 @@ class TaskRgbObservationConsumerV1:
             'capture_identity': identity.to_mapping(),
             'capture_identity_sha256': identity.identity_hash,
             'camera': self.camera.to_mapping(),
+            'resolved_camera': result.metadata.to_mapping(),
             'renderer_generation': self.generation,
             'completion': 'synchronous capture completed before observation publication',
             'completion_evidence': getattr(self._session, 'completion_evidence', None),
