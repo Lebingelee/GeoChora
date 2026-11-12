@@ -35,6 +35,9 @@ def compile_nut_assembly_source(*, artifact, artifact_declaration, composition, 
     from .source import TaskSceneSource
     from ..runtime.sessions.source_composition_adapters import apply_declared_provider_source_options
 
+    expected = artifact_declaration.compile()
+    if type(artifact) is not type(expected) or artifact.identity_hash != expected.identity_hash:
+        raise ValueError('selected nominal NutAssembly Artifact required')
     xml, base = build_nut_assembly_declared_model(
         scene=scene, asset=asset, physics_dt=physics_dt, robot_source=robot.single_mjcf_source())
     xml, contact_profile = apply_declared_provider_source_options(

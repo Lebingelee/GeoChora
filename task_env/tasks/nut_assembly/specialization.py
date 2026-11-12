@@ -245,8 +245,6 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
                          lift_height_m=None, task_config=None, robot=None):
     task_config = _configuration() if task_config is None else task_config
     robot = make_agent(task_config['recipe']['agent_uids'][0]) if robot is None else robot
-    if artifact.to_mapping() != build_artifact(lift_height_m=lift_height_m, task_config=task_config, robot=robot).to_mapping():
-        raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
     if backend != 'cpu':

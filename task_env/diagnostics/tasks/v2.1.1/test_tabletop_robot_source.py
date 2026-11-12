@@ -903,6 +903,19 @@ def test_nut_source_assembly_receives_the_selected_robot_and_provider(provider, 
         source_resource_receipt(source).close()
 
 
+def test_nut_foreign_artifact_is_rejected_before_source_materialization(monkeypatch):
+    from dataclasses import replace
+    from task_env.assembly import nut_assembly as assembly
+    from task_env.tasks.nut_assembly import specialization
+
+    artifact = replace(specialization.build_artifact(), artifact_id='foreign-artifact')
+    def unexpected_materialization(**_kwargs):
+        pytest.fail('foreign Artifact must not materialize the declared source')
+    monkeypatch.setattr(assembly, 'build_nut_assembly_declared_model', unexpected_materialization)
+    with pytest.raises(ValueError, match='selected nominal NutAssembly Artifact required'):
+        specialization.build_runtime_source(artifact, provider='mujoco')
+
+
 def test_nut_mujoco_source_records_provider_lowerer_identity():
     import xml.etree.ElementTree as ET
     from task_env.tasks.nut_assembly.specialization import build_reference
