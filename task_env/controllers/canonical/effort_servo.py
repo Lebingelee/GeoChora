@@ -66,6 +66,7 @@ class JointReferenceEffortControllerV1:
         self._linear = LinearEffortControllerV1(linear, binding, model)
         self.profile = profile
         self.binding = binding
+        self._channels = self._linear._channels
         self.writer_id = profile.controller_id
         self.identity = digest({'profile': profile.identity_hash, 'linear': self._linear.identity,
                                 'controller_law': 'explicit_full_pd'})

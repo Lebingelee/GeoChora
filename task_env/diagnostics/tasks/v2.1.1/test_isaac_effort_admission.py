@@ -129,8 +129,12 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     assert value['reset_plan'].reset_sample.task_artifact_hash == artifact.identity_hash
     if profile != 'r3_continuous_v1':
         from task_env.runtime.sessions.isaac_physical import build_isaac_panda_effort_execution
+        from task_env.runtime.sessions.control import bind_selected_controller
         source = value['source']
         assert calls == [source]
+        selected = bind_selected_controller(value, binding=binding, provider='isaacsim', backend='cuda')
+        assert selected.selection_matches[0].selection_profile_id == profile
+        assert selected.physical_execution is value['physical_execution']
         assert 'task_env/runtime/sessions/isaac_physical.py' in value['source_sha256']
         assert 'task_env/runtime/sessions/source_composition_adapters.py' in value['source_sha256']
         expected_drive = 'position' if profile == 'panda-direct-effort-v1' else 'disabled'

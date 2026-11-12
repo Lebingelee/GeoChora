@@ -174,7 +174,8 @@ class PandaAgent(BaseAgent):
         writers = ('panda-arm-effort', 'panda-hand-effort') if split else ('panda-direct-effort',)
         paths = tuple(('robot', name) for name in names)
         subject = ControlledSubjectV1(entity_id, entity_id, source_id, source_closure_sha256,
-            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None, paths, writers)
+            'references_existing', 'fixed', FrameReference(entity_id, 'link0'), None, paths, writers,
+            supported_controller_profiles=tuple(PandaAgent.effort_controller_profiles()))
         declarations = tuple(SubjectJointDeclarationV1(
             path, name, ((writers[0] if i < 7 else writers[-1]),),
             native_actuators[i], transmission_ids[i],

@@ -422,8 +422,17 @@ class ReferenceTaskBinding:
     def build_for_request(self, provider, backend, seed, horizon, sampled=None):
         """Build from one explicit Task/Robot/Runtime request."""
         if self.build_receives_binding:
-            return self.build(provider, backend, seed, horizon, sampled, self)
-        return self.build(provider, backend, seed, horizon, sampled)
+            value = self.build(provider, backend, seed, horizon, sampled, self)
+        else:
+            value = self.build(provider, backend, seed, horizon, sampled)
+        execution = value.get('physical_execution')
+        profile = getattr(execution, 'selection_profile_id', None)
+        if profile is not None:
+            declared = value.get('selected_controller_profile_id', profile)
+            if declared != profile:
+                raise ValueError('selected Controller profile differs from its execution')
+            value = {**value, 'selected_controller_profile_id': profile}
+        return value
 
     def bind_compiled_control(self, value):
         """Bind the physical action contract to the Controllers actually compiled.

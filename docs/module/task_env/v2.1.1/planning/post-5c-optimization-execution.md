@@ -1396,3 +1396,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 上一批多资产根导入还存在逻辑摘要路径碰撞：两个不同文件若内容恰好相同会被合并。本批按真实路径拒绝碰撞，无论内容是否相同。生产修改 5 文件 +30／−8，净增 22 行；版本诊断修改 3 文件 +30／−2，净增 28 行；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1358。相对 `1f1359ee` 的 task_env 差异 138 文件（新增 13、删除 20、修改 105），+8068／−14776，净减 6708 行，包含此前旧路径退休与诊断迁移，不归因于本批。
 
 最终版本诊断 199 项通过；真实 MJCF 和已有 USD delivery 的纯构造检查均核对共同适配入口、Controller 及 source 身份。MuJoCo direct effort、joint effort、R3 Solution 单步以及 GeoPhys direct effort 完成 reset、控制、再次 reset、重复 close；MuJoCo 各观测 5 个 native 子步，GeoPhys 不可观测并按 50 预留。R3 仅单步，并非完整 Solution；Isaac 原生执行、renderer、Nut 和普通任务未复验，历史证据仍按原输入及范围使用。冻结输入、双锁、预算与收据位于 ignored `workspace/maintenance/v211_effort_source_dispatch_20261112/`。E01～E04 尚未整体接收。
+
+
+### 6.144 Panda effort 与共同主体／Controller 匹配
+
+输入 `04aaa652`；实施前重审台账 GOV、ENTRY、TASK、ENV、SUBJ、CTRL、source 和实际四任务调用链。Pendulum／双轮车的 effort execution 已携带选择身份并经过主体、通道、writer 和 source 的共同匹配；PickCube effort 以前未提供该身份，绕过同一匹配。现 Panda 受控主体声明实际支持的 effort profile，Controller 及其 reference 包装公开绑定通道；execution 保存已选择 profile，正式构建请求传播该身份并由既有 Controller 匹配和 Runtime builder 复核。reset 时使用待提交的 Controller 进行 deployment 预检，重建和物化复核同一实际身份；切换后的 Env value 和 Robot 视图绑定已提交 execution。Position、effort 语义及各 adapter 的 native 准入继续各自保留。匹配仍有一主体一 writer 的现有限制，动态模型仍依赖其原有 source 绑定，不据此宣称任意主体组合或全部模型匹配完成。
+
+生产修改 7 文件 +63／−15，净增 48 行，用于现有共同匹配和切换时身份传播；版本诊断修改 3 文件 +42／−1；本文新增记录。无新增、删除或整文件迁移；项目 tracked 文件数保持 1358。相对 `1f1359ee` 的 task_env 差异 139 文件（新增 13、删除 20、修改 106），+8159／−14778，净减 6619 行，包含此前旧路径退休与诊断迁移，不归因于本批。
+
+最终版本诊断 203 项通过；五种 Panda effort profile 在纯构造中通过共同主体和通道匹配，USD delivery 的 direct／joint profile 同样验证匹配但未启动 Isaac 原生运行。MuJoCo PickCube direct、PickCube joint→R3 reset 切换、Nut Solution 单步、Pendulum 和双轮车分别完成短程 reset／推进／再次 reset／关闭，观测 5／10／5／25／25 native 子步；GeoPhys PickCube direct 同样完成短程，native 子步不可观测并按 50 预留。Nut 为单步非完整 Solution；renderer 和其他 provider 未复验。首次真实尝试中切换后的身份与旧 preflight 冲突，已修正并保留失败记录；最终冻结输入、双锁、预算和收据在 ignored `workspace/maintenance/v211_effort_controller_match_v2_20261112/`，初次在相邻无 v2 目录。E01～E04 尚未整体接收。

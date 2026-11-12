@@ -257,7 +257,8 @@ def _match_physical_execution(value):
         if action_profile is not None:
             action_rows.append({
                 'action_names': action_profile.action_names,
-                'action_to_effort': action_profile.action_to_effort,
+                'action_to_effort': getattr(action_profile, 'action_to_effort',
+                                            getattr(action_profile, 'reference_to_joint', None)),
                 'action_key': getattr(action_profile, 'action_key', None),
                 'action_low': getattr(action_profile, 'action_low', ()),
                 'action_high': getattr(action_profile, 'action_high', ()),
@@ -265,6 +266,7 @@ def _match_physical_execution(value):
         else:
             action_rows.append({
                 'action_key': getattr(controller, '_action_key', None),
+                'action_shape': getattr(controller, 'action_shape', None),
                 'ranges': tuple(item.effort_range for item in controller_channels),
             })
         for channel in controller_channels:

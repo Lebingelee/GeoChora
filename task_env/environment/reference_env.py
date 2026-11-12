@@ -1756,8 +1756,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                    else self._physical_execution())
         if profile is not None:
             declared_physical = self.value.get('physical_execution')
+            committed = None if physical_selection is None else physical_selection.committed
             if (declared_physical is not None and profile is not declared_physical
-                    and (physical_selection is None or declared_physical is not physical_selection.declaration)):
+                    and (physical_selection is None or (
+                        declared_physical is not physical_selection.declaration
+                        and (committed is None or declared_physical is not committed.execution)))):
                 raise ValueError('physical execution differs from the selected declaration')
             profile.preflight(provider=self.provider, backend=self.backend,
                               artifact=self.artifact, source=self.value['source'])
@@ -1817,6 +1820,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                     requested = dict(requested or {})
                     requested['controller'] = {'gravity_compensation': True}
                 preflight_value = candidate_value if switching else self.value
+                if physical_candidate is not None:
+                    active = physical_candidate.execution
+                    preflight_value = {**preflight_value, 'physical_execution': active,
+                                       'controller': active.controllers[0],
+                                       'selected_controller_profile_id': active.selection_profile_id}
                 facts = dict(requested=requested, task_uid=self.uid, artifact=preflight_value['artifact'],
                              source=preflight_value['source'],
                              controller=preflight_value.get('controller'), seed=seed)
@@ -1942,6 +1950,11 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 verify_source=verify_rebuilt_source, set_phase=set_reconstruction_phase,
                 prepared=candidate_value if switching else None)
             self.value, self.artifact = rebuilt.value, rebuilt.artifact
+            if physical_candidate is not None:
+                active = physical_candidate.execution
+                self.value = {**self.value, 'physical_execution': active,
+                              'controller': active.controllers[0],
+                              'selected_controller_profile_id': active.selection_profile_id}
             seed, self.solution = rebuilt.seed, rebuilt.solution
             self._external_solution_owner = external_solution
             previous_action_schema = self.binding.action_schema

@@ -23,6 +23,7 @@ class ConstrainedPairEffortControllerV1:
         if type(servo) is not JointReferenceEffortControllerV1:
             raise TypeError('paired effort requires the shared joint-reference servo')
         self.servo, self.binding, self.writer_id = servo, servo.binding, servo.writer_id
+        self._channels, self.profile = servo._channels, servo.profile
         self.identity = digest({'schema': 'constrained-pair-effort-controller-v1',
                                 'servo': servo.identity, 'projection': 'equal-pair-mean'})
 
@@ -64,6 +65,7 @@ class R3ReferenceEffortControllerV1:
             raise ValueError('R3 effort servo needs seven joint references and one paired opening')
         self.reference, self.servo = reference, servo
         self.binding, self.writer_id = servo.binding, servo.writer_id
+        self._channels = servo._channels
         self.entity_id, self.end_frame_id = entity_id, end_frame_id
         self.opening_range_m = float(opening_range_m)
         self.identity = digest({'schema': 'r3-reference-effort-controller-v1',
@@ -141,8 +143,18 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
                                joint_velocity_limit_rad_s=None, mass_model=None,
                                dynamic_parameters=None):
     """Compose a Panda effort profile from source-admitted controller inputs."""
+    from dataclasses import replace
+    profile_ids = {value: key for key, value in PANDA_EFFORT_PROFILE_KINDS.items()}
+    if kind not in profile_ids:
+        raise ValueError('unknown Panda effort profile')
+
+    def selected(execution):
+        for controller in execution.controllers:
+            controller.profile_id = profile_ids[kind]
+        return replace(execution, selection_profile_id=profile_ids[kind])
+
     if kind == 'direct':
-        return direct_execution
+        return selected(direct_execution)
     if kind not in {'joint', 'r3-pose', 'joint-mass', 'r3-mass-pose'}:
         raise ValueError('unknown Panda effort profile')
     reference = None
@@ -156,23 +168,23 @@ def build_panda_effort_profile(direct_execution, *, kind, cadence_s, end_frame_i
     if dynamic_parameters is not None:
         if mass_model is not None or kind not in {'joint', 'r3-pose'}:
             raise ValueError('dynamic effort profile requires a joint or pose reference')
-        return build_dynamic_reference_effort_execution(
+        return selected(build_dynamic_reference_effort_execution(
             direct_execution, reference_kind=kind, cadence_s=cadence_s,
-            r3_reference=reference, end_frame_id=end_frame_id, **dynamic_parameters)
+            r3_reference=reference, end_frame_id=end_frame_id, **dynamic_parameters))
     if kind in {'joint-mass', 'r3-mass-pose'}:
         if mass_model is None:
-            return build_dynamic_reference_effort_execution(
+            return selected(build_dynamic_reference_effort_execution(
                 direct_execution, reference_kind='r3-pose' if kind == 'r3-mass-pose' else 'joint',
                 cadence_s=cadence_s, r3_reference=reference, end_frame_id=end_frame_id,
-                kp=20., kd=2., mass_only=True)
+                kp=20., kd=2., mass_only=True))
         from .mass_matrix_effort import build_mass_effort_execution
-        return build_mass_effort_execution(
+        return selected(build_mass_effort_execution(
             direct_execution, **mass_model, use_pose_reference=kind == 'r3-mass-pose',
-            r3_reference=reference, end_frame_id=end_frame_id)
+            r3_reference=reference, end_frame_id=end_frame_id))
     if mass_model is not None:
         raise ValueError('mass model supplied to non-mass effort profile')
-    return build_reference_effort_execution(
-        direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id)
+    return selected(build_reference_effort_execution(
+        direct_execution, reference_kind=kind, r3_reference=reference, end_frame_id=end_frame_id))
 
 
 def _reference_effort_contract(direct_execution, reference_kind, r3_reference, end_frame_id):

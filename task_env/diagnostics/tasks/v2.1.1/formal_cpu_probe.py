@@ -267,6 +267,8 @@ try:
             observation,info=env.reset(seed=31,options={'controller':'r3-pose'})
             committed=env._physical_reset_selection.current.execution
             assert env.robot.subjects == committed.subjects and env.robot.controllers == committed.controllers
+            assert env._controller_selection_matches[0].selection_profile_id == 'panda-r3-effort-reference-v1'
+            assert env._controller_selection_matches[0].controller_identities == (committed.controllers[0].identity,)
             assert env.robot.controller is env.controller is committed.controllers[0] and env.robot is not prior_robot
             assert env.robot.controller.identity != prior_robot.controller.identity
             result['switched_physical_controller']=env.robot.controller.identity

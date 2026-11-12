@@ -137,10 +137,14 @@ def test_panda_effort_controller_rejects_foreign_writer():
         task_binding.close_task_resources()
 
 
-@pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1'])
+@pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
+                                    'panda-r3-effort-reference-v1', 'panda-joint-mass-effort-v1',
+                                    'panda-r3-mass-effort-v1'])
 def test_effort_retains_formal_task_identity(profile):
+    from dataclasses import replace
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv, build_artifact
+    from task_env.runtime.sessions.control import bind_selected_controller
 
     config = resolve_task_env_config(PickCubeReferenceEnv, {
         'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
@@ -150,6 +154,15 @@ def test_effort_retains_formal_task_identity(profile):
     try:
         value = binding.build_for_request('mujoco', 'cpu', 31, 8)
         assert value['artifact'].artifact_id == build_artifact().artifact_id
+        selected = bind_selected_controller(value, binding=binding, provider='mujoco', backend='cpu')
+        assert selected.physical_execution is value['physical_execution']
+        match, = selected.selection_matches
+        assert match.selection_profile_id == profile
+        assert match.controller_identities == (value['controller'].identity,)
+        assert match.subject_ids == ('panda-v1',)
+        assert len(match.channel_keys) == len(match.resource_keys) == 9
+        with pytest.raises(ValueError, match='physical selection differs'):
+            replace(selected.physical_execution, selection_profile_id='foreign-profile')
     finally:
         binding.close_task_resources()
 
@@ -374,6 +387,28 @@ def test_effort_reset_rebuilds_plan_for_requested_seed(switchable):
             solution = env.value['solution_factory']()
             env.reset_for_solution(solution, seed=43)
             assert env.sample.task_seed == 43
+    finally:
+        env.close()
+
+
+def test_reset_switch_matches_the_candidate_controller_before_materialization():
+    from task_env import make_env
+
+    env = make_env('pick-cube-p16-reference-v1', config={
+        'execution': {'physics_provider': 'mujoco', 'deployment': 'in_process'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1',
+                       'parameters': {'reset_selection': True}},
+        'episode': {'horizon': 8},
+    })
+    try:
+        env.reset(seed=31)
+        first = env.controller.identity
+        env.reset(seed=31, options={'controller': 'r3-pose'})
+        match, = env._controller_selection_matches
+        assert match.selection_profile_id == 'panda-r3-effort-reference-v1'
+        assert match.controller_identities == (env.controller.identity,)
+        assert env.controller.identity != first
+        assert env.value['physical_execution'] is env._physical_reset_selection.current.execution
     finally:
         env.close()
 

@@ -194,10 +194,12 @@ def build_existing_subject_effort(robot, *, scene, artifact, source, profile_id,
         return select_subject_effort_controller(subject, binding, profile_id=profile_id,
             writer_id=writer, units=units, cadence_s=artifact.timebase.control_dt)
 
-    return build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
+    from dataclasses import replace
+    execution = build_declared_effort_execution(scene=scene, artifact=artifact, source=source,
         subject=subject, declarations=declarations, assembly_id=robot.assembly_id,
         controller_factory=make_controller, state_joint_names=names,
         joint_bindings=joint_bindings, frame_bindings=frame_bindings)
+    return replace(execution, selection_profile_id=profile_id)
 
 
 def compile_declared_subject_binding(scene, artifact_sha256, source_id, source_closure_sha256,
@@ -356,6 +358,7 @@ class PhysicalControlExecutionV1:
     requirements: object
     generation: int
     subjects: tuple[ControlledSubjectV1, ...] = ()
+    selection_profile_id: str | None = None
 
     def selected_runtime_builder(self, selected):
         from .selected_materialization import PhysicalRuntimeBuilder
@@ -378,6 +381,13 @@ class PhysicalControlExecutionV1:
                        or not controller.writer_id
                        for controller in self.controllers)):
             raise ValueError('physical execution Controllers differ from binding')
+        if self.selection_profile_id is not None:
+            if (type(self.selection_profile_id) is not str or not self.selection_profile_id
+                    or any(getattr(controller, 'profile_id', None) != self.selection_profile_id
+                           for controller in self.controllers)
+                    or any(self.selection_profile_id not in subject.supported_controller_profiles
+                           for subject in self.subjects)):
+                raise ValueError('physical selection differs from its Controllers or subjects')
         if len({controller.identity for controller in self.controllers}) != len(self.controllers):
             raise ValueError('physical execution Controller identities must be unique')
         if len({controller.writer_id for controller in self.controllers}) != len(self.controllers):
