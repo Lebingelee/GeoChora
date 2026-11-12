@@ -329,8 +329,9 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                                                            else execution.backend))
     admission_route = _session_admission_input_route(_session_admission_input)
     if (_observer_render_request is not None and _observer_render_request.provider == 'isaacsim'
-            and admission_route != 'f06_pickcube'):
-        raise ValueError('Isaac observer request requires the exact F06 input')
+            and admission_route != 'f06_pickcube'
+            and getattr(declared_execution, 'physics_profile', None) != G05_ISAAC_EFFORT_PROFILE):
+        raise ValueError('Isaac observer request requires an admitted F06 or G05 input')
     _f06_pickcube_isaac_input = _session_admission_input if admission_route == 'f06_pickcube' else None
     if (_f06_pickcube_isaac_input is not None
             or (type(execution) is ExecutionSpecV1
@@ -399,7 +400,8 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             try:
                 native_io = create_isaac_native_runtime_io(
                     artifact, declared_execution, source,
-                    g05_effort=True,
+                    g05_effort=True, observer_render_request=_observer_render_request,
+                    task_render_requested=_task_render_requested,
                 )
                 session = UsdCoreRuntimeSession(
                     artifact, declared_execution, source, native_io, drive_receipt=None,

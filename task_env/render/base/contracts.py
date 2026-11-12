@@ -9,8 +9,44 @@ from typing import Protocol
 import numpy as np
 
 
-TASK_RGB_PAIRINGS = frozenset({('mujoco', 'cpu', 'mujoco'), ('geophys', 'cpu', 'mujoco'),
-                               ('geophys', 'cpu', 'geophys'), ('isaacsim', 'cuda', 'isaacsim')})
+@dataclass(frozen=True)
+class TaskRgbCapability:
+    """One registered task-camera route; discovery does not load an SDK."""
+    renderer: str
+    backend: str
+    profile: str
+    device: str | None
+    color_space: str
+    ownership: str
+    physics_profile: str | None = None
+    shared_framebuffer: bool = False
+
+
+TASK_RGB_CAPABILITIES = {
+    ('mujoco', 'cpu', 'mujoco'): TaskRgbCapability(
+        'mujoco', 'native-opengl', 'v211_mujoco_cpu_native_rgb_v1', None,
+        'GL_LINEAR framebuffer RGB; primaries uncalibrated', 'independent visual model',
+        'mujoco-scene-v3-runtime-v1'),
+    ('geophys', 'cpu', 'mujoco'): TaskRgbCapability(
+        'mujoco', 'native-opengl', 'v211_geophys_cpu_mujoco_native_rgb_v1', None,
+        'GL_LINEAR framebuffer RGB; primaries uncalibrated', 'independent visual model',
+        'geophys-scene-v3-runtime-v1'),
+    ('geophys', 'cpu', 'geophys'): TaskRgbCapability(
+        'geophys', 'rasterizer', 'v211_geophys_cpu_task_rgb_v1', 'cpu',
+        'sRGB transfer after ACES; primaries uncalibrated', 'borrowed Runtime camera',
+        shared_framebuffer=True),
+    ('isaacsim', 'cuda', 'isaacsim'): TaskRgbCapability(
+        'isaacsim', 'rtx', 'v211_isaac_rtx_task_rgb_v1', 'cuda:0',
+        'sRGB transfer after RTX tone mapping; primaries uncalibrated', 'borrowed Runtime camera'),
+}
+TASK_RGB_PAIRINGS = frozenset(TASK_RGB_CAPABILITIES)
+
+
+def task_rgb_capability(provider, backend, renderer):
+    try:
+        return TASK_RGB_CAPABILITIES[(provider, backend, renderer)]
+    except KeyError as error:
+        raise ValueError('unsupported fixed task RGB renderer and physics pairing') from error
 
 
 def validate_camera_declarations(*, render_mode=None, observer_camera=None, task_camera=None,

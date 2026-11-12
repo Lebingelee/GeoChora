@@ -947,7 +947,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         camera_specs=(camera,) if camera is not None else environment.render.cameras)
                     env.metadata['reference_profile'] = env.reference_profile()
                     env._legacy_camera_observations = bool(environment.render.camera_obs)
-                    if render_mode is not None:
+                    if render_mode is not None and observer_camera is None:
                         env.render_mode = render_mode
                         env._human_display_unavailable = True
                         env.metadata.update(render_modes=['human', 'rgb_array'] if provider == 'geophys' else ['human'],
@@ -2122,7 +2122,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             observation_schema = self.info.get('observation_schema')
             if defer_task_rgb:
                 from ..observations.selected_reference import selected_reference_observation_schema
-                observation_schema = selected_reference_observation_schema(self, self.obs)
+                observation_schema = selected_reference_observation_schema(
+                    self, self.obs, base_schema=(observation_schema
+                        if isinstance(observation_schema, ObservationSchema) else None))
             elif not isinstance(observation_schema, ObservationSchema):
                 observation_schema = getattr(
                     getattr(self, '_observation_builder', None), 'schema', None,
@@ -2147,7 +2149,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             }
             for key, value in reset_info_defaults.items():
                 self.info.setdefault(key, value)
-            if not isinstance(self.info.get('observation_schema'), ObservationSchema):
+            if defer_task_rgb or not isinstance(self.info.get('observation_schema'), ObservationSchema):
                 self.info['observation_schema'] = observation_schema
             if physical_candidate is not None:
                 self.info['physical_action_spec_v1'] = physical_selection.describe()
@@ -2517,8 +2519,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             renderer = self._task_rgb_config[1]
             receipt = {**receipt, 'camera_name': camera.name,
                 'requested_camera': _json_value(asdict(camera)),
-                'renderer': renderer, 'render_backend': {
-                    'mujoco': 'native-opengl', 'geophys': 'rasterizer', 'isaacsim': 'rtx'}[renderer],
+                'renderer': renderer, 'render_backend': self._task_rgb_capability.backend,
                 'observation_boundary': {'episode_id': publication.view.boundary.episode_id,
                     'control_step': state.control_step, 'simulation_time_s': float(state.simulation_time)}}
         return image, receipt
@@ -2541,35 +2542,24 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         observer = getattr(self, '_selected_observer_camera', None)
         if observer is not None and observer.camera_id == camera.camera_id:
             raise ValueError('task and observer cameras require distinct identities')
-        if (observer is not None and renderer == 'geophys'
-                and (observer.width, observer.height) != (camera.width, camera.height)):
-            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
         import copy
         camera = copy.deepcopy(camera)
-        if (self.provider, self.backend, renderer) not in _TASK_RGB_PAIRS:
-            raise ValueError('unsupported fixed task RGB renderer and physics pairing')
         if 'task_rgb' in self.observation_space.spaces:
             raise ValueError('task observation already declares task_rgb')
-        color_setup = None
-        if renderer == 'isaacsim':
-            from ..runtime.sessions.isaac_native_io import configure_isaac_task_rgb_color_defaults
-            color_setup = configure_isaac_task_rgb_color_defaults()
-        if renderer in {'geophys', 'isaacsim'}:
-            from ..render.base.contracts import ObserverRenderRequestV1
-            request = ObserverRenderRequestV1(camera, 'rgb_array', self.provider,
-                                              'rasterizer' if renderer == 'geophys' else 'rtx')
-            request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
-            if getattr(self, '_observer_render_request', None) is None:
-                self._observer_render_request = request
+        from ..render.camera.task_rgb import prepare_task_rgb_adapter
+        capability, color_setup, native_request = prepare_task_rgb_adapter(
+            camera=camera, renderer=renderer, provider=self.provider, backend=self.backend,
+            artifact=self.artifact, observer=observer)
+        if native_request is not None and getattr(self, '_observer_render_request', None) is None:
+            self._observer_render_request = native_request
+        self._task_rgb_capability = capability
         spaces = OrderedDict(self.observation_space.spaces)
         spaces['task_rgb'] = Box(0., 1., shape=(camera.height, camera.width, 3), dtype=np.float32)
         self.observation_space = Dict(spaces)
         self._task_rgb_config = (camera, renderer)
         self._task_rgb_consumer = None
         self.metadata = dict(self.metadata)
-        color = ('GL_LINEAR framebuffer RGB; primaries uncalibrated' if renderer == 'mujoco'
-                 else 'sRGB transfer after ACES; primaries uncalibrated' if renderer == 'geophys'
-                 else 'sRGB transfer after RTX tone mapping; primaries uncalibrated')
+        color = capability.color_space
         self.metadata['task_rgb_v1'] = {'camera': camera.to_mapping(), 'renderer': renderer,
                                         'color_space': color,
                                         'ownership': 'owned host copy', 'color_setup': color_setup}
@@ -2593,38 +2583,41 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     def _configure_selected_observer(self, render_mode, camera):
         from types import SimpleNamespace
         from ..render import TaskEnvRenderProvider
+        from ..render.camera.task_rgb import prepare_observer_adapter
         task_rgb = getattr(self, '_task_rgb_config', None)
-        if task_rgb is not None and camera.camera_id == task_rgb[0].camera_id:
-            raise ValueError('task and observer cameras require distinct identities')
-        if (task_rgb is not None and task_rgb[1] == 'geophys'
-                and (camera.width, camera.height) != (task_rgb[0].width, task_rgb[0].height)):
-            raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')
-        if camera.task_artifact_hash != self.artifact.identity_hash:
-            raise ValueError('observer camera TaskArtifact linkage mismatch')
+        task_binding = None if task_rgb is None else (task_rgb[0], self._task_rgb_capability)
+        capability, request = prepare_observer_adapter(
+            camera=camera, render_mode=render_mode, provider=self.provider, backend=self.backend,
+            artifact=self.artifact, task_rgb=task_binding)
         self.render_mode = render_mode
         self._selected_observer_camera = camera
-        if self.provider in {'isaacsim', 'geophys'}:
-            from ..render.base.contracts import ObserverRenderRequestV1
-            backend = 'rtx' if self.provider == 'isaacsim' else 'rasterizer'
-            request = ObserverRenderRequestV1(camera, render_mode, self.provider, backend)
-            request.validate(artifact=self.artifact, physics_provider=self.provider, physics_backend=self.backend)
+        if request is not None:
             self._observer_render_request = request
         self._ui_render_provider = TaskEnvRenderProvider(
             render_source=None, config=SimpleNamespace(width=camera.width, height=camera.height),
             frame_capture=self._capture_selected_observer,
-            frame_color_space=('GL_LINEAR framebuffer RGB; uncalibrated primaries and input assets'
-                               if self.provider == 'mujoco' else
-                               'sRGB transfer after ACES; primaries uncalibrated' if self.provider == 'geophys' else
-                               'sRGB transfer after RTX tone mapping; primaries and source assets uncalibrated'))
+            frame_color_space=capability.color_space)
         self.metadata = dict(self.metadata)
         self.metadata.update(render_modes=['human', 'rgb_array'], render_mode=render_mode,
-                             render_backend=({'isaacsim': 'isaacsim-rtx', 'geophys': 'geophys-rasterizer'}
-                                             .get(self.provider, 'mujoco-native-opengl')))
+                             render_backend=f'{capability.renderer}-{capability.backend}')
 
-    def _capture_selected_observer(self):
-        publication = self._published_position_typed_state
+    def _observer_publication(self):
+        """Provide the renderer's V1 view at the current physical boundary."""
+        from ..artifacts import CanonicalStateViewV1
+
+        publication = getattr(self, '_published_position_typed_state', None)
         if publication is None or self._execution_fault is not None:
             raise RuntimeError('observer requires a successfully published state')
+        if isinstance(publication.view, CanonicalStateViewV1):
+            return publication
+        if getattr(self, '_task_rgb_state_binding', None) is None:
+            from ..render.camera.api import prepare_task_rgb_state_binding
+            self._task_rgb_state_binding = prepare_task_rgb_state_binding(
+                self.provider, self.value.get('source'), artifact=self.artifact)
+        return self._publish_task_rgb_typed_state(self.state)
+
+    def _capture_selected_observer(self):
+        publication = self._observer_publication()
         if self.provider in {'isaacsim', 'geophys'}:
             return self.session.capture_observer(self._selected_observer_camera, publication.view)
         if getattr(self, '_visual_state_session', None) is None:
@@ -2634,16 +2627,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         return self._visual_state_session.capture(publication.view)
 
     def _present_selected_observer(self):
-        publication = self._published_position_typed_state
-        if publication is None or self._execution_fault is not None:
-            raise RuntimeError('observer requires a successfully published state')
-        return self.session.present_observer(publication.view)
+        return self.session.present_observer(self._observer_publication().view)
 
     def task_camera_binding(self):
         """Read the constructed task camera's native binding for this episode."""
-        publication = self._published_position_typed_state
-        if publication is None or self._execution_fault is not None or self.session is None:
+        if self.session is None:
             raise RuntimeError('task camera readback requires a successfully published state')
+        publication = self._observer_publication()
         if self.provider == 'mujoco':
             if getattr(self, '_declared_task_camera', None) is None:
                 raise RuntimeError('no task camera declared')
@@ -2686,10 +2676,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         provider = getattr(self, '_ui_render_provider', None)
         if provider is None or provider.last_frame_receipt is None:
             raise RuntimeError('no completed observer render')
-        publication = self._published_position_typed_state
+        publication = getattr(self, '_published_position_typed_state', None)
         identity = provider.last_frame_receipt['capture_identity']
-        if (publication is None or self._execution_fault is not None or
-                identity['state_boundary'] != publication.view.boundary.to_mapping() or
+        if (publication is None or self._execution_fault is not None or self.session is None or
+                identity['state_boundary'] != self.session.state_boundary_identity().to_mapping() or
                 identity['camera_geometry_identity_hash'] != self._selected_observer_camera.identity_hash):
             provider.invalidate_frame()
             raise RuntimeError('observer render receipt no longer matches the current publication')

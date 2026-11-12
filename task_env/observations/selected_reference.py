@@ -25,7 +25,7 @@ def selected_reference_observation_spaces(env, *, include_robot_state=False):
     return observation_spaces
 
 
-def selected_reference_observation_schema(env, observation=None):
+def selected_reference_observation_schema(env, observation=None, *, base_schema=None):
     """Describe the exact selected Env projection and any fixed task camera."""
     from ..environment.types import ObservationFieldSpec, ObservationSchema
 
@@ -77,6 +77,22 @@ def selected_reference_observation_schema(env, observation=None):
     for group in root_names:
         value = observation[group] if isinstance(observation, Mapping) and group in observation else declared_only
         visit(str(group), value, spaces[group])
+    if base_schema is not None:
+        if not isinstance(base_schema, ObservationSchema):
+            raise TypeError('base observation schema must be ObservationSchema')
+        from dataclasses import replace
+        prior = {field.name: field for field in base_schema.fields}
+        current = {field.name: field for field in fields}
+        if not set(prior) <= set(current):
+            raise ValueError('base observation schema contains undeclared fields')
+        for name, field in prior.items():
+            if (field.shape, field.dtype) != (current[name].shape, current[name].dtype):
+                raise ValueError('base observation schema differs from declared space')
+        fields = [replace(field, semantic=prior[field.name].semantic, unit=prior[field.name].unit,
+                          frame=prior[field.name].frame,
+                          time_reference=prior[field.name].time_reference,
+                          required=prior[field.name].required)
+                  if field.name in prior else field for field in fields]
     return ObservationSchema('selected-reference-observation-v1', tuple(fields),
                              groups=tuple(str(name) for name in root_names))
 

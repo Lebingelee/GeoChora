@@ -48,6 +48,8 @@ def test_camera_spec_capture_metadata_uses_published_boundary_for_reset_and_step
     env = object.__new__(SelectedReferenceEnv)
     env._task_camera_spec = CameraSpec(name='task', width=4, height=3, depth=False)
     env._task_rgb_config = camera, 'mujoco'
+    from task_env.render.base.contracts import task_rgb_capability
+    env._task_rgb_capability = task_rgb_capability('mujoco', 'cpu', 'mujoco')
     env._task_rgb_consumer = TaskRgbObservationConsumerV1(camera, selection,
         lambda _state: _Session(camera, selection), color_space='test')
     env.session = SimpleNamespace()  # Renderer owns camera calibration, not physics.

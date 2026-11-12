@@ -311,7 +311,9 @@ class FloraParallelVisualizer:
         controller = getattr(self, "_camera_controller", None)
         if controller is None:
             return False
-        return bool(controller.update(window))
+        import taichi as ti
+        return bool(controller.update(window, right_key=ti.ui.RMB,
+                                      left_key=ti.ui.LMB, ctrl_key=ti.ui.CTRL))
 
     def read_resources(self) -> dict[str, object]:
         stats = self._scene.scene_stats()

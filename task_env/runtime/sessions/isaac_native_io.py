@@ -828,14 +828,17 @@ class IsaacSimNativeRuntimeIOV1:
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
         app_owner: IsaacSimAppOwnerV1, *,
                  f06_pickcube_input=None,
-                 g05_effort=False, observer_render_request=None):
+                 g05_effort=False, observer_render_request=None, task_render_requested=False):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
         if type(source) is not UsdRuntimeSourceV1 or type(lease) is not UsdSnapshotLeaseV1:
             raise TypeError("Isaac native I/O requires verified USD RuntimeSource and owned snapshot lease")
         self._artifact, self._execution, self._source = artifact, execution, source
         self._lease, self._app_owner = lease, app_owner
+        if type(task_render_requested) is not bool:
+            raise TypeError('task renderer request must be boolean')
         self._observer_render_request = observer_render_request
+        self._task_render_requested = task_render_requested
         self._observer_stage_time_range_receipt = None
         self._observer_render_light_receipt = None
         self._task_renderer_stage_preparation = None
@@ -845,6 +848,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._task_camera_geometry = None
         self._task_camera_sensor = None
         self._observer_faulted = False
+        self._task_camera_faulted = False
         self._f06_pickcube_input = f06_pickcube_input
         self._f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
         self._g05_effort = execution.physics_profile == 'isaac-gpu-physx-g05-5c-effort-v1'
@@ -854,6 +858,7 @@ class IsaacSimNativeRuntimeIOV1:
                 self._f06_pickcube and self._g05_effort):
             raise ValueError('Isaac I/O requires one exact native route/profile alone')
         self._closed = False
+        self._native_close_completed = False
         self._runtime_owner_closed = False
         self._context = None
         self._stage = None
@@ -966,7 +971,7 @@ class IsaacSimNativeRuntimeIOV1:
             load_stage = getattr(self._stage, 'Load', None)
             if callable(load_stage):
                 load_stage()
-            if self._observer_render_request is not None:
+            if self._observer_render_request is not None or self._task_render_requested:
                 start_time_code = float(self._stage.GetStartTimeCode())
                 source_end_time_code = float(self._stage.GetEndTimeCode())
                 end_time_code = source_end_time_code
@@ -2680,7 +2685,8 @@ class IsaacSimNativeRuntimeIOV1:
 
     def capture_observer(self, camera, state):
         """Capture the published F06 boundary through the existing App/scene owner."""
-        if self._closed or self._observer_faulted or self._observer_render_request is None:
+        if (self._closed or self._observer_faulted or getattr(self, '_observer_runtime_invalid', False)
+                or self._observer_render_request is None):
             raise RuntimeError('Isaac observer is unavailable or faulted')
         from ...observations.canonical_camera import CameraGeometry, resolve_camera, CanonicalCameraObservation
         from ...observations.canonical_camera.images import normalize_rgb
@@ -2707,7 +2713,8 @@ class IsaacSimNativeRuntimeIOV1:
         """Capture the separately bound task camera using an owned RTX sensor."""
         from ...observations.canonical_camera import resolve_camera, CanonicalCameraObservation
         from ...observations.canonical_camera.images import normalize_rgb
-        if self._closed or self._observer_faulted or self._observer_render_request is None:
+        if (self._closed or self._task_camera_faulted or getattr(self, '_observer_runtime_invalid', False)
+                or not self._task_render_requested):
             raise RuntimeError('Isaac task renderer is unavailable or faulted')
         if camera != self._task_camera_geometry or self._task_camera_path is None:
             raise ValueError('Isaac task capture camera differs from its binding')
@@ -2717,12 +2724,11 @@ class IsaacSimNativeRuntimeIOV1:
             return self._capture_observer_admitted(camera, state, resolve_camera, normalize_rgb,
                                                    CanonicalCameraObservation, task=True)
         except BaseException as error:
-            self._observer_faulted = True
-            for close in (self._close_observer, self._close_task_camera_sensor):
-                try:
-                    close()
-                except BaseException as cleanup_error:
-                    error.add_note(f'Isaac task camera cleanup also failed: {cleanup_error!r}')
+            self._task_camera_faulted = True
+            try:
+                self._close_task_camera_sensor()
+            except BaseException as cleanup_error:
+                error.add_note(f'Isaac task camera cleanup also failed: {cleanup_error!r}')
             raise
 
     def task_camera_completion(self, state):
@@ -3331,9 +3337,10 @@ class IsaacSimNativeRuntimeIOV1:
             raise primary
 
     def _close_task_camera_sensor(self):
-        sensor, self._task_camera_sensor = getattr(self, '_task_camera_sensor', None), None
+        sensor = getattr(self, '_task_camera_sensor', None)
         if sensor is not None:
             sensor.detach_annotators('rgb')
+            self._task_camera_sensor = None
 
     def close(self) -> None:
         if self._closed:
@@ -3403,6 +3410,7 @@ class IsaacSimNativeRuntimeIOV1:
                     primary.add_note(f"USD snapshot lease cleanup also failed: {type(cleanup_error).__name__}: {cleanup_error}")
         if primary is not None:
             raise primary
+        self._native_close_completed = True
 
     def close_runtime_owner(self) -> None:
         if self._runtime_owner_closed:
@@ -3413,7 +3421,8 @@ class IsaacSimNativeRuntimeIOV1:
     def close_receipt(self):
         """Owned close facts from the App and USD snapshot lease owners."""
         return {'schema_version': 'isaac-native-close-v1',
-                'native_io_closed': self._closed,
+                'native_io_closed': getattr(self, '_native_close_completed', False),
+                'native_io_close_requested': self._closed,
                 'runtime_owner_close_requested': self._runtime_owner_closed,
                 'usd_snapshot_lease_closed': self._lease.closed,
                 'app_owner': self._app_owner.close_receipt()}
@@ -3462,6 +3471,7 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
             f06_pickcube_input=f06_pickcube_input,
             g05_effort=g05_effort,
             observer_render_request=observer_render_request,
+            task_render_requested=task_render_requested,
         )
     except BaseException as primary:
         # Constructor cleanup owns the lease/App when startup begins; this is

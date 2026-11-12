@@ -67,8 +67,8 @@ class PhysicalRuntimeBuilder:
         else:
             options = {'_observer_render_request': getattr(env, '_observer_render_request', None),
                        '_session_admission_input': env.value.get('session_admission_input'),
-                       '_task_render_requested': bool(getattr(env, 'render_mode', None) is not None
-                                                      or getattr(env, '_task_rgb_config', None) is not None)}
+                       '_task_render_requested': bool(getattr(env, '_task_rgb_config', None) is not None
+                                                      or getattr(env, '_component_task_rgb', None) is not None)}
             if getattr(env, '_legacy_observer_requested', False):
                 options['_legacy_observer_requested'] = True
             if getattr(env, '_legacy_camera_observations', False):
@@ -129,8 +129,8 @@ class PositionRuntimeBuilder:
                 session_admission_input=env.value.get('session_admission_input'),
                 observer_render_request=getattr(env, '_observer_render_request', None),
                 task_render_requested=bool(
-                    getattr(env, 'render_mode', None) is not None
-                    or getattr(env, '_component_task_rgb', None) is not None
+                    getattr(env, '_component_task_rgb', None) is not None
+                    or getattr(env, '_task_rgb_config', None) is not None
                 ))
         env._materialized_position_control_binding = position_binding
         env._materialized_position_control_selector = selector

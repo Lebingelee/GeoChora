@@ -12,10 +12,12 @@ from .source import DynamicCameraRenderSourceV1, DynamicCameraRenderSourceV2, pr
 
 PROFILE = 'p1_4_native_camera_cpu_v0'
 V211_DYNAMIC_PROFILE = 'v211_mujoco_cpu_render_binding_v1'
-V211_RGB_PROFILE = 'v211_mujoco_cpu_native_rgb_v1'
-V211_GEOPHYS_MUJOCO_RGB_PROFILE = 'v211_geophys_cpu_mujoco_native_rgb_v1'
-V211_PHYSICS_PROFILE = 'mujoco-scene-v3-runtime-v1'
-D03_PHYSICS_PROFILE = 'geophys-scene-v3-runtime-v1'
+from ..base.contracts import task_rgb_capability
+
+V211_RGB_PROFILE = task_rgb_capability('mujoco', 'cpu', 'mujoco').profile
+V211_GEOPHYS_MUJOCO_RGB_PROFILE = task_rgb_capability('geophys', 'cpu', 'mujoco').profile
+V211_PHYSICS_PROFILE = task_rgb_capability('mujoco', 'cpu', 'mujoco').physics_profile
+D03_PHYSICS_PROFILE = task_rgb_capability('geophys', 'cpu', 'mujoco').physics_profile
 D03_DYNAMIC_PROFILE = 'd03_mujoco_native_dynamic_opengl_v1'
 D04_DYNAMIC_PROFILE = 'd04_mujoco_native_dynamic_opengl_rgbd_v1'
 D04_ENTITY_SEGMENTATION_PROFILE = 'd04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1'

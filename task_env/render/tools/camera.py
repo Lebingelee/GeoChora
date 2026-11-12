@@ -8,16 +8,16 @@ Rasterizer FPS camera:
 * RMB drag rotates the view;
 * Ctrl+RMB drag translates in the current view plane;
 * the wheel dollies along the current view direction;
-* no keyboard movement is handled here.
+* optional extended controls support middle-button gestures and FPS keys.
 """
 
 from __future__ import annotations
 
 import math
+import time
 from typing import Callable
 
 import numpy as np
-import taichi as ti
 
 
 CameraPoseSink = Callable[
@@ -72,6 +72,8 @@ class InteractiveCameraController:
         self._pitch = 0.0
         self._last_mouse: tuple[float, float] | None = None
         self._mouse_drag_mode: str | None = None
+        self._last_middle: tuple[float, float] | None = None
+        self._last_input_time: float | None = None
         self.sync_pose(position, look_at, up)
 
     @property
@@ -98,6 +100,8 @@ class InteractiveCameraController:
         self._position = position_np
         self._last_mouse = None
         self._mouse_drag_mode = None
+        self._last_middle = None
+        self._last_input_time = None
 
     def set_motion_scale(
         self,
@@ -151,12 +155,12 @@ class InteractiveCameraController:
         return False
 
     @classmethod
-    def _is_ctrl_pressed(cls, window: object) -> bool:
+    def _is_ctrl_pressed(cls, window: object, ctrl_key: object) -> bool:
         """Accept Forge's aggregate and left/right Ctrl key spellings."""
 
         return any(
             cls._is_pressed(window, key)
-            for key in (ti.ui.CTRL, "Control", "Control_L", "Control_R", "Ctrl")
+            for key in (ctrl_key, "Control", "Control_L", "Control_R", "Ctrl")
         )
 
     @staticmethod
@@ -224,17 +228,29 @@ class InteractiveCameraController:
             tuple(float(value) for value in up),
         )
 
-    def update(self, window: object) -> bool:
+    def update(self, window: object, *, right_key="RMB", left_key="LMB", ctrl_key="Control",
+               extended=False, middle_key="MMB", shift_key="Shift", alt_key="Alt",
+               move_speed_per_second=0.3, delta_seconds=None) -> bool:
         """Consume one window state and emit at most one changed camera pose."""
 
         scroll_delta = self._consume_scroll_delta(window)
         input_available = self._input_available(window)
-        right_pressed = self._is_pressed(window, ti.ui.RMB)
-        left_pressed = self._is_pressed(window, ti.ui.LMB)
-        ctrl_pressed = self._is_ctrl_pressed(window)
+        right_pressed = self._is_pressed(window, right_key)
+        left_pressed = self._is_pressed(window, left_key)
+        ctrl_pressed = self._is_ctrl_pressed(window, ctrl_key)
+        middle_pressed = extended and self._is_pressed(window, middle_key)
+        shift_pressed = extended and self._is_pressed(window, shift_key)
+        alt_pressed = extended and self._is_pressed(window, alt_key)
+        if extended:
+            now = time.monotonic()
+            elapsed = (0.0 if self._last_input_time is None else now - self._last_input_time)
+            self._last_input_time = now
+            dt = max(0.0, min(0.1, float(elapsed if delta_seconds is None else delta_seconds)))
+        else:
+            dt = 0.0
         cursor = (
             self._cursor_position(window)
-            if right_pressed or abs(scroll_delta) > 1.0e-8
+            if right_pressed or middle_pressed or abs(scroll_delta) > 1.0e-8
             else None
         )
         cursor_valid = bool(
@@ -247,7 +263,7 @@ class InteractiveCameraController:
         changed = False
 
         drag_mode = "pan" if ctrl_pressed else "rotate"
-        if right_pressed and input_available:
+        if right_pressed and not middle_pressed and not left_pressed and input_available:
             if not cursor_valid:
                 self._last_mouse = None
                 self._mouse_drag_mode = None
@@ -292,12 +308,44 @@ class InteractiveCameraController:
         if (
             abs(scroll_delta) > 1.0e-8
             and not right_pressed
+            and not middle_pressed
             and not left_pressed
             and cursor_valid
         ):
             position += front * scroll_delta * self._wheel_dolly_step
             changed = True
 
+        if extended:
+            middle_active = middle_pressed and not right_pressed and not left_pressed and cursor_valid
+            if middle_active and self._last_middle is not None:
+                dx, dy = cursor[0] - self._last_middle[0], cursor[1] - self._last_middle[1]
+                if abs(dx) > 1.0e-8 or abs(dy) > 1.0e-8:
+                    focus = position + front * self._look_distance
+                    if shift_pressed and ctrl_pressed:
+                        position -= front * dy * self._pan_speed_per_norm
+                    elif ctrl_pressed:
+                        self._look_distance = max(1.0e-4, min(1.0e8,
+                            self._look_distance * math.exp(max(-4.0, min(4.0, dy * 4.0)))))
+                        position = focus - front * self._look_distance
+                    elif shift_pressed:
+                        position -= (dx * right + dy * up) * self._pan_speed_per_norm
+                    else:
+                        self._yaw -= dx * self._mouse_sensitivity
+                        self._pitch = max(-1.5, min(1.5, self._pitch + dy * self._mouse_sensitivity))
+                        front, right, up = self._view_basis(self._yaw, self._pitch)
+                        position = focus - front * self._look_distance
+                    changed = True
+            self._last_middle = cursor if middle_active else None
+            move = np.zeros(3, dtype=np.float64)
+            for key, vector in (('w', front), ('s', -front), ('a', -right), ('d', right),
+                                ('e', np.array([0., 0., 1.])), ('q', np.array([0., 0., -1.]))):
+                if self._is_pressed(window, key):
+                    move += vector
+            magnitude = float(np.linalg.norm(move))
+            if magnitude > 1.0e-8 and dt > 0.0:
+                factor = (5.0 if shift_pressed else 1.0) * (0.2 if alt_pressed else 1.0)
+                position += move / magnitude * float(move_speed_per_second) * dt * factor
+                changed = True
         if not changed:
             return False
         self._emit(position, front, up)

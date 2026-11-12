@@ -1,7 +1,7 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
-parser=argparse.ArgumentParser();parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
+parser=argparse.ArgumentParser();parser.add_argument('--public-ui-check',action='store_true');parser.add_argument('--observer-check',action='store_true');parser.add_argument('--task-renderer', default='mujoco', choices=('mujoco','geophys'));parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
 parser.add_argument('--table-half-x',type=float,default=None)
@@ -98,7 +98,11 @@ try:
                     camera = CameraGeometry.from_camera_spec(camera, task_artifact_hash=preliminary.artifact.identity_hash)
                 finally:
                     preliminary.close()
-            camera_options = {'task_rgb_camera': camera, 'task_renderer': 'mujoco'}
+            camera_options = {'task_rgb_camera': camera, 'task_renderer': args.task_renderer}
+        if args.observer_check or args.public_ui_check:
+            from task_env.environment.config import CameraSpec
+            camera_options['observer_camera'] = CameraSpec('observer', width=64, height=48, depth=False)
+            camera_options['render_mode'] = 'rgb_array'
         if args.yaml:
             import yaml
             path = Path('formal-task.yaml')
@@ -224,6 +228,55 @@ try:
             assert info['task_rgb_v1']['capture_identity']['capture_phase'] == 'reset_initial'
             assert info['task_rgb_v1']['resolved_camera']['capture_control_step'] == 0
             result['rgb_reset_boundary'] = info['task_rgb_v1']['capture_identity']['state_boundary']
+        if args.public_ui_check:
+            from types import SimpleNamespace
+            from task_env.render.base.contracts import RenderMode
+            from task_env.render.providers.single import TaskEnvRenderProvider
+            source = env.session._observer_render_source
+            presenter = TaskEnvRenderProvider(render_source=source, config=SimpleNamespace(
+                width=64, height=48, backend='rasterizer', render_preset='interactive'))
+            boundary = env.session.state_boundary_identity().to_mapping()
+            clock = float(env.state.simulation_time)
+            try:
+                exported = presenter.render(mode=RenderMode.RGB_ARRAY, snapshot=None)
+                assert exported.shape == (48, 64, 3)
+                presenter.render(mode=RenderMode.HUMAN, snapshot=None)
+                assert presenter._window is not None
+                assert env.session.state_boundary_identity().to_mapping() == boundary
+                assert float(env.state.simulation_time) == clock
+                result['public_ui'] = {'offscreen_shape': list(exported.shape), 'window_created': True,
+                    'boundary_unchanged': True, 'clock_before': clock, 'clock_after': float(env.state.simulation_time)}
+            finally:
+                presenter.close()
+        if args.observer_check:
+            from task_env.environment.config import CameraSpec
+            from task_env.observations.canonical_camera import CameraGeometry
+            boundary = env.session.state_boundary_identity().to_mapping()
+            clock = float(env.state.simulation_time)
+            task_frame = observation['task_rgb'].copy() if args.task_rgb else None
+            camera_identity = (info['task_rgb_v1']['capture_identity']['camera_geometry_identity_hash']
+                               if args.task_rgb else None)
+            observer_a = env.render()
+            observer_b = env.render()
+            assert observer_a.shape == observer_b.shape == (48, 64, 3)
+            assert env.session.state_boundary_identity().to_mapping() == boundary
+            assert float(env.state.simulation_time) == clock
+            if task_frame is not None:
+                np.testing.assert_array_equal(observation['task_rgb'], task_frame)
+            alternate = CameraGeometry.from_camera_spec(
+                CameraSpec('observer-alternate', width=64, height=48, depth=False, position=(0.1, 0, 0)),
+                task_artifact_hash=env.artifact.identity_hash)
+            env.set_observer_camera(alternate)
+            env.render()
+            assert env.session.state_boundary_identity().to_mapping() == boundary
+            assert float(env.state.simulation_time) == clock
+            if task_frame is not None:
+                assert info['task_rgb_v1']['capture_identity']['camera_geometry_identity_hash'] == camera_identity
+                np.testing.assert_array_equal(observation['task_rgb'], task_frame)
+            result['observer_repeated_render'] = {'physics_clock_before': clock,
+                'physics_clock_after': float(env.state.simulation_time), 'boundary_unchanged': True,
+                'observer_replaced': alternate.camera_id, 'task_camera_identity': camera_identity,
+                'task_frame_retained': task_frame is not None}
         if args.case in {'panda-effort','panda-joint'}:
             for finger in ('panda-v1/finger_joint1','panda-v1/finger_joint2'):
                 declared=float(env.artifact.initialization.joint_position[finger])
