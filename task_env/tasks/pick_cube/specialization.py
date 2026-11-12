@@ -365,7 +365,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
 
 def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
                           include_solution=True, controller_profile="r3_continuous_v1",
-                          resolved_config=None, task_config=None, physical_fixture=False,
+                          resolved_config=None, task_config=None, lift_height_m=None, physical_fixture=False,
                           controller_builder=None):
     """Build the exact F06 Isaac source through the existing PickCube owners."""
     if controller_profile != "r3_continuous_v1":
@@ -377,7 +377,8 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
     # Both USD control modes prepare the same Task data without building a
     # separate MJCF Controller; the selected USD Controller is created below.
     prepared = _prepare_reference_source(backend="cpu", controller_profile=controller_profile,
-                                         resolved_config=resolved_config, task_config=task_config)
+                                         resolved_config=resolved_config, task_config=task_config,
+                                         lift_height_m=lift_height_m)
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(prepared.source):
         source_ids = _source_identity_files(None, PickCubeReadinessSolution, profile_source=prepared.profile_source)
@@ -393,7 +394,7 @@ def build_isaac_reference(*, delivery_manifest, task_seed=31, horizon=1000,
         robot = legacy["source"].agents[0]
         runtime_input = build_pickcube_isaac_runtime_input_v1(
             delivery_manifest, task_seed=task_seed, horizon=horizon, task_config=task_config,
-            physical_fixture=physical_fixture, robot=robot,
+            physical_fixture=physical_fixture, robot=robot, lift_height_m=lift_height_m,
         )
         manifest_path = Path(delivery_manifest).resolve(strict=True)
         panda_xml_path = manifest_path.parent / runtime_input.runtime_source.scene_source.loaded_delivery.delivery.source_entry_file
@@ -579,7 +580,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
                 raise ValueError("F06 Isaac PickCube requires its explicit source_delivery_manifest")
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, include_solution=False,
-                controller_profile=controller_profile,
+                controller_profile=controller_profile, lift_height_m=lift_height_m,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
@@ -589,7 +590,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         if provider == "isaacsim":
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, include_solution=False,
-                controller_profile=controller_profile,
+                controller_profile=controller_profile, lift_height_m=lift_height_m,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
@@ -603,6 +604,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
                 horizon=horizon, include_solution=False, controller_profile=controller_profile,
+                lift_height_m=lift_height_m,
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
@@ -672,6 +674,8 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
     @staticmethod
     def validate_selected_configuration(**options):
+        if options['provider'] == 'isaacsim' and set(options['task_parameters']) - {'lift_height_m'}:
+            raise ValueError('Isaac PickCube does not support the requested Task parameter')
         if (options['reset_profile'] is not None
                 and (options['profile'] != 'r3_continuous_v1' or options['gravity_compensation'])):
             raise ValueError('reset profile requires PickCube R3 without gravity compensation')
@@ -921,7 +925,7 @@ def _source_bindings(scene: SceneDefinition, artifact: TaskArtifactV1):
 
 def build_pickcube_isaac_runtime_input_v1(
     delivery_manifest: str | Path, *, task_seed: int = 31, horizon: int = 1000,
-    task_config=None, physical_fixture=False, robot=None,
+    task_config=None, physical_fixture=False, robot=None, lift_height_m=None,
 ) -> UsdRuntimeInputV1:
     """Build the current PickCube Task and public USD source through Core owners."""
 
@@ -938,7 +942,7 @@ def build_pickcube_isaac_runtime_input_v1(
         raise ValueError("F06 builder requires the exact generated PickCube desktop delivery v1")
 
     task_config = _configuration() if task_config is None else task_config
-    legacy_artifact = build_artifact(task_config=task_config)
+    legacy_artifact = build_artifact(task_config=task_config, lift_height_m=lift_height_m)
     if physical_fixture not in (False, 'coexist', 'effort-only'):
         raise ValueError('F06 physical fixture must select coexist or effort-only')
     if physical_fixture:

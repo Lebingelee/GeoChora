@@ -1089,4 +1089,10 @@ MuJoCo CPU 的 Panda direct effort、reset-scoped joint／r3 切换、Pendulum �
 
 140 项版本检查通过。MuJoCo 直接 effort 完成 5 个 native 子步和第二次 reset，MuJoCo joint effort 的 Controller reset 与 H5 读回完成 10 个子步；GeoPhys joint effort 完成 reset、step、第二次 reset 和关闭，native 子步未直接计数。MJCF 导入有语义诊断。受影响的 Isaac effort 本轮仅检查配置传递，未做真实 CUDA 复验；完整 Solution 未运行。冻结 diff、预算和收据位于 ignored `workspace/maintenance/v211_effort_config_owner_20261112_1qrzc718/`。
 
-复核还发现：Isaac Position 的正式配置可以包含 `lift_height_m`，但 `make_reference_binding` 调用 USD builder 时未传该值，USD Artifact 仍按默认值构造；effort 当前则拒绝该参数。这是尚未解决的配置语义分叉，不因本条收敛而消失，需在后续共同任务构建中修复并按影响验证。E01～E04 未整体接收。
+复核还发现：`make_reference_binding` 调用 USD builder 时未传 `lift_height_m`，USD Artifact 按默认值构造。这里更正本条初写的判断：正式解析器当时明确拒绝 Isaac 的所有任务参数，因此正式入口不会静默忽略该值；实际问题是 Isaac 不支持此覆盖，且内部 builder 没有贯通该值。后续处理见 6.105。E01～E04 未整体接收。
+
+### 6.105 PickCube lift 参数贯通 position 与 effort
+
+输入 `c4a5195e`。将 `lift_height_m` 从正式任务配置传至 Position 和 effort 的 MJCF／USD 任务声明、Artifact、reset 与任务评价；移除共同配置层对 Isaac 所有任务参数的笼统拒绝，PickCube 仍明确拒绝其 Isaac source 不支持的 Task force。旧 Isaac 入口对 lift 的拒绝和 builder 对参数的遗漏得到纠正，不扩大 provider 原生能力或任务范围。
+
+生产修改 4 文件 +25／−19，净增 6 行；版本诊断修改 2 文件 +61／−0，本文和当前状态文档修改 2 文件。无新增、删除或整文件迁移，tracked 文件数保持 1356。145 项版本检查通过，包括两个控制模式在 MJCF 与 USD Artifact 的非默认任务语义，以及 USD reset 对同一 Artifact 的身份绑定。MuJoCo Position Solution 单步和直接 effort 分别完成 5 个 native 子步及再次 reset。Isaac Position 以 0.17 米 lift 完成 reset、非零 action、第二次 reset、同步 RGB 和独立三帧读回，观察 41 次 physics callback，订阅前启动推进未知；Runtime 和 reader 退出码均为 0，日志有只读目录、USD 包、渲染预热警告。首次 Isaac 尝试因诊断脚本在 SimulationApp 启动前加载 USD 引起扩展初始化冲突并退出 139，未进入物理推进；重试将 Artifact 身份移到独立进程计算，完整失败及预算记录保留。Isaac effort 本轮仅完成 USD Artifact／reset 合同检查，真实 CUDA effort 和完整 Solution 尚未复验。冻结 diff、预算和收据分别位于 ignored `workspace/maintenance/v211_lift_config_cpu_20261112_u4on4_61/` 与 `workspace/maintenance/v211_isaac_lift_20261112_svcug385/`。E01～E04 未整体接收。

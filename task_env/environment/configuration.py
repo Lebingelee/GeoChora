@@ -456,8 +456,6 @@ def _resolve_selected_config(environment_type, config):
             raise ValueError(f"task.{key} must be within [{lower}, {upper}]")
         params.append((key, float(value)))
     manifest = execution_defaults.get("source_delivery_manifest")
-    if provider == "isaacsim" and params:
-        raise ValueError("task parameter overrides are not yet admitted by the Isaac source")
     if provider == "isaacsim":
         profiles = getattr(environment_type, 'selected_isaac_controller_profiles', frozenset())
         if not environment_type.selected_supports_isaac or manifest is None or profile not in profiles:

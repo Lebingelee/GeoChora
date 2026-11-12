@@ -222,4 +222,6 @@ native Position 物化改按 Controller 声明核对 Joint，完整 USD 绑定�
 
 默认 tabletop source 组合现在使用任务 source 已声明的同一 Robot，装配主体仍按选择替换；MuJoCo、GeoPhys 和两个 MuJoCo worker 的受影响短程已复验。详见[实施记录 6.103](../planning/post-5c-optimization-execution.md#6103-source-组合复用已声明的-robot)。
 
-PickCube effort 现在消费正式解析的任务与环境配置；MuJoCo／GeoPhys 短程已复验，Isaac effort 仍需真实 CUDA 复验。Isaac Position 的 `lift_height_m` 未传至 USD Artifact，仍待修复。详见[实施记录 6.104](../planning/post-5c-optimization-execution.md#6104-pickcube-effort-消费已解析配置)。
+PickCube effort 现在消费正式解析的任务与环境配置；MuJoCo／GeoPhys 短程已复验，Isaac effort 仍需真实 CUDA 复验。详见[实施记录 6.104](../planning/post-5c-optimization-execution.md#6104-pickcube-effort-消费已解析配置)。
+
+PickCube 的 `lift_height_m` 已贯通 Position／effort 的 MJCF 与 USD 任务 Artifact；MuJoCo 两种控制及 Isaac Position 非默认值短程已验证。详见[实施记录 6.105](../planning/post-5c-optimization-execution.md#6105-pickcube-lift-参数贯通-position-与-effort)。

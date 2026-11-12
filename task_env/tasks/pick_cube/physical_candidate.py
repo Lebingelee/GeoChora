@@ -30,7 +30,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
     if robot_uid != 'panda-v1' or gravity_compensation or reset_profile is not None:
         raise ValueError('physical profile requires its declared Panda source without Position-only options')
     if provider == 'isaacsim':
-        if source_delivery_manifest is None or parameters or task_parameters:
+        if source_delivery_manifest is None or parameters or set(task_parameters) - {'lift_height_m'}:
             raise ValueError('Isaac physical control requires its USD delivery without MJCF-only options')
         if horizon > 1000:
             raise ValueError('Isaac physical source horizon must be in [1, 1000]')
@@ -48,7 +48,7 @@ def validate_physical_configuration(*, provider, backend, profile, robot_uid, na
         raise ValueError('physical reset selection requires an isolated MuJoCo reference Controller')
     if not switch and policy != 'dynamic':
         raise ValueError('physical action-space policy requires reset selection')
-    if set(task_parameters) - {'cube_force_z_N'}:
+    if set(task_parameters) - {'cube_force_z_N', 'lift_height_m'}:
         raise ValueError('physical source retains its declared Task parameters; unsupported override')
     if 'cube_force_z_N' in task_parameters and (provider, drive, kind, switch) != (
             'mujoco', 'position', 'direct', False):
@@ -59,6 +59,7 @@ def physical_binding_from_config(config):
     import json
     options = json.loads(config.controller_parameters_json)
     task_config = json.loads(config.task_configuration_json)
+    lift_height_m = dict(config.task_parameters).get('lift_height_m')
     kind = PandaAgent.effort_controller_profiles()[config.controller_profile]
     drive = config.native_drive or ('position' if kind == 'direct' else 'disabled')
     if config.physics_provider == 'isaacsim':
@@ -67,13 +68,14 @@ def physical_binding_from_config(config):
             seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
             horizon=config.environment.episode.horizon,
             drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
-            task_config=task_config, resolved_config=config.environment)
+            task_config=task_config, resolved_config=config.environment, lift_height_m=lift_height_m)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(provider=config.physics_provider,
         horizon=config.environment.episode.horizon, seed=config.environment.episode.seed if config.environment.episode.seed is not None else 31,
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
         reset_switch=options.get('reset_selection', False), space_policy=options.get('action_space_policy', 'dynamic'),
-        cube_force_z_N=force, task_config=task_config, resolved_config=config.environment)
+        cube_force_z_N=force, task_config=task_config, resolved_config=config.environment,
+        lift_height_m=lift_height_m)
 
 
 def _direct_physical_observation_spaces(env):
@@ -148,7 +150,7 @@ def _pickcube_mjcf_scene(task_config, robot):
 
 def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
                           task_config, resolved_config, reset_switch=False,
-                          space_policy='dynamic', cube_force_z_N=None):
+                          space_policy='dynamic', cube_force_z_N=None, lift_height_m=None):
     """Declare task/source/control bindings; the shared factory constructs Env."""
     from ...artifacts import FrameReference
     from ...controllers.canonical.contracts import reference_pose_action
@@ -160,7 +162,7 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
 
     prepared = _prepare_reference_source(
         backend='cpu', controller_profile='r3_continuous_v1', task_config=task_config,
-        resolved_config=resolved_config)
+        resolved_config=resolved_config, lift_height_m=lift_height_m)
     legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     from ...runtime.sessions.source import close_execution_source_on_failure
     with close_execution_source_on_failure(original):
@@ -298,7 +300,8 @@ def make_physical_binding(*, provider, horizon, seed, drive_mode, control_kind,
         binding = ReferenceTaskBinding(build=build, build_seeded=build_seeded,
             reset_sample=lambda _artifact, actual_seed: sample_episode_reset_plan(
                 task_source, scene, artifact, task_seed=actual_seed).reset_sample,
-            evaluate=lambda state, semantics: evaluate(state, semantics),
+            evaluate=lambda state, semantics: evaluate(state, semantics,
+                task_config=task_config, lift_height_m=lift_height_m),
             task_definition_factory=PickCubeTaskDefinition.from_artifact,
             task_state_projection=as_task_state_view,
             object_poses=(('cube-v1', 'cube_v1'),), external_actions=True, interval_mode='grouped',

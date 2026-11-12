@@ -127,6 +127,30 @@ def test_effort_uses_resolved_task_configuration_without_loading_it_again(monkey
         binding.close_task_resources()
 
 
+@pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
+def test_pickcube_position_and_effort_consume_the_same_lift(profile):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu',
+                      'deployment': 'in_process', 'interpreter': __import__('sys').executable},
+        'controller': {'profile_id': profile}, 'task': {'lift_height_m': .17},
+        'episode': {'horizon': 8},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    value = None
+    try:
+        value = binding.build_seeded('mujoco', 'cpu', 42, 8)
+        assert value['artifact'].semantics.parameters_si['lift_height'] == .17
+        assert binding.task_definition_factory(value['artifact']).semantics.parameters_si['lift_height'] == .17
+    finally:
+        if binding.close_task_resources is not None:
+            binding.close_task_resources()
+        elif value is not None:
+            value['source'].execution_source_receipt.close()
+
+
 @pytest.mark.parametrize('provider', ['mujoco', 'geophys'])
 @pytest.mark.parametrize('profile', ['panda-direct-effort-v1', 'panda-joint-effort-reference-v1',
     'panda-r3-effort-reference-v1', 'panda-joint-mass-effort-v1', 'panda-r3-mass-effort-v1'])

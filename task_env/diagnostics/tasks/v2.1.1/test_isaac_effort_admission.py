@@ -86,6 +86,43 @@ def test_solution_reconstruction_uses_seeded_builder_when_available():
     assert strategy.build_reset({}, 42, object()) == ('isaacsim', 'cuda', 42, 8)
 
 
+@pytest.mark.parametrize('profile', ['r3_continuous_v1', 'panda-direct-effort-v1'])
+def test_usd_formal_task_lift_reaches_artifact_and_reset(profile):
+    import sys
+    from pathlib import Path
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    root = Path(__file__).resolve().parents[4]
+    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    if not manifest.is_file():
+        pytest.skip('verified Isaac source delivery is unavailable')
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                      'physics_device': 'cuda:0', 'source_delivery_manifest': str(manifest),
+                      'deployment': 'in_process', 'interpreter': sys.executable},
+        'controller': {'profile_id': profile}, 'episode': {'horizon': 8},
+        'task': {'lift_height_m': .17},
+    })
+    binding = PickCubeReferenceEnv.selected_binding(config)
+    value = binding.build_seeded('isaacsim', 'cuda', 42, 8)
+    artifact = value['artifact']
+    assert artifact.semantics.parameters_si['lift_height'] == .17
+    assert value['reset_plan'].reset_sample.task_artifact_hash == artifact.identity_hash
+
+
+def test_usd_rejects_unsupported_task_force():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    with pytest.raises(ValueError, match='does not support the requested Task parameter'):
+        resolve_task_env_config(PickCubeReferenceEnv, {
+            'execution': {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
+                          'physics_device': 'cuda:0', 'source_delivery_manifest': '/unused'},
+            'controller': {'profile_id': 'r3_continuous_v1'}, 'task': {'cube_force_z_N': 1.},
+        })
+
+
 def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypatch):
     from dataclasses import replace
     from pathlib import Path
