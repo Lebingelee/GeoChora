@@ -10,7 +10,6 @@ import json
 import math
 from pathlib import Path
 from typing import NamedTuple
-import subprocess
 
 import numpy as np
 
@@ -41,9 +40,7 @@ from ...environment.configuration import (
     overlay_public_env_config,
     resolve_env_config,
 )
-from ...environment.task_source import compile_declared_artifact
 from ...registry import make_agent, make_object, make_scene, register_env
-from ...robots.panda import PandaAgent
 from ...planners import AbsolutePosePlannerConfig
 from ...runtime.sessions.control import ControlBinding
 from ...robots.panda import PandaAgent, panda_reference_control_binding
@@ -163,42 +160,23 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu", resolved_conf
     declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
     if artifact.identity_hash != compile_panda_box_artifact(declaration).identity_hash:
         raise ValueError("selected P1.6 TaskArtifact required")
-    if backend not in {"cpu", "cuda"}:
-        raise ValueError("PickCube reference backend must be cpu or cuda")
     config = _environment_config() if resolved_config is None else resolved_config
-    config = replace(config, runtime=replace(config.runtime, backend=backend))
-    return compile_panda_box_source(declaration, artifact, config, own_snapshot=True)
+    return compile_panda_box_source(declaration, artifact, config, own_snapshot=True, backend=backend)
 
 
 def _source_identity_files(controller, solution_type, *, profile_source=None, provider=None, robot=None):
     root = Path(__file__).resolve().parents[3]
+    from ...runtime.sessions.provenance import (construction_source_inventory,
+                                                selected_reference_construction_sources)
     files = {Path(__file__).resolve(), Path(__file__).with_name("task.py").resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
              Path(inspect.getsourcefile(compile_panda_box_source)).resolve(),
-             Path(__file__).parents[2].joinpath("assembly/compiler.py").resolve(),
-             Path(inspect.getsourcefile(compile_declared_artifact)).resolve(),
              Path(inspect.getsourcefile(solution_type)).resolve(),
-             Path(inspect.getsourcefile(AbsolutePosePlannerConfig)).resolve(),
-             Path(inspect.getsourcefile(panda_reference_control_binding)).resolve(),
-             root / "task_env/planners/contracts.py",
-             root / "task_env/planners/completion.py",
-             Path(inspect.getsourcefile(ReferenceTaskBinding)).resolve(),
-             Path(inspect.getsourcefile(SelectedReferenceEnv)).resolve(),
-             root / "task_env/environment/lifecycle.py",
-             root / "task_env/runtime/sessions/api.py",
-             root / "task_env/runtime/sessions/control.py",
-             root / "task_env/runtime/sessions/position_subject_binding.py",
-             root / "task_env/runtime/sessions/source_composition_adapters.py",
              root / "task_env/robots/panda.py", root / "task_env/robots/assembled_panda.py",
              root / "task_env/robots/source_recipe.py",
              root / "task_env/robots/panda_observation.py",
-             root / "task_env/tasks/pick_cube/observation.py",
-             Path(inspect.getsourcefile(TaskArtifact)).resolve(),
-             root / "task_env/recorders/reference_provenance.py",
-             root / "task_env/utils/_paths.py",
-             root / "task_env/recorders/position_metadata.py",
-             root / "task_env/observations/selected_reference.py",
-             Path(inspect.getsourcefile(RuntimeSource)).resolve()}
+             root / "task_env/tasks/pick_cube/observation.py"}
+    files.update(selected_reference_construction_sources(root))
     if provider == 'mujoco':
         files.add(root / 'task_env/runtime/sessions/mujoco_composition.py')
     if provider == 'isaacsim':
@@ -212,12 +190,9 @@ def _source_identity_files(controller, solution_type, *, profile_source=None, pr
         ))
     if controller is not None:
         files.add(Path(inspect.getsourcefile(type(controller))).resolve())
-    canonical = root / "task_env" / "controllers" / "canonical"
-    files.update(path.resolve() for path in canonical.glob("*.py") if path.is_file())
     if profile_source is not None:
         files.add(Path(profile_source).resolve())
-    return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(files)}
+    return construction_source_inventory(root, files)
 
 
 def _r3_dynamic_profile():
@@ -270,17 +245,6 @@ class _UsdSourceContext(NamedTuple):
     source_sha256: dict
 
 
-def _compile_task_source(*, backend, resolved_config, lift_height_m, task_config, robot, own_snapshot=False):
-    """Compile the declared Task and Robot without selecting a Controller."""
-    if backend not in {"cpu", "cuda"}:
-        raise ValueError("PickCube reference backend must be cpu or cuda")
-    declaration = _declaration(lift_height_m=lift_height_m, task_config=task_config)
-    config = _environment_config(task_config) if resolved_config is None else resolved_config
-    config = replace(config, runtime=replace(config.runtime, backend=backend))
-    compiled = compile_panda_box_task(declaration, config=config, robot=robot, own_snapshot=own_snapshot)
-    return config, compiled.artifact, compiled.source
-
-
 def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolved_config=None,
                               lift_height_m=None, task_config=None, robot=None):
     """Prepare the Task source and readiness for a Position Solution."""
@@ -295,9 +259,10 @@ def _prepare_reference_source(*, backend="cpu", controller_profile="r1", resolve
     if is_r3_profile:
         resolved_config = _nut_aligned_environment_config(
             _environment_config(task_config) if resolved_config is None else resolved_config)
-    config, artifact, source = _compile_task_source(
-        backend=backend, resolved_config=resolved_config, lift_height_m=lift_height_m,
-        task_config=task_config, robot=robot)
+    config = _environment_config(task_config) if resolved_config is None else resolved_config
+    compiled = compile_panda_box_task(_declaration(lift_height_m=lift_height_m, task_config=task_config),
+                                      config=config, robot=robot, backend=backend)
+    artifact, source, config = compiled.artifact, compiled.source, compiled.source.config
     from .solution import PickCubeReadinessConfig
     planner_config = (
         _pickcube_r3_planner_config(dynamic_profile, artifact.timebase.control_dt)
@@ -345,13 +310,14 @@ def _compile_mjcf_effort_source(request, *, reset_switch, task_config, resolved_
             resolved_config=resolved_config, lift_height_m=lift_height_m, robot=robot)
         legacy_artifact, original, readiness = prepared.artifact, prepared.source, prepared.readiness
     else:
-        _, legacy_artifact, source = _compile_task_source(
-            backend=backend, resolved_config=_nut_aligned_environment_config(resolved_config),
-            lift_height_m=lift_height_m, task_config=task_config, robot=robot, own_snapshot=True)
-        original, readiness = source, None
+        compiled = compile_panda_box_task(
+            _declaration(lift_height_m=lift_height_m, task_config=task_config),
+            config=_nut_aligned_environment_config(resolved_config), robot=robot,
+            backend=backend, own_snapshot=True)
+        legacy_artifact, original, readiness = compiled.artifact, compiled.source, None
     with close_execution_source_on_failure(original):
-        revision = subprocess.check_output(['git', '-C', str(Path(__file__).resolve().parents[3]),
-                                            'rev-parse', 'HEAD'], text=True).strip()
+        from ...runtime.sessions.provenance import construction_revision
+        revision = construction_revision(Path(__file__).resolve().parents[3])
         if reset_switch:
             from .solution import PickCubeReadinessSolution
             solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
@@ -432,7 +398,8 @@ def _bind_reference_position_control(compiled, context, controller, request, *, 
         })
         controller = execution_controller
     root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    from ...runtime.sessions.provenance import construction_revision
+    revision = construction_revision(root)
     source_ids = _source_identity_files(controller, PickCubeReadinessSolution,
         profile_source=profile_source, provider=request.provider, robot=context.robot)
     construction_identity = reference_task_identity_fields(artifact, source, controller)
@@ -544,9 +511,9 @@ def _compile_isaac_reference_source(request, *, delivery_manifest, controller_pr
         result = (CompiledReferenceTaskV1(runtime_input.artifact, runtime_input.runtime_source),
                   _UsdSourceContext(runtime_input, robot, action_config, prepared.task_config,
                       prepared.config, prepared.readiness, prepared.dynamic_profile, source_ids))
-    # Readiness uses a temporary MJCF snapshot; the USD source owns its bytes.
-    prepared.source.execution_source_receipt.close()
-    return result
+        # Readiness uses a temporary MJCF snapshot; USD materialization owns its later lease.
+        prepared.source.execution_source_receipt.close()
+        return result
 
 
 def _bind_isaac_reference_control(compiled, context, selection, request, *, include_solution, resolved_config):
@@ -560,26 +527,12 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
     readiness = context.readiness
     solution_identity = PickCubeReadinessSolution.identity_for_config(readiness)
     solution = PickCubeReadinessSolution(config=readiness) if include_solution else None
-    source_ids = dict(context.source_sha256)
-    if physical is not None:
-        source_ids.pop("task_env/controllers/canonical/position_profile.py", None)
-    identity_paths = (Path(__file__), Path(__file__).parents[2] / "runtime/sessions/source.py",
-                      Path(__file__).parents[2] / "runtime/sessions/api.py",
-                      Path(__file__).parents[2] / "controllers/canonical/kinematics.py")
-    if physical is None:
-        identity_paths += (Path(__file__).parents[2] / "controllers/canonical/position_profile.py",)
-    else:
-        identity_paths += (Path(__file__).parents[2] / "runtime/sessions/source_composition_adapters.py",
-                           Path(__file__).parents[2] / "runtime/sessions/isaac_physical.py")
-    for path in identity_paths:
-        source_ids[path.resolve().relative_to(Path(__file__).parents[3]).as_posix()] = hashlib.sha256(
-            path.read_bytes()
-        ).hexdigest()
-    source_ids["f06_delivery_source_entry_sha256"] = loaded.delivery.source_entry_sha256
-    source_ids["f06_delivery_manifest_sha256"] = loaded.manifest_bytes_sha256
+    from ...runtime.sessions.isaac_usd_admission import f06_construction_source_inventory
+    from ...runtime.sessions.provenance import construction_revision
+    source_ids = f06_construction_source_inventory(
+        runtime_input, context.source_sha256, task_path=__file__, physical=physical is not None)
     root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
-                                       text=True).strip()
+    revision = construction_revision(root)
     effective_config = (asdict(context.config)
                         if resolved_config is None else asdict(resolved_config))
     # Keep historical F06 source/configuration identity when the additive
@@ -591,8 +544,7 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
     resolved = {
         "construction_id": "pickcube-p16-reference-construction-v2",
         "task_recipe": context.task_config,
-        "artifact": runtime_input.artifact.to_mapping(),
-        "artifact_sha256": runtime_input.artifact.identity_hash,
+        **runtime_input.construction_identity_fields(),
         "runtime_config": effective_config,
         "runtime_config_sha256": effective_config_sha,
         "readiness": asdict(readiness), "resolved_controller_action": asdict(action_config),
@@ -601,12 +553,6 @@ def _bind_isaac_reference_control(compiled, context, selection, request, *, incl
         "solution_identity": solution_identity,
         "source_revision": revision,
         "source_sha256": source_ids,
-        "runtime_source_id": runtime_input.runtime_source.source_id,
-        "runtime_source_closure_sha256": runtime_input.runtime_source.source_closure_digest,
-        "runtime_source_bindings": {name: dict(getattr(runtime_input.runtime_source, name))
-            for name in ("joints", "bodies", "frames", "free_joints", "joint_targets")},
-        "execution_spec_v1": runtime_input.execution.to_mapping(),
-        "reset_plan_identity_sha256": runtime_input.reset_plan.identity_hash,
         "f06_delivery_manifest_sha256": runtime_input.delivery_manifest_sha256,
         "tcp_profile": PANDA_PICKCUBE_EE_TCP_V1.to_mapping(),
         "qualification": "NOT_REQUALIFIED",

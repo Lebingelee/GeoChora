@@ -8,6 +8,40 @@ import subprocess
 import sys
 
 
+def selected_reference_construction_sources(root):
+    """Common construction owners shared by selected reference tasks."""
+    root = Path(root).resolve()
+    relative = (
+        'task_env/artifacts/contracts.py', 'task_env/assembly/compiler.py',
+        'task_env/environment/lifecycle.py', 'task_env/environment/reference_binding.py',
+        'task_env/environment/reference_env.py', 'task_env/environment/task_source.py',
+        'task_env/observations/selected_reference.py', 'task_env/planners/cartesian.py',
+        'task_env/planners/completion.py', 'task_env/planners/contracts.py',
+        'task_env/recorders/position_metadata.py', 'task_env/recorders/reference_provenance.py',
+        'task_env/runtime/sessions/api.py', 'task_env/runtime/sessions/control.py',
+        'task_env/runtime/sessions/position_subject_binding.py',
+        'task_env/runtime/sessions/source.py', 'task_env/runtime/sessions/source_composition_adapters.py',
+        'task_env/utils/_paths.py',
+    )
+    canonical = root / 'task_env/controllers/canonical'
+    return tuple(root / name for name in relative) + tuple(
+        path for path in canonical.glob('*.py') if path.is_file())
+
+
+def construction_source_inventory(root, paths):
+    """Hash declared construction owners, including the inventory implementation."""
+    root = Path(root).resolve()
+    sources = {Path(path).resolve() for path in paths}
+    sources.add(Path(__file__).resolve())
+    return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(sources)}
+
+
+def construction_revision(root):
+    """Identify the checkout used for a construction without rewriting old receipts."""
+    return subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
+
+
 def resolve_isaac_sdk_identity(*, pip_version=None, sdk_root=None):
     """Identify supported SDK releases from explicit metadata, preserving raw text.
 

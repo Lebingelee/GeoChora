@@ -940,6 +940,22 @@ class UsdRuntimeInputV1:
     delivery_manifest_sha256: str
     admission_policy: Mapping | None = None
 
+    def construction_identity_fields(self):
+        """Project the immutable source and reset identities for construction receipts."""
+        source = self.runtime_source
+        return {
+            'artifact': self.artifact.to_mapping(),
+            'artifact_sha256': self.artifact.identity_hash,
+            'runtime_source_id': source.source_id,
+            'runtime_source_closure_sha256': source.source_closure_digest,
+            'runtime_source_bindings': {
+                name: dict(getattr(source, name))
+                for name in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets')
+            },
+            'execution_spec_v1': self.execution.to_mapping(),
+            'reset_plan_identity_sha256': self.reset_plan.identity_hash,
+        }
+
     def validate(self):
         from ...artifacts import ExecutionSpecV1
         from ...artifacts.execution import EpisodeResetPlanV1

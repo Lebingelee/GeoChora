@@ -274,6 +274,16 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
         selected.controller.prepare_action_request([0.], scene=value['source'].scene_definition, plan=plan)
     from task_env.runtime.sessions.api import _validate_usd_task_policy, _F06_TASK_POLICY_SHA256_V1
     input_v1 = value['session_admission_input']
+    identities = input_v1.construction_identity_fields()
+    assert identities['runtime_source_id'] == value['source'].source_id
+    assert identities['runtime_source_closure_sha256'] == value['source'].source_closure_digest
+    assert identities['reset_plan_identity_sha256'] == value['reset_plan'].identity_hash
+    assert identities['runtime_source_bindings']['joints'] == dict(value['source'].joints)
+    assert all(value['resolved_configuration'][key] == item for key, item in identities.items())
+    inventory = value['source_sha256']
+    assert inventory['f06_delivery_manifest_sha256'] == input_v1.delivery_manifest_sha256
+    assert 'task_env/runtime/sessions/isaac_usd_admission.py' in inventory
+    assert 'task_env/runtime/sessions/provenance.py' in inventory
     changed_targets = dict(value['source'].joint_targets)
     changed_targets[next(iter(changed_targets))] = 'foreign-native-joint'
     changed_source = replace(value['source'], joint_targets=changed_targets)

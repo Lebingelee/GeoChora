@@ -118,16 +118,21 @@ def compile_panda_box_artifact(declaration: PandaBoxDeclaration):
     return _panda_box_reference_declaration(declaration).artifact.compile()
 
 
-def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config, *, own_snapshot=False):
+def compile_panda_box_source(declaration: PandaBoxDeclaration, artifact, config, *, own_snapshot=False,
+                             backend=None):
     """Resolve the same box asset into source names and registered components."""
-    return compile_panda_box_task(declaration, config=config, artifact=artifact,
+    return compile_panda_box_task(declaration, config=config, artifact=artifact, backend=backend,
                                   own_snapshot=own_snapshot).source
 
 
 def compile_panda_box_task(declaration: PandaBoxDeclaration, *, config, artifact=None,
-                           controller_factory=None, robot=None, own_snapshot=False):
+                           controller_factory=None, robot=None, own_snapshot=False, backend=None):
     """Compile the declared Artifact and RuntimeSource through the shared owner."""
     d = declaration
+    if backend is not None:
+        if backend not in {'cpu', 'cuda'}:
+            raise ValueError('PickCube reference backend must be cpu or cuda')
+        config = replace(config, runtime=replace(config.runtime, backend=backend))
     from ..registry import make_agent
     robot = make_agent('panda-v1') if robot is None else robot
     composer = PickCubeSceneComposer(

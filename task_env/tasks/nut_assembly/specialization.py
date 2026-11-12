@@ -6,7 +6,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-import subprocess
 from typing import NamedTuple
 
 import numpy as np
@@ -291,41 +290,25 @@ def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend=
     return runtime_source, contact_profile
 
 
-def _sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
 def _source_identity_files():
     root = Path(__file__).resolve().parents[3]
+    from ...runtime.sessions.provenance import (construction_source_inventory,
+                                                selected_reference_construction_sources)
     relative = (
         "task_env/tasks/nut_assembly/__init__.py",
         "task_env/tasks/nut_assembly/task.py", "task_env/tasks/nut_assembly/specialization.py",
         "task_env/tasks/nut_assembly/solution.py",
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
         "task_env/assembly/r05b_trusted_execution_source_manifest.json",
-        "task_env/assembly/compiler.py", "task_env/environment/task_source.py",
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py", "task_env/robots/panda.py",
-        "task_env/environment/reference_env.py", "task_env/environment/reference_binding.py",
-        "task_env/environment/lifecycle.py",
-        "task_env/artifacts/contracts.py",
-        "task_env/recorders/reference_provenance.py", "task_env/utils/_paths.py",
-        "task_env/recorders/position_metadata.py",
-        "task_env/observations/selected_reference.py",
         "task_env/robots/panda_observation.py",
-        "task_env/planners/completion.py",
-        "task_env/runtime/sessions/api.py", "task_env/runtime/sessions/control.py",
-        "task_env/runtime/sessions/position_subject_binding.py",
-        "task_env/runtime/sessions/source_composition_adapters.py",
         "task_env/runtime/sessions/mujoco_composition.py",
         "task_env/robots/assembled_panda.py", "task_env/robots/source_recipe.py",
-        "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
+        "task_env/runtime/sessions/common.py",
         "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
-        "task_env/planners/cartesian.py", "task_env/planners/contracts.py",
     )
-    controller = root / "task_env/controllers/canonical"
-    relative = (*relative, R3_PROFILE_PATH.relative_to(root).as_posix(),
-                *(p.relative_to(root).as_posix() for p in controller.glob("*.py") if p.is_file()))
-    return {name: _sha(root / name) for name in sorted(set(relative))}
+    paths = (*selected_reference_construction_sources(root), *(root / name for name in relative), R3_PROFILE_PATH)
+    return construction_source_inventory(root, paths)
 
 
 class _NutSourceContext(NamedTuple):
@@ -381,7 +364,8 @@ def _bind_reference_controller(compiled, context, execution_controller, request,
         "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
     execution_controller.bind_identity_provenance(controller_identity)
     root = Path(__file__).resolve().parents[3]
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    from ...runtime.sessions.provenance import construction_revision
+    revision = construction_revision(root)
     construction_identity = reference_task_identity_fields(
         artifact, source, controller, include_runtime_config_sha256=False,
     )

@@ -64,6 +64,39 @@ def test_example_action_uses_control_capability_not_compatibility_method():
                                   [1, 2, 3, 1, 0, 0, 0, 1])
 
 
+def test_construction_inventory_rechecks_declared_bytes_and_includes_owner(tmp_path, monkeypatch):
+    import hashlib
+    from task_env.runtime.sessions import provenance
+
+    owner = tmp_path / 'provenance.py'
+    declared = tmp_path / 'task.py'
+    owner.write_text('owner')
+    declared.write_text('first')
+    monkeypatch.setattr(provenance, '__file__', str(owner))
+    first = provenance.construction_source_inventory(tmp_path, [declared, declared])
+    assert first == {'provenance.py': hashlib.sha256(b'owner').hexdigest(),
+                     'task.py': hashlib.sha256(b'first').hexdigest()}
+    declared.write_text('second')
+    second = provenance.construction_source_inventory(tmp_path, [declared])
+    assert second['task.py'] == hashlib.sha256(b'second').hexdigest()
+    assert second['provenance.py'] == first['provenance.py']
+
+
+def test_tabletop_tasks_consume_common_construction_source_owners():
+    from pathlib import Path
+    from task_env.runtime.sessions.provenance import selected_reference_construction_sources
+    from task_env.tasks.pick_cube.solution import PickCubeReadinessSolution
+    from task_env.tasks.pick_cube.specialization import _source_identity_files as pick_sources
+    from task_env.tasks.nut_assembly.specialization import _source_identity_files as nut_sources
+
+    root = Path(__file__).resolve().parents[4]
+    common = {path.relative_to(root).as_posix() for path in selected_reference_construction_sources(root)}
+    pick = pick_sources(None, PickCubeReadinessSolution, provider='mujoco')
+    nut = nut_sources()
+    assert common <= pick.keys() and common <= nut.keys()
+    assert all(pick[key] == nut[key] for key in common)
+
+
 @pytest.mark.parametrize(('uid', 'profile'), [
     ('pick-cube-p16-reference-v1', 'r3_continuous_v1'),
     ('pick-cube-p16-reference-v1', 'panda-direct-effort-v1'),

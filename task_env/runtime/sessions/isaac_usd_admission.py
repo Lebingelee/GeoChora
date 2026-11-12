@@ -52,6 +52,30 @@ def f06_isaac_robot_geometry_root(delivery):
     _validate_f06_isaac_delivery(delivery, delivery.manifest_bytes_sha256)
     return f'{delivery.delivery.entry_prim}/panda/Geometry'
 
+
+def f06_construction_source_inventory(runtime_input, declared_sources, *, task_path, physical):
+    """Add USD admission and control owners to a Task's declared source inventory."""
+    from pathlib import Path
+    from .provenance import construction_source_inventory
+
+    root = Path(__file__).resolve().parents[3]
+    sources = dict(declared_sources)
+    if physical:
+        sources.pop('task_env/controllers/canonical/position_profile.py', None)
+    paths = [Path(task_path), root / 'task_env/runtime/sessions/source.py',
+             root / 'task_env/runtime/sessions/api.py',
+             root / 'task_env/controllers/canonical/kinematics.py', Path(__file__)]
+    if physical:
+        paths.extend((root / 'task_env/runtime/sessions/source_composition_adapters.py',
+                      root / 'task_env/runtime/sessions/isaac_physical.py'))
+    else:
+        paths.append(root / 'task_env/controllers/canonical/position_profile.py')
+    sources.update(construction_source_inventory(root, paths))
+    delivery = runtime_input.runtime_source.scene_source.loaded_delivery
+    sources['f06_delivery_source_entry_sha256'] = delivery.delivery.source_entry_sha256
+    sources['f06_delivery_manifest_sha256'] = delivery.manifest_bytes_sha256
+    return sources
+
 def _validate_usd_task_policy(input_v1, expected_sha256):
     """Verify a pinned task declaration before trusting its binding and limits."""
     from ...controllers.canonical.contracts import digest
