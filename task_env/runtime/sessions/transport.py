@@ -151,7 +151,8 @@ def _episode(session):
 
 
 def _error(error):
-    return {'type': type(error).__name__, 'message': str(error)}
+    return {'type': type(error).__name__, 'message': str(error),
+            'notes': list(getattr(error, '__notes__', ()))}
 
 
 def _raise_remote(value, *, request_identity=None, phase='worker_operation'):
@@ -161,6 +162,8 @@ def _raise_remote(value, *, request_identity=None, phase='worker_operation'):
     error.phase = phase
     error.reason = 'remote_' + str(value.get('type', 'error'))
     error.request_identity = request_identity
+    for note in value.get('notes', ()):
+        error.add_note(note)
     raise error
 
 
@@ -190,7 +193,7 @@ class _WorkerCallback:
     def __call__(self, *args): return self.call('__call__', *args)
 
 
-def serve_session(sock, session, request_identity, *, handlers=None):
+def serve_session(sock, session, request_identity, *, handlers=None, close_owned=None):
     """Forward one session until close; check operation and episode identity."""
     materialization = session.provider_materialization_id
     handlers = {} if handlers is None else dict(handlers)
@@ -206,20 +209,19 @@ def serve_session(sock, session, request_identity, *, handlers=None):
         if cleaned:
             return
         cleaned = True
-        error = None
+        from .api import close_session_and_runtime_owner
+        error, _ = close_session_and_runtime_owner(session,
+            session_error_label='worker session close', owner_error_label='worker owner close')
         try:
-            session.close()
-        except BaseException as exc:
-            error = exc
-        try:
-            close_owner = getattr(session, 'close_runtime_owner', None)
-            if callable(close_owner):
-                close_owner()
+            if close_owned is not None:
+                close_owned()
         except BaseException as exc:
             if error is None:
                 error = exc
             else:
-                error.add_note(f'worker owner close also failed: {exc}')
+                error.add_note(f'worker source/task close also failed: {exc}')
+                for note in getattr(exc, '__notes__', ()):
+                    error.add_note(note)
         if error is not None:
             raise error
 

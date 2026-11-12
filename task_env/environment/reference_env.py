@@ -1009,14 +1009,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
     @staticmethod
     def _release_failed_task_construction(value, binding, error):
         source = value.get('source') if isinstance(value, Mapping) else None
-        from ..runtime.sessions.source import source_resource_receipt
-        receipt = source_resource_receipt(source)
-        for cleanup in (getattr(receipt, 'close', None), getattr(binding, 'close_task_resources', None)):
-            if callable(cleanup):
-                try:
-                    cleanup()
-                except BaseException as cleanup_error:
-                    error.add_note(f'task construction cleanup also failed: {cleanup_error!r}')
+        from ..runtime.sessions.source import close_source_and_task_resources
+        close_source_and_task_resources(source, binding, error=error)
 
     def _selected_execution_context(self):
         resolved = getattr(self, 'resolved_public_config', None)
@@ -4015,12 +4009,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 owner_error_label='failed reset Runtime owner close')
         self._failed_runtime_sessions = []
         source = self.value.get('source')
-        from ..runtime.sessions.source import source_resource_receipt
-        source_receipt = source_resource_receipt(source)
-        if source_receipt is not None:
-            cleanup('source receipt cleanup', source_receipt.close)
-        if self.binding.close_task_resources is not None:
-            cleanup('task resource cleanup', self.binding.close_task_resources)
+        from ..runtime.sessions.source import close_source_and_task_resources
+        first_error = close_source_and_task_resources(source, self.binding, error=first_error)
         if first_error is not None:
             raise first_error
 

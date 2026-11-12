@@ -23,6 +23,23 @@ def source_resource_receipt(source):
             or getattr(source, 'execution_source_receipt', None))
 
 
+def close_source_and_task_resources(source, binding, *, error=None):
+    """Release owned source and Task resources, preserving the first failure."""
+    receipt = source_resource_receipt(source)
+    for label, operation in (('source receipt cleanup', getattr(receipt, 'close', None)),
+                             ('task resource cleanup', getattr(binding, 'close_task_resources', None))):
+        if not callable(operation):
+            continue
+        try:
+            operation()
+        except BaseException as cleanup_error:
+            if error is None:
+                error = cleanup_error
+            else:
+                error.add_note(f'{label} also failed: {cleanup_error!r}')
+    return error
+
+
 @contextmanager
 def close_execution_source_on_failure(source):
     """Keep a source lease on success; release it if its owner cannot be built."""

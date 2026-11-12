@@ -72,9 +72,11 @@ def _materialize_selected(payload):
     binding = cls._build_selected_binding(config)
     provider, backend = config.physics_provider, config.environment.runtime.backend
     seed, horizon = payload['seed'], config.environment.episode.horizon
-    value = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
-    source = value['source']
+    source = None
+    session = None
     try:
+        value = binding.reset_reconstruction_strategy(provider, backend, horizon).initial(seed=seed)
+        source = value['source']
         artifact = value['artifact']
         execution = decode_execution_spec(payload['execution'])
         if type(execution) not in (ExecutionSpec, ExecutionSpecV1):
@@ -155,11 +157,13 @@ def _materialize_selected(payload):
                 operation = getattr(session, name, None)
                 if callable(operation):
                     handlers[name] = subject_scoped(operation)
-        return session, handlers, source
-    except BaseException:
-        receipt = getattr(source, 'execution_source_receipt', None)
-        if receipt is not None:
-            receipt.close()
+        return session, handlers, source, binding
+    except BaseException as error:
+        from .api import close_session_and_runtime_owner
+        from .source import close_source_and_task_resources
+        close_session_and_runtime_owner(session, first_error=error,
+            session_error_label='worker session close', owner_error_label='worker runtime owner close')
+        close_source_and_task_resources(source, binding, error=error)
         raise
 
 
@@ -257,6 +261,7 @@ def main():
     payload = request.get('payload')
     handed_off = False
     source = None
+    close_owned = None
     early_app_owner = None
     completed = False
     try:
@@ -271,9 +276,19 @@ def main():
             from .isaac_native_io import _process_app_owner, F06_ISAAC_APP_LAUNCH_PROFILE_V1
             early_app_owner = _process_app_owner(launch_profile_id=F06_ISAAC_APP_LAUNCH_PROFILE_V1)
             early_app_owner.open(f06_compatibility=True)
-        session, handlers, source = _materialize_selected(payload)
+        session, handlers, source, binding = _materialize_selected(payload)
+        from .source import close_source_and_task_resources
+        owned_closed = False
+        def close_owned():
+            nonlocal owned_closed
+            if owned_closed:
+                return
+            owned_closed = True
+            error = close_source_and_task_resources(source, binding)
+            if error is not None:
+                raise error
         handed_off = True
-        completed = serve_session(sock, session, identity, handlers=handlers)
+        completed = serve_session(sock, session, identity, handlers=handlers, close_owned=close_owned)
     except BaseException as error:
         if not handed_off:
             try:
@@ -283,13 +298,23 @@ def main():
         else:
             raise
     finally:
-        receipt = getattr(source, 'execution_source_receipt', None)
-        if receipt is not None:
-            receipt.close()
-        if early_app_owner is not None:
-            early_app_owner.close()
-        _write_runtime_scope_receipt()
-        sock.close()
+        original_error = sys.exc_info()[1]
+        cleanup_error = original_error
+        for label, cleanup in (('source/task close', close_owned),
+                               ('App close', getattr(early_app_owner, 'close', None)),
+                               ('scope receipt', _write_runtime_scope_receipt),
+                               ('socket close', sock.close)):
+            if not callable(cleanup):
+                continue
+            try:
+                cleanup()
+            except BaseException as error:
+                if cleanup_error is None:
+                    cleanup_error = error
+                else:
+                    cleanup_error.add_note(f'worker {label} also failed: {error!r}')
+        if cleanup_error is not None and original_error is None:
+            raise cleanup_error
     if isinstance(payload, dict) and payload.get('selection', {}).get('physics_provider') == 'isaacsim':
         return 0 if completed else 1
     return None
