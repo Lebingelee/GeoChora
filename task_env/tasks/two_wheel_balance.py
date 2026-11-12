@@ -27,6 +27,7 @@ from ..robots.two_wheel_balance import (
     TWO_WHEEL_ACTION_CONTRACT,
     TWO_WHEEL_BALANCE_MJCF_XML,
     TWO_WHEEL_TORQUE_LIMIT_NM,
+    TwoWheelBalanceEntity,
 )
 from .base import BaseTaskEnv
 
@@ -439,11 +440,7 @@ class TwoWheelBalanceEnv(BaseTaskEnv):
 
     uses_selected_public_config = True
     physical_task_timebase = (.002, 25)
-    selected_physical_controller_profiles = (
-        'direct_joint_effort_v1',
-        'velocity_damped_joint_effort_v1',
-    )
-    selected_controller_profiles = frozenset(selected_physical_controller_profiles)
+    selected_controller_profiles = frozenset(TwoWheelBalanceEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
     selected_supports_isaac = True

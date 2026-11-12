@@ -1360,3 +1360,12 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产修改 4 文件 +53／−66，净减 13 行；其中约 42 行观测投影从 candidate 迁至 Task，并改用所选 Robot 身份／关节声明；candidate 自身 +5／−61。版本诊断修改 1 文件 +4／−1，检查 Isaac binding 指向共同空间及 Task 观测 owner；本文新增记录。无新增、删除或整文件迁移，tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异为 136 文件（新增 12、删除 20、修改 104），+7883／−14754，净减 6871 行；包含此前旧路径退休和诊断迁移，不归因于本批。
 
 最终输入版本诊断 193 项通过；MuJoCo PickCube direct effort 完成 reset、控制、再次 reset 和关闭，观测 5 native 子步；可切换 joint／R3 effort 路线完成控制、记录、无效切换拒绝、有效 reset 切换及后续控制，观测 10 子步。GeoPhys direct effort 同样完成短程，native 子步未观测，按 50 预留。Isaac 仅检查 binding 和 schema 引用，未启动原生路线；renderer、其他任务及完整 Solution 本批未复验。冻结输入、双锁、预算与收据在 ignored `workspace/maintenance/v211_pickcube_observation_owner_20261112/`。E01～E04 未整体接收。
+
+
+### 6.140 普通 Robot 的 Controller 能力作为单一声明
+
+输入 `48b4c3da`；实施前重审台账 GOV、ENTRY、TASK-04、ENV、SUBJ 和 CTRL 并核对当前构造。Pendulum／双轮车的 Task 类和 Robot 受控主体原各自列出两份相同 Controller profile；现每个 Robot 一处声明能力，Task 配置准入和该 Robot 的 `ControlledSubjectV1` 直接消费同一份声明，移除两个 Task 中仅用于旧 component codec 的重复列表。Task 默认选择和 provider 路由限制仍保留；本项不宣称 Panda／装配或全部 provider 的能力已统一。
+
+生产修改 4 文件 +8／−14，净减 6 行；版本诊断修改 1 文件 +12／−0，核对任务允许集合、默认选择与实际主体支持集合；本文新增记录。无新增、删除或整文件迁移；tracked 项目文件数保持 1357。相对 `1f1359ee` 的 task_env 差异 136 文件（新增 12、删除 20、修改 104），+7901／−14766，净减 6865 行，包含此前历史路径退休和诊断迁移，不归因于本批。
+
+最终输入版本诊断 195 项通过。MuJoCo Pendulum／双轮车均以速度阻尼 Controller 完成 reset、控制、再次 reset 和重复 close，各观测 25 个 native 子步；GeoPhys Pendulum 默认 direct Controller 同样完成短程，native 子步未观测，按 50 预留。Isaac、renderer、桌面任务和完整 Solution 本批未复验；能力列表内容与先前相同，不据此扩大既有证据范围。冻结输入、双锁、预算及收据位于 ignored `workspace/maintenance/v211_robot_controller_choices_20261112/`。E01～E04 未整体接收。

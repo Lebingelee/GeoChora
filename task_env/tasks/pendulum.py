@@ -30,6 +30,7 @@ from ..registry import register_env
 from ..robots.pendulum import (
     PENDULUM_ACTION_CONTRACT,
     PENDULUM_MJCF_XML,
+    PendulumEntity,
 )
 from .base import BaseTaskEnv
 
@@ -570,11 +571,7 @@ class PendulumEnv(BaseTaskEnv):
 
     uses_selected_public_config = True
     physical_task_timebase = (.002, 25)
-    selected_physical_controller_profiles = (
-        'direct_joint_effort_v1',
-        'velocity_damped_joint_effort_v1',
-    )
-    selected_controller_profiles = frozenset(selected_physical_controller_profiles)
+    selected_controller_profiles = frozenset(PendulumEntity.controller_profiles)
     selected_isaac_controller_profiles = frozenset(('direct_joint_effort_v1',))
     selected_parameter_limits = {}
     selected_supports_isaac = True

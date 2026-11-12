@@ -8,6 +8,18 @@ from task_env.robots.two_wheel_balance import TwoWheelBalanceEntity
 from task_env.runtime.sessions import isaac_g05
 from task_env.runtime.sessions.declared_effort_source import compile_declared_effort_source
 from task_env.tasks import pendulum_physical, two_wheel_physical
+from task_env.tasks.pendulum import PendulumEnv
+from task_env.tasks.two_wheel_balance import TwoWheelBalanceEnv
+
+
+@pytest.mark.parametrize(('robot', 'env_type'), [
+    (PendulumEntity(), PendulumEnv),
+    (TwoWheelBalanceEntity(), TwoWheelBalanceEnv),
+])
+def test_task_controller_choices_match_robot_subject(robot, env_type):
+    subject, _ = robot.physical_subject_declaration(source_id='source', source_closure_sha256='a' * 64)
+    assert env_type.selected_controller_profiles == frozenset(subject.supported_controller_profiles)
+    assert env_type.selected_default_controller_profile() in subject.supported_controller_profiles
 
 
 @pytest.mark.parametrize(('uid', 'robot_type'), [

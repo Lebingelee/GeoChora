@@ -76,6 +76,7 @@ class PendulumEntity(RobotComponent):
     assembly_id = 'pendulum-source-assembly'
     source_xml = PENDULUM_MJCF_XML
     source_base_dir = Path(__file__).resolve().parent
+    controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
 
     def scene_definition(self, *, source_revision=None):
         origin = PoseWorld((0., 0., 0.), (1., 0., 0., 0.))
@@ -111,8 +112,7 @@ class PendulumEntity(RobotComponent):
         subject = ControlledSubjectV1(self.uid, self.uid, source_id, source_closure_sha256,
             'references_existing', 'fixed', FrameReference(self.uid, 'pendulum_anchor'), None,
             (component_path,), (writer,),
-            supported_controller_profiles=('direct_joint_effort_v1',
-                                            'velocity_damped_joint_effort_v1'))
+            supported_controller_profiles=self.controller_profiles)
         joint = SubjectJointDeclarationV1(component_path, self.joint_name, (writer,),
             self.actuator_name, self.actuator_name, 1., (-2., 2.), 'disabled')
         return subject, (joint,)

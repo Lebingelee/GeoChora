@@ -100,6 +100,7 @@ class TwoWheelBalanceEntity(RobotComponent):
     assembly_id = 'two-wheel-source-assembly'
     source_xml = TWO_WHEEL_BALANCE_MJCF_XML
     source_base_dir = Path(__file__).resolve().parent
+    controller_profiles = ('direct_joint_effort_v1', 'velocity_damped_joint_effort_v1')
 
     frame_names = ('balance_anchor', 'balance_chassis', 'left_wheel', 'right_wheel')
 
@@ -140,8 +141,7 @@ class TwoWheelBalanceEntity(RobotComponent):
         subject = ControlledSubjectV1(self.uid, self.uid, source_id, source_closure_sha256,
             'references_existing', 'fixed', FrameReference(self.uid, 'balance_anchor'), None,
             component_paths, (writer,),
-            supported_controller_profiles=('direct_joint_effort_v1',
-                                            'velocity_damped_joint_effort_v1'))
+            supported_controller_profiles=self.controller_profiles)
         joints = tuple(SubjectJointDeclarationV1(path, name, (writer,), actuator,
             actuator, 1., (-1.5, 1.5), 'disabled') for path, name, actuator in zip(
                 component_paths, (self.left_wheel_joint_name, self.right_wheel_joint_name),
