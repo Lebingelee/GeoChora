@@ -243,6 +243,26 @@ R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_s
 | R29 核 | 按事件给出最终 owner／调用链、输入输出 HEAD、文件新增删除迁移、生产＋诊断＋文档 diff、复用／新证据与限制；区分阶段内移动和项目净减少 | 统计与结果可复算；净减 9098 行只作为本次输入基线，后续新增有职责说明；不规定任意删行／文件下降比例，不用全文件搬迁冒充 owner 收敛 |
 | R30 核 | 对本账本 30 格及第 9 节总账映射一次收口，分别判断 E00、E01、E02、E03、E04；将 E05 以后未完成内容明确保留 | 实施者结论、独立主审、维护者接收分列；无未解释的 in-scope OPEN 才提请该事件接收。完成 E00～E04 不等于全部代码／项目优化接收，也不自动进入 E05 或 G06 |
 
+### U5 事件结果、验证与变更度量
+
+| 事件 | 实施者结果与实际 owner | 限制 |
+| --- | --- | --- |
+| E00 | 启动身份、保护输入、顺序及效果计量已记录；每次实施对照本账与优化总台账 | 历史和用户原有 dirty 执行记录未覆盖 |
+| E01 | 四任务经 `make_env → resolve_task_env_config → TaskBuildRequest`；旧 Position candidate 和两个旧 PickCube physical UID 不恢复 | 范围外 component caller 未全面删除，旧 UID 不视为支持 |
+| E02 | `SourceBoundTaskBuilder` 编排 source、Robot 主体、Controller 和 reset plan；Task 提供任务声明，adapter 处理 MJCF／USD 等合法差异 | 不承诺任意主体、资产和 provider 自由组合 |
+| E03 | `EpisodeExecutionState` 协调 reset；source reconstruction、session／Runtime owner、camera 和 Task 各自负责资源。预检拒绝恢复 RNG；有副作用后的失败 latch fault | 真实 Isaac reset 失败注入和真实 camera 失败未运行，fake 证据只证明合同 |
+| E04 | `prepare_selected_control_action → submit_control_command → RuntimeSession` 是受测 Position／effort 控制链；Solution 标准调用由调用方持有，兼容入口共享提案处理 | mixed／COM 的其余交集及完整 Solution 未在本轮全部复验，物理语义和拒绝边界保留 |
+
+R26：[最终 MuJoCo 计划](../../../../../workspace/maintenance/v211_u5_final_mujoco_20261112_001/plan.json)在生产 HEAD `76536d2a` 下覆盖四任务、装配 Panda 与 effort，每条真实构造、reset、非零 interval、状态／clock、第二次 reset 和重复 close；总计 70 显式子步。Nut 的有界 guarded Solution 是单 interval，不代表任务成功。caller-owned Solution 和 failure 检查见 U3／U4 原始计划；最终 50 项精确 fake／纯节点通过。
+
+R27：MuJoCo 的最终路线如上；[GeoPhys 计划](../../../../../workspace/maintenance/v211_u5_geophys_20261112_001/plan.json)在同一生产 HEAD 覆盖 Panda effort 与 Pendulum 的短程及关闭，未独立计数 native 子步。Isaac CUDA Position／effort 的真实短程及 App close receipt 来自 [U1 冻结输入](../../../../../workspace/maintenance/v211_u1_usd_shared_native_20261112_002/plan.json)：其后未修改 USD provider／source 实现；U2 只改变 reset 失败 owner 保留和 Task sampler 的预检 RNG 回滚，U3 改兼容 Solution，U4 改 Nut Solution／示例。Isaac 证据不是 `76536d2a` 重新实测；启动隐式推进 unknown，Position 的 SDK 关闭日志警告和 App receipt 分别保留。其它 provider／renderer 交集不外推。
+
+R28：[MuJoCo borrowed RGB](../../../../../workspace/maintenance/v211_u5_renderer_20261112_001/plan.json)和 [GeoPhys physics × MuJoCo renderer-only RGB](../../../../../workspace/maintenance/v211_u5_cross_rgb_20261112_001/plan.json)均覆盖 reset、interval、第二次 reset 的同一公开状态边界及重复 close。MuJoCo 记录的总物理子步为该 interval 的 5；跨组合的 GeoPhys 子步未独立计数，不能据此声称测得额外推进为零。没有新增像素质量阈值或扩大到全部 renderer。
+
+R29：以 `1f1359ee` 的 stage 5 接收点到 `76536d2a` 的已跟踪文件为统计范围，文件由 1,361 增至 1,364；不检测重命名时新增 26、删除 23、修改 115；`git diff -M` 识别其中一组 64% 相似度的 Robot binding 迁移，不能把它计作净删除。按路径分类：生产／其他 +5,564／−15,220，净 −9,656；诊断 +4,776／−0；文档 +882／−131，净 +751；项目合计净 −4,129 行。诊断增加含新版本诊断及既有文件迁移，行数不是独立新增功能数量。以上不含原有未跟踪文件、dirty 执行记录及 ignored 输出，也不包含本次 U5 记录提交。以本次重评输入 `b94e8625` 为基准到同一生产 HEAD：生产／其他 +996／−687，诊断 +529／−23，文档 +379／−0，分别净 +309、+506、+379；项目文件数 1,361→1,364。本轮新增代码主要用于共同 source／Controller 构建、失败资源归属与对应诊断，不能描述成全为精简。
+
+R30：R01～R30 已有实施者结果和所列证据，**独立主审及维护者最终接收均待完成**；不得把实施者自评写成正式接收。E05 及以后、完整单 seed Solution（E13）、项目证据整理、分支清理与 G06 均未完成或自动启动。历史 COM 原判据失败、R05c 资格限制及既有偏差继续保留。
+
 ### 6.1 验证复用和命令选择
 
 | 大单元 | 可优先复用的现有检查／取证入口 | 结论边界 |
@@ -294,7 +314,7 @@ R15～R21 实施者核对：兼容入口共用提案检查／投影及已有 `_s
 | U2 | 实施者自评完成，独立主审及维护者接收待定：修复失败 reset 的旧 Runtime owner 遗失及预检拒绝后的 RNG 变化；保全 source、worker 与 camera 清理合同 | 第 3 节资源／阶段表、30 项纯合同检查与 [MuJoCo 最终冻结计划](../../../../../workspace/maintenance/v211_u2_lifecycle_20261112_003/plan.json)；Isaac 的成功路径沿用 U1 证据并保留日志限制 | R09～R14 均有实施者结论；U3 可继续，真实 Isaac 失败与真实 camera 失败未复验 |
 | U3 | 实施者自评完成，独立主审及维护者接收待定：兼容入口共用提案处理，保留调用方持有 Solution 的标准调用、现有 typed 语义和唯一提交 owner | 第 4 节支持表、12 项纯合同检查及 MuJoCo Solution／expert／故障／typed 控制冻结证据；部分 mixed／COM 交集未复验 | R15～R21 均有实施者结论；U4 可继续。完整 Solution 保留 E13 |
 | U4 | 实施者自评完成，独立主审及维护者接收待定：示例按控制能力选动作，Nut caller-owned Solution 接受正式 schema，版本诊断标明真实成本并增加配置 import／资产守卫 | 第 5 节分类、11 项精确纯检查及[四任务示例计划](../../../../../workspace/maintenance/v211_u4_cli_20261112_003/plan.json)；LIBERO 静态核对 | R22～R25 均有实施者结论；批处理／训练与完整 benchmark 不在本单元 |
-| U5 | 尚未执行最终事件接收 | 没有新 native 或完整 Solution 结果 | R26～R30 |
+| U5 | 实施者自评完成；最终事件结果及 provider／renderer 影响表见第 6 节 | 生产 HEAD `76536d2a` 的 MuJoCo、GeoPhys 和两条 RGB 短程；Isaac 复用 U1 有界证据并标明 diff 和日志限制 | R26～R30 均有实施者结果；独立主审和维护者接收待完成 |
 
 当前 Controller owner 调整后，119 项受影响诊断通过；[冻结输入](../../../../../workspace/maintenance/v211_u1_position_controller_owner_20261112_002/plan.json)下 MuJoCo PickCube／Nut 和 Isaac Position／effort 各完成 5 个显式子步、二次 reset 与 close，Isaac 日志未见 traceback，隐式启动推进数未知。先前运行期间发生源码输入漂移，两条 Isaac 各消耗 5 个显式子步的结果未作为冻结输入证据；一次锁冲突未推进，均保留原始输出并计入计划。
 
