@@ -589,9 +589,22 @@ def position_execution_info(state, last_position_transition):
 def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=None,
                            resolved_config=None, lift_height_m=None, task_config=None,
                            interval_provider=None,
-                           cube_force_z_N=None, robot_uid="panda-v1", robot=None):
+                           cube_force_z_N=None, robot_uid="panda-v1", robot=None,
+                           physical_kind=None, physical_drive=None):
     if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
         raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    physical = physical_kind is not None
+    if physical != (physical_drive is not None):
+        raise ValueError('physical Controller kind and drive must be declared together')
+
+    def build_physical_controller(robot, runtime_input, panda_xml, action_config):
+        from ...runtime.sessions.source_composition_adapters import build_panda_source_effort_profile
+        source, artifact = runtime_input.runtime_source, runtime_input.artifact
+        return build_panda_source_effort_profile(robot, source.scene_definition, artifact, source,
+            native_drive=physical_drive, kind=physical_kind, config=action_config,
+            source_xml=panda_xml, end_frame_id='ee',
+            task_settings=panda_effort_task_settings(physical_kind))
+
     def adapt(value):
         if cube_force_z_N is not None:
             from ...controllers.canonical.contracts import digest
@@ -605,13 +618,20 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
     def build(provider, backend, seed, horizon, sampled):
         if sampled is not None:
             raise ValueError('PickCube does not accept an externally sampled reset')
+        if physical and (provider, backend) != ('isaacsim', 'cuda'):
+            raise ValueError('Isaac physical control requires Isaac CUDA')
         if provider == "isaacsim":
             if backend != "cuda" or source_delivery_manifest is None:
                 raise ValueError("F06 Isaac PickCube requires CUDA and its explicit source delivery")
+            if physical and (type(horizon) is not int or not 1 <= horizon <= 1000):
+                raise ValueError('Isaac physical source horizon must be in [1, 1000]')
             return build_isaac_reference(
                 delivery_manifest=source_delivery_manifest, task_seed=seed,
-                horizon=horizon, include_solution=False, controller_profile=controller_profile,
+                horizon=horizon, include_solution=False,
+                controller_profile='r3_continuous_v1' if physical else controller_profile,
                 lift_height_m=lift_height_m, robot=robot,
+                **({'physical_fixture': 'effort-only' if physical_drive == 'disabled' else 'coexist',
+                    'controller_builder': build_physical_controller} if physical else {}),
                 **({"resolved_config": resolved_config} if resolved_config is not None else {}),
                 **({"task_config": task_config} if task_config is not None else {}),
             )
@@ -620,6 +640,17 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
         return adapt(build_reference(backend=backend, include_solution=False,
             controller_profile=controller_profile, resolved_config=resolved_config,
             lift_height_m=lift_height_m, task_config=task_config, robot_uid=robot_uid, task_seed=seed, robot=robot))
+
+    if physical:
+        from .task import physical_task_binding_fields
+        return ReferenceTaskBinding(build=build,
+            **physical_task_binding_fields(task_config=task_config, lift_height_m=lift_height_m,
+                                           hand_frame_id='ee'),
+            reset_runtime_input=lambda value: value.get('session_admission_input'),
+            validate_external_solution=_validate_external_readiness_solution,
+            external_solution_actions=True,
+            reset_expert_kwargs=lambda env: {'execution_info': env.expert_execution_info()},
+            observe_expert_kwargs=lambda env, _samples: {'execution_info': env.expert_execution_info()})
 
     return ReferenceTaskBinding(
         build=build,

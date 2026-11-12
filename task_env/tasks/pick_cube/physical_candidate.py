@@ -14,11 +14,10 @@ def physical_binding_from_config(config, *, robot=None):
     kind, drive, reset_switch, space_policy = resolve_panda_effort_options(
         config.controller_profile, config.native_drive, options)
     if config.physics_provider == 'isaacsim':
-        from .physical_isaac_candidate import make_isaac_physical_binding
-        return make_isaac_physical_binding(delivery_manifest=config.source_delivery_manifest,
-            horizon=config.environment.episode.horizon,
-            drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,
-            task_config=task_config, resolved_config=config.environment, lift_height_m=lift_height_m, robot=robot)
+        from .specialization import make_reference_binding
+        return make_reference_binding(source_delivery_manifest=config.source_delivery_manifest,
+            resolved_config=config.environment, lift_height_m=lift_height_m, task_config=task_config,
+            robot=robot, physical_kind=kind, physical_drive=drive)
     force = dict(config.task_parameters).get('cube_force_z_N')
     return make_physical_binding(
         drive_mode='effort-only' if drive == 'disabled' else 'coexist', control_kind=kind,

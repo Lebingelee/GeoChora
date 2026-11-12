@@ -57,14 +57,9 @@ def _formal_isaac_joint_config():
     })
 
 
-def test_usd_effort_binding_does_not_request_position_source_composition(monkeypatch):
+def test_usd_effort_binding_uses_physical_observation_and_no_position_composition():
     from task_env.observations.selected_reference import selected_reference_observation_spaces
     from task_env.tasks.pick_cube.task import PickCubeReferenceEnv, physical_observation
-    from task_env.tasks.pick_cube import specialization
-
-    def reject_position_binding(*args, **kwargs):
-        pytest.fail('physical construction must not create a Position binding')
-    monkeypatch.setattr(specialization, 'make_reference_binding', reject_position_binding)
 
     binding = PickCubeReferenceEnv._build_selected_binding(_formal_isaac_joint_config())
     assert binding.scalar_control_binding is None
