@@ -831,8 +831,13 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         from ..registry import make_agent
         if robot is None or robot.uid != config.robot_uid:
             robot = make_agent(config.robot_uid)
-        binding = replace(cls.selected_binding(config, robot=robot), robot=robot)
-        return cls._bind_robot_source_composer(binding, config)
+        binding = cls.selected_binding(config, robot=robot)
+        try:
+            binding = replace(binding, robot=robot)
+            return cls._bind_robot_source_composer(binding, config)
+        except BaseException as error:
+            cls._release_failed_task_construction(None, binding, error)
+            raise
 
     @classmethod
     def _bind_robot_source_composer(cls, binding, config):

@@ -1470,3 +1470,10 @@ MJCF Position／RGB 的 source lease 目前与旧 Artifact、控制计划和闭�
 生产代码修改 3 文件，+8／−9，净减 1 行；版本诊断修改 1 文件，+2／−0；无新增、删除或整文件迁移，tracked 总数 1360 不变。共享 observation 和 recorder 原有功能仍有专用路径，本批只取消重复数据键，不代表完成 ENV／adapter 整体归位。
 
 版本诊断 210 项通过，包括真实交付构建和 Position 准入对象、source／Controller 绑定的检查。MuJoCo PickCube R3 正式入口通过 reset、非零 step、共同提交、记录逻辑读回、第二次 reset、Robot 重绑定和重复 close，观测 5 个 native 子步；冻结输入、双锁和收据见 ignored `workspace/maintenance/v211_admission_binding_20261112/`。这次未复验 Isaac 原生、renderer 或完整 Solution；历史 Isaac 运行属于不同代码输入，不能替代本批记录器与观测的原生验证。E01～E04 仍未整体接收。
+
+
+### 6.152 Task binding 构建失败清理
+
+复核 ENV-01／05 的构建资源所有权：`_build_selected_binding` 在 Task binding 返回后准备 Robot source composer，若此步骤抛异常，原来直接退出且不调用 binding 的资源清理。现在此失败阶段复用已有共同构建失败清理，并保持原始异常；清理失败作为异常 note 保留。正常构建、provider／renderer 和物理推进路径未改。这是受控故障注入发现的资源边界，并非声称正式路线已发生过该故障。
+
+生产代码修改 1 文件 +7／−2，诊断代码修改 1 文件 +40／−0；无新增、删除或整文件迁移，tracked 文件数保持 1360。诊断在真实 PickCube effort binding 所持 source 快照准备完成后注入 composer 异常，分别检查正常清理及清理报错时的原异常与资源状态；本注入并不证明正式 effort composer 自然会失败。版本诊断最终输入 212 项通过，未运行 native、renderer 或完整 Solution。既有正常运行证据可对未改变的正常路径按其原身份参考，不能据此扩大本次失败语义的原生验证。E01～E04 仍未整体接收。

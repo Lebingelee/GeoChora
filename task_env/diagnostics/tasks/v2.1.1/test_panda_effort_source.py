@@ -132,3 +132,43 @@ def test_failed_robot_composition_releases_canonical_source_snapshot():
         assert not snapshot.exists()
     finally:
         binding.close_task_resources()
+
+
+@pytest.mark.parametrize('cleanup_failure', [False, True])
+def test_failed_robot_source_composer_releases_prepared_task_source(monkeypatch, cleanup_failure):
+    from dataclasses import replace
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
+
+    config = resolve_task_env_config(PickCubeReferenceEnv, {
+        'execution': {'physics_provider': 'mujoco', 'physics_backend': 'cpu'},
+        'controller': {'profile_id': 'panda-joint-effort-reference-v1'},
+        'episode': {'horizon': 8},
+    })
+    selected_binding = PickCubeReferenceEnv.selected_binding
+    snapshots = []
+
+    def prepare(cls, config, *, robot):
+        binding = selected_binding(config, robot=robot)
+        source = binding.build_for_request('mujoco', 'cpu', 31, 8)['source']
+        snapshots.append(source.source_snapshot_receipt.snapshot_root)
+        assert snapshots[-1].is_dir()
+        if cleanup_failure:
+            close = binding.close_task_resources
+            def fail_after_close():
+                close()
+                raise RuntimeError('cleanup failed')
+            binding = replace(binding, close_task_resources=fail_after_close)
+        return binding
+
+    def reject(cls, binding, config):
+        raise ValueError('source composition rejected')
+
+    monkeypatch.setattr(PickCubeReferenceEnv, 'selected_binding', classmethod(prepare))
+    monkeypatch.setattr(PickCubeReferenceEnv, '_bind_robot_source_composer', classmethod(reject))
+    with pytest.raises(ValueError, match='source composition rejected') as caught:
+        PickCubeReferenceEnv._build_selected_binding(config)
+    if cleanup_failure:
+        assert any('cleanup failed' in note for note in caught.value.__notes__)
+    assert len(snapshots) == 1
+    assert not snapshots[0].exists()
