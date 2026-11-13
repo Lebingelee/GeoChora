@@ -135,6 +135,18 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 同一有序 `du -s -x -B1` 范围（U7 准备目录含原快照，加 U5 包）由 25,846,870,016 降至 16,482,275,328，下降 **9,364,594,688 字节**。该范围在清理前已经包含原快照和 U5 包，但不包含新建的清理工具和逐项日志目录；后者在清理后另测 **21,622,784 字节**，日志可能继续增长。硬链接、共享块、其他活动及不同起始时点使这些数不构成 E00～E16 历史累计净节省。完整恢复副本现不存在：四个依赖其原路径的验证工具如需再用，须先在隔离位置重建并验证；这不改变 U4/U5 的既有接收范围。
 
+### 剩余工作树的使用安排待维护者确认
+
+清理后[登记与活动快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/remaining-worktrees-post-copy-cleanup-20261114.json)：archive 仍 locked，继续保留。其余三处须分别确认是否仍用于开发、是否允许本目标接管保全准备；这不是请求删除许可。
+
+| 工作树 | 当前影响与保全边界 |
+| --- | --- |
+| `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora` | detached，含 ignored workspace、独立锁与嵌套第三方 Git；主 checkout 有 134 条绝对链接指向该 workspace。GeoPhys 命名 refs 已有浅仓库恢复，两个 camera 输出根已另保全，但完整 workspace 及归属未闭合。 |
+| `workspace/maintenance/geophys_upstream_reset_20261022_001/core-baseline` | 嵌套登记 worktree；两处 gitlink 为指向外部的符号链接，不得递归跟随或将目标作为私有文件处理。 |
+| `workspace/maintenance/p2_0_v1_1_clean_checkout_20261017` | 旧版嵌套登记 worktree，含 initialized 子模块；GeoPhys 浅 refs 和选定本地输出已保全，不代表完整环境或使用安排已确认。 |
+
+本次可见 cwd/root/fd 未命中，扫描有 1,030 次权限拒绝；不据此判断 owner 已释放或其他不可见／未来进程不存在。本 chat 的 artifacts 列表为空，不能据此断言其他 chat 未附着或不再使用。维护者确认各自使用安排后，仍须核验剩余本地内容、引用及具体受支持处置方式；实际删除须另列范围并取得授权。
+
 ### 项目接收入口（准备中）
 
 * **代码范围：** [U4 独立主审及有界接收](20261113_e11_e16_u4_independent_acceptance.md)；不因项目清理重开。T19 的同次联合证据及 H5 单文件不自含完整 completion 的限制见 [联合证据报告](20261113_e11_e16_u4_joint_completion.md)。
