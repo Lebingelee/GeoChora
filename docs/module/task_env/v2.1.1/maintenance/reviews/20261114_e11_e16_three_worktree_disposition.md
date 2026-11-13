@@ -75,6 +75,8 @@
 
 [恢复 fixture 独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-restore-fixture-review.md)重跑了 13 项状态检查（含 8 个意图状态还原）与 10 项单 Git 仓库组合检查；备份链接或内容篡改会先被拒绝。复核发现原恢复状态曾误称内容全部恢复，现已改为只称指针字节和根 inode；恢复过程再次中断、完整树与嵌套 Git 的恢复仍未证明。
 
+现已将固定候选映射和共享锁接入[只读观察适配器](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/observe_live_submodule_readonly.py)，并准备[真实恢复适配草案](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/restore_live_submodule_draft.py)；恢复开关保持 `False`。草案在任何恢复改动前核对两棵内容基线，恢复后再次核对并检查 Git 身份；指针文件重建后的 inode／mtime 和根目录时间戳不声称恢复。独立复核提出的“结果缺失时仍可能撤回已完成迁移”、事后才检查内容以及中间完成日志过早三个缺口已修正；[恢复适配审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-recovery-draft-review.md)重跑临时 Git fixture 与同大小、mtime 保持不变的文件篡改检查。原始观察器读取可能改变指针 atime 的反例已改为 `O_NOATIME` 并在临时文件复核；权限不足时将失败，不保证目录 atime 不变。恢复自身再中断后的对账、真实路径／锁竞争及完整属性仍未闭合，不得把草案当作已可执行恢复程序。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
