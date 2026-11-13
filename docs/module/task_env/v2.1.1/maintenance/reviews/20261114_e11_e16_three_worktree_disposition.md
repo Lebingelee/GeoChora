@@ -61,6 +61,12 @@
 
 [清单独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-content-baseline-review.md)核对八个清单摘要、路径全集、数量和当前根 inode，并独立抽样 42 次验证普通文件的 SHA、长度及 inode；四个 Git 文件指针均解析到相应管理目录。清单的扩展属性仅有摘要、不能据此恢复值，未保存完整根目录属性、链接数及 atime/ctime；文件打开使用 `O_NOATIME`，目录遍历仍不能保证目录 atime 不变。上述检查不把清单变成备份。
 
+对四个 checkout 及四个 Git 管理目录执行了[持锁只读预检](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-live-preflight-20261114-001/receipt.json)：八份当次内容清单均与基线逐项相同，HEAD、状态及嵌套 gitlink 与预检输入相符，四个命名 refs 清单摘要已记录；前后活动扫描分别有 1,021／1,024 次权限拒绝。进程在共享锁上下文正常退出后打印成功。独立复核指出，**旧版脚本在锁退出验证前就写 PASS 收据**，所以该收据单独不能证明锁退出成功；另见[审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-live-preflight-review.md)。脚本已调整为锁上下文正常退出后发布收据，并固定输入和命名 refs 摘要、对同一字节校验与解析；[合成锁漂移及结构检查](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/preflight-publication-test.json)通过，修订版尚未重跑八根全量内容。普通 Git 读取和目录遍历可能改变 atime；本结果不是恢复验证或迁移许可。
+
+另按四个确定的拟迁出位置，准备了[原始与目标 Git 指针／配置的私有小文件](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-config-preparation-20261114-001/receipt.json)：原始内容的 SHA 和 inode 与基线一致，目标配置经 Git 解析确认 `core.worktree` 指向拟定位置。输出目录权限 `0700`、文件 `0600`，配置可能含敏感内容，不应展示；该准备未持共享锁，也不能证明迁出后仓库可用或授权真实迁移。
+
+[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-live-preflight-review.md)核对了四组路径、载荷 SHA 和权限；按 Git 解析，目标配置除 `core.worktree` 外的条目与原配置一致。复核也确认修订预检脚本的 PASS 发布位置、固定摘要和合成测试范围，但未重跑修订版全量扫描；父路径及非合作写者竞态仍不受这些检查保证。
+
 基于上述清单准备了[仅限临时 fixture 的事务原型及八项合成检查](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-relocation-prototype-tests.json)，覆盖同设备不覆盖迁移、已存在目标、日志及源目录符号链接、FIFO 和非 fixture 根拒绝。独立主审在试验过程中先后复现日志符号链接越界写、源目录符号链接越界读和 FIFO 阻塞；各具体反例经修正后复核，见[原型审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-relocation-prototype-review.md)。原型仍不具备真实路径支持、完整清单核验、非合作父目录替换防护、真实异常对账和完整属性恢复，不能用于真实迁移，也不代表子模块删除条件已满足。
 
 原型新增了[只读中断对账及 13 项隔离检查](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/relocation-reconciliation-tests.json)：校验日志顺序、目录 inode 和 Git 指针的旧／目标摘要；未完成意图标为不确定，日志与物理状态不一致、路径穿越及同内容不同 inode 均拒绝。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-relocation-reconciliation-review.md)先后发现并复验修正了未记录移动、`..` 穿越及同内容替换反例。此对账仅识别受控合成状态，不恢复数据，不证明日志真实性、并发路径安全、真实异常恢复或完整属性保存；上一段所列真实迁移条件仍未满足。
