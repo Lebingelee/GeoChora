@@ -1,12 +1,12 @@
 # E05～E10 剩余实施账本
 
-更新：2026-11-13。状态：`INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。实施的实时进度见第 13 节。
+更新：2026-11-13。状态：`MAINTAINER_ACCEPTED_BOUNDED`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。实施的实时进度见第 13 节。
 
 ## 0. 结论与使用方式
 
-第 0～12 节保留 `67cb643f` 时的规划、职责要求和证据选择，不能再当作当前剩余缺陷；实施与独立主审已结束，当前结果以第 13 节及[主审报告](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)为准，维护者最终接收待确认。
+第 0～12 节保留 `67cb643f` 时的规划、职责要求和证据选择，不能再当作当前剩余缺陷；实施与独立主审已结束，当前结果以第 13 节及[主审报告](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)为准，维护者于 2026-11-13 在本次对话明确接收 E05～E10；历史规划和主审时点不改。
 
-**E05～E10 均已有可复用实现，但尚不能按事件接收。主要欠账在 source／资产配方、provider 准入、状态／相机和 renderer 的职责归位；Task 在接收方生效后减责，Recorder 分开普通格式与历史实验 oracle。无需重做 E00～E04 的共同构建、生命周期和提交链。**
+**历史规划判断（67cb643f 时点，已由第 13 节结果取代）：** E05～E10 均已有可复用实现，但当时尚不能按事件接收。主要欠账在 source／资产配方、provider 准入、状态／相机和 renderer 的职责归位；Task 在接收方生效后减责，Recorder 分开普通格式与历史实验 oracle。无需重做 E00～E04 的共同构建、生命周期和提交链。
 
 | 事件 | 当前成立的基础 | 还差什么 | 本轮主要单元 |
 | --- | --- | --- | --- |
@@ -239,7 +239,7 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 
 ## 13. 当前实施结果（唯一更新区）
 
-独立主审输入 `d9dc02c6`（此前生产 `91ebc9d6`），本次小修生产 `7a098423`；[逐项主审与证据](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)已核对 S01～S40。六事件具备既定范围的有界接收条件；**维护者最终接收仍待确认**。原[实施者结果](../maintenance/20261113_e05_e10_u7_delivery.md)及 U1～U6 报告保留各自时点。
+独立主审输入 `d9dc02c6`（此前生产 `91ebc9d6`），本次小修生产 `7a098423`；[逐项主审与证据](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)已核对 S01～S40。六事件具备既定范围的有界接收条件；**维护者于 2026-11-13 明确统一接收 E05～E10**；后续从[E11～E16账本](post-5c-e11-e16-remaining-ledger.md)准备，不重开本轮。原[实施者结果](../maintenance/20261113_e05_e10_u7_delivery.md)及 U1～U6 报告保留各自时点。
 
 | 单元 | 状态 | 最终效果／证据／边界 |
 | --- | --- | --- |
@@ -249,6 +249,6 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 | U4／S19～S25 | REVIEWED_BOUNDED | capability关联真实factory，native设置退出Env，task/observer局部故障和资源owner分开；三原生与cross、重复render及窗口证据按影响保留。 |
 | U5／S26～S30 | REVIEWED_BOUNDED | Task/source阶段与Runtime交接有实际caller；candidate未恢复；Nut公共guard/interval与任务严格策略分层。Task减少不等于项目净删码，完整Nut Solution留E13。 |
 | U6／S31～S36 | REVIEWED_BOUNDED | 普通H5/历史codec/严格Judge/replay分层及非Panda同次记录成立；`7a098423`删除通用metadata的PickCube语义覆盖，声明经H5投影保留，3项回归通过。 |
-| U7／S37～S40 | REVIEWED_BOUNDED | 40项逐点主审、独立87项纯/fake/离线检查和额外H5读回完成；2项真实source检查凭31个一致SHA及原JUnit精准复用。当前索引/Goal/Skill已同步；本次无新native，最终维护者接收pending。 |
+| U7／S37～S40 | REVIEWED_BOUNDED | 40项逐点主审、独立87项纯/fake/离线检查和额外H5读回完成；2项真实source检查凭31个一致SHA及原JUnit精准复用。当前索引/Goal/Skill已同步；本次无新native；2026-11-13维护者明确接收。 |
 
 本次原始计划、失败、更正、哈希对照和结果在[主审输出](../../../../../workspace/maintenance/v211_e05_e10_independent_review_20261113_001/input-snapshot.json)。实施性余项结束，不另建40份报告；完整Solution及全程V09、E11～E16、G06/G07和整个代码/项目优化仍按原矩阵处理。

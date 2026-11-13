@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-13",
-  "status": "POST_5C_E05_E10_REVIEWED_BOUNDED_PENDING_MAINTAINER",
+  "status": "POST_5C_E00_E10_ACCEPTED_E11_E16_PLANNED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "E05-E10 implementation and independent review complete within bounded scope; maintainer acceptance pending. Preserve E00-E04 acceptance. E11-E16 and complete E13 Solutions remain; no G06.",
+  "next_action": "E00-E10 maintainer accepted within each bounded scope. E11-E16 detailed ledger and Goal prepared; not started. Complete full E13 Solutions and code acceptance before evidence/refs cleanup; no automatic G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2082,15 +2082,15 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "E05_E10_REVIEWED_BOUNDED_PENDING_MAINTAINER",
+    "status": "E00_E10_ACCEPTED_E11_E16_PLANNED",
     "date": "2026-11-13",
-    "authority": "Maintainer requested independent review and permits minor closeout; E00-E04 previously accepted. E05-E10 maintainer acceptance not inferred.",
+    "authority": "Maintainer explicitly accepted E05-E10 on 2026-11-13 in current conversation and requested E11-E16 analysis, detailed ledger and adjusted Goal; planning only.",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "7a098423",
-    "current_step": "E05-E10 independent review complete, maintainer acceptance pending",
-    "next_step": "Maintainer decision on bounded E05-E10 results; later events remain under original matrix. No automatic G06 or project cleanup.",
+    "current_step": "E11-E16 planning complete, implementation not started",
+    "next_step": "Execute seven units using the dedicated E11-E16 ledger after implementation authorization; code acceptance and project acceptance remain separate.",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
@@ -2106,12 +2106,18 @@
       "E02": "MAINTAINER_ACCEPTED_BOUNDED",
       "E03": "MAINTAINER_ACCEPTED_BOUNDED",
       "E04": "MAINTAINER_ACCEPTED_BOUNDED",
-      "E05": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
-      "E06": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
-      "E07": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
-      "E08": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
-      "E09": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
-      "E10": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER"
+      "E05": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E06": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E07": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E08": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E09": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E10": "MAINTAINER_ACCEPTED_BOUNDED",
+      "E11": "PLANNED_NOT_STARTED",
+      "E12": "PLANNED_NOT_STARTED",
+      "E13": "PLANNED_NOT_STARTED",
+      "E14": "PLANNED_NOT_STARTED",
+      "E15": "PLANNED_NOT_STARTED",
+      "E16": "PLANNED_NOT_STARTED"
     },
     "e00_e04_prior_increment_snapshot": {
       "implementation_attempt_count": 1,
@@ -2155,7 +2161,7 @@
       "scope": "Bounded E00-E04 only; subsequent code/project optimization remains pending."
     },
     "e05_e10_plan": {
-      "status": "INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER",
+      "status": "MAINTAINER_ACCEPTED_BOUNDED",
       "input_head": "67cb643f24a06dad2056a277110e14ba8d13ff31",
       "ledger_ref": "../planning/post-5c-e05-e10-remaining-ledger.md",
       "goal_ref": "../planning/post-5c-e05-e10-goal.md",
@@ -2165,7 +2171,7 @@
       "snapshot_ref": "../../../../../workspace/maintenance/v211_e05_e10_replan_20261112_001/input-snapshot.json",
       "implementation_completed": true,
       "independent_review_completed": true,
-      "maintainer_accepted": false,
+      "maintainer_accepted": true,
       "native_runs_this_planning_delivery": 0
     },
     "e05_e10_review": {
@@ -2174,13 +2180,35 @@
       "status": "BOUNDED_ACCEPTANCE_RECOMMENDED",
       "review_ref": "reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
       "checkpoint_count": 40,
-      "maintainer_accepted": false,
+      "maintainer_accepted": true,
       "pure_fake_offline_passed": 87,
       "asset_nodes_guard_rejected_then_reused": 2,
       "matching_frozen_source_hashes": 31,
       "native_runs_this_review": 0,
       "output_ref": "../../../../../workspace/maintenance/v211_e05_e10_independent_review_20261113_001/",
       "full_solution": "E13_NOT_RUN_THIS_REVIEW"
+    },
+    "e05_e10_acceptance": {
+      "date": "2026-11-13",
+      "authority": "Explicit maintainer acceptance in current conversation: 好的，我同意接收。",
+      "production_commit": "7a098423",
+      "review_ref": "reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
+      "scope": "E05-E10 bounded implementation only; full Solutions, whole code/project acceptance and G06 remain pending."
+    },
+    "e11_e16_plan": {
+      "status": "PLANNED_NOT_STARTED",
+      "date": "2026-11-13",
+      "input_head": "a6b107ac43bed77565a643612372c6c76e641511",
+      "ledger_ref": "../planning/post-5c-e11-e16-remaining-ledger.md",
+      "goal_ref": "../planning/post-5c-e11-e16-goal.md",
+      "units": 7,
+      "checkpoints": 44,
+      "snapshot_ref": "../../../../../workspace/maintenance/v211_e11_e16_replan_20261113_001/input-snapshot.json",
+      "implementation_started": false,
+      "native_runs_this_planning_delivery": 0,
+      "deletions_this_planning_delivery": 0,
+      "local_heads_observed": 9,
+      "worktrees_observed": 6
     }
   }
 }

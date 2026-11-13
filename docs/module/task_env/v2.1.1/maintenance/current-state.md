@@ -48,6 +48,15 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
 
-## 当前实施范围：E05～E10（独立主审完成，待维护者接收）
+## E05～E10：维护者已接收
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)现已逐点核对 S01～S40，建议六事件按既定范围有界接收；主审小修生产 `7a098423` 删除 physical Recorder 的 PickCube 语义覆盖并验证声明保全。维护者最终接收待确认，E11～E16 尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)现已逐点核对 S01～S40，建议六事件按既定范围有界接收；主审小修生产 `7a098423` 删除 physical Recorder 的 PickCube 语义覆盖并验证声明保全。维护者于2026-11-13在本次对话明确接收E05～E10，E11～E16尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+
+
+## 下一范围：E11～E16（规划就绪，尚未开工）
+
+以[E11～E16细化账本](../planning/post-5c-e11-e16-remaining-ledger.md)及[实施Goal](../planning/post-5c-e11-e16-goal.md)为下一执行入口：7个大单元、44个检查点，按诊断、caller、完整Solution、代码接收、五stage证据归并、输出清理、refs/worktree及项目接收推进。每个单元完成实现、必要验证、记录压缩和提交后才对照总账，不按小格反复派包。
+
+规划输入`a6b107ac`，tracked clean，四保护输入和pins不变；本次仅静态/调用者/文档及磁盘、refs/worktree只读盘点，无pytest/资产构造/native或清理。当前诊断451个tracked文件，版本目录30个Python文件；34个文件有退休入口/reader名称引用，不能全当生产缺陷。主maintenance约84.46GB、旧integration的workspace约13.79GB均为混合总量，不是可删空间承诺。9个本地heads、6个worktree需按保全及实际依赖处置；当前Harness共享锁仍位于历史大目录。
+
+E13仍需PickCube三provider与Nut两CPU provider单seed完整尝试及同次独立记录读回，两任务各自MuJoCo必须成功。E14单独接收代码优化后，E15/E16按具体清单保全、归并、安全清理和恢复，项目优化另行接收；不自动merge/push/tag/发布或进入G06。详细检查点、现有符号、接收owner、退出证据及操作边界均在专用账本。

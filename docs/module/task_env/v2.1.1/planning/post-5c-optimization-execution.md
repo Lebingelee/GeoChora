@@ -1,6 +1,6 @@
 # 5c 后代码与项目优化：执行安排
 
-日期：2026-11-12。E00～E04 已完成实施、独立主审及后续余项修复，维护者已在本次对话统一接收。当前效果见第 6 节及[专用账本](post-5c-e00-e04-remaining-ledger.md)。第 1～5 节保留 2026-11-11 的历史启动安排，不作为新的剩余工作或实时状态。
+日期：2026-11-13。E00～E10已获维护者按各自范围接收；E00～E04已完成实施、独立主审及后续余项修复。当前效果见第 6 节及[专用账本](post-5c-e00-e04-remaining-ledger.md)。第 1～5 节保留 2026-11-11 的历史启动安排，不作为新的剩余工作或实时状态。
 
 ## 1. 启动边界
 
@@ -131,8 +131,15 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 
 ## 7. E05～E10 当前结果
 
-维护者接收E00～E04后，E05～E10按[专用账本](post-5c-e05-e10-remaining-ledger.md)的U1～U7完成实施；[独立主审](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)逐点核对S01～S40，建议既定范围有界接收，最终维护者接收待确认。原[Goal](post-5c-e05-e10-goal.md)作为已执行提示保留，不重新开始规划/实施循环。
+维护者接收E00～E04后，E05～E10按[专用账本](post-5c-e05-e10-remaining-ledger.md)的U1～U7完成实施；[独立主审](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)逐点核对S01～S40，建议既定范围有界接收，维护者已于2026-11-13在本次对话明确接收E05～E10。原[Goal](post-5c-e05-e10-goal.md)作为已执行提示保留，不重新开始规划/实施循环。
 
 审查输入`d9dc02c6`、此前生产`91ebc9d6`；小修生产`7a098423`删除通用physical metadata的PickCube语义覆盖，3项回归证明声明及v3 H5投影保全。独立87项纯/fake/离线检查通过；2项真实source检查因资产守卫停止后，按31个一致SHA与原JUnit精准复用。GeoPhys/Isaac同次H5及最终PickCube一步重执行已独立读回；本次未运行native或安装资产构造，原始失败与更正保留。
 
 六事件实施性余项结束，E13完整Solution与全程记录读回保留；E11/E12全库治理及E14～E16项目接收仍未完成。四保护输入和pins保全；没有清理输出、refs/worktree或启动G06。
+
+
+## 8. E11～E16准备（尚未实施）
+
+下一执行入口为[细化账本](post-5c-e11-e16-remaining-ledger.md)及[Goal](post-5c-e11-e16-goal.md)。规划输入`a6b107ac`；7个大单元、T01～T44，按诊断/caller→完整Solution→代码主审与接收→最终证据包→输出清理→refs/worktree与项目接收推进。日常只读专用账本与当前单元必需源码，每个大单元结束才对照总账相应部分。
+
+本次记录维护者对E05～E10接收，完成源码/调用关系、诊断及caller、原始证据位置、磁盘和Git对象只读核查；未运行pytest、SDK/资产解析/native，也未删除任何原件、refs或worktree。实际盘点与保护SHA见[输入快照](../../../../../workspace/maintenance/v211_e11_e16_replan_20261113_001/input-snapshot.json)。最终效果统一写专用账本第11节，本页只保留恢复入口，不继续逐命令追加。
