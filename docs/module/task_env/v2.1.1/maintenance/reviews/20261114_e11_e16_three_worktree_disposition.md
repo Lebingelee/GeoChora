@@ -38,3 +38,5 @@
 ## 空间口径
 
 在 robosuite 迁出后，各候选单独 `du -s -x -B1` 分别为 **6,456,983,552／37,482,496／1,993,269,248 字节**，合计 **8,487,735,296 字节**；对应三处 Git worktree 管理目录另合计 **1,264,984,064 字节**。两组不能当作保证回收量：共享块、硬链接、Git 实际删除内容、日志和并发均会影响结果。本次三工作树保全目录含迁出的 robosuite，测得约 **857.5 MB**；它是保留占用，不应只计算旧路径消失量。完整有序测量范围及当时合计 **26,910,564,352 字节**见[空间收据](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/three-worktree-space-before.json)；若获批，执行前重测并在执行后按同一顺序把不存在路径计 0，单列新增日志。不能将此次候选估算称作 E00～E16 历史累计净节省。
+
+为评估不复制而整体迁出第三方 checkout 的保留成本，对 camera GeoPhys、camera Menagerie、p2 GeoPhys、p2 Menagerie 分别单独测得 **500,371,456／1,909,256,192／68,640,768／1,909,256,192 字节**，见[分项测量](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-retention-space-estimates.json)。这些数包括各 checkout 内缓存，不含主 Git 目录中的子模块管理资料；单独测量不证明独占块或实际回收量，也不意味着已决定迁出方式。
