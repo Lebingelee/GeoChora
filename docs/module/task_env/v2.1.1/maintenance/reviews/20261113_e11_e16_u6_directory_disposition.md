@@ -41,13 +41,13 @@
 
 当前测试样本的独立恢复：从保留对象和索引使用 `workspace/maintenance/v211_e11_e16_u5_20261113_001/materialize_current_test_fixtures.py` 向新空目录复制并校验 112 个文件；在恢复副本上，三份 USD delivery 经 OpenUSD 读取通过、两份 leaf H5 分别经当前 codec 与历史 judge 读取通过、四份 physical H5 的受守卫检查 8 项通过。该复核不依赖原历史目录，也不证明每个历史 reader 或物理运行。测试副本 `/tmp/geochora-u6-fixture-recovery-20261113-001/` 快照占用 46,522,368 分配字节，是本轮临时产物，已按本次授权删除。
 
-U7 的 stage3/stage4 refs 已按具体授权删除；其余候选仍保留，不进行未经授权的删除或 Git prune。下表记录具体状态；剩余候选在实际操作前仍须核对 owner、忽略文件和其他会话使用情况。
+U7 的 stage3/stage4 refs 已按具体授权删除；integration 已获条件式删除授权但尚未执行，其余候选仍保留，不进行未经授权的删除或 Git prune。下表记录具体状态；剩余候选在实际操作前仍须核对 owner、忽略文件和其他会话使用情况。
 
 | 对象 | 当前准备与未解决事项 |
 |---|---|
 | 主 checkout `/home/lly/Program_Files/Geochora` 与 `codex/v211-stage5-diagnostic` | 保留；含四份保护输入、最终证据包和当前工作。 |
 | `codex/v211-stage3`、`codex/v211-stage4` | 已按维护者明确授权，以 `git branch -d` 删除；原 ref 分别为 `842e1efd8268a6a99d075640a30840c2eeb4918f`、`3ca161c41340d6015be4fc949ac43771c233ee1c`。删除前确认均为当前 HEAD 祖先、未被工作树检出，refs bundle 与恢复仓库复核通过；[删除收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/approved-stage3-stage4-deletion.json)记录保护 SHA、pins 与恢复入口。本地 heads 9→7，未删除工作树。 |
-| `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | 暂缓候选；维护者已确认停用并授权本 Goal 接管锁迁移和本地内容保全，但未授权删除。分支已被该 worktree 检出，不能先删分支或以 bundle 代替本地内容。三份 untracked 的[范围内复制与恢复验证](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-untracked-restore-report.json)不覆盖 ignored 内容；本地 ignored 快照及验证另行记录。 |
+| `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | 维护者后续已明确授权在保全及使用冲突闭合后，对此 worktree 执行一次 Git 官方 `worktree remove --force`，然后正常删除该分支；不扩展到其他 worktree。删除前复核发现 VS Code Markdown language server 的 PID 765269 当前 cwd 在该 worktree，故暂停实际移除，[预检记录](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-removal-preflight-current.json)列出保全校验和冲突。进程释放后需重查，不重复询问已给出的删除授权。 |
 | `/home/lly/.codex/worktrees/archive_v1_0_0` | 保留；Git 明确标记为冻结历史参考且锁定。 |
 | `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora` | 暂缓候选；tracked 状态干净但有 ignored 内容，须确认实际归属和保全。 |
 | `workspace/maintenance/geophys_upstream_reset_20261022_001/core-baseline` | 暂缓候选；嵌套注册 worktree，`GeoPhys` 和 `asset/external/mujoco_menagerie` 存在类型变化，不能随父目录递归删除。 |
@@ -62,12 +62,14 @@ U7 的 stage3/stage4 refs 已按具体授权删除；其余候选仍保留，不
 
 上述三个 GeoPhys 恢复样本均来自 `.pytest_cache`；另从本地 `.taichi_cache` 和 `temp_outputs` 各选一份文件实际恢复，原件、快照和恢复副本 SHA-256 均一致，见[补充样本记录](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/geophys-representative-restore.json)。这仍是抽样，不证明完整环境可运行。
 
-integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；保全其 shallow 边界后在新 bare 仓库恢复全部 10 个 refs 和符号 HEAD，`git fsck` 通过，详情见[恢复报告](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-geophys-restore-report.json)。结果只覆盖来源已有浅历史，不能声称历史完整；Menagerie 的 12 个 refs 与主 checkout 相同。integration 有已初始化子模块，其受支持移除流程仍须确定，且维护者尚未授权移除，当前不作为可执行移除候选。
+后续删除前复核中，最终证据包的四个符号链接均不指向 integration；当前编排索引的三个 G02 旧路径已切到 SHA 相同的保留对象，历史 source-map 另加有界定位。integration 临时快照本身有 6,062 条绝对符号链接指向原 workspace，其中 6,050 个目标条目存在于快照，12 条在原目录中已失效；见[链接核查](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-snapshot-absolute-links-audit.json)。移除原工作树后，这些原样保留的绝对链接不会自动指向快照，历史快照需要恢复到原路径或在恢复副本上重映射；不改写原始快照冒称历史环境仍可直接运行。
 
-在隔离合成仓库中测试当前 Git 2.43.0：普通 `git worktree remove` 对含已初始化子模块的工作树拒绝；正常 `git submodule deinit` 后再次执行仍拒绝。完整输出见[合成流程收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/synthetic-worktree-submodule-removal.json)。此试验未操作真实 integration，也未使用 force；不能据此声称真实工作树可移除。删除工作树的授权仍缺失，受支持且不绕过子模块保护的流程仍 OPEN。
+integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；保全其 shallow 边界后在新 bare 仓库恢复全部 10 个 refs 和符号 HEAD，`git fsck` 通过，详情见[恢复报告](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-geophys-restore-report.json)。结果只覆盖来源已有浅历史，不能声称历史完整；Menagerie 的 12 个 refs 与主 checkout 相同。维护者后续已具体授权受条件约束的一次 Git 官方强制移除；目前因上表的实际使用冲突尚未执行。
+
+在隔离合成仓库中测试当前 Git 2.43.0：普通 `git worktree remove` 对含已初始化子模块的工作树拒绝；正常 `git submodule deinit` 后再次执行仍拒绝。完整输出见[合成流程收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/synthetic-worktree-submodule-removal.json)。维护者后续授权 integration 一次官方 `--force` 后，另一个含子模块与未跟踪文件的合成仓库试验以该选项成功移除；两次试验均未操作真实 integration。实际移除仍须先解除发现的 VS Code 使用冲突并重新预检。
 
 对 camera、core-baseline 和旧版本 clean checkout 的[只读 gitlink 快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/remaining-worktree-gitlink-snapshot.json)显示，三者各自的 HEAD 都含 GeoPhys 和 Menagerie gitlink；camera 与旧版本 checkout 两个子模块均已初始化。core-baseline 的两处类型变化实际为指向 `geophys-upstream` 和主 checkout Menagerie 的符号链接，目标都在该 worktree 外，不能跟随或当作其私有内容删除。此快照未保全 ignored 内容或确认其他 worktree 的 owner，合成试验也未在这些真实 worktree 上执行；它们仍不具备删除条件。
 
-空间：四个获授权历史目录清理在记录的 package 加目标范围内，`du` 差额为 3,731,234,816 分配字节；新 integration 快照单独 `du` 为 15,385,866,240 分配字节，GeoPhys bundle 和恢复仓库另约 38,899,712／40,267,776 字节。上述范围和时间不同，硬链接及并发变化不完整，不能相减称为项目真实净下降；显然也不能忽略新增保全量。项目净空间目标仍 OPEN。其余 refs/worktree 删除必须由维护者针对具体候选另行决定；锁迁移授权不等于删除授权。
+空间：四个获授权历史目录清理在记录的 package 加目标范围内，`du` 差额为 3,731,234,816 分配字节；新 integration 快照单独 `du` 为 15,385,866,240 分配字节，GeoPhys bundle 和恢复仓库另约 38,899,712／40,267,776 字节。上述范围和时间不同，硬链接及并发变化不完整，不能相减称为项目真实净下降；显然也不能忽略新增保全量。项目净空间目标仍 OPEN。除已获条件式授权的 integration 和其阶段分支外，其他 refs/worktree 删除必须由维护者针对具体候选另行决定。
 
 [独立项目准备复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-project-preparation-review.md)复算 3,056 条 stage 映射对应的 816 个去重对象，大小和 SHA 均匹配；该数不包括其他 source 索引对象。复核当时确认上述两分支可作为审核候选，后续又复核了获授权的删除结果、GeoPhys ignored 清单及样本恢复。integration 与其他未闭合的工作树仍不可直接移除；U6/U7、项目净下降及维护者项目接收仍 OPEN。

@@ -239,7 +239,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | U4 T22～T28 | MAINTAINER_ACCEPTED_BOUNDED_U4_CODE | 单一能力矩阵、当前入口、Skills、[60 项逐行表](../maintenance/reviews/20261113_e11_e16_u4_row_reconciliation.md)及[独立主审／条件接收](../maintenance/reviews/20261113_e11_e16_u4_independent_acceptance.md)已记录；项目和分支仍 OPEN。 |
 | U5 T29～T34 | SELF_ASSESSED_COMPLETE_BOUNDED | [有界证据选择与复核](../maintenance/reviews/20261113_e11_e16_u5_evidence_selection.md)：五 stage、优化五路线及必要诊断入口已冻结，七项代表性离线检查 PASS；限制如报告。原件未删除；T34 的处置授权与执行时 owner/锁核查、U6 清理及 U7 最终接收仍 OPEN。 |
 | U6 T35～T38 | IN_PROGRESS | [目录保留与处置准备](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已列具体候选、保全及锁快照；两份历史 H5 测试已切到保留对象并通过 25 项检查，四份 physical 输入从新位置通过 8 项检查，Panda 和 G05 USD 测试切换到包内文件，定向 pxr source 检查分别 8 项及 5 项通过；六项临时副本和四个历史目录已分别按具体授权删除并完成代表性复核。经维护者确认停用，integration 和主 checkout 旧锁及新路径已统一为同 inode；旧双锁计划和其他 checkout 的限制见处置表。refs/worktree、本地内容保全与项目净空间核算仍 OPEN。 |
-| U7 T39～T44 | PREPARATION_IN_PROGRESS | [保留、删除结果及恢复入口](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已核对；integration 被维护者授权接管，其本地快照及 GeoPhys ignored 路径已逐文件比对并做样本恢复，GeoPhys 浅仓库 refs 已携浅边界恢复验证。stage3/stage4 refs 经具体授权删除，heads 9→7；已完成独立项目准备复核。integration 已初始化子模块的受支持移除流程、其他工作树处置及其授权、净空间和维护者项目接收仍 OPEN。 |
+| U7 T39～T44 | PREPARATION_IN_PROGRESS | [保留、删除结果及恢复入口](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已核对；integration 本地快照及 GeoPhys ignored 路径已逐文件比对并做样本恢复，GeoPhys 浅仓库 refs 已携浅边界恢复验证。stage3/stage4 refs 经具体授权删除，heads 9→7；已完成独立项目准备复核。维护者后续具体授权 integration 在条件闭合后一次官方强制移除，但预检发现 VS Code 进程以该工作树为 cwd，故实际移除暂停；其他工作树处置及其授权、净空间和维护者项目接收仍 OPEN。 |
 
 ### U1 结果（2026-11-13，实施自评）
 
