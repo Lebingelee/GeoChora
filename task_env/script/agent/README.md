@@ -218,9 +218,9 @@ identity. Keep both paths intact while old callers exist. On a monitored error
 or a single SIGINT, SIGTERM or SIGHUP, the supervisor retains its lock while
 retiring the worker process group; an unretired group keeps the lock held. This
 does not cover repeated-signal races, SIGKILL, host failure, unhandled signals,
-escaped process groups, or a different worktree's independently created lock.
-The example acquires only this checkout's lock; it does not itself coordinate
-with another worktree. Each run writes a separate receipt and canonical H5.
+escaped process groups, or an independently created lock in another checkout.
+The example acquires this checkout's lock; coordination requires every caller
+to use the same inode. Each run writes a separate receipt and canonical H5.
 
 A passing probe covers its declared seeds only. Preserve execution faults and
 sampling-distribution revisions for Human review. Recording/storage validity is

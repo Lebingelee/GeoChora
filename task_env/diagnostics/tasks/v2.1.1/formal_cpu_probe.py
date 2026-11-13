@@ -1,6 +1,7 @@
 """Bounded public-factory CPU check; SDK step counting is external instrumentation."""
 from pathlib import Path
 import argparse,datetime,fcntl,json,os,resource,sys,time,traceback
+from native_locks import acquire_plan_locks
 parser=argparse.ArgumentParser();parser.add_argument('--external-nut-solution',action='store_true');parser.add_argument('--public-ui-check',action='store_true');parser.add_argument('--observer-check',action='store_true');parser.add_argument('--task-renderer', default='mujoco', choices=('mujoco','geophys'));parser.add_argument('--reset-switch',action='store_true');parser.add_argument('--validate-schema',action='store_true');parser.add_argument('--task-rgb',action='store_true');parser.add_argument('--camera-spec',action='store_true');parser.add_argument('--case',required=True);parser.add_argument('--plan',required=True)
 parser.add_argument('--provider',choices=('mujoco','geophys'),default='mujoco')
 parser.add_argument('--cube-force-z',type=float,default=None)
@@ -19,8 +20,7 @@ started=time.monotonic();locks=[];env=None;result={'case':args.case,'provider':a
 resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2)
 resource.setrlimit(resource.RLIMIT_CPU,(120,125))
 try:
-    for path in plan['locks_in_order']:
-        handle=open(path,'r+');fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB);locks.append(handle)
+    acquire_plan_locks(plan['locks_in_order'], locks)
     result['locks_acquired']=True
     import numpy as np
     if args.provider=='mujoco':

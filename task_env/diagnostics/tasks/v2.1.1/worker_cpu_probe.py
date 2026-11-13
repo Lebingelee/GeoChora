@@ -1,6 +1,7 @@
 """Bounded public factory, isolated MuJoCo worker, one control interval."""
 from pathlib import Path
 import fcntl, json, resource, sys, time, traceback
+from native_locks import acquire_plan_locks
 plan=json.loads(Path(sys.argv[1]).read_text())
 case=sys.argv[2] if len(sys.argv)>2 else 'pickcube'
 if case not in {'pickcube','nut'}:
@@ -12,8 +13,7 @@ resource.setrlimit(resource.RLIMIT_AS,(plan['rss_address_space_limit_bytes'],)*2
 resource.setrlimit(resource.RLIMIT_CPU,(120,125))
 row={'status':'RUNNING','observed_native_substeps':None,'conservative_substep_charge':50}; locks=[]; env=None; start=time.monotonic()
 try:
- for path in plan['locks_in_order']:
-  fd=open(path,'r+'); fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB); locks.append(fd)
+ acquire_plan_locks(plan['locks_in_order'], locks)
  import numpy as np
  from task_env import make_env
  config={'execution':{'physics_provider':provider,'deployment':'isolated_worker','interpreter':sys.executable},'episode':{'horizon':8}}

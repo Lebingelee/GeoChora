@@ -7,6 +7,7 @@ import resource
 import sys
 import time
 import traceback
+from native_locks import acquire_plan_locks
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--provider', choices=('mujoco', 'geophys'), required=True)
@@ -19,10 +20,7 @@ result = {'provider': args.provider, 'status': 'RUNNING', 'native_substeps': 0 i
 locks, task_binding, session = [], None, None
 started = time.monotonic()
 try:
-    for path in plan['locks_in_order']:
-        handle = open(path, 'r+')
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        locks.append(handle)
+    acquire_plan_locks(plan['locks_in_order'], locks)
     import numpy as np
     if args.provider == 'mujoco':
         import mujoco
