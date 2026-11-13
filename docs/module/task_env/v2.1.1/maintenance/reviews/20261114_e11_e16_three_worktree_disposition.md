@@ -26,11 +26,15 @@
 
 以上结果经[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-three-worktree-preservation-review.md)；合成 Git 试验、实际内容及恢复样本各有界限。原 integration 专属 Git 管理元数据先前损失无法补回。旧 `robosuite master` 缺失的 promisor blob 与未初始化 gitlink 在操作前已不具备本地完整内容，不作为本次新物理运行或完整历史可重建的依据。
 
+补充在隔离临时目录从两个现有 GeoPhys 恢复库导出各自冻结 HEAD，**2,854／2,149 个 tracked 文件**逐项重新计算 Git blob OID，均匹配；一个／两个嵌套 gitlink 分别只登记身份，未恢复外部仓库。见[完整文件恢复收据](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/geophys-head-full-file-restore-20261114.json)与[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-geophys-restore-deinit-config-review.md)。该试验不恢复文件所有权、时间、ignored 项或其他 refs，不需要复制完整旧 workspace。
+
 ## 尚未闭合的执行方式
 
 独立项目复核指出，原 Goal 禁止强删绕过子模块问题，现有工作树含已初始化子模块；此前草案提出的 `--force` 不满足该条件，已撤回，不作为审批方案。隔离试验中普通 `git worktree remove` 在 `submodule deinit` 后仍拒绝。Git 2.43 的[官方实现](https://raw.githubusercontent.com/git/git/v2.43.0/builtin/worktree.c)会检查工作树管理目录中的 `modules` 目录，即使它为空；这一发现只解释试验现象，不构成修改真实管理目录的授权。正在隔离验证保全第三方内容后如何遵守正常移除流程，并须独立复核。历史输出和缓存的逐项舍弃范围、操作事务、权限预检及恢复措施也尚需闭合。
 
 进一步的[合成试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/git-noforce-retirement-synthetic-v4.json)在迁出子模块、修改其管理指针并手动删除空管理目录后，普通移除返回成功；但[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-noforce-retirement-v4-review.md)认为这不足以证明没有绕过子模块保护，官方文档也未保证该组合受支持。合成脚本还通过 `info/exclude` 隐藏测试链接，不能照搬真实工作树。真实多子模块、事务恢复和权限场景未验证；不执行该方案。
+
+对普通已初始化子模块，另在 `extensions.worktreeConfig=true` 的隔离双工作树 fixture 测试 `git submodule deinit`：候选子模块成功解除初始化，但**共享 Git config 字节发生变化，主工作树的 submodule status 也随之变化**；主子模块 HEAD 未变，worktree 私有 config 未变。见[配置作用域试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/deinit-shared-config-fixture-20261114.json)。实际仓库含共享子模块配置，不能假定对 camera／p2 执行 deinit 只影响候选；在消除此具体冲突前不得对真实仓库使用。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-geophys-restore-deinit-config-review.md)复现了共享配置改变；额外 fixture 将 `GIT_CONFIG` 指向隔离文件后，同样不能阻止共享配置和主状态改变，见[试验收据](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/deinit-config-override-fixture-20261114.json)。试验不暴露配置值，且不证明真实仓库一定出现相同变化。
 
 另外，对指向外部 Git 仓库的 gitlink 符号链接直接执行不带 `--force` 的 `git submodule deinit`，在[隔离合成试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/git-deinit-external-symlink-synthetic.json)中返回失败前，已先把外部仓库的 `.git` 管理目录迁入 worktree 的 `modules`。哨兵内容虽仍在，外部仓库管理状态已改变。此流程不符合外部目标保护边界，**不得对 core-baseline 的两条外链直接使用**；试验只操作了临时目录。五个既有输出根的[当前 checksum 复核](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/output-roots-current-rsync-recheck.json)仍与保留副本一致，范围仅限这些根。
 
