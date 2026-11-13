@@ -10,7 +10,7 @@
 | `v211_e11_e16_u5_20261113_001/stage04/4a-delivery/` | 临时副本，已授权并删除 | 310,669,312 | 旧 4a 布局复制，用于旧 manifest 试验；有界 4a 核查使用包内代表日志和 source 索引。旧 manifest 重算/链接迁移提议不作为保留入口。与对象硬链接可能共享块，不能将该数字当净节省。 |
 | `v211_e11_e16_u5_20261113_001/3b-nut-reconstruction/runtime/` | 临时副本，已授权并删除 | 16,089,088 | 先前 Nut XML 重建运行时，最终入口保留结果和 source receipt；含一条指向下列运行时资产的链接，删除时不得跟随。 |
 | `v211_e11_e16_u5_20261113_001/nut-source-reconstruction/runtime/` 和 `runtime-minimal/` | 临时副本，已授权并删除 | 单独测量分别 52,834,304 / 41,164,800 | 先前 XML 重建运行时，保留重建报告与 source receipt；旧重建脚本在这些运行时删除后不能原地重跑，不要求重建旧 manifest。两目录含共享硬链接，不能将各自 `du` 相加当净回收。 |
-| `v211_g04_4a_attempt003/` | 暂缓候选 | 310,669,312 | 历史 tracked 文档及可能的动态调用仍引用，先完成必要引用迁移与 owner 检查；旧 manifest 非保留义务。 |
+| `v211_g04_4a_attempt003/` | 暂缓候选 | 310,669,312 | 编排文件中四个当前引用已切到同 SHA 的保留对象；历史审查页仍有旧目录链接，完整旧 manifest 不再是保留义务。动态调用及 owner 仍须核对。 |
 | `v211_g04_4b_attempt001/` | 暂缓候选 | 2,495,217,664 | 同上；原接收的影响分析与唯一成果保全需逐项确认。 |
 | `v211_g04_4c_attempt001/` | 暂缓候选 | 900,399,104 | 同上；当前锁/fixture 不得随意删。 |
 | `v211_g05_5c_unit4_continuation_20261109/` | 暂缓候选 | 24,952,832 | 同上；需确认仍在使用的引用和唯一输出。 |
@@ -24,6 +24,8 @@
 维护者对以上两项明确答复“同意删除”后执行，其他候选未获此次授权、未删除。[清理收据](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-approved-two-copies-cleanup-receipt.json)记录原 inode、范围、保护文件 SHA 和 pins。按同一次 `du` 口径，包和恢复试验合计分配字节从 7,074,217,984 降至包内 850,919,424，差 6,223,298,560 字节；这是所测两目录的差额，并非扣除所有归并新增量的项目净节省，外部硬链接和并发变化不在该测量范围内。删除后七项代表性包内检查 PASS，历史 H5 检查 25 项和 physical 检查 8 项通过。两个目录没有嵌套工作树、符号链接或跨挂载；可见 cwd/root/fd 无命中，但进程检查有 1,015 次权限拒绝，无法排除不可见或后续活动。
 
 两份旧 H5 的当前 codec／历史 judge 测试已切换到 U5 包中对应 SHA 对象并检查 SHA；25 项受守卫离线检查通过。四份 physical 测试输入也已在包内建立相对符号链接，指定新位置运行的 8 项受守卫检查通过；测试仍允许显式指定其他输入。旧文件保持不变。Panda Isaac 资产测试现使用包内 USD manifest；按 manifest 将 68 个已保全 source 对象以硬链接排列，包含 pxr 的定向 source 构造检查 8 项通过，solver SDK 被阻止导入。该检查不是 App 或 native 物理运行。G05 简单主体两份 delivery 的 24 个必要文件也以包内硬链接布局；三种配置安装、损坏拒绝及 source 绑定共 5 项 pxr 检查通过。历史 supervisor 的共享锁仍在 `phase_ii_01_sol_luna_handoff_20261023_001/`。该目录、现行测试样本、所有锁、保护输入、第三方源码与嵌套 worktree 均不列删除。当前 checkout 锁 inode 29918777，另一个 integration checkout 锁 inode 33310300；本次 `/proc/locks` 快照均未显示持锁项，这不是未来无 owner 的保证。既往进程 fd 扫描存在权限拒绝，不能证明全部进程没有打开目录。统一锁路径前须查清全部活动运行端，避免新旧 inode 并行形成双锁，不能通过 unlink 实现切换。
+
+针对四个历史目录的[保留检查](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-stage-directory-retention-check.json)：U5 最终选择中分别有 148／1,243／229／17 条原路径映射，内容对象 SHA 和长度均匹配；只覆盖选中的有界结论，不保证其余历史文件或整包可恢复。4a 的当前 `orchestration.json` 四个 report／matrix／plan／manifest 引用已切到与原文件 SHA 相同的对象；manifest 仍是历史清单，不表示其全部旧条目将被保留。历史审查页及可能的外部调用仍可能使用旧路径。当前进程 cwd/fd 快照无可见命中，有 427 次权限拒绝，无法证明所有 owner 释放；四目录仍未授权删除。定向纯/fake 入口 240 passed；当前文档 validator 保持 1 项保护文件 `MUJOCO_LOG.TXT` 错误、79 项历史链接问题和 0 项 stale path，不称全绿。
 
 四个暂缓历史目录的 [符号链接与 worktree 快照](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-candidate-symlink-worktree-snapshot.json)：4a 和 4c 各 0 条符号链接；4b 有 19 条全部指向目录外，其中包含 integration checkout 的 pytest 临时路径和当前 Python 环境的第三方包；5c unit4 有 67 条，解析后均在其目录内。所查四个目录没有发现嵌套 `.git` 标记或已注册 worktree。执行任何获授权的目录操作都不得跟随符号链接，尤其不得触及其外部目标；此快照不证明 owner 或活动状态。
 

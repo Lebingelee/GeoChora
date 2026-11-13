@@ -1066,8 +1066,8 @@
               "output_head": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
               "prompt_sha256": "8f1d62eff4f7494a95d57b83a2f164a1b22aa25db10d06efe2f1486f5add3d4d",
               "prompt_path": "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G04_4a_attempt003/prompt.md",
-              "report_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt003/report.md",
-              "output_manifest_ref": "../../../../../workspace/maintenance/v211_g04_4a_attempt003/output-manifest.json",
+              "report_ref": "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/43/43f8627a0abe76336f34b218725740351e73ba8bfb5a59d7fe13fe193d0dd66c",
+              "output_manifest_ref": "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/0a/0abfdec614c599d22b15ae45a57aed42798f2333d41a5b1bfdd33a48455a82bb",
               "sol_review_ref": "reviews/20261106_4a_attempt003_sol_review.md",
               "commit": "105219eda7161e7292d0d8c2ce478c49bdb4eca2",
               "native_starts": 9,
@@ -1108,9 +1108,9 @@
             "reviews/20261106_4a_attempt002_recovery_sol_review.md",
             "reviews/20261106_4a_wrench_cross_backend_followup.md",
             "../planning/stage4-4a-attempt003-reassessment.md",
-            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/report.md",
-            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/case-matrix.md",
-            "../../../../../workspace/maintenance/v211_g04_4a_attempt003/4b-plan.md",
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/43/43f8627a0abe76336f34b218725740351e73ba8bfb5a59d7fe13fe193d0dd66c",
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/16/1653401617d85594e3d144b69e48466ab94dcdd5d0eb9d531aadaf64df7c3926",
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/be/bec747fee518fc2bd7ea72f542bc75ebadd4623c464712a48f992bc2fa76f7f1",
             "reviews/20261106_4a_attempt003_sol_review.md"
           ],
           "commits": [
