@@ -42,6 +42,21 @@
 
 [独立审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-multisubmodule-crash-experiment-review.md)指出，合成的两个子模块复用了同一嵌套路径，不覆盖真实的三种路径；仅检查外链存在及外部哨兵，未核验其原始文本或实际目标。恢复按路径存在性判断，未防止目标替换，且 `rename` 可覆盖。审查还发现测试 worker 最初可接受任意路径：现已增加临时目录／标记防误用检查，受测主 checkout 路径[被拒绝](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/relocation-worker-guard-test.json)，并重新通过八个合成停止点；该检查不是抵抗恶意替换的安全边界，也不使试验脚本成为真实执行器。
 
+### 第三方 checkout 保全路径草案（未执行）
+
+为避免复制整棵工作树，一个待验证方案是在同设备内，分别将下表的 checkout 和其 Git 管理目录迁入 `workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/third-party/submodules/` 下各自的 `checkout`、`gitdir`，再修正迁出 checkout 的 Git 文件及迁出管理目录中的 `core.worktree`。这是四对各自独立的路径，不应把父目录或外部链接目标作为对象；同设备迁移仍保留现有缓存和重复的 Menagerie 文件占用。
+
+| 标识及目标子目录 | 当前 checkout | 当前 Git 管理目录（相对主 `.git/worktrees/`） |
+| --- | --- | --- |
+| `camera-geophys/` | `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys` | `Geochora/modules/GeoPhys` |
+| `camera-menagerie/` | `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/asset/external/mujoco_menagerie` | `Geochora/modules/asset/external/mujoco_menagerie` |
+| `p2-geophys/` | `/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/GeoPhys` | `p2_0_v1_1_clean_checkout_20261017/modules/GeoPhys` |
+| `p2-menagerie/` | `/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/asset/external/mujoco_menagerie` | `p2_0_v1_1_clean_checkout_20261017/modules/asset/external/mujoco_menagerie` |
+
+任何真实迁移前必须先实现并独立审查事务工具：持共享锁并重新查具体活动冲突；逐路径以不跟随链接的目录 fd 核验设备、inode、目标不存在和源内容；持久记录原 Git 文件、配置、权限和每步意图；以不覆盖方式迁移并同步父目录；迁移后复核 HEAD、refs、shallow、内容、三处未初始化嵌套 gitlink、外链文本和外部目标。中断时须依据日志和实际 inode 判断、逐项恢复或报告不确定状态，不自动覆盖目标或假定回滚成功。现有合成程序不满足这些要求；该草案也**没有解决**后续 Git worktree 移除的子模块检查，因此不是操作命令或待批准删除清单。保全后的常规 `git worktree remove` 能否按原 Goal 支持仍须另行解决。
+
+[草案独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-relocation-path-draft-review.md)核对了四对当前路径、双向相对指针和设备，并确认拟目标目录当时不存在；建议定案前比较复用主 Menagerie 副本与整体迁出时对独有数据、缓存和空间的影响。其结论仅确认草案所列路径和限制，不是实际迁移或删除的批准。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
