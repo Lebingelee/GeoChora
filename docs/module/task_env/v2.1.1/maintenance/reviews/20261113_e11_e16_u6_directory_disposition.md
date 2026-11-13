@@ -66,6 +66,8 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 在隔离合成仓库中测试当前 Git 2.43.0：普通 `git worktree remove` 对含已初始化子模块的工作树拒绝；正常 `git submodule deinit` 后再次执行仍拒绝。完整输出见[合成流程收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/synthetic-worktree-submodule-removal.json)。此试验未操作真实 integration，也未使用 force；不能据此声称真实工作树可移除。删除工作树的授权仍缺失，受支持且不绕过子模块保护的流程仍 OPEN。
 
+对 camera、core-baseline 和旧版本 clean checkout 的[只读 gitlink 快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/remaining-worktree-gitlink-snapshot.json)显示，三者各自的 HEAD 都含 GeoPhys 和 Menagerie gitlink；camera 与旧版本 checkout 两个子模块均已初始化。core-baseline 的两处类型变化实际为指向 `geophys-upstream` 和主 checkout Menagerie 的符号链接，目标都在该 worktree 外，不能跟随或当作其私有内容删除。此快照未保全 ignored 内容或确认其他 worktree 的 owner，合成试验也未在这些真实 worktree 上执行；它们仍不具备删除条件。
+
 空间：四个获授权历史目录清理在记录的 package 加目标范围内，`du` 差额为 3,731,234,816 分配字节；新 integration 快照单独 `du` 为 15,385,866,240 分配字节，GeoPhys bundle 和恢复仓库另约 38,899,712／40,267,776 字节。上述范围和时间不同，硬链接及并发变化不完整，不能相减称为项目真实净下降；显然也不能忽略新增保全量。项目净空间目标仍 OPEN。其余 refs/worktree 删除必须由维护者针对具体候选另行决定；锁迁移授权不等于删除授权。
 
 [独立项目准备复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-project-preparation-review.md)复算 3,056 条 stage 映射对应的 816 个去重对象，大小和 SHA 均匹配；该数不包括其他 source 索引对象。复核当时确认上述两分支可作为审核候选，后续又复核了获授权的删除结果、GeoPhys ignored 清单及样本恢复。integration 与其他未闭合的工作树仍不可直接移除；U6/U7、项目净下降及维护者项目接收仍 OPEN。
