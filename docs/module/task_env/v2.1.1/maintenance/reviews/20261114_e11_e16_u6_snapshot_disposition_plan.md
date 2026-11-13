@@ -32,3 +32,12 @@
 独立审查先复现 `fchmod` 已生效时立即中断导致权限未恢复但记录成功的缺陷，已按实际 mode 恢复并重新核对；还复现日志对账中未开始目录 mode 变化未标冲突、无待处理 intent 却接受 `uncertain`、journal 跟随链接及 FIFO 打开阻塞等问题，均已补充拒绝或冲突分类和合成回归。最新固定版本独立运行 **18 项合成测试通过**；journal 本身通过调用方提供的目录 fd 以 no-follow、nonblocking 方式读取，仍须由最终调用方证明目录和日志来源可信。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-journal-reconciler-review.md)记有版本及限制。
 
 [两种 SIGKILL 合成演练](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/synthetic-transaction-crash-reconciled-v5.json)在写入 unlink 意图后分别于实际 unlink 前、后终止，日志对账均标为不确定，并在核对目录 inode／owner／mode 后由测试父进程手动恢复 mode；未回填文件或恢复 mtime。它不证明真实清理或断电可靠性，也不能将日志确认等同排除非合作写入。原快照和完整恢复副本未修改。真实执行器、进程／owner／引用排除、执行期对象核验及维护者具体授权仍 OPEN。
+
+
+## 持锁只读检查与分组恢复准备
+
+[只读闸门 v2](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/read-only-gate-v2-20261114.json)在持主 checkout 共享锁期间，从固定目录 fd 读取并在结束时重新核对 manifest／父目录清单，重算候选快照、完整恢复副本和 U5 对象，前后核验四保护输入及两 pins。前后可见 cwd/root/fd 扫描无命中，权限拒绝分别 1,030／1,033 次；不覆盖不可见或 mmap-only 使用者、未来活动和非配合 writer。闸门返回后释放锁，结果不是删除许可，也不能代替同次实际操作时持锁重新检查。早期 v1 收据使用过在锁外先摘要再读取的实现，只作历史结果，不证明 v2 的输入绑定。
+
+部分操作后的[恢复清单原型](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/recovery_plan.py)将受影响路径的完整硬链接组列为隔离重建候选，并将目录中断、冲突或不一致状态列为人工复核；[分组物化原型](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/materialize_recovery.py)只向新目录复制对象，不覆盖现存文件。以真实保留对象和**假设的**单个路径缺失做[33 条硬链接路径演练](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/partial-recovery-demo-verification.json)，原快照实际没有删除，恢复组的内容、基本属性和链接数通过自检。这是一个组的演练；调用者仍须绑定可信 manifest／journal、提供全部保护根并处理目录、链接和完整快照拼合。
+
+合成测试分别覆盖持锁闸门 9 项、恢复清单 9 项、分组物化 6 项及事务／对账集成 19 项；未运行 native。审查期间独立子代理的后续复核请求被系统标记为可能涉及网络安全风险而终止，故最新恢复清单与分组物化程序**尚未完成独立复核**；之前已完成的独立复核不自动覆盖后续修改。以上仍不能替代真实执行器、同次 owner 独占、具体授权及维护者对恢复限制的决定。
