@@ -127,6 +127,14 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 快照候选的具体路径、保留材料、恢复限制、预计权限处理与中止要求列于[处置方案草案](20261114_e11_e16_u6_snapshot_disposition_plan.md)；目前尚无完成审查的真实执行器，草案不是删除授权。
 
+### 2026-11-14 两份验证副本按授权清理
+
+维护者批准[两条精确路径及保留范围](20261114_e11_e16_u6_snapshot_disposition_plan.md)后，在主 checkout 共享锁下重核原快照与全量恢复副本的 21,929 条候选路径（各 19,785 个独立 inode、9,234,545,951 内容字节）及 561 个 U5 对象；核对浅仓库 v2 的 bundle、shallow、refs、HEAD 和 fsck。持锁前后可见目标使用命中均为 0，但 `/proc` 权限拒绝分别为 1,039／1,033 次；非合作 writer、仅 mmap 和不可见进程仍不排除。逐项身份检查后，两个验证副本均已删除；原 integration 快照及 21,929 候选原件、U5 包、v2 恢复仓库、其他工作树与锁保留。
+
+[执行日志](../../../../../../workspace/maintenance/v211_approved_temporary_copy_cleanup_20261114_001/events.jsonl)记录 21,961 对文件 unlink、3,430 对内部目录 rmdir 和两个根目录移除，意图及结果已持久记录；[只读对账](../../../../../../workspace/maintenance/v211_approved_temporary_copy_cleanup_20261114_001/reconcile.py)未发现未闭合 intent。执行器经独立审查并修复清单读取、日志顺序及 v2 身份核对缺陷，3 项合成测试通过；锁和 no-follow 不保证对非合作并发替换安全。删除后从 U5 重算 3,056 条 stage 映射、816 个唯一 stage 对象及全部 1,370 个内容对象，SHA/长度通过；四保护 SHA 与两 pins 不变。独立复核详见[本次收尾审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-approved-validation-copies-cleanup-review.md)。
+
+同一有序 `du -s -x -B1` 范围（U7 准备目录含原快照，加 U5 包）由 25,846,870,016 降至 16,482,275,328，下降 **9,364,594,688 字节**。该范围在清理前已经包含原快照和 U5 包，但不包含新建的清理工具和逐项日志目录；后者在清理后另测 **21,622,784 字节**，日志可能继续增长。硬链接、共享块、其他活动及不同起始时点使这些数不构成 E00～E16 历史累计净节省。完整恢复副本现不存在：四个依赖其原路径的验证工具如需再用，须先在隔离位置重建并验证；这不改变 U4/U5 的既有接收范围。
+
 ### 项目接收入口（准备中）
 
 * **代码范围：** [U4 独立主审及有界接收](20261113_e11_e16_u4_independent_acceptance.md)；不因项目清理重开。T19 的同次联合证据及 H5 单文件不自含完整 completion 的限制见 [联合证据报告](20261113_e11_e16_u4_joint_completion.md)。
