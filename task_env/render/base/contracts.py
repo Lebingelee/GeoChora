@@ -20,6 +20,7 @@ class TaskRgbCapability:
     ownership: str
     physics_profile: str | None = None
     shared_framebuffer: bool = False
+    frame_mounts: bool = False
 
 
 TASK_RGB_CAPABILITIES = {
@@ -37,7 +38,8 @@ TASK_RGB_CAPABILITIES = {
         shared_framebuffer=True),
     ('isaacsim', 'cuda', 'isaacsim'): TaskRgbCapability(
         'isaacsim', 'rtx', 'v211_isaac_rtx_task_rgb_v1', 'cuda:0',
-        'sRGB transfer after RTX tone mapping; primaries uncalibrated', 'borrowed Runtime camera'),
+        'sRGB transfer after RTX tone mapping; primaries uncalibrated', 'borrowed Runtime camera',
+        frame_mounts=True),
 }
 TASK_RGB_PAIRINGS = frozenset(TASK_RGB_CAPABILITIES)
 
@@ -96,11 +98,12 @@ def validate_camera_declarations(*, render_mode=None, observer_camera=None, task
         if type(camera) is CameraGeometry:
             camera.validate()
         elif type(camera) is CameraSpec:
-            if (camera.frame != 'world' or not np.isfinite((*camera.position, *camera.quaternion_wxyz,
+            if ((camera.frame != 'world' and camera is not task_rgb_camera)
+                    or not np.isfinite((*camera.position, *camera.quaternion_wxyz,
                     camera.fov_y, camera.near, camera.far)).all()
                     or np.linalg.norm(camera.quaternion_wxyz) < 1e-12
                     or not 0 < camera.fov_y < np.pi):
-                raise ValueError('task RGB requires a finite world CameraSpec with nonzero quaternion')
+                raise ValueError('camera requires a finite admitted CameraSpec with nonzero quaternion')
         else:
             raise TypeError('camera must be CameraSpec or linked CameraGeometry')
         if not camera.rgb or camera.depth or camera.rgb_layout != 'HWC' or camera.rgb_dtype != 'float32':

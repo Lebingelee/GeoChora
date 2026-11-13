@@ -2534,8 +2534,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         if camera.task_artifact_hash != self.artifact.identity_hash:
             raise ValueError('task RGB camera TaskArtifact linkage mismatch')
         if (not camera.rgb or camera.depth or camera.rgb_layout != 'HWC'
-                or camera.rgb_dtype != 'float32' or camera.parent_frame != 'world'):
-            raise ValueError('task RGB requires a world-mounted HWC float32 RGB camera')
+                or camera.rgb_dtype != 'float32'):
+            raise ValueError('task RGB requires an HWC float32 RGB camera')
         observer = getattr(self, '_selected_observer_camera', None)
         if observer is not None and observer.camera_id == camera.camera_id:
             raise ValueError('task and observer cameras require distinct identities')

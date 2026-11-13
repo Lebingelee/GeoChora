@@ -5,6 +5,27 @@ exact node; a file in this directory is not automatically a pure test. The
 repository root is the working directory in the examples below. Use the
 project's configured Python with pytest, NumPy, PyYAML and h5py installed.
 
+### Isaac gripper rework (2026-11-13)
+
+`isaac_gripper_rework.py` has explicit `asset`, `empty-close`, `contact-lift`
+and `solution` cases. Native cases require a frozen externally supervised plan,
+both shared locks, the installed immutable USD manifest, a separate offline
+asset inspection and a unique output directory. The simulation process must
+not import standalone pip OpenUSD before Kit starts. `GEOCHORA_CORE_SITE` is an
+optional dependency path scoped to Gym/h5py imports; it is not an asset path.
+
+The controlled lift changes caller actions only, and declares a normal wrist
+CameraSpec; Core owns construction, stepping, recording and close. Independent
+contact reporting uses public SDK events and copies callback values immediately,
+without solver/private adapter access or additional stepping. Empty SDK reports
+do not establish absence of contact. It is separate from the formal Solution
+case, which reuses the ordinary caller loop without contact instrumentation.
+Results, failed launches, exact budgets and H5 readback are indexed in the
+[rework report](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md).
+`test_frame_mounted_task_camera.py`, `test_pickcube_close_readiness.py` and the
+measured-boundary node in `test_solution_compatibility.py` run in the guarded
+pure command; they establish contracts, not native contact, pixels or success.
+
 | Claim / owner | Exact entry and inputs | Class / limits |
 | --- | --- | --- |
 | Formal configuration selects the four current tasks without opening declared assets or importing native SDKs; configuration/registry | `python -B task_env/diagnostics/tasks/v2.1.1/run_pure_checks.py` | Pure/fake; also runs the other pure/fake rows below. Fresh Python process, automatic pytest plugins disabled. |

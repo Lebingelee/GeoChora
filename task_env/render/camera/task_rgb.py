@@ -70,6 +70,8 @@ def prepare_task_rgb_adapter(*, camera, renderer, provider, backend, artifact, o
     from ..base.contracts import ObserverRenderRequestV1, task_rgb_capability
 
     capability = task_rgb_capability(provider, backend, renderer)
+    if camera.parent_frame != 'world' and not capability.frame_mounts:
+        raise ValueError('selected task RGB renderer does not admit frame-mounted cameras')
     if (observer is not None and capability.shared_framebuffer
             and (observer.width, observer.height) != (camera.width, camera.height)):
         raise ValueError('GeoPhys task and observer cameras require the same framebuffer extent')

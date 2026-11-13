@@ -80,7 +80,7 @@ def test_observer_route_rejects_unadmitted_control_and_foreign_descriptor():
 def _isaac_camera_io():
     from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
     io = object.__new__(IsaacSimNativeRuntimeIOV1)
-    camera = object()
+    camera = SimpleNamespace(parent_frame="world")
     io._closed = False
     io._observer_faulted = False
     io._task_camera_faulted = False
@@ -173,7 +173,7 @@ def test_isaac_headless_admission_never_forges_observer_request(monkeypatch):
     from task_env.runtime.sessions import isaac_native_io
     from task_env.render.camera.task_rgb import prepare_task_rgb_adapter
     monkeypatch.setattr(isaac_native_io, 'configure_isaac_task_rgb_color_defaults', lambda: {'ok': True})
-    cap, setup, request = prepare_task_rgb_adapter(camera=object(), renderer='isaacsim',
+    cap, setup, request = prepare_task_rgb_adapter(camera=SimpleNamespace(parent_frame='world'), renderer='isaacsim',
         provider='isaacsim', backend='cuda', artifact=object(), observer=None)
     assert cap.backend == 'rtx' and setup == {'ok': True} and request is None
 

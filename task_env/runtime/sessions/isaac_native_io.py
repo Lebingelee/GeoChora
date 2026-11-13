@@ -2618,8 +2618,8 @@ class IsaacSimNativeRuntimeIOV1:
         if type(camera) is not CameraGeometry:
             raise TypeError('task camera must be CameraGeometry')
         camera.validate()
-        if camera.task_artifact_hash != self._artifact.identity_hash or camera.parent_frame != 'world':
-            raise ValueError('task camera must be linked to this artifact and world mounted')
+        if camera.task_artifact_hash != self._artifact.identity_hash:
+            raise ValueError('task camera must be linked to this artifact')
         self._prepare_task_rgb_render_stage()
         metadata = resolve_camera(camera, state)
         path = '/GeoChoraTaskCamera_' + uuid.uuid4().hex
@@ -2683,6 +2683,24 @@ class IsaacSimNativeRuntimeIOV1:
                 'state_boundary': state.boundary.to_mapping(),
                 'capture': 'none; geometry binding only'}
 
+    def _sync_task_camera_mount(self, camera, state):
+        """Update only the owned camera from its current published parent Frame."""
+        import numpy as np
+        from pxr import Gf, UsdGeom
+        from ...observations.canonical_camera import resolve_camera
+
+        metadata = resolve_camera(camera, state)
+        world = np.asarray(metadata.T_world_from_camera, dtype=np.float64).copy()
+        world[:3, :3] = world[:3, :3] @ np.diag([1., -1., -1.])
+        prim = self._stage.GetPrimAtPath(self._task_camera_path)
+        if not prim or not prim.IsA(UsdGeom.Camera):
+            raise RuntimeError('bound task camera prim is unavailable')
+        # Sensor initialization can normalize the owned camera's xform ops.
+        # Author its next pose through USD's matrix operation, then let the
+        # existing binding check verify the realized transform and optics.
+        operation = UsdGeom.Xformable(prim).MakeMatrixXform()
+        operation.Set(Gf.Matrix4d(*[float(value) for value in world.T.reshape(-1)]))
+
     def capture_observer(self, camera, state):
         """Capture the published F06 boundary through the existing App/scene owner."""
         if (self._closed or self._observer_faulted or getattr(self, '_observer_runtime_invalid', False)
@@ -2718,6 +2736,8 @@ class IsaacSimNativeRuntimeIOV1:
             raise RuntimeError('Isaac task renderer is unavailable or faulted')
         if camera != self._task_camera_geometry or self._task_camera_path is None:
             raise ValueError('Isaac task capture camera differs from its binding')
+        if camera.parent_frame != 'world':
+            self._sync_task_camera_mount(camera, state)
         binding_receipt = self.task_camera_binding(state)
         self._task_camera_binding_receipt = binding_receipt
         try:

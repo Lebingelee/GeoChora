@@ -21,7 +21,10 @@ def test_pickcube_position_and_physical_readiness_share_measured_boundary():
     assert not physical_execution_info(env).close_ready
     env._last_physical_opening_target = None
     assert position_execution_info(state, None) == physical_execution_info(env)
+    assert not physical_execution_info(env).close_ready  # No full close request yet.
+    env._last_physical_opening_target = 0.
     assert physical_execution_info(env).close_ready
+    env._last_physical_opening_target = None
 
     state.joint_position = {'panda-v1/finger_joint1': .041, 'panda-v1/finger_joint2': .041}
     assert physical_execution_info(env).target_opening_m == .08

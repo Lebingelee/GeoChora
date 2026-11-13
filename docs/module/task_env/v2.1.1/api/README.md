@@ -62,6 +62,10 @@ finally:
 
 相机可用世界 CameraSpec 声明，在编译后生成绑定几何；底层 advanced CameraGeometry 仍校验 Artifact。observer／task camera 身份必须不同，输出限原 HWC float32 RGB，renderer／physics pairing 和历史观察路线限制继续拒绝。本批只验证声明与生命周期合同，未新增真实 RGB 结论。
 
+2026-11-13 腕部相机增量：Isaac PhysX CUDA × Isaac RTX 的 `task_rgb_camera` 还可使用 `CameraSpec(frame='body', parent='panda-v1/ee', ...)`。parent 是已发布 Frame 的 `entity_id/frame_id`；缺失或不唯一时拒绝。相机解析器组合当前父 Frame 与局部安装位姿，Isaac renderer 更新自己拥有的相机并核验原生几何，沿原捕获路径检查物理时钟。MuJoCo／GeoPhys 的 frame-mounted task RGB 尚未实现，构建时拒绝；observer 的原 world 限制保留。具体 seed31、256×192 腕部图像、动作和 H5 边界见[夹爪返工记录](../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md)。这不扩展成任意挂载、renderer 或资产组合的资格。
+
+PickCube 当前公开 info 中的 Position 就绪读回为 `pickcube_position_execution_info_v2`：完整零开口请求、实测开口小于全开 80 mm、关节速度绝对值之和不超过 5 mm/s，表示该边界的关闭已稳定。Solution 要求连续 50 ms 后才尝试抬升；空载和夹物都可能满足，它不是接触或抓取成功检测。原 100 mm 方块抬升成功判据、控制律、本次 Isaac 5 N 原生限幅及 `grasped_cube` 历史奖励代理均未改变。显式 v1 输入仍按原 45 mm 合同验证；新 Task 不再输出 v1，旧记录不被重新解释为 v2。
+
 旧 PickCube physical candidate、Isaac physical candidate 和 Position candidate UID 已退休，不再接收旧输入或 `source_workspace`。请使用本页正式 UID 和 `controller.profile_id`；历史候选的证据与身份按原记录保留。Isaac 路线可自动查找已安装的 Robot USD 资产，普通 `make_env` 配置不必填写内部 manifest；显式 `execution.source_delivery_manifest` 仍可用于选择已验证的高级输入。当前资产包仍需预先安装，项目尚未提供自动生成或发行包安装；不会从历史 workspace 隐式查找。
 
 维护者可以使用 `python -m task_env.assembly.usd_cache --provider isaacsim --robot <robot-uid> --manifest <已验证交付清单>` 预装本地 delivery。安装复制并重新验证完整闭包，不覆盖同位置的不同资产；默认位置为用户缓存，也可通过 `GEOCHORA_USD_ASSET_ROOT` 选择位置。此维护命令当前仍需要清单路径，不代表资产分发已经完成。

@@ -48,8 +48,8 @@ class CameraGeometry(Contract):
     def from_camera_spec(cls, spec, *, task_artifact_hash):
         """Lower the public camera declaration into source-linked geometry."""
         from ...environment.config import CameraSpec
-        if type(spec) is not CameraSpec or spec.frame != 'world':
-            raise TypeError('task RGB requires a world CameraSpec')
+        if type(spec) is not CameraSpec:
+            raise TypeError('task RGB requires a CameraSpec')
         quaternion = np.asarray(spec.quaternion_wxyz, dtype=np.float64)
         norm = np.linalg.norm(quaternion)
         if not np.isfinite(norm) or norm < 1e-12:
@@ -59,7 +59,8 @@ class CameraGeometry(Contract):
                      (2*(x*y+z*w), 1-2*(x*x+z*z), 2*(y*z-x*w), spec.position[1]),
                      (2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y), spec.position[2]),
                      (0., 0., 0., 1.))
-        camera = cls('camera-observation-v0', task_artifact_hash, spec.name, 'world',
+        parent = 'world' if spec.frame == 'world' else spec.parent
+        camera = cls('camera-observation-v0', task_artifact_hash, spec.name, parent,
                      transform, MOUNT_FROM_CAMERA, spec.width, spec.height, spec.fov_y,
                      spec.near, spec.far, spec.rgb, spec.depth, spec.rgb_layout, spec.rgb_dtype)
         camera.validate()

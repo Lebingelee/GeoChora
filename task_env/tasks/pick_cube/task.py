@@ -23,7 +23,7 @@ FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 
 def _gripper_execution_info(state, target, *, clamp_default):
     """Project one measured boundary into the Task's readiness contract."""
-    from .solution import PickCubePositionExecutionInfoV1
+    from .solution import PickCubePositionExecutionInfoV2
 
     opening = sum(float(state.joint_position[name]) for name in FINGERS)
     if -1e-6 <= opening < 0.:
@@ -31,9 +31,9 @@ def _gripper_execution_info(state, target, *, clamp_default):
     speed = sum(abs(float(state.joint_velocity[name])) for name in FINGERS)
     if target is None:
         target = min(.08, max(0., opening)) if clamp_default else opening
-    return PickCubePositionExecutionInfoV1('pickcube-position-execution-info-v1',
+    return PickCubePositionExecutionInfoV2('pickcube-position-execution-info-v2',
         int(state.control_step), float(state.simulation_time), opening, speed, target,
-        bool(target <= .045 and opening <= .045 and speed <= .005))
+        PickCubePositionExecutionInfoV2.closure_is_ready(target, opening, speed))
 
 
 def physical_execution_info(env):
@@ -264,7 +264,7 @@ def physical_task_binding(*, build, task_config, lift_height_m,
         external_solution_actions=reset_switch,
         validate_external_solution=validate_solution if reset_switch else None,
         position_execution_info=physical_execution_info if reset_switch else None,
-        position_execution_info_key='pickcube_position_execution_info_v1' if reset_switch else None,
+        position_execution_info_key='pickcube_position_execution_info_v2' if reset_switch else None,
         physical_reset_capability=reset_capability,
         physical_action_observer=observe_physical_action if reset_switch else None)
 

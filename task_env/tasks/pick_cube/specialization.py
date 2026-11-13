@@ -453,7 +453,7 @@ def make_reference_binding(*, controller_profile="r1", source_delivery_manifest=
             position_execution_info(env.state, env.last_position_transition)
             if env.value.get('session_admission_input') is not None else None
         ),
-        position_execution_info_key='pickcube_position_execution_info_v1',
+        position_execution_info_key='pickcube_position_execution_info_v2',
         reset_runtime_input=lambda value: value.get('session_admission_input'),
         position_control_binding=position_control_binding_from_selected,
         validate_external_solution=_validate_external_readiness_solution,

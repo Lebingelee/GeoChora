@@ -808,6 +808,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
             return execution_info
         if not isinstance(info, Mapping):
             raise TypeError('public execution info is required')
+        position = info.get('pickcube_position_execution_info_v2')
+        if position is not None:
+            return PickCubePositionExecutionInfoV2.from_mapping(position)
         position = info.get('pickcube_position_execution_info_v1')
         if position is not None:
             return PickCubePositionExecutionInfoV1.from_mapping(position)
@@ -820,6 +823,7 @@ class PickCubeReadinessSolution(PickCubeSolution):
         self._execution(self._execution_from_info(info, execution_info), reset=True)
         self.planned_actions_emitted = 0
         self.readiness_wait_actions_emitted = 0
+        self._position_close_settled_ticks = 0
         self.total_control_actions_emitted = 0
         self._wait_count = 0
         self.completion_events = []
@@ -907,6 +911,10 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if (policy.kind == "gripper_ready"
                 and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
             ready = execution_info.close_ready
+            if isinstance(execution_info, PickCubePositionExecutionInfoV2):
+                self._position_close_settled_ticks = (
+                    self._position_close_settled_ticks + 1 if ready else 0)
+                ready = self._position_close_settled_ticks * self.readiness_config.control_dt >= .05
         else:
             ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
         if policy.kind == "task_outcome" and ready:
@@ -998,7 +1006,9 @@ __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
 
 @dataclass(frozen=True)
 class PickCubePositionExecutionInfoV1(Contract):
-    """Force-free gripper readiness from measured joint position and velocity."""
+    """Historical 45 mm readiness contract; retained for explicit v1 inputs."""
+
+    schema_id = "pickcube-position-execution-info-v1"
 
     schema_version: str
     control_step: int
@@ -1008,8 +1018,12 @@ class PickCubePositionExecutionInfoV1(Contract):
     target_opening_m: float
     close_ready: bool
 
+    @staticmethod
+    def closure_is_ready(target, opening, speed):
+        return bool(target <= .045 and opening <= .045 and abs(speed) <= .005)
+
     def validate(self):
-        if self.schema_version != "pickcube-position-execution-info-v1":
+        if self.schema_version != self.schema_id:
             raise ValueError("unsupported PickCube Position execution info")
         values = (self.simulation_time, self.measured_opening_m,
                   self.measured_opening_velocity_m_s, self.target_opening_m)
@@ -1025,13 +1039,26 @@ class PickCubePositionExecutionInfoV1(Contract):
                 f"measured_opening_velocity_m_s={self.measured_opening_velocity_m_s!r}, "
                 f"target_opening_m={self.target_opening_m!r})"
             )
-        expected = bool(
-            self.target_opening_m <= 0.045
-            and self.measured_opening_m <= 0.045
-            and abs(self.measured_opening_velocity_m_s) <= 0.005
-        )
+        expected = self.closure_is_ready(self.target_opening_m, self.measured_opening_m,
+                                         self.measured_opening_velocity_m_s)
         if type(self.close_ready) is not bool or self.close_ready != expected:
             raise ValueError("PickCube close readiness must follow measured position/velocity only")
 
 
-__all__ += ["PickCubePositionExecutionInfoV1"]
+@dataclass(frozen=True)
+class PickCubePositionExecutionInfoV2(PickCubePositionExecutionInfoV1):
+    """A full close request has settled, allowing the Solution to try lifting.
+
+    An object can prevent zero opening. This is neither contact detection nor
+    grasp success: the Solution requires 50 ms of settled readback, and the
+    unchanged Task predicate still requires an actual 100 mm cube lift.
+    """
+
+    schema_id = "pickcube-position-execution-info-v2"
+
+    @staticmethod
+    def closure_is_ready(target, opening, speed):
+        return bool(target == 0. and opening < .08 and abs(speed) <= .005)
+
+
+__all__ += ["PickCubePositionExecutionInfoV1", "PickCubePositionExecutionInfoV2"]
