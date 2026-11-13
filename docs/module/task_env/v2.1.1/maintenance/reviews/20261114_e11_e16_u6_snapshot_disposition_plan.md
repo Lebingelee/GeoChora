@@ -23,3 +23,12 @@
 - 完成实际删除后才开展受影响的当前引用、包内独立读回、正式示例路径及保护 SHA/pins 的适当复核；不以物理重跑代替离线读回，也不自动进入 G06。所有结果、例外及维护者项目接收仍分别记录。
 
 只读预检、父目录属性快照及合成故障试验见[处置账本](20261113_e11_e16_u6_directory_disposition.md)。它们没有实现上述真实执行器，不作为一次性删除请求的充分依据。
+
+
+## 合成事务及日志对账原型
+
+在 ignored `snapshot-dedup-preparation/` 准备了仅供新建合成目录使用、无真实执行 CLI 的 [事务核心](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/transaction_core.py)和[只读日志对账原型](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/reconcile_transaction.py)。它们没有取得维护者删除授权，不建立真实 owner 独占、共享锁或 U5 执行期完整检查；marker 只是合成测试约定，不能视为安全隔离。
+
+独立审查先复现 `fchmod` 已生效时立即中断导致权限未恢复但记录成功的缺陷，已按实际 mode 恢复并重新核对；还复现日志对账中未开始目录 mode 变化未标冲突、无待处理 intent 却接受 `uncertain`、journal 跟随链接及 FIFO 打开阻塞等问题，均已补充拒绝或冲突分类和合成回归。最新固定版本独立运行 **18 项合成测试通过**；journal 本身通过调用方提供的目录 fd 以 no-follow、nonblocking 方式读取，仍须由最终调用方证明目录和日志来源可信。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-journal-reconciler-review.md)记有版本及限制。
+
+[两种 SIGKILL 合成演练](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/synthetic-transaction-crash-reconciled-v5.json)在写入 unlink 意图后分别于实际 unlink 前、后终止，日志对账均标为不确定，并在核对目录 inode／owner／mode 后由测试父进程手动恢复 mode；未回填文件或恢复 mtime。它不证明真实清理或断电可靠性，也不能将日志确认等同排除非合作写入。原快照和完整恢复副本未修改。真实执行器、进程／owner／引用排除、执行期对象核验及维护者具体授权仍 OPEN。
