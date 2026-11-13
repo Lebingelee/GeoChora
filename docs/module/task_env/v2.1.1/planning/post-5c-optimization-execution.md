@@ -129,8 +129,10 @@ task_env/diagnostics/tasks/test_selected_api_configuration_and_identity.py::test
 
 旧执行摘要可从 `b94e8625`、`3b5023e8` 的相应记录/账本恢复，更早逐批记录见 `69f4380e`。初始 `1f1359ee → 76536d2a` 的累计统计及 U1～U5 原始 native/失败记录保留在专用账本，不与本轮增量混算。COM 历史失败、R05c NOT_REQUALIFIED、Isaac shutdown 日志及未计数启动推进限制保留；本轮没有整理 refs、worktree 或原始证据。
 
-## 7. E05～E10 后续规划
+## 7. E05～E10 当前结果
 
-维护者统一接收 E00～E04 后，下一范围为 E05～E10。使用[专用剩余账本](post-5c-e05-e10-remaining-ledger.md)及[实施 Goal](post-5c-e05-e10-goal.md)，按 U1 source → U2 provider → U3 状态/相机 → U4 renderer → U5 Task → U6 Recorder/replay → U7 定向复验与对账推进。一次完整结束大单元后才对照总账相应条目；不再逐函数反复重评全部范围。
+维护者接收E00～E04后，E05～E10按[专用账本](post-5c-e05-e10-remaining-ledger.md)的U1～U7完成实施；[独立主审](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)逐点核对S01～S40，建议既定范围有界接收，最终维护者接收待确认。原[Goal](post-5c-e05-e10-goal.md)作为已执行提示保留，不重新开始规划/实施循环。
 
-本次核查输入 `67cb643f`、生产 `912416e6`，tracked clean、四保护输入和 pins 保全。仅静态核查、规划及直接状态索引同步，E05～E10 尚未实施，未运行 pytest/native/资产解析。完整 Solution 和完整同次记录读回仍归 E13；本次不清理输出、refs/worktree，不启动 G06。
+审查输入`d9dc02c6`、此前生产`91ebc9d6`；小修生产`7a098423`删除通用physical metadata的PickCube语义覆盖，3项回归证明声明及v3 H5投影保全。独立87项纯/fake/离线检查通过；2项真实source检查因资产守卫停止后，按31个一致SHA与原JUnit精准复用。GeoPhys/Isaac同次H5及最终PickCube一步重执行已独立读回；本次未运行native或安装资产构造，原始失败与更正保留。
+
+六事件实施性余项结束，E13完整Solution与全程记录读回保留；E11/E12全库治理及E14～E16项目接收仍未完成。四保护输入和pins保全；没有清理输出、refs/worktree或启动G06。

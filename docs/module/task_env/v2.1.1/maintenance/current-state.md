@@ -48,6 +48,6 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
 
-## 当前实施范围：E05～E10（本轮实施与对账待独立主审）
+## 当前实施范围：E05～E10（独立主审完成，待维护者接收）
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。独立主审和维护者接收尚待完成，E11～E16 尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)现已逐点核对 S01～S40，建议六事件按既定范围有界接收；主审小修生产 `7a098423` 删除 physical Recorder 的 PickCube 语义覆盖并验证声明保全。维护者最终接收待确认，E11～E16 尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。

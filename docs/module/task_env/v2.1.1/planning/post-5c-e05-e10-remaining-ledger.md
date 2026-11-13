@@ -1,8 +1,10 @@
 # E05～E10 剩余实施账本
 
-更新：2026-11-12。状态：`IMPLEMENTING_U1`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。实施的实时进度见第 13 节。
+更新：2026-11-13。状态：`INDEPENDENT_REVIEWED_BOUNDED_PENDING_MAINTAINER`。维护者已在本次对话**统一接收 E00～E04**。本账本承接[总台账](post-5c-code-project-optimization-diagnostic-ledger.md)，只细化 E05～E10；[实施 Goal](post-5c-e05-e10-goal.md)引用本页，不复制另一套检查点。实施的实时进度见第 13 节。
 
 ## 0. 结论与使用方式
+
+第 0～12 节保留 `67cb643f` 时的规划、职责要求和证据选择，不能再当作当前剩余缺陷；实施与独立主审已结束，当前结果以第 13 节及[主审报告](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)为准，维护者最终接收待确认。
 
 **E05～E10 均已有可复用实现，但尚不能按事件接收。主要欠账在 source／资产配方、provider 准入、状态／相机和 renderer 的职责归位；Task 在接收方生效后减责，Recorder 分开普通格式与历史实验 oracle。无需重做 E00～E04 的共同构建、生命周期和提交链。**
 
@@ -38,7 +40,7 @@
 | environment | 15 | 12,372 |
 | 版本诊断 v2.1.1 | 18 | 4,802 |
 
-目录按现有路径计量，含 `__init__`；Python 行含空行和注释，不能相加当成有效代码行。重要文件为 compiler 518、fixed_attachment 479、Runtime API 1,202、reference_env 4,393、selected_reference 207、Isaac native I/O 3,473、H5 1,823、Nut Solution 1,652 行。**这些是定位阅读负担的输入，不能设任意删行或文件数指标。**
+目录按现有路径计量，含 `__init__`；其中 task_env 总量于本次主审改用 NUL 路径统计，校正默认 Git 中文路径转义造成的 3 项漏计，原输入快照保留；Python 行含空行和注释，不能相加当成有效代码行。重要文件为 compiler 518、fixed_attachment 479、Runtime API 1,202、reference_env 4,393、selected_reference 207、Isaac native I/O 3,473、H5 1,823、Nut Solution 1,652 行。**这些是定位阅读负担的输入，不能设任意删行或文件数指标。**
 
 核查先用 CodeGraph；其 drift 文件再读磁盘源码、AST 和实际 caller。未导入生产模块、加载任务资产、运行 pytest／native／GPU／GUI。本页只对所列边界作静态判断，不声称已复现运行故障。[输入快照](../../../../../workspace/maintenance/v211_e05_e10_replan_20261112_001/input-snapshot.json)保存状态、pins、保护文件字节摘要和统计；[静态源码清单](../../../../../workspace/maintenance/v211_e05_e10_replan_20261112_001/static-source-inventory.json)保存符号定位。实施时以实际新 HEAD／dirty 冻结，不把此规划 HEAD 当执行身份。
 
@@ -237,14 +239,16 @@ E00～E04最终生产912416e6、217受影响source/caller检查、76纯/fake检�
 
 ## 13. 当前实施结果（唯一更新区）
 
-| 单元 | 状态 | 最终效果／提交／证据／未完成项 |
-| --- | --- | --- |
-| U1／S01～S06 | IMPLEMENTED | 输入 `5dd3d29a`，提交 `1a2bc947`；[实施结果、四任务调用、模式边界和证据](../maintenance/20261112_e05_e10_u1_source_delivery.md)。Scene、Robot 和 MJCF adapter 分别接收桌面、主体声明及物化；USD 路径按声明绑定；source snapshot 的创建与失败释放归编译 owner；两实体 attachment 与受限 Panda 资产 profile 分开，严格准入保留。三原生代表路线及 GeoPhys × MuJoCo RGB 按实际影响复验，具体范围见记录；本结果为实施者自评，E05 与整个优化尚未接收。 |
-| U2／S07～S12 | IMPLEMENTED | 输入 `1a2bc947`，提交 `73eebf37`；[实施结果、实际调用、证据和限制](../maintenance/20261112_e05_e10_u2_provider_delivery.md)。精确 USD／Panda 准入归相应 provider owner，GeoPhys solver 配置归 provider bootstrap，isolated Isaac App 由 worker/provider 管理；最终隔离短程、GeoPhys 和 MuJoCo 代表路线及定向故障检查已覆盖受影响边界。GeoPhys 使用固定 pin 已有的公开初始化 facade，原缺口判断已更正；旧 SDK 日志及第 11 节所记启动预算偏差保留；本结果为实施者自评，E06 和整个优化尚未接收。 |
-| U3／S13～S18 | IMPLEMENTED | 输入 `73eebf37`，提交 `ff5309d0`；[实施结果、字段来源、证据与限制](../maintenance/20261112_e05_e10_u3_observation_delivery.md)。Robot 与 Task 拥有各自投影，renderer 在 adapter 声明状态需求；四任务 schema、非 Position RGB 和跨 provider reset 已定向复验。光学 readback、重复 render、Isaac 采集与 Recorder metadata 分别留 U4/U6/U7；结果为实施者自评，E07/E08 尚未接收。 |
-| U4／S19～S25 | IMPLEMENTED | 输入 `ff5309d0`，提交 `1ce601fa`；[实施结果、真实采集与窗口证据](../maintenance/20261112_e05_e10_u4_renderer_delivery.md)。renderer capability 与 factory 对齐，Isaac task/observer 请求和故障分离，展示与相机输入走公开合同；三家原生及 cross 路线分别按影响复验。U3 简单任务附加 RGB schema 遗漏已修复，设备限制及先前失败保留；S19 后续将 observer 准入统一至 Robot 能力与 renderer 合同并接入真实 factory；42 组纯配置对照及三条受影响原生路线见[后续结果](../maintenance/20261113_e05_e10_u7_delivery.md#s19observer-准入与物理状态采集2026-11-13)；结果为实施者自评，E08 尚未接收。 |
-| U5／S26～S30 | IMPLEMENTED | 输入 `1ce601fa`，初始提交 `5cb0d470`；[最终效果、四任务调用和证据](../maintenance/20261113_e05_e10_u7_delivery.md)。PickCube Task 声明任务及 readiness，source adapter 实际编译与组合 MJCF／USD、绑定 Controller 并交付 Runtime，source inventory 由 Task、资产、Robot 和 provider owner 提供；Nut 通用 feedback／guard 归公共 owner，严格任务策略保留。S26～S30 按受测范围实施完成；独立主审及维护者接收待完成。 |
-| U6／S31～S36 | IMPLEMENTED | 输入 `5cb0d470`，提交 `f83c0601`；[实施结果与证据](../maintenance/20261113_e05_e10_u6_recording_delivery.md)。旧 Judge 与 codec 分层、只读 inspect；Pendulum 和双轮车进入 v3 物理记录，Pendulum 同次状态／动作／clock／RGB／outcome 已独立读回。图片字节没有独立摘要；GeoPhys／Isaac 受影响路线与最终对账留 U7。本结果为实施者自评。 |
-| U7／S37～S40 | IMPLEMENTED | [六事件实施者结果、证据和限制](../maintenance/20261113_e05_e10_u7_delivery.md)已按最终影响对账，S19 与 S27 的受测缺口已补；独立主审及维护者接收待完成，完整 Solution 留 E13，E11～E16 未提前关闭。 |
+独立主审输入 `d9dc02c6`（此前生产 `91ebc9d6`），本次小修生产 `7a098423`；[逐项主审与证据](../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)已核对 S01～S40。六事件具备既定范围的有界接收条件；**维护者最终接收仍待确认**。原[实施者结果](../maintenance/20261113_e05_e10_u7_delivery.md)及 U1～U6 报告保留各自时点。
 
-每行最终结果可链接一份按模块压缩的实现摘要及机器可复核证据；S格的最终owner/判断可放同一摘要的40行表，不另建40份报告。没有对应最终调用与证据的格子仍为OPEN。
+| 单元 | 状态 | 最终效果／证据／边界 |
+| --- | --- | --- |
+| U1／S01～S06 | REVIEWED_BOUNDED | Scene、Robot、source lowerer与资产profile实际接收；compiler退出Empty/Panda配方，intent/最终writer映射和lease保全；add仍未实现，合法MJCF/USD差异保留。 |
+| U2／S07～S12 | REVIEWED_BOUNDED | 精确准入归provider，GeoPhys公开初始化/assembly和worker/App职责生效；故障清理和代表原生证据齐备，旧启动预算偏差和未知隐式步保留。 |
+| U3／S13～S18 | REVIEWED_BOUNDED | Robot/Task投影和共同schema、延迟camera绑定、独立renderer publication真实接通；非Position与四任务边界已对账，不扩大sensor/mount。 |
+| U4／S19～S25 | REVIEWED_BOUNDED | capability关联真实factory，native设置退出Env，task/observer局部故障和资源owner分开；三原生与cross、重复render及窗口证据按影响保留。 |
+| U5／S26～S30 | REVIEWED_BOUNDED | Task/source阶段与Runtime交接有实际caller；candidate未恢复；Nut公共guard/interval与任务严格策略分层。Task减少不等于项目净删码，完整Nut Solution留E13。 |
+| U6／S31～S36 | REVIEWED_BOUNDED | 普通H5/历史codec/严格Judge/replay分层及非Panda同次记录成立；`7a098423`删除通用metadata的PickCube语义覆盖，声明经H5投影保留，3项回归通过。 |
+| U7／S37～S40 | REVIEWED_BOUNDED | 40项逐点主审、独立87项纯/fake/离线检查和额外H5读回完成；2项真实source检查凭31个一致SHA及原JUnit精准复用。当前索引/Goal/Skill已同步；本次无新native，最终维护者接收pending。 |
+
+本次原始计划、失败、更正、哈希对照和结果在[主审输出](../../../../../workspace/maintenance/v211_e05_e10_independent_review_20261113_001/input-snapshot.json)。实施性余项结束，不另建40份报告；完整Solution及全程V09、E11～E16、G06/G07和整个代码/项目优化仍按原矩阵处理。
