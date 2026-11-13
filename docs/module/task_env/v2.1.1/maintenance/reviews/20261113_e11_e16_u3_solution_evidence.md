@@ -1,5 +1,7 @@
 # E11–E16 U3：完整 Solution 实施结果与开放边界
 
+后续状态：下文保留本记录提交时的失败与 OPEN 判断；`0506ae26` 后 Isaac `solution-002` 完成，维护者已明确本轮联合证据口径。五路字段三态及独立离线关联见[U4 联合证据](20261113_e11_e16_u4_joint_completion.md)，不改变下文原运行及其历史结果。
+
 状态：执行及修复已记录，T19 的 completion 记录边界、T20 最终对账和整体接收仍 OPEN；非独立主审或维护者接收。输入 HEAD `1ff617d0c441ea7968c90f23b1bdb027ae5b65d8`；输出 HEAD 为本记录所在提交。原始计划、锁与资源采样、stdout/stderr、H5 和独立读回位于 ignored `workspace/maintenance/v211_e11_e16_u3_20261113_001/`，由 `u3-intermediate.json` 索引；不把数据写入 Git。运行使用含未提交修复的工作树，不能声称全部记录来自干净提交。PickCube 的 Solution 源 SHA 为 `603a339a1ded6c26fb1d53746a18b75196433edc472e78f90534906d71977c07`；实际命令、其余源码身份和限制见各 plan。
 
 | 检查点 | 实施结果 / 未决 owner |

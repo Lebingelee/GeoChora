@@ -48,14 +48,14 @@
 | REN-08 通用相机交互数学直接依赖 Taichi 输入常量 | camera 数学／UI adapter | 相机数学不强制顶层 Taichi；UI 输入常量由 UI 层提供 | `render.tools.camera` → `InteractiveCameraController` | E05–E10 S24；U1 import/fake tests | 有界自评；待主审 |
 | OBS-01 名为 selected-reference 的公共投影仍以 Panda／PickCube 为默认 | Robot／Task observation projection | Robot 提供主体字段，Task 提供物体字段；不将 Panda 强加简单主体 | `selected_reference` → declared Robot/Task observation | E05–E10 S13/S14；四任务受测 schema | 有界自评；待主审 |
 | OBS-02 多种相机配置／schema 需要一处规范化，不凭空宣布全部统一 | CameraSpec／canonical geometry／capture | 复用延迟绑定及 schema 校验；未宣称所有 camera 格式统一 | `CameraSpec` → task RGB capability → capture | E05–E10 S16–S18；U1 metadata tests | 有界自评；sensor/mount 不扩展 |
-| REC-01 通用 H5 模块混入精确诊断实验的物理拓扑和样本数 | 通用 H5／legacy codec／版本 Judge | 通用 v3、历史 leaf codec 与严格实验 Judge 分层；历史判据保留 | `load_structured_control_records_h5`／`load_legacy_leaf_control_h5` | E05–E10 S31/S32；U1 offline H5 | 有界自评；U3 T19 completion OPEN |
+| REC-01 通用 H5 模块混入精确诊断实验的物理拓扑和样本数 | 通用 H5／legacy codec／版本 Judge | 通用 v3、历史 leaf codec 与严格实验 Judge 分层；历史判据保留 | `load_structured_control_records_h5`／`load_legacy_leaf_control_h5` | E05–E10 S31/S32；U1 offline H5；五路联合证据 | 有界自评；completion 非 H5 单文件自含，待独立复审 |
 | REC-02 静态 provenance 复用已有改进，避免每步文件 I/O 回流 | reference provenance／source snapshot | 复用静态 source/provenance 缓存，避免把逐步文件 I/O 重新引入 | `begin_selected_recording` → `selected_source_provenance` | E05–E10 S34；原 Nut 5 次 source 读 | 有界自评；不声称跨 reset 缓存 |
 | REC-03 回放／重新执行与正常新运行的身份策略必须区别 | replay inspect／selected re-execution | 离线 inspect 不建 Env；重执行先核 source identity，拒绝不支持 schema | `inspect_selected_replay`／`reexecute_selected` | E05–E10 S35；同源码一步结果 | 有界自评；非 D0、非跨源码重放 |
 | CALL-01 CLI／教程／示例仍可能把复杂候选入口教给用户 | CLI／examples／completion projection | 正式配置及 caller-owned Solution；显式 backend 失败不转换为另一交集 | `examples/tasks/pick_cube.py`／`script/env/_common.py` → `make_env` | U2 T08–T10；U3 五条运行 | 实施自评；独立主审待完成 |
 | CALL-02 vector／learner／LIBERO 等不能被标量整理顺手破坏 | vectorization／learner adapters | 四正式 UID 提前拒绝未支持 batch；component 保留，space 与 autoreset 按 fake 合同检查 | `make_framework_parallel_spec`／SB3 adapter／learner data | U2 T11/T12；`test_batch_boundaries.py`／`test_learner_boundaries.py` | 实施自评；不声称 native batch 或训练 |
 | CALL-03 objects／planners／reporter／utils 按职责保留，不为凑“全面重构”制造抽象 | objects／planners／reporter／utils | 保留有真实 caller 的各自职责；未发现需抽象化的本轮缺陷 | `make_object`、`CanonicalSolutionLifecycle`、`ReporterSession`、`tree_copy` | U2 T14；lifecycle/reporter/vector fake checks | 实施自评；待主审 |
 | CALL-04 LIBERO benchmark 的来源语义不能被主任务整理误覆盖 | LIBERO source／OSC／trajectory | 保持原任务和 20 Hz／2 ms ×25 cadence；只核受影响 Core 交接 | `bench_deploy.libero` selected environment → OSC → worker/reader | U2 T13；两个历史 H5 95/96、103/104 | 有界自评；历史 task success 均 false |
-| TEST-01 旧测试文件不是纯度／授权范围的可靠边界 | 版本 diagnostics／guard | 精确节点分纯/fake、离线、真实 source 与 native；不把文件名当授权 | `run_pure_checks.py` → 固定 pytest 节点 | U1 claim 表；U3 guarded 223 | 实施自评；guard 非 OS sandbox |
+| TEST-01 旧测试文件不是纯度／授权范围的可靠边界 | 版本 diagnostics／guard | 精确节点分纯/fake、离线、真实 source 与 native；不把文件名当授权 | `run_pure_checks.py` → 固定 pytest 节点 | U1 claim 表；0506ae26 guarded 240 | 实施自评；guard 非 OS sandbox |
 | TEST-02 测试不能把旧候选布局定义为新架构的正确性 | 现行 diagnostics／历史 fixtures | 迁移仍有产品意义的检测器；退役候选不作为产品正确性条件 | `test_solution_compatibility.py`／legacy reader tests | U1 claim/owner 表与旧 oracle 去向 | 实施自评；不复活 candidate |
 | TEST-03 生产诊断探针应归位，但正式证据接口不应一起删除 | 诊断 probe／provider admission／codec | 实验 probe 与产品合法准入、readback、历史 codec 分层保留 | `legacy_leaf_judge.py`／`load_legacy_leaf_control_h5`／provider admission | E05–E10 S07/S08/S32；U1 分类 | 有界自评；不机械删除 F05 |
 | TEST-04 测试和报告必须能复核，文件数量不代表证据强度 | 版本诊断／最终证据包 owner | 读回与关联明确数据身份；最终五 stage 证据迁移与复算未完成 | `associate_solution_record.py`／U5 独立 reader | U3 同次读回；U5 T29–T34 | 代码证据自评；证据归并 OPEN |
@@ -72,12 +72,12 @@
 | V01 | U3 映射：正式配置及 mapping/YAML 等价；不外推任意组合。 |
 | V02 | U3 映射：四主体与装配按各自原生输入或本轮完整运行关联；旧输入不冒称本轮重跑。 |
 | V03 | U3 映射：Position／effort、双 writer 和 fault 按受影响范围复用；不扩大所有控制组合。 |
-| V04 | U3 映射：borrowed／独立 renderer 和非 Position 按原输入复用；没有新像素资格。 |
-| V05 | U3 映射：三原生和 GeoPhys physics × MuJoCo renderer 的原始去向及各自限制。 |
-| V06 | U3 映射：reset、step、再次 reset、采图和 close 的有界原始结果；本轮 fake 另列。 |
+| V04 | 原 borrowed／独立 renderer 和非 Position 按原输入及影响复用；0506ae26 新增 Isaac 移动腕部挂载，专项证据见[返工报告](20261113_isaac_gripper_rework_ef10e348.md)，不外推其他 provider。 |
+| V05 | 三原生和 GeoPhys physics × MuJoCo renderer 保留各自原始输入；Isaac 腕部 RGB 为单独的受控物理对照，未新增通用像素资格。 |
+| V06 | 原 reset、step、再 reset、采图和 close 按实际影响复用；新增 Isaac 腕部对照及其同次 close，240 项 guarded pure/fake 另列。 |
 | V07 | U3 映射：source／资源／stale／fault 及旧入口按精确节点与历史 oracle 复用。 |
-| V08 | U3 五条单 seed 完整尝试；两项 MuJoCo 均成功，Isaac 任务／Solution 失败。 |
-| V09 | U3 同次 H5 的独立读回及 caller 报告关联；Isaac v3 completion 缺失仍为 T19 OPEN。 |
+| V08 | 四条 CPU 原完整运行和 Isaac `solution-002` 均任务成功、caller 报告 Solution 完成；各自冻结源码与配置。旧 Isaac 1000 步失败作为历史保留。 |
+| V09 | [五路同次联合证据](20261113_e11_e16_u4_joint_completion.md)：四条 canonical 文件缺 completion 字段，新 Isaac v3 字段为 null；独立 H5 读回与同次 caller／监督事实联合，不声称 H5 单文件完成证明。 |
 | V10 | 当前文档／示例和能力矩阵正在更新；原 2 项基线错误中的退休源码引用已改为精确历史 Git 来源。历史源码行号误报修复后，docs validator 现有 1 项保护文件 hash 错误及 79 个历史链接问题；逐项归属见 U4 实施记录。五 stage 归并、项目清理、恢复与维护者接收尚 OPEN。 |
 
-V01–V09 的命令、输入、证据入口与限制见 U3；每项仍需独立主审。`OPEN` 不构成 N/A、延期或维护者同意。
+V01–V09 的原命令、输入与限制见 U3；0506ae26 的受影响路径及联合证据见上述补充，待独立复审。`OPEN` 不构成 N/A、延期或维护者同意。

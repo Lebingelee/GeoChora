@@ -516,7 +516,7 @@
   "publication_claim": false,
   "current_state_ref": "../maintenance/current-state.md",
   "evidence_reconciliation": {
-    "status": "IN_PROGRESS_REVIEW_PENDING",
+    "status": "U4_CODE_ACCEPTED_U5_PENDING",
     "date": "2026-11-13",
     "planning_snapshot_date": "2026-11-03",
     "execution_ref": "../planning/post-5c-e11-e16-remaining-ledger.md",
@@ -532,7 +532,7 @@
     "meaning": "Frozen planning snapshot from 2026-11-03; NOT_RUN cells are final G07 goals, not statements that no earlier bounded evidence exists. Do not rewrite historical results."
   },
   "current_support": {
-    "status": "IMPLEMENTATION_REVIEW_PENDING",
+    "status": "MAINTAINER_ACCEPTED_BOUNDED_U4_CODE",
     "accepted_scope": "G01–G05 and E00–E10 accepted within their documented historical bounds; U3 evidence is implementation self-assessment pending independent review and maintainer decision.",
     "source_of_history": "../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
     "configuration_and_formal_tasks": [
@@ -541,10 +541,10 @@
       "pendulum-v1",
       "two-wheel-balance-v1"
     ],
-    "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped.",
+    "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification.",
     "batch_scope": "Four formal task UIDs explicitly reject unsupported formal batch before resource allocation; G06 is not implemented or accepted.",
     "g07_scope": "Three providers × three seeds remains an unrun final gate; these single-seed records do not fill final_pickcube_cells.",
-    "record_completion_scope": "H5 observations and caller-owned completion are checked separately. Isaac v3 Outcome solution_completed is absent; T19 remains OPEN.",
+    "record_completion_scope": "Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance.",
     "complete_solution_intersections": [
       {
         "id": "pick-mujoco-r1",
@@ -679,12 +679,12 @@
         "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim"
       },
       {
-        "id": "pick-isaac-r3",
+        "id": "pick-isaac-solution-002",
         "task_uid": "pick-cube-p16-reference-v1",
         "source_kind": "installed USD delivery",
         "task_artifact_sha256": "124b4ea126ce8061422de37f8dc7a291374863bbd039422e98602a9345625394",
         "controller_identity": "f2820d59aa2148b43ee9eacd0b95b986adca0e07395f32bba8c318f93be5c34a",
-        "solution_identity": "1eccb772d274ee372cdeaf4d044656630d6959ab8574565f43febebea76e2e80",
+        "solution_identity": "c000f7053ad76d916734505e7aae8a9f5c9d4b168568f32cea46031d701a1821",
         "provider": "isaacsim",
         "backend": "cuda",
         "device": "cuda:0",
@@ -696,20 +696,20 @@
         "control_dt_s": 0.01,
         "controller_profile": "r3_continuous_v1",
         "runtime_valid": true,
-        "task_success": false,
-        "solution_complete_from_caller": false,
-        "completion_eligible_from_caller": false,
+        "task_success": true,
+        "solution_complete_from_caller": true,
+        "completion_eligible_from_caller": true,
         "record_readback_valid": true,
-        "transitions": 1000,
-        "boundaries": 1001,
-        "record_sha256": "3f163081760f6ad8a49abb593c6a1266dc47f20bd72751bf49e5bd1e30951d48",
+        "transitions": 951,
+        "boundaries": 952,
+        "record_sha256": "95add33866ad97627ad0deb6e44fc53cae75aa2fcadb80ec59c28781387d92f4",
         "env_close_from_caller": true,
-        "app_close": "caller reports close succeeded; worker close follows transport path; full SDK shutdown log not independently established",
-        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
-        "plan_sha256": "76e75ff15035938d373ecda22c432d615cac3d594cda3dc5639875e66b285ac1",
-        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
-        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/pick-isaac-r3",
-        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim; v3 Outcome completion absent; review open"
+        "app_close": "native IO, USD lease and App close completed in same-run receipt; SDK implicit startup/reset advances unknown",
+        "source_revision": "ef10e3480b894b65a291b21f839c718549a45798 plus frozen working-tree source SHA in plan; later committed as 0506ae26",
+        "plan_sha256": "2d91cad33af8f222e41f03488e19b735e839d8b089cf96a0909c9dba942354e1",
+        "evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md",
+        "raw_directory": "workspace/maintenance/v211_isaac_gripper_rework_20261113_001/solution-002",
+        "limitations": "single seed, state-only formal Solution; completion from same-run caller, H5 outcome solution_completed null and external_stop/truncated projection; no D0 or qualification; bounded independent review and maintainer-authorized acceptance"
       }
     ],
     "historical_bounded_short_routes": [
@@ -762,6 +762,42 @@
         "plan": "workspace/maintenance/v211_e05_e10_u7_20261113_001/isaac-record-retry/plan.json",
         "plan_sha256": "76debafe4f3129e456998104b620f39d4bcf3c671e4ccc64993f23dedf7b2041"
       }
-    ]
+    ],
+    "historical_solution_diagnostics": [
+      {
+        "id": "pick-isaac-r3",
+        "task_uid": "pick-cube-p16-reference-v1",
+        "source_kind": "installed USD delivery",
+        "task_artifact_sha256": "124b4ea126ce8061422de37f8dc7a291374863bbd039422e98602a9345625394",
+        "controller_identity": "f2820d59aa2148b43ee9eacd0b95b986adca0e07395f32bba8c318f93be5c34a",
+        "solution_identity": "1eccb772d274ee372cdeaf4d044656630d6959ab8574565f43febebea76e2e80",
+        "provider": "isaacsim",
+        "backend": "cuda",
+        "device": "cuda:0",
+        "renderer": "none",
+        "task_rgb": "not recorded",
+        "batch_mode": "scalar",
+        "seed": 31,
+        "horizon": 1000,
+        "control_dt_s": 0.01,
+        "controller_profile": "r3_continuous_v1",
+        "runtime_valid": true,
+        "task_success": false,
+        "solution_complete_from_caller": false,
+        "completion_eligible_from_caller": false,
+        "record_readback_valid": true,
+        "transitions": 1000,
+        "boundaries": 1001,
+        "record_sha256": "3f163081760f6ad8a49abb593c6a1266dc47f20bd72751bf49e5bd1e30951d48",
+        "env_close_from_caller": true,
+        "app_close": "caller reports close succeeded; worker close follows transport path; full SDK shutdown log not independently established",
+        "source_revision": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8 (dirty working tree; frozen source hashes in plan)",
+        "plan_sha256": "76e75ff15035938d373ecda22c432d615cac3d594cda3dc5639875e66b285ac1",
+        "evidence": "../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "raw_directory": "workspace/maintenance/v211_e11_e16_u3_20261113_001/pick-isaac-r3",
+        "limitations": "single seed; state only; completion is from caller report, not inferred from H5; no D0 or qualification claim; v3 Outcome completion absent; review open"
+      }
+    ],
+    "frame_mounted_camera_evidence": "../maintenance/reviews/20261113_isaac_gripper_rework_ef10e348.md"
   }
 }
