@@ -8,6 +8,12 @@
 
 历史路径中已有的诊断耦合不因本规范自动变为合规，本轮不立即迁移；按[v2.1.1收尾安排](../../docs/module/task_env/v2.1.1/planning/pre-stage3-environment-refactor.md#diagnostic-policy-and-final-cleanup)登记并在版本集成前集中分类处理。下文保留现有入口及历史说明，不表示所有模块已完成解耦。
 
+## v2.1.1 current diagnostic selection
+
+See the [v2.1.1 claim and input map](tasks/v2.1.1/README.md) for the guarded
+pure/fake entry, offline historical records, and explicit source/native limits.
+The inventory is still in progress; unlisted nodes are not automatically pure.
+
 ## Static-template diagnostics
 
 Stage A contact precision profiling, the Stage G precision gate, and the

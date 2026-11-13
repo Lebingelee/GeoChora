@@ -443,13 +443,25 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
         replace(value['source'], position_subject_plan=foreign_plan)
 
 
-def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema():
+def test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema(monkeypatch):
+    import builtins
     from task_env.runtime.sessions.api import _session_admission_input_route
     from task_env.runtime.sessions.source import UsdRuntimeInputV1
 
+    original_import = builtins.__import__
+    def reject_retired_candidate(name, *args, **kwargs):
+        if 'position_candidate' in name:
+            pytest.fail('formal admission imported a retired candidate')
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, '__import__', reject_retired_candidate)
     value = object.__new__(UsdRuntimeInputV1)
     object.__setattr__(value, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
     assert _session_admission_input_route(value) == 'f06_pickcube'
+    subclass = type('UnsupportedRuntimeInput', (UsdRuntimeInputV1,), {})
+    other = object.__new__(subclass)
+    object.__setattr__(other, 'schema_version', 'pick-cube-isaac-runtime-input-v1')
+    with pytest.raises(TypeError, match='exact supported task runtime input'):
+        _session_admission_input_route(other)
     object.__setattr__(value, 'schema_version', 'old-position-input-v1')
     with pytest.raises(TypeError, match='exact supported task runtime input'):
         _session_admission_input_route(value)

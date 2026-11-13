@@ -5,7 +5,7 @@ from task_env.artifacts.state import CanonicalStateViewV2, TypedJointStateValue
 from task_env.controllers.canonical.effort_servo import JointReferenceEffortControllerV1, JointReferenceEffortProfileV1
 from task_env.controllers.canonical.model import AffineJointBiasModelV1, ControllerModelRequirementV1
 from task_env.runtime.sessions.physical_control import compile_physical_control_binding, prepare_physical_command_batch
-from task_env.diagnostics.tasks.test_v211_physical_control_contract import _case, _joint_receipt
+from task_env.diagnostics.tasks.physical_contract_fixtures import _case, _joint_receipt
 
 
 def make_case():

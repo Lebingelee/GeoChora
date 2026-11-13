@@ -33,80 +33,12 @@ from task_env.artifacts import (
 )
 
 
+from task_env.diagnostics.tasks.physical_contract_fixtures import (
+    IDENTITY, SHARED_ASSET, _asset, _entity, _scene_v3, _pin, _entity_member,
+    _sub, _nested, _assembly, _primary_closure,
+)
+
 ROOT = Path(__file__).resolve().parents[3]
-IDENTITY = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
-SHARED_ASSET = "robot/shared"
-
-
-def _asset(asset_id=SHARED_ASSET, *, version="v1", source_revision=None):
-    return AssetDefinition(
-        "asset-definition-v1",
-        asset_id,
-        version,
-        f"procedural://example/{asset_id}",
-        source_revision=source_revision,
-    )
-
-
-def _entity(entity_id, asset_id=SHARED_ASSET, *, version="v1"):
-    return EntityInstance("entity-instance-v1", entity_id, asset_id, version)
-
-
-def _scene_v3(*, source_revision=None):
-    entities = (_entity("arm"), _entity("hand"))
-    frames = tuple(
-        FrameDefinition("frame-definition-v1", entity.entity_id, frame_id, "runtime", None, None)
-        for entity in entities
-        for frame_id in ("base", "tool")
-    )
-    articulations = tuple(
-        ArticulationDefinition(
-            "articulation-definition-v1",
-            entity.entity_id,
-            "base",
-            ("base", "tool"),
-            (JointDefinition(
-                "joint-definition-v1",
-                "drive",
-                FrameReference(entity.entity_id, "base"),
-                FrameReference(entity.entity_id, "tool"),
-                IDENTITY,
-                IDENTITY,
-                "revolute",
-                (0.0, 0.0, 1.0),
-                "radian",
-                "radian_per_second",
-                1,
-                1,
-            ),),
-        )
-        for entity in entities
-    )
-    actuators = (
-        ActuatorResourceDefinition("actuator-resource-v1", "arm", "drive"),
-        ActuatorResourceDefinition("actuator-resource-v1", "arm", "gripper"),
-        ActuatorResourceDefinition("actuator-resource-v1", "hand", "drive"),
-    )
-    groups = (
-        ControlGroup("control-group-v1", "arm", "arm-main", (ActuatorReference("arm", "drive"),)),
-        ControlGroup("control-group-v1", "arm", "arm-hand", (ActuatorReference("arm", "gripper"),)),
-        ControlGroup("control-group-v1", "hand", "hand-main", (ActuatorReference("hand", "drive"),)),
-    )
-    robots = tuple(
-        RobotInstance("robot-instance-v1", entity.entity_id, (FrameReference(entity.entity_id, "base"),))
-        for entity in entities
-    )
-    return SceneDefinition(
-        "scene-definition-v3",
-        "scene-main",
-        (_asset(source_revision=source_revision),),
-        entities,
-        frames,
-        articulations,
-        robots,
-        actuators,
-        groups,
-    )
 
 
 def _scene_v2():
@@ -135,67 +67,6 @@ def _scene_v1(*, entity_ids=("arm",)):
         (_asset(),),
         tuple(_entity(entity_id) for entity_id in entity_ids),
     )
-
-
-def _pin(scene):
-    return LogicalAssemblyScenePinV1(
-        "logical-assembly-scene-pin-v1",
-        scene.scene_id,
-        scene.schema_version,
-        scene.identity_hash,
-    )
-
-
-def _entity_member(entity_id, *, path=None, asset_id=SHARED_ASSET, asset_version="v1"):
-    return LogicalAssemblyEntityMemberV1(
-        "entity_member", path or (f"owner-{entity_id}",), entity_id, asset_id, asset_version
-    )
-
-
-def _sub(path, target, target_kind):
-    return LogicalAssemblySubcomponentReferenceV1(
-        "existing_entity_subcomponent_ref", tuple(path), target_kind, target
-    )
-
-
-def _nested(path, child, *, digest=None):
-    return LogicalAssemblyNestedMemberV1(
-        "nested_assembly",
-        tuple(path),
-        child.assembly_id,
-        child.revision,
-        child.logical_content_sha256 if digest is None else digest,
-    )
-
-
-def _assembly(scene, assembly_id, members=(), *, revision="r1", scene_pin=None):
-    return LogicalAssemblyV1(
-        "logical-assembly-v1", assembly_id, revision, scene_pin or _pin(scene), tuple(members)
-    )
-
-
-def _primary_closure(scene=None):
-    scene = scene or _scene_v3()
-    arm = _assembly(scene, "arm-leaf", (_entity_member("arm", path=("owner", "arm")),))
-    hand = _assembly(scene, "hand-leaf", (_entity_member("hand", path=("owner", "hand")),))
-    branch = _assembly(scene, "robot-branch", (
-        _nested(("arm",), arm),
-        _nested(("hand",), hand),
-        _sub(("arm-base-view",), FrameReference("arm", "base"), "frame"),
-        _sub(("arm-tool-view",), FrameReference("arm", "tool"), "frame"),
-        _sub(("arm-drive-joint",), JointReference("arm", "drive"), "joint"),
-        _sub(("arm-drive-actuator",), ActuatorReference("arm", "drive"), "actuator"),
-        _sub(("arm-main-group",), LogicalAssemblyControlGroupReferenceV1("arm", "arm-main"), "control_group"),
-        _sub(("arm-hand-group",), LogicalAssemblyControlGroupReferenceV1("arm", "arm-hand"), "control_group"),
-        # This reference is read-only and points at the separately owned sibling hand leaf.
-        _sub(("hand-group-view",), LogicalAssemblyControlGroupReferenceV1("hand", "hand-main"), "control_group"),
-    ))
-    root = _assembly(scene, "robot-root", (_nested(("robot",), branch),))
-    return root, branch, arm, hand, {
-        (branch.assembly_id, branch.revision): branch,
-        (arm.assembly_id, arm.revision): arm,
-        (hand.assembly_id, hand.revision): hand,
-    }
 
 
 def test_multilevel_resolution_preserves_typed_refs_sibling_views_and_distinct_entities(monkeypatch):

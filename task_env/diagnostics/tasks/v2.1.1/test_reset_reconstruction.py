@@ -199,6 +199,31 @@ def test_failed_reset_retains_previous_runtime_owner_until_env_close(monkeypatch
     assert events == ['session', 'session', 'owner']
 
 
+def test_physical_reset_preflight_failure_keeps_existing_session(monkeypatch):
+    from task_env.environment import reference_binding
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    events = []
+    def reject(**kwargs):
+        events.append(('preflight', kwargs['provider'], kwargs['backend']))
+        raise ValueError('source capability rejected')
+    profile = SimpleNamespace(preflight=reject)
+    previous = object()
+    state = SimpleNamespace(fault=None, require_open=lambda message: None)
+    env = SimpleNamespace(
+        _episode_execution_state=lambda: state, _task_rgb_config=None,
+        _physical_reset_selection=None, _physical_execution=lambda: profile,
+        provider='mujoco', backend='cpu', artifact=object(), session=previous,
+        value={'physical_execution': profile, 'source': object()},
+    )
+    monkeypatch.setattr(reference_binding, 'prepare_selected_reset',
+                        lambda *args, **kwargs: pytest.fail('reset preparation started'))
+    with pytest.raises(ValueError, match='source capability rejected'):
+        SelectedReferenceEnv._prepare_reference_reset(env, seed=31)
+    assert events == [('preflight', 'mujoco', 'cpu')]
+    assert env.session is previous
+
+
 @pytest.mark.parametrize('requested_seed', [None, 47])
 def test_rejected_reset_preflight_preserves_task_rng(requested_seed):
     from copy import deepcopy

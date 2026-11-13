@@ -233,13 +233,21 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 
 | 单元 | 状态 | 最终效果／提交／验证／限制 |
 | --- | --- | --- |
-| U1 T01～T07 | NOT_STARTED | 待实施 |
+| U1 T01～T07 | SELF_ASSESSED_COMPLETE | 版本诊断入口、历史去向及证据依赖见[诊断 claim/owner 表](../../../../../task_env/diagnostics/tasks/v2.1.1/README.md)；本行所在提交为输出 HEAD。TEST-04 最终证据归并仍归 U5；代码整体独立主审及维护者接收不由本单元自封。 |
 | U2 T08～T14 | NOT_STARTED | 待实施 |
 | U3 T15～T21 | NOT_STARTED | 待实施；完整Solution门未由短程覆盖 |
 | U4 T22～T28 | NOT_STARTED | 待代码独立主审及维护者接收 |
 | U5 T29～T34 | NOT_STARTED | 待最终证据归并与独立复算，不删除原件 |
 | U6 T35～T38 | NOT_STARTED | 待具体清单、保全及处置授权 |
 | U7 T39～T44 | NOT_STARTED | 待安全移除、恢复核查及项目接收 |
+
+### U1 结果（2026-11-13，实施自评）
+
+输入 HEAD `cd486aff5ce6b5d0bcdc6561529b5c6c388efc22`；输出为本结果所在提交。T01～T07 在本单元按以下范围 PASS：T01 按版本文件及精确 node 区分纯/fake、离线 H5、真实 source、CPU、GPU/App 和窗口；T02 纯入口 fresh-process 守卫及子进程 canary，错误选择原生节点拒绝；T03 对规划盘点的 34 个旧引用文件列出历史／当前去向，保留历史 Judge、codec 与原结果；T04 保留 provider 准入、可选 compiled readback、fixed attachment receipt 与 typed fault，465 个非诊断生产 Python 文件的直接、相对及字面量动态 import 静态检查未见反向依赖；T05 迁移有当前职责的物理、相机、effort、主体及自由关节检查，旧 candidate 与旧 reset fake 明列历史；T06 冻结两份历史 H5 和四份当前短程 H5 路径、大小及 SHA-256，U5/U6 负责复算与重定位；T07 完成定向验证与本地提交。未列入固定入口的混合模块不是纯测试；历史旧功能不因当前表格被重建或扩大认证。总账回核：TEST-01/02 的本单元诊断分层与 claim 已覆盖；TEST-03 复用已接收的 S04/S32 迁移并核对当前 owner，本轮无新的越权生产实现需迁；TEST-04 的五 stage 最终证据闭包仍 OPEN，归 U5/U6。
+
+固定纯/fake 入口 132 PASS；R02c/R03c 离线读回和复制品篡改 25 PASS；四份显式一 interval 记录的离线读回／篡改 8 PASS。`strace` 验证所测纯集无成功打开受守卫的资产／SDK 路径，旧 H5 和当前 H5 原件分别只读；守卫并非 OS sandbox，`-I/-S` 和其他外部目录不在其声明内。旧 R01b 文档示例节点因输入 HEAD 已缺原标题而失败，列 U4 文档历史归属；不得称全部历史测试通过。文档 validator 保持基线 2 errors/96 历史链接问题，新增错误 0。未运行 source/native/App/window；没有生产代码变化，COM 原严格 FAIL/有界采纳不变。原始命令和跟踪文件在 [本单元 ignored 记录](../../../../../workspace/maintenance/v211_e11_e16_execution_20261113_001/)；不等于完整 Solution 或项目接收。
+
+变更量按 `git diff --cached --no-renames --numstat` 计：本 U 相对输入 HEAD，生产 **+0/−0/净0**，诊断 22 路径 +2,590/−1,309（净 +1,281），账本 1 路径 +9/−1；`--no-renames` 将 3 次改名计为 6 路径。诊断全目录 tracked 451→459、Python 394→400；版本目录 tracked 30→40、Python 30→38。按原函数／整文件行数统计，约 1,221 行已有测试/fixture 迁移并适配；另复制一份 736 行合成 Scene JSON 给版本检查，旧副本仍有历史 caller。其余新增为守卫、负例及索引，不是生产能力扩张。相对 `a6b107ac`：生产 +0/−0；诊断 +2,590/−1,309；文档/Skills +368/−27（含两次规划提交）。累计相对 `1f1359ee`：生产 +8,284/−17,638；诊断 +9,674/−1,308；文档/Skills +2,302/−114。累计量包含 E00～E10，不归功本单元。既有 Runtime/adapter 合同未变；相机、控制、Recorder 与历史 source 的检测入口更集中，未测试的新物理交集仍留 U3。
 
 实施时本节链接一份44点最终结果表及60项签收表即可；保留第1～10节为明确的规划时点。当前文档/保护检查只证明规划交付，不证明任何新功能或清理已完成。
 

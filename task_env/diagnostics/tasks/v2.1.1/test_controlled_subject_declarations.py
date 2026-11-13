@@ -2,7 +2,7 @@
 from dataclasses import replace
 import pytest
 from task_env.artifacts import FrameReference, JointReference
-from task_env.diagnostics.tasks.test_phase_ii_01_r01b_logical_resolution import (
+from task_env.diagnostics.tasks.physical_contract_fixtures import (
     _scene_v3, _assembly, _entity_member, _sub, _nested,
 )
 from task_env.runtime.sessions.physical_control import (
