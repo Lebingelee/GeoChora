@@ -9,7 +9,7 @@ from task_env.assembly.usd_cache import install_usd_delivery, installed_usd_mani
 from task_env.environment.configuration import resolve_task_env_config
 
 ROOT = Path(__file__).resolve().parents[4]
-G05 = ROOT / 'workspace/maintenance/v211_g05_5c_unit005_isaac_continuation_20261110_002/g05-delivery-014'
+G05 = ROOT / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/fixtures/usd-g05'
 PANDA = ROOT / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
 
 

@@ -296,8 +296,8 @@ def test_isaac_scene_and_runtime_share_one_verified_delivery(monkeypatch):
     from task_env.runtime.sessions import declared_effort_source
 
     root = Path(__file__).resolve().parents[4]
-    manifest = root / ('workspace/maintenance/v211_g05_5c_unit005_isaac_continuation_20261110_002/'
-                       'g05-delivery-014/pendulum/delivery_manifest.json')
+    manifest = root / ('workspace/maintenance/v211_e11_e16_u5_20261113_001/'
+                       'fixtures/usd-g05/pendulum/delivery_manifest.json')
     if not manifest.is_file():
         pytest.skip('validated Isaac delivery is unavailable')
     loads = []

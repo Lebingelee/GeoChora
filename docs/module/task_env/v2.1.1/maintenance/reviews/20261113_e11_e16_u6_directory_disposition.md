@@ -15,7 +15,7 @@
 | `v211_g04_4c_attempt001/` | 暂缓候选 | 900,399,104 | 同上；当前锁/fixture 不得随意删。 |
 | `v211_g05_5c_unit4_continuation_20261109/` | 暂缓候选 | 24,952,832 | 同上；需确认仍在使用的引用和唯一输出。 |
 
-两份旧 H5 的当前 codec／历史 judge 测试已切换到 U5 包中对应 SHA 对象并检查 SHA；25 项受守卫离线检查通过。四份 physical 测试输入也已在包内建立相对符号链接，指定新位置运行的 8 项受守卫检查通过；测试仍允许显式指定其他输入。旧文件保持不变。Panda Isaac 资产测试现使用包内 USD manifest；按 manifest 将 68 个已保全 source 对象以硬链接排列，包含 pxr 的定向 source 构造检查 8 项通过，solver SDK 被阻止导入。该检查不是 App 或 native 物理运行。G05 简单主体资产测试仍引用其原目录；历史 supervisor 的共享锁仍在 `phase_ii_01_sol_luna_handoff_20261023_001/`。该目录、现行测试样本、所有锁、保护输入、第三方源码与嵌套 worktree 均不列删除。当前 checkout 锁 inode 29918777，另一个 integration checkout 锁 inode 33310300；本次 `/proc/locks` 快照均未显示持锁项，这不是未来无 owner 的保证。既往进程 fd 扫描存在权限拒绝，不能证明全部进程没有打开目录。统一锁路径前须查清全部活动运行端，避免新旧 inode 并行形成双锁，不能通过 unlink 实现切换。
+两份旧 H5 的当前 codec／历史 judge 测试已切换到 U5 包中对应 SHA 对象并检查 SHA；25 项受守卫离线检查通过。四份 physical 测试输入也已在包内建立相对符号链接，指定新位置运行的 8 项受守卫检查通过；测试仍允许显式指定其他输入。旧文件保持不变。Panda Isaac 资产测试现使用包内 USD manifest；按 manifest 将 68 个已保全 source 对象以硬链接排列，包含 pxr 的定向 source 构造检查 8 项通过，solver SDK 被阻止导入。该检查不是 App 或 native 物理运行。G05 简单主体两份 delivery 的 24 个必要文件也以包内硬链接布局；三种配置安装、损坏拒绝及 source 绑定共 5 项 pxr 检查通过。历史 supervisor 的共享锁仍在 `phase_ii_01_sol_luna_handoff_20261023_001/`。该目录、现行测试样本、所有锁、保护输入、第三方源码与嵌套 worktree 均不列删除。当前 checkout 锁 inode 29918777，另一个 integration checkout 锁 inode 33310300；本次 `/proc/locks` 快照均未显示持锁项，这不是未来无 owner 的保证。既往进程 fd 扫描存在权限拒绝，不能证明全部进程没有打开目录。统一锁路径前须查清全部活动运行端，避免新旧 inode 并行形成双锁，不能通过 unlink 实现切换。
 
 恢复：选择中的原始文件通过 `retained-claim-selection.json` 的 `original` → `retained` 和 SHA/长度从 U5 对象复制到新的空目标并校验；source 另由列出的索引定位。此方法不保证恢复被舍弃的完整旧目录或旧 manifest。临时试验目录可用已保留输入重新进行范围内的验证，但不承诺重建其全部历史输出。
 

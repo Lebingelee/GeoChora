@@ -132,8 +132,8 @@ The Panda Isaac source admission tests use the retained U5
 `assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json` and its
 manifest-relative source and USD files. These source-construction checks require
 OpenUSD (`pxr`) and are not part of the pure/fake mode; no Isaac App or solver
-run is implied. The separate G05 pendulum/two-wheel delivery inputs still use
-their original locations.
+run is implied. The G05 pendulum/two-wheel USD inputs use the preserved package
+`fixtures/usd-g05/` instead of their historical delivery directory.
 
 ## Migration and historical references
 
