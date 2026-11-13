@@ -5,7 +5,7 @@
 | 路径（均位于 `/home/lly/Program_Files/Geochora/workspace/maintenance/`） | 当前决定 | 快照分配字节 | 保全与约束 |
 |---|---|---:|---|
 | `v211_e11_e16_u5_20261113_001/` | 保留 | 1,161,216,000 | 五入口、优化入口、最终选择与 reader；其临时子目录单列，不以整个目录为删除对象。 |
-| `v211_e11_e16_u7_preparation_20261113_001/` | 保留 | 57,516,032 | refs/worktree 预备和本地保全成果；U7 还须核对恢复及独有内容。 |
+| `v211_e11_e16_u7_preparation_20261113_001/` | 保留 | 当前 14,226,345,984；先前快照 57,516,032 | refs/worktree 预备和本地保全成果；其中 integration 临时快照单独为 14,089,285,632，不能与整个父目录 `du` 相加重复计量。 |
 | `v211_e11_e16_u5_restore_probe_20261113_001/` | 临时副本，已授权并删除 | 5,912,633,344 | 本轮从已保全对象生成的恢复试验；旧恢复验证脚本依赖此路径，删除后这些历史试验不能原地复跑。最终选择与七项代表检查不依赖该目录；必要对象留在 U5 包。 |
 | `v211_e11_e16_u5_20261113_001/stage04/4a-delivery/` | 临时副本，已授权并删除 | 310,669,312 | 旧 4a 布局复制，用于旧 manifest 试验；有界 4a 核查使用包内代表日志和 source 索引。旧 manifest 重算/链接迁移提议不作为保留入口。与对象硬链接可能共享块，不能将该数字当净节省。 |
 | `v211_e11_e16_u5_20261113_001/3b-nut-reconstruction/runtime/` | 临时副本，已授权并删除 | 16,089,088 | 先前 Nut XML 重建运行时，最终入口保留结果和 source receipt；含一条指向下列运行时资产的链接，删除时不得跟随。 |
@@ -46,7 +46,7 @@ U7 的 refs/worktree 均暂保留，未获具体授权，不进行删除或 Git 
 | 对象 | 当前准备与未解决事项 |
 |---|---|
 | 主 checkout `/home/lly/Program_Files/Geochora` 与 `codex/v211-stage5-diagnostic` | 保留；含四份保护输入、最终证据包和当前工作。 |
-| `codex/v211-stage3`、`codex/v211-stage4` | 暂缓候选；两者均为当前 HEAD 祖先，已含在 refs bundle 中，未授权删除。 |
+| `codex/v211-stage3`、`codex/v211-stage4` | 可提交维护者集中审核的删除候选；分别为 `842e1efd8268a6a99d075640a30840c2eeb4918f`、`3ca161c41340d6015be4fc949ac43771c233ee1c`，均为当前 HEAD 祖先，refs bundle 已实际恢复验证；未授权删除。删除前复核 ref 身份、当前祖先关系及其他使用情况。 |
 | `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | 暂缓候选；维护者已确认停用并授权本 Goal 接管锁迁移和本地内容保全，但未授权删除。分支已被该 worktree 检出，不能先删分支或以 bundle 代替本地内容。三份 untracked 的[范围内复制与恢复验证](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-untracked-restore-report.json)不覆盖 ignored 内容；本地 ignored 快照及验证另行记录。 |
 | `/home/lly/.codex/worktrees/archive_v1_0_0` | 保留；Git 明确标记为冻结历史参考且锁定。 |
 | `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora` | 暂缓候选；tracked 状态干净但有 ignored 内容，须确认实际归属和保全。 |
@@ -55,3 +55,11 @@ U7 的 refs/worktree 均暂保留，未获具体授权，不进行删除或 Git 
 | `main`、`develop`、`v1.1.0`、`v2.0.0`、`v2.1.0` 和四个现有 tags | 保留。 |
 
 三个阶段分支的 [bundle 恢复验证](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/ref-restore-verification.json)仅覆盖 Git refs：三条 ref 在新 bare 仓库恢复并通过 fsck；本次重新计算 bundle SHA 与报告一致。它不覆盖 ignored 文件、子模块或工作树归属。先前 fsck 的不可达对象缺口已登记，不继续扩大全库历史追查。清理后净空间、refs/worktree 前后以及维护者项目接收仍 OPEN。
+
+维护者接管后的 integration 保全：三份 untracked 原件、保全副本和恢复样本的 SHA 再次相同。其 workspace、temp_outputs 及另外 443 个 ignored 路径已作[临时快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-local-snapshot-receipt.json)，带校验和的 `rsync` 干运行比对无差异，并从快照实际恢复三个文件和一条符号链接样本。符号链接只保全原链接文本，不复制外部目标；子模块 ignored 缓存不在快照中，不能以此声称工作树所有本地字节均已保全。源工作区扫描未发现嵌套 `.git`、跨设备或特殊文件；两个子模块的 tracked 状态干净。
+
+integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；保全其 shallow 边界后在新 bare 仓库恢复全部 10 个 refs 和符号 HEAD，`git fsck` 通过，详情见[恢复报告](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-geophys-restore-report.json)。结果只覆盖来源已有浅历史，不能声称历史完整；Menagerie 的 12 个 refs 与主 checkout 相同。integration 有已初始化子模块及未保全的子模块 ignored 缓存，当前不作为可执行移除候选。
+
+空间：四个获授权历史目录清理在记录的 package 加目标范围内，`du` 差额为 3,731,234,816 分配字节；新 integration 快照单独 `du` 为 14,089,285,632 分配字节，GeoPhys bundle 和恢复仓库另约 38,899,712／40,267,776 字节。上述范围和时间不同，硬链接及并发变化不完整，不能相减称为项目真实净下降；显然也不能忽略新增保全量。项目净空间目标仍 OPEN。refs/worktree 删除必须由维护者针对具体候选另行决定；锁迁移授权不等于删除授权。
+
+[独立项目准备复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-project-preparation-review.md)复算 3,056 条 stage 映射对应的 816 个去重对象，大小和 SHA 均匹配；该数不包括其他 source 索引对象。复核确认上述两分支可作为具体审核候选，integration 与其他未闭合的工作树仍不可直接移除；U6/U7、项目净下降及维护者项目接收仍 OPEN。
