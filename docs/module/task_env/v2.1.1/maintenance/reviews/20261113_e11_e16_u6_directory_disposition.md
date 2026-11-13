@@ -5,7 +5,7 @@
 | 路径（均位于 `/home/lly/Program_Files/Geochora/workspace/maintenance/`） | 当前决定 | 快照分配字节 | 保全与约束 |
 |---|---|---:|---|
 | `v211_e11_e16_u5_20261113_001/` | 保留 | 1,161,216,000 | 五入口、优化入口、最终选择与 reader；其临时子目录单列，不以整个目录为删除对象。 |
-| `v211_e11_e16_u7_preparation_20261113_001/` | 保留 | 本次快照 15,523,381,248；早前快照 57,516,032 | refs/worktree 预备和本地保全成果；其中 integration 临时快照单独为 15,385,866,240，不能与整个父目录 `du` 相加重复计量。 |
+| `v211_e11_e16_u7_preparation_20261113_001/` | 保留 | 本次快照 15,523,999,744；早前快照 57,516,032 | refs/worktree 预备和本地保全成果；其中 integration 临时快照单独为 15,385,866,240，不能与整个父目录 `du` 相加重复计量。 |
 | `v211_e11_e16_u5_restore_probe_20261113_001/` | 临时副本，已授权并删除 | 5,912,633,344 | 本轮从已保全对象生成的恢复试验；旧恢复验证脚本依赖此路径，删除后这些历史试验不能原地复跑。最终选择与七项代表检查不依赖该目录；必要对象留在 U5 包。 |
 | `v211_e11_e16_u5_20261113_001/stage04/4a-delivery/` | 临时副本，已授权并删除 | 310,669,312 | 旧 4a 布局复制，用于旧 manifest 试验；有界 4a 核查使用包内代表日志和 source 索引。旧 manifest 重算/链接迁移提议不作为保留入口。与对象硬链接可能共享块，不能将该数字当净节省。 |
 | `v211_e11_e16_u5_20261113_001/3b-nut-reconstruction/runtime/` | 临时副本，已授权并删除 | 16,089,088 | 先前 Nut XML 重建运行时，最终入口保留结果和 source receipt；含一条指向下列运行时资产的链接，删除时不得跟随。 |
@@ -59,6 +59,8 @@ U7 的 stage3/stage4 refs 已按具体授权删除；其余候选仍保留，不
 若需恢复已删除的两条分支，在确认同名 ref 仍不存在后，从主仓库运行 `git fetch workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/stage-refs.bundle refs/heads/codex/v211-stage3:refs/heads/codex/v211-stage3 refs/heads/codex/v211-stage4:refs/heads/codex/v211-stage4`，再将两条 ref 分别与上表 OID 比较；不要用强制 refspec 覆盖新创建的同名分支。该操作恢复 Git refs，不恢复已删除的未选历史文件或工作树。
 
 维护者接管后的 integration 保全：三份 untracked 原件、保全副本和恢复样本的 SHA 再次相同。其 workspace、temp_outputs 及另外 443 个 ignored 路径已作[临时快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-local-snapshot-receipt.json)，带校验和的 `rsync` 干运行比对无差异，并从快照实际恢复三个文件和一条符号链接样本。GeoPhys 子模块另有 3,858 个 ignored 路径已[复制、校验并恢复三个样本](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-geophys-ignored-receipt.json)，单独占 1,296,580,608 分配字节；Menagerie 未列出 ignored 项。符号链接只保全原链接文本，不复制外部目标，样本恢复不等于完整运行环境恢复。源工作区扫描未发现嵌套 `.git`、跨设备或特殊文件；两个子模块的 tracked 状态干净。
+
+上述三个 GeoPhys 恢复样本均来自 `.pytest_cache`；另从本地 `.taichi_cache` 和 `temp_outputs` 各选一份文件实际恢复，原件、快照和恢复副本 SHA-256 均一致，见[补充样本记录](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/geophys-representative-restore.json)。这仍是抽样，不证明完整环境可运行。
 
 integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；保全其 shallow 边界后在新 bare 仓库恢复全部 10 个 refs 和符号 HEAD，`git fsck` 通过，详情见[恢复报告](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-geophys-restore-report.json)。结果只覆盖来源已有浅历史，不能声称历史完整；Menagerie 的 12 个 refs 与主 checkout 相同。integration 有已初始化子模块，其受支持移除流程仍须确定，且维护者尚未授权移除，当前不作为可执行移除候选。
 
