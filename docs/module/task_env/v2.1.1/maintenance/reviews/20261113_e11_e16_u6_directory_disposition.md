@@ -91,3 +91,26 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 删除后纯／fake **240 PASS**、历史H5 **25 PASS**、physical离线读回 **8 PASS**，证据包七项代表离线检查 **PASS**；现有reader按原设计只刷新派生结果JSON，非新native运行。3,056条stage映射的816个唯一对象及包内现存1,370个内容对象（含source等支持对象）的SHA／长度核验通过，原H5／source内容对象未改写。文档检查与先前快照相同：1项既存 `MUJOCO_LOG.TXT` 保护基准错误、79项历史链接问题、0项stale path，本轮保护SHA未变、新增错误0。日志和[内容核验](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/retained-package-integrity.json)保留在本轮ignored目录；生产代码与测试代码修改均为0。
 
 同一次 `du -s -x -B1` 对有序集合“integration残留＋主checkout”计量，包含现有快照及新收尾记录，清理前155,104,763,904、清理后139,519,737,856分配字节，减少 **15,585,026,048字节（约15.59 GB）**；[前测量](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/space-before.json)与[后测量](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/space-after.json)使用相同顺序去重硬链接，测量之后的日志／文档写入另有少量增量。这证明本轮固定范围的下降，不补造建立快照前的E00～E16项目净下降。integration删除事项闭合；临时快照精简、其他工作树处置、累计空间核算及项目最终接收继续OPEN，U4／U5不重开，G06不启动。
+
+
+## 2026-11-14：integration 快照去重候选复核
+
+复用 integration 残留逐项保全证明，仅筛选 `integration-local-snapshot/workspace/` 中已有证明且 SHA 与 U5 内容对象对应的普通文件；没有重开 U4/U5，也没有改动快照或 U5 对象。对 **21,929 条路径、19,785 个独立 inode 和 561 个 U5 对象**逐一核验：快照与 U5 内容 SHA 均匹配，候选硬链接组在该清单中完整。候选 inode 的 `st_blocks` 合计 **9,271,549,952 字节**，不是实际可释放字节；共享块、范围外引用和并发变化尚未计入。清单及结果见[候选审计](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/candidate-audit.json)，清单 SHA-256 为 `ebd4bc4b3149de129869335363823788fea74a2a849de49faf88327fc76a4113`。
+
+候选 inode 的扩展属性检查均为空；恢复样本覆盖 4 组、36 条路径（含多硬链接组），内容、mode、uid、gid、mtime 和组内硬链接符合记录，未与 U5 对象共用 inode。另一个仅写新目录的候选材料化工具以 20 组进行 smoke；二者均为抽样，不构成全量恢复验证。现有工具不恢复目录属性、原 inode、ctime 或绝对链接的重映射，不能称完整原快照恢复。原快照 6,062 条指向旧 integration workspace 的绝对链接限制仍适用。
+
+候选路径涉及 1,784 个直接父目录，其中 **368 个当前不可写**。排除含不可写父目录的完整硬链接组后，剩 7,089 组、9,233 条路径，独立 inode 分配块合计 2,930,221,056 字节；这仍只是筛选结果，未证明可删除或可回收。未更改目录权限。独立审查复算全部候选内容及 U5 对象，同意清单可审核，但认为执行前仍须准备逐路径身份与内容重验、路径安全、owner/引用、异常中止与逐项收据，并明确恢复义务；详见[独立审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-snapshot-dedup-review.md)。现阶段不请求把该清单作为可直接执行的删除授权；快照、其他工作树和第三方内容均保留。
+
+本次复核后四个保护输入 SHA 和两项子模块 HEAD 均与 integration 收尾收据一致。生产代码无变化；U6 的快照处置与项目净空间核算、U7 其他工作树的归属/保全和维护者项目接收仍 OPEN。
+
+2026-11-14 当前只读 `git status --ignored=matching` 快照：冻结工作树无 tracked/untracked 变化；camera 无 tracked/untracked 变化且列出 56 个 ignored 顶层条目；core-baseline 有两处已知子模块类型变化及 18 个 ignored 顶层条目；旧版本 clean checkout 无 tracked/untracked 变化且列出 66 个 ignored 顶层条目。这里的数字是 Git 压缩显示的条目数，并非文件总数，不证明 owner 已释放或 ignored 内容已保全。四者均未移除。
+
+### 项目接收入口（准备中）
+
+* **代码范围：** [U4 独立主审及有界接收](20261113_e11_e16_u4_independent_acceptance.md)；不因项目清理重开。T19 的同次联合证据及 H5 单文件不自含完整 completion 的限制见 [联合证据报告](20261113_e11_e16_u4_joint_completion.md)。
+* **最终证据：** [U5 五 stage 与五路线选择](20261113_e11_e16_u5_evidence_selection.md)；按各自冻结源码、配置和运行身份阅读，不称五路线均在最新 HEAD 重跑。
+* **项目范围：** 本页记录已授权清理、锁迁移、恢复样本、失败事故及后续收尾；[专用账本第 11 节](../../planning/post-5c-e11-e16-remaining-ledger.md)为 U1～U7 当前状态入口。与规划输入 `a6b107ac` 比较，至 `a5991ea0` 的 tracked diff 为 108 文件、+6,063/−1,667 行；与 `1f1359ee` 比较为 280 文件、+22,473/−18,499 行，均包括代码、测试与文档，不代表本次快照审计的生产改动。
+* **独立项目中途审查：** [U6/U7 收尾审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-u7-closeout-review.md)逐项列出 T35～T44 尚未闭合的条件；它不是最终整理后的主审，也不是维护者接收。
+* **未闭合：** 快照去重仅完成候选核验和样本恢复；其他三个非冻结旧工作树的归属及本地内容保全尚待闭合，冻结工作树保持锁定；累计项目净空间无法由现有不同时点口径直接相减；清理后完整项目复核和维护者项目接收仍未完成。当前 6 heads、5 注册 worktrees；原 integration 专属 Git 管理元数据无法保证恢复。
+
+此入口用于后续审查，并非实施者自行宣布项目接收。除此前具体批准的对象外，不隐含删除许可，也不启动 G06。
