@@ -24,6 +24,7 @@ from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
 from ...artifacts.contracts import Contract
 from ...controllers.canonical.contracts import digest
 from ...controllers.canonical.execution import ARM_HOLD_RAMP_PROFILE, ArmTargetExecutionRequestV1
+from ...controllers.canonical.feedback import boundary_interval_clock_tolerance
 from ...objects.pick_cube import CUBE_HALF_SIZE
 
 
@@ -565,10 +566,20 @@ class PickCubeReadinessConfig:
     timeout_derivation: str
     version: str = "pick-cube-readiness-v1"
     measured_tcp_clearance_gate: bool = False
+    physics_dt: float | None = None
+    control_substeps: int = 1
 
     def __post_init__(self):
         if self.version != "pick-cube-readiness-v1" or self.control_dt <= 0:
             raise ValueError("invalid readiness configuration")
+        if type(self.control_substeps) is not int or self.control_substeps < 1:
+            raise ValueError("invalid readiness control substeps")
+        if self.physics_dt is not None:
+            import math
+            if (not math.isfinite(self.physics_dt) or self.physics_dt <= 0
+                    or not math.isclose(self.physics_dt * self.control_substeps, self.control_dt,
+                                        rel_tol=1e-12, abs_tol=0.0)):
+                raise ValueError("readiness physics timebase differs from control dt")
         if type(self.measured_tcp_clearance_gate) is not bool:
             raise TypeError("measured_tcp_clearance_gate must be an explicit boolean")
         if len(self.policies) != 4 or tuple(p.kind for p in self.policies) != (
@@ -712,6 +723,8 @@ class PickCubeReadinessConfig:
              policy("task_outcome", int(pose), "lift_outcome_timeout")),
             digest(profile), json.dumps(derivation, sort_keys=True),
             measured_tcp_clearance_gate=measured_tcp_clearance_gate,
+            physics_dt=float(artifact.timebase.physics_dt),
+            control_substeps=int(artifact.timebase.control_substeps),
         )
 
     @property
@@ -726,6 +739,8 @@ class PickCubeReadinessConfig:
         return digest({
             "version": self.version, "base": asdict(self.base),
             "control_dt": self.control_dt,
+            "physics_dt": self.physics_dt,
+            "control_substeps": self.control_substeps,
             "policies": [policy.to_mapping() for policy in self.policies],
             "profile_identity": self.profile_identity,
             "timeout_derivation": self.timeout_derivation,
@@ -775,11 +790,14 @@ class PickCubeReadinessSolution(PickCubeSolution):
         if not reset:
             if execution_info.control_step != self._boundary_step + 1:
                 raise ValueError("stale/skipped execution boundary")
-            expected = self._boundary_time + self.readiness_config.control_dt
-            import math
-            if abs(execution_info.simulation_time - expected) > max(
-                math.ulp(expected), math.ulp(execution_info.simulation_time)
-            ):
+            config = self.readiness_config
+            expected = config.control_dt
+            tolerance = boundary_interval_clock_tolerance(
+                self._boundary_time, execution_info.simulation_time, expected,
+                config.physics_dt if config.physics_dt is not None else expected,
+                config.control_substeps,
+            )
+            if abs((execution_info.simulation_time - self._boundary_time) - expected) > tolerance:
                 raise ValueError("stale execution time")
         self._boundary_step = execution_info.control_step
         self._boundary_time = execution_info.simulation_time

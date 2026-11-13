@@ -12,6 +12,7 @@ import sys
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 NODES = (
+    'task_env/diagnostics/tasks/v2.1.1/test_pickcube_clock.py',
     'task_env/diagnostics/tasks/v2.1.1/test_reporter_ownership.py',
     'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_on_task_success_completes_immediately',
     'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_task_failure_after_success_is_not_overridden',

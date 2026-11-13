@@ -181,7 +181,8 @@ def main(argv=None) -> int:
     episode = None
     try:
         with bounded_process(args.memory_limit_mb if args.memory_limit_mb is not None else 8192, args.time_limit_s,
-                             limit_address_space=args.provider != "isaacsim") as budget:
+                             limit_address_space=args.provider != "isaacsim",
+                             limit_cpu_time=args.provider != "isaacsim") as budget:
             from task_env import make_env
 
             env = make_env(ENV_ID, config={
@@ -229,9 +230,14 @@ def main(argv=None) -> int:
     if recording.is_file():
         try:
             recording_summary = load_recording_summary(recording)
-            from task_env.trajectory.canonical.h5 import load
-            trajectory = load(recording)
-            report["planned_action_count"] = sum(item.planned_action for item in trajectory.transitions)
+            if recording_summary.get("schema") == "task-env-h5/v3":
+                # The generic recorder stores structured controls but no canonical
+                # planned_action flag; the caller's transition count is separate.
+                report["planned_action_count"] = None
+            else:
+                from task_env.trajectory.canonical.h5 import load
+                trajectory = load(recording)
+                report["planned_action_count"] = sum(item.planned_action for item in trajectory.transitions)
             report["recording"] = {
                 "path": str(recording),
                 "sha256": __import__("hashlib").sha256(recording.read_bytes()).hexdigest(),
@@ -243,8 +249,12 @@ def main(argv=None) -> int:
     runtime_valid = bool(
         construction_succeeded and reset_succeeded and finalize_succeeded and close_succeeded
         and recording_summary and recording_summary.get("t_plus_one_valid")
-        and report.get("planned_action_count", 0) > 0
+        and episode and episode.get("transitions", 0) > 0
+        and recording_summary.get("transitions") == episode["transitions"]
+        and (recording_summary.get("schema") == "task-env-h5/v3"
+             or report.get("planned_action_count", 0) > 0)
         and not report.get("error") and not report.get("close_error")
+        and not report.get("readback_error")
     )
     report["runtime_valid"] = runtime_valid
     report["close_attempted"] = env is not None

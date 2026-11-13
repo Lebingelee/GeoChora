@@ -36,8 +36,8 @@ def test_direct_isaac_forwards_formal_execution_and_reports_failure(tmp_path, mo
     limits = []
 
     @contextmanager
-    def fake_budget(memory, time, *, limit_address_space=True):
-        limits.append((memory, time, limit_address_space))
+    def fake_budget(memory, time, *, limit_address_space=True, limit_cpu_time=True):
+        limits.append((memory, time, limit_address_space, limit_cpu_time))
         yield {'fake': True}
 
     def fail_make_env(uid, *, config):
@@ -54,7 +54,7 @@ def test_direct_isaac_forwards_formal_execution_and_reports_failure(tmp_path, mo
     assert execution == {'physics_provider': 'isaacsim', 'physics_backend': 'cuda',
                          'physics_device': 'cuda:0', 'interpreter': str(Path(sys.executable).absolute())}
     assert calls[0][1]['episode']['horizon'] == 55
-    assert limits == [(8192, 420, False)]
+    assert limits == [(8192, 420, False, False)]
     report = json.loads(capsys.readouterr().out)
     assert report['backend'] == 'cuda' and report['device'] == 'cuda:0'
     assert report['runtime_valid'] is False and 'synthetic construction error' in report['error']
@@ -75,6 +75,21 @@ def test_identity_summary_uses_resolved_backend_without_inventing_cpu():
     assert identity_summary(SimpleNamespace(metadata={}), provider='isaacsim')['backend'] is None
 
 
+def test_isaac_budget_preserves_inherited_process_limits():
+    import resource
+    from examples._common import bounded_process
+
+    before_cpu = resource.getrlimit(resource.RLIMIT_CPU)
+    before_memory = resource.getrlimit(resource.RLIMIT_AS)
+    with bounded_process(8192, 900, limit_address_space=False, limit_cpu_time=False) as budget:
+        assert resource.getrlimit(resource.RLIMIT_CPU) == before_cpu
+        assert resource.getrlimit(resource.RLIMIT_AS) == before_memory
+        assert budget['cpu_limit_scope'] == 'not_set_by_example'
+        assert budget['wall_limit_s'] == 900
+    assert resource.getrlimit(resource.RLIMIT_CPU) == before_cpu
+    assert resource.getrlimit(resource.RLIMIT_AS) == before_memory
+
+
 def test_public_yaml_and_mapping_have_same_selected_configuration(tmp_path):
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.script.env._common import public_config
@@ -91,7 +106,10 @@ def test_public_yaml_and_mapping_have_same_selected_configuration(tmp_path):
 
 
 @pytest.mark.parametrize('close_fails', [False, True])
-def test_direct_isaac_reports_runtime_and_close_separately(tmp_path, monkeypatch, capsys, close_fails):
+@pytest.mark.parametrize('generic_v3', [False, True])
+@pytest.mark.parametrize('count_mismatch', [False, True])
+@pytest.mark.parametrize('digest_fails', [False, True])
+def test_direct_isaac_reports_runtime_and_close_separately(tmp_path, monkeypatch, capsys, close_fails, generic_v3, count_mismatch, digest_fails):
     from contextlib import nullcontext
     import task_env
     import task_env.tasks.pick_cube as pick_task
@@ -123,13 +141,27 @@ def test_direct_isaac_reports_runtime_and_close_separately(tmp_path, monkeypatch
     monkeypatch.setattr(pick_cube, 'bootstrap_imports', lambda: None)
     monkeypatch.setattr(pick_cube, 'bounded_process', lambda *args, **kwargs: nullcontext({}))
     monkeypatch.setattr(pick_cube, 'run_caller_solution', lambda *args, **kwargs:
-                        {'task_success': True, 'expert_complete': True, 'completion_eligible': True})
-    monkeypatch.setattr(pick_cube, 'load_recording_summary', lambda path: {'t_plus_one_valid': True})
-    monkeypatch.setattr(h5, 'load', lambda path: SimpleNamespace(transitions=[SimpleNamespace(planned_action=True)]))
+                        {'task_success': True, 'expert_complete': True, 'completion_eligible': True, 'transitions': 1})
+    monkeypatch.setattr(pick_cube, 'load_recording_summary', lambda path:
+                        {'t_plus_one_valid': True, 'transitions': 2 if count_mismatch else 1,
+                         'schema': 'task-env-h5/v3' if generic_v3 else 'canonical-trajectory-v0'})
+    def canonical_load(path):
+        assert not generic_v3, 'generic v3 must not use the canonical reader'
+        return SimpleNamespace(transitions=[SimpleNamespace(planned_action=True)])
+    monkeypatch.setattr(h5, 'load', canonical_load)
+    if digest_fails:
+        import hashlib
+        def fail_digest(_data):
+            raise OSError('recording digest failed')
+        monkeypatch.setattr(hashlib, 'sha256', fail_digest)
     code = pick_cube.main(['--provider', 'isaacsim', '--recording', str(tmp_path / 'fake.h5')])
     report = json.loads(capsys.readouterr().out)
     assert report['close_attempted'] is True and report['close_succeeded'] is not close_fails
-    assert report['runtime_valid'] is not close_fails
+    valid = not close_fails and not count_mismatch and not digest_fails
+    assert report['runtime_valid'] is valid
     assert report['identity']['backend'] == 'cuda'
-    assert (report['task_outcome'] == 'SOLVED') is not close_fails
-    assert code == (1 if close_fails else 0)
+    assert report['planned_action_count'] is (None if generic_v3 else 1)
+    if digest_fails:
+        assert 'recording digest failed' in report['readback_error']
+    assert (report['task_outcome'] == 'SOLVED') is valid
+    assert code == (0 if valid else 1)

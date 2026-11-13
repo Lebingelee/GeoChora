@@ -235,7 +235,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | --- | --- | --- |
 | U1 T01～T07 | SELF_ASSESSED_COMPLETE | 版本诊断入口、历史去向及证据依赖见[诊断 claim/owner 表](../../../../../task_env/diagnostics/tasks/v2.1.1/README.md)；本行所在提交为输出 HEAD。TEST-04 最终证据归并仍归 U5；代码整体独立主审及维护者接收不由本单元自封。 |
 | U2 T08～T14 | SELF_ASSESSED_COMPLETE | 正式 caller、batch 边界、完成事实及 LIBERO 检查见[U2 caller 对账](../maintenance/reviews/20261113_e11_e16_u2_caller_review.md)；输出为本行所在提交。直接 Isaac 与完整 Solution 的真实执行归 U3，独立主审和维护者接收归 U4，不由实施者自封。 |
-| U3 T15～T21 | NOT_STARTED | 待实施；完整Solution门未由短程覆盖 |
+| U3 T15～T21 | IMPLEMENTED_WITH_OPEN | 五条完整尝试及同次读回见[U3 实施结果](../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)，输出 HEAD 为本行所在提交。Isaac 修复后运行有效但任务失败；T19 的 caller completion 与 H5 可观测边界、T20 最终对账仍 OPEN，独立主审归 U4，未经维护者同意不把例外算作 E13 关闭。 |
 | U4 T22～T28 | NOT_STARTED | 待代码独立主审及维护者接收 |
 | U5 T29～T34 | NOT_STARTED | 待最终证据归并与独立复算，不删除原件 |
 | U6 T35～T38 | NOT_STARTED | 待具体清单、保全及处置授权 |

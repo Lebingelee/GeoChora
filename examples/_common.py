@@ -50,20 +50,22 @@ def _virtual_bytes() -> int:
 
 
 @contextmanager
-def bounded_process(memory_limit_mb: int, time_limit_s: int, *, limit_address_space: bool = True):
+def bounded_process(memory_limit_mb: int, time_limit_s: int, *, limit_address_space: bool = True,
+                    limit_cpu_time: bool = True):
     """Apply Linux-oriented per-process limits for example runs.
 
     When enabled, ``RLIMIT_AS`` caps virtual address space and is inherited by
     child processes. It is neither an RSS nor an aggregate process-tree cap.
-    CPU time is per process; the real-time alarm bounds the coordinator.
+    When enabled, CPU time is per process and inherited by workers; the
+    real-time alarm always bounds the coordinator.
     """
 
     if not sys.platform.startswith("linux") or os.name != "posix" or not hasattr(signal, "setitimer"):
         raise RuntimeError("these example limits are supported on Linux with POSIX resource and timer APIs")
     if not 1024 <= memory_limit_mb <= 8192:
         raise ValueError("--memory-limit-mb must be between 1024 and 8192")
-    if not 1 <= time_limit_s <= 420:
-        raise ValueError("--time-limit-s must be between 1 and 420")
+    if not 1 <= time_limit_s <= 1200:
+        raise ValueError("--time-limit-s must be between 1 and 1200")
 
     import resource
 
@@ -84,23 +86,26 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int, *, limit_address_sp
     old_timer = signal.getitimer(signal.ITIMER_REAL)
     if limit_address_space:
         resource.setrlimit(resource.RLIMIT_AS, (as_limit, as_hard))
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit, cpu_hard))
+    if limit_cpu_time:
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit, cpu_hard))
     signal.signal(signal.SIGALRM, _raise_timeout)
-    if hasattr(signal, "SIGXCPU"):
+    if limit_cpu_time and hasattr(signal, "SIGXCPU"):
         signal.signal(signal.SIGXCPU, _raise_timeout)
     signal.setitimer(signal.ITIMER_REAL, float(time_limit_s))
     try:
         yield {"address_space_limit_bytes": as_limit if limit_address_space else None,
                "address_space_limit_scope": "single_process_rlimit_as" if limit_address_space else "not_set",
-               "cpu_limit_s": cpu_limit, "cpu_limit_scope": "single_process_rlimit_cpu",
+               "cpu_limit_s": cpu_limit if limit_cpu_time else None,
+               "cpu_limit_scope": "single_process_rlimit_cpu" if limit_cpu_time else "not_set_by_example",
                "wall_limit_s": time_limit_s, "wall_limit_scope": "coordinating_process_alarm",
                "native_threads": 1}
     finally:
         signal.setitimer(signal.ITIMER_REAL, *old_timer)
         signal.signal(signal.SIGALRM, old_alarm)
-        if old_xcpu is not None:
+        if limit_cpu_time and old_xcpu is not None:
             signal.signal(signal.SIGXCPU, old_xcpu)
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu_soft, cpu_hard))
+        if limit_cpu_time:
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_soft, cpu_hard))
         if limit_address_space:
             resource.setrlimit(resource.RLIMIT_AS, (as_soft, as_hard))
 

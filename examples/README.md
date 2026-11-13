@@ -29,8 +29,8 @@ public `make_env` example; `--execution harness` uses the versioned built-in
 Harness contract and the same Core task owner. The direct Isaac route uses the
 installed USD asset, CUDA PhysX and the selected Isaac interpreter; the
 versioned F06 Harness remains a separate route requiring its frozen manifest.
-The direct Isaac example does not set an address-space limit; use external
-process-tree resource supervision when one is required. Genesis/SAPIEN Harness
+The direct Isaac example does not set an address-space or CPU-time limit;
+use external process-tree resource supervision when one is required. Genesis/SAPIEN Harness
 commands write `NOT_RUN_DEPENDENCY` without starting a worker when their engine
 module is absent, and report `UNSUPPORTED_CAPABILITY` when the Core provider
 manifest is unavailable. Use fresh output directories. NutAssembly selects
@@ -44,8 +44,9 @@ The Linux-oriented time/address-space options apply these scopes:
 `--time-limit-s` sets a per-process CPU-time limit and a real-time alarm in the
 coordinating process; `--address-space-limit-mb` applies per-process
 `RLIMIT_AS`. The older `--memory-limit-mb` spelling remains an alias.
-For direct Isaac, `--memory-limit-mb` is rejected and no `RLIMIT_AS` is set
-by the example. On the CPU routes, `RLIMIT_AS` limits virtual address space; it is not an RSS or aggregate
+For direct Isaac, `--memory-limit-mb` is rejected and neither `RLIMIT_AS` nor
+`RLIMIT_CPU` is set by the example; the real-time alarm still applies to the
+coordinator, and any limits inherited from the caller remain in force. On the CPU routes, `RLIMIT_AS` limits virtual address space; it is not an RSS or aggregate
 process-tree memory cap. Native BLAS/OpenMP thread counts are set to one before
 runtime imports.
 
