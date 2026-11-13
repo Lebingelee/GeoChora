@@ -505,9 +505,9 @@
             "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_manual_analysis_stage2_summary_001/report.md",
             "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/execution-output/V211_stage2_progress_report_20261104.md",
             "/home/lly/Documents/ChatGPT/GeoChora v2.1.1/handoffs/V211_G02_2b_stopped_sol_review_20261104/review.md",
-            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/mujoco_pickcube_seed31/worker_result.json",
-            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/mujoco_pickcube_seed32/worker_result.json",
-            "/home/lly/.codex/worktrees/v210-integration/Geochora/workspace/maintenance/v211_g02_2b_attempt002/runs/geophys_pickcube_seed31/worker/worker_result.json"
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/0a/0aba621e0018078f316daeac731617d8309c67809a102c9dffdb77db6a0900ac",
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/9d/9decf1f26b303e0671af27b5bcb47c9b2a641369214d74557c2a7c801035dbb1",
+            "../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/49/494f9b364f7ab00800dd701f200973ce6d03e495404b8fd47bee15b9030719ae"
           ],
           "commits": [
             "8fba7f8ff0d47f7de8e5ced53f2ecdeb21869238"
