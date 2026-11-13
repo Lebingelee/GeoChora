@@ -87,8 +87,14 @@
 
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
+## 权限预检
+
+对 core-baseline 与 p2 进行不跟随符号链接的[只读权限预检](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/core-p2-permission-precheck-20261114.json)：分别遍历 206／763 个目录，未发现当前用户缺少目录写入或搜索权限、跨设备目录或扫描错误。core-baseline 的两条链接仅计链接本身；[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-core-p2-permission-precheck-review.md)全遍历得到相同计数，受查目录未发现 sticky bit 或 POSIX ACL xattr。检查不保证根父目录权限、同设备 bind mount、不可变标志、只读挂载、未来并发或 Git 实际删除成功。camera 的 61 个 `0555` 目录及逐项身份仍见[原预检](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/camera-permission-precheck.json)，尚未修改权限。
+
 ## 空间口径
 
 在 robosuite 迁出后，各候选单独 `du -s -x -B1` 分别为 **6,456,983,552／37,482,496／1,993,269,248 字节**，合计 **8,487,735,296 字节**；对应三处 Git worktree 管理目录另合计 **1,264,984,064 字节**。两组不能当作保证回收量：共享块、硬链接、Git 实际删除内容、日志和并发均会影响结果。本次三工作树保全目录含迁出的 robosuite，测得约 **857.5 MB**；它是保留占用，不应只计算旧路径消失量。完整有序测量范围及当时合计 **26,910,564,352 字节**见[空间收据](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/three-worktree-space-before.json)；若获批，执行前重测并在执行后按同一顺序把不存在路径计 0，单列新增日志。不能将此次候选估算称作 E00～E16 历史累计净节省。
+
+同一有序范围的[最新测量](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/three-worktree-space-current-20261114.json)为 **26,922,086,400 字节**，比此前增加 11,522,048 字节；新增主要反映保全目录测量增长，不能归因于删除，也不能当作累计项目净变化。三处候选及对应管理目录的分项与前测相同，15,385,866,240 字节的 integration 快照仍计入保留。
 
 为评估不复制而整体迁出第三方 checkout 的保留成本，对 camera GeoPhys、camera Menagerie、p2 GeoPhys、p2 Menagerie 分别单独测得 **500,371,456／1,909,256,192／68,640,768／1,909,256,192 字节**，见[分项测量](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-retention-space-estimates.json)。这些数包括各 checkout 内缓存，不含主 Git 目录中的子模块管理资料；单独测量不证明独占块或实际回收量，也不意味着已决定迁出方式。
