@@ -1,5 +1,7 @@
 # G04/4c attempt001：Controller reset 与迁移后 PickCube
 
+> U6 整理说明：本文中的旧目录路径保留为历史记录；该目录已按维护者授权退休。所选证据的旧路径、SHA 和现存位置见 [G04 有界证据入口](../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/stage04/README.md)，旧目录及其完整 manifest 不保证可恢复。
+
 状态：attempt001 已执行，证据待 Sol 独立主审；4b 已有界接收。执行与接收分离：维护者手动转交单一实施会话，Sol 独立主审。依赖原 [4c 目标](../goals/04-control.md#4c)、[控制协议](../contracts/control-and-feedback.md)和 [4b 审查](../maintenance/reviews/20261106_4b_attempt002_sol_review.md)。外部包 snapshot 为实际执行输入及预算的权威，本文不改变原目标。
 
 ## 已知真实缺口及优先次序

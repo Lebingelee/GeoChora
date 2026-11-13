@@ -1,5 +1,7 @@
 # G04 4a 复盘及 4b 准备经验
 
+> U6 整理说明：本文中的旧目录路径保留为历史记录；该目录已按维护者授权退休。所选证据的旧路径、SHA 和现存位置见 [G04 有界证据入口](../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/stage04/README.md)，旧目录及其完整 manifest 不保证可恢复。
+
 2026-11-06，维护者要求在建立 4b prompt 前复盘 4a，并把可执行经验用于后续开发。此页是对既有记录的分析和 4b **准备建议**，不构成 4b 执行包、native/GPU 授权或新验收门；当前 4a 已按[独立主审](reviews/20261106_4a_attempt003_sol_review.md)有界接收，4b／4c 仍 PLANNED、attempt0。阶段目标以[原 G04](../goals/04-control.md)为准；状态以[编排索引](orchestration.json)为准。
 
 ## 时间线与计时口径

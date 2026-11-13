@@ -1,5 +1,7 @@
 # G04 4a attempt003：Sol 独立主审
 
+> U6 整理说明：本文中的旧目录路径保留为历史记录；该目录已按维护者授权退休。所选证据的旧路径、SHA 和现存位置见 [G04 有界证据入口](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/stage04/README.md)，旧目录及其完整 manifest 不保证可恢复。
+
 ## 决定
 
 Sol 决定 `ACCEPTED_BOUNDED_4A_CONTROL_CONTRACT`：**按原 4a 契约、统一消费与 4b 计划出口有界接收**，普通 attempt count=3。此决定接收控制主体／typed 物理命令／公共模型与消费边界，以及 4b 验证计划的已陈述设计；真实运行支持仅限本页实际证据，并不接收 4b 三后端物理施力、实测力或 4c Controller reset／PickCube 成功。维护者手动决定并转发下一个完整包前，不自动启动 4b、阶段 5 或新会话。非刚体仍仅 typed 槽，装配 Panda 保持原已采纳版本附加用例的排期。
