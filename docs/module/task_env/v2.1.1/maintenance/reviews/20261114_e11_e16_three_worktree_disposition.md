@@ -38,6 +38,10 @@
 
 [独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-relocation-review.md)还发现真实 Git 管理树与单子模块试验不同：[只读目录盘点](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-admin-parent-shapes.json)中，两处均为 `modules/GeoPhys` 和 `modules/asset/external/mujoco_menagerie`。即使保全迁出四个叶管理目录，`modules/asset/external` 等祖先仍会存在；此前单层空 `modules` 合成试验不能直接套用。祖先目录的身份、是否为空、恢复及该操作是否符合原 Goal 均未解决，不递归删除管理目录。复核另指出，整体迁出虽不新增复制，仍会保留两份 Menagerie 现有字节，并非去重；应优先复用已保全内容，不可仅凭 tracked 相同就舍弃 ignored 或管理资料。
 
+随后[双子模块隔离试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/multisubmodule-crash-experiment.json)模拟一层及多层管理路径、未初始化嵌套 gitlink、ignored 文件及外部链接，并在八个步骤后让子进程立即退出；每次由外部进程恢复后，两子模块的 inode、HEAD、原始 Git 文件／配置、嵌套 gitlink 状态、ignored 文件与外部哨兵均符合试验前状态。首次启动因测试程序把相对 Git common-dir 当绝对路径而失败，未进入迁移阶段；修正临时路径解析后重试通过。这不覆盖系统调用中断、断电、非合作并发、xattr 或原始目录属性；预先存放的备份也不是完整持久日志，仍不是可运行于真实工作树的执行器，未进行真实工作树移除。
+
+[独立审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-multisubmodule-crash-experiment-review.md)指出，合成的两个子模块复用了同一嵌套路径，不覆盖真实的三种路径；仅检查外链存在及外部哨兵，未核验其原始文本或实际目标。恢复按路径存在性判断，未防止目标替换，且 `rename` 可覆盖。审查还发现测试 worker 最初可接受任意路径：现已增加临时目录／标记防误用检查，受测主 checkout 路径[被拒绝](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/relocation-worker-guard-test.json)，并重新通过八个合成停止点；该检查不是抵抗恶意替换的安全边界，也不使试验脚本成为真实执行器。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
