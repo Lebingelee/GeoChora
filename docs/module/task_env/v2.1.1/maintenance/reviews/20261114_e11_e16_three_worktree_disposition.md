@@ -31,6 +31,8 @@
 
 进一步的[合成试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/git-noforce-retirement-synthetic-v4.json)在迁出子模块、修改其管理指针并手动删除空管理目录后，普通移除返回成功；但[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-noforce-retirement-v4-review.md)认为这不足以证明没有绕过子模块保护，官方文档也未保证该组合受支持。合成脚本还通过 `info/exclude` 隐藏测试链接，不能照搬真实工作树。真实多子模块、事务恢复和权限场景未验证；不执行该方案。
 
+另外，对指向外部 Git 仓库的 gitlink 符号链接直接执行不带 `--force` 的 `git submodule deinit`，在[隔离合成试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/git-deinit-external-symlink-synthetic.json)中返回失败前，已先把外部仓库的 `.git` 管理目录迁入 worktree 的 `modules`。哨兵内容虽仍在，外部仓库管理状态已改变。此流程不符合外部目标保护边界，**不得对 core-baseline 的两条外链直接使用**；试验只操作了临时目录。五个既有输出根的[当前 checksum 复核](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/output-roots-current-rsync-recheck.json)仍与保留副本一致，范围仅限这些根。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
