@@ -61,6 +61,8 @@
 
 [清单独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-content-baseline-review.md)核对八个清单摘要、路径全集、数量和当前根 inode，并独立抽样 42 次验证普通文件的 SHA、长度及 inode；四个 Git 文件指针均解析到相应管理目录。清单的扩展属性仅有摘要、不能据此恢复值，未保存完整根目录属性、链接数及 atime/ctime；文件打开使用 `O_NOATIME`，目录遍历仍不能保证目录 atime 不变。上述检查不把清单变成备份。
 
+基于上述清单准备了[仅限临时 fixture 的事务原型及八项合成检查](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-relocation-prototype-tests.json)，覆盖同设备不覆盖迁移、已存在目标、日志及源目录符号链接、FIFO 和非 fixture 根拒绝。独立主审在试验过程中先后复现日志符号链接越界写、源目录符号链接越界读和 FIFO 阻塞；各具体反例经修正后复核，见[原型审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-relocation-prototype-review.md)。原型仍不具备真实路径支持、完整清单核验、非合作父目录替换防护、异常对账和完整属性恢复，不能用于真实迁移，也不代表子模块删除条件已满足。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
