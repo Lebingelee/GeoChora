@@ -105,6 +105,8 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 2026-11-14 当前只读 `git status --ignored=matching` 快照：冻结工作树无 tracked/untracked 变化；camera 无 tracked/untracked 变化且列出 56 个 ignored 顶层条目；core-baseline 有两处已知子模块类型变化及 18 个 ignored 顶层条目；旧版本 clean checkout 无 tracked/untracked 变化且列出 66 个 ignored 顶层条目。这里的数字是 Git 压缩显示的条目数，并非文件总数，不证明 owner 已释放或 ignored 内容已保全。四者均未移除。
 
+剩余工作树的[2026-11-14 只读快照](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/remaining-worktrees-20261114.json)另分别测量：冻结 archive 12,279,808、camera 7,301,443,584、core-baseline 37,482,496、旧版 clean checkout 1,993,269,248 分配字节。每项为单独 `du -s -x`，包含其源码和本地子模块，跨对象共享块可能重复计数，不代表候选或可释放空间；不能把它们相加当净空间。camera 的 ignored `workspace` 另测 4,826,411,008 字节、`temp_outputs` 7,069,696 字节；旧版 checkout 两者分别为 40,960／20,480 字节。其内容和归属未确认，均保留。该快照对可见进程 cwd/root/fd 未见命中，但有 1,048 次权限拒绝，不能证明无使用者或未映射内容，也不是删除授权。
+
 当前锁和旧 integration 字面路径的逐类调用及限制见[共享锁与旧路径核对](20261114_e11_e16_u6_lock_path_audit.md)。本 checkout 的新旧锁仍是同一 inode；受守卫锁定向检查 10 项通过，旧路径仍是正式示例依赖，T35 不提前关闭。
 
 ### 项目接收入口（准备中）
