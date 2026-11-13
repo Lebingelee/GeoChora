@@ -71,6 +71,10 @@
 
 原型新增了[只读中断对账及 13 项隔离检查](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/relocation-reconciliation-tests.json)：校验日志顺序、目录 inode 和 Git 指针的旧／目标摘要；未完成意图标为不确定，日志与物理状态不一致、路径穿越及同内容不同 inode 均拒绝。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-relocation-reconciliation-review.md)先后发现并复验修正了未记录移动、`..` 穿越及同内容替换反例。此对账仅识别受控合成状态，不恢复数据，不证明日志真实性、并发路径安全、真实异常恢复或完整属性保存；上一段所列真实迁移条件仍未满足。
 
+随后准备了真实路径[迁移草案](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/live_submodule_move_draft.py)：固定候选、逐对基线和 Git 身份核对、同设备不覆盖迁移、事件记录及迁后比对；真实执行开关始终为 `False`。独立复核指出事务目录父目录同步及迁移前 Git 身份检查的缺口，修订后在[临时 Git fixture](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/live-submodule-move-draft-test.json)通过迁出／恢复等受限检查；[审查记录](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-move-draft-review.md)仍将真实中断对账与恢复列为阻断。与草案日志格式对应的[只读观察与八个意图前后 fixture 还原](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/live-submodule-observe-draft-tests.json)已准备，并能拒绝若干错误状态；[相关审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-observer-review.md)指出的 side-file 跟链、锁退出未明和非对象结果处理已定向修订。合成恢复仅核对根 inode 和原指针字节，并不证明全部内容或属性恢复；没有真实路径恢复实现、恢复过程中再中断对账或已验证的锁／并发防护。上述草案不解决原 Goal 对 worktree 子模块处置的要求。
+
+[恢复 fixture 独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-restore-fixture-review.md)重跑了 13 项状态检查（含 8 个意图状态还原）与 10 项单 Git 仓库组合检查；备份链接或内容篡改会先被拒绝。复核发现原恢复状态曾误称内容全部恢复，现已改为只称指针字节和根 inode；恢复过程再次中断、完整树与嵌套 Git 的恢复仍未证明。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
