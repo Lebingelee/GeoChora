@@ -41,13 +41,13 @@
 
 当前测试样本的独立恢复：从保留对象和索引使用 `workspace/maintenance/v211_e11_e16_u5_20261113_001/materialize_current_test_fixtures.py` 向新空目录复制并校验 112 个文件；在恢复副本上，三份 USD delivery 经 OpenUSD 读取通过、两份 leaf H5 分别经当前 codec 与历史 judge 读取通过、四份 physical H5 的受守卫检查 8 项通过。该复核不依赖原历史目录，也不证明每个历史 reader 或物理运行。测试副本 `/tmp/geochora-u6-fixture-recovery-20261113-001/` 快照占用 46,522,368 分配字节，是本轮临时产物，已按本次授权删除。
 
-U7 的 stage3/stage4 refs 已按具体授权删除；integration 已获条件式删除授权但尚未执行，其余候选仍保留，不进行未经授权的删除或 Git prune。下表记录具体状态；剩余候选在实际操作前仍须核对 owner、忽略文件和其他会话使用情况。
+U7 的 stage3/stage4 refs 已按具体授权删除；integration 此前一次 Git 移除失败，现已按2026-11-14维护者续授权完成残留及 stage5 分支清理，见文末收尾记录。其余候选仍保留，不进行未经授权的删除或 Git prune。
 
 | 对象 | 当前准备与未解决事项 |
 |---|---|
 | 主 checkout `/home/lly/Program_Files/Geochora` 与 `codex/v211-stage5-diagnostic` | 保留；含四份保护输入、最终证据包和当前工作。 |
 | `codex/v211-stage3`、`codex/v211-stage4` | 已按维护者明确授权，以 `git branch -d` 删除；原 ref 分别为 `842e1efd8268a6a99d075640a30840c2eeb4918f`、`3ca161c41340d6015be4fc949ac43771c233ee1c`。删除前确认均为当前 HEAD 祖先、未被工作树检出，refs bundle 与恢复仓库复核通过；[删除收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/approved-stage3-stage4-deletion.json)记录保护 SHA、pins 与恢复入口。本地 heads 9→7，未删除工作树。 |
-| `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | **部分移除失败，需处置。** 维护者授权一次官方 `worktree remove --force`；VS Code 原 cwd 占用退出、复查无可见冲突后执行，Git 返回 `Permission denied`，但已删除该工作树 Git 登记目录。磁盘目录仍存在，旧分支保留，未尝试分支删除或第二次强制移除。详见下方事故与[执行结果](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-approved-removal-execution-result.json)。 |
+| `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | **残留与分支已删除。** 前次 Git 移除失败的事故保留原结论；2026-11-14续授权后逐项核验剩余内容，给368个只读目录补充所有者权限，以不跟随符号链接的目录描述符流程清除已注销残留，再用普通 `git branch -d` 删除旧分支。未重建旧登记、未再次调用 `worktree remove --force`。详见[收尾收据](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/cleanup-result.json)。 |
 | `/home/lly/.codex/worktrees/archive_v1_0_0` | 保留；Git 明确标记为冻结历史参考且锁定。 |
 | `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora` | 暂缓候选；tracked 状态干净但有 ignored 内容，须确认实际归属和保全。 |
 | `workspace/maintenance/geophys_upstream_reset_20261022_001/core-baseline` | 暂缓候选；嵌套注册 worktree，`GeoPhys` 和 `asset/external/mujoco_menagerie` 存在类型变化，不能随父目录递归删除。 |
@@ -79,3 +79,15 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 本次失败尝试前后对同一有序集合（integration 残留、U7 准备含快照、U5 包）测得 `du` 降低 **1,822,535,680 字节**；同期整个 `/home` 所在文件系统 `df` 已用减少 **2,469,957,632 字节**，见[空间收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-partial-removal-space.json)。两者口径不同，后者含并发系统活动；两者均从快照建立之后开始，不能证明扣除原保全新增量后的项目净下降。失败后纯／fake 固定集 240 项通过，U5 3,056 条 stage 映射的 816 个唯一对象 SHA／长度全检无错；主 checkout 的保护文件 SHA 和两个 pins 未变。
 
 [独立项目准备复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-project-preparation-review.md)复算 3,056 条 stage 映射对应的 816 个去重对象，大小和 SHA 均匹配；该数不包括其他 source 索引对象。复核当时确认上述两分支可作为审核候选，后续又复核了获授权的删除结果、GeoPhys ignored 清单及样本恢复。integration 与其他未闭合的工作树仍不可直接移除；U6/U7、项目净下降及维护者项目接收仍 OPEN。
+
+## 2026-11-14：integration 残留与旧阶段分支收尾
+
+维护者授权本轮完成所述删除任务，输入 `fe53e1a9`、当前优化分支，tracked clean。范围仅为已注销的 integration 残留和 `codex/v211-stage5`；约15.4 GB临时快照、Git恢复材料、其余工作树和版本 refs 均保留。前文事故及独立复核是其原时点记录，不是本轮当前状态。
+
+删除前对64,337个残留条目逐项核对：[保全校验](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/audit-result.json)确认40,151个普通文件和6,328条链接与快照对应、3份未跟踪文件与保留副本对应、3,412个文件与保留的Core／Menagerie Git blob对应；两个失效 `.git` 指针另存小副本。全部43,568个普通文件均有保全来源，未跟随链接读取外部目标。复核stage5为当前HEAD祖先、bundle及恢复ref相同，GeoPhys恢复仓库全部10个refs及浅边界保持一致；本轮不恢复前次已经丢失的worktree专用Git配置、reflog等管理元数据。
+
+持主checkout共享锁期间，仅对368个属于当前用户的只读目录补充所有者读／写／执行权限，普通文件权限修改为0；在核对无挂载跨越、嵌套注册工作树和有效子Git管理目录后，使用不跟随链接的 `shutil.rmtree(..., dir_fd=...)` 删除这个已不受Git管理的残留。随后普通 `git branch -d` 成功删除stage5。残留路径已不存在；259个去重外部链接目标的存在性及所查设备／inode／模式／大小／mtime未变，主锁inode、四保护SHA、两pins未变。注册worktree仍为5个（本轮开始前已注销integration），本地heads由7减至6。当前可见进程无目标cwd/fd冲突；`/proc`权限限制与维护者已确认停用的使用安排分别记录在收据中。
+
+删除后纯／fake **240 PASS**、历史H5 **25 PASS**、physical离线读回 **8 PASS**，证据包七项代表离线检查 **PASS**；现有reader按原设计只刷新派生结果JSON，非新native运行。3,056条stage映射的816个唯一对象及包内现存1,370个内容对象（含source等支持对象）的SHA／长度核验通过，原H5／source内容对象未改写。文档检查与先前快照相同：1项既存 `MUJOCO_LOG.TXT` 保护基准错误、79项历史链接问题、0项stale path，本轮保护SHA未变、新增错误0。日志和[内容核验](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/retained-package-integrity.json)保留在本轮ignored目录；生产代码与测试代码修改均为0。
+
+同一次 `du -s -x -B1` 对有序集合“integration残留＋主checkout”计量，包含现有快照及新收尾记录，清理前155,104,763,904、清理后139,519,737,856分配字节，减少 **15,585,026,048字节（约15.59 GB）**；[前测量](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/space-before.json)与[后测量](../../../../../../workspace/maintenance/v211_integration_residual_cleanup_20261114_001/space-after.json)使用相同顺序去重硬链接，测量之后的日志／文档写入另有少量增量。这证明本轮固定范围的下降，不补造建立快照前的E00～E16项目净下降。integration删除事项闭合；临时快照精简、其他工作树处置、累计空间核算及项目最终接收继续OPEN，U4／U5不重开，G06不启动。

@@ -239,7 +239,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | U4 T22～T28 | MAINTAINER_ACCEPTED_BOUNDED_U4_CODE | 单一能力矩阵、当前入口、Skills、[60 项逐行表](../maintenance/reviews/20261113_e11_e16_u4_row_reconciliation.md)及[独立主审／条件接收](../maintenance/reviews/20261113_e11_e16_u4_independent_acceptance.md)已记录；项目和分支仍 OPEN。 |
 | U5 T29～T34 | SELF_ASSESSED_COMPLETE_BOUNDED | [有界证据选择与复核](../maintenance/reviews/20261113_e11_e16_u5_evidence_selection.md)：五 stage、优化五路线及必要诊断入口已冻结，七项代表性离线检查 PASS；限制如报告。原件未删除；T34 的处置授权与执行时 owner/锁核查、U6 清理及 U7 最终接收仍 OPEN。 |
 | U6 T35～T38 | IN_PROGRESS | [目录保留与处置准备](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已列具体候选、保全及锁快照；两份历史 H5 测试已切到保留对象并通过 25 项检查，四份 physical 输入从新位置通过 8 项检查，Panda 和 G05 USD 测试切换到包内文件，定向 pxr source 检查分别 8 项及 5 项通过；六项临时副本和四个历史目录已分别按具体授权删除并完成代表性复核。经维护者确认停用，integration 和主 checkout 旧锁及新路径已统一为同 inode；旧双锁计划和其他 checkout 的限制见处置表。refs/worktree、本地内容保全与项目净空间核算仍 OPEN。 |
-| U7 T39～T44 | PARTIAL_REMOVAL_FAILED | [保留、删除结果及恢复入口](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已核对；stage3/stage4 refs 经具体授权删除，heads 9→7。VS Code 占用退出后，integration 一次获授权官方强制移除因权限错误失败且部分生效：Git 登记已移除，残留目录与 stage5 分支仍在；worktree Git 管理目录未完整备份。已保全的快照与 refs 有界验证仍成立，恢复／清理方案、其他工作树、净空间和维护者项目接收仍 OPEN。 |
+| U7 T39～T44 | IN_PROGRESS_INTEGRATION_RETIRED | [处置与恢复入口](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)记录前次部分失败及2026-11-14维护者续授权收尾：64,337个残留条目逐项保全核验后，仅修复368个目录权限，已注销integration残留和stage5分支均已删除；本地heads 9→6，注册worktree为5（本轮开始前已注销integration）。四保护SHA、pins及包内内容对象不变，240项纯/fake、25＋8项离线H5及七项包检查通过。本轮固定范围下降约15.59 GB；约15.4 GB临时快照仍保留，原Git管理元数据缺口仍明确。其他工作树、快照精简、历史累计空间和维护者项目接收继续OPEN，不重开U4/U5。 |
 
 ### U1 结果（2026-11-13，实施自评）
 

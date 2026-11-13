@@ -61,4 +61,6 @@ O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E
 
 E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务成功及同次 caller Solution 完成；原 Isaac 失败保留在[U3实施结果](reviews/20261113_e11_e16_u3_solution_evidence.md)。维护者同意的[同次联合证据](reviews/20261113_e11_e16_u4_joint_completion.md)已完成离线核对，四条 canonical H5 completion 字段不存在，新 Isaac 字段为 null；H5 单文件不自含完整 completion，独立复审已支持该有界结论。E14 文档与代码范围已按维护者本次条件授权[有界接收](reviews/20261113_e11_e16_u4_independent_acceptance.md)；项目接收另行决定。其后 E15/E16 按具体清单保全、归并、安全清理和恢复，项目优化另行接收；不自动 merge/push/tag/发布或进入 G06。详细检查点、接收 owner 和操作边界均在专用账本。
 
+2026-11-14项目整理进展：U5有界证据归并已完成；integration此前Git移除部分失败，现按维护者续授权完成残留及旧stage5分支清理，当前6个本地heads、5个注册worktree。删除前剩余文件逐项与快照／Git对象核验，删除后240项纯/fake、25＋8项离线H5和七项包检查通过，四保护SHA及pins未变。约15.4 GB临时快照仍保留；其精简、其他worktree处置、历史累计净空间及U6/U7项目接收仍未完成。[当前处置与收尾证据](reviews/20261113_e11_e16_u6_directory_disposition.md)记录了前次Git管理元数据未完整保全的限制，不将本次清理写成完整恢复或整轮项目接收。
+
 2026-11-13 Isaac 夹爪专项返工补充：原 U3 的失败结论按原冻结输入保留。[后续物理对照与修复](reviews/20261113_isaac_gripper_rework_ef10e348.md)确认空载可近零闭合、碰撞方块50 mm，约53.6 mm夹持下可以抬起并保持；原45 mm就绪门阻止了Solution试举。Task现在输出v2稳定关闭读回，Solution连续稳定50 ms后尝试抬升，100 mm成功判据和物理参数不变。相同seed31／1000 horizon的正式Isaac Solution已于951步完成、lift105.254 mm，H5独立读回4755个显式子步及关闭回执成立；腕部RGB有单独430步／431帧控制对照。H5 completion仍为null，U4接收依据独立复审及同次联合证据，而非该专项自行替代主审。
