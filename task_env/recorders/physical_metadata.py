@@ -20,9 +20,6 @@ def physical_record_metadata(env):
     leaf_specs = [dict(path=item.name, shape=item.shape, dtype=item.dtype,
                        semantic=item.semantic, unit=item.unit, frame=item.frame,
                        time_reference=item.time_reference) for item in schema.fields]
-    for field in leaf_specs:
-        if field['path'] == 'state.ee_pose':
-            field['semantic'] = 'source-bound PickCube end-effector site pose'
     source = env.value['source']
     reset_plan = env.value['reset_plan']
     artifact = env.artifact
