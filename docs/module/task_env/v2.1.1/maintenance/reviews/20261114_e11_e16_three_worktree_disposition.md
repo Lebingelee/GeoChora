@@ -33,6 +33,10 @@
 
 另外，对指向外部 Git 仓库的 gitlink 符号链接直接执行不带 `--force` 的 `git submodule deinit`，在[隔离合成试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/git-deinit-external-symlink-synthetic.json)中返回失败前，已先把外部仓库的 `.git` 管理目录迁入 worktree 的 `modules`。哨兵内容虽仍在，外部仓库管理状态已改变。此流程不符合外部目标保护边界，**不得对 core-baseline 的两条外链直接使用**；试验只操作了临时目录。五个既有输出根的[当前 checksum 复核](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/output-roots-current-rsync-recheck.json)仍与保留副本一致，范围仅限这些根。
 
+对 camera／p2 四个已初始化子模块的[只读迁移预检](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-relocation-preflight.json)显示：各 checkout、对应 Git 管理目录和拟保全位置位于同一设备，四者都是浅仓库，未发现 objects alternates；Git 文件和 `core.worktree` 均使用指向旧位置的相对路径，单纯移动目录会破坏其关联。两个 GeoPhys checkout 共三个嵌套 gitlink 原本未初始化。一次[隔离恢复试验](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-relocation-recovery-synthetic.json)在五个顺序阶段分别模拟停止，并恢复 checkout／管理目录 inode、Git 文件、配置、HEAD 和状态；首次试验因迁出后尚未修正 `core.worktree` 而不能通过 `git -C` 打开仓库，修正合成步骤后通过。这是进程内控制的临时实验，不覆盖断电、持久日志、真实嵌套子模块、竞争替换或外链，不构成真实迁移程序。四个真实子模块均未移动。
+
+[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-submodule-relocation-review.md)还发现真实 Git 管理树与单子模块试验不同：[只读目录盘点](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/submodule-admin-parent-shapes.json)中，两处均为 `modules/GeoPhys` 和 `modules/asset/external/mujoco_menagerie`。即使保全迁出四个叶管理目录，`modules/asset/external` 等祖先仍会存在；此前单层空 `modules` 合成试验不能直接套用。祖先目录的身份、是否为空、恢复及该操作是否符合原 Goal 均未解决，不递归删除管理目录。复核另指出，整体迁出虽不新增复制，仍会保留两份 Menagerie 现有字节，并非去重；应优先复用已保全内容，不可仅凭 tracked 相同就舍弃 ignored 或管理资料。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
