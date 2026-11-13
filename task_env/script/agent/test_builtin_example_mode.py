@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import signal
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -15,6 +16,181 @@ if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
 from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+
+
+def test_native_lock_alias_contends_with_legacy_inode(tmp_path, monkeypatch):
+    import fcntl
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    with legacy.open('r+') as existing:
+        fcntl.flock(existing, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with validation._open_shared_native_lock() as alias:
+            assert validation._lock_matches_legacy(alias)
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(alias, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(existing, fcntl.LOCK_UN)
+    with validation._open_shared_native_lock() as alias:
+        fcntl.flock(alias, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(alias, fcntl.LOCK_UN)
+
+
+def test_native_lock_alias_rejects_different_inode(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    alias = tmp_path / 'alias.lock'
+    legacy.touch()
+    alias.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', alias)
+    with pytest.raises(RuntimeError, match='does not match legacy lock'):
+        validation._open_shared_native_lock()
+
+
+def test_native_lock_alias_detects_legacy_replacement(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    with validation._open_shared_native_lock() as alias:
+        assert validation._lock_matches_legacy(alias)
+        replacement = tmp_path / 'replacement.lock'
+        replacement.touch()
+        replacement.replace(legacy)
+        assert not validation._lock_matches_legacy(alias)
+
+
+def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
+    import fcntl
+    import os
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog = tmp_path / 'catalog.json'
+    catalog.write_text('{}')
+    scope = tmp_path / 'scope.json'
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_proc_rss_tree', lambda pid: 0)
+    monkeypatch.setattr(validation, '_directory_bytes', lambda path: (_ for _ in ()).throw(
+        RuntimeError('synthetic monitor failure')))
+    original_popen = subprocess.Popen
+    launched = []
+
+    def spawn_synthetic_worker(*args, **kwargs):
+        worker = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'],
+                                start_new_session=True, preexec_fn=kwargs['preexec_fn'])
+        launched.append(worker)
+        return worker
+
+    monkeypatch.setattr(validation.subprocess, 'Popen', spawn_synthetic_worker)
+    with pytest.raises(RuntimeError, match='synthetic monitor failure'):
+        validation._run_one(spec, catalog, scope, 31, tmp_path / 'output', provider='mujoco')
+    assert len(launched) == 1 and launched[0].poll() is not None
+    with pytest.raises(ProcessLookupError):
+        os.killpg(launched[0].pid, 0)
+    with legacy.open('r+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def test_forced_group_retirement_invalidates_harness_result(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    import builtin_example_validation as validation
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    monkeypatch.setattr(validation, 'CORE', tmp_path)
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_geophys_source', lambda: tmp_path)
+    monkeypatch.setattr(validation, '_cold_read_h5', lambda *args, **kwargs: None)
+    output = tmp_path / 'output'
+
+    @contextmanager
+    def completed_worker(*args, **kwargs):
+        (output / 'run.json').write_text(json.dumps({'runtime_valid': True}))
+        state = {'forced_retirement': False}
+        yield SimpleNamespace(poll=lambda: 0, wait=lambda: 0), state
+        state['forced_retirement'] = True
+
+    monkeypatch.setattr(validation, '_supervised_worker', completed_worker)
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog = tmp_path / 'catalog.json'
+    catalog.write_text('{}')
+    scope = tmp_path / 'scope.json'
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    result = validation._run_one(spec, catalog, scope, 31, output, provider='mujoco')
+    assert result['status'] == 'INVALID'
+    assert result['runtime_valid'] is False
+    assert result['resource_violation'] == 'worker process group required forced retirement'
+
+
+@pytest.mark.parametrize('termination_signal', [signal.SIGTERM, signal.SIGHUP])
+def test_termination_signal_retires_synthetic_worker_before_unlock(tmp_path, termination_signal):
+    import fcntl
+    import os
+    import signal
+    import time
+
+    legacy = tmp_path / 'legacy.lock'
+    legacy.touch()
+    alias = tmp_path / 'locks' / 'native.lock'
+    pid_file = tmp_path / 'worker.pid'
+    script = '''
+import fcntl, os, pathlib, sys, time
+sys.path.insert(0, sys.argv[1])
+import builtin_example_validation as v
+v.LEGACY_LOCK = pathlib.Path(sys.argv[2])
+v.LOCK = pathlib.Path(sys.argv[3])
+with v._open_shared_native_lock() as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with v._supervised_worker([sys.executable, '-c', 'import time; time.sleep(60)'],
+                              environment=os.environ.copy(), stdout=None, stderr=None) as (worker, state):
+        pathlib.Path(sys.argv[4]).write_text(str(worker.pid))
+        time.sleep(60)
+'''
+    supervisor = subprocess.Popen([sys.executable, '-B', '-c', script, str(AGENT_DIR),
+                                   str(legacy), str(alias), str(pid_file)],
+                                  start_new_session=True)
+    worker_pid = None
+    try:
+        deadline = time.monotonic() + 10
+        while not pid_file.exists() and supervisor.poll() is None and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert pid_file.is_file(), 'synthetic worker did not start'
+        worker_pid = int(pid_file.read_text())
+        supervisor.send_signal(termination_signal)
+        assert supervisor.wait(timeout=10) == 128 + termination_signal
+        with pytest.raises(ProcessLookupError):
+            os.killpg(worker_pid, 0)
+        with legacy.open('r+') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    finally:
+        if supervisor.poll() is None:
+            supervisor.kill()
+            supervisor.wait()
+        if worker_pid is not None:
+            try:
+                os.killpg(worker_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def _spec(**changes):

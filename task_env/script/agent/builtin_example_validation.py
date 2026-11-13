@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from dataclasses import replace
 import fcntl
@@ -10,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -22,7 +24,8 @@ else:
     from isaac_core_site_overlay import populate_isaac_core_site_overlay
 
 CORE = Path(__file__).resolve().parents[3]
-LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
+LEGACY_LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
+LOCK = CORE / 'workspace/locks/shared_native_execution.lock'
 CPU_PYTHON = Path(sys.executable)
 MAX_WORKER_LOG_BYTES = 64 * 1024**2
 MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
@@ -32,6 +35,38 @@ ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 
 
 _populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
+
+
+def _lock_matches_legacy(stream):
+    """Fail closed if either pathname no longer names the locked inode."""
+    opened = os.fstat(stream.fileno())
+    current = LOCK.lstat()
+    legacy = LEGACY_LOCK.lstat()
+    return (stat.S_ISREG(opened.st_mode) and stat.S_ISREG(current.st_mode)
+            and stat.S_ISREG(legacy.st_mode)
+            and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
+            == (legacy.st_dev, legacy.st_ino))
+
+
+def _open_shared_native_lock():
+    """Create an alias to the existing lock, never a competing lock inode."""
+    legacy = LEGACY_LOCK.lstat()
+    if not stat.S_ISREG(legacy.st_mode):
+        raise RuntimeError('legacy native lock must be a regular file')
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(LEGACY_LOCK, LOCK, follow_symlinks=False)
+    except FileExistsError:
+        pass
+    fd = os.open(LOCK, os.O_RDWR | os.O_NOFOLLOW)
+    stream = os.fdopen(fd, 'r+')
+    try:
+        if not _lock_matches_legacy(stream):
+            raise RuntimeError('native lock alias does not match legacy lock')
+    except BaseException:
+        stream.close()
+        raise
+    return stream
 
 
 def _isaac_python(explicit=None):
@@ -134,6 +169,77 @@ def _kill_process_group(process, sig):
         os.killpg(process.pid, sig)
     except ProcessLookupError:
         pass
+
+
+def _retire_process_group(process):
+    """Keep the caller's lock held until the supervised group has exited."""
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGHUP})
+    try:
+        interrupted = process.poll() is None
+        if interrupted:
+            try:
+                _kill_process_group(process, signal.SIGTERM)
+            except PermissionError:
+                pass
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    _kill_process_group(process, signal.SIGKILL)
+                except PermissionError:
+                    pass
+                process.wait()
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return interrupted
+            except PermissionError:
+                # Do not release the lock when group retirement is unknown.
+                interrupted = True
+                time.sleep(.1)
+                continue
+            if time.monotonic() >= deadline:
+                interrupted = True
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    return interrupted
+                except PermissionError:
+                    pass
+            time.sleep(.1)
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+
+@contextmanager
+def _supervised_worker(command, *, environment, stdout, stderr):
+    """Turn termination signals into cleanup and close the startup window."""
+    def interrupted(signum, frame):
+        raise SystemExit(128 + signum)
+
+    previous_handlers = {sig: signal.signal(sig, interrupted) for sig in (signal.SIGTERM, signal.SIGHUP)}
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGHUP})
+    state = {'forced_retirement': False}
+    try:
+        def prepare_child():
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            _set_child_affinity()
+
+        process = subprocess.Popen(
+            command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
+            start_new_session=True, preexec_fn=prepare_child,
+        )
+        try:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            yield process, state
+        finally:
+            state['forced_retirement'] = _retire_process_group(process)
+    finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
 
 
 def _cold_read_h5(output, receipt, *, provider):
@@ -298,7 +404,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
                '--working-tree-scope', str(scope_path), '--seed', str(seed),
                '--output', str(output)]
     wall_start = time.perf_counter()
-    with LOCK.open('a') as lock_stream:
+    with _open_shared_native_lock() as lock_stream:
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -309,6 +415,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
             })
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': 'another process owns the shared native execution lock'}
+        if not _lock_matches_legacy(lock_stream):
+            raise RuntimeError('native lock alias changed while acquiring lock')
         _write_json(output / 'run_preflight.json', {
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
             'status': 'READY', 'mem_available_start_bytes': mem_start,
@@ -316,70 +424,56 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
             'shared_native_lock_path': str(LOCK), 'cpu_affinity_slots': 4,
         })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-            process = subprocess.Popen(
-                command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
-                start_new_session=True, preexec_fn=_set_child_affinity,
-            )
-            timed_out = False
-            resource_violation = None
-            while process.poll() is None:
-                elapsed = time.perf_counter() - wall_start
-                if elapsed > timeout_s:
-                    timed_out = True
-                    resource_violation = f'wall watchdog {timeout_s}s exceeded'
-                    _kill_process_group(process, signal.SIGTERM)
+            with _supervised_worker(command, environment=environment, stdout=stdout, stderr=stderr) as (process, worker_state):
+                timed_out = False
+                resource_violation = None
+                while process.poll() is None:
+                    elapsed = time.perf_counter() - wall_start
+                    if elapsed > timeout_s:
+                        timed_out = True
+                        resource_violation = f'wall watchdog {timeout_s}s exceeded'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
                     try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                try:
-                    available = _mem_available_bytes()
-                    rss = _proc_rss_tree(process.pid)
-                    gpu_free = _gpu_free_mib() if provider == 'isaacsim' else None
-                except Exception as error:
-                    resource_violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
-                    _kill_process_group(process, signal.SIGTERM)
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                if available < 1024**3:
-                    resource_violation = f'MemAvailable below 1 GiB: {available}'
-                elif rss > 10 * 1024**3:
-                    resource_violation = f'process-group RSS above 10 GiB: {rss}'
-                elif provider == 'isaacsim' and gpu_free < 256:
-                    resource_violation = f'GPU free memory below 256 MiB: {gpu_free}'
-                elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
-                    resource_violation = 'worker stdout/stderr exceeded 64 MiB log budget'
-                elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
-                    resource_violation = 'run output exceeded 2 GiB evidence budget'
-                if resource_violation:
-                    _kill_process_group(process, signal.SIGTERM)
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        _kill_process_group(process, signal.SIGKILL)
-                    break
-                time.sleep(1.0)
-            returncode = process.wait()
-            worker_process_wall_s = time.perf_counter() - wall_start
-        # The run lock is retained through direct worker exit and process-group
-        # retirement so an abnormal Kit shutdown cannot overlap a new run.
-        pg_alive = True
-        for _ in range(50):
-            try:
-                os.killpg(process.pid, 0)
-            except ProcessLookupError:
-                pg_alive = False
-                break
-            time.sleep(0.1)
-        if pg_alive:
-            _kill_process_group(process, signal.SIGTERM)
-            time.sleep(0.5)
-            _kill_process_group(process, signal.SIGKILL)
-            resource_violation = resource_violation or 'worker process group did not end after parent exit'
+                        available = _mem_available_bytes()
+                        rss = _proc_rss_tree(process.pid)
+                        gpu_free = _gpu_free_mib() if provider == 'isaacsim' else None
+                    except Exception as error:
+                        resource_violation = f'resource monitoring unavailable: {type(error).__name__}: {error}'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
+                    if available < 1024**3:
+                        resource_violation = f'MemAvailable below 1 GiB: {available}'
+                    elif rss > 10 * 1024**3:
+                        resource_violation = f'process-group RSS above 10 GiB: {rss}'
+                    elif provider == 'isaacsim' and gpu_free < 256:
+                        resource_violation = f'GPU free memory below 256 MiB: {gpu_free}'
+                    elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
+                        resource_violation = 'worker stdout/stderr exceeded 64 MiB log budget'
+                    elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
+                        resource_violation = 'run output exceeded 2 GiB evidence budget'
+                    if resource_violation:
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
+                    time.sleep(1.0)
+                returncode = process.wait()
+                worker_process_wall_s = time.perf_counter() - wall_start
+            group_intervened = worker_state['forced_retirement']
+        pg_alive = False
+        if group_intervened:
+            resource_violation = resource_violation or 'worker process group required forced retirement'
         fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
     _write_json(output / 'lock_receipt.json', {
         'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
@@ -390,7 +484,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else None
     cold_read = _cold_read_h5(output, receipt, provider=provider)
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else receipt
-    status = 'RUNTIME_VALID' if receipt and receipt.get('runtime_valid') and returncode == 0 else 'INVALID'
+    status = ('RUNTIME_VALID' if receipt and receipt.get('runtime_valid')
+              and returncode == 0 and resource_violation is None else 'INVALID')
     return {
         'seed': seed, 'provider': provider, 'status': status,
         'returncode': returncode, 'timed_out': timed_out,
@@ -406,7 +501,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         'worker_stdout': str(stdout_path.relative_to(CORE)),
         'worker_stderr': str(stderr_path.relative_to(CORE)),
         'task_outcome': receipt.get('task_outcome') if receipt else None,
-        'runtime_valid': receipt.get('runtime_valid') if receipt else False,
+        'runtime_valid': status == 'RUNTIME_VALID',
         'isaac_app_launch_profile_id': (
             receipt.get('isaac_app_launch_profile', {}).get('profile_id')
             if receipt and isinstance(receipt.get('isaac_app_launch_profile'), dict) else None

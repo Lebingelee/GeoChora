@@ -31,7 +31,9 @@
 
 四个历史目录删除前的 [符号链接与 worktree 快照](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-candidate-symlink-worktree-snapshot.json)：4a 和 4c 各 0 条符号链接；4b 有 19 条全部指向目录外，其中包含 integration checkout 的 pytest 临时路径和当前 Python 环境的第三方包；5c unit4 有 67 条，解析后均在其目录内。所查四个目录没有发现嵌套 `.git` 标记或已注册 worktree。执行任何获授权的目录操作都不得跟随符号链接，尤其不得触及其外部目标；此快照不证明 owner 或活动状态。
 
-锁调用补查：当前 `task_env/script/agent/builtin_example_validation.py` 仅持有本 checkout 的旧锁；U3 保留的监督器和计划按 integration 锁、主 checkout 锁的顺序分别获取两把。当前 checkout 和 integration checkout 各有多份历史 supervisor 固定引用各自旧锁；版本化的三个 probe 接收计划提供的 `locks_in_order`。因此现在只切换示例验证器或只更换其中一个 inode，会与仍运行旧代码的执行端失去共同互斥。2026-11-13 14:01 UTC 的 [锁与测试输入快照](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-current-fixture-lock-verification.json)未看到这两把锁被持有；进程名检查未找到所查 supervisor／native 进程，Codex 列表中有关项目其他可见会话为 idle 或 notLoaded。这些是瞬时观察，不排除其他运行端、权限不可见进程或后续启动。保留两把锁及原计划；最终迁移前须先确定所有实际运行端并制定共用锁与过渡顺序，禁止 unlink 现有锁。
+锁调用与过渡：示例验证器现使用 `workspace/locks/shared_native_execution.lock`，它是本 checkout 历史锁的硬链接，打开及获取时核对同一设备和 inode；旧锁缺失、替换或不匹配时拒绝运行。实测主 checkout 两条路径同为设备 2052、inode 29918777；integration 旧锁仍是独立 inode 33310300。旧调用者仍引用各自旧路径，U3 监督器按 integration、主 checkout 顺序获取两把；示例自身仅获取本 checkout 锁，不能声称跨 worktree 互斥已统一。2026-11-13 14:01 UTC 的 [锁与测试输入快照](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-current-fixture-lock-verification.json)未见这两把锁被持有，但存在进程可见性限制，不能证明全部 owner 已释放。保留两把锁、两个主 checkout 路径及原计划，禁止运行期间替换或 unlink；T35 跨 worktree 统一仍 OPEN。
+
+监督器原先可能在监控异常或终止信号后提前放锁，现于所测路径持锁直至进程组退休；强制退休使运行结果 INVALID。[独立只读复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-lock-transition-review.md)对本地过渡未发现新增阻断：七项受守卫的锁争用、替换、合成进程异常／SIGTERM／SIGHUP及强制退休状态检查通过；最终实现另通过固定纯/fake 入口 240 项。未运行 native；SIGKILL、宿主故障、未处理或重复信号、逃逸进程组以及运行时路径被替换等仍不受保证，不能据此认定全局锁安全。
 
 本轮测试后复核 G05 24 个文件和 Panda delivery 82 个文件，内容 SHA 均属于 U5 保留选择；这只是文件字节核验。
 
