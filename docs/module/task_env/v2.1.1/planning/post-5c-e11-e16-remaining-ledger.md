@@ -237,7 +237,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | U2 T08～T14 | SELF_ASSESSED_COMPLETE | 正式 caller、batch 边界、完成事实及 LIBERO 检查见[U2 caller 对账](../maintenance/reviews/20261113_e11_e16_u2_caller_review.md)；输出为本行所在提交。直接 Isaac 与完整 Solution 的真实执行归 U3，独立主审和维护者接收归 U4，不由实施者自封。 |
 | U3 T15～T21 | IMPLEMENTED_REVIEW_PENDING | 原五条完整尝试见[U3 实施结果](../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)，旧 Isaac 失败原样保留；后续 `0506ae26` 的 `solution-002` 完成原任务。维护者同意的 T19 同次联合口径及五路读回见[联合证据](../maintenance/reviews/20261113_e11_e16_u4_joint_completion.md)，H5 单文件不自含完整 completion；T19/T20 的有界联合口径已通过 U4 独立复审，限制保持明确。 |
 | U4 T22～T28 | MAINTAINER_ACCEPTED_BOUNDED_U4_CODE | 单一能力矩阵、当前入口、Skills、[60 项逐行表](../maintenance/reviews/20261113_e11_e16_u4_row_reconciliation.md)及[独立主审／条件接收](../maintenance/reviews/20261113_e11_e16_u4_independent_acceptance.md)已记录；项目和分支仍 OPEN。 |
-| U5 T29～T34 | NOT_STARTED | 待最终证据归并与独立复算，不删除原件 |
+| U5 T29～T34 | SELF_ASSESSED_COMPLETE_BOUNDED | [有界证据选择与复核](../maintenance/reviews/20261113_e11_e16_u5_evidence_selection.md)：五 stage、优化五路线及必要诊断入口已冻结，七项代表性离线检查 PASS；限制如报告。原件未删除；T34 的处置授权与执行时 owner/锁核查、U6 清理及 U7 最终接收仍 OPEN。 |
 | U6 T35～T38 | NOT_STARTED | 待具体清单、保全及处置授权 |
 | U7 T39～T44 | NOT_STARTED | 待安全移除、恢复核查及项目接收 |
 
