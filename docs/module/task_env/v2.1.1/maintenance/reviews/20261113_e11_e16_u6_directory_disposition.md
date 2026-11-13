@@ -105,6 +105,8 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 2026-11-14 当前只读 `git status --ignored=matching` 快照：冻结工作树无 tracked/untracked 变化；camera 无 tracked/untracked 变化且列出 56 个 ignored 顶层条目；core-baseline 有两处已知子模块类型变化及 18 个 ignored 顶层条目；旧版本 clean checkout 无 tracked/untracked 变化且列出 66 个 ignored 顶层条目。这里的数字是 Git 压缩显示的条目数，并非文件总数，不证明 owner 已释放或 ignored 内容已保全。四者均未移除。
 
+当前锁和旧 integration 字面路径的逐类调用及限制见[共享锁与旧路径核对](20261114_e11_e16_u6_lock_path_audit.md)。本 checkout 的新旧锁仍是同一 inode；受守卫锁定向检查 10 项通过，旧路径仍是正式示例依赖，T35 不提前关闭。
+
 ### 项目接收入口（准备中）
 
 * **代码范围：** [U4 独立主审及有界接收](20261113_e11_e16_u4_independent_acceptance.md)；不因项目清理重开。T19 的同次联合证据及 H5 单文件不自含完整 completion 的限制见 [联合证据报告](20261113_e11_e16_u4_joint_completion.md)。
