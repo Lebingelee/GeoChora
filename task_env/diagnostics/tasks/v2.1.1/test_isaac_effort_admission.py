@@ -224,7 +224,7 @@ def test_usd_formal_task_lift_reaches_artifact_and_reset(profile, monkeypatch):
     monkeypatch.setattr(source_composition_adapters, 'build_panda_source_effort_profile', record)
 
     root = Path(__file__).resolve().parents[4]
-    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    manifest = root / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     config = resolve_task_env_config(PickCubeReferenceEnv, {
@@ -297,7 +297,7 @@ def test_custom_action_config_produces_same_mjcf_and_usd_readiness():
     from task_env.tasks.pick_cube import specialization
 
     root = Path(__file__).resolve().parents[4]
-    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    manifest = root / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     config = specialization._environment_config()
@@ -378,7 +378,7 @@ def test_usd_position_compiles_robot_subject_and_actual_controller_plan(monkeypa
     from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     root = Path(__file__).resolve().parents[4]
-    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    manifest = root / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     from task_env.controllers.canonical.execution import ReferenceExecutionController
@@ -476,7 +476,7 @@ def test_usd_controller_failure_does_not_allocate_mjcf_snapshot(monkeypatch):
     from task_env.tasks.pick_cube.specialization import make_reference_binding
 
     root = Path(__file__).resolve().parents[4]
-    manifest = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    manifest = root / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
     if not manifest.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     def unexpected(*args, **kwargs):
@@ -550,7 +550,7 @@ def test_pickcube_usd_rejects_stale_source_before_controller_binding(tmp_path, m
     from task_env.tasks.pick_cube.specialization import PickCubeReferenceEnv
 
     root = Path(__file__).resolve().parents[4]
-    original = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+    original = root / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
     if not original.is_file():
         pytest.skip('verified Isaac source delivery is unavailable')
     manifest = install_usd_delivery(original, provider='isaacsim', robot_uid='panda-v1', root=tmp_path)

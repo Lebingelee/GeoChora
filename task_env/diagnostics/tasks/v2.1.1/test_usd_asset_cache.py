@@ -10,7 +10,7 @@ from task_env.environment.configuration import resolve_task_env_config
 
 ROOT = Path(__file__).resolve().parents[4]
 G05 = ROOT / 'workspace/maintenance/v211_g05_5c_unit005_isaac_continuation_20261110_002/g05-delivery-014'
-PANDA = ROOT / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json'
+PANDA = ROOT / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json'
 
 
 @pytest.mark.parametrize(('task_uid', 'robot_uid', 'manifest', 'profile'), [

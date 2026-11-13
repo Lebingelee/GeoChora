@@ -128,6 +128,13 @@ the hashes above; verify them when substituting another input set.
 oracle. Its old `load_leaf_control_records_h5` name is intentional and is
 not a production fallback.
 
+The Panda Isaac source admission tests use the retained U5
+`assets/isaac-panda/restored/isaac-delivery/delivery_manifest.json` and its
+manifest-relative source and USD files. These source-construction checks require
+OpenUSD (`pxr`) and are not part of the pure/fake mode; no Isaac App or solver
+run is implied. The separate G05 pendulum/two-wheel delivery inputs still use
+their original locations.
+
 ## Migration and historical references
 
 - `test_v211_physical_control_contract.py`: 19 current provider-free
