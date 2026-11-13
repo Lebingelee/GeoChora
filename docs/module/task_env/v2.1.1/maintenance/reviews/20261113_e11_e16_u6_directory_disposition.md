@@ -113,6 +113,12 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 当前锁和旧 integration 字面路径的逐类调用及限制见[共享锁与旧路径核对](20261114_e11_e16_u6_lock_path_audit.md)。本 checkout 的新旧锁仍是同一 inode；受守卫锁定向检查 10 项通过，旧路径仍是正式示例依赖，T35 不提前关闭。
 
+只读[预检 v3](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/read-only-preflight-v3-20261114.json)再次通过：不跟随符号链接逐路径核对快照和全量恢复文件、父目录属性以及 561 个 U5 对象；快照与恢复各读取 9,234,545,951 内容字节。新增输出目录固定 fd、独占创建和 U5 包根保护，并检查恢复文件 xattr；10 项合成预检通过。[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-preflight-output-fix-review.md)确认两处已发现的输出误写问题在所测边界修复；审计目录／祖先被非合作进程移动等仍不保证。v2 先于输出防护修订，不能证明新防护；v3 启动后观察到的脚本 SHA 与报告摘要另见[身份记录](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/preflight-v3-code-identity.json)，不是签名执行证明。v3 首次启动时手工输错 manifest 摘要，程序在只读检查前拒绝且未产生报告；修正后通过。
+
+只在新建临时目录进行 3 项两文件事务试验和单目录 SIGKILL 后 mode／mtime 恢复试验；这些均为合成试验，未验证真实候选 unlink、断电或完整重启恢复，部分删除也不会自动回滚。
+
+快照候选的具体路径、保留材料、恢复限制、预计权限处理与中止要求列于[处置方案草案](20261114_e11_e16_u6_snapshot_disposition_plan.md)；目前尚无完成审查的真实执行器，草案不是删除授权。
+
 ### 项目接收入口（准备中）
 
 * **代码范围：** [U4 独立主审及有界接收](20261113_e11_e16_u4_independent_acceptance.md)；不因项目清理重开。T19 的同次联合证据及 H5 单文件不自含完整 completion 的限制见 [联合证据报告](20261113_e11_e16_u4_joint_completion.md)。
