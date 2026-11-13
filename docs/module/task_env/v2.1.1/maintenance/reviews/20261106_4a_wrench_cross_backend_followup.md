@@ -18,7 +18,7 @@ GeoPhys [UI 文档](../../../../../../GeoPhys/docs/guides/simulation-ui.md)确�
 
 ## 另一项已确认的候选／计划差异
 
-[A05 候选 profile](../../../../../../task_env/tasks/position_candidate/physical_profile.py)把手部作用点设为 body-local `(0.01,0,0)`，力矩参考点设为 body-local 原点；`native05` 对这个 profile 输入 body-frame `(0,0,1)` N 和参考点处零总力矩。[4b 候选计划](../../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/4b-plan.md)则规定 world `(0,0,1)` N、body-local 同一偏置作用点、以该作用点为参考的零力矩。这不仅 force frame 不同，参考点也不同。
+A05 候选 profile（该源码已退休；原审查提交可用 `git show 0bb15ff8732323ce0dd06b45196053aa16b5e712:task_env/tasks/position_candidate/physical_profile.py` 恢复，Git blob `cec5914b6df12cf1e1f6abfe53303e3cf7e6a868`）把手部作用点设为 body-local `(0.01,0,0)`，力矩参考点设为 body-local 原点；`native05` 对这个 profile 输入 body-frame `(0,0,1)` N 和参考点处零总力矩。[4b 候选计划](../../../../../../workspace/maintenance/v211_g04_4a_attempt002_recovery/4b-plan.md)则规定 world `(0,0,1)` N、body-local 同一偏置作用点、以该作用点为参考的零力矩。这不仅 force frame 不同，参考点也不同。
 
 以姿态单位阵、body 原点 `(0,0,0)`、点 `(0.01,0,0)`、F `(0,0,1)` N 为纯算术例，依[当前 resolver](../../../../../../task_env/runtime/sessions/physical_control.py) 的“torque 是关于 reference 的总力矩”语义：候选指定原点零总力矩，换算后原点力矩为 0；4b 若在作用点指定零力矩，原点力矩为 `(0,-0.01,0)` N·m。候选的结果与其当前声明一致，不能仅因数值不同判为代码数学错误；但不能把 `native05` 当作 4b 的偏心作用力。独立 pure probe 和日志在 ignored `workspace/maintenance/v211_g04_wrench_followup_sol/{point_reference_probe.py,point_reference_probe.log}`，SHA-256 分别 `6cefa0548d179960005fb72905b7df00e07780f1dd0aca8aad04ea01f5426081`、`6fa74668fd4f6f02498911fe060e22fd25effab3eabc61af01b55e4c9079c0d6`，使用 SDK/XML 导入防护，无真实构造或物理步。后续须明确“纯力施加在 point”与“指定关于 reference 的总力矩”的输入解释，并为两者提供可区分的测试；如复用现有 candidate 作为 4b case，修正其配置或选择匹配计划的其他现有 owner，不能在运行后改 oracle。
 

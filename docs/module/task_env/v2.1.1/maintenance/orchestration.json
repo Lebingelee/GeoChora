@@ -1,7 +1,7 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
   "updated_date": "2026-11-13",
-  "status": "POST_5C_E00_E10_ACCEPTED_E11_E16_PLANNED",
+  "status": "POST_5C_E11_E16_IMPLEMENTATION_IN_PROGRESS",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
   "documentation_authorized": true,
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "E00-E10 maintainer accepted within each bounded scope. E11-E16 detailed ledger and Goal prepared; not started. Complete full E13 Solutions and code acceptance before evidence/refs cleanup; no automatic G06.",
+  "next_action": "U1/U2 self-assessed; U3 five full attempts and readbacks recorded with T19 open. Complete U4 code/document reconciliation and independent review; code and project maintainer acceptance remain separate; do not start G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2082,15 +2082,15 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "E00_E10_ACCEPTED_E11_E16_PLANNED",
+    "status": "E00_E10_ACCEPTED_E11_E16_IMPLEMENTATION_IN_PROGRESS",
     "date": "2026-11-13",
-    "authority": "Maintainer explicitly accepted E05-E10 on 2026-11-13 in current conversation and requested E11-E16 analysis, detailed ledger and adjusted Goal; planning only.",
+    "authority": "Maintainer accepted E05–E10 and started the E11–E16 implementation Goal; CUDA and Isaac EULA were explicitly authorized. Deletion and maintainer acceptance remain separate.",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "7a098423",
-    "current_step": "E11-E16 planning complete, implementation not started",
-    "next_step": "Execute seven units using the dedicated E11-E16 ledger after implementation authorization; code acceptance and project acceptance remain separate.",
+    "current_step": "U1/U2 self-assessed, U3 implemented with T19 open, U4 implementation ready for independent review",
+    "next_step": "Complete U4 actual-code independent review and obtain maintainer code acceptance; then prepare U5 evidence consolidation before authorized cleanup.",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
@@ -2112,12 +2112,12 @@
       "E08": "MAINTAINER_ACCEPTED_BOUNDED",
       "E09": "MAINTAINER_ACCEPTED_BOUNDED",
       "E10": "MAINTAINER_ACCEPTED_BOUNDED",
-      "E11": "PLANNED_NOT_STARTED",
-      "E12": "PLANNED_NOT_STARTED",
-      "E13": "PLANNED_NOT_STARTED",
-      "E14": "PLANNED_NOT_STARTED",
-      "E15": "PLANNED_NOT_STARTED",
-      "E16": "PLANNED_NOT_STARTED"
+      "E11": "IMPLEMENTED_SELF_ASSESSED_PENDING_REVIEW",
+      "E12": "IMPLEMENTED_SELF_ASSESSED_PENDING_REVIEW",
+      "E13": "IMPLEMENTED_WITH_OPEN_T19",
+      "E14": "IMPLEMENTED_REVIEW_PENDING",
+      "E15": "NOT_STARTED",
+      "E16": "NOT_STARTED"
     },
     "e00_e04_prior_increment_snapshot": {
       "implementation_attempt_count": 1,
@@ -2196,7 +2196,7 @@
       "scope": "E05-E10 bounded implementation only; full Solutions, whole code/project acceptance and G06 remain pending."
     },
     "e11_e16_plan": {
-      "status": "PLANNED_NOT_STARTED",
+      "status": "IMPLEMENTATION_IN_PROGRESS",
       "date": "2026-11-13",
       "input_head": "a6b107ac43bed77565a643612372c6c76e641511",
       "ledger_ref": "../planning/post-5c-e11-e16-remaining-ledger.md",
@@ -2204,11 +2204,22 @@
       "units": 7,
       "checkpoints": 44,
       "snapshot_ref": "../../../../../workspace/maintenance/v211_e11_e16_replan_20261113_001/input-snapshot.json",
-      "implementation_started": false,
+      "implementation_started": true,
       "native_runs_this_planning_delivery": 0,
       "deletions_this_planning_delivery": 0,
       "local_heads_observed": 9,
-      "worktrees_observed": 6
-    }
+      "worktrees_observed": 6,
+      "execution_checkpoint": {
+        "u1_commit": "d0c25ae49afe3e1fceebaa9fa77f35587447976e",
+        "u2_commit": "1ff617d0c441ea7968c90f23b1bdb027ae5b65d8",
+        "u3_commit": "5742e956",
+        "u3_status": "IMPLEMENTED_WITH_OPEN_T19",
+        "u3_evidence_ref": "reviews/20261113_e11_e16_u3_solution_evidence.md",
+        "u4_status": "IMPLEMENTED_REVIEW_PENDING",
+        "code_maintainer_acceptance": false,
+        "project_maintainer_acceptance": false
+      }
+    },
+    "planning_authority": "Maintainer explicitly accepted E05-E10 on 2026-11-13 in current conversation and requested E11-E16 analysis, detailed ledger and adjusted Goal; planning only."
   }
 }

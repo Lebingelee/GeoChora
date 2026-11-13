@@ -218,7 +218,14 @@ def source_link_exists(ref: str, source_path: str, rel: str, anchor: str) -> boo
             data = show(ref, target_path).decode("utf-8")
         except (subprocess.CalledProcessError, UnicodeDecodeError):
             return False
-    return not anchor or anchor in anchors(data)
+    if not anchor:
+        return True
+    line_range = re.fullmatch(r"L([1-9][0-9]*)(?:-L([1-9][0-9]*))?", anchor)
+    if line_range:
+        first = int(line_range.group(1))
+        last = int(line_range.group(2) or first)
+        return first <= last <= len(data.splitlines())
+    return anchor in anchors(data)
 
 
 def is_historical_path(path: str, entry: dict | None) -> bool:

@@ -2,7 +2,7 @@
 
 3b attempt001 对既有环境执行了三路线短程检查，结果和限制见[3b attempt001执行摘要](../maintenance/reviews/20261105_3b_attempt001_execution.md)。GeoPhys 原生 rigid solver 不消费未选的 MuJoCo solver 声明；显式选择后者时仍检查其版本。Core 与 SDK 的安装清单和所选运行链依赖分开判定；这不证明两份 requirements 可以整体混装。
 
-本页记录阶段3前维护中的入口；环境统一与下列组合的最终验收尚未完成。命令中的路径是占位符。仓库无根 packaging metadata，不使用 `pip install -e .`。训练和 renderer 都不是 state-only 首次启动的前提。
+本页记录当前公开入口及其受测边界；全面代码／项目接收和版本最终验收尚未完成。命令中的路径是占位符。仓库无根 packaging metadata，不使用 `pip install -e .`。训练和 renderer 都不是 state-only 首次启动的前提。
 
 ## 新克隆与已有安装
 
@@ -37,9 +37,9 @@ GEOPHYS_SRC=/absolute/path/to/GeoPhys/src
   --provider geophys --backend cpu --renderer none --seed 73
 ```
 
-此命令重置一次、执行一个零扭矩 transition 并 close；`empty-v1` 和 `two-wheel-balance-v1` 也有对应 scalar 路线。选择 `--renderer rasterizer` 仅路由到已有 Pendulum RGB 示例。选择 `pick-cube-p16-reference-v1` 或 `nut-assembly-outcome-reference-v1` 时使用现有 task-owned Expert 示例，`--provider` 可选 `geophys` 或 `mujoco`，`--backend cpu --renderer none`。这些 Expert 示例执行至完成或 horizon，而不是一 transition。当前 selected 的 `--renderer` 非 `none` 会明确拒绝。
+此命令重置一次、执行一个零扭矩 transition 并 close；`empty-v1` 和 `two-wheel-balance-v1` 也有对应 scalar 路线。选择 `--renderer rasterizer` 仅路由到已有 Pendulum RGB 示例。选择 `pick-cube-p16-reference-v1` 或 `nut-assembly-outcome-reference-v1` 时使用现有 task-owned Expert 示例，`--provider` 可选 `geophys` 或 `mujoco`，`--backend cpu --renderer none`。这些 Expert 示例执行至完成或 horizon，而不是一 transition。此启动脚本对 selected 任务的非 `none` renderer 明确拒绝；正式配置的受测 task RGB 能力以[能力矩阵](../capabilities/README.md)为准。
 
-Isaac PickCube 的公开入口示例如下，**本轮尚未原生运行**：
+Isaac PickCube 的公开入口示例如下。该交集已做单 seed 完整尝试和同次独立读回：runtime valid，任务与 Solution 未成功；v3 H5 的 caller completion 字段缺失仍需独立主审，详见[U3 结果](../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)：
 
 ```sh
 "$PY" "$CORE/examples/start.py" --python "$PY" --core "$CORE" \
@@ -49,6 +49,8 @@ Isaac PickCube 的公开入口示例如下，**本轮尚未原生运行**：
 ```
 
 `--isaac-python` 优先于 `ISAAC_SIM_PYTHON`；启动器要求两者之一。Isaac App 需要所选 SDK 的许可和环境，直接入口使用已安装 USD 资产；高级 F06 Harness 的 manifest 仍须匹配其冻结准入。缺解释器、GeoPhys `scene` 源码、已安装资产或不支持的组合会报错；不会下载或静默切换。直接 Isaac 示例不设置地址空间上限，资源规划需另行覆盖子进程。`GEOCHORA_GEOPHYS_SRC`、`GEOCHORA_CORE_PYTHON` 由启动器传入子进程；一般直接示例也可用前者选择已有 GeoPhys `src`。如果 `scene` 已从其他路径导入，bootstrap 要求使用新解释器，避免混用。
+
+启动器使用直接示例默认的 420 秒墙时限制，慢速主机可能在完整运行前超时；U3 在该机器的受监督复验使用 900 秒并耗时约 591 秒。需要调整时可直接运行 `examples/tasks/pick_cube.py --provider isaacsim --isaac-python <解释器> --seed 31 --horizon 1000 --time-limit-s 900`，并按本机情况为整个进程树另设资源计划；这不是完成或成功的保证。
 
 参数与错误路由已离线检查；上述启动命令和 renderer 在本维护版本的 native 运行仍待验收，不能因 `--help` 或离线测试通过而视为运行成功。
 

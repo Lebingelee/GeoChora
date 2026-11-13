@@ -27,7 +27,7 @@
 1. 查询某任务／资产的能力和拒绝原因，选择三个首批 physics 路线之一，查看解析配置。
 2. state-only 构建、reset、step、记录和 close，独立读回同次运行；不要求安装 renderer 才能使用 state-only。
 3. 配置窗口观察相机并 render；另配任务相机，采集离屏 RGB，并证明无需额外 render 即从 reset／step 获取同步图像。
-4. 同一个public Env通过reset切换已支持 backend／renderer，按任务初始化新 episode，观察旧数据失效和失败后的恢复操作。
+4. 同一个 public Env 在已支持的配置边界内通过 reset 切换 backend／Controller，按任务初始化新 episode，观察旧数据失效和失败后的恢复操作；renderer 在构建时选择并固定至 close，不通过 reset 切换。
 5. reset 切换 Controller，读取新的 action spec／space；展示Robot／组件binding、关节／末端参考、direct joint effort及有界BodyWrench组合的语义差别。
 6. 在已验证的两个以上后端建立小 batch；展示部分 reset、终止帧、固定动作规格及整批切换。
 7. 用 NutAssembly 复用上述公共配置，明确实际支持的子集。
@@ -40,4 +40,4 @@
 
 新增后端／切换／控制／render／batch示例随阶段3–6的真实实现添加，7a/7c检查调用者可用性；不据此延期前述新手基础交付。本页当前只有交付要求，没有新增运行示例、训练或仿真结果。
 
-- [Panda 本体重力补偿](panda-gravity-compensation.md)：MuJoCo CPU 进程内默认关闭的有界实现与限制，待独立复审。
+- [Panda 本体重力补偿](panda-gravity-compensation.md)：MuJoCo CPU 进程内默认关闭的有界实现与限制，按 G03 既有范围接收；原严格失败及其他 provider 限制保留。

@@ -126,7 +126,9 @@ MuJoCo／GeoPhys 旧 selected CPU RuntimeSession 的 `snapshot_free_joint_native
 
 GeoPhys 的 `GeoPhysRuntimeBoundary.read_model_snapshot()` 委托 provider 的 `RigidSolver.read_model_snapshot()`，从该次物化的有效字段复制 body、joint、actuator、equality 和 tendon 值；session build facts 将 provider ID 绑定到同一来源名称。该快照不推进物理，缺失字段明确标注 unavailable。Isaac F06 另保存同一 bootstrap 边界的公开 Jacobian 和 tensor 连杆姿态，供轴方向与来源独立比较；读取前后物理计数必须一致。这些只读事实不构成跨 provider 功能认证。
 
-## 4b 有界物理控制路线
+## 4b 有界物理控制路线（历史记录）
+
+本节保留原 4b 实验时点的 source、控制语义和证据；其中 candidate UID 已退休，当前正式构造使用上文 `make_env` 和 profile 配置。历史文字中的候选接口不能作为当前 UID 可调用的声明。
 
 版本化 `pickcube-physical-candidate-v1`（MuJoCo／GeoPhys CPU）和 `pickcube-isaac-physical-candidate-v1`（Isaac Sim 6.2／CUDA、F06）通过既有 factory、SelectedReferenceEnv 和 RuntimeSession 提供 Panda 七臂及受源约束的成对双指 effort；直接贡献的限幅不代表与保留的原生 position drive 叠加后的总力。每个 interval 的贡献由 session 持有并清理；MuJoCo／Isaac 逐子步重施各自的有效写入，GeoPhys 保持本 interval 的公开广义力并在结束时清零，其独立 `hold_reapply` 声明当前拒绝。重复贡献、无效映射和未经协调的完整 PD 与活动 drive 组合被拒绝。原 source 的 tendon、equality 和 mimic 不变，不能由此推断两根手指可独立任意施力。
 

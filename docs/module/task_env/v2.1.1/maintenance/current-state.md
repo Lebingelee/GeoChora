@@ -46,17 +46,17 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。E00～E04 主审余项修复轮的 217 项受影响 source/caller 检查通过，另有 76 项纯/fake 精确检查通过（与前者有重叠，不相加）；六项 USD 检查为真实 delivery 的离线构造，不启动 Isaac App。MuJoCo 七条短程共 75 个显式子步，GeoPhys effort/Pendulum 两条短程通过；加上测试中的 40 个，本轮共 115 个显式 MuJoCo 子步。冻结输入为 `e25f37c5` 加保存的生产 patch，与 `912416e6` 对应生产字节相同，运行的 source_revision 仍为 e25，不改称提交后重跑。详情见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。renderer 未重跑，完整 Solution 仍留 E13；旧逐批记录从历史提交和原始输出恢复。
 
-O5 仍需完成两任务各自公开支持 provider 的单 seed 完整 Solution 与同次记录读回，至少 MuJoCo 任务成功；O6 完成逐项主审和代码优化接收后才进入 O7 项目清理。规划 [capability-matrix.json](../capabilities/capability-matrix.json) 仍须按实际证据逐格对账；本地成果尚未合入 develop／main，未发布。
+O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E16；O6 仍需逐项独立主审和维护者代码接收，之后才进入 O7 项目清理。[capability-matrix.json](../capabilities/capability-matrix.json) 分列当前有界证据与历史目标；本地成果尚未合入 develop／main，未发布。
 
 ## E05～E10：维护者已接收
 
 维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)现已逐点核对 S01～S40，建议六事件按既定范围有界接收；主审小修生产 `7a098423` 删除 physical Recorder 的 PickCube 语义覆盖并验证声明保全。维护者于2026-11-13在本次对话明确接收E05～E10，E11～E16尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
 
 
-## 下一范围：E11～E16（规划就绪，尚未开工）
+## 当前范围：E11～E16（实施与代码对账）
 
 以[E11～E16细化账本](../planning/post-5c-e11-e16-remaining-ledger.md)及[实施Goal](../planning/post-5c-e11-e16-goal.md)为下一执行入口：7个大单元、44个检查点，按诊断、caller、完整Solution、代码接收、五stage证据归并、输出清理、refs/worktree及项目接收推进。每个单元完成实现、必要验证、记录压缩和提交后才对照总账，不按小格反复派包。
 
-规划输入`a6b107ac`，tracked clean，四保护输入和pins不变；本次仅静态/调用者/文档及磁盘、refs/worktree只读盘点，无pytest/资产构造/native或清理。当前诊断451个tracked文件，版本目录30个Python文件；34个文件有退休入口/reader名称引用，不能全当生产缺陷。主maintenance约84.46GB、旧integration的workspace约13.79GB均为混合总量，不是可删空间承诺。9个本地heads、6个worktree需按保全及实际依赖处置；当前Harness共享锁仍位于历史大目录。
+规划时输入`a6b107ac`，tracked clean，四保护输入和pins不变；规划轮仅作静态及只读盘点。随后 U1（`d0c25ae4`）和 U2（`1ff617d0`）完成实施自评；U3 检查点 `5742e956` 记录五条完整运行、同次读回和受影响修复。四保护输入及两 pins 在 U3 后仍一致。规划时主 maintenance 约84.46GB、旧 integration 的 workspace 约13.79GB 均为混合总量，不是可删空间承诺；9 个本地 heads、6 个 worktree 须在处置时重新核对，当前 Harness 共享锁仍位于历史大目录。
 
-E13仍需PickCube三provider与Nut两CPU provider单seed完整尝试及同次独立记录读回，两任务各自MuJoCo必须成功。E14单独接收代码优化后，E15/E16按具体清单保全、归并、安全清理和恢复，项目优化另行接收；不自动merge/push/tag/发布或进入G06。详细检查点、现有符号、接收owner、退出证据及操作边界均在专用账本。
+E13 的 PickCube 三 provider 与 Nut 两 CPU provider 已各做完整单 seed 尝试、同次记录及独立读回；两任务的 MuJoCo 均任务成功并完成原 Solution，GeoPhys 两条成功，Isaac CUDA runtime valid 但任务／Solution 失败。Isaac v3 H5 未保存 caller completion，关联报告和独立主审边界仍开放，详见[U3实施结果](reviews/20261113_e11_e16_u3_solution_evidence.md)，不得自封例外。E14 文档与代码对账材料已整理，独立主审与维护者代码接收尚未完成。其后 E15/E16 按具体清单保全、归并、安全清理和恢复，项目优化另行接收；不自动 merge/push/tag/发布或进入 G06。详细检查点、接收 owner 和操作边界均在专用账本。
