@@ -17,6 +17,10 @@
 
 两份旧 H5 的当前 codec／历史 judge 测试已切换到 U5 包中对应 SHA 对象并检查 SHA；25 项受守卫离线检查通过。四份 physical 测试输入也已在包内建立相对符号链接，指定新位置运行的 8 项受守卫检查通过；测试仍允许显式指定其他输入。旧文件保持不变。Panda Isaac 资产测试现使用包内 USD manifest；按 manifest 将 68 个已保全 source 对象以硬链接排列，包含 pxr 的定向 source 构造检查 8 项通过，solver SDK 被阻止导入。该检查不是 App 或 native 物理运行。G05 简单主体两份 delivery 的 24 个必要文件也以包内硬链接布局；三种配置安装、损坏拒绝及 source 绑定共 5 项 pxr 检查通过。历史 supervisor 的共享锁仍在 `phase_ii_01_sol_luna_handoff_20261023_001/`。该目录、现行测试样本、所有锁、保护输入、第三方源码与嵌套 worktree 均不列删除。当前 checkout 锁 inode 29918777，另一个 integration checkout 锁 inode 33310300；本次 `/proc/locks` 快照均未显示持锁项，这不是未来无 owner 的保证。既往进程 fd 扫描存在权限拒绝，不能证明全部进程没有打开目录。统一锁路径前须查清全部活动运行端，避免新旧 inode 并行形成双锁，不能通过 unlink 实现切换。
 
+锁调用补查：当前 `task_env/script/agent/builtin_example_validation.py` 仅持有本 checkout 的旧锁；U3 保留的监督器和计划按 integration 锁、主 checkout 锁的顺序分别获取两把。当前 checkout 和 integration checkout 各有多份历史 supervisor 固定引用各自旧锁；版本化的三个 probe 接收计划提供的 `locks_in_order`。因此现在只切换示例验证器或只更换其中一个 inode，会与仍运行旧代码的执行端失去共同互斥。2026-11-13 14:01 UTC 的 [锁与测试输入快照](../../../../../../workspace/maintenance/v211_e11_e16_u5_20261113_001/u6-current-fixture-lock-verification.json)未看到这两把锁被持有；进程名检查未找到所查 supervisor／native 进程，Codex 列表中有关项目其他可见会话为 idle 或 notLoaded。这些是瞬时观察，不排除其他运行端、权限不可见进程或后续启动。保留两把锁及原计划；最终迁移前须先确定所有实际运行端并制定共用锁与过渡顺序，禁止 unlink 现有锁。
+
+本轮测试后复核 G05 24 个文件和 Panda delivery 82 个文件，内容 SHA 均属于 U5 保留选择；这只是文件字节核验。
+
 恢复：选择中的原始文件通过 `retained-claim-selection.json` 的 `original` → `retained` 和 SHA/长度从 U5 对象复制到新的空目标并校验；source 另由列出的索引定位。此方法不保证恢复被舍弃的完整旧目录或旧 manifest。临时试验目录可用已保留输入重新进行范围内的验证，但不承诺重建其全部历史输出。
 
 U7 的 refs/worktree 均暂保留，包含被显式锁定的历史 v1.0 worktree；未获具体授权，不进行删除或 Git prune。先前 fsck 的不可达对象缺口已登记，不继续扩大全库历史追查。清理后净空间、refs/worktree 前后以及维护者项目接收仍 OPEN。
