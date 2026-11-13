@@ -41,3 +41,21 @@
 部分操作后的[恢复清单原型](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/recovery_plan.py)将受影响路径的完整硬链接组列为隔离重建候选，并将目录中断、冲突或不一致状态列为人工复核；[分组物化原型](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/materialize_recovery.py)只向新目录复制对象，不覆盖现存文件。以真实保留对象和**假设的**单个路径缺失做[33 条硬链接路径演练](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/partial-recovery-demo-verification.json)，原快照实际没有删除，恢复组的内容、基本属性和链接数通过自检。这是一个组的演练；调用者仍须绑定可信 manifest／journal、提供全部保护根并处理目录、链接和完整快照拼合。
 
 合成测试分别覆盖持锁闸门 9 项、恢复清单 9 项、分组物化 6 项及事务／对账集成 19 项；未运行 native。审查期间独立子代理的后续复核请求被系统标记为可能涉及网络安全风险而终止，故最新恢复清单与分组物化程序**尚未完成独立复核**；之前已完成的独立复核不自动覆盖后续修改。以上仍不能替代真实执行器、同次 owner 独占、具体授权及维护者对恢复限制的决定。
+
+
+## 维护者待审：仅清理本轮验证副本的替代方案
+
+为避免先改变尚有恢复及引用限制的 integration 快照，提出下列替代方案：**保留原快照及 21,929 条候选原件，本次不申请删除它们；只申请删除两个本轮创建的临时验证副本**。此方案须由维护者对下表精确路径批准；在此之前均保留。它若获批，取代上文“恢复副本须保留到候选处置后”的顺序：未来如另行申请处置候选原件，须先重新建立完整恢复副本并通过核验，再准备新的一次具体授权；不能沿用当前已删除的副本或将旧检查称为实时结果。
+
+| 待批准的精确目录（均在 `workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/` 下） | 现测独立 `du -s -x -B1` | 保留依据及影响 |
+| --- | ---: | --- |
+| `snapshot-dedup-preparation/full-restore-validation-20261114/` | 9,285,554,176 字节 | 全量恢复试验副本；原 integration 快照、U5 对象、候选 manifest、工具和校验收据均保留。删除后 `verify_full_restore.py`、`demo_partial_recovery.py`、`verify_combined_sample.py` 和 `run_read_only_gate.py` 原路径依赖失效；要再次运行须先生成并验证副本。恢复试验仍只证明候选普通文件及已登记的属性，不证明完整快照或环境。 |
+| `remaining-geophys-ref-preservation-20261114/` | 79,040,512 字节 | 首次 camera GeoPhys 恢复试验；包含专为试验建立的 `camera-restored.git` bare 仓库。v2 的 camera bundle 和 shallow SHA 与其一致，恢复 refs、符号 HEAD 一致，两恢复仓库 `git fsck --full --strict` 均通过；v2 与独立复核保留。首次因对 bare 仓库运行 `git status` 退出 128 的记录保留。 |
+
+两项单独 `du` 之和为 9,364,594,688 字节，既不是保证释放量，也不是 E00～E16 项目累计净节省。原快照约 15.4 GB、U5 包及后续验证资料仍占空间。待审项的[只读盘点](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/remaining-temporary-copy-disposition-inventory-20261114.json)在持主共享锁时记录根 inode、类型和外部硬链接：完整恢复副本 21,929 个文件、19,785 个 inode，首次 refs 试验 32 个文件，两项均无发现的符号链接、跨设备条目或范围外硬链接；首次试验中的 bare 仓库为已明确列出的例外，不能因没有 `.git` 文件名而忽略其 Git 类型。可见 cwd/root/fd 前后无命中，但各有 1,030 次 `/proc` 权限拒绝，无法排除不可见及 mmap 使用或检查后变化。逐条身份快照分别为 [恢复副本清单](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/restore-copy-disposition-inventory-20261114.jsonl)（SHA-256 `e3a2d67502e4a1741238bb35c4fa90e8d1e5fccd84ac3e7a18f11c68396e1654`）和 [首次 refs 副本清单](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/geophys-first-copy-disposition-inventory-20261114.jsonl)（SHA-256 `37fc28effdcfefd294842ab3b7464e8f92cbcc7ac25a33f60782fd7b01d28539`），清单只含元数据而非内容 hash。执行前须持锁再次核对根与全部条目身份、目录权限、挂载、真实 Git/worktree 类型和可见活动；遇变化或冲突中止，不能跟随链接或涉及其他目录，并在同一包含保留材料的范围前后测量空间。
+
+[独立处置复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-temporary-validation-copies-review.md)独立核对两个目录的类型、权限和内部硬链接，并重算 561 个 U5 对象；认为二者可作为单独批准的候选，要求执行前重新核验保留材料、活动、身份及权限。本次未重哈希完整恢复副本，核查不能排除不可见使用者。
+
+获批后的执行安排：只处理上述两根目录，先持现有共享锁，复核四保护 SHA、两 pins、原快照、U5 内容与 manifest、v2 bundle 和 HEAD／refs；逐项核对盘点身份、类型、设备、硬链接与当前目录写权限，读取 `/proc/locks` 并扫描可见使用者，出现冲突或任何无法解释的变化即停止，不以旧收据替代当次检查。采用限定两根目录的 no-follow、目录描述符相对操作，不递归跨挂载、不 chmod、不触及同级文件；删除前在候选外持久记录预检及目标身份，逐目录记录结果。若执行异常或进程中断，停止另一候选，保留原快照、U5、v2 和日志，列出已删除、剩余及不确定项，经复核后另行处理，不宣称自动回滚或继续重试。不可见、仅 mmap 和非合作并发活动仍无法由扫描完全排除。删除后复查保留材料与保护 SHA／pins，同范围实测空间变化并提交实际收据。
+
+其他所有 worktree（包括 locked archive、camera、core-baseline、旧版 checkout）、主锁及旧锁、四保护输入、pins、第三方源码、版本 refs/tags、U5 证据、原 integration 快照及其候选文件均**不在此次申请内**。camera 存在主 checkout 指向它的 134 条绝对链接，归属及引用尚未闭合。U6/U7 和维护者项目接收仍 OPEN，本表不是最终项目接收。
