@@ -238,7 +238,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | U3 T15～T21 | IMPLEMENTED_REVIEW_PENDING | 原五条完整尝试见[U3 实施结果](../maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)，旧 Isaac 失败原样保留；后续 `0506ae26` 的 `solution-002` 完成原任务。维护者同意的 T19 同次联合口径及五路读回见[联合证据](../maintenance/reviews/20261113_e11_e16_u4_joint_completion.md)，H5 单文件不自含完整 completion；T19/T20 的有界联合口径已通过 U4 独立复审，限制保持明确。 |
 | U4 T22～T28 | MAINTAINER_ACCEPTED_BOUNDED_U4_CODE | 单一能力矩阵、当前入口、Skills、[60 项逐行表](../maintenance/reviews/20261113_e11_e16_u4_row_reconciliation.md)及[独立主审／条件接收](../maintenance/reviews/20261113_e11_e16_u4_independent_acceptance.md)已记录；项目和分支仍 OPEN。 |
 | U5 T29～T34 | SELF_ASSESSED_COMPLETE_BOUNDED | [有界证据选择与复核](../maintenance/reviews/20261113_e11_e16_u5_evidence_selection.md)：五 stage、优化五路线及必要诊断入口已冻结，七项代表性离线检查 PASS；限制如报告。原件未删除；T34 的处置授权与执行时 owner/锁核查、U6 清理及 U7 最终接收仍 OPEN。 |
-| U6 T35～T38 | IN_PROGRESS | [目录保留与处置准备](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已列具体候选、保全及锁快照；实际 owner 和旧引用切换仍需执行时确认，删除须具体授权，未执行清理。 |
+| U6 T35～T38 | IN_PROGRESS | [目录保留与处置准备](../maintenance/reviews/20261113_e11_e16_u6_directory_disposition.md)已列具体候选、保全及锁快照；两份历史 H5 测试已切到保留对象并通过 25 项检查，四份 physical 输入从新位置通过 8 项检查；锁和其余旧引用仍待处理，删除须具体授权，未执行清理。 |
 | U7 T39～T44 | NOT_STARTED | 待安全移除、恢复核查及项目接收 |
 
 ### U1 结果（2026-11-13，实施自评）

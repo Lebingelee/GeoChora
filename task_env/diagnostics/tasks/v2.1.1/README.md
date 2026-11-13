@@ -95,8 +95,10 @@ containing `probe` does not by itself establish a native or pure classification.
 
 ## Historical H5 dependencies
 
-Both samples are read-only inputs. U5 must copy and independently recheck them
-before any U6 path switch; this inventory does not authorize deletion.
+Both samples are read-only inputs. The test reads their SHA-addressed copies
+from `workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256/`
+and checks their SHA-256 before use. The paths below identify the originals;
+their preservation and path switch do not authorize deleting the old directory.
 
 | Existing path under `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/` | bytes | SHA-256 |
 | --- | ---: | --- |
@@ -113,10 +115,13 @@ round's evidence (paths under the repository root):
 | `workspace/maintenance/v211_e05_e10_u6_20261113_001/physical-record-final/panda-rgb/episode.h5` | 202,488 | `edfe54bc9af7aac3ef2380484d405fad16c405e28c5158b6bd1e757649998f4c` |
 | `workspace/maintenance/v211_e05_e10_metadata_followup_20261113_001/native/pendulum-rgb/episode.h5` | 84,304 | `af2d2800ac05211064711157a810717ad8f57b23793549392372de9e9e70e07e` |
 
-For that set, `TASK_ENV_PHYSICAL_RECORDINGS` is the parent `physical-record-final`
-and `TASK_ENV_METADATA_RECORD` is the fourth file. U5 must preserve and remap
-these inputs or select and validate replacement evidence; the current test
-accepts explicit alternate paths but does not assert they have these hashes.
+The preserved package supplies relative symlinks into its SHA-addressed objects.
+From the repository root, set `TASK_ENV_PHYSICAL_RECORDINGS` to
+`workspace/maintenance/v211_e11_e16_u5_20261113_001/fixtures/physical` and
+`TASK_ENV_METADATA_RECORD` to
+`workspace/maintenance/v211_e11_e16_u5_20261113_001/fixtures/metadata/pendulum-rgb/episode.h5`.
+The current test accepts explicit alternate paths but does not itself assert
+the hashes above; verify them when substituting another input set.
 
 `task_env.recorders.load_legacy_leaf_control_h5` is the generic decoder;
 `legacy_leaf_judge.py` owns the historical experiment-specific stricter

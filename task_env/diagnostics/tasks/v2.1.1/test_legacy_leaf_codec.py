@@ -1,5 +1,6 @@
 """Read historical leaf records without native SDK and retain strict old judge."""
 from pathlib import Path
+import hashlib
 import runpy
 import shutil
 
@@ -9,14 +10,28 @@ import pytest
 from task_env.recorders import load_legacy_leaf_control_h5
 
 ROOT = Path(__file__).resolve().parents[4]
-RUNS = ROOT / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001'
+OBJECTS = ROOT / 'workspace/maintenance/v211_e11_e16_u5_20261113_001/objects/sha256'
+FIXTURES = {
+    'r02c_005/native_run_001/E3-simultaneous-default.h5':
+        '65c8858cde1695c2687cf78080961d8e03e6ae599989c9a88aa367f5995d8357',
+    'r03c_004/native/E3.h5':
+        '6aefd11b074481f78c613a5fc275b4a7c8931c7ff0b02accd5545bccbaf5cd72',
+}
 JUDGE = Path(__file__).with_name('legacy_leaf_judge.py')
+
+
+def fixture_path(relative):
+    digest = FIXTURES[relative]
+    path = OBJECTS / digest[:2] / digest
+    assert path.is_file(), f'preserved historical H5 fixture missing: {path}'
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == digest, f'H5 fixture changed: {path}'
+    return path
 
 
 @pytest.mark.parametrize('relative', ['r02c_005/native_run_001/E3-simultaneous-default.h5',
                                      'r03c_004/native/E3.h5'])
 def test_old_leaf_h5_decodes_and_old_judge_remains_strict(relative, tmp_path):
-    source = RUNS / relative
+    source = fixture_path(relative)
     generic = load_legacy_leaf_control_h5(source)
     assert generic['transition_count'] == 64 and generic['observation_count'] == 65
     assert generic['observations']['state']['boundary_identity_sha256'].shape == (65, 32)
@@ -55,7 +70,7 @@ def test_historical_judge_rejects_tampered_control_and_metadata(relative, case, 
     from task_env.trajectory.metadata import dump_metadata, load_metadata
 
     attachment_cases = {'attachment_plan_hash', 'entity_binding', 'native_tcp'}
-    source = RUNS / relative
+    source = fixture_path(relative)
     destination = tmp_path / (case + '.h5')
     shutil.copyfile(source, destination)
     with h5py.File(destination, 'r+') as root:
