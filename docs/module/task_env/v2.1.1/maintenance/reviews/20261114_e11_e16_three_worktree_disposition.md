@@ -77,6 +77,8 @@
 
 现已将固定候选映射和共享锁接入[只读观察适配器](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/observe_live_submodule_readonly.py)，并准备[真实恢复适配草案](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/restore_live_submodule_draft.py)；恢复开关保持 `False`。草案在任何恢复改动前核对两棵内容基线，恢复后再次核对并检查 Git 身份；指针文件重建后的 inode／mtime 和根目录时间戳不声称恢复。独立复核提出的“结果缺失时仍可能撤回已完成迁移”、事后才检查内容以及中间完成日志过早三个缺口已修正；[恢复适配审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-live-submodule-recovery-draft-review.md)重跑临时 Git fixture 与同大小、mtime 保持不变的文件篡改检查。原始观察器读取可能改变指针 atime 的反例已改为 `O_NOATIME` 并在临时文件复核；权限不足时将失败，不保证目录 atime 不变。恢复自身再中断后的对账、真实路径／锁竞争及完整属性仍未闭合，不得把草案当作已可执行恢复程序。
 
+针对恢复自身再次中断，新增[只读对账适配器](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/observe_live_recovery_readonly.py)，依据固定候选、两份日志和受检 inode／指针摘要报告不确定状态，不自动重试。八个意图前后位置已在临时文件中以真实子进程 `SIGKILL` 验证，均返回未确认状态；[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-recovery-sigkill-review.md)在新建临时目录独立重跑全部八项。[测试收据](../../../../../../workspace/maintenance/v211_e11_e16_three_worktree_preservation_20261114_001/recovery-sigkill-fixture-tests.json)不覆盖系统调用内部中断、断电、并发或真实目录。隔离检查还观察到 inode 可以在文件替换后被复用，因此不以 inode 相同单独断定原文件未被替换；日志未认证、完整数据恢复和真实路径的对账仍不能由此证明。
+
 执行前仍须重新检查锁、进程、保全、路径身份、外链和硬链接；任何具体冲突或保全缺口须停止受影响操作。先前 integration 强制移除部分失败且损失 Git 管理元数据，本次不得假定失败可自动回滚。维护者最终项目接收仍单独决定。
 
 ## 空间口径
