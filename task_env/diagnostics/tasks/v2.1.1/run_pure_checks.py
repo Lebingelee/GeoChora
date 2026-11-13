@@ -12,6 +12,18 @@ import sys
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 NODES = (
+    'task_env/diagnostics/tasks/v2.1.1/test_reporter_ownership.py',
+    'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_on_task_success_completes_immediately',
+    'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_task_failure_after_success_is_not_overridden',
+    'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_snapshot_restore_continues_deterministically',
+    'task_env/diagnostics/phase1/integration/test_solution_lifecycle.py::test_snapshot_restore_fails_closed_for_missing_or_incompatible_state',
+    'bench_deploy/libero/diagnostics/test_controller_policy.py',
+    'bench_deploy/libero/diagnostics/test_replay_contract.py',
+    'task_env/diagnostics/tasks/v2.1.1/test_learner_boundaries.py',
+    'task_env/diagnostics/tasks/v2.1.1/test_batch_boundaries.py',
+    'task_env/diagnostics/tasks/v2.1.1/test_completion_projections.py',
+    'task_env/diagnostics/tasks/v2.1.1/test_script_backend_selection.py',
+    'task_env/diagnostics/tasks/v2.1.1/test_public_isaac_example.py',
     'task_env/diagnostics/tasks/v2.1.1/test_formal_configuration.py::test_config_resolution_does_not_open_assets_or_import_native_sdks',
     'task_env/diagnostics/tasks/v2.1.1/test_control_lifecycle.py',
     'task_env/diagnostics/tasks/v2.1.1/test_episode_import.py',

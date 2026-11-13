@@ -131,54 +131,67 @@ def main(argv=None) -> int:
     parser.add_argument("--recording", type=Path,
                         help="canonical H5 output; default workspace/examples/pick_cube/<provider>-<seed>.h5")
     parser.add_argument("--source-delivery-manifest", type=Path,
-                        help="exact versioned F06 PickCube USD manifest for Isaac Sim")
+                        help="optional Isaac USD manifest; required by the versioned F06 Harness")
     parser.add_argument("--isaac-python", type=Path,
                         help="Isaac interpreter; overrides ISAAC_SIM_PYTHON and checkout default")
     parser.add_argument("--harness-output-dir", type=Path,
-                        help="fresh supervised Harness output directory for Isaac Sim")
+                        help="fresh supervised Harness output directory")
     parser.add_argument("--time-limit-s", type=int, default=420)
     parser.add_argument(
         "--address-space-limit-mb", "--memory-limit-mb", dest="memory_limit_mb",
-        type=int, default=8192,
-        help="Linux per-process RLIMIT_AS virtual address-space cap; not RSS or process-tree memory",
+        type=int, default=None,
+        help="CPU route RLIMIT_AS virtual address-space cap (default 8192 MiB); not supported on direct Isaac",
     )
     args = parser.parse_args(argv)
     if not 1 <= args.horizon <= 6000:
         parser.error("--horizon must be in [1, 6000]")
     if args.provider in ("genesis", "sapien") and args.execution != "harness":
         parser.error("Genesis/SAPIEN are optional and may only be selected through --execution harness")
-    if args.provider == "isaacsim" or args.execution == "harness":
+    if args.execution == "harness":
         try:
             return _run_harness(args)
         except (ValueError, FileExistsError) as error:
             parser.error(str(error))
 
+    if args.provider != "isaacsim" and (args.isaac_python is not None or args.source_delivery_manifest is not None):
+        parser.error("--isaac-python and --source-delivery-manifest require --provider isaacsim")
+    if args.harness_output_dir is not None:
+        parser.error("--harness-output-dir requires --execution harness")
+    if args.provider == "isaacsim" and args.memory_limit_mb is not None:
+        parser.error("--memory-limit-mb is not supported on the direct Isaac route")
     bootstrap_imports()
+    backend, device = ("cuda", "cuda:0") if args.provider == "isaacsim" else ("cpu", "cpu")
+    execution = {"physics_provider": args.provider, "physics_backend": backend, "physics_device": device}
+    if args.isaac_python is not None:
+        execution["interpreter"] = str(args.isaac_python.expanduser().absolute())
+    if args.source_delivery_manifest is not None:
+        execution["source_delivery_manifest"] = str(args.source_delivery_manifest.expanduser().absolute())
     env = None
     recording = (args.recording.expanduser().resolve() if args.recording else
                  (_REPOSITORY_ROOT / "workspace/examples/pick_cube" / f"{args.provider}-{args.seed}.h5").resolve())
     report = {"status": "ERROR", "runtime_valid": False, "task_outcome": "UNRESOLVED",
-              "env_id": ENV_ID, "provider": args.provider, "backend": "cpu", "device": "cpu",
+              "env_id": ENV_ID, "provider": args.provider, "backend": backend, "device": device,
               "controller_profile": args.controller_profile, "seed": args.seed,
               "horizon": args.horizon, "recording_path": str(recording),
               "capability_intersection": (
-                  f"selected PickCube P1.6, scalar CPU, existing task-owned "
+                  f"selected PickCube P1.6, scalar {args.provider}/{backend}/{device}, existing task-owned "
                   f"{args.controller_profile}/ReadinessSolution"
               )}
     construction_succeeded = reset_succeeded = finalize_succeeded = close_succeeded = False
     episode = None
     try:
-        with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
+        with bounded_process(args.memory_limit_mb if args.memory_limit_mb is not None else 8192, args.time_limit_s,
+                             limit_address_space=args.provider != "isaacsim") as budget:
             from task_env import make_env
 
             env = make_env(ENV_ID, config={
-                "execution": {"physics_provider": args.provider, "physics_backend": "cpu"},
+                "execution": execution,
                 "episode": {"horizon": args.horizon},
                 "controller": {"profile_id": args.controller_profile},
             })
             construction_succeeded = True
             from task_env.tasks.pick_cube import build_readiness_solution
-            solution = build_readiness_solution(backend='cpu', controller_profile=args.controller_profile)
+            solution = build_readiness_solution(backend=backend, controller_profile=args.controller_profile)
             obs, reset_info = env.reset(seed=args.seed)
             solution.reset(obs, reset_info, env.metadata)
             reset_succeeded = True
@@ -234,8 +247,10 @@ def main(argv=None) -> int:
         and not report.get("error") and not report.get("close_error")
     )
     report["runtime_valid"] = runtime_valid
+    report["close_attempted"] = env is not None
+    report["close_succeeded"] = close_succeeded
     report["task_outcome"] = (
-        "SOLVED" if episode and episode.get("task_success") and episode.get("expert_complete")
+        "SOLVED" if runtime_valid and episode and episode.get("completion_eligible")
         else "TASK_OR_EXPERT_FAILURE_REPORTED" if runtime_valid
         else "UNRESOLVED_RUNTIME_FAILURE"
     )

@@ -50,16 +50,15 @@ def main(argv=None):
         parser.error('rasterizer example is restricted to scalar Pendulum / GeoPhys / CPU')
     if args.provider == 'isaacsim':
         selected_isaac = args.isaac_python or os.environ.get('ISAAC_SIM_PYTHON')
-        if selected_isaac is None or args.source_delivery_manifest is None:
-            parser.error('Isaac requires --isaac-python or ISAAC_SIM_PYTHON, and --source-delivery-manifest')
+        if selected_isaac is None:
+            parser.error('Isaac requires --isaac-python or ISAAC_SIM_PYTHON')
         isaac_python = _file(parser, selected_isaac, '--isaac-python/ISAAC_SIM_PYTHON', executable=True)
-        manifest = _file(parser, args.source_delivery_manifest, '--source-delivery-manifest')
+        manifest = (_file(parser, args.source_delivery_manifest, '--source-delivery-manifest')
+                    if args.source_delivery_manifest is not None else None)
     elif args.isaac_python is not None or args.source_delivery_manifest is not None:
         parser.error('Isaac interpreter and delivery manifest require --provider isaacsim')
     if args.horizon is not None and not 1 <= args.horizon <= 6000:
         parser.error('--horizon must be in [1, 6000]')
-    if args.provider == 'isaacsim' and (args.horizon not in (None, 1000) or args.seed not in (None, 31, 32, 33)):
-        parser.error('the existing Isaac harness requires horizon 1000 and seed 31, 32 or 33')
     if args.uid in CLASSIC and args.horizon is not None:
         parser.error('classic example runs exactly one transition and does not accept --horizon')
     if args.renderer == 'rasterizer':
@@ -75,8 +74,9 @@ def main(argv=None):
     if args.horizon is not None:
         command += ['--horizon', str(args.horizon)]
     if args.provider == 'isaacsim':
-        command += ['--execution', 'harness', '--isaac-python', str(isaac_python),
-                    '--source-delivery-manifest', str(manifest)]
+        command += ['--isaac-python', str(isaac_python)]
+        if manifest is not None:
+            command += ['--source-delivery-manifest', str(manifest)]
     environment = os.environ.copy()
     environment['GEOCHORA_GEOPHYS_SRC'] = str(source)
     environment['GEOCHORA_CORE_PYTHON'] = str(python)

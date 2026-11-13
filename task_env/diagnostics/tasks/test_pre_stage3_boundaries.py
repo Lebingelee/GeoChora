@@ -469,7 +469,7 @@ def test_start_passes_external_isaac_interpreter_and_manifest(monkeypatch, tmp_p
                        '--backend', 'cuda', '--renderer', 'none', '--isaac-python', sys.executable,
                        '--source-delivery-manifest', str(manifest), '--seed', '31']) == 0
     command, options = captured[0]
-    assert command[command.index('--isaac-python') + 1] == str(__import__('pathlib').Path(sys.executable).resolve())
+    assert command[command.index('--isaac-python') + 1] == str(__import__('pathlib').Path(sys.executable).absolute())
     assert command[command.index('--source-delivery-manifest') + 1] == str(manifest)
     assert options['env']['GEOCHORA_GEOPHYS_SRC'] == str(source)
 

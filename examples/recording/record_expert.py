@@ -57,6 +57,10 @@ def main(argv=None) -> int:
     verification = None
     recording = None
     error = None
+    finalization_error = None
+    close_error = None
+    readback_error = None
+    close_attempted = close_succeeded = False
     status = "ERROR"
     try:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
@@ -99,15 +103,21 @@ def main(argv=None) -> int:
                         (episode or {}).get("failure_reason") or status.lower()
                     )
                 except Exception as exc:
-                    error = {"type": type(exc).__name__, "message": f"recording finalization failed: {exc}"}
+                    finalization_error = {"type": type(exc).__name__, "message": str(exc)}
                     status = "ERROR"
-            env.close()
+            close_attempted = True
+            try:
+                env.close()
+                close_succeeded = True
+            except Exception as exc:
+                close_error = {"type": type(exc).__name__, "message": str(exc)}
+                status = "ERROR"
 
     if output.exists():
         try:
             recording = load_recording_summary(output)
         except Exception as exc:
-            error = {"type": type(exc).__name__, "message": f"recording validation failed: {exc}"}
+            readback_error = {"type": type(exc).__name__, "message": str(exc)}
             status = "ERROR"
     else:
         recording = {"status": "NOT_WRITTEN", "path": str(output)}
@@ -133,6 +143,11 @@ def main(argv=None) -> int:
         "resource_budget": budget,
         "output": str(output),
         "error": error,
+        "finalization_error": finalization_error,
+        "close_attempted": close_attempted,
+        "close_succeeded": close_succeeded,
+        "close_error": close_error,
+        "readback_error": readback_error,
     }
     print(json.dumps(report, sort_keys=True, default=str))
     return 0 if status == "PASS" else 1

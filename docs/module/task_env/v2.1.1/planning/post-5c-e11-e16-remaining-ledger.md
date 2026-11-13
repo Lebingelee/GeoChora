@@ -234,7 +234,7 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | 单元 | 状态 | 最终效果／提交／验证／限制 |
 | --- | --- | --- |
 | U1 T01～T07 | SELF_ASSESSED_COMPLETE | 版本诊断入口、历史去向及证据依赖见[诊断 claim/owner 表](../../../../../task_env/diagnostics/tasks/v2.1.1/README.md)；本行所在提交为输出 HEAD。TEST-04 最终证据归并仍归 U5；代码整体独立主审及维护者接收不由本单元自封。 |
-| U2 T08～T14 | NOT_STARTED | 待实施 |
+| U2 T08～T14 | SELF_ASSESSED_COMPLETE | 正式 caller、batch 边界、完成事实及 LIBERO 检查见[U2 caller 对账](../maintenance/reviews/20261113_e11_e16_u2_caller_review.md)；输出为本行所在提交。直接 Isaac 与完整 Solution 的真实执行归 U3，独立主审和维护者接收归 U4，不由实施者自封。 |
 | U3 T15～T21 | NOT_STARTED | 待实施；完整Solution门未由短程覆盖 |
 | U4 T22～T28 | NOT_STARTED | 待代码独立主审及维护者接收 |
 | U5 T29～T34 | NOT_STARTED | 待最终证据归并与独立复算，不删除原件 |
@@ -248,6 +248,14 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 固定纯/fake 入口 132 PASS；R02c/R03c 离线读回和复制品篡改 25 PASS；四份显式一 interval 记录的离线读回／篡改 8 PASS。`strace` 验证所测纯集无成功打开受守卫的资产／SDK 路径，旧 H5 和当前 H5 原件分别只读；守卫并非 OS sandbox，`-I/-S` 和其他外部目录不在其声明内。旧 R01b 文档示例节点因输入 HEAD 已缺原标题而失败，列 U4 文档历史归属；不得称全部历史测试通过。文档 validator 保持基线 2 errors/96 历史链接问题，新增错误 0。未运行 source/native/App/window；没有生产代码变化，COM 原严格 FAIL/有界采纳不变。原始命令和跟踪文件在 [本单元 ignored 记录](../../../../../workspace/maintenance/v211_e11_e16_execution_20261113_001/)；不等于完整 Solution 或项目接收。
 
 变更量按 `git diff --cached --no-renames --numstat` 计：本 U 相对输入 HEAD，生产 **+0/−0/净0**，诊断 22 路径 +2,590/−1,309（净 +1,281），账本 1 路径 +9/−1；`--no-renames` 将 3 次改名计为 6 路径。诊断全目录 tracked 451→459、Python 394→400；版本目录 tracked 30→40、Python 30→38。按原函数／整文件行数统计，约 1,221 行已有测试/fixture 迁移并适配；另复制一份 736 行合成 Scene JSON 给版本检查，旧副本仍有历史 caller。其余新增为守卫、负例及索引，不是生产能力扩张。相对 `a6b107ac`：生产 +0/−0；诊断 +2,590/−1,309；文档/Skills +368/−27（含两次规划提交）。累计相对 `1f1359ee`：生产 +8,284/−17,638；诊断 +9,674/−1,308；文档/Skills +2,302/−114。累计量包含 E00～E10，不归功本单元。既有 Runtime/adapter 合同未变；相机、控制、Recorder 与历史 source 的检测入口更集中，未测试的新物理交集仍留 U3。
+
+### U2 结果（2026-11-13，实施自评）
+
+输入 HEAD `d0c25ae49afe3e1fceebaa9fa77f35587447976e`，输出为本结果所在提交。T08～T14 在 U2 的 caller/离线合同范围按[逐项对账](../maintenance/reviews/20261113_e11_e16_u2_caller_review.md)完成：正式示例及 YAML 入口、无广泛重试的 backend 请求、独立完成事实及关闭错误、正式 batch 资源前拒绝与 component 保留、learner space/data、LIBERO source/OSC/gripper 与外围 owner 均有实际 caller 和定向证据。T14 的五条公开命令及报告出口已备好；T15 必须在执行窗口复核并冻结 argv、资源、锁和 source，不能将这些准备称为 native 结果。总账回核 CALL-01～04：入口、并行/learner、外围 owner 与 LIBERO 的本单元边界见对账表，完整运行与代码接收分别仍为 U3/U4。
+
+固定纯/fake 入口 **207 passed**，系统调用跟踪中受查 SDK/资产路径成功打开 **0**；现有完成语义/Harness 定向检查 **23 passed、29 subtests passed**。当前独立 reader 对两份历史 LIBERO H5 通过完整性读回（95/96 与 103/104 transitions/boundaries），两者任务成功均 false，不是本轮物理重跑。文档 validator 保持基线 **2 errors、96 历史链接问题**，无新增 error；保护文件 SHA 和 GeoPhys/Menagerie pins 与输入一致。未运行 native、App、训练或删除。原始验证和离线 readback 在 ignored `workspace/maintenance/v211_e11_e16_u2_20261113_001/`；U3–U7 及独立/维护者接收仍 OPEN。
+
+按 `git diff --cached --no-renames --numstat` 分类，本单元相对输入：生产 +291/−216（净 +75，20 路径），诊断/测试 +587/−1（9 路径），文档/Skills +101/−18（4 路径）。相对 `a6b107ac`：生产 +291/−216、诊断 +3,177/−1,310、文档 +468/−44；累计相对 `1f1359ee`：生产 +8,555/−17,814、诊断 +10,261/−1,309、文档 +2,420/−169，累计包含先前单元，不冒领；分桶收据在 ignored 目录。新增共享 completion 投影减少三个 caller 的重复判断；batch 仅补准入和关闭错误处理，不改变物理控制、来源、时钟或单一提交 owner。既有物理 adapter、LIBERO、objects/planners/reporter/utils 未改；非本轮原生资格不因静态验证升级。
 
 实施时本节链接一份44点最终结果表及60项签收表即可；保留第1～10节为明确的规划时点。当前文档/保护检查只证明规划交付，不证明任何新功能或清理已完成。
 

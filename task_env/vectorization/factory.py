@@ -33,6 +33,10 @@ def make_framework_parallel_spec(
     """Assemble a parallel task through the same three env factories as single."""
 
     environment_type = ENV_REGISTRY.get(uid)
+    if getattr(environment_type, 'uses_selected_public_config', False):
+        raise StageUnavailableError(
+            f"task {uid!r} has no formal batch adapter; use scalar make_env"
+        )
     values = dict(env_config or {})
     base_seed = values.pop("base_seed", env_kwargs.pop("base_seed", 73))
     if env_kwargs:

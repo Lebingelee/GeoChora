@@ -50,12 +50,12 @@ def _virtual_bytes() -> int:
 
 
 @contextmanager
-def bounded_process(memory_limit_mb: int, time_limit_s: int):
+def bounded_process(memory_limit_mb: int, time_limit_s: int, *, limit_address_space: bool = True):
     """Apply Linux-oriented per-process limits for example runs.
 
-    ``RLIMIT_AS`` caps this process's virtual address space. It is neither an
-    RSS limit nor an aggregate process-tree memory limit. CPU time is also a
-    per-process limit; the real-time alarm bounds the coordinating process.
+    When enabled, ``RLIMIT_AS`` caps virtual address space and is inherited by
+    child processes. It is neither an RSS nor an aggregate process-tree cap.
+    CPU time is per process; the real-time alarm bounds the coordinator.
     """
 
     if not sys.platform.startswith("linux") or os.name != "posix" or not hasattr(signal, "setitimer"):
@@ -72,7 +72,7 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int):
     as_limit = min(requested, as_soft) if as_soft != resource.RLIM_INFINITY else requested
     if as_hard != resource.RLIM_INFINITY:
         as_limit = min(as_limit, as_hard)
-    if _virtual_bytes() >= as_limit:
+    if limit_address_space and _virtual_bytes() >= as_limit:
         raise RuntimeError("current process virtual memory already exceeds the requested address-space limit")
 
     cpu_soft, cpu_hard = resource.getrlimit(resource.RLIMIT_CPU)
@@ -82,14 +82,16 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int):
     old_alarm = signal.getsignal(signal.SIGALRM)
     old_xcpu = signal.getsignal(signal.SIGXCPU) if hasattr(signal, "SIGXCPU") else None
     old_timer = signal.getitimer(signal.ITIMER_REAL)
-    resource.setrlimit(resource.RLIMIT_AS, (as_limit, as_hard))
+    if limit_address_space:
+        resource.setrlimit(resource.RLIMIT_AS, (as_limit, as_hard))
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit, cpu_hard))
     signal.signal(signal.SIGALRM, _raise_timeout)
     if hasattr(signal, "SIGXCPU"):
         signal.signal(signal.SIGXCPU, _raise_timeout)
     signal.setitimer(signal.ITIMER_REAL, float(time_limit_s))
     try:
-        yield {"address_space_limit_bytes": as_limit, "address_space_limit_scope": "single_process_rlimit_as",
+        yield {"address_space_limit_bytes": as_limit if limit_address_space else None,
+               "address_space_limit_scope": "single_process_rlimit_as" if limit_address_space else "not_set",
                "cpu_limit_s": cpu_limit, "cpu_limit_scope": "single_process_rlimit_cpu",
                "wall_limit_s": time_limit_s, "wall_limit_scope": "coordinating_process_alarm",
                "native_threads": 1}
@@ -99,7 +101,8 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int):
         if old_xcpu is not None:
             signal.signal(signal.SIGXCPU, old_xcpu)
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_soft, cpu_hard))
-        resource.setrlimit(resource.RLIMIT_AS, (as_soft, as_hard))
+        if limit_address_space:
+            resource.setrlimit(resource.RLIMIT_AS, (as_soft, as_hard))
 
 
 def run_caller_solution(env, solution, obs, info, *, horizon: int) -> dict:
@@ -124,53 +127,17 @@ def episode_result(env, *, solution=None, info: Mapping | None = None, transitio
                    truncated: bool = False) -> dict:
     """Keep physical task outcome and expert lifecycle as separate fields."""
 
-    info = dict(info or {})
-    metrics = dict(info.get("task_metrics", {}))
+    from task_env.script.trajectory.completion import completion_facts
+
     solution = env.solution if solution is None else solution
-    outcome = solution.outcome_report() if callable(getattr(solution, "outcome_report", None)) else {}
-    task_success = bool(metrics.get("task_success", info.get("is_success", False)))
-    solution_done = bool(solution.done)
-    solution_failed = bool(solution.failed)
-    planned = outcome.get("planned_trajectory_completed", info.get("planned_trajectory_completed"))
-    outcome_complete = outcome.get("outcome_complete", info.get("outcome_complete"))
-    override = outcome.get("unapproved_override_used", info.get("unapproved_override_used"))
-    strict_lifecycle = outcome.get(
-        "original_expert_lifecycle_status", info.get("original_expert_lifecycle_status")
-    )
-    expert_complete = outcome.get("expert_complete", info.get("expert_complete"))
-    if expert_complete is None and isinstance(strict_lifecycle, dict):
-        expert_complete = strict_lifecycle.get("expert_complete")
-    if expert_complete is None:
-        expert_complete = solution_done and not solution_failed
-    physical_complete = task_success and not bool(info.get("task_failure", False))
-    if outcome_complete is None:
-        complete = physical_complete and solution_done and not solution_failed
-        completion_basis = "selected_expert_completion"
-    else:
-        complete = bool(physical_complete and solution_done and not solution_failed
-                        and planned is True and outcome_complete is True and override is False)
-        completion_basis = "outcome_policy_and_full_planned_route"
-    if terminated or truncated:
-        complete = False
+    facts = completion_facts(solution, info, terminated=terminated, truncated=truncated)
     return {
-        "status": "PASS" if complete else "FAIL",
-        "completion_basis": completion_basis,
-        "task_success": task_success,
-        "expert_complete": bool(expert_complete),
-        "solution_done": solution_done,
-        "solution_failed": solution_failed,
-        "planned_trajectory_completed": planned,
-        "outcome_complete": outcome_complete,
-        "unapproved_override_used": override,
-        "original_expert_lifecycle_status": strict_lifecycle,
-        "readiness_warnings": info.get("readiness_warnings", outcome.get("readiness_warnings", [])),
-        "task_failure": bool(info.get("task_failure", False)),
-        "terminated": bool(terminated),
-        "truncated": bool(truncated),
+        **facts,
+        "status": "PASS" if facts["policy_complete"] else "FAIL",
         "transitions": int(transitions),
-        "failure_reason": solution.failure_reason or (None if complete else "task_or_expert_incomplete"),
-        "task_metrics": metrics,
+        "task_metrics": dict((info or {}).get("task_metrics", {})),
     }
+
 
 
 def identity_summary(env, *, provider: str) -> dict:
@@ -178,7 +145,7 @@ def identity_summary(env, *, provider: str) -> dict:
     return {
         "env_id": metadata.get("env_id"),
         "provider": provider,
-        "backend": "cpu",
+        "backend": getattr(getattr(getattr(env, "config", None), "runtime", None), "backend", None),
         "task_artifact_sha256": metadata.get("task_artifact_hash"),
         "construction_id": metadata.get("construction_id"),
         "control_dt": metadata.get("control_dt"),

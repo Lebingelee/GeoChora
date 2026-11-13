@@ -35,7 +35,8 @@ def main(argv=None) -> int:
     bootstrap_imports()
     env = None
     report = {"status": "ERROR", "env_id": ENV_ID, "provider": args.provider,
-              "capability_intersection": "selected NutAssembly Outcome V1, caller-owned Solution, scalar CPU"}
+              "capability_intersection": "selected NutAssembly Outcome V1, caller-owned Solution, scalar CPU",
+              "close_attempted": False, "close_succeeded": False}
     try:
         with bounded_process(args.memory_limit_mb, args.time_limit_s) as budget:
             from task_env import make_env
@@ -58,7 +59,13 @@ def main(argv=None) -> int:
             report["identity"] = identity_summary(env, provider=args.provider)
     finally:
         if env is not None:
-            env.close()
+            report["close_attempted"] = True
+            try:
+                env.close()
+                report["close_succeeded"] = True
+            except Exception as exc:
+                report["close_error"] = f"{type(exc).__name__}: {exc}"
+                report["status"] = "ERROR"
     print(json.dumps(report, sort_keys=True, default=str))
     return 0 if report["status"] == "PASS" else 1
 

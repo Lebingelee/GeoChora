@@ -934,10 +934,17 @@ class BatchTaskLifecycleAdapter(CommonTaskLifecycleAdapter):
 
     def close(self) -> None:
         provider = self.parallel_render_provider
-        if provider is not None:
-            close_provider = getattr(provider, "close", None)
-            if callable(close_provider):
-                close_provider()
+        try:
+            if provider is not None:
+                close_provider = getattr(provider, "close", None)
+                if callable(close_provider):
+                    close_provider()
+        except BaseException as error:
+            try:
+                self.runtime.close()
+            except BaseException as cleanup_error:
+                error.add_note(f"runtime cleanup also failed: {cleanup_error!r}")
+            raise
         self.runtime.close()
 
     def _normalize_reset_mask(self, mask: np.ndarray | None) -> np.ndarray:

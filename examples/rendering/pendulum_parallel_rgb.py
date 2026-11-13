@@ -1,7 +1,6 @@
-"""Render a single Pendulum batch frame through the existing GeoPhys route.
+"""Historical single-frame Pendulum batch-render example.
 
-The bounded example uses the current local merged-scene batch runtime and
-GeoPhys rasterizer. It does not exercise Flora or renderer interoperability.
+The current formal Pendulum has no batch adapter; this route is unavailable.
 """
 
 from __future__ import annotations

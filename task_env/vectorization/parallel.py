@@ -33,6 +33,23 @@ from .registry import PARALLEL_ENV_REGISTRY, register_parallel_env
 from ..utils.tree import tree_copy, tree_index, tree_set_index, validate_batched_tree
 
 
+def _require_parallel_registration(uid: str) -> None:
+    """Reject known scalar-only tasks before creating a worker or Runtime."""
+    if PARALLEL_ENV_REGISTRY.contains(uid):
+        return
+    from ..registry import ENV_REGISTRY
+    from ..environment.types import StageUnavailableError
+
+    normalized = str(uid).strip()
+    if normalized in ENV_REGISTRY.uids() and getattr(
+        ENV_REGISTRY.get(normalized), 'uses_selected_public_config', False
+    ):
+        raise StageUnavailableError(
+            f"task {normalized!r} has no formal batch adapter; use scalar make_env"
+        )
+    raise KeyError(f"task uid has no homogeneous parallel backend: {normalized}")
+
+
 def register_vector_env(
     uid: str,
     factory=None,
@@ -61,10 +78,7 @@ def make_homogeneous_env(
     import importlib
 
     importlib.import_module("task_env.tasks")
-    if not PARALLEL_ENV_REGISTRY.contains(uid):
-        raise KeyError(
-            f"task uid has no homogeneous parallel backend: {str(uid).strip()}"
-        )
+    _require_parallel_registration(uid)
     factory = PARALLEL_ENV_REGISTRY.get(uid)
     factory_kwargs: dict[str, Any] = {
         "num_env": int(num_env),
@@ -255,10 +269,7 @@ class RemoteBatchVecEnv(VecEnv):
         import importlib
 
         importlib.import_module("task_env.tasks")
-        if not PARALLEL_ENV_REGISTRY.contains(self.uid):
-            raise KeyError(
-                f"unknown TaskEnv uid: {self.uid}"
-            )
+        _require_parallel_registration(self.uid)
         context = mp.get_context(start_method)
         self._remote, work_remote = context.Pipe()
         config = {

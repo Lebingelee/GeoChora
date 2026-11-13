@@ -296,7 +296,14 @@ class HomogeneousVectorTaskEnv:
         return resetter(mask, selection=selection)
 
     def close(self) -> None:
-        self.close_render()
+        try:
+            self.close_render()
+        except BaseException as error:
+            try:
+                self._task_spec.close()
+            except BaseException as cleanup_error:
+                error.add_note(f"task cleanup also failed: {cleanup_error!r}")
+            raise
         self._task_spec.close()
 
 
