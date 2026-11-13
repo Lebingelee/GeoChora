@@ -97,9 +97,13 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 
 复用 integration 残留逐项保全证明，仅筛选 `integration-local-snapshot/workspace/` 中已有证明且 SHA 与 U5 内容对象对应的普通文件；没有重开 U4/U5，也没有改动快照或 U5 对象。对 **21,929 条路径、19,785 个独立 inode 和 561 个 U5 对象**逐一核验：快照与 U5 内容 SHA 均匹配，候选硬链接组在该清单中完整。候选 inode 的 `st_blocks` 合计 **9,271,549,952 字节**，不是实际可释放字节；共享块、范围外引用和并发变化尚未计入。清单及结果见[候选审计](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/candidate-audit.json)，清单 SHA-256 为 `ebd4bc4b3149de129869335363823788fea74a2a849de49faf88327fc76a4113`。
 
-候选 inode 的扩展属性检查均为空；恢复样本覆盖 4 组、36 条路径（含多硬链接组），内容、mode、uid、gid、mtime 和组内硬链接符合记录，未与 U5 对象共用 inode。另一个仅写新目录的候选材料化工具以 20 组进行 smoke；二者均为抽样，不构成全量恢复验证。现有工具不恢复目录属性、原 inode、ctime 或绝对链接的重映射，不能称完整原快照恢复。原快照 6,062 条指向旧 integration workspace 的绝对链接限制仍适用。
+候选 inode 的扩展属性检查均为空；恢复样本覆盖 4 组、36 条路径（含多硬链接组），内容、mode、uid、gid、mtime 和组内硬链接符合记录，未与 U5 对象共用 inode。另一个仅写新目录的候选材料化工具以 20 组进行 smoke；当时二者均为抽样；后续全量候选文件恢复见下段。现有工具不恢复目录属性、原 inode、ctime 或绝对链接的重映射，不能称完整原快照恢复。原快照 6,062 条指向旧 integration workspace 的绝对链接限制仍适用。
 
 候选路径涉及 1,784 个直接父目录，其中 **368 个当前不可写**。排除含不可写父目录的完整硬链接组后，剩 7,089 组、9,233 条路径，独立 inode 分配块合计 2,930,221,056 字节；这仍只是筛选结果，未证明可删除或可回收。未更改目录权限。独立审查复算全部候选内容及 U5 对象，同意清单可审核，但认为执行前仍须准备逐路径身份与内容重验、路径安全、owner/引用、异常中止与逐项收据，并明确恢复义务；详见[独立审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-snapshot-dedup-review.md)。现阶段不请求把该清单作为可直接执行的删除授权；快照、其他工作树和第三方内容均保留。
+
+后续将全部候选从 U5 对象复制到新的隔离恢复目录 `snapshot-dedup-preparation/full-restore-validation-20261114/`（[恢复收据](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/full-restore-verification.json)）；实施者与[独立复核](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u7-full-snapshot-restore-review.md)各自遍历校验 21,929 条路径、19,785 个 inode、9,234,545,951 内容字节，SHA、长度、mode、uid/gid、mtime、链接数及组内／组间身份均一致，未与 U5 对象硬链接，缺失／额外文件 0。这个结果只涵盖选中的普通文件，不还原目录属性、atime/ctime 或原 inode。另在新目录拼合一个 3 字节候选、一个 26,337 字节非候选文件和一条由旧绝对目标重映射的链接并校验；这只是[拼合样本](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/combined-recovery-nonempty-result.json)，不是完整快照或运行环境恢复。[链接分析](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/link-dependency-audit.json)记录 6,062 条旧绝对链接中 0 条直接指向候选文件、391 条指向包含候选的目录，只按字面前缀匹配，不覆盖链接链或外部引用。
+
+全量恢复目录独立 `du -s -x -B1` 为 **9,285,554,176 字节**，是本轮新增保全试验空间；原快照同口径为 15,385,866,240 字节，两者都保留。候选去重如要实际产生净收益，必须计入该新增副本及其未来去向，不能只列被删条目的块数。[候选直接父目录属性清单](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/snapshot-dedup-preparation/parent-directory-metadata.json)记录 1,784 个目录的身份、模式、所有者、mtime 和 xattr：368 个当前不可写，全部属于当前 uid，均无列出的 xattr；这是时点检查，不授权 chmod 或删除。执行方案仍须逐路径身份／内容、U5、owner／引用、完整链接组和目录属性复核，设计异常中止及可追踪收据，明确未恢复范围后再集中申请具体授权。
 
 本次复核后四个保护输入 SHA 和两项子模块 HEAD 均与 integration 收尾收据一致。生产代码无变化；U6 的快照处置与项目净空间核算、U7 其他工作树的归属/保全和维护者项目接收仍 OPEN。
 
@@ -115,6 +119,6 @@ integration 的 GeoPhys 是独立浅仓库，单独 bundle 普通克隆失败；
 * **最终证据：** [U5 五 stage 与五路线选择](20261113_e11_e16_u5_evidence_selection.md)；按各自冻结源码、配置和运行身份阅读，不称五路线均在最新 HEAD 重跑。
 * **项目范围：** 本页记录已授权清理、锁迁移、恢复样本、失败事故及后续收尾；[专用账本第 11 节](../../planning/post-5c-e11-e16-remaining-ledger.md)为 U1～U7 当前状态入口。与规划输入 `a6b107ac` 比较，至 `a5991ea0` 的 tracked diff 为 108 文件、+6,063/−1,667 行；与 `1f1359ee` 比较为 280 文件、+22,473/−18,499 行，均包括代码、测试与文档，不代表本次快照审计的生产改动。
 * **独立项目中途审查：** [U6/U7 收尾审查](../../../../../../workspace/maintenance/v211_e11_e16_independent_review_0506ae26/u6-u7-closeout-review.md)逐项列出 T35～T44 尚未闭合的条件；它不是最终整理后的主审，也不是维护者接收。
-* **未闭合：** 快照去重仅完成候选核验和样本恢复；其他三个非冻结旧工作树的归属及本地内容保全尚待闭合，冻结工作树保持锁定；累计项目净空间无法由现有不同时点口径直接相减；清理后完整项目复核和维护者项目接收仍未完成。当前 6 heads、5 注册 worktrees；原 integration 专属 Git 管理元数据无法保证恢复。
+* **未闭合：** 快照候选普通文件已全量恢复校验，拼合仅为样本，删除方案及具体授权仍待闭合；其他三个非冻结旧工作树的归属及本地内容保全尚待闭合，冻结工作树保持锁定；累计项目净空间无法由现有不同时点口径直接相减；清理后完整项目复核和维护者项目接收仍未完成。当前 6 heads、5 注册 worktrees；原 integration 专属 Git 管理元数据无法保证恢复。
 
 此入口用于后续审查，并非实施者自行宣布项目接收。除此前具体批准的对象外，不隐含删除许可，也不启动 G06。
