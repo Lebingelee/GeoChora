@@ -29,4 +29,17 @@
 
 当前测试样本的独立恢复：从保留对象和索引使用 `workspace/maintenance/v211_e11_e16_u5_20261113_001/materialize_current_test_fixtures.py` 向新空目录复制并校验 112 个文件；在恢复副本上，三份 USD delivery 经 OpenUSD 读取通过、两份 leaf H5 分别经当前 codec 与历史 judge 读取通过、四份 physical H5 的受守卫检查 8 项通过。该复核不依赖原历史目录，也不证明每个历史 reader 或物理运行。测试副本 `/tmp/geochora-u6-fixture-recovery-20261113-001/` 快照占用 46,522,368 分配字节，是本轮临时产物，保留为后续清理候选，本次未删除。
 
-U7 的 refs/worktree 均暂保留，包含被显式锁定的历史 v1.0 worktree；未获具体授权，不进行删除或 Git prune。先前 fsck 的不可达对象缺口已登记，不继续扩大全库历史追查。清理后净空间、refs/worktree 前后以及维护者项目接收仍 OPEN。
+U7 的 refs/worktree 均暂保留，未获具体授权，不进行删除或 Git prune。以下是 U7 只读处置准备，不是移除指令；每项在实际操作前仍须核对 owner、忽略文件和其他会话使用情况。
+
+| 对象 | 当前准备与未解决事项 |
+|---|---|
+| 主 checkout `/home/lly/Program_Files/Geochora` 与 `codex/v211-stage5-diagnostic` | 保留；含四份保护输入、最终证据包和当前工作。 |
+| `codex/v211-stage3`、`codex/v211-stage4` | 暂缓候选；两者均为当前 HEAD 祖先，已含在 refs bundle 中，未授权删除。 |
+| `codex/v211-stage5` 与 `/home/lly/.codex/worktrees/v210-integration/Geochora` | 暂缓候选；分支已被该 worktree 检出，worktree 有三份 untracked 输入、ignored 输出及旧锁，不能先删分支或以 bundle 代替本地内容。三份 untracked 的[范围内复制与恢复验证](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/integration-untracked-restore-report.json)不覆盖 ignored 内容或 owner。 |
+| `/home/lly/.codex/worktrees/archive_v1_0_0` | 保留；Git 明确标记为冻结历史参考且锁定。 |
+| `/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora` | 暂缓候选；tracked 状态干净但有 ignored 内容，须确认实际归属和保全。 |
+| `workspace/maintenance/geophys_upstream_reset_20261022_001/core-baseline` | 暂缓候选；嵌套注册 worktree，`GeoPhys` 和 `asset/external/mujoco_menagerie` 存在类型变化，不能随父目录递归删除。 |
+| `workspace/maintenance/p2_0_v1_1_clean_checkout_20261017` | 暂缓候选；嵌套注册 worktree，tracked 状态干净但有 ignored 内容，须确认归属与保全。 |
+| `main`、`develop`、`v1.1.0`、`v2.0.0`、`v2.1.0` 和四个现有 tags | 保留。 |
+
+三个阶段分支的 [bundle 恢复验证](../../../../../../workspace/maintenance/v211_e11_e16_u7_preparation_20261113_001/ref-restore-verification.json)仅覆盖 Git refs：三条 ref 在新 bare 仓库恢复并通过 fsck；本次重新计算 bundle SHA 与报告一致。它不覆盖 ignored 文件、子模块或工作树归属。先前 fsck 的不可达对象缺口已登记，不继续扩大全库历史追查。清理后净空间、refs/worktree 前后以及维护者项目接收仍 OPEN。
