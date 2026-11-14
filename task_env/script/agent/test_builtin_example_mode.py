@@ -137,6 +137,19 @@ def test_replaced_lock_retires_running_worker(tmp_path, monkeypatch):
         os.killpg(workers[0].pid, 0)
 
 
+def test_supervised_worker_uses_isolated_cwd(tmp_path):
+    import os
+    import builtin_example_validation as validation
+
+    with validation._supervised_worker(
+        [sys.executable, '-c', "from pathlib import Path; Path('worker-cwd.txt').write_text('ok')"],
+        environment=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        cwd=tmp_path,
+    ) as (worker, _state):
+        assert worker.wait(timeout=10) == 0
+    assert (tmp_path / 'worker-cwd.txt').read_text() == 'ok'
+
+
 def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
     import fcntl
     import os

@@ -210,7 +210,7 @@ def _retire_process_group(process):
 
 
 @contextmanager
-def _supervised_worker(command, *, environment, stdout, stderr):
+def _supervised_worker(command, *, environment, stdout, stderr, cwd=None):
     """Turn termination signals into cleanup and close the startup window."""
     def interrupted(signum, frame):
         raise SystemExit(128 + signum)
@@ -224,7 +224,7 @@ def _supervised_worker(command, *, environment, stdout, stderr):
             _set_child_affinity()
 
         process = subprocess.Popen(
-            command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
+            command, cwd=CORE if cwd is None else cwd, env=environment, stdout=stdout, stderr=stderr,
             start_new_session=True, preexec_fn=prepare_child,
         )
         try:
@@ -421,7 +421,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
             'shared_native_lock_path': str(LOCK), 'cpu_affinity_slots': 4,
         })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
-            with _supervised_worker(command, environment=environment, stdout=stdout, stderr=stderr) as (process, worker_state):
+            with _supervised_worker(command, environment=environment, stdout=stdout, stderr=stderr,
+                                    cwd=output.resolve()) as (process, worker_state):
                 timed_out = False
                 resource_violation = None
                 while process.poll() is None:
