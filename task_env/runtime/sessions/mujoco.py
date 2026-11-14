@@ -793,6 +793,7 @@ class _MuJoCoSession(_SessionValues):
         })
         return result
 
+    @property
     def close_receipt(self):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed close evidence is unavailable for this session profile')

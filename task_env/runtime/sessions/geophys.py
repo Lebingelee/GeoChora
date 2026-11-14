@@ -759,6 +759,7 @@ class _GeoPhysSession(_SessionValues):
                       simulation_time_episode_s=float(state.simulation_time))
         return result
 
+    @property
     def close_receipt(self):
         if not self._closed or self._last_close_receipt is None:
             raise RuntimeError('GeoPhys RuntimeSession close has not completed')

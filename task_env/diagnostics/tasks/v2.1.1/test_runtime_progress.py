@@ -56,3 +56,21 @@ def test_mixed_progress_rejects_unadmitted_route_before_readback(cls):
     session.snapshot = lambda: pytest.fail('unadmitted route read the native state')
     with pytest.raises(RuntimeError, match='mixed runtime progress is unavailable'):
         session.runtime_progress_receipt
+
+
+@pytest.mark.parametrize('cls', [_MuJoCoSession, _GeoPhysSession])
+def test_close_receipt_is_guarded_value_and_defensive_copy(cls):
+    from task_env.runtime.sessions.transport import _encode
+
+    session = _session(cls)
+    session._closed = False
+    session._last_close_receipt = None
+    with pytest.raises(RuntimeError, match='close has not completed'):
+        _ = session.close_receipt
+    session._closed = True
+    session._last_close_receipt = {'nested': {'completed': True}}
+    receipt = session.close_receipt
+    assert receipt == {'nested': {'completed': True}}
+    assert _encode(receipt) is not None
+    receipt['nested']['completed'] = False
+    assert session.close_receipt['nested']['completed'] is True

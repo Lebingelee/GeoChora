@@ -10,7 +10,7 @@
 
 2026-11-14 总账复审及收尾：`d0902adc` 的[逐项复审](reviews/20261114_e00_e16_total_ledger_reaudit_0847a5da.md)确认57项满足有界出口，GOV-04／DOC-01／DOC-02留有编排和Skill同步欠账；后续已按维护者授权完成[E14资料收尾和60项现行结案表](reviews/20261114_e14_current_state_alignment_closeout.md)。60项及V01～V10均按既定有界范围结案，原复审保留其时点；不改变原运行身份、批准例外或G06/G07未开始状态。
 
-维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)状态为`PLANNED_NOT_IMPLEMENTED`，按C1～C5组织；不是未关闭的原账目，不自动启动Goal或native执行。
+维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)已完成 C1～C5 的有界实施和[集中复验](reviews/20261114_post_optimization_c5_final.md)，其限制及独立复核见交付记录；不是未关闭的原账目，不自动启动 G06。
 
 ## 启动输入与工作归属
 
