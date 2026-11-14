@@ -187,6 +187,7 @@ def test_failed_reset_retains_previous_runtime_owner_until_env_close(monkeypatch
     monkeypatch.setattr(reference_binding, 'prepare_selected_reset', lambda *args, **kwargs: 31)
     monkeypatch.setattr(source_module, 'close_source_and_task_resources',
                         lambda source, binding, error=None: error)
+    env._clear_position_publication = lambda: SelectedReferenceEnv._clear_position_publication(env)
     operations = SelectedReferenceEnv._prepare_reference_reset(env, seed=31)
     with pytest.raises(RuntimeError, match='reconstruction failed') as caught:
         operations['prepare']()

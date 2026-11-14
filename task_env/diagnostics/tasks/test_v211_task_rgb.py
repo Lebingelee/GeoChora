@@ -123,6 +123,8 @@ def test_selected_reset_captures_task_rgb_after_reset_transaction_returns(monkey
 
     lifecycle = ResetState()
     env = object.__new__(SelectedReferenceEnv)
+    from types import SimpleNamespace
+    env.binding = SimpleNamespace(task_reset_sampler=None)
     env._task_rgb_config = object()
     env._defer_task_rgb_capture = False
     env._reset_failure_receipt = 'prior'

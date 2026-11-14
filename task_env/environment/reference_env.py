@@ -1454,11 +1454,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._position_episode_end = None
             self._compiled_layout_pre_reset = None
             self._compiled_layout_post_reset = None
-            self._published_position_state = None
-            self._published_position_typed_state = None
-            self._published_position_obs = None
-            self._published_position_info = None
-            self._published_position_evaluation = None
+            self._clear_position_publication()
             self.recorder = None
             self.recording_path = None
 
@@ -1857,11 +1853,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         # Controller that produced it. Every reset starts with empty publication
         # and switch slots, including resets that change selected capabilities.
         self._position_episode_end = None
-        self._published_position_state = None
-        self._published_position_typed_state = None
-        self._published_position_obs = None
-        self._published_position_info = None
-        self._published_position_evaluation = None
+        self._clear_position_publication()
         # Retire both publications at the destructive episode boundary. The
         # next reset readback republishes Controller state; task RGB builds a
         # separate projection only when its observation is assembled.
@@ -1880,10 +1872,12 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                          'replacement_session_close_attempted': False,
                          'replacement_session_close_completed': False}
         selected_reset_plan = None
+        task_uid = success_definition = None
         failure_phase = 'camera_reset_close'
 
         def prepare():
             nonlocal seed, previous_session_close_attempted, failure_phase, selected_reset_plan
+            nonlocal task_uid, success_definition
             if switching:
                 self._switch_rng_state = switch_candidate.rng_state
                 self._switch_task_seed = switch_candidate.task_seed
@@ -1953,6 +1947,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 self.action_space = self.binding.action_space_factory()
             self._bind_selected_controller(self.value)
             self._bind_selected_task_definition()
+            from .reference_binding import selected_task_reset_identity
+            task_uid, success_definition = selected_task_reset_identity(self)
             if deployment_receipt is not None:
                 from ..runtime.sessions.api import assess_selected_request
                 from ..runtime.sessions.provenance import describe_execution_selection
@@ -2096,25 +2092,6 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             # from the values committed by this reset transaction before a
             # deferred renderer validates and publishes the same boundary.
             evaluation = self.evaluation
-            resolved_task = getattr(getattr(self, 'config', None), 'task', None)
-            resolved_configuration = self.value.get('resolved_configuration', {})
-            if not isinstance(resolved_configuration, Mapping):
-                resolved_configuration = {}
-            task_recipe = resolved_configuration.get('task_recipe', {})
-            resolved_recipe = task_recipe.get('recipe', {}) if isinstance(task_recipe, Mapping) else {}
-            if not isinstance(resolved_recipe, Mapping):
-                resolved_recipe = {}
-            task_source = self.value.get('task_source')
-            task_uid = (getattr(resolved_task, 'task_uid', None)
-                        or getattr(task_source, 'task_id', None)
-                        or resolved_recipe.get('task_uid')
-                        or getattr(self.artifact, 'task_id', None) or self.uid)
-            success_definition = (getattr(resolved_task, 'success_definition', None)
-                                  or resolved_recipe.get('success_definition')
-                                  or getattr(getattr(self.artifact, 'semantics', None),
-                                             'success_definition', None))
-            if type(success_definition) is not str or not success_definition:
-                raise ValueError('selected reset cannot resolve its task success definition')
             from ..environment.types import ObservationSchema
             observation_schema = self.info.get('observation_schema')
             if defer_task_rgb:
@@ -2204,11 +2181,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._active_native_interval_receipt = None
             self._episode_mode = None
             self._position_episode_end = None
-            self._published_position_state = self.state
-            self._published_position_typed_state = getattr(self, 'typed_state', None)
-            self._published_position_obs = self.obs
-            self._published_position_info = dict(self.info)
-            self._published_position_evaluation = self.evaluation
+            self._publish_position_boundary(
+                self.state, getattr(self, 'typed_state', None), self.evaluation)
             if self.value.get('physical_execution') is not None:
                 self._physical_published_state = self.state
                 self._physical_published_typed_state = self.typed_state
@@ -2232,8 +2206,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self.obs['task_rgb'] = image
             self.info = dict(info)
             self.info['task_rgb_v1'] = receipt
-            self._published_position_obs = self.obs
-            self._published_position_info = dict(self.info)
+            # RGB completes after the state boundary commits. The returned
+            # observation and info are new mappings; state is not republished.
             if not self.observation_space.contains(self.obs):
                 raise ValueError('committed reset observation with task RGB violates observation_space')
             self.info['observation_schema'].validate(self.obs)
@@ -2430,6 +2404,16 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
         }
         values['identity_hash'] = digest(values)
         return values
+
+    def _clear_position_publication(self):
+        self._published_position_state = None
+        self._published_position_typed_state = None
+        self._published_position_evaluation = None
+
+    def _publish_position_boundary(self, state, typed_state, evaluation):
+        self._published_position_state = state
+        self._published_position_typed_state = typed_state
+        self._published_position_evaluation = evaluation
 
     def _publish_execution_info(self, info):
         execution_info = self.expert_execution_info()
@@ -3139,11 +3123,8 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             if getattr(self.binding, 'physical_observation_binding', None) is not None:
                 self._last_position_terminated = terminated
                 self._last_position_truncated = truncated
-                self._published_position_state = self.state
-                self._published_position_typed_state = self.typed_state
-                self._published_position_obs = self.obs
-                self._published_position_info = dict(self.info)
-                self._published_position_evaluation = self.evaluation
+                self._publish_position_boundary(
+                    self.state, self.typed_state, self.evaluation)
             if self.value.get('physical_execution') is not None:
                 self._physical_published_state = self.state
                 self._physical_published_typed_state = self.typed_state
@@ -3376,11 +3357,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                         terminated=terminated, truncated=truncated,
                     )
             # No boundary is published until the active recorder append succeeds.
-            self._published_position_state = state
-            self._published_position_typed_state = self.typed_state
-            self._published_position_obs = observation
-            self._published_position_info = dict(self.info)
-            self._published_position_evaluation = evaluation
+            self._publish_position_boundary(state, self.typed_state, evaluation)
             if terminated or truncated:
                 self._position_episode_end = self._make_position_episode_end(
                     'task_terminal' if terminated else 'horizon_reached',

@@ -212,6 +212,10 @@ try:
                 assert env.physical_action_spec()['parameters'] == {'kp': args.controller_kp}
                 result['controller_reset_parameters'] = env.physical_action_spec()['parameters']
         assert env.observation_space.contains(observation)
+        assert info['task_uid'] == env.config.task.task_uid
+        assert info['success_definition'] == env.config.task.success_definition
+        result['reset_task_facts'] = {'task_uid': info['task_uid'],
+                                      'success_definition': info['success_definition']}
         if args.validate_schema:
             info['observation_schema'].validate(observation)
             result['observation_fields'] = list(info['observation_schema'].leaf_field_names)

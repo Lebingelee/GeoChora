@@ -12,7 +12,7 @@ def make_selected():
                       'physics_device':'cpu', 'deployment':'in_process',
                       'interpreter':sys.executable,
                       'reset_profile':'pickcube-state-only-switch-v1'},
-        'task': {'controller_profile':'r3_continuous_v1'},
+        'controller': {'profile_id':'r3_continuous_v1'},
         'episode': {'horizon':32},
     })
 
@@ -50,7 +50,7 @@ def test_materialization_failure_after_release_faults_and_no_normal_publication(
             env.reset(seed=31)
         assert events == ['close','materialize'] and env.session is None
         assert env.execution_fault is not None
-        assert env._published_position_obs is None
+        assert env._published_position_state is None
         with pytest.raises(RuntimeError, match='fault'):
             env.step([0.] * 8)
     finally:
@@ -182,7 +182,7 @@ def test_partial_reset_write_failure_reports_fault_and_releases_session(monkeypa
         assert env.reset_failure_receipt['replacement_session_close_completed']
         assert env.reset_failure_receipt['reset_write_attempted']
         assert env.reset_failure_receipt['reset_write_status'] == 'unknown'
-        assert env._published_position_obs is None
+        assert env._published_position_state is None
         with pytest.raises(RuntimeError,match='fault'):
             env.step([0.]*8)
     finally:

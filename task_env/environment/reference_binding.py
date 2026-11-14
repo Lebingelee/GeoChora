@@ -301,6 +301,29 @@ def validate_initial_state_publication(session, publication, state):
     return publication
 
 
+def selected_task_reset_identity(env):
+    """Resolve task identity at binding time, including typed construction."""
+    task = getattr(getattr(env, 'config', None), 'task', None)
+    uid, success = getattr(task, 'task_uid', None), getattr(task, 'success_definition', None)
+    if uid and success:
+        if type(success) is not str:
+            raise ValueError('selected reset cannot resolve its task success definition')
+        return uid, success
+    configuration = env.value.get('resolved_configuration', {})
+    configuration = configuration if isinstance(configuration, Mapping) else {}
+    task_recipe = configuration.get('task_recipe', {})
+    recipe = task_recipe.get('recipe', {}) if isinstance(task_recipe, Mapping) else {}
+    recipe = recipe if isinstance(recipe, Mapping) else {}
+    source = env.value.get('task_source')
+    uid = (getattr(task, 'task_uid', None) or getattr(source, 'task_id', None)
+           or recipe.get('task_uid') or getattr(env.artifact, 'task_id', None) or env.uid)
+    success = (getattr(task, 'success_definition', None) or recipe.get('success_definition')
+               or getattr(getattr(env.artifact, 'semantics', None), 'success_definition', None))
+    if type(success) is not str or not success:
+        raise ValueError('selected reset cannot resolve its task success definition')
+    return uid, success
+
+
 def evaluate_task_definition(env, state, *, action=None, task_state=None):
     """Evaluate a declared TaskDefinition through the common semantic lifecycle."""
     if env.binding.task_definition_factory is None:

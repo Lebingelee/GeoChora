@@ -199,9 +199,7 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
             env._physical_published_evaluation = env.evaluation
         if getattr(env.binding, 'physical_observation_binding', None) is not None:
             env._last_position_terminated, env._last_position_truncated = terminated, truncated
-            env._published_position_state, env._published_position_typed_state = env.state, env.typed_state
-            env._published_position_obs, env._published_position_info = env.obs, dict(env.info)
-            env._published_position_evaluation = env.evaluation
+            env._publish_position_boundary(env.state, env.typed_state, env.evaluation)
         return env.obs, float(env.evaluation.reward), terminated, truncated, env.info
 
     def on_failure(phase, error):
