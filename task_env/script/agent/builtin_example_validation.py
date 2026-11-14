@@ -78,6 +78,48 @@ def _core_python():
     return Path(value).expanduser().absolute() if value else CPU_PYTHON
 
 
+def _isaac_dependency_overlay(executable, output):
+    """Expose only the missing task/recording packages, after SDK packages."""
+    query = ('import json,sys,sysconfig; print(json.dumps({'
+             '"version":list(sys.version_info[:2]),"purelib":sysconfig.get_paths()["purelib"]}))')
+    clean_env = os.environ.copy()
+    clean_env.pop('PYTHONPATH', None)
+    clean_env.pop('GEOCHORA_CORE_SITE', None)
+    clean_env['PYTHONNOUSERSITE'] = '1'
+    core = json.loads(subprocess.check_output([str(_core_python()), '-c', query], env=clean_env, text=True, timeout=10))
+    isaac = json.loads(subprocess.check_output([str(executable), '-c', query], env=clean_env, text=True, timeout=10))
+    if core['version'] != isaac['version']:
+        raise ValueError('Core and Isaac Python versions differ; dependency overlay is unsafe')
+    core_site = Path(core['purelib']).resolve(strict=True)
+    overlay = output / 'isaac_dependency_overlay'
+    overlay.mkdir()
+    names = ['gymnasium', 'farama_notifications', 'h5py', 'h5py.libs']
+    for prefix in ('gymnasium-', 'farama_notifications-', 'h5py-'):
+        names.extend(p.name for p in core_site.iterdir() if p.name.startswith(prefix) and p.name.endswith('.dist-info'))
+    for name in names:
+        source = core_site / name
+        if source.exists():
+            (overlay / name).symlink_to(source, target_is_directory=source.is_dir())
+        elif name in ('gymnasium', 'h5py'):
+            raise ValueError(f'Core dependency is missing: {source}')
+    check = ('import sys,json,tempfile; sys.path.append(sys.argv[1]); '
+             'import numpy,h5py,gymnasium; '
+             'f=tempfile.TemporaryFile(); '
+             'h=h5py.File(f,"w"); h["x"]=numpy.array([0.,1.]); h.close(); '
+             'f.seek(0); h=h5py.File(f,"r"); assert h["x"][:].tolist()==[0.,1.]; h.close(); f.close(); '
+             'assert gymnasium.spaces.Box(-1.,1.,shape=(2,),dtype=numpy.float32).contains(numpy.array([0.,1.],dtype=numpy.float32)); '
+             'print(json.dumps({"modules":{m.__name__:{"version":m.__version__,"path":m.__file__} for m in (numpy,h5py,gymnasium)},'
+             '"hdf5_runtime":h5py.version.hdf5_version,"hdf5_built":h5py.version.hdf5_built_version_tuple}))')
+    result = json.loads(subprocess.check_output([str(executable), '-c', check, str(overlay)],
+                                                 cwd=output, env=clean_env, text=True, timeout=30))
+    numpy_path = Path(result['modules']['numpy']['path']).resolve(strict=True)
+    if not numpy_path.is_relative_to(Path(isaac['purelib']).resolve(strict=True)):
+        raise ValueError(f'Isaac NumPy is outside the SDK site-packages: {numpy_path}')
+    _write_json(output / 'isaac_dependency_overlay.json', {'core_site': str(core_site),
+                'python_version': core['version'], 'entries': names, 'import_check': result})
+    return overlay
+
+
 def _geophys_source():
     value = os.environ.get('GEOCHORA_GEOPHYS_SRC')
     path = Path(value).expanduser().resolve() if value else CORE / 'GeoPhys/src'
@@ -381,6 +423,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_RESOURCE_GATE',
                 'gpu_free_mib': gpu_start, 'reason': 'less than 5120 MiB free GPU memory'}
     environment = os.environ.copy()
+    environment.pop('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY', None)
     environment.pop('PYTHONPATH', None) if provider == 'isaacsim' else None
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     if provider != 'isaacsim':
@@ -395,6 +438,16 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         # The SDK interpreter must use its own dependencies.  Importing a
         # second Python environment's binary modules can mix incompatible ABIs.
         environment.pop('GEOCHORA_CORE_SITE', None)
+        try:
+            environment['GEOCHORA_ISAAC_DEPENDENCY_OVERLAY'] = str(_isaac_dependency_overlay(executable, output))
+        except Exception as error:
+            _write_json(output / 'run_preflight.json', {
+                'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+                'status': 'NOT_RUN_DEPENDENCY', 'shared_native_lock_acquired': False,
+                'reason': f'Isaac dependency overlay: {type(error).__name__}: {error}',
+            })
+            return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_DEPENDENCY',
+                    'reason': f'Isaac dependency overlay: {type(error).__name__}: {error}'}
     command = [str(executable), str(Path(__file__).with_name('builtin_example_worker.py')),
                '--spec', str(spec_path), '--catalog', str(catalog_path),
                '--working-tree-scope', str(scope_path), '--seed', str(seed),

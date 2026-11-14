@@ -23,6 +23,20 @@ if _GEOPHYS_SRC:
     # Prefer the requested source over unrelated installed modules.
     sys.path.insert(1, str(_geophys_path))
 
+# Append the supervisor's minimal Core dependency overlay after SDK paths.
+_ISAAC_SITE = os.environ.get('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY')
+if _ISAAC_SITE:
+    try:
+        _spec_arg = Path(sys.argv[sys.argv.index('--spec') + 1])
+        _output_arg = Path(sys.argv[sys.argv.index('--output') + 1]).resolve(strict=True)
+        _overlay = Path(_ISAAC_SITE).resolve(strict=True)
+        if (json.loads(_spec_arg.read_text())['provider'] != 'isaacsim'
+                or _overlay != _output_arg / 'isaac_dependency_overlay'):
+            raise ValueError('dependency overlay is not owned by this Isaac run')
+    except (ValueError, IndexError, KeyError, OSError) as error:
+        raise ValueError('invalid Isaac dependency overlay context') from error
+    sys.path.append(str(_overlay))
+
 if __package__:
     from .builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
     from .catalog_query import core_context

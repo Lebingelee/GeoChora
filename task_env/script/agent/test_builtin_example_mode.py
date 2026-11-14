@@ -150,6 +150,17 @@ def test_supervised_worker_uses_isolated_cwd(tmp_path):
     assert (tmp_path / 'worker-cwd.txt').read_text() == 'ok'
 
 
+def test_isaac_dependency_overlay_rejects_python_version_mismatch(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    replies = iter(({'version': [3, 12], 'purelib': '/core'},
+                    {'version': [3, 11], 'purelib': '/isaac'}))
+    monkeypatch.setattr(validation.subprocess, 'check_output', lambda *args, **kwargs: json.dumps(next(replies)))
+    with pytest.raises(ValueError, match='versions differ'):
+        validation._isaac_dependency_overlay(tmp_path / 'isaac', tmp_path)
+    assert not (tmp_path / 'isaac_dependency_overlay').exists()
+
+
 def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
     import fcntl
     import os
@@ -170,12 +181,14 @@ def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkey
         'harness-example-working-tree-scope-v1', ()).to_dict()))
     monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
     monkeypatch.setattr(validation, '_proc_rss_tree', lambda pid: 0)
+    monkeypatch.setenv('GEOCHORA_ISAAC_DEPENDENCY_OVERLAY', '/not/a/cpu/dependency')
     monkeypatch.setattr(validation, '_directory_bytes', lambda path: (_ for _ in ()).throw(
         RuntimeError('synthetic monitor failure')))
     original_popen = subprocess.Popen
     launched = []
 
     def spawn_synthetic_worker(*args, **kwargs):
+        assert 'GEOCHORA_ISAAC_DEPENDENCY_OVERLAY' not in kwargs['env']
         worker = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'],
                                 start_new_session=True, preexec_fn=kwargs['preexec_fn'])
         launched.append(worker)
