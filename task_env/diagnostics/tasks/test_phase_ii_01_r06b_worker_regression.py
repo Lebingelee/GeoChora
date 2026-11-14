@@ -463,7 +463,7 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             monkeypatch.setattr(supervisor, '_terminate_group', lambda _pgid, proc: {
                 'term_sent': True, 'kill_sent': False, 'term_wait_seconds': 0.0,
             })
-        receipt = supervisor.run_supervisor(contract_path)
+        receipt = supervisor._run_historical_test_logic(contract_path, fake_popen=popen, fake_run=FakeRun())
         assert receipt['rss_sample_count'] in (0, 1)
         assert receipt['process_group_exit_confirmed_before_unlock'] is True
         assert receipt['reader_completed_before_unlock'] is True

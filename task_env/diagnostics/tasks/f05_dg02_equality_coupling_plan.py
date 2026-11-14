@@ -95,7 +95,7 @@ def _resource_and_lock_check() -> int:
     available = mem_available()
     if available < 6 * 1024**3:
         raise RuntimeError(f"native start gate failed before planning: MemAvailable={available}")
-    with LOCK.open("a+") as stream:
+    with LOCK.open("r+") as stream:
         try:
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
@@ -105,6 +105,7 @@ def _resource_and_lock_check() -> int:
 
 
 def build(suffix: str) -> Path:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if not re.fullmatch(r"[0-9]{3}", suffix):
         raise ValueError("coupling run suffix must be exactly three digits")
     run_id = f"DG02_G4_SOURCE_USD_EQUALITY_COUPLING_{suffix}"

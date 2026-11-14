@@ -106,6 +106,15 @@ def _wait_for_lock(fd: int, max_wait_seconds: int, output_dir: Path) -> tuple[bo
 
 
 def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) -> dict[str, object]:
+    raise RuntimeError('retired historical native supervisor; use the current canonical-lock Harness')
+
+
+def _run_historical_test_logic(contract_path: Path, *, fake_popen, fake_run,
+                               max_lock_wait_seconds: int = 1200) -> dict[str, object]:
+    """Retained solely for isolated fake regression tests, not a supported runner."""
+    import subprocess as real_subprocess
+    if fake_popen is real_subprocess.Popen or fake_run is real_subprocess.run:
+        raise ValueError('historical test logic requires injected fake process functions')
     contract_path = contract_path.resolve()
     contract = json.loads(contract_path.read_text())
     output_dir = Path(contract['output_dir']).resolve()
@@ -176,7 +185,7 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
             }
             _write_json(output_dir / 'native_start_ledger.json', ledger)
             with worker_log.open('wb') as log:
-                process = subprocess.Popen(
+                process = fake_popen(
                     [sys.executable, str(ROOT / 'task_env/diagnostics/tasks/r06b_order_worker.py'),
                      '--contract', str(contract_path)],
                     cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
@@ -245,7 +254,7 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
                     reader_started = time.monotonic()
                     reader_started_at_unix_s = time.time()
                     try:
-                        reader = subprocess.run(raw_command, cwd=ROOT, env=environment,
+                        reader = fake_run(raw_command, cwd=ROOT, env=environment,
                                                 stdout=log, stderr=subprocess.STDOUT,
                                                 timeout=60, check=False)
                     finally:

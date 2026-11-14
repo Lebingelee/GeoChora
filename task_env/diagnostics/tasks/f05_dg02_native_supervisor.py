@@ -76,6 +76,7 @@ def _wait_group_gone(pgid: int, *, grace_s: float) -> tuple[int, list[int]]:
 
 def run(*, python: Path, worker: Path, plan: Path, plan_sha256: Path,
         receipt: Path, output_root: Path, lock_path: Path) -> dict:
+    raise RuntimeError('retired historical native supervisor; use the current canonical-lock Harness')
     python = python.resolve(strict=True)
     worker = worker.resolve(strict=True)
     plan = plan.resolve(strict=True)
@@ -109,7 +110,7 @@ def run(*, python: Path, worker: Path, plan: Path, plan_sha256: Path,
     stderr_path = output_root / "stderr.txt"
     worker_receipt = output_root / "worker_receipt.json"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_stream = lock_path.open("a+")
+    lock_stream = lock_path.open("r+")
     acquired = False
     acquired_utc = None
     process = None

@@ -37,27 +37,23 @@ ISAAC_BOOTSTRAP_PHYSICS_STEPS_UPPER_BOUND = 18
 _populate_isaac_core_site_overlay = populate_isaac_core_site_overlay
 
 
-def _lock_matches_legacy(stream):
-    """Fail closed if either pathname no longer names the locked inode."""
+def _lock_matches_legacy(stream, *, require_legacy=False):
+    """Check the canonical inode and any retained compatibility alias."""
     opened = os.fstat(stream.fileno())
     current = LOCK.lstat()
-    legacy = LEGACY_LOCK.lstat()
-    return (stat.S_ISREG(opened.st_mode) and stat.S_ISREG(current.st_mode)
-            and stat.S_ISREG(legacy.st_mode)
-            and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
-            == (legacy.st_dev, legacy.st_ino))
+    if not (stat.S_ISREG(opened.st_mode) and stat.S_ISREG(current.st_mode)
+            and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)):
+        return False
+    try:
+        legacy = LEGACY_LOCK.lstat()
+    except FileNotFoundError:
+        return not require_legacy
+    return (stat.S_ISREG(legacy.st_mode)
+            and (opened.st_dev, opened.st_ino) == (legacy.st_dev, legacy.st_ino))
 
 
 def _open_shared_native_lock():
-    """Create an alias to the existing lock, never a competing lock inode."""
-    legacy = LEGACY_LOCK.lstat()
-    if not stat.S_ISREG(legacy.st_mode):
-        raise RuntimeError('legacy native lock must be a regular file')
-    LOCK.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        os.link(LEGACY_LOCK, LOCK, follow_symlinks=False)
-    except FileExistsError:
-        pass
+    """Open the existing canonical lock without creating a competing inode."""
     fd = os.open(LOCK, os.O_RDWR | os.O_NOFOLLOW)
     stream = os.fdopen(fd, 'r+')
     try:
@@ -415,7 +411,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
             })
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': 'another process owns the shared native execution lock'}
-        if not _lock_matches_legacy(lock_stream):
+        legacy_was_present = os.path.lexists(LEGACY_LOCK)
+        if not _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present):
             raise RuntimeError('native lock alias changed while acquiring lock')
         _write_json(output / 'run_preflight.json', {
             'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
@@ -428,6 +425,18 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
                 timed_out = False
                 resource_violation = None
                 while process.poll() is None:
+                    try:
+                        lock_valid = _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present)
+                    except OSError:
+                        lock_valid = False
+                    if not lock_valid:
+                        resource_violation = 'shared native lock path changed during worker execution'
+                        _kill_process_group(process, signal.SIGTERM)
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            _kill_process_group(process, signal.SIGKILL)
+                        break
                     elapsed = time.perf_counter() - wall_start
                     if elapsed > timeout_s:
                         timed_out = True
@@ -471,6 +480,11 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
                 returncode = process.wait()
                 worker_process_wall_s = time.perf_counter() - wall_start
             group_intervened = worker_state['forced_retirement']
+        try:
+            if not _lock_matches_legacy(lock_stream, require_legacy=legacy_was_present):
+                resource_violation = resource_violation or 'shared native lock path changed during worker execution'
+        except OSError:
+            resource_violation = resource_violation or 'shared native lock path changed during worker execution'
         pg_alive = False
         if group_intervened:
             resource_violation = resource_violation or 'worker process group required forced retirement'

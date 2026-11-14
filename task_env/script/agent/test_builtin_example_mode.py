@@ -26,6 +26,8 @@ def test_native_lock_alias_contends_with_legacy_inode(tmp_path, monkeypatch):
     legacy.touch()
     monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
     monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
     with legacy.open('r+') as existing:
         fcntl.flock(existing, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with validation._open_shared_native_lock() as alias:
@@ -58,12 +60,81 @@ def test_native_lock_alias_detects_legacy_replacement(tmp_path, monkeypatch):
     legacy.touch()
     monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
     monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
     with validation._open_shared_native_lock() as alias:
         assert validation._lock_matches_legacy(alias)
         replacement = tmp_path / 'replacement.lock'
         replacement.touch()
         replacement.replace(legacy)
         assert not validation._lock_matches_legacy(alias)
+
+
+def test_native_lock_works_without_legacy_but_never_creates_canonical(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    legacy, canonical = tmp_path / 'legacy', tmp_path / 'canonical'
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    with pytest.raises(FileNotFoundError):
+        validation._open_shared_native_lock()
+    assert not legacy.exists() and not canonical.exists()
+    canonical.touch()
+    with validation._open_shared_native_lock() as lock:
+        assert validation._lock_matches_legacy(lock)
+        assert not validation._lock_matches_legacy(lock, require_legacy=True)
+    assert not legacy.exists()
+
+
+def test_canonical_replacement_is_detected(tmp_path, monkeypatch):
+    import builtin_example_validation as validation
+
+    canonical, replacement = tmp_path / 'canonical', tmp_path / 'replacement'
+    canonical.touch()
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'missing-legacy')
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    with validation._open_shared_native_lock() as lock:
+        replacement.touch()
+        replacement.replace(canonical)
+        assert not validation._lock_matches_legacy(lock)
+
+
+def test_replaced_lock_retires_running_worker(tmp_path, monkeypatch):
+    import os
+    import builtin_example_validation as validation
+
+    canonical = tmp_path / 'native.lock'
+    canonical.touch()
+    monkeypatch.setattr(validation, 'CORE', tmp_path)
+    monkeypatch.setattr(validation, 'LOCK', canonical)
+    monkeypatch.setattr(validation, 'LEGACY_LOCK', tmp_path / 'missing-legacy')
+    monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
+    monkeypatch.setattr(validation, '_geophys_source', lambda: tmp_path)
+    monkeypatch.setattr(validation, '_cold_read_h5', lambda *args, **kwargs: None)
+    original_popen = subprocess.Popen
+    workers = []
+
+    def start_worker(*args, **kwargs):
+        worker = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'],
+                                start_new_session=True, preexec_fn=kwargs['preexec_fn'])
+        workers.append(worker)
+        replacement = tmp_path / 'replacement'
+        replacement.touch()
+        replacement.replace(canonical)
+        return worker
+
+    monkeypatch.setattr(validation.subprocess, 'Popen', start_worker)
+    spec, catalog, scope = (tmp_path / name for name in ('spec.json', 'catalog.json', 'scope.json'))
+    spec.write_text(json.dumps(_spec().to_dict()))
+    catalog.write_text('{}')
+    scope.write_text(json.dumps(ExampleWorkingTreeScopeV1(
+        'harness-example-working-tree-scope-v1', ()).to_dict()))
+    result = validation._run_one(spec, catalog, scope, 31, tmp_path / 'output', provider='mujoco')
+    assert result['status'] == 'INVALID'
+    assert result['resource_violation'] == 'shared native lock path changed during worker execution'
+    assert len(workers) == 1 and workers[0].poll() is not None
+    with pytest.raises(ProcessLookupError):
+        os.killpg(workers[0].pid, 0)
 
 
 def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
@@ -75,6 +146,8 @@ def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkey
     legacy.touch()
     monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
     monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
     spec = tmp_path / 'spec.json'
     spec.write_text(json.dumps(_spec().to_dict()))
     catalog = tmp_path / 'catalog.json'
@@ -115,6 +188,8 @@ def test_forced_group_retirement_invalidates_harness_result(tmp_path, monkeypatc
     monkeypatch.setattr(validation, 'CORE', tmp_path)
     monkeypatch.setattr(validation, 'LEGACY_LOCK', legacy)
     monkeypatch.setattr(validation, 'LOCK', tmp_path / 'locks' / 'native.lock')
+    validation.LOCK.parent.mkdir(parents=True)
+    __import__('os').link(legacy, validation.LOCK)
     monkeypatch.setattr(validation, '_mem_available_bytes', lambda: 8 * 1024**3)
     monkeypatch.setattr(validation, '_geophys_source', lambda: tmp_path)
     monkeypatch.setattr(validation, '_cold_read_h5', lambda *args, **kwargs: None)
@@ -151,6 +226,8 @@ def test_termination_signal_retires_synthetic_worker_before_unlock(tmp_path, ter
     legacy = tmp_path / 'legacy.lock'
     legacy.touch()
     alias = tmp_path / 'locks' / 'native.lock'
+    alias.parent.mkdir()
+    os.link(legacy, alias)
     pid_file = tmp_path / 'worker.pid'
     script = '''
 import fcntl, os, pathlib, sys, time

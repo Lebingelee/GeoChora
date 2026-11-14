@@ -82,6 +82,7 @@ def _tracked_paths(candidate: dict) -> list[Path]:
 
 
 def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     output_dir = output_dir.resolve()
     suffix = output_dir.name.rsplit("_", 1)[-1]
     if not suffix.isdigit():
@@ -121,7 +122,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     window_limits = budget["window_limits"]
     resource = budget["resource_envelope"]
     lock_path = Path(resource["shared_native_lock_path"]).resolve()
-    with lock_path.open("a+") as lock:
+    with lock_path.open("r+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

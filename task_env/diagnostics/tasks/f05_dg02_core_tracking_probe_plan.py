@@ -51,6 +51,7 @@ def _branch(repo: Path) -> str:
 
 
 def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     output_dir = output_dir.resolve()
     plan_path = output_dir.with_name(output_dir.name + ".plan.json")
     sidecar = output_dir.with_name(output_dir.name + ".plan.json.sha256")
@@ -97,7 +98,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     if int(_json(PROGRESS)["native"]["geophys_steps"]) + MICROPROBE_STEPS > 66000:
         raise RuntimeError("60-step diagnostic does not fit the frozen GeoPhys total budget")
     lock_path = Path(base["limits"]["shared_native_lock_path"]).resolve()
-    with lock_path.open("a+") as lock:
+    with lock_path.open("r+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

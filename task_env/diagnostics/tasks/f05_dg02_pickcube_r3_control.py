@@ -122,6 +122,7 @@ def _source_rows() -> dict:
 
 
 def freeze_plan(provider: str, run_dir: Path) -> tuple[dict, Path, Path]:
+    raise RuntimeError('retired historical native plan builder; use the current canonical-lock Harness')
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("PickCube R3 control provider must be geophys or mujoco")
     run_dir = run_dir.resolve()
@@ -148,7 +149,7 @@ def freeze_plan(provider: str, run_dir: Path) -> tuple[dict, Path, Path]:
     limit = budget["window_limits"]
     lock_path = Path(resource["shared_native_lock_path"]).resolve()
     import fcntl
-    with lock_path.open("a+") as lock:
+    with lock_path.open("r+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

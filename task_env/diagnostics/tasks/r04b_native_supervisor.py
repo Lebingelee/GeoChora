@@ -131,6 +131,15 @@ def _stop_group(process: subprocess.Popen, pgid: int) -> str:
 
 def supervise(*, lock_path: Path, output: Path, worker_output: Path, worktree: Path,
               python: Path, worker_script: Path, wait_lock_s: float) -> dict[str, object]:
+    raise RuntimeError('retired historical native supervisor; use the current canonical-lock Harness')
+
+
+def _supervise_historical_test_logic(*, lock_path: Path, output: Path, worker_output: Path, worktree: Path,
+                                     python: Path, worker_script: Path, wait_lock_s: float,
+                                     fake_popen) -> dict[str, object]:
+    """Retained solely for isolated fake regression tests, not a supported runner."""
+    if fake_popen is subprocess.Popen:
+        raise ValueError('historical test logic requires an injected fake process factory')
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         raise ValueError("supervisor output directory must be fresh")
@@ -140,7 +149,7 @@ def supervise(*, lock_path: Path, output: Path, worker_output: Path, worktree: P
     lock_wait_path = output / "lock_wait.jsonl"
     sample_path = output / "resource_samples.jsonl"
     command_log = output / "native_worker.log"
-    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fd = os.open(lock_path, os.O_RDWR | os.O_NOFOLLOW)
     lock_start = time.monotonic()
     lock_acquired = False
     process = None
@@ -258,7 +267,7 @@ def supervise(*, lock_path: Path, output: Path, worker_output: Path, worktree: P
         command = [str(python), str(worker_script), "--output", str(worker_output)]
         launch_start = time.monotonic()
         with command_log.open("wb") as stream:
-            process = subprocess.Popen(
+            process = fake_popen(
                 command, cwd=worktree, env=environment, stdin=subprocess.DEVNULL,
                 stdout=stream, stderr=subprocess.STDOUT, start_new_session=True,
             )
