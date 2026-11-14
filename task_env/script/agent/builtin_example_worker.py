@@ -371,7 +371,6 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
     try:
         context = core_context(catalog['core_repo'])
         if spec.provider == 'isaacsim':
-            # Select the process owner without opening an App during compilation.
             from task_env.runtime.sessions.isaac_native_io import (
                 F06_ISAAC_APP_LAUNCH_PROFILE_V1, _process_app_owner,
             )
@@ -381,6 +380,13 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                     or launch_profile_id != F06_ISAAC_APP_LAUNCH_PROFILE_V1):
                 raise ValueError('Isaac Harness run plan lacks an explicit App launch profile')
             app_owner = _process_app_owner(launch_profile_id=launch_profile_id)
+            if any(name == 'pxr' or name.startswith('pxr.') for name in sys.modules):
+                raise RuntimeError('OpenUSD was imported before Isaac App startup')
+            execution_phase = 'isaac_app_precompile_start'
+            row['isaac_app_precompile_start_attempted'] = True
+            app_owner.open(f06_compatibility=True)
+            row['isaac_app_precompile_start_completed'] = True
+            row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
         # The built-in profile has its own tracked-clean + exact untracked
         # scope; the legacy strict catalog validator correctly remains strict.
         execution_phase = 'compile'
@@ -409,9 +415,6 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                    repo_dirty=compiled.repo_dirty,
                    core_commit=context['core_commit'])
         execution_phase = 'reset'
-        if app_owner is not None:
-            app_owner.open(f06_compatibility=True)
-            row['isaac_app_launch_profile'] = app_owner.launch_profile_receipt()
         observation, reset_info = env.reset(seed=seed)
         solution = env.value['solution_factory']()
         if solution.identity != env.value['solution_identity']:

@@ -706,7 +706,8 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
             self.opened = False
             self.closed = False
 
-        def open(self):
+        def open(self, *, f06_compatibility):
+            assert f06_compatibility is True
             events.append('app_open')
             self.opened = True
 
@@ -739,7 +740,7 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
 
     def compile_example(*_args, **_kwargs):
         events.append('source_compile')
-        assert not owner.opened
+        assert owner.opened
         raise RuntimeError('offline compile probe')
 
     with patch.object(builtin_example_worker, 'core_context', return_value={
@@ -750,14 +751,44 @@ def test_isaac_worker_opens_shared_app_before_source_compile_and_closes_on_compi
             spec, catalog, scope, seed=31, output=output,
         )
 
-    assert events == ['source_compile', 'app_close']
-    assert row['isaac_app_precompile_start_attempted'] is False
-    assert row['isaac_app_precompile_start_completed'] is False
-    assert row['isaac_app_launch_profile'] is None
+    assert events == ['app_open', 'source_compile', 'app_close']
+    assert row['isaac_app_precompile_start_attempted'] is True
+    assert row['isaac_app_precompile_start_completed'] is True
+    assert row['isaac_app_launch_profile']['profile_id'] == 'f06-headless-no-render-v1'
     assert row['isaac_app_owner_close_receipt']['close_completed'] is True
     assert row['errors'][0]['phase'] == 'compile'
     assert row['runtime_valid'] is False
     assert not (tmp_path / 'isaac-run' / 'episode.h5').exists()
+
+
+def test_isaac_worker_refuses_preloaded_usd_without_opening_app(tmp_path, monkeypatch):
+    import builtin_example_worker as worker
+    import task_env.runtime.sessions.isaac_native_io as native
+
+    events = []
+    owner = SimpleNamespace(
+        open=lambda **kwargs: events.append('open'),
+        close=lambda: events.append('close'),
+        close_receipt=lambda: {'close_attempted': True},
+    )
+    monkeypatch.setitem(sys.modules, 'pxr', SimpleNamespace())
+    monkeypatch.setattr(worker, 'core_context', lambda *args: {'core_commit': 'test'})
+    monkeypatch.setattr(native, '_process_app_owner', lambda **kwargs: owner)
+    output = tmp_path / 'run'
+    output.mkdir()
+    (output / 'run_plan.json').write_text(json.dumps({
+        'schema_version': 'harness-builtin-pickcube-example-run-plan-v2',
+        'isaac_app_launch_profile_id': 'f06-headless-no-render-v1',
+    }))
+    spec = _spec(provider='isaacsim', backend='cuda', device='cuda:0',
+                 source_delivery_manifest='/frozen/manifest.json')
+    row = worker.run_one(spec, {'core_repo': str(tmp_path)},
+                         ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ()),
+                         seed=31, output=output)
+    assert events == ['close']
+    assert row['isaac_app_precompile_start_attempted'] is False
+    assert row['runtime_valid'] is False
+    assert 'before Isaac App startup' in row['errors'][0]['message']
 
 
 def test_isaac_interpreter_selection_without_launch(monkeypatch, tmp_path):
