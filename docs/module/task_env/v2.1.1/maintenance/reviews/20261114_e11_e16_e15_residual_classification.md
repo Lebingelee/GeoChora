@@ -73,3 +73,5 @@
 随后独立主审从 unit2／3 gate 与维护者已接收范围中定位另外十个具体运行，包括原始 RGB 帧和反馈对照；已单独归位 [128 项及 SHA 清单](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/human-reviewed-additional-runs/manifest.json)，2,172,197 逻辑字节，执行中排除 Taichi 和 Python 缓存。独立范围复核进行中；这些归位不代表历史 native 重跑。
 
 独立主审已逐项核验十个新增运行的 128 份归位副本，并确认所列 12 帧 RGB 原始数组及同次上下文在两份 human 保全清单中；未验证原 manifest 的全部内容或完整环境。对其余待判断文件另按当前 Git tracked 正规文件作 SHA 对比，得到 [1,051 条逐路径重复候选](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/stage-current-tracked-duplicates-candidate.jsonl)，共 37,444,771 逻辑字节，其中 1,048 条属于 human 诊断目录。清单 SHA-256 `505e29a991cf6a5eecd1151b962e0bb73994c0b3f2dd5c1a0ca252583ce1e860`；仅说明比对时内容相同，需保证 tracked 来源与具体版本可恢复、重新核验并明确旧运行路径不再原地完整，不能据此自动删除。
+
+上述冻结对象、当前 tracked 来源、缓存、快照重复／旧记录及历史测试链接共九类候选已做[逐路径交叉检查](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/preliminary-candidate-overlap-audit.json)：49,458 个非目录路径互不重叠，缓存另有 1,428 个目录条目。该文件不是可执行清单；仍须结束未决材料判断、验证实际依赖和恢复、统一执行前锁与身份检查并取得具体授权。分类归位目录当前实占约 281 MB（含清单、两份 R05c 核心原始记录和按链接复用的读回输入），最终净变化必须扣除其新增分配，不能将候选逻辑字节相加当作释放空间。
