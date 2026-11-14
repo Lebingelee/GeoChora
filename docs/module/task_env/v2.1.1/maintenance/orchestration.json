@@ -1,6 +1,6 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-14",
+  "updated_date": "2026-11-15",
   "status": "POST_5C_E00_E16_MAINTAINER_ACCEPTED_BOUNDED",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "E00-E16 retains maintainer bounded acceptance at delivery 86921c62 and its E14 alignment closeout. Subsequent C1-C5 simplification and bounded verification are implemented at 7f8796b4; do not restart that plan. The G05-to-G06 review in reviews/20261114_g05_pre_g06_readiness_7f8796b4.md found no functional blocker requiring G05 rework within accepted bounds. Prepare the G06 scope, inherited source baseline, branch arrangement and bounded execution package; G06 remains unstarted until its separate maintainer start. Preserve historical evidence and approved limitations; do not merge, push, tag or publish.",
+  "next_action": "E00-E16 retains maintainer bounded acceptance at 86921c62; C1-C5 implementation and bounded verification are at production code 7f8796b4, with G05 readiness review afb58944. The maintainer authorized committing the three preserved Markdown inputs (0722341b), updating the roadmap (23c6c86f), and fast-forwarding local develop to the current stage delivery; the G06 handoff documentation is included in that local synchronization. Read 20261115_g06_agent_handoff.md and verify live refs, then continue G06 under the maintainer's G06 instruction using the existing owners and original optimization ledger. G06 implementation has not started in this handoff; preserve accepted bounds. No main merge, push, tag or publication is authorized by this local develop synchronization.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,

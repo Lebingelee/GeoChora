@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-14。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-15。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
@@ -11,6 +11,8 @@
 2026-11-14 总账复审及收尾：`d0902adc` 的[逐项复审](reviews/20261114_e00_e16_total_ledger_reaudit_0847a5da.md)确认57项满足有界出口，GOV-04／DOC-01／DOC-02留有编排和Skill同步欠账；后续已按维护者授权完成[E14资料收尾和60项现行结案表](reviews/20261114_e14_current_state_alignment_closeout.md)。60项及V01～V10均按既定有界范围结案，原复审保留其时点；不改变原运行身份、批准例外或G06/G07未开始状态。
 
 维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)已完成 C1～C5 的有界实施和[集中复验](reviews/20261114_post_optimization_c5_final.md)，其限制及独立复核见交付记录；不是未关闭的原账目。基于 `7f8796b4` 的[G05→G06复核](reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)未发现须重开G05的功能阻断项，已同步当前说明；可以准备G06的范围和执行包，本次不自动启动G06。
+
+2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。接手请读取[G06 Agent handoff](20261115_g06_agent_handoff.md)并核对实时refs；G06实际实施仍由后续agent开展，main／远端未同步、未发布。
 
 ## 启动输入与工作归属
 
@@ -24,7 +26,7 @@
 | 执行窗口 | 单元 9 已有返包及释放记录；启动观察未见本仓库 native worker，前序协调 chat 为 idle；启动时当前 chat 仅写 O0 文档；后续直接实施 E00～E04 的资源使用按其运行计划及释放记录核对 |
 | 当前改动 | E00～E04 已完成实施、基线独立主审及主审余项修复，并于 2026-11-12 获维护者统一接收。E00～E04 接收生产 `912416e6`，精确验证输入及限制见执行计划第 6 节；不沿用启动表充当实时锁 |
 
-保护输入为 `MUJOCO_LOG.TXT`、2026-10-30 runtime route handoff、stage3 gravity proposal 和用户优化台账。精确大小／SHA-256 与原工作树状态在 ignored [输入快照](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json)。没有将它们加入本轮提交，也没有清理原始输出、改动 pins、merge／push／tag。
+上表启动时的保护输入为 `MUJOCO_LOG.TXT`、2026-10-30 runtime route handoff、stage3 gravity proposal 和用户优化台账。精确大小／SHA-256 与原工作树状态在 ignored [输入快照](../../../../../workspace/maintenance/v211_post5c_optimization_o0_20261111_001/input-snapshot.json)，启动轮没有提交这些输入。维护者此次明确授权后，三份Markdown已在`0722341b`原样纳入Git，字节及原历史结论未改；目前仅`MUJOCO_LOG.TXT`仍为保护untracked。两个pins不变，没有清理原始输出、push或改tag；本地develop快进见上方交接记录。
 
 ## 已接收的能力与边界
 
@@ -50,7 +52,7 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。E00～E04 主审余项修复轮的 217 项受影响 source/caller 检查通过，另有 76 项纯/fake 精确检查通过（与前者有重叠，不相加）；六项 USD 检查为真实 delivery 的离线构造，不启动 Isaac App。MuJoCo 七条短程共 75 个显式子步，GeoPhys effort/Pendulum 两条短程通过；加上测试中的 40 个，本轮共 115 个显式 MuJoCo 子步。冻结输入为 `e25f37c5` 加保存的生产 patch，与 `912416e6` 对应生产字节相同，运行的 source_revision 仍为 e25，不改称提交后重跑。详情见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。renderer 未重跑，完整 Solution 仍留 E13；旧逐批记录从历史提交和原始输出恢复。
 
-O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E16；O6 独立主审与维护者代码接收及 O7 项目清理和有界接收均已完成。[capability-matrix.json](../capabilities/capability-matrix.json) 分列当前有界证据与历史目标；本地成果尚未合入 develop／main，未发布。
+O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E16；O6 独立主审与维护者代码接收及 O7 项目清理和有界接收均已完成。[capability-matrix.json](../capabilities/capability-matrix.json)分列当前有界证据与历史目标；本地develop已按本次授权同步G05及优化成果，main／远端未同步，未发布。
 
 ## E05～E10：维护者已接收
 
