@@ -101,3 +101,5 @@
 对 1,536 份已选或新保留文本作有界[相对路径字面检查](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained-relative-citations.json)，发现大量命中来自历史 output-manifest 的目录枚举，不能据此认定全部为核心。对 report、gate、results 或读回／因果比较直接命中且此前仍未归位的 [26 项](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/relative-report-citations/manifest.json)已按 SHA 归位，共 249,765 逻辑字节；关联可能包含重名误匹配，交独立主审核对。该检查只覆盖文本字面相对路径，不证明动态引用不存在。
 
 独立主审核对 G05 5b 的 scene holdout 和 configured camera 两条已选运行时发现，原始 RGB／窗口帧及 raw／start／end 已在 U5，但两组 worker 日志、资源采样和 core diff 尚未单列；已按 SHA 归位[六项同次上下文](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-window-run-context/manifest.json)，499,639 逻辑字节。资源采样只说明预算上下文，不另作物理结果；范围复核继续。
+
+对 G05 5b 最终选中的两条 CPU 窗口及两条离屏运行，独立主审指出同次 start／end、worker 和资源记录尚未在 U5 对象中；四个受选 probe 的 PNG 亦为单独路径。已归位[26 项原始上下文和八张 PNG](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-cpu-window-rgb-context/manifest.json)，258,906 逻辑字节，维持原 U5 原始数组／窗口证据和历史受测范围；独立复核进行中。
