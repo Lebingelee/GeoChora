@@ -67,4 +67,4 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 
 2026-11-14阶段性记录：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；保留主checkout与冻结archive。该时点尚待T35收敛和快照处置，后续状态见下；各次测量及恢复限制保留在[原执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。
 
-当前项目停门：[最新独立复核](reviews/20261114_e11_e16_final_project_review_e3f13d72.md)对 `e3f13d72` 确认六heads、四tags、两个注册worktree和批准清单删除成立；当前受支持锁收敛有界成立，三provider短程记录及冷读通过。U4/U5不重开，但E15尚有102个stage历史目录（有序范围约23.11 GB）和约6.11 GB快照补集未作最终保留／清理分类，不能仅等待审批就称E11～E16全部完成。下一步按复核R1～R4集中收尾，再作维护者项目接收；旧Git管理元数据损失、历史精确净额UNKNOWN及同次completion边界保留，G06不启动。
+当前项目停门：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开，项目最终接收由维护者决定：[接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留，G06 不启动。

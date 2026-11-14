@@ -1734,6 +1734,7 @@
             "review_ref": "reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md",
             "ordinary_attempts_preserved": true,
             "code_optimization_accepted": false,
+    "code_optimization_accepted_scope": "Legacy broad optimization flag is not project acceptance; E11-E14 U4 code scope has maintainer bounded acceptance as recorded in E14.",
             "project_optimization_accepted": false
           }
         }
@@ -2082,19 +2083,22 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "E00_E10_ACCEPTED_E11_E16_REMAINING_PROJECT_CLEANUP",
+    "status": "E00_E10_ACCEPTED_E11_E16_PROJECT_ACCEPTANCE_OPEN",
     "date": "2026-11-14",
     "authority": "Maintainer accepted E05–E10 and started the E11–E16 implementation Goal; CUDA and Isaac EULA were explicitly authorized. Deletion and maintainer acceptance remain separate.",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
     "production_head": "3e77f6e0768ca2896e60d4236c9822a917625887",
-    "current_step": "U4 code scope and U5 evidence package retain their bounded acceptance; authorized worktree and snapshot cleanup verified. E15 remaining-output classification and final project acceptance are not complete.",
-    "next_step": "Complete R1-R4 of the latest independent review: classify retained stage outputs and snapshot complement, prepare the concrete remaining disposition, validate package/current dependencies, and submit the final project decision without reopening U4/U5.",
-    "latest_independent_project_review_ref": "reviews/20261114_e11_e16_final_project_review_e3f13d72.md",
+    "current_step": "U4 code scope and U5 evidence package retain bounded acceptance; authorized E15 final cleanup and independent reconciliation are complete. Final project acceptance remains the maintainer decision.",
+    "next_step": "Submit the E11-E16 final project acceptance entry and documented limitations to the maintainer; do not reopen U4/U5 or start G06.",
+    "prior_independent_project_review_ref": "reviews/20261114_e11_e16_final_project_review_e3f13d72.md",
+    "latest_independent_project_review_ref": "reviews/20261114_e15_final_project_reconciliation.md",
+    "project_acceptance_entry_ref": "reviews/20261114_e11_e16_u7_project_acceptance_entry.md",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
+    "code_optimization_accepted_scope": "Legacy broad optimization flag is not project acceptance; E11-E14 U4 code scope has maintainer bounded acceptance as recorded in E14.",
     "project_optimization_accepted": false,
     "g06_started": false,
     "native_runs_this_kickoff": 0,
@@ -2117,7 +2121,7 @@
       "E12": "U4_REVIEWED_BOUNDED_CODE_SCOPE",
       "E13": "BOUNDED_JOINT_EVIDENCE_ACCEPTED",
       "E14": "MAINTAINER_ACCEPTED_BOUNDED_U4_CODE",
-      "E15": "PARTIAL_CLEANUP_REVIEWED",
+      "E15": "FINAL_AUTHORIZED_CLEANUP_INDEPENDENTLY_RECONCILED",
       "E16": "REFS_WORKTREES_REVIEWED_PROJECT_ACCEPTANCE_OPEN"
     },
     "e00_e04_prior_increment_snapshot": {
