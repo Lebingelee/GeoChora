@@ -14,7 +14,7 @@
 
 受守卫定向测试：`/home/lly/miniconda3/envs/geochora/bin/python`，设置 `GEOCHORA_PURE_GUARD_ROOTS` 为本 checkout `asset` 和 `~/.cache/geochora/usd`，加入版本化 `pure_guard`，禁用 pytest 插件自动加载及缓存，执行 `test_native_locks.py` 的 3 项与 `test_builtin_example_mode.py` 的锁争用、不同 inode、替换、监控异常、强制退休以及两种终止信号节点，共 **10 passed**；只使用临时文件和合成进程，不是 native 测试。第一次错误使用系统 Python 3.14 且未设置守卫根变量，发生守卫初始化错误和缺少 NumPy，10 项在收集阶段 ERROR；上述结果来自正确环境的独立重试，不把第一次失败计为通过。
 
-同日对四个剩余注册工作树的 `/proc` 可见 cwd、root 和 fd 做瞬时路径检查，未见命中；有 1,042 次权限拒绝及 4 个检查时消失的条目，不能由此确认 owner、未来使用、所有映射或不可见进程状态。冻结 archive 继续 locked；camera、core-baseline、旧版 clean checkout 的 owner、ignored 内容及处置仍须逐项闭合。该观察不构成删除许可。
+同日该次审计时，对四个剩余注册工作树的 `/proc` 可见 cwd、root 和 fd 做瞬时路径检查，未见命中；有 1,042 次权限拒绝及 4 个检查时消失的条目，不能由此确认 owner、未来使用、所有映射或不可见进程状态。该观察不构成删除许可。此后维护者明确确认停用并批准具体清单，camera、core-baseline、旧版 clean checkout 已按[执行记录](20261114_e11_e16_three_worktree_execution.md)移除；冻结 archive 继续 locked。
 
 T35 的当前可用锁采用**有界过渡并保留旧路径**；按原退出条件“当前运行不再依赖旧路径”仍 OPEN。其他 checkout、旧计划和锁路径被并发替换的风险亦未消除，不把本表称为全局锁迁移完成。
 
