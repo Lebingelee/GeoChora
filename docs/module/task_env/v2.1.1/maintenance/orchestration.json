@@ -1,6 +1,6 @@
 {
   "schema_version": "geochora-v211-orchestration-plan-v1",
-  "updated_date": "2026-11-13",
+  "updated_date": "2026-11-14",
   "status": "POST_5C_E11_E16_IMPLEMENTATION_IN_PROGRESS",
   "route_approval": "maintainer_confirmed_7_stages_22_substages",
   "protocol_status": "APPROVED_IMPLEMENTATION_BASELINE",
@@ -22,7 +22,7 @@
   },
   "active_packages": [],
   "next_candidate": null,
-  "next_action": "U4 code-scope independent review and maintainer conditional bounded acceptance recorded; prepare U5 five-stage evidence package and independent recomputation, without deletion. Project acceptance remains separate; do not start G06.",
+  "next_action": "Preserve U4/U5 bounded acceptance and the verified authorized cleanup. Complete the final retain/delete classification and disposition of the remaining stage outputs and integration snapshot complement, then obtain maintainer project acceptance. Follow the e3f13d72 independent review R1-R4; do not start G06.",
   "window_policy": {
     "ordinary_attempt_limit_per_substage": 3,
     "attempt_is_execution_window": true,
@@ -2082,15 +2082,16 @@
     }
   ],
   "post_5c_optimization": {
-    "status": "E00_E10_ACCEPTED_E11_E16_IMPLEMENTATION_IN_PROGRESS",
-    "date": "2026-11-13",
+    "status": "E00_E10_ACCEPTED_E11_E16_REMAINING_PROJECT_CLEANUP",
+    "date": "2026-11-14",
     "authority": "Maintainer accepted E05–E10 and started the E11–E16 implementation Goal; CUDA and Isaac EULA were explicitly authorized. Deletion and maintainer acceptance remain separate.",
     "planning_ref": "../planning/post-5c-optimization-execution.md",
     "ledger_ref": "../planning/post-5c-code-project-optimization-diagnostic-ledger.md",
     "input_head": "1f1359eef9bfff73cf7688a8270c5f06471dc614",
-    "production_head": "7a098423",
-    "current_step": "U4 code-scope accepted under explicit maintainer conditions; U5 evidence consolidation next",
-    "next_step": "Complete U4 actual-code independent review and obtain maintainer code acceptance; then prepare U5 evidence consolidation before authorized cleanup.",
+    "production_head": "3e77f6e0768ca2896e60d4236c9822a917625887",
+    "current_step": "U4 code scope and U5 evidence package retain their bounded acceptance; authorized worktree and snapshot cleanup verified. E15 remaining-output classification and final project acceptance are not complete.",
+    "next_step": "Complete R1-R4 of the latest independent review: classify retained stage outputs and snapshot complement, prepare the concrete remaining disposition, validate package/current dependencies, and submit the final project decision without reopening U4/U5.",
+    "latest_independent_project_review_ref": "reviews/20261114_e11_e16_final_project_review_e3f13d72.md",
     "implementation_package_dispatched": false,
     "g05_function_accepted": true,
     "code_optimization_accepted": false,
@@ -2112,12 +2113,12 @@
       "E08": "MAINTAINER_ACCEPTED_BOUNDED",
       "E09": "MAINTAINER_ACCEPTED_BOUNDED",
       "E10": "MAINTAINER_ACCEPTED_BOUNDED",
-      "E11": "IMPLEMENTED_SELF_ASSESSED_PENDING_REVIEW",
-      "E12": "IMPLEMENTED_SELF_ASSESSED_PENDING_REVIEW",
+      "E11": "U4_REVIEWED_BOUNDED_CODE_SCOPE",
+      "E12": "U4_REVIEWED_BOUNDED_CODE_SCOPE",
       "E13": "BOUNDED_JOINT_EVIDENCE_ACCEPTED",
       "E14": "MAINTAINER_ACCEPTED_BOUNDED_U4_CODE",
-      "E15": "NOT_STARTED",
-      "E16": "NOT_STARTED"
+      "E15": "PARTIAL_CLEANUP_REVIEWED",
+      "E16": "REFS_WORKTREES_REVIEWED_PROJECT_ACCEPTANCE_OPEN"
     },
     "e00_e04_prior_increment_snapshot": {
       "implementation_attempt_count": 1,

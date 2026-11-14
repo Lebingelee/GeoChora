@@ -1,6 +1,6 @@
 # v2.1.1 当前状态
 
-更新时间：2026-11-13。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
+更新时间：2026-11-14。本文是版本的人工可读当前摘要；工作包、attempt 和历史记录由[编排索引](orchestration.json)维护，逐项优化范围由[优化台账](../planning/post-5c-code-project-optimization-diagnostic-ledger.md)维护。
 
 ## 当前停门
 
@@ -50,7 +50,7 @@ O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E
 
 ## E05～E10：维护者已接收
 
-维护者已决定准备 E05 资产/source、E06 physics adapter、E07 状态/相机、E08 renderer、E09 Task 精简和 E10 Recorder/replay。当前以[专用剩余账本](../planning/post-5c-e05-e10-remaining-ledger.md)和[实施 Goal](../planning/post-5c-e05-e10-goal.md)作为后续执行入口：六个实施单元及一个集中复验/对账单元，共 40 个闭合检查点。E00～E04 不再重开；U1～U7 的本轮实施及影响对账已完成实施者自评，见[结果和证据](20261113_e05_e10_u7_delivery.md)；S09 的 GeoPhys 公开初始化、S19 的 observer 准入和 S27 的 Task/source 构建职责已按各自受测范围闭合。[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)现已逐点核对 S01～S40，建议六事件按既定范围有界接收；主审小修生产 `7a098423` 删除 physical Recorder 的 PickCube 语义覆盖并验证声明保全。维护者于2026-11-13在本次对话明确接收E05～E10，E11～E16尚未实施完成。完整 Solution 继续归 E13，整体代码/项目优化尚未接收。
+E05资产/source、E06 physics adapter、E07状态/相机、E08 renderer、E09 Task精简和E10 Recorder/replay已按[专用账本](../planning/post-5c-e05-e10-remaining-ledger.md)完成，[实施Goal](../planning/post-5c-e05-e10-goal.md)保留为历史提示，不再作为下一执行包。[结果和证据](20261113_e05_e10_u7_delivery.md)及[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)覆盖S01～S40，生产小修 `7a098423` 删除physical Recorder的PickCube语义覆盖并验证声明保全；维护者于2026-11-13明确接收。后续完整Solution已按E11～E16的U3/U4有界核对，项目整理与最终接收见下。
 
 
 ## 当前范围：E11～E16（实施与代码对账）
@@ -65,4 +65,6 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 
 2026-11-13 Isaac 夹爪专项返工补充：原 U3 的失败结论按原冻结输入保留。[后续物理对照与修复](reviews/20261113_isaac_gripper_rework_ef10e348.md)确认空载可近零闭合、碰撞方块50 mm，约53.6 mm夹持下可以抬起并保持；原45 mm就绪门阻止了Solution试举。Task现在输出v2稳定关闭读回，Solution连续稳定50 ms后尝试抬升，100 mm成功判据和物理参数不变。相同seed31／1000 horizon的正式Isaac Solution已于951步完成、lift105.254 mm，H5独立读回4755个显式子步及关闭回执成立；腕部RGB有单独430步／431帧控制对照。H5 completion仍为null，U4接收依据独立复审及同次联合证据，而非该专项自行替代主审。
 
-2026-11-14后续：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，已完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；现存主 checkout 与冻结 archive 两个注册工作树。删除后 240 项纯／fake 和七项包内离线检查通过，同序含快照范围减少 9,752,719,360 字节；实际范围、外部目标及恢复限制见[执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。T35、integration 快照进一步处置、历史累计空间及维护者项目接收仍 OPEN。
+2026-11-14阶段性记录：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；保留主checkout与冻结archive。该时点尚待T35收敛和快照处置，后续状态见下；各次测量及恢复限制保留在[原执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。
+
+当前项目停门：[最新独立复核](reviews/20261114_e11_e16_final_project_review_e3f13d72.md)对 `e3f13d72` 确认六heads、四tags、两个注册worktree和批准清单删除成立；当前受支持锁收敛有界成立，三provider短程记录及冷读通过。U4/U5不重开，但E15尚有102个stage历史目录（有序范围约23.11 GB）和约6.11 GB快照补集未作最终保留／清理分类，不能仅等待审批就称E11～E16全部完成。下一步按复核R1～R4集中收尾，再作维护者项目接收；旧Git管理元数据损失、历史精确净额UNKNOWN及同次completion边界保留，G06不启动。

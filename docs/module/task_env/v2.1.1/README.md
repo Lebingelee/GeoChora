@@ -1,8 +1,8 @@
 # TaskEnv v2.1.1 — 协议与实施
 
-更新时间：2026-11-13。**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；当前进入代码与项目优化，G06／G07 尚未开始。**
+更新时间：2026-11-14。**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；当前仍在代码与项目优化，G06／G07 尚未开始。**
 
-从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E10 已获维护者按各自范围统一接收；前轮范围为 [E05～E10 细化账本](planning/post-5c-e05-e10-remaining-ledger.md)及其[实施 Goal](planning/post-5c-e05-e10-goal.md)，U1～U7 已完成实施、影响对账及[独立主审](maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md)，维护者于2026-11-13明确接收。当前使用[E11～E16细化账本](planning/post-5c-e11-e16-remaining-ledger.md)和[实施Goal](planning/post-5c-e11-e16-goal.md)：U1/U2实施自评完成，四条CPU及后续Isaac成功运行已按同次联合证据核对，H5单文件不自含完整completion；旧Isaac失败保留。U4独立主审复审后按维护者本次条件授权有界接收；下一步U5证据归并。完整Solution、独立主审、维护者代码接收与项目接收分开。
+从[唯一当前摘要](maintenance/current-state.md)恢复接收范围、启动输入、正式入口及下一停门；工作包状态在[编排索引](maintenance/orchestration.json)，实施顺序见[优化执行安排](planning/post-5c-optimization-execution.md)及[60 项台账](planning/post-5c-code-project-optimization-diagnostic-ledger.md)。[单元 9 综合主审](maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)保留原 5a／5b、四主体、同步 RGB 及跨组合的受测边界，维护者已确认功能接收。E00～E10已获维护者按各自范围接收；当前使用[E11～E16细化账本](planning/post-5c-e11-e16-remaining-ledger.md)。U4代码范围与U5有界证据归并已接收，五条完整运行采用同次联合completion口径；H5单文件不自含完整completion，旧Isaac失败保留。已批准的旧工作树／快照清单已执行，但[最新独立复核](maintenance/reviews/20261114_e11_e16_final_project_review_e3f13d72.md)确认E15剩余历史输出及快照补集尚缺最终分类和处置，整体项目接收仍OPEN；不把清单执行成功写成E11～E16全部完成。
 
 优化及人工接收完成后才决定进入 G06；G07 的最终三 provider × 三 seed 门保留。renderer 创建时固定至 close；COM 原判据 FAIL、原 N08 FAIL、R05c NOT_REQUALIFIED、6.1 close 及历史执行偏差不改写。完整两任务 Solution 在本次优化按各自支持 provider 单 seed 验证，G07 仍保留其最终集成范围。
 
