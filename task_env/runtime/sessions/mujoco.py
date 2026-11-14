@@ -783,26 +783,16 @@ class _MuJoCoSession(_SessionValues):
     def runtime_progress_receipt(self):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed runtime progress is unavailable for this session profile')
-        return {
-            'schema_version': 'runtime-progress-v1',
-            'provider_materialization_id': self._provider_materialization_id,
-            'episode_id': self._episode_id,
-            'reset_sample_id': self._reset_sample_id,
-            'reset_count': int(self._reset_count),
-            'control_step': int(self._control_step),
-            'state_revision': int(self._state_revision),
-            'native_step_count': int(self._native_steps),
+        result = self._mixed_runtime_progress_values()
+        result.update({
             'preprocess_call_count': int(self._preprocess_calls),
             'forward_call_count': int(self._forward_calls),
             'simulation_time_native_s': float(self._data.time),
             'simulation_time_episode_s': float(self._data.time - self._reset_time_origin),
-            'source_id': self._source.scene_source.source_id,
-            'source_closure_digest': self._source.source_closure_digest,
-            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
             'physical_state_monitor': self.physical_state_monitor_receipt,
-        }
+        })
+        return result
 
-    @property
     def close_receipt(self):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed close evidence is unavailable for this session profile')

@@ -1,6 +1,6 @@
 # Env、physics adapter 与 renderer 后续精简计划
 
-2026-11-14。状态：`C1_C2_IMPLEMENTED_C3_C5_PENDING`。C1 与 C2 的有界结果分别见[发布记录](../maintenance/reviews/20261114_post_optimization_c1_publication.md)和[共同 interval 记录](../maintenance/reviews/20261114_post_optimization_c2_shared_interval.md)；完整计划和最终复验仍未完成。源码盘点输入为 `d0902adc`；本轮 E14 收尾仅修改文档、Skill、示例 caller 和对应诊断，以下 Core 文件未改。原 E00～E16 的有界接收与[60项结案](../maintenance/reviews/20261114_e14_current_state_alignment_closeout.md)继续有效；本计划不新增 E17，不自动启动 Goal、native 窗口或 G06。
+2026-11-14。状态：`C1_C3_IMPLEMENTED_C4_C5_PENDING`。有界结果见[C1 发布记录](../maintenance/reviews/20261114_post_optimization_c1_publication.md)、[C2 共同 interval 记录](../maintenance/reviews/20261114_post_optimization_c2_shared_interval.md)和[C3 provider 记录](../maintenance/reviews/20261114_post_optimization_c3_provider_values.md)；完整计划和最终复验仍未完成。源码盘点输入为 `d0902adc`；本轮 E14 收尾仅修改文档、Skill、示例 caller 和对应诊断，以下 Core 文件未改。原 E00～E16 的有界接收与[60项结案](../maintenance/reviews/20261114_e14_current_state_alignment_closeout.md)继续有效；本计划不新增 E17，不自动启动 Goal、native 窗口或 G06。
 
 ## 1. 要减少什么
 

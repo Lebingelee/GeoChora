@@ -214,6 +214,22 @@ class _SessionValues:
         elif option is None or explicit_timestep is None or float(explicit_timestep) != artifact.timebase.physics_dt:
             raise ValueError('source/native physics timestep mismatch')
 
+    def _mixed_runtime_progress_values(self):
+        """Project the shared identity and counters of an admitted mixed session."""
+        return {
+            'schema_version': 'runtime-progress-v1',
+            'provider_materialization_id': self._provider_materialization_id,
+            'episode_id': self._episode_id,
+            'reset_sample_id': self._reset_sample_id,
+            'reset_count': int(self._reset_count),
+            'control_step': int(self._control_step),
+            'state_revision': int(self._state_revision),
+            'native_step_count': int(self._native_steps),
+            'source_id': self._source.scene_source.source_id,
+            'source_closure_digest': self._source.source_closure_digest,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+        }
+
     @property
     def build_layout_facts(self):
         """Owned values from the adapter's completed request-specific mapping check."""

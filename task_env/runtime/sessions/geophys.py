@@ -753,24 +753,12 @@ class _GeoPhysSession(_SessionValues):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed runtime progress is unavailable for this session profile')
         state = self.snapshot()
-        return {
-            'schema_version': 'runtime-progress-v1',
-            'provider_materialization_id': self._provider_materialization_id,
-            'episode_id': self._episode_id,
-            'reset_sample_id': self._reset_sample_id,
-            'reset_count': int(self._reset_count),
-            'control_step': int(self._control_step),
-            'state_revision': int(self._state_revision),
-            'native_step_count': int(self._native_steps),
-            'simulation_time_native_s': float(state.simulation_time),
-            # Mixed GeoPhys reset admission is source-time-zero only.
-            'simulation_time_episode_s': float(state.simulation_time),
-            'source_id': self._source.scene_source.source_id,
-            'source_closure_digest': self._source.source_closure_digest,
-            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
-        }
+        result = self._mixed_runtime_progress_values()
+        # Mixed GeoPhys reset admission is source-time-zero only.
+        result.update(simulation_time_native_s=float(state.simulation_time),
+                      simulation_time_episode_s=float(state.simulation_time))
+        return result
 
-    @property
     def close_receipt(self):
         if not self._closed or self._last_close_receipt is None:
             raise RuntimeError('GeoPhys RuntimeSession close has not completed')
