@@ -2462,6 +2462,18 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             raise RuntimeError('selected task has no solution identity for recording')
         return identity
 
+    def _observe_selected_solution(self, solution, observation, reward, terminated,
+                                   truncated, info, extra, *, report):
+        """Commit one Solution observation and publish its completion facts."""
+        solution.observe(observation, reward, terminated, truncated, info, **extra)
+        if report and hasattr(solution, 'outcome_report'):
+            self.info.update(solution.outcome_report())
+        self.info.update(
+            selected_policy_execution_complete=bool(solution.done),
+            selected_policy_execution_failed=bool(solution.failed),
+            expert_failure_reason=solution.failure_reason,
+        )
+
     def _validate_external_solution(self, solution):
         if self.binding.validate_external_solution is None:
             raise StageUnavailableError('this selected task has no external Solution lifecycle')
@@ -2823,10 +2835,10 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 operations = component_lifecycle.prepare_step(action)
             else:
                 operations = self._prepare_selected_step(action)
-            result = self._episode_execution_state().execute_interval(**operations)
             if component_lifecycle is not None:
+                result = self._episode_execution_state().execute_interval(**operations)
                 return self._format_component_step(component_lifecycle, result)
-            return result
+            return self._episode_execution_state().execute_selected_interval(self, **operations)
 
     def _prepare_selected_step(self, action):
         self._episode_execution_state().require_step(
@@ -3111,10 +3123,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             self._episode_mode = 'external_solution' if proposal is not None and not caller_driven else 'external'
             self._episode_execution_state().finish_step(terminated=terminated, truncated=truncated)
             if proposal is not None and not caller_driven:
-                observer_solution.observe(self.obs, float(self.evaluation.reward), terminated, truncated, task_info_for_solution(self.info))
-                self.info.update(selected_policy_execution_complete=bool(observer_solution.done),
-                                 selected_policy_execution_failed=bool(observer_solution.failed),
-                                 expert_failure_reason=observer_solution.failure_reason)
+                self._observe_selected_solution(
+                    observer_solution, self.obs, float(self.evaluation.reward), terminated, truncated,
+                    task_info_for_solution(self.info), {}, report=False)
             if self.recorder is not None and getattr(self.recorder, 'active', False):
                 from ..recorders.physical_metadata import record_physical_transition
                 record_append_attempted = True
@@ -3178,8 +3189,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 transition_status=self._fault_transition_status(
                     self.recorder, recording_before, append_attempted=record_append_attempted))
 
-        return dict(apply_control=apply_control, advance=advance, read_state=lambda: self.state,
-                    evaluate=evaluate, observe=lambda _state: self.obs,
+        return dict(apply_control=apply_control, advance=advance, evaluate=evaluate,
                     publish=publish, on_failure=on_failure)
 
 
@@ -3330,16 +3340,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 publication_phase = 'position_solution_observation'
                 solution_owner = self.solution if observer_solution is None else observer_solution
                 extra = self.binding.observe_expert_kwargs(self, None)
-                solution_owner.observe(
-                    observation, evaluation.reward, terminated, truncated, self.info, **extra,
-                )
-                if hasattr(solution_owner, 'outcome_report'):
-                    self.info.update(solution_owner.outcome_report())
-                self.info.update(
-                    selected_policy_execution_complete=bool(solution_owner.done),
-                    selected_policy_execution_failed=bool(solution_owner.failed),
-                    expert_failure_reason=solution_owner.failure_reason,
-                )
+                self._observe_selected_solution(
+                    solution_owner, observation, evaluation.reward, terminated, truncated,
+                    self.info, extra, report=True)
                 self._stopped = bool(solution_owner.done or solution_owner.failed
                                      or terminated or truncated)
             if self.recorder is not None:
@@ -3403,8 +3406,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         return dict(
             apply_control=apply_control, advance=advance,
-            read_state=lambda: self.state, evaluate=evaluate,
-            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+            evaluate=evaluate, publish=publish, on_failure=on_failure,
             phases=('position_control_compute_apply_step', 'position_control_compute_apply_step',
                     'position_control_compute_apply_step', 'position_observation',
                     'position_observation', 'position_publication'),
@@ -3511,7 +3513,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 operations = prepare_selected_control_action(
                     self, action, proposal=proposal, observer_solution=observer_solution,
                     caller_driven=caller_driven)
-                return self._episode_execution_state().execute_interval(**operations)
+                return self._episode_execution_state().execute_selected_interval(self, **operations)
         except BaseException as error:
             # Solution.act() precedes this method and may already have mutated
             # state, even when a Task-load admission fails before its callback.
@@ -3583,13 +3585,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
             composition = getattr(source, 'source_composition_request', None)
             rows = tuple(getattr(composition, 'resource_writers', ()))
             if rows:
-                ownership = {}
-                for entity, actuator, writer in rows:
-                    ownership.setdefault(writer, []).append(f'{entity}/{actuator}')
-                resource_owners = tuple(
-                    (writer, tuple(sorted(resources)))
-                    for writer, resources in sorted(ownership.items())
-                )
+                from ..runtime.sessions.control_submission import _resource_owners_from_rows
+                resource_owners = _resource_owners_from_rows(
+                    rows, {writer for _, _, writer in rows})
                 writers = tuple(writer for writer, _resources in resource_owners)
                 resources = tuple(sorted(resource for _writer, owned in resource_owners
                                          for resource in owned))
@@ -3761,16 +3759,9 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
                 extra = (self.binding.observe_expert_kwargs(self, native_samples, interval_receipt)
                          if interval_receipt is not None
                          else self.binding.observe_expert_kwargs(self, native_samples))
-                observer_solution.observe(
-                    self.obs, self.evaluation.reward, terminated, truncated, task_info_for_solution(self.info), **extra,
-                )
-                if hasattr(observer_solution, 'outcome_report'):
-                    self.info.update(observer_solution.outcome_report())
-                self.info.update(
-                    selected_policy_execution_complete=bool(observer_solution.done),
-                    selected_policy_execution_failed=bool(observer_solution.failed),
-                    expert_failure_reason=observer_solution.failure_reason,
-                )
+                self._observe_selected_solution(
+                    observer_solution, self.obs, self.evaluation.reward, terminated, truncated,
+                    task_info_for_solution(self.info), extra, report=True)
                 self._stopped = observer_solution.done or observer_solution.failed
             self._episode_execution_state().finish_step(
                 terminated=terminated, truncated=truncated, preserve_stop=True,
@@ -3838,8 +3829,7 @@ class SelectedReferenceEnv(GymEnvBase, TaskEnvironmentComponent):
 
         return dict(
             apply_control=apply_control, advance=advance,
-            read_state=lambda: self.state, evaluate=evaluate,
-            observe=lambda _state: self.obs, publish=publish, on_failure=on_failure,
+            evaluate=evaluate, publish=publish, on_failure=on_failure,
         )
 
     @staticmethod

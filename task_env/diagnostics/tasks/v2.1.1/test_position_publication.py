@@ -71,3 +71,39 @@ def test_reset_task_facts_prefer_formal_config_and_keep_typed_fallback():
     env.value = {'task_source': SimpleNamespace(task_id='typed-task'),
                  'resolved_configuration': {'task_recipe': {'recipe': {'success_definition': 'typed-success'}}}}
     assert selected_task_reset_identity(env) == ('typed-task', 'typed-success')
+
+
+def test_position_interval_record_failure_does_not_publish_new_boundary(monkeypatch):
+    import pytest
+    from task_env.environment.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions import control
+    from task_env.recorders import position_metadata
+
+    before = SimpleNamespace(control_step=0, simulation_time=0.)
+    after = SimpleNamespace(control_step=1, simulation_time=.01)
+    old, new = object(), object()
+    env = object.__new__(SelectedReferenceEnv)
+    env.__dict__.update(_uses_component_assembly=False, _execution_fault=None,
+        _stopped=False, _closed=False, horizon=4, position_profile=True,
+        dual_entity_position=False, session=SimpleNamespace(snapshot=lambda: after),
+        _selected_controller=object(), position_profiles=(SimpleNamespace(requirements=object()),),
+        position_plan=object(), typed_state=old, position_scene=object(),
+        position_joint_bindings={}, position_frame_bindings={}, state=before,
+        artifact=SimpleNamespace(timebase=SimpleNamespace(control_substeps=5, control_dt=.01)),
+        recorder=SimpleNamespace(transition_count=0, observation_count=1),
+        _published_position_typed_state=old, value={})
+    env._position_requirements = lambda: object()
+    env._publish_task_position_execution_info = lambda _info: None
+    env.observation = lambda _state: ({'sample': 1}, {}, SimpleNamespace(failure=False, reward=1.))
+    monkeypatch.setattr(control, 'execute_position_control_interval',
+                        lambda *_args, **_kwargs: (object(), object(), object(), after, new))
+    def reject_record(*_args, **_kwargs):
+        raise RuntimeError('record failed after advance')
+    monkeypatch.setattr(position_metadata, 'record_position_transition', reject_record)
+    operations = env._prepare_position_profile(object())
+    with pytest.raises(RuntimeError, match='record failed after advance'):
+        env._episode_execution_state().execute_selected_interval(env, **operations)
+    assert env._published_position_typed_state is old
+    assert env.execution_fault.phase == 'record_position_transition'
+    assert env.execution_fault.interval_completed is True
+    assert env.execution_fault.transition_status == 'rejected'

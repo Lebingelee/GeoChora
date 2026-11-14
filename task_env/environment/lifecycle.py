@@ -153,6 +153,11 @@ class EpisodeExecutionState:
             on_failure(phase, error)
             raise
 
+    def execute_selected_interval(self, env, **operations):
+        """Run selected hooks against the Env's single state and observation owner."""
+        return self.execute_interval(
+            read_state=lambda: env.state, observe=lambda _state: env.obs, **operations)
+
     def finish_episode(self) -> None:
         self.stopped = True
 

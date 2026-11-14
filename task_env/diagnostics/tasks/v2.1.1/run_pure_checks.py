@@ -16,6 +16,8 @@ NODES = (
     'task_env/diagnostics/tasks/v2.1.1/test_public_scalar_example.py',
     'task_env/diagnostics/tasks/v2.1.1/test_pickcube_close_readiness.py',
     'task_env/diagnostics/tasks/v2.1.1/test_solution_compatibility.py::test_pickcube_position_and_physical_readiness_share_measured_boundary',
+    'task_env/diagnostics/tasks/v2.1.1/test_solution_compatibility.py::test_solution_observation_commits_once_and_preserves_report_policy',
+    'task_env/diagnostics/tasks/v2.1.1/test_solution_compatibility.py::test_solution_observation_failure_does_not_publish_completion',
     'task_env/diagnostics/tasks/v2.1.1/test_frame_mounted_task_camera.py',
     'task_env/diagnostics/tasks/v2.1.1/test_document_history_refs.py',
     'task_env/diagnostics/tasks/v2.1.1/test_pickcube_clock.py',

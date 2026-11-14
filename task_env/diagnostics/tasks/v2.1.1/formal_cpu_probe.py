@@ -402,6 +402,7 @@ try:
             else:raise AssertionError('invalid controller reset was accepted')
             assert env.robot is prior_robot and env.controller is prior_robot.controller and env.physical_action_spec()==prior_spec
             observation,info=env.reset(seed=31,options={'controller':'r3-pose'})
+            post_reset_schema = info['observation_schema'] if args.validate_schema else None
             committed=env._physical_reset_selection.current.execution
             assert env.robot.subjects == committed.subjects and env.robot.controllers == committed.controllers
             assert env._controller_selection_matches[0].selection_profile_id == 'panda-r3-effort-reference-v1'
@@ -432,6 +433,7 @@ try:
             options = {'execution': {'physics_provider': 'geophys', 'deployment': 'in_process',
                                      'interpreter': sys.executable}} if args.reset_switch else None
             observation,info=env.reset(seed=19 if args.case=='nut' else 31, options=options)
+            post_reset_schema = info['observation_schema'] if args.validate_schema else None
         if args.reset_switch:
             assert env.provider == 'geophys'
             assert set(observation['privileged_state']) == {'cube_body_pose'}
@@ -439,7 +441,7 @@ try:
             result['switched_provider'] = env.provider
         assert env.observation_space.contains(observation)
         if args.validate_schema:
-            info['observation_schema'].validate(observation)
+            post_reset_schema.validate(observation)
             result['schema_validated_reset_step_reset'] = True
         assert type(env._task_definition) is task_definition_type
         assert env._task_lifecycle.task_definition is env._task_definition

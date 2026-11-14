@@ -224,5 +224,5 @@ def prepare_selected_physical_sequence(env, action, *, profile, view, context, a
             native_substeps_expected=env.artifact.timebase.control_substeps,
             readback_error=readback_error, transition_status='not_assessed')
 
-    return dict(apply_control=apply_control, advance=advance, read_state=lambda: env.state,
-                evaluate=evaluate, observe=lambda _state: env.obs, publish=publish, on_failure=on_failure)
+    return dict(apply_control=apply_control, advance=advance, evaluate=evaluate,
+                publish=publish, on_failure=on_failure)

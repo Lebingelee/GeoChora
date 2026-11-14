@@ -110,3 +110,51 @@ def test_partial_control_write_preserves_error_and_skips_advance():
             publish=lambda *_: None, on_failure=on_failure)
     assert caught.value is error
     assert events == ['write', 'control_application']
+
+
+def test_position_resource_projection_preserves_writer_scope_and_duplicates():
+    from task_env.runtime.sessions.control_submission import _resource_owners_from_rows
+
+    rows = (('hand', 'z', 'w2'), ('arm', 'b', 'w1'), ('arm', 'a', 'w1'),
+            ('arm', 'a', 'w1'))
+    assert _resource_owners_from_rows(rows, ('w2', 'missing', 'w1')) == (
+        ('missing', ()), ('w1', ('arm/a', 'arm/a', 'arm/b')), ('w2', ('hand/z',)))
+
+
+def test_selected_interval_reads_committed_env_state_and_observation_once():
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    env = SimpleNamespace(state='before', obs='old')
+    events = []
+    def apply():
+        events.append('apply')
+        return 'command'
+    def advance(command):
+        events.append(('advance', command))
+        env.state = 'after'
+    def evaluate(state):
+        events.append(('evaluate', state))
+        env.obs = 'new'
+        return 'evaluation'
+    def publish(command, state, evaluation, observation):
+        events.append(('publish', command, state, evaluation, observation))
+        return observation
+    state = EpisodeExecutionState()
+    assert state.execute_selected_interval(env, apply_control=apply, advance=advance,
+        evaluate=evaluate, publish=publish, on_failure=lambda *_: pytest.fail('unexpected fault')) == 'new'
+    assert events == ['apply', ('advance', 'command'), ('evaluate', 'after'),
+                      ('publish', 'command', 'after', 'evaluation', 'new')]
+
+
+def test_selected_interval_preserves_evaluation_failure_phase():
+    from task_env.environment.lifecycle import EpisodeExecutionState
+
+    env = SimpleNamespace(state='boundary', obs='prior')
+    phases = []
+    def fail(_state):
+        raise RuntimeError('evaluation failed')
+    with pytest.raises(RuntimeError, match='evaluation failed'):
+        EpisodeExecutionState().execute_selected_interval(env, apply_control=lambda: None,
+            advance=lambda _: None, evaluate=fail, publish=lambda *_: pytest.fail('published'),
+            on_failure=lambda phase, error: phases.append((phase, str(error))))
+    assert phases == [('task_evaluation', 'evaluation failed')]

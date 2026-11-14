@@ -141,3 +141,41 @@ def test_nut_solution_accepts_public_schema_but_still_rejects_nonfinite_info():
     assert solution._validate(observation, info) is False
     with pytest.raises(ValueError, match='nonfinite'):
         solution._validate(observation, {**info, 'simulation_time_s': float('nan')})
+
+
+@pytest.mark.parametrize('include_report', [False, True])
+def test_solution_observation_commits_once_and_preserves_report_policy(include_report):
+    from types import SimpleNamespace
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    events = []
+    class Solution:
+        done, failed, failure_reason = True, False, None
+        def observe(self, observation, reward, terminated, truncated, info, **kwargs):
+            events.append(('observe', observation, reward, terminated, truncated, info, kwargs))
+        def outcome_report(self):
+            events.append(('report',))
+            return {'selected_policy_execution_complete': 'overridden', 'task_report': 7}
+    env = object.__new__(SelectedReferenceEnv)
+    env.info = {'existing': 1}
+    projected = {'input': 2}
+    env._observe_selected_solution(Solution(), 'observation', 1.5, False, True,
+                                   projected, {'sample': 4}, report=include_report)
+    assert events[0] == ('observe', 'observation', 1.5, False, True, projected, {'sample': 4})
+    assert len(events) == (2 if include_report else 1)
+    assert env.info['selected_policy_execution_complete'] is True
+    assert env.info['selected_policy_execution_failed'] is False
+    assert ('task_report' in env.info) is include_report
+
+
+def test_solution_observation_failure_does_not_publish_completion():
+    from task_env.environment.reference_env import SelectedReferenceEnv
+
+    class FailedSolution:
+        def observe(self, *_args, **_kwargs):
+            raise RuntimeError('observe failed')
+    env = object.__new__(SelectedReferenceEnv)
+    env.info = {'existing': 1}
+    with pytest.raises(RuntimeError, match='observe failed'):
+        env._observe_selected_solution(FailedSolution(), None, 0., False, False, {}, {}, report=True)
+    assert env.info == {'existing': 1}

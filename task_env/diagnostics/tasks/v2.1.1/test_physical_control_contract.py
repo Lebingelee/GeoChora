@@ -547,7 +547,11 @@ def test_disjoint_named_controllers_can_form_one_interval():
 
 
 @pytest.mark.parametrize('bad_ack', [False, True])
-def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
+@pytest.mark.parametrize(('solution_mode', 'callback_failure', 'record_failure'),
+                         [(False, False, False), (True, False, False),
+                          (True, True, False), (True, False, True)])
+def test_selected_env_production_step_uses_single_fake_session_write(
+        bad_ack, solution_mode, callback_failure, record_failure, monkeypatch):
     """Exercise the real selected step owner; fake I/O never advances physics."""
     from types import SimpleNamespace
     from task_env.artifacts.state import (CanonicalStateViewV2, CanonicalStatePublicationV2,
@@ -660,20 +664,62 @@ def test_selected_env_production_step_uses_single_fake_session_write(bad_ack):
     replace_binding.physical_control_profile = lambda _env: fresh_execution
     # Explicit mock of the downstream native receipt: this is not build evidence.
     env.session.provenance = 'native_build'
+    observed = []
+    class Solution:
+        done, failed, failure_reason = False, False, None
+        def observe(self, observation, reward, terminated, truncated, info):
+            observed.append((observation, reward, terminated, truncated, info))
+            if callback_failure:
+                raise RuntimeError('solution observe failed')
+        def outcome_report(self):
+            pytest.fail('physical callback must not read the optional report')
+    solution = Solution()
+    if record_failure:
+        from task_env.recorders import physical_metadata
+        env.recorder = SimpleNamespace(active=True, transition_count=0, observation_count=1)
+        def fail_append(*_args, **_kwargs):
+            raise RuntimeError('record append failed')
+        monkeypatch.setattr(physical_metadata, 'record_physical_transition', fail_append)
+    def step():
+        if solution_mode:
+            return env._step((.25,), proposal=object(), observer_solution=solution)
+        return env.step((.25,))
     if bad_ack:
         with pytest.raises(ValueError, match='invalid write acknowledgement'):
-            env.step((.25,))
+            step()
         assert (env.session.writes, env.session.advances, env.session.aborts) == (1, 0, 1)
+        assert observed == []
         return
-    result = env.step((.25,))
+    if callback_failure:
+        with pytest.raises(RuntimeError, match='solution observe failed'):
+            step()
+        assert (env.session.writes, env.session.advances) == (1, 1)
+        assert len(observed) == 1
+        assert env.execution_fault is not None
+        assert env.execution_fault.interval_completed is True
+        return
+    if record_failure:
+        with pytest.raises(RuntimeError, match='record append failed'):
+            step()
+        assert (env.session.writes, env.session.advances) == (1, 1)
+        assert len(observed) == 1
+        assert env.execution_fault.interval_completed is True
+        assert env.execution_fault.transition_status == 'rejected'
+        return
+    result = step()
     assert result[:4] == ({'x':1.},.5,False,False)
     assert result[4]['physical_control_v1']['native_write_ack']['stage'] == 'native_write_ack'
     assert (env.session.writes, env.session.advances) == (1,1)
+    assert len(observed) == int(solution_mode)
+    if solution_mode:
+        assert observed[0][:4] == ({'x':1.},.5,False,False)
+        assert result[4]['selected_policy_execution_complete'] is False
     # Re-present the same pre-advance boundary to test duplicate submission.
     env.state = SimpleNamespace(control_step=0, simulation_time=0.)
     with pytest.raises(ValueError, match='already submitted'):
-        env.step((.25,))
+        step()
     assert (env.session.writes, env.session.advances) == (1,1)
+    assert len(observed) == int(solution_mode)
 
 
 def test_selected_env_composes_independent_effort_and_wrench_once():

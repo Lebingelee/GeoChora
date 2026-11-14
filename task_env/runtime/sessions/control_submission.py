@@ -23,6 +23,13 @@ def _digest(value, label):
         raise ValueError(f'{label} must be a lowercase SHA-256')
 
 
+def _resource_owners_from_rows(rows, writers):
+    """Project declared writer rows without deduplicating resource claims."""
+    return tuple((writer, tuple(sorted(f'{entity}/{actuator}'
+        for entity, actuator, owner in rows if owner == writer)))
+        for writer in sorted(writers))
+
+
 def _validate_resource_intervals(claims, *, writer_resources, substeps):
     """Validate exclusive, source-authorized resource claims on half-open ticks.
 
@@ -255,9 +262,7 @@ def prepare_position_scene_interval(*, session, plan, command, source_id,
             ('rad', 'm'), 'exclusive', None, target.writer_id, target.controller_identity,
             generation, target.identity_hash, resources,
             *(command.slices[index][:2] if type(command) is PositionControlSequenceV1 else (0, count))))
-    authority = tuple((writer, tuple(sorted(f'{entity}/{actuator}'
-        for entity, actuator, owner in plan.resource_writers if owner == writer)))
-        for writer in sorted(owners))
+    authority = _resource_owners_from_rows(plan.resource_writers, owners)
     claims = tuple((item.writer_id, resource, item.start_substep, item.end_substep)
                    for item in contributions for resource in item.resources)
     _validate_resource_intervals(claims, writer_resources=authority, substeps=count)
@@ -398,9 +403,8 @@ def prepare_subject_position_scene_interval(*, session, target, source_id,
         if type(split_bundle) is not PositionOutputBundleV1:
             raise ValueError('scene subject interval lacks its component outputs')
         split_bundle.validate_target(target, plan)
-    expected = tuple(sorted((writer, tuple(sorted(f'{entity}/{actuator}'
-        for entity, actuator, owner in plan.resource_writers if owner == writer)))
-        for writer in {writer for _, _, writer in plan.resource_writers}))
+    expected = _resource_owners_from_rows(
+        plan.resource_writers, {writer for _, _, writer in plan.resource_writers})
     if tuple(sorted(resource_owners)) != expected:
         raise ValueError('scene subject resources differ from the bound writer')
     expected_boundary = (boundary.provider_materialization_id, boundary.episode_id,
@@ -899,11 +903,7 @@ def _preflight_control_command(session, command, *, command_kind, command_sha256
                             and plan.source_closure_digest != source_closure_sha256)
                         or any(item.binding_identity_hash != plan.identity_hash for item in typed_targets)):
                     raise ValueError('position target differs from the materialized binding plan')
-                expected = tuple(sorted(
-                    (writer, tuple(sorted(f'{entity}/{actuator}'
-                                          for entity, actuator, owner in plan.resource_writers
-                                          if owner == writer)))
-                    for writer in writer_ids))
+                expected = _resource_owners_from_rows(plan.resource_writers, writer_ids)
                 if tuple(sorted(resource_owners)) != expected or any(not resources for _, resources in expected):
                     raise ValueError('position resources differ from the materialized binding plan')
                 timebase = getattr(getattr(session, '_artifact', None), 'timebase', None)
