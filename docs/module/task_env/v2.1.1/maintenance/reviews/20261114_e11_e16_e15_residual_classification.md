@@ -53,3 +53,7 @@
 对“仅匹配其他 U5 对象”的 407 项，进一步按原冻结脚本展开 13 个 supporting-source 索引：其中 **247 项、132,402,635 逻辑字节**匹配冻结的辅助来源对象，另 160 项尚未证明属于冻结集；[247 项独立候选清单](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/stage-frozen-supporting-duplicates-candidate.jsonl) SHA-256 `2efe12dc10fe826ab9dede0dc7b44f9f57c01de7e1d599d9da302fb8200f79bb`。已交叉核对完整选择为 1,021 个不同对象，与原 U5 冻结数一致；这项来源证据与前述 20,804 条 stage 对象候选不重叠。依然需要独立核对、执行时复算和具体授权。
 
 独立复核 20,804 条候选的路径、普通文件身份、冻结对象映射和共享锁／62 处缓存不重叠，抽样 **100 对**原件和对象 SHA 通过，非全量独立复算；未发现全局第三方源码路径混入。发现 U5 历史采集脚本 `preserve_selected_source_trees.py` 会从候选旧目录重新遍历并写入索引；旧源原件退休后，该历史采集用途不再受支持，不将其当作当前包内 reader。所选对象和原路径映射从现有 U5 取回；旧的完整 stage 目录／所有历史 manifest 与一键采集能力不作为保留目标。此结论不证明其他动态或 ignored caller 已穷尽，候选执行前须持锁逐对重算 SHA、检查活动与链接，并在实际处置后复验当前 reader。
+
+对 102 根中 15 个含已选 claim 文本的根，针对 28 份保留报告／命令／结果作同目录[字面引用扫描](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/stage-claim-explicit-citations.json)，找到 167 个仍存在的直接引用路径：131 个内容匹配冻结对象；其余 36 个原始小日志、结果和脚本合计 168,017 B，已[单独归位并核验 SHA](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/stage-claim-cited-supplement/manifest.json)。扫描排除列出全部历史文件的 manifest，限同根的字面路径，不覆盖跨根引用、动态依赖或未选报告；正在独立复核，不能由此宣布 102 根全部可清理。
+
+独立抽样核对 247 条 supporting-source 候选中 40 对原件／对象 SHA，均匹配；逐项核对所有清单 SHA 均属于 13 份冻结 supporting 索引的内容集合，实际命中 7 份。内容属于冻结集合不等同于每个旧原路径本身被索引，也不证明没有路径依赖。20,804 条和 247 条候选在执行前都要逐项复算、核对引用与活动、取得具体授权。
