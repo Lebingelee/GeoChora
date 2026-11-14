@@ -7,3 +7,5 @@ F05 N1／native、R04b、R05b、R06b 历史 native supervisor 的公开执行入
 新旧路径目前仍是同 inode 硬链接，旧链接没有删除。协议只覆盖本次列出的受控运行者；其他 checkout、旧外部副本及恶意或非合作文件替换不在保证范围。运行中的正式示例按监控循环检查路径变化，并非原子地禁止其他进程在任意时刻替换路径；probe 仅在取得锁时检查，不能声称能阻止运行期间的非合作替换。
 
 受 pure guard 的定向回归：20 项锁与 worker 退休测试及 R04b 锁超时／零启动节点通过。完整两个测试文件还存在两个与本次 diff 无关的历史 API 漂移失败：测试引用当前不存在的 `build_reference` 和 `ISAAC_PYTHON`；不能称整个文件全绿。R06b 历史 fake 节点因旧的 `attached_leaf_candidate` 模块缺失无法收集，不能记为通过。真实 worker 及最终项目接收另行记录。
+
+后续补强：正式监督器将持有的 flock 文件描述符传给 worker，并在隔离 runtime 存在时继续传递；父进程退出不主动解锁，最后一个持有描述符关闭后释放。隔离 runtime 设置 Linux parent-death signal 并检查父进程启动竞态；这不证明 SDK 孙进程、机器崩溃或非合作调用者的全部行为。worker 退出后锁不可取得则标记 INVALID，并延迟 H5 冷读。Isaac 的正式 Harness worker 在自身进程内使用已验证的单 App，避免原隔离部署重复启动。35 项定向检查与进程/信号合成试验通过。此前意外及实际中断边界见[事故记录](20261114_e11_e16_harness_worker_incident.md)；三 provider 的真实短程及独立读回见[项目接收入口](20261114_e11_e16_u7_project_acceptance_entry.md)。
