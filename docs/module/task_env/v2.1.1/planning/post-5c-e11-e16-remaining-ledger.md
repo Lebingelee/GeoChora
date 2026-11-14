@@ -242,6 +242,8 @@ V01～V10为验证清单，另列不混入60个代码/项目条目。T20负责V0
 | U7 T39～T44 | MAINTAINER_ACCEPTED_BOUNDED_PROJECT | 主 checkout 与冻结 archive 保留，六个 local heads、四个 tags；三处移除及保护输入、pins 和证据复核见[执行记录](../maintenance/reviews/20261114_e11_e16_three_worktree_execution.md)。integration 原 Git 管理元数据损失不可补回；当前空间范围、短程结果及接收边界见[项目接收入口](../maintenance/reviews/20261114_e11_e16_u7_project_acceptance_entry.md)。维护者已明确[有界接收交付 `86921c62`](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)；不重开 U4/U5，G06 另行启动。 |
 
 
+当前资料收尾补充（2026-11-14）：总账复审 `d0902adc` 的GOV-04／DOC-01／DOC-02已按维护者授权完成编排顶层、API、Skill及诊断索引对齐，见[E14收尾及60项结案表](../maintenance/reviews/20261114_e14_current_state_alignment_closeout.md)。上表U4及下文各实施自评保留原时点，不能作为重启U5或继续清理的现行指令。
+
 ### U1 结果（2026-11-13，实施自评）
 
 输入 HEAD `cd486aff5ce6b5d0bcdc6561529b5c6c388efc22`；输出为本结果所在提交。T01～T07 在本单元按以下范围 PASS：T01 按版本文件及精确 node 区分纯/fake、离线 H5、真实 source、CPU、GPU/App 和窗口；T02 纯入口 fresh-process 守卫及子进程 canary，错误选择原生节点拒绝；T03 对规划盘点的 34 个旧引用文件列出历史／当前去向，保留历史 Judge、codec 与原结果；T04 保留 provider 准入、可选 compiled readback、fixed attachment receipt 与 typed fault，465 个非诊断生产 Python 文件的直接、相对及字面量动态 import 静态检查未见反向依赖；T05 迁移有当前职责的物理、相机、effort、主体及自由关节检查，旧 candidate 与旧 reset fake 明列历史；T06 冻结两份历史 H5 和四份当前短程 H5 路径、大小及 SHA-256，U5/U6 负责复算与重定位；T07 完成定向验证与本地提交。未列入固定入口的混合模块不是纯测试；历史旧功能不因当前表格被重建或扩大认证。总账回核：TEST-01/02 的本单元诊断分层与 claim 已覆盖；TEST-03 复用已接收的 S04/S32 迁移并核对当前 owner，本轮无新的越权生产实现需迁；TEST-04 的五 stage 最终证据闭包仍 OPEN，归 U5/U6。

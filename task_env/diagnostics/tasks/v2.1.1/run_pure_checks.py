@@ -12,6 +12,7 @@ import sys
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 NODES = (
+    'task_env/diagnostics/tasks/v2.1.1/test_public_scalar_example.py',
     'task_env/diagnostics/tasks/v2.1.1/test_pickcube_close_readiness.py',
     'task_env/diagnostics/tasks/v2.1.1/test_solution_compatibility.py::test_pickcube_position_and_physical_readiness_share_measured_boundary',
     'task_env/diagnostics/tasks/v2.1.1/test_frame_mounted_task_camera.py',

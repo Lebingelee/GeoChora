@@ -4,9 +4,13 @@
 
 ## 当前停门
 
-**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；维护者已确认进入 5c 后代码与项目优化。G06／G07 尚未开始，v2.1.1 尚未完成。** 单元 1～9 是 5c 内部工作单元，版本仍为七阶段、二十二子阶段。
+**G01～G05 已按各自范围有界接收，5c 诊断单元 1～9 收口；5c 后 E00～E16 代码与项目优化已获维护者有界接收。G06／G07 尚未开始，v2.1.1 尚未完成。** 单元 1～9 是 5c 内部工作单元，版本仍为七阶段、二十二子阶段。
 
 [单元 9 综合主审](reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的 `SOL_ACCEPTED_BOUNDED_5C` 已由维护者在本次启动对话确认；原主审中的“维护者待确认”描述保留其审查时点。优化实施安排见[执行计划](../planning/post-5c-optimization-execution.md)。顺序为：G05 功能接收 → 代码优化、定向复验及人工接收 → 项目证据和 refs／worktree 整理及接收 → 决定进入 G06。G07 继续承担 G06 新增调用者及最终版本收口，7b 三 provider × 三 seed 门保留。
+
+2026-11-14 总账复审及收尾：`d0902adc` 的[逐项复审](reviews/20261114_e00_e16_total_ledger_reaudit_0847a5da.md)确认57项满足有界出口，GOV-04／DOC-01／DOC-02留有编排和Skill同步欠账；后续已按维护者授权完成[E14资料收尾和60项现行结案表](reviews/20261114_e14_current_state_alignment_closeout.md)。60项及V01～V10均按既定有界范围结案，原复审保留其时点；不改变原运行身份、批准例外或G06/G07未开始状态。
+
+维护者另行提出的[Env／provider／renderer精简计划](../planning/post-optimization-env-provider-render-slimming-plan.md)状态为`PLANNED_NOT_IMPLEMENTED`，按C1～C5组织；不是未关闭的原账目，不自动启动Goal或native执行。
 
 ## 启动输入与工作归属
 

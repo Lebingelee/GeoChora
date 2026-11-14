@@ -26,9 +26,10 @@ from task_env import make_env
 from task_env.tasks.nut_assembly import build_outcome_solution
 
 env = make_env("nut-assembly-outcome-reference-v1",
-               config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})
-solution = build_outcome_solution(provider="mujoco")
+               config={"execution": {"physics_provider": "mujoco", "physics_backend": "cpu"},
+                       "episode": {"horizon": 6000}})
 try:
+    solution = build_outcome_solution(provider="mujoco")
     obs, info = env.reset(seed=19)
     solution.reset(obs, info, env.metadata)
     while not solution.done and not solution.failed:
@@ -45,4 +46,6 @@ finally:
 
 上述示例是普通 MuJoCo scalar CPU 路线。历史 R05b 专属构造和 Solution 入口已退休；其原有证据保留为历史记录。当前任务通过正式配置构造，并按所选路线的实际证据判断支持范围。
 
-PickCube Solution 也返回 `ExpertAction`，调用方可将其直接交给 `env.step(action)`；阶段和 readiness 记录随动作保留。Solution 从公开 `info` 读取并校验执行反馈，旧的显式 `execution_info` 参数仍兼容。Nut 的控制请求／来源边界仍为必需；PickCube 不接受控制请求字段；调用方驱动动作携带声明的 Solution 身份和动作前来源边界，Env 在推进前与任务配置和当前边界核对。该身份是完整性校验，不是调用者身份认证。在 `5a04140a` 的历史 CPU 代表回归见[验证记录](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。[U3 当前运行](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)覆盖 PickCube MuJoCo／GeoPhys CPU 和 Isaac CUDA、Nut 两条 CPU 的完整单 seed 尝试及同次读回；Isaac runtime valid 但任务与 Solution 失败，v3 H5 中 caller completion 字段缺失的边界仍开放。通用 candidate oracle 及 feasibility 入口也由调用方驱动；旧 `step_expert()` 方法仍是受限兼容，不作为这些入口的回退。示例：[PickCube](../../../../examples/tasks/pick_cube.py)、[NutAssembly](../../../../examples/tasks/nut_assembly.py)、[录制](../../../../examples/recording/record_expert.py)。
+PickCube Solution 也返回 `ExpertAction`，调用方可将其直接交给 `env.step(action)`；阶段和 readiness 记录随动作保留。Solution 从公开 `info` 读取并校验执行反馈，旧的显式 `execution_info` 参数仍兼容。Nut 的控制请求／来源边界仍为必需；PickCube 不接受控制请求字段；调用方驱动动作携带声明的 Solution 身份和动作前来源边界，Env 在推进前与任务配置和当前边界核对。该身份是完整性校验，不是调用者身份认证。在 `5a04140a` 的历史 CPU 代表回归见[验证记录](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261105_pre_stage3_resumed_physical_checks.md)。
+
+当前接收口径（2026-11-14）：[U3 原运行](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_e11_e16_u3_solution_evidence.md)中的 Isaac 失败保留；后续 `solution-002` 已在自己的冻结身份下完成任务和 Solution。四条 CPU 及这条 Isaac 完整单seed运行通过[同次联合证据](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261113_e11_e16_u4_joint_completion.md)有界接收；CPU canonical H5 没有 completion 字段，Isaac v3为null，由同次caller、监督和独立读回联合证明，不能称H5单文件自含。各路线不是同一最新HEAD重跑，也不构成G07三seed矩阵。通用candidate oracle及feasibility入口同样由调用方驱动；旧 `step_expert()` 不作为回退。示例：[PickCube](../../../../examples/tasks/pick_cube.py)、[NutAssembly](../../../../examples/tasks/nut_assembly.py)、[录制](../../../../examples/recording/record_expert.py)。

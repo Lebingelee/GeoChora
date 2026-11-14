@@ -1,7 +1,11 @@
 # v2.1.1 diagnostics: current claim and input map
 
-This is an **in-progress U1 inventory**, not a qualification matrix. Select an
-exact node; a file in this directory is not automatically a pure test. The
+This is the **current claim and input selection index** (2026-11-14), not a
+qualification matrix. E00–E16 has maintainer bounded acceptance; U1–U7 execution
+instructions are historical, not pending work. See the
+[current state](../../../../docs/module/task_env/v2.1.1/maintenance/current-state.md)
+and [E14 alignment closeout](../../../../docs/module/task_env/v2.1.1/maintenance/reviews/20261114_e14_current_state_alignment_closeout.md).
+Select an exact node; a file in this directory is not automatically a pure test. The
 repository root is the working directory in the examples below. Use the
 project's configured Python with pytest, NumPy, PyYAML and h5py installed.
 
@@ -29,6 +33,7 @@ pure command; they establish contracts, not native contact, pixels or success.
 | Claim / owner | Exact entry and inputs | Class / limits |
 | --- | --- | --- |
 | Formal configuration selects the four current tasks without opening declared assets or importing native SDKs; configuration/registry | `python -B task_env/diagnostics/tasks/v2.1.1/run_pure_checks.py` | Pure/fake; also runs the other pure/fake rows below. Fresh Python process, automatic pytest plugins disabled. |
+| Pendulum RGB example uses formal configuration and an observer camera; documented Nut Solution config resolves; public callers | Same command: `test_public_scalar_example.py` | Real configuration/camera route checks with a fake Env loop; no native rendering, physics or Solution success claim. |
 | Episode import works without optional H5 tooling | Same command: `test_episode_import.py` | Fresh Python child inherits the guard; it does not construct an environment. |
 | Exact USD input type/schema rejects subclasses and does not import retired candidate; Session admission | Same command: `test_isaac_effort_admission.py::test_isaac_position_input_dispatch_requires_exact_formal_type_and_schema` | Pure, this node only; the containing module also reads real source in other nodes. |
 | Source lease, stale reset reconstruction, preflight failure and session ownership; Env/Runtime | Same command: `test_reset_reconstruction.py` | Fake builders plus a temporary synthetic XML snapshot; no Runtime constructed. |
