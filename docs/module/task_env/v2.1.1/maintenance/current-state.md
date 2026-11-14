@@ -46,20 +46,20 @@ E00～E04 接收生产为 `912416e6`；四个正式任务使用 `task_env.make_e
 
 本版本诊断集中在 `task_env/diagnostics/tasks/v2.1.1/`。E00～E04 主审余项修复轮的 217 项受影响 source/caller 检查通过，另有 76 项纯/fake 精确检查通过（与前者有重叠，不相加）；六项 USD 检查为真实 delivery 的离线构造，不启动 Isaac App。MuJoCo 七条短程共 75 个显式子步，GeoPhys effort/Pendulum 两条短程通过；加上测试中的 40 个，本轮共 115 个显式 MuJoCo 子步。冻结输入为 `e25f37c5` 加保存的生产 patch，与 `912416e6` 对应生产字节相同，运行的 source_revision 仍为 e25，不改称提交后重跑。详情见[按模块压缩的实施记录](../planning/post-5c-optimization-execution.md#6-e00e04-实施记录)。renderer 未重跑，完整 Solution 仍留 E13；旧逐批记录从历史提交和原始输出恢复。
 
-O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E16；O6 仍需逐项独立主审和维护者代码接收，之后才进入 O7 项目清理。[capability-matrix.json](../capabilities/capability-matrix.json) 分列当前有界证据与历史目标；本地成果尚未合入 develop／main，未发布。
+O5 对应的五条完整运行与同次读回及其开放边界见下方 E11～E16；O6 独立主审与维护者代码接收及 O7 项目清理和有界接收均已完成。[capability-matrix.json](../capabilities/capability-matrix.json) 分列当前有界证据与历史目标；本地成果尚未合入 develop／main，未发布。
 
 ## E05～E10：维护者已接收
 
 E05资产/source、E06 physics adapter、E07状态/相机、E08 renderer、E09 Task精简和E10 Recorder/replay已按[专用账本](../planning/post-5c-e05-e10-remaining-ledger.md)完成，[实施Goal](../planning/post-5c-e05-e10-goal.md)保留为历史提示，不再作为下一执行包。[结果和证据](20261113_e05_e10_u7_delivery.md)及[独立主审](reviews/20261113_e05_e10_independent_review_d9dc02c6.md)覆盖S01～S40，生产小修 `7a098423` 删除physical Recorder的PickCube语义覆盖并验证声明保全；维护者于2026-11-13明确接收。后续完整Solution已按E11～E16的U3/U4有界核对，项目整理与最终接收见下。
 
 
-## 当前范围：E11～E16（实施与代码对账）
+## E11～E16：维护者有界接收
 
-以[E11～E16细化账本](../planning/post-5c-e11-e16-remaining-ledger.md)及[实施Goal](../planning/post-5c-e11-e16-goal.md)为下一执行入口：7个大单元、44个检查点，按诊断、caller、完整Solution、代码接收、五stage证据归并、输出清理、refs/worktree及项目接收推进。每个单元完成实现、必要验证、记录压缩和提交后才对照总账，不按小格反复派包。
+以[E11～E16细化账本](../planning/post-5c-e11-e16-remaining-ledger.md)及[实施Goal](../planning/post-5c-e11-e16-goal.md)记录七个大单元、44个检查点及其证据；维护者已按[接收记录](reviews/20261114_e11_e16_maintainer_project_acceptance.md)对 `86921c62` 及明确限制作有界项目接收。
 
-规划时输入`a6b107ac`，tracked clean，四保护输入和pins不变；规划轮仅作静态及只读盘点。随后 U1（`d0c25ae4`）和 U2（`1ff617d0`）完成实施自评；U3 检查点 `5742e956` 记录五条完整运行、同次读回和受影响修复。四保护输入及两 pins 在 U3 后仍一致。规划时主 maintenance 约84.46GB、旧 integration 的 workspace 约13.79GB 均为混合总量，不是可删空间承诺；9 个本地 heads、6 个 worktree 须在处置时重新核对，当前 Harness 共享锁仍位于历史大目录。
+规划时输入`a6b107ac`，tracked clean，四保护输入和pins不变；规划轮仅作静态及只读盘点。随后 U1（`d0c25ae4`）和 U2（`1ff617d0`）完成实施自评；U3 检查点 `5742e956` 记录五条完整运行、同次读回和受影响修复。四保护输入及两 pins 在 U3 后仍一致。规划时主 maintenance 约84.46GB、旧 integration 的 workspace 约13.79GB 均为混合总量，不是可删空间承诺；9 个本地 heads、6 个 worktree 须在处置时重新核对，当时 Harness 共享锁位于历史大目录；后续锁已按现行合同收敛。
 
-E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务成功及同次 caller Solution 完成；原 Isaac 失败保留在[U3实施结果](reviews/20261113_e11_e16_u3_solution_evidence.md)。维护者同意的[同次联合证据](reviews/20261113_e11_e16_u4_joint_completion.md)已完成离线核对，四条 canonical H5 completion 字段不存在，新 Isaac 字段为 null；H5 单文件不自含完整 completion，独立复审已支持该有界结论。E14 文档与代码范围已按维护者本次条件授权[有界接收](reviews/20261113_e11_e16_u4_independent_acceptance.md)；项目接收另行决定。其后 E15/E16 按具体清单保全、归并、安全清理和恢复，项目优化另行接收；不自动 merge/push/tag/发布或进入 G06。详细检查点、接收 owner 和操作边界均在专用账本。
+E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务成功及同次 caller Solution 完成；原 Isaac 失败保留在[U3实施结果](reviews/20261113_e11_e16_u3_solution_evidence.md)。维护者同意的[同次联合证据](reviews/20261113_e11_e16_u4_joint_completion.md)已完成离线核对，四条 canonical H5 completion 字段不存在，新 Isaac 字段为 null；H5 单文件不自含完整 completion，独立复审已支持该有界结论。E14 文档与代码范围已按维护者本次条件授权[有界接收](reviews/20261113_e11_e16_u4_independent_acceptance.md)；该段为 U4 接收时点；其后 E15/E16 按具体清单保全、归并、安全清理和恢复，项目优化现已由维护者有界接收；不自动 merge/push/tag/发布或进入 G06。详细检查点、接收 owner 和操作边界均在专用账本。
 
 2026-11-14项目整理进展：U5有界证据归并已完成；integration此前Git移除部分失败，现按维护者续授权完成残留及旧stage5分支清理，当时6个本地heads、5个注册worktree。删除前剩余文件逐项与快照／Git对象核验，删除后240项纯/fake、25＋8项离线H5和七项包检查通过，四保护SHA及pins未变。约15.4 GB临时快照仍保留；其精简、当时其他worktree处置、历史累计净空间及U6/U7项目接收在该时点仍未完成。[当前处置与收尾证据](reviews/20261113_e11_e16_u6_directory_disposition.md)记录了前次Git管理元数据未完整保全的限制，不将本次清理写成完整恢复或整轮项目接收。
 
@@ -67,4 +67,4 @@ E13 的四条 CPU 完整运行与后续 Isaac `solution-002` 均已记录任务�
 
 2026-11-14阶段性记录：维护者批准三处停用工作树的[集中清单及具体例外](reviews/20261114_e11_e16_three_worktree_decision.md)，完成 camera、core-baseline 和旧版 clean checkout 的 Git 移除；保留主checkout与冻结archive。该时点尚待T35收敛和快照处置，后续状态见下；各次测量及恢复限制保留在[原执行结果](reviews/20261114_e11_e16_three_worktree_execution.md)。
 
-当前项目停门：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开，项目最终接收由维护者决定：[接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留，G06 不启动。
+当前项目停门：[E15 最终清理与独立复核](reviews/20261114_e15_final_disposition_execution.md)已完成维护者批准清单；同序含 U5 和分类日志的范围下降 29,109,616,640 B，保留两项原位例外。U4/U5 不重开；维护者已接收 [项目接收入口](reviews/20261114_e11_e16_u7_project_acceptance_entry.md)所列边界及交付 `86921c62`。旧 Git 管理元数据损失、历史精确净额 UNKNOWN、同次 completion 及不可见进程限制保留，G06 不启动。
