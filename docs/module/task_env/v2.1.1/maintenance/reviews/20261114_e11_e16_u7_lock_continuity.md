@@ -8,4 +8,6 @@
 
 在主 checkout 中以普通 Python 导入 `task_env/script/agent/builtin_example_validation.py`，调用实际 `_open_shared_native_lock()` 后非阻塞取得独占 `flock`；另起 Python 进程分别以 `r+` 打开规范和历史路径并尝试非阻塞独占锁。两次均报告 `BlockingIOError`；持锁期间 `_lock_matches_legacy` 为真，关闭后两路径设备及 inode 前后一致，均为 `(2052, 29918777)`。检查过程中没有等待占用的锁，没有执行物理仿真，也没有删除、重建或替换锁。此检查证明该时点实际两路径跨进程互斥，不证明全量运行路径均已迁移，也不消除将来路径被替换的风险。
 
+另一次受守卫检查调用实际 `_run_one`，使用当前仓库示例 spec/scope、空 catalog fixture 和实际共享锁：在另一个打开的描述符持有锁时，返回 `BLOCKED_NATIVE_LOCK`，预检收据记录 `shared_native_lock_acquired=false`，未创建 worker 日志。测试还用禁止启动的 stub 防止意外调用 worker；结果及可复核脚本保留在 [U7 锁预检目录](../../../../../../workspace/maintenance/v211_e11_e16_u7_lock_preflight_20261114_001/result.json)。这是入口的受限预检证据，不验证完整 catalog、worker、物理运行或跨进程的此特定预检流程。
+
 后续若要满足 T35 原退出条件，需先明确可执行旧写者的迁移或退役范围，核对外部调用约束，并对新入口缺失／替换路径时的失败关闭和跨进程互斥做验证；处理旧链接仍需针对具体对象的授权。另一种项目决策是明确保留该兼容别名及其失败关闭合同作为有界例外；这不等于原 T35 条件已达成。
