@@ -103,3 +103,5 @@
 独立主审核对 G05 5b 的 scene holdout 和 configured camera 两条已选运行时发现，原始 RGB／窗口帧及 raw／start／end 已在 U5，但两组 worker 日志、资源采样和 core diff 尚未单列；已按 SHA 归位[六项同次上下文](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-window-run-context/manifest.json)，499,639 逻辑字节。资源采样只说明预算上下文，不另作物理结果；范围复核继续。
 
 对 G05 5b 最终选中的两条 CPU 窗口及两条离屏运行，独立主审指出同次 start／end、worker 和资源记录尚未在 U5 对象中；四个受选 probe 的 PNG 亦为单独路径。已归位[26 项原始上下文和八张 PNG](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-cpu-window-rgb-context/manifest.json)，258,906 逻辑字节，维持原 U5 原始数组／窗口证据和历史受测范围；独立复核进行中。
+
+独立主审已逐项核对相对报告引用的 26 项和两组 G05 上下文的 32 项源／副本 SHA；四条 CPU 监督命令分别对应所选 probe，八张原 PNG 齐全。相对引用在 11 个所列文本中有 31 次完整字面命中，但不扩大历史接收范围。另发现已冻结的 Isaac close 原始 raw 列出一张额外 `close-event-pump.npy`，冻结 reader 使用的是另外三帧；该[原帧](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-close-event-capture/manifest.json)已按 SHA 单独归位（921,728 字节），不声称它是原 reader 通过的必要条件或新增物理运行。
