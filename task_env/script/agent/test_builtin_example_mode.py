@@ -310,6 +310,67 @@ with v._open_shared_native_lock() as lock:
                 pass
 
 
+@pytest.mark.parametrize('termination_signal', [signal.SIGTERM, signal.SIGHUP, signal.SIGKILL])
+def test_detached_runtime_keeps_lock_after_supervisor_death(tmp_path, termination_signal):
+    import fcntl
+    import os
+    import time
+
+    legacy, canonical = tmp_path / 'legacy', tmp_path / 'canonical'
+    canonical.touch()
+    os.link(canonical, legacy)
+    worker_pid, runtime_pid = tmp_path / 'worker.pid', tmp_path / 'runtime.pid'
+    worker_code = r'''import os,pathlib,subprocess,sys,time
+fd=int(os.environ['GEOCHORA_SUPERVISED_NATIVE_LOCK_FD'])
+child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],
+                       pass_fds=(fd,),start_new_session=True)
+pathlib.Path(sys.argv[1]).write_text(str(os.getpid()))
+pathlib.Path(sys.argv[2]).write_text(str(child.pid))
+time.sleep(60)
+'''
+    supervisor_code = r'''import fcntl,os,pathlib,sys,time
+sys.path.insert(0,sys.argv[1]); import builtin_example_validation as v
+v.LOCK=pathlib.Path(sys.argv[2]); v.LEGACY_LOCK=pathlib.Path(sys.argv[3])
+with v._open_shared_native_lock() as lock:
+ fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+ with v._supervised_worker([sys.executable,'-c',sys.argv[4],sys.argv[5],sys.argv[6]],
+      environment=os.environ.copy(),stdout=None,stderr=None,lock_fd=lock.fileno()):
+  time.sleep(60)
+'''
+    parent = subprocess.Popen([sys.executable, '-B', '-c', supervisor_code, str(AGENT_DIR),
+                               str(canonical), str(legacy), worker_code, str(worker_pid), str(runtime_pid)])
+    children = []
+    try:
+        deadline = time.monotonic() + 10
+        while not runtime_pid.exists() and parent.poll() is None and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert runtime_pid.exists() and worker_pid.exists()
+        children = [int(worker_pid.read_text()), int(runtime_pid.read_text())]
+        parent.send_signal(termination_signal)
+        parent.wait(timeout=10)
+        with canonical.open('r+') as contender:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    finally:
+        if parent.poll() is None:
+            parent.kill()
+            parent.wait()
+        for pid in reversed(children):
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    deadline = time.monotonic() + 10
+    with canonical.open('r+') as contender:
+        while True:
+            try:
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                assert time.monotonic() < deadline
+                time.sleep(.05)
+
+
 def _spec(**changes):
     value = {
         'schema_version': 'harness-builtin-pickcube-example-v1',
@@ -459,6 +520,9 @@ def test_compiler_admits_only_the_catalogued_exact_isaac_route():
         assert compiled.runtime_source_id == 'f06-source'
         assert compiled.runtime_source_sha256 == 'e' * 64
         assert make_env.call_count == 1 and env.value['source'].source_closure_digest == 'e' * 64
+        execution = make_env.call_args.kwargs['config']['execution']
+        assert execution['deployment'] == 'in_process'
+        assert execution['interpreter'] == sys.executable
 
 
 def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp_path):

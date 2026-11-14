@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 if __package__:
@@ -144,6 +145,8 @@ def resolve_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     selected_config = {
         'execution': {'physics_provider': spec.provider, 'physics_backend': spec.backend,
                       'physics_device': spec.device,
+                      **({'deployment': 'in_process', 'interpreter': sys.executable}
+                         if spec.provider == 'isaacsim' else {}),
                       **({'source_delivery_manifest': spec.source_delivery_manifest}
                          if spec.source_delivery_manifest is not None else {})},
         'episode': {'horizon': spec.horizon_control_ticks},

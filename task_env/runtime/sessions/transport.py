@@ -12,6 +12,7 @@ import math
 import os
 import signal
 import socket
+import stat
 import struct
 import subprocess
 
@@ -484,6 +485,13 @@ def source_execution_facts(artifact, execution, source, controller):
 
 _WORKER_BOOTSTRAP = r'''
 import os, pathlib, runpy, sys, sysconfig
+if os.environ.get('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD') is not None:
+    import ctypes, signal
+    expected_parent = int(os.environ['GEOCHORA_SUPERVISED_PARENT_PID'])
+    if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL, 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), 'cannot establish supervised parent-death signal')
+    if os.getppid() != expected_parent:
+        os._exit(125)
 core, geophys, fd, launcher_mode = sys.argv[1:]
 prefix = str(pathlib.Path(sys.executable).parent.parent)
 paths = sysconfig.get_paths(vars={'base': prefix, 'platbase': prefix})
@@ -536,11 +544,25 @@ def start_selected_worker(interpreter, payload, *, timeout=30.0):
     try:
         env = dict(os.environ, GEOCHORA_GEOPHYS_SRC=str(geophys),
                    GEOCHORA_CORE_PYTHON=str(executable), PYTHONDONTWRITEBYTECODE='1')
+        inherited_fds = [child.fileno()]
+        supervised_lock = env.get('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD')
+        if supervised_lock is not None:
+            lock_fd = int(supervised_lock)
+            opened = os.fstat(lock_fd)
+            lock_path = core / 'workspace/locks/shared_native_execution.lock'
+            current = lock_path.lstat()
+            if (not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(current.st_mode)
+                    or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)):
+                raise RuntimeError('supervised native lock fd does not match canonical lock')
+            inherited_fds.append(lock_fd)
+            env['GEOCHORA_SUPERVISED_PARENT_PID'] = str(os.getpid())
+        else:
+            env.pop('GEOCHORA_SUPERVISED_PARENT_PID', None)
         process = subprocess.Popen(
             [str(executable), '-I', '-S', '-B', '-c', _WORKER_BOOTSTRAP,
              str(core), str(geophys), str(child.fileno()),
              'launcher' if executable.name == 'python.sh' else 'python'],
-            cwd=os.getcwd(), env=env, pass_fds=(child.fileno(),), start_new_session=True,
+            cwd=os.getcwd(), env=env, pass_fds=tuple(inherited_fds), start_new_session=True,
             stdin=subprocess.DEVNULL,
             stdout=None if payload['selection']['physics_provider'] == 'isaacsim' else subprocess.DEVNULL,
             stderr=None if payload['selection']['physics_provider'] == 'isaacsim' else subprocess.DEVNULL,

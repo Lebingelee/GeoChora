@@ -252,7 +252,7 @@ def _retire_process_group(process):
 
 
 @contextmanager
-def _supervised_worker(command, *, environment, stdout, stderr, cwd=None):
+def _supervised_worker(command, *, environment, stdout, stderr, cwd=None, lock_fd=None):
     """Turn termination signals into cleanup and close the startup window."""
     def interrupted(signum, frame):
         raise SystemExit(128 + signum)
@@ -265,8 +265,16 @@ def _supervised_worker(command, *, environment, stdout, stderr, cwd=None):
             signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
             _set_child_affinity()
 
+        child_environment = dict(environment)
+        child_environment.pop('GEOCHORA_SUPERVISED_NATIVE_LOCK_FD', None)
+        inherited_fds = ()
+        if lock_fd is not None:
+            os.fstat(lock_fd)
+            child_environment['GEOCHORA_SUPERVISED_NATIVE_LOCK_FD'] = str(lock_fd)
+            inherited_fds = (lock_fd,)
         process = subprocess.Popen(
-            command, cwd=CORE if cwd is None else cwd, env=environment, stdout=stdout, stderr=stderr,
+            command, cwd=CORE if cwd is None else cwd, env=child_environment, stdout=stdout, stderr=stderr,
+            pass_fds=inherited_fds,
             start_new_session=True, preexec_fn=prepare_child,
         )
         try:
@@ -475,7 +483,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
             with _supervised_worker(command, environment=environment, stdout=stdout, stderr=stderr,
-                                    cwd=output.resolve()) as (process, worker_state):
+                                    cwd=output.resolve(), lock_fd=lock_stream.fileno()) as (process, worker_state):
                 timed_out = False
                 resource_violation = None
                 while process.poll() is None:
@@ -542,12 +550,27 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider, isa
         pg_alive = False
         if group_intervened:
             resource_violation = resource_violation or 'worker process group required forced retirement'
-        fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+        # Close our descriptor on context exit; an isolated Runtime descendant
+        # retains the same locked open-file description until it exits. An
+        # explicit LOCK_UN here would release the lock on behalf of the child.
+    lock_available_after_worker = False
+    try:
+        with _open_shared_native_lock() as probe:
+            fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_available_after_worker = True
+    except (OSError, RuntimeError):
+        pass
     _write_json(output / 'lock_receipt.json', {
         'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
-        'shared_native_lock_path': str(LOCK), 'released_after_worker_process_group_exit': not pg_alive,
+        'shared_native_lock_path': str(LOCK),
+        'released_after_worker_process_group_exit': lock_available_after_worker and not pg_alive,
+        'shared_lock_available_after_worker_exit': lock_available_after_worker,
         'lock_held_for_worker': True,
     })
+    if not lock_available_after_worker:
+        return {'seed': seed, 'provider': provider, 'status': 'INVALID',
+                'runtime_valid': False, 'worker_process_group_ended': not pg_alive,
+                'reason': 'shared lock remains held or changed after worker exit; cold read deferred'}
     receipt_path = output / 'run.json'
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else None
     cold_read = _cold_read_h5(output, receipt, provider=provider)
