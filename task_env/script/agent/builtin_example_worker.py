@@ -493,6 +493,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             # Env/session close normally closes this shared owner. Calling its
             # idempotent close here also covers compile failures before Env
             # construction and retains cleanup evidence in the worker receipt.
+            row['isaac_app_start_attempts'] = getattr(app_owner, 'start_attempts', None)
             try:
                 app_owner.close()
             except BaseException as error:
