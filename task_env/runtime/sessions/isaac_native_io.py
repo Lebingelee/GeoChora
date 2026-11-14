@@ -2776,7 +2776,7 @@ class IsaacSimNativeRuntimeIOV1:
         import numpy as np
         import omni.timeline
         import omni.usd
-        from pxr import Gf, UsdGeom, UsdRender
+        from pxr import Gf, UsdGeom
         from isaacsim.sensors.experimental.rtx import RtxCamera, CameraSensor
         import omni.replicator.core as rep
         from ...artifacts import RendererSelectionV1
@@ -2828,8 +2828,6 @@ class IsaacSimNativeRuntimeIOV1:
                 'episode_id': episode_id,
                 'provider_epoch_offset_s': task_clock_mapping['provider_epoch_offset_s'],
             }
-            print('G05_TASK_RGB_CLOCK_MAPPING '
-                  + json.dumps(task_clock_mapping, sort_keys=True), flush=True)
         stage = omni.usd.get_context().get_stage()
         if stage is None or stage != self._stage:
             raise RuntimeError('Isaac observer lost its leased USD stage')
@@ -2883,101 +2881,25 @@ class IsaacSimNativeRuntimeIOV1:
         task_completions = []
         dispatcher_path = '/Render/PostProcess/SDGPipeline/PostProcessDispatcher'
 
-        def log_task_scheduler_snapshot(phase, operation):
-            import carb
-            import omni.graph.core as og
-
-            snapshot = {
-                'phase': phase,
-                'operation': operation,
-                'physics_step': int(before[0]),
-                'physics_time_s': float(before[1]),
-                'timeline_playing': bool(timeline.is_playing()),
-                'timeline_time_s': float(timeline.get_current_time()),
-                'task_clock_mapping': task_clock_mapping,
-                'task_renderer_stage_preparation': copy.deepcopy(
-                    getattr(self, '_task_renderer_stage_preparation', None)
-                ),
-                'usd_stage_time_range': {
-                    'start_time_code': float(self._stage.GetStartTimeCode()),
-                    'end_time_code': float(self._stage.GetEndTimeCode()),
-                    'time_codes_per_second': float(self._stage.GetTimeCodesPerSecond()),
-                    'frames_per_second': float(self._stage.GetFramesPerSecond()),
-                },
-                'sensor_camera_prim': path,
-            }
+        def read_task_fabric_witness():
+            """Read the stage and Fabric time used by the capture completion gate."""
+            witness = {}
             try:
                 import usdrt
-                node = og.get_node_by_path(dispatcher_path)
-                snapshot['dispatcher_present'] = node is not None
-                if node is not None:
-                    snapshot['dispatcher_compute_count'] = int(node.get_compute_count())
-                    numerator = node.get_attribute('outputs:referenceTimeNumerator').get()
-                    denominator = node.get_attribute('outputs:referenceTimeDenominator').get()
-                    snapshot['dispatcher_reference_time_numerator'] = (
-                        None if numerator is None else int(numerator)
-                    )
-                    snapshot['dispatcher_reference_time_denominator'] = (
-                        None if denominator is None else int(denominator)
-                    )
-                    snapshot['dispatcher_reference_time_s'] = (
-                        float(numerator) / float(denominator)
-                        if numerator is not None and denominator not in (None, 0) else None
-                    )
-                settings = carb.settings.get_settings()
                 stage_id = int(omni.usd.get_context().get_stage_id())
-                snapshot['usd_stage_id'] = stage_id
-                snapshot['play_simulations_setting'] = settings.get_as_bool(
-                    '/app/player/playSimulations'
-                )
+                witness['usd_stage_id'] = stage_id
                 fabric_stage = usdrt.Usd.Stage.Attach(stage_id)
                 external_time_prim = fabric_stage.GetPrimAtPath('/ExternalSimulationTime')
-                snapshot['fabric_external_simulation_time_prim_present'] = bool(
-                    external_time_prim and external_time_prim.IsValid()
-                )
                 if external_time_prim and external_time_prim.HasAttribute('omni:time'):
                     external_time = external_time_prim.GetAttribute('omni:time').Get()
-                    snapshot['fabric_external_simulation_time_s'] = (
+                    witness['fabric_external_simulation_time_s'] = (
                         None if external_time is None else float(external_time)
                     )
                 else:
-                    snapshot['fabric_external_simulation_time_s'] = None
-                snapshot['support_multi_tick_rate'] = bool(
-                    settings.get_as_bool('/rtx/hydra/supportMultiTickRate')
-                )
-                snapshot['async_rendering'] = bool(
-                    settings.get_as_bool('/omni/replicator/asyncRendering')
-                )
-                snapshot['sensor_has_data'] = bool(sensor.has_data())
-                product = sensor.render_product
-                product_prim = product.GetPrim()
-                snapshot['render_product_path'] = (
-                    str(product_prim.GetPath()) if product_prim and product_prim.IsValid() else None
-                )
-                if product_prim and product_prim.IsValid():
-                    resolution = product_prim.GetAttribute('resolution').Get()
-                    snapshot['render_product_resolution'] = (
-                        list(resolution) if resolution is not None else []
-                    )
-                    viewport_handle = product_prim.GetAttribute('viewportHandle')
-                    snapshot['render_product_viewport_handle'] = (
-                        None if not viewport_handle or not viewport_handle.IsValid()
-                        else viewport_handle.Get()
-                    )
-                    camera_rel = UsdRender.Product(product_prim).GetCameraRel()
-                    snapshot['render_product_camera_targets'] = [
-                        str(target) for target in camera_rel.GetTargets()
-                    ]
-                if task:
-                    snapshot['replicator_status'] = str(rep.orchestrator.get_status())
-                    snapshot['replicator_sim_times_to_write'] = [
-                        [int(numerator), int(denominator)]
-                        for numerator, denominator in rep.orchestrator.get_sim_times_to_write()
-                    ]
+                    witness['fabric_external_simulation_time_s'] = None
             except Exception as error:
-                snapshot['diagnostic_read_error'] = f'{type(error).__name__}: {error}'
-            print('G05_TASK_RGB_RENDER_DIAG ' + json.dumps(snapshot, sort_keys=True), flush=True)
-            return snapshot
+                witness['diagnostic_read_error'] = f'{type(error).__name__}: {error}'
+            return witness
 
         task_rgb_data = None
 
@@ -2988,7 +2910,7 @@ class IsaacSimNativeRuntimeIOV1:
             if task:
                 import carb
                 import omni.graph.core as og
-                before_render_snapshot = log_task_scheduler_snapshot('before_render', operation)
+                before_render_snapshot = read_task_fabric_witness()
                 node = og.get_node_by_path(dispatcher_path)
                 prior_count = int(node.get_compute_count()) if node else 0
                 previous_data, previous_info = sensor.get_data('rgb')
@@ -3007,7 +2929,7 @@ class IsaacSimNativeRuntimeIOV1:
                 # existing App owner; there is no second renderer or physics owner.
                 rep.orchestrator.step(rt_subframes=1, pause_timeline=True,
                                       delta_time=0.0, wait_for_render=True)
-                after_render_snapshot = log_task_scheduler_snapshot('after_render', operation)
+                after_render_snapshot = read_task_fabric_witness()
                 attempt_data, sensor_info = sensor.get_data('rgb')
                 timeline_after_s = float(timeline.get_current_time())
                 play_simulations_after = bool(
@@ -3044,8 +2966,6 @@ class IsaacSimNativeRuntimeIOV1:
                     'play_simulations_restored': play_simulations_before == play_simulations_after,
                     'sensor_progress': task_sensor_progress,
                 }
-                print('G05_TASK_RGB_SYNC_CAPTURE '
-                      + json.dumps(task_render_pulse, sort_keys=True), flush=True)
             else:
                 rep.orchestrator.step(rt_subframes=1, pause_timeline=True, delta_time=0.0,
                                       wait_for_render=True)
