@@ -161,6 +161,20 @@ def test_isaac_dependency_overlay_rejects_python_version_mismatch(tmp_path, monk
     assert not (tmp_path / 'isaac_dependency_overlay').exists()
 
 
+def test_isaac_worker_output_allows_only_run_owned_overlay(tmp_path, monkeypatch):
+    import builtin_example_worker as worker
+
+    overlay = tmp_path / 'isaac_dependency_overlay'
+    overlay.mkdir()
+    (tmp_path / 'isaac_dependency_overlay.json').write_text('{}')
+    monkeypatch.setattr(worker, '_ISAAC_SITE', str(overlay))
+    assert worker._prepare_output_directory(tmp_path) == tmp_path
+    unexpected = tmp_path / 'unexpected'
+    unexpected.touch()
+    with pytest.raises(FileExistsError, match='unexpected'):
+        worker._prepare_output_directory(tmp_path)
+
+
 def test_harness_monitor_exception_retires_worker_before_unlock(tmp_path, monkeypatch):
     import fcntl
     import os

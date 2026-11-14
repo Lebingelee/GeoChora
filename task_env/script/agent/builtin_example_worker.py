@@ -221,9 +221,16 @@ def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
 def _prepare_output_directory(output: Path):
     output = output.resolve()
     if output.exists():
-        unexpected = {path.name for path in output.iterdir()} - {
+        allowed = {
             'worker.stdout.log', 'worker.stderr.log', 'run_plan.json', 'run_preflight.json',
         }
+        if _ISAAC_SITE:
+            overlay = output / 'isaac_dependency_overlay'
+            receipt = output / 'isaac_dependency_overlay.json'
+            if overlay.is_symlink() or not overlay.is_dir() or receipt.is_symlink() or not receipt.is_file():
+                raise ValueError('Isaac dependency overlay inputs are not regular run-owned entries')
+            allowed.update((overlay.name, receipt.name))
+        unexpected = {path.name for path in output.iterdir()} - allowed
         if unexpected:
             raise FileExistsError(f'worker output directory already contains data: {sorted(unexpected)}')
     else:
