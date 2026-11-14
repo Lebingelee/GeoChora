@@ -107,3 +107,5 @@
 独立主审已逐项核对相对报告引用的 26 项和两组 G05 上下文的 32 项源／副本 SHA；四条 CPU 监督命令分别对应所选 probe，八张原 PNG 齐全。相对引用在 11 个所列文本中有 31 次完整字面命中，但不扩大历史接收范围。另发现已冻结的 Isaac close 原始 raw 列出一张额外 `close-event-pump.npy`，冻结 reader 使用的是另外三帧；该[原帧](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/retained/g05-close-event-capture/manifest.json)已按 SHA 单独归位（921,728 字节），不声称它是原 reader 通过的必要条件或新增物理运行。
 
 G05 最终 cross reader 所需的 69 项 selected-source 内容均属于 U5 冻结对象，仍须保留索引及原路径映射；`canonical-source.xml` 与 5a 的绝对 meshdir 身份不同，不合并身份。新归位材料又为快照与 stage 相同的 [48 项](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/snapshot-stage-with-new-retained-counterpart-candidate.jsonl)提供独立保留来源，逐项复算 SHA，清单 SHA-256 `0f1315fc448307f9295f6004019a6f81f29940c500f6abb2f302b29ae3b4559c`；独立审查进行中。[候选交叉表 v6](../../../../../../workspace/maintenance/v211_e11_e16_e15_final_classification_20261114_001/preliminary-candidate-overlap-audit-v6.json)共 55,849 条互不重叠的非目录路径，未构成删除授权。
+
+独立主审已对新 48 项逐项核对快照、stage、最终保留副本的 SHA 和 manifest 映射，并确认与其他候选、缓存根及共享锁无路径或 inode 冲突；关闭过程帧的原件／副本 SHA 也匹配。执行前仍需重新核验这些来源、实际锁状态及原路径依赖。
