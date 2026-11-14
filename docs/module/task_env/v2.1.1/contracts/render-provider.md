@@ -6,7 +6,7 @@
 
 2026-11-07 维护者修订：renderer 在 public Env 创建时选择并准入，从创建到 close 保持同一选择；reset 可按需重建该 renderer 的 session、worker/App 或 lease，但不更换 renderer。同一 Env 的 renderer 往返切换留待后续未排期任务，不是 5c 出口。若 reset 的其他配置与固定 renderer 不兼容，应在可静态判断的副作用前拒绝。配置解析、相机绑定和内部身份由 Core 协调，调用者不手工拼接 receipt／generation。目标和验证范围见[5c 范围](../planning/stage5-5c-fixed-renderer-scope.md)。
 
-5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；一个 world-mounted task camera、具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和跨组合的 5c 实施候选及真实证据以本次工作包和独立主审结论为准；不得把 5b observer 证据当成 5c task RGB。
+5b 三条指定 PickCube 路线的窗口、离屏 RGB 与 observer/task camera 隔离已按 [Sol 主审](../maintenance/reviews/20261107_5b_diagnostic_attempt003_sol_review.md)有界接收；具体设备/版本/色彩限制及不支持的交集以该审查和 API 描述为准。同步任务 observation、构建时固定 renderer 和真实跨组合已按[单元9综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)有界接收，后续当前源码影响核对见[G05→G06复核](../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)。Isaac受测frame-mounted RGB为后续明确扩展，不向CPU相机推广；不得把5b observer证据或state-only Solution当成5c task RGB。
 
 ## 三项独立完成目标
 
@@ -83,7 +83,7 @@ close() -> None
 
 **5c 已实现的采集阶段区分：**底层 `CameraGeometry.capture_phase` 仍为 `post_control_step`；`TaskRgbObservationConsumerV1` 核对 renderer 返回的 state boundary 与 sample clock 后，根据 consumer 的 episode 生命周期标记 `reset_initial` 或 `post_control_step`，`CameraCaptureIdentityV1` 接受并验证这两种阶段。001 的四路线证据保存了受测边界；当前代码的适用性仍须结合各路线实际改动和 [003 主审](../maintenance/reviews/20261108_5c_attempt003_sol_review.md)判断，不能将阶段标签本身当成真实采集完成的证明。
 
-若 App `update()`、render/present 或 camera warmup 可推进 physics，路线必须证明公开 pause/render-only 路径，或拒绝 task observation 模式。warmup 必须在正式 reset/readback 前显式记账，正式首帧仍从该 reset boundary 生成。当前 Isaac F06 为 headless 且 `enable_cameras=False`，不能作为 camera 支持；不得为本设计启动 App。官方 Isaac 6.2 文档将 SimulationManager stepping 与 RenderingManager/Replicator rendering 分开描述，实际所需 experimental RTX camera API 和 exact installed build 必须在未来包重新核对。
+若 App `update()`、render/present 或 camera warmup 可推进 physics，路线必须证明公开 pause/render-only 路径，或拒绝 task observation 模式。warmup 必须在正式 reset/readback 前显式记账，正式首帧仍从该 reset boundary 生成。设计起点的旧Isaac F06配置曾为headless且 `enable_cameras=False`，该旧配置本身不能证明camera支持；这不再是当前路线的能力结论。[C4真实短程](../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md)已在冻结Isaac 6.2 RTX输入下覆盖reset首帧、非零step、两次同边界采图零额外物理推进、二次reset和close。provider epoch与episode clock分别记录；SDK隐式startup/reset推进仍为unknown，不改称零步。后续执行仍须遵守当次冻结资源计划，本协议本身不授权启动App。
 
 ## RGB、缓存与失败语义
 

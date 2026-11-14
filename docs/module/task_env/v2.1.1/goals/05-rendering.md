@@ -6,7 +6,7 @@
 
 复用 render backend registry、single／parallel providers、camera API／source 及 provider 公开场景数据。selected 配置／session 当前仍 state-only；必须把场景、实际状态、采样、obs 和关闭一起接通，不能仅新增 renderer 名称。
 
-2026-11-11 当前注记：上段 state-only 及下文 2026-11-08“尚未完整贯通”描述保留为历史起点。单元 9 的[Sol 综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)已对修订后的 5c 功能作有界接收，维护者最终接收待确认；原 5a／5b 有界结果继续按影响保留。生产身份为 `a53bf19d`，综合交付为 `b23fb3cc`；不宣称任意组合或完整 Qualification。代码／入口及项目优化仍须另行完成和人工接收，尚未进入 G06。
+2026-11-14 当前注记：上段 state-only 及下文 2026-11-08“尚未完整贯通”描述保留为历史起点。[单元 9 综合主审](../maintenance/reviews/20261111_unit009_sol_5c_bounded_acceptance_b23fb3cc.md)的5c功能有界结论已获维护者确认；原5a／5b结果按影响保留，原生产／交付身份仍为 `a53bf19d`／`b23fb3cc`。其后E00～E16代码与项目优化已获[维护者有界接收](../maintenance/reviews/20261114_e11_e16_maintainer_project_acceptance.md)，C1～C5后续精简已有[实施及集中复验](../maintenance/reviews/20261114_post_optimization_c5_final.md)。当前 `7f8796b4` 的[G05→G06复核](../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md)未发现须重开G05的功能阻断项；CPU原生／跨组合／窗口证据沿各自冻结身份复用，C4另有修改后的Isaac同步RGB短程。C5两条完整Solution为state-only，不替代RGB证据。G06仍未启动，不宣称任意组合或新Qualification。
 
 <a id="5a"></a>
 ## 5a：公开场景数据和原生绑定

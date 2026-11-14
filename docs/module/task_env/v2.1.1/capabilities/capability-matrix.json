@@ -532,8 +532,8 @@
     "meaning": "Frozen planning snapshot from 2026-11-03; NOT_RUN cells are final G07 goals, not statements that no earlier bounded evidence exists. Do not rewrite historical results."
   },
   "current_support": {
-    "status": "MAINTAINER_ACCEPTED_BOUNDED_U4_CODE",
-    "accepted_scope": "G01–G05 and E00–E10 accepted within their documented historical bounds; U3 evidence is implementation self-assessment pending independent review and maintainer decision.",
+    "status": "MAINTAINER_ACCEPTED_BOUNDED_POST_5C",
+    "accepted_scope": "G01–G05 and E00–E16 retain maintainer bounded acceptance, with the original evidence identities and approved exceptions. U3 and later Isaac solution-002 use the accepted same-run joint completion evidence; they are not pending a new U3 decision. Subsequent C1–C5 implementation at 7f8796b4 has bounded review and impact verification recorded in ../maintenance/reviews/20261114_post_optimization_c5_final.md and ../maintenance/reviews/20261114_g05_pre_g06_readiness_7f8796b4.md; this does not expand supported intersections or Qualification.",
     "source_of_history": "../maintenance/reviews/20261113_e05_e10_independent_review_d9dc02c6.md",
     "configuration_and_formal_tasks": [
       "pick-cube-p16-reference-v1",
@@ -541,7 +541,7 @@
       "pendulum-v1",
       "two-wheel-balance-v1"
     ],
-    "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification.",
+    "renderer_scope": "Fixed for Env lifetime; historical borrowed native and GeoPhys physics × MuJoCo renderer evidence remains source-scoped. Isaac 6.2 PhysX CUDA × Isaac RTX also supports a qualified frame-mounted task camera in the measured PickCube seed31 controlled-lift diagnostic (430 transitions, 431 RGB observations); MuJoCo/GeoPhys moving task cameras remain unsupported. This diagnostic is not the state-only full Solution run or a general renderer qualification. Post-optimization C4 separately exercised reset, one nonzero step, two same-boundary captures, second reset and close on that Isaac wrist RGB route; its seven listed frozen source hashes match 7f8796b4, and the closed H5 was independently reread. See ../maintenance/reviews/20261114_post_optimization_c4_task_rgb.md. C5 full Solutions remain state-only; other native/cross/window evidence is reused at its original source identity, not claimed as a final-HEAD rerun.",
     "batch_scope": "Four formal task UIDs explicitly reject unsupported formal batch before resource allocation; G06 is not implemented or accepted.",
     "g07_scope": "Three providers × three seeds remains an unrun final gate; these single-seed records do not fill final_pickcube_cells.",
     "record_completion_scope": "Five routes use same-run joint evidence: independent H5 readback and caller completion with verified identities. Four canonical H5 files lack completion field; Isaac v3 field is null. No H5-only completion claim; independent review supports bounded maintainer-authorized acceptance.",
