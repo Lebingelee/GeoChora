@@ -2464,13 +2464,24 @@ def _pickcube_performance(worker_python, *, provider, sensor, window, count=16):
         config['render'] = _pickcube_camera_configuration()
     else:
         config['render'] = {}
+    # PickCube's ordinary task default is 960x720; the performance protocol
+    # explicitly fixes a 640x480 observer independently of the task default.
+    config['render'].update(width=640, height=480)
     config['render']['parallel'] = {'columns': math.ceil(math.sqrt(count))}
     started = time.monotonic()
     env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=count,
                             backend='cuda', execution='device', render_mode='human' if window else None,
                             worker_directory=os.getcwd())
     try:
-        env.reset(seed=31)
+        print('performance phase: reset', flush=True)
+        observation, _ = env.reset(seed=31)
+        print('performance phase: reset complete', flush=True)
+        if sensor:
+            for name in ('base', 'hand'):
+                image = observation['cameras'][name]['rgb']
+                if (tuple(image.shape) != (count, 128, 128, 3)
+                        or image.dtype != torch.uint8 or image.device.type != 'cuda'):
+                    raise AssertionError('performance camera differs from the frozen batch configuration')
         layout_facts = env.resource_summary()['device_transition']['physical_layout_facts']
         if window:
             env.set_parallel_render_num(count)
@@ -2485,14 +2496,18 @@ def _pickcube_performance(worker_python, *, provider, sensor, window, count=16):
             if window:
                 env.render()
         torch.cuda.synchronize()
+        print('performance phase: warmup complete', flush=True)
         if window:
             from PIL import Image
             before = env.read_device_state(('qpos',)).identity
             frame = env.render(mode='rgb_array')
+            if tuple(frame.shape) != (480, 640, 3):
+                raise AssertionError('performance observer is not the frozen 640x480 resolution')
             Image.fromarray(frame.cpu().numpy()).save('observer-warmup.png')
             env.render(mode='human')
             if env.read_device_state(('qpos',)).identity != before:
                 raise AssertionError('observer witness capture advanced physics')
+        print('performance phase: measurement', flush=True)
         started = time.monotonic()
         steps = 0
         step_seconds = presentation_seconds = 0.
@@ -2519,6 +2534,8 @@ def _pickcube_performance(worker_python, *, provider, sensor, window, count=16):
                 'visibly_distinguishable_envs': None if window else 0,
                 'sensor_envs': count if sensor else 0,
                 'render_grid_columns': math.ceil(math.sqrt(count)),
+                'observer_resolution': [640, 480] if window else None,
+                'sensor_resolution': [128, 128] if sensor else None,
                 'sensor_cameras': ['base', 'hand'] if sensor else [],
                 'warmup_steps': 20, 'measured_steps': steps, 'measurement_seconds': elapsed,
                 'initialization_seconds': init_seconds, 'sample_sufficient': steps >= 100 and elapsed >= 10,
@@ -2685,6 +2702,9 @@ def _run(worker_python, output, case, *, batch_size=16):
                    str(test) + '::test_public_discrete_and_continuous_modes_expose_tunneling_limit']
     elif case == 'geophys-mesh-contact':
         test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_mesh_contact.py'
+        command = [sys.executable, '-m', 'pytest', '-q', str(test)]
+    elif case == 'geophys-framebuffer-resize':
+        test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rendering/test_framebuffer_device_rgb.py'
         command = [sys.executable, '-m', 'pytest', '-q', str(test)]
     elif case == 'geophys-table-stability':
         test = Path(__file__).resolve().parents[5] / 'GeoPhys/test/verification/rigid/test_rigid_batch_table_stability.py'
@@ -3101,7 +3121,7 @@ def main():
             'framebuffer-device', 'geophys-camera', 'geophys-aot-core', 'geophys-merge-regression',
             'geophys-merge-clip', 'geophys-merge-focused', 'geophys-merge-lighting', 'geophys-merge-mjcf-light',
             'geophys-merge-rigid', 'geophys-merge-robot', 'geophys-batch-cuda', 'geophys-device-state',
-            'geophys-device-effort', 'geophys-device-reset', 'geophys-free-damping', 'geophys-static-contact-filter', 'geophys-torsion', 'geophys-torsion-direct', 'geophys-torsion-constraints', 'geophys-efc-regression', 'geophys-batch-plan-regression', 'geophys-actuator-isolation', 'geophys-device-layout', 'geophys-renamed-layout', 'geophys-contact-mode-comparison', 'geophys-mesh-contact', 'transport-regression', 'core-semantics',
+            'geophys-device-effort', 'geophys-device-reset', 'geophys-free-damping', 'geophys-static-contact-filter', 'geophys-torsion', 'geophys-torsion-direct', 'geophys-torsion-constraints', 'geophys-efc-regression', 'geophys-batch-plan-regression', 'geophys-actuator-isolation', 'geophys-device-layout', 'geophys-renamed-layout', 'geophys-contact-mode-comparison', 'geophys-mesh-contact', 'geophys-framebuffer-resize', 'transport-regression', 'core-semantics',
             'scalar-effort-regression', 'core-regression', 'performance-pendulum-off', 'performance-pendulum-window',
             'performance-geophys-off', 'performance-geophys-window', 'performance-isaac-off', 'performance-isaac-window',
             'device-sha-pendulum', 'device-sha-pickcube', 'device-sha-pickcube-camera', 'mjwarp-world-clock',
