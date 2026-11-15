@@ -469,6 +469,60 @@ def test_geophys_contact_mode_is_explicit_source_independent_and_roundtrips():
                                 execution_scope='device_batch')
 
 
+@pytest.mark.parametrize('scope,execution', [
+    ('device_batch', {'physics_provider': 'geophys', 'interpreter': '/tmp/profile-python'}),
+    ('scalar', {'physics_provider': 'geophys', 'physics_backend': 'cpu', 'physics_device': 'cpu'}),
+])
+def test_geophys_contact_budget_is_validated_and_survives_resolution(scope, execution):
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+
+    task = ENV_REGISTRY.get('pendulum-v1')
+    request = {'execution': execution, 'runtime': {'body_contact_solver_iterations': 37}}
+    resolved = resolve_task_env_config(task, request, execution_scope=scope)
+    assert resolved.environment.runtime.body_contact_solver_iterations == 37
+    assert resolve_task_env_config(task, resolved, execution_scope=scope) == resolved
+    for bad in (0, -1, True, 1.5):
+        with pytest.raises(ValueError, match='positive integer'):
+            resolve_task_env_config(task, {**request, 'runtime': {'body_contact_solver_iterations': bad}},
+                                    execution_scope=scope)
+    with pytest.raises(KeyError, match='runtime fields'):
+        resolve_task_env_config(task, {**request, 'runtime': {'unrelated': 37}}, execution_scope=scope)
+
+
+def test_geophys_contact_budget_rejects_other_provider():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.registry import ENV_REGISTRY
+
+    with pytest.raises(ValueError, match='requires the GeoPhys provider'):
+        resolve_task_env_config(ENV_REGISTRY.get('pendulum-v1'), {
+            'execution': {'physics_provider': 'mujoco_warp', 'interpreter': '/tmp/profile-python'},
+            'runtime': {'body_contact_solver_iterations': 37}}, execution_scope='device_batch')
+
+
+def test_scalar_geophys_mode_and_budget_survive_recorded_configuration():
+    from task_env.environment.configuration import resolve_task_env_config
+    from task_env.recorders.reference_provenance import recorded_execution_configuration
+    from task_env.registry import ENV_REGISTRY
+
+    task = ENV_REGISTRY.get('pendulum-v1')
+    request = {'execution': {'physics_provider': 'geophys', 'physics_backend': 'cpu',
+                             'physics_device': 'cpu', 'geophys_contact_mode': 'discrete'},
+               'runtime': {'body_contact_solver_iterations': 37}}
+    resolved = resolve_task_env_config(task, request)
+    assert resolved.geophys_contact_mode == 'discrete'
+    assert resolve_task_env_config(task, resolved) == resolved
+    recorded = recorded_execution_configuration(uid=task.uid, provider='geophys', backend='cpu',
+                                                  horizon=resolved.environment.episode.horizon,
+                                                  resolved=resolved)
+    assert recorded['execution']['geophys_contact_mode'] == 'discrete'
+    assert recorded['runtime']['body_contact_solver_iterations'] == 37
+    replay = {key: value for key, value in recorded.items() if key != 'env_id'}
+    again = resolve_task_env_config(task, replay)
+    assert again.geophys_contact_mode == resolved.geophys_contact_mode
+    assert again.environment.runtime.body_contact_solver_iterations == 37
+
+
 def test_pickcube_device_source_uses_declared_effort_transmissions():
     from task_env.environment.configuration import resolve_task_env_config
     from task_env.registry import ENV_REGISTRY

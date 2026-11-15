@@ -280,8 +280,9 @@ def check_geophys_named_layout(names, data, source, boundary):
 
 class _GeoPhysSession(_SessionValues):
     def __init__(self, artifact, source, *, observer_render_request=None, legacy_observer_requested=False,
-                 legacy_camera_observations=False):
+                 legacy_camera_observations=False, contact_mode='provider_default'):
         self._initialize_values(artifact, source, 'geophys')
+        runtime_options = {} if contact_mode == 'provider_default' else {'contact_mode': contact_mode}
         runtime = bootstrap_task_runtime(
             config=source.config, composition=source.composition, scene=source.scene,
             agents=source.agents, objects=source.objects,
@@ -295,6 +296,7 @@ class _GeoPhysSession(_SessionValues):
                 execution_source_receipt=source.execution_source_receipt,
             ),
             create_render_source=observer_render_request is not None or legacy_observer_requested,
+            **runtime_options,
         )
         self._observer_render_request = observer_render_request
         self._observer_render_source = runtime.render_source
@@ -341,6 +343,8 @@ class _GeoPhysSession(_SessionValues):
                 'physical_model': _geophys_model_facts(compiled),
                 'effective_physical_model': _geophys_effective_model_facts(
                     self._boundary.read_model_snapshot(), names)}
+            if contact_mode != 'provider_default':
+                self._build_layout_facts.update(runtime.contact_facts)
             if source.source_reference_plan is not None:
                 plan = source.source_reference_plan
                 position = source.position_subject_binding

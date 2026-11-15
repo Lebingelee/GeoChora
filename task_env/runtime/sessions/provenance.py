@@ -250,11 +250,17 @@ for distribution, name in modules.items():
         origin_ownership[distribution] = 'unknown'
     except ValueError:
         origin_ownership[distribution] = 'mismatch'
+try:
+    from packaging.markers import default_environment
+    marker_environment = default_environment()
+except ImportError:
+    marker_environment = None
 print('GEOCHORA_METADATA_V1:' + json.dumps({'python': str(pathlib.Path(sys.executable).resolve()),
                   'launcher_pythonpath': launcher_paths,
                   'worker_executable': str(pathlib.Path(sys.executable).absolute()),
                   'python_version': list(sys.version_info[:3]), 'origins': origins,
                   'versions': versions, 'module_origins': module_origins,
+                  'marker_environment': marker_environment,
                   'origin_ownership': origin_ownership,
                   'isaacsim_namespace_owner': isaacsim_namespace_owner}, sort_keys=True))
 '''
@@ -379,6 +385,7 @@ def assess_declared_dependencies(provider, metadata_receipt, *, solver_family=No
     try:
         import tomllib
         from packaging.requirements import Requirement
+        from packaging.markers import default_environment
         from packaging.version import InvalidVersion, Version
     except ImportError:
         return {'status': 'unknown', 'reason': 'dependency specification parser unavailable',
@@ -414,8 +421,19 @@ def assess_declared_dependencies(provider, metadata_receipt, *, solver_family=No
         name = re.sub(r'[-_.]+', '-', requirement.name).lower()
         observed = versions.get(name)
         row = {'name': name, 'requirement': declaration, 'observed_version': observed}
-        if requirement.marker is not None or requirement.extras:
-            row.update(status='unknown', reason='target-environment marker or extra is not evaluated')
+        marker_environment = metadata_receipt.get('marker_environment')
+        target_version = metadata_receipt.get('python_version')
+        marker_known = (isinstance(marker_environment, dict)
+                        and set(default_environment()) <= set(marker_environment)
+                        and isinstance(target_version, (list, tuple)) and len(target_version) >= 3
+                        and marker_environment.get('python_version') == '.'.join(map(str, target_version[:2]))
+                        and marker_environment.get('python_full_version') == '.'.join(map(str, target_version[:3])))
+        if requirement.extras:
+            row.update(status='unknown', reason='requirement extras are not evaluated')
+        elif requirement.marker is not None and not marker_known:
+            row.update(status='unknown', reason='target-environment marker facts unavailable')
+        elif requirement.marker is not None and not requirement.marker.evaluate(environment=marker_environment):
+            row.update(status='skipped', reason='requirement marker does not apply to target interpreter')
         elif name not in versions:
             row.update(status='unknown', reason='distribution was not queried')
         elif (name == 'isaacsim' and observed is None

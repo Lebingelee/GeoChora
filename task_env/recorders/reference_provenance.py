@@ -53,11 +53,16 @@ def recorded_execution_configuration(*, uid, provider, backend, horizon, resolve
         execution['source_delivery_manifest'] = resolved.source_delivery_manifest
     if getattr(resolved, 'reset_profile', None) is not None:
         execution['reset_profile'] = resolved.reset_profile
+    if resolved.geophys_contact_mode != 'provider_default':
+        execution['geophys_contact_mode'] = resolved.geophys_contact_mode
     episode = resolved.environment.episode
     result = {'env_id': uid, 'execution': execution,
               'episode': {'horizon': episode.horizon, 'seed': episode.seed,
                           'ignore_done': episode.ignore_done},
               'task': dict(resolved.task_parameters)}
+    if resolved.environment.runtime.body_contact_solver_iterations is not None:
+        result['runtime'] = {'body_contact_solver_iterations':
+                             resolved.environment.runtime.body_contact_solver_iterations}
     controller = {}
     if resolved.controller_profile is not None:
         controller['profile_id'] = resolved.controller_profile

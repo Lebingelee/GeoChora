@@ -22,6 +22,12 @@ def _worker(selection):
     return selection is not None and selection.deployment == 'isolated_worker'
 
 
+def _contact_mode_options(env, key):
+    resolved = getattr(env, 'resolved_public_config', None)
+    mode = 'provider_default' if resolved is None else resolved.geophys_contact_mode
+    return {} if mode == 'provider_default' else {key: mode}
+
+
 @dataclass(frozen=True)
 class PhysicalRuntimeBuilder:
     execution: object
@@ -69,6 +75,7 @@ class PhysicalRuntimeBuilder:
                        '_session_admission_input': env.value.get('session_admission_input'),
                        '_task_render_requested': bool(getattr(env, '_task_rgb_config', None) is not None
                                                       or getattr(env, '_component_task_rgb', None) is not None)}
+            options.update(_contact_mode_options(env, '_geophys_contact_mode'))
             if getattr(env, '_legacy_observer_requested', False):
                 options['_legacy_observer_requested'] = True
             if getattr(env, '_legacy_camera_observations', False):
@@ -131,7 +138,7 @@ class PositionRuntimeBuilder:
                 task_render_requested=bool(
                     getattr(env, '_component_task_rgb', None) is not None
                     or getattr(env, '_task_rgb_config', None) is not None
-                ))
+                ), **_contact_mode_options(env, 'geophys_contact_mode'))
         env._materialized_position_control_binding = position_binding
         env._materialized_position_control_selector = selector
         initial = PositionInitialState(plan, env.position_scene, joints, frames,
@@ -159,7 +166,8 @@ class ScalarRuntimeBuilder:
             return RuntimeBuildResult(skip_gravity=env._physical_execution() is None)
         env.session = materialize_control(env.artifact, env.execution, source=env.value['source'],
             binding=self.binding,
-            selected_controller=(env._selected_controller if env.binding.interval_mode == 'native' else None))
+            selected_controller=(env._selected_controller if env.binding.interval_mode == 'native' else None),
+            **_contact_mode_options(env, 'geophys_contact_mode'))
         return RuntimeBuildResult()
 
 

@@ -928,6 +928,7 @@ def materialize_control(
     selected_controller=None,
     observer_render_request=None,
     task_render_requested=False,
+    geophys_contact_mode='provider_default',
 ):
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
@@ -1070,6 +1071,8 @@ def materialize_control(
     if len(profiles) == 2:
         from .api import _DUAL_POSITION_MATERIALIZATION_AUTHORITY
         materialization_authority = _DUAL_POSITION_MATERIALIZATION_AUTHORITY
+    mode_options = ({} if geophys_contact_mode == 'provider_default'
+                    else {'_geophys_contact_mode': geophys_contact_mode})
     session = materialize(
         artifact, declared_execution, source=source,
         manifest=admission_manifest,
@@ -1077,6 +1080,7 @@ def materialize_control(
         _session_admission_input=session_admission_input,
         _observer_render_request=observer_render_request,
         _task_render_requested=task_render_requested,
+        **mode_options,
     )
     session._control_binding = binding
     if controller_binding_plan is not None:

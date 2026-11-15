@@ -201,7 +201,7 @@ class GeoPhysNativeBatch:
         runtime_config = SimpleNamespace(integrator='euler', enable_ground_contact=False,
             enable_domain_boundary_contact=False, physics_dt=self._physics_dt,
             gravity=tuple(request['gravity']), broadphase=request['broadphase'],
-            rigid_solver_backend=None, body_contact_solver_iterations=None,
+            rigid_solver_backend=None, body_contact_solver_iterations=request.get('body_contact_solver_iterations'),
             control_substeps=self._substeps, backend='cuda', contact_mode=self._contact_mode)
         try:
             self._runtime = GeoPhysRigidBatchRuntime.from_compiled_scene(
@@ -238,6 +238,8 @@ class GeoPhysNativeBatch:
                                    'scope': 'source-layout isolated effort; solver-admitted dynamics',
                                    'contact_mode_requested': self._contact_mode,
                                    'contact_mode_resolved': self._runtime.contact_mode_resolved,
+                                   'solver_iterations_requested': self._runtime.solver_iterations_requested,
+                                   'solver_iterations_resolved': self._runtime.solver.resolved_iteration_budget(),
                                    'native_clock': 'BatchedRigidSolver direct step count and dt'})
         return description
 
@@ -357,7 +359,9 @@ class GeoPhysDeviceBatchSession(DevicePhysicalBatchSession):
             'num_envs': count, 'physics_dt': timebase.physics_dt,
             'control_substeps': timebase.control_substeps,
             'gravity': source.config.runtime.gravity, 'broadphase': source.config.runtime.broadphase,
-            'contact_mode': contact_mode}
+            'contact_mode': contact_mode,
+            'body_contact_solver_iterations': (runtime_config.body_contact_solver_iterations
+                                               if runtime_config is not None else None)}
         self.num_envs, self.device = count, str(device)
         self._source, self._artifact, self._execution = source, artifact, execution
         self._source_identity = (source.source_id, source.source_closure_digest, artifact.identity_hash)

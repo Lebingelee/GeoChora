@@ -15,6 +15,7 @@ class TaskRuntimeBootstrap:
     boundary: GeoPhysRuntimeBoundary
     render_source: object | None = None
     render_options: object | None = None
+    contact_facts: object | None = None
 
 
 def bootstrap_task_runtime(
@@ -27,6 +28,7 @@ def bootstrap_task_runtime(
     scene_composer=None,
     reset_sampler=None,
     create_render_source: bool = False,
+    contact_mode: str = 'provider_default',
 ) -> TaskRuntimeBootstrap:
     from .provider_bootstrap import init_task_env_backend, materialize_task_scene
 
@@ -38,10 +40,18 @@ def bootstrap_task_runtime(
         objects=objects,
         scene_composer=scene_composer,
     )
-    runtime = materialize_task_scene(
-        compiled, config.runtime,
-        create_render_source=bool(create_render_source or config.render.camera_obs),
-    )
+    options = {'create_render_source': bool(create_render_source or config.render.camera_obs)}
+    if contact_mode != 'provider_default':
+        options['contact_mode'] = contact_mode
+    runtime = materialize_task_scene(compiled, config.runtime, **options)
+    contact_facts = None
+    if contact_mode != 'provider_default':
+        signature = dict(runtime.solver.graph_signature().fields)
+        enabled = signature['enable_ccd']
+        if type(enabled) is not bool or enabled != (contact_mode == 'continuous'):
+            raise ValueError('GeoPhys actual CCD mode differs from the requested mode')
+        contact_facts = {'contact_mode_requested': contact_mode,
+                         'contact_mode_resolved': 'continuous' if enabled else 'discrete'}
     resolve_initial_state = getattr(reset_sampler, "resolve_initial_state", None)
     initial_state = (
         resolve_initial_state(
@@ -72,6 +82,7 @@ def bootstrap_task_runtime(
         boundary=boundary,
         render_source=runtime.render_source,
         render_options=runtime.render_options,
+        contact_facts=contact_facts,
     )
 
 

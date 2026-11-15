@@ -16,7 +16,8 @@ from task_env import make_parallel_env
 
 
 def run(interpreter, *, provider='mujoco_warp', num_env=3, seed=31, steps=20,
-        sensor=False, window=False, output=None, geophys_contact_mode='provider_default'):
+        sensor=False, window=False, output=None, geophys_contact_mode='provider_default',
+        geophys_contact_iterations=None):
     if num_env < 1 or steps < 1:
         raise ValueError('num_env and steps must be positive')
     execution = {'physics_provider': provider}
@@ -28,6 +29,10 @@ def run(interpreter, *, provider='mujoco_warp', num_env=3, seed=31, steps=20,
         execution['geophys_contact_mode'] = geophys_contact_mode
     config = {'execution': execution, 'controller': {'profile_id': 'panda-direct-effort-v1'},
               'robot': {'native_drive': 'disabled'}, 'episode': {'seed': seed, 'horizon': steps}}
+    if geophys_contact_iterations is not None:
+        if provider != 'geophys':
+            raise ValueError('GeoPhys contact iterations require the GeoPhys provider')
+        config['runtime'] = {'body_contact_solver_iterations': geophys_contact_iterations}
     if sensor:
         yaw, pitch = .45, .30
         cy, sy, cp, sp = (math.cos(yaw / 2), math.sin(yaw / 2),
@@ -64,6 +69,8 @@ def run(interpreter, *, provider='mujoco_warp', num_env=3, seed=31, steps=20,
             facts = env.resource_summary()['device_transition']['physical_layout_facts']
             result['contact_mode_requested'] = facts['contact_mode_requested']
             result['contact_mode_resolved'] = facts['contact_mode_resolved']
+            result['solver_iterations_requested'] = facts['solver_iterations_requested']
+            result['solver_iterations_resolved'] = facts['solver_iterations_resolved']
     finally:
         env.close()
     result['closed'] = True
@@ -78,6 +85,7 @@ def main():
     parser.add_argument('--provider', choices=('mujoco_warp', 'geophys', 'isaacsim'), default='mujoco_warp')
     parser.add_argument('--geophys-contact-mode', choices=('provider_default', 'discrete', 'continuous'),
                         default='provider_default')
+    parser.add_argument('--geophys-contact-iterations', type=int)
     parser.add_argument('--num-env', type=int, default=3)
     parser.add_argument('--seed', type=int, default=31)
     parser.add_argument('--steps', type=int, default=20)
@@ -88,7 +96,8 @@ def main():
     print(json.dumps(run(args.interpreter, provider=args.provider, num_env=args.num_env,
                          seed=args.seed, steps=args.steps, sensor=args.sensor,
                          window=args.window, output=args.output,
-                         geophys_contact_mode=args.geophys_contact_mode)))
+                         geophys_contact_mode=args.geophys_contact_mode,
+                         geophys_contact_iterations=args.geophys_contact_iterations)))
 
 
 if __name__ == '__main__':

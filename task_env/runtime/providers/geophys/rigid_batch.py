@@ -128,6 +128,7 @@ class GeoPhysRigidBatchRuntime:
             ),
         )
         runtime.contact_mode_resolved = 'continuous' if solver_config.contact.enable_ccd else 'discrete'
+        runtime.solver_iterations_requested = solver_config.contact.body_contact_solver_iterations
         return runtime
 
     def __init__(

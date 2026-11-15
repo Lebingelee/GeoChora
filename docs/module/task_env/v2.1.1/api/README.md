@@ -12,7 +12,9 @@ G06b 开发中的 PickCube canonical physical observation 不再包含 `state.bo
 
 G06b 开发检查已通过普通设备入口运行三个 provider 的 Pendulum 与 PickCube。PickCube 的 GeoPhys 证据限定为显式离散碰撞和已验证任务配置：B=3 的原源 mesh／多点接触、耦合手指、部分 reset、base／hand 相机及两行 H5 已实测；独立几何读回的受控接触轨迹最大桌面穿透约 0.77 mm，自由下落及较弱保持动作则出现约 5～12 mm 穿透。该限制不能外推为通用稳定接触。Isaac 复用一个 PhysX owner，分别对重叠 cube、重叠机器人及跨环境机器人／方块做了碰撞过滤的有无对照。Isaac 的源 MJCF 阻尼由 provider 在设备端逐子步实现。上述结果均为待审的有界证据，尚不能宣布 G06b 或 G06 接收。
 
-设备批量的 GeoPhys 碰撞模式可在既有 `execution.geophys_contact_mode` 中设为 `provider_default`、`discrete` 或 `continuous`；缺省保持 provider 原有行为。显式 `discrete` 只选择关闭时间连续 CCD，显式值进入运行身份并报告解析结果；未支持的组合会拒绝，不会自动回退。当前源 mesh 与约束组合尚未支持连续模式，离散模式与连续模式不声明物理等价。GeoPhys 的 source implicitfast 仅对适配器实际验证的平滑动力学条件接受，不能据此推断通用积分器等价。
+GeoPhys 标量和设备批量入口的碰撞模式可在既有 `execution.geophys_contact_mode` 中设为 `provider_default`、`discrete` 或 `continuous`；缺省保持 provider 原有行为。显式 `discrete` 只选择关闭时间连续 CCD，显式值进入运行身份并报告解析结果；未支持的组合会拒绝，不会自动回退。设备批量的当前源 mesh 与约束组合尚未支持连续模式，离散模式与连续模式不声明物理等价。GeoPhys 的 source implicitfast 仅对适配器实际验证的平滑动力学条件接受，不能据此推断通用积分器等价。
+
+已有 `runtime.body_contact_solver_iterations` 可为 GeoPhys 显式指定正整数接触迭代预算；省略或设为 `None` 保持原有的场景导出预算。设备批量的 resource summary 同时报告请求值、实际接触预算与耦合约束预算；标量记录的执行配置保留显式模式和预算以供重放。该选项不会按任务或资产自动选择，也不改变其他碰撞参数。G06b attempt002 中，使用同一冻结动作文件的三组 PickCube 输入，在显式离散模式、32 次迭代和所测 B=3/B=16 下逐子步读回的最大桌面穿透约 1.72 mm；64 次迭代的对应 B=3 最大值约 0.77 mm。上述结果只适用于各次测量的源、初态和动作，不构成通用接触保证，求解残差、速度成本和渲染停滞仍需独立主审。
 
 普通设备批量示例见 [Pendulum](../../../../../examples/parallel/pendulum_device.py) 和 [PickCube](../../../../../examples/parallel/pick_cube_device.py)，默认关闭可选相机与窗口。传感器采集和窗口彼此独立；Recorder 是显式操作。MJWarp 可在 info 提供每行原生 world time；Isaac 提供共享模拟管理器时钟，GeoPhys 提供直接 solver step 计数，不能将后二者当作逐 world 原生时钟。
 

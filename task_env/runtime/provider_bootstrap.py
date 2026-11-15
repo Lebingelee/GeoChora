@@ -21,7 +21,8 @@ def init_task_env_backend(arch: str = "cpu", **kwargs: Any) -> None:
     init_taichi(arch=normalized, **kwargs)
 
 
-def materialize_task_scene(compiled, runtime_config, *, create_render_source: bool):
+def materialize_task_scene(compiled, runtime_config, *, create_render_source: bool,
+                           contact_mode: str = 'provider_default'):
     """Use GeoPhys' public assembly entry with the selected Runtime settings."""
     from simulation import assemble_mjcf_articulated_runtime
     from solvers.rigid import RigidGroundConfig
@@ -40,6 +41,10 @@ def materialize_task_scene(compiled, runtime_config, *, create_render_source: bo
         solver_kwargs["rigid_solver_backend"] = runtime_config.rigid_solver_backend
     if runtime_config.body_contact_solver_iterations is not None:
         solver_kwargs["body_contact_solver_iterations"] = runtime_config.body_contact_solver_iterations
+    if contact_mode not in ('provider_default', 'discrete', 'continuous'):
+        raise ValueError('unsupported GeoPhys contact mode')
+    if contact_mode != 'provider_default':
+        solver_kwargs['enable_ccd'] = contact_mode == 'continuous'
     return assemble_mjcf_articulated_runtime(
         compiled.imported_scene, scene_model=compiled.scene_model,
         apply_mjcf_options=True, default_dt=runtime_config.physics_dt,

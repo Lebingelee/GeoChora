@@ -94,16 +94,19 @@ def test_distribution_constraint_is_route_specific(version, provider, status):
 
 def test_requirements_assessment_separates_core_geophys_and_unknown_metadata():
     from task_env.runtime.sessions.provenance import assess_declared_dependencies
+    from packaging.markers import default_environment
     # Synthetic distribution facts exercise the actual checked-in declarations;
     # they are not an environment or provider capability claim.
     versions = {
         'numpy': '2.2.6', 'scipy': '1.14.0', 'psutil': '6.0.0', 'pydantic': '2.11.0',
-        'taichi-forge': '0.6.3', 'trimesh': '4.0.0', 'pyvista': '0.46.5',
+        'taichi-forge': '0.7.0', 'trimesh': '4.0.0', 'pyvista': '0.46.5',
         'Pillow': '11.1.0', 'mujoco': '3.8.1', 'gymnasium': '1.3.0',
         'h5py': '3.12.0', 'PyYAML': '6.0',
     }
     facts = {'versions': versions, 'module_origins': {name: '/fixture/' + name for name in versions},
-             'origin_ownership': {name: 'owned' for name in versions}, 'python_version': [3, 12, 0]}
+             'origin_ownership': {name: 'owned' for name in versions}, 'python_version': [3, 12, 0],
+             'marker_environment': {**default_environment(), 'python_version': '3.12',
+                                    'python_full_version': '3.12.0'}}
     core = assess_declared_dependencies('mujoco', facts)
     geo = assess_declared_dependencies('geophys', facts)
     assert core['status'] == 'available'
@@ -119,6 +122,34 @@ def test_requirements_assessment_separates_core_geophys_and_unknown_metadata():
     versions['isaacsim'] = None
     facts['module_origins']['isaacsim'] = None
     assert assess_declared_dependencies('isaacsim', facts)['status'] == 'unavailable'
+
+
+def test_target_markers_are_evaluated_and_missing_target_facts_fail_closed():
+    from copy import deepcopy
+    from packaging.markers import default_environment
+    from task_env.runtime.sessions.provenance import assess_declared_dependencies
+
+    versions = {'numpy': '2.2.6', 'scipy': '1.14.0', 'psutil': '6.0.0',
+                'pydantic': '2.11.0', 'taichi-forge': '0.7.0', 'trimesh': '4.0.0',
+                'pyvista': '0.46.5', 'Pillow': '11.1.0', 'mujoco': '3.8.1',
+                'gymnasium': '1.3.0', 'h5py': '3.12.0', 'PyYAML': '6.0'}
+    facts = {'versions': versions, 'module_origins': {name: '/fixture/' + name for name in versions},
+             'origin_ownership': {name: 'owned' for name in versions}, 'python_version': [3, 12, 0],
+             'marker_environment': {**default_environment(), 'python_version': '3.12',
+                                    'python_full_version': '3.12.0'}}
+    baseline = assess_declared_dependencies('geophys', facts, solver_family='rigid')
+    conditional = [r for r in baseline['requirements'] if ';' in r['requirement']]
+    assert conditional and all(r['status'] in {'available', 'skipped'} for r in conditional)
+    future = deepcopy(facts)
+    future['python_version'] = [3, 14, 0]
+    future['marker_environment']['python_version'] = '3.14'
+    future['marker_environment']['python_full_version'] = '3.14.0'
+    result = assess_declared_dependencies('geophys', future, solver_family='rigid')
+    numpy_rows = [r for r in result['requirements'] if r['name'] == 'numpy' and ';' in r['requirement']]
+    assert [r['status'] for r in numpy_rows] == ['skipped', 'unavailable']
+    future['marker_environment'] = None
+    result = assess_declared_dependencies('geophys', future, solver_family='rigid')
+    assert all(r['status'] == 'unknown' for r in result['requirements'] if ';' in r['requirement'])
 
 
 def test_required_dependency_rejects_before_existing_session_is_closed(monkeypatch):
@@ -145,7 +176,8 @@ def test_required_dependency_rejects_before_existing_session_is_closed(monkeypat
             env._prepare_reference_reset(seed=31)
         receipt = failure.value.receipt
         rows = [r for r in receipt['dependency']['requirements'] if r['name'] == 'numpy']
-        assert rows and all(row['status'] == 'unavailable' for row in rows)
+        applicable = [row for row in rows if row['status'] != 'skipped']
+        assert applicable and all(row['status'] == 'unavailable' for row in applicable)
         assert receipt['native_effective']['status'] == 'unknown'
         assert receipt['status'] == 'rejected'
         assert receipt['failure_reason'] == 'dependency_unavailable'

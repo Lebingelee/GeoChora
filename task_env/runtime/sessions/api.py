@@ -304,7 +304,12 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 _session_admission_input=None,
                 _observer_render_request=None, _task_render_requested=False,
                 _legacy_observer_requested=False,
-                _legacy_camera_observations=False) -> RuntimeSession:
+                _legacy_camera_observations=False,
+                _geophys_contact_mode='provider_default') -> RuntimeSession:
+    if _geophys_contact_mode not in ('provider_default', 'discrete', 'continuous'):
+        raise ValueError('unsupported GeoPhys contact mode')
+    if _geophys_contact_mode != 'provider_default' and execution.physics_provider != 'geophys':
+        raise ValueError('explicit GeoPhys contact mode requires the GeoPhys provider')
     if type(_legacy_observer_requested) is not bool:
         raise TypeError('legacy observer request must be boolean')
     if type(_task_render_requested) is not bool:
@@ -459,6 +464,8 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source pose bindings do not cover semantics')
     materialization_options = {'mixed_actuator_plan': source.mixed_actuator_plan,
                                'observer_render_request': _observer_render_request}
+    if _geophys_contact_mode != 'provider_default':
+        materialization_options['geophys_contact_mode'] = _geophys_contact_mode
     if _legacy_observer_requested:
         materialization_options['legacy_observer_requested'] = True
     if _legacy_camera_observations:
@@ -550,10 +557,12 @@ def _validate_v1_materialization_source(
 
 def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None,
                           observer_render_request=None, legacy_observer_requested=False,
-                          legacy_camera_observations=False):
+                          legacy_camera_observations=False, geophys_contact_mode='provider_default'):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         options = {'observer_render_request': observer_render_request}
+        if geophys_contact_mode != 'provider_default':
+            options['contact_mode'] = geophys_contact_mode
         if legacy_observer_requested:
             options['legacy_observer_requested'] = True
         if legacy_camera_observations:

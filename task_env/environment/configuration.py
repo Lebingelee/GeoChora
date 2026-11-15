@@ -331,6 +331,9 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             config["execution"]["reset_profile"] = supplied.reset_profile
         if supplied.geophys_contact_mode != 'provider_default':
             config['execution']['geophys_contact_mode'] = supplied.geophys_contact_mode
+        if supplied.environment.runtime.body_contact_solver_iterations is not None:
+            config['runtime'] = {'body_contact_solver_iterations':
+                                 supplied.environment.runtime.body_contact_solver_iterations}
         if supplied.controller_profile is not None:
             config['controller']['profile_id'] = supplied.controller_profile
         if supplied.robot_uid is not None:
@@ -344,7 +347,7 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
     if not isinstance(config, Mapping):
         raise TypeError("selected TaskEnv config must be a mapping or YAML path")
     values = dict(config)
-    allowed = {"execution", "episode", "task", "controller", "robot"}
+    allowed = {"execution", "episode", "task", "controller", "robot", "runtime"}
     if execution_scope == 'device_batch':
         allowed.add('render')
     unknown = set(values) - allowed
@@ -391,12 +394,10 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
         "execution": {"physics_provider", "physics_backend", "physics_device",
                       "source_delivery_manifest", "render_default", "host", "engine",
                       "solver_family", "solver_algorithm", "coupler", "batch_layout",
-                      "deployment", "interpreter", "native_dt", "reset_profile"},
+                      "deployment", "interpreter", "native_dt", "reset_profile", "geophys_contact_mode"},
         "episode": {"horizon", "seed", "ignore_done"},
         "task": set(environment_type.selected_parameter_limits),
     }
-    if execution_scope == 'device_batch':
-        allowed_sections['execution'].add('geophys_contact_mode')
     for name, section in sections.items():
         unknown = set(section) - allowed_sections[name]
         if unknown:
@@ -442,6 +443,13 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
             execution_defaults['interpreter'] = os.environ.get('GEOCHORA_GEOPHYS_PYTHON') or sys.executable
 
     provider = execution_defaults["physics_provider"]
+    runtime_options = values.get('runtime', {})
+    if not isinstance(runtime_options, Mapping):
+        raise TypeError('runtime must be a mapping')
+    if set(runtime_options) - {'body_contact_solver_iterations'}:
+        raise KeyError('unsupported selected runtime fields')
+    if runtime_options.get('body_contact_solver_iterations') is not None and provider != 'geophys':
+        raise ValueError('body_contact_solver_iterations requires the GeoPhys provider')
     contact_mode = execution_defaults.get('geophys_contact_mode', 'provider_default')
     if contact_mode not in ('provider_default', 'discrete', 'continuous'):
         raise ValueError('execution.geophys_contact_mode must be provider_default, discrete or continuous')
@@ -512,6 +520,8 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
     env = replace(base, runtime=replace(base.runtime, backend=backend),
                   control=replace(base.control, profile_id=profile),
                   episode=replace(base.episode, horizon=horizon, seed=seed, ignore_done=ignore_done))
+    if runtime_options:
+        env = replace(env, runtime=replace(env.runtime, **runtime_options))
     if execution_scope == 'device_batch':
         # Preserve the device renderer's established layout while exposing it
         # through the same public render configuration as camera placement.
@@ -586,6 +596,9 @@ def _resolve_selected_config(environment_type, config, *, execution_scope='scala
                     "task": dict(result.task_parameters)}
         if execution_scope == 'device_batch':
             original['render'] = asdict(result.environment.render)
+        if result.environment.runtime.body_contact_solver_iterations is not None:
+            original['runtime'] = {'body_contact_solver_iterations':
+                                   result.environment.runtime.body_contact_solver_iterations}
         if result.robot_uid is not None:
             original["robot"] = {"uid": result.robot_uid}
         original['controller'] = {'parameters': json.loads(result.controller_parameters_json)}

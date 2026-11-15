@@ -14,7 +14,7 @@
 
 2026-11-15 G06交接准备：[总路线](../planning/roadmap.md)已补充两次G05架构改造及总账持续约束；本地develop已按维护者授权从`9d942d43`正常快进到阶段成果，首轮同步为`23c6c86f`，本交接文档提交亦同步。[G06 Agent handoff](20261115_g06_agent_handoff.md)保留派发前时点；后续 attempt001 已开始实施，main／远端未同步、未发布。
 
-G06b attempt001 在 `1ad14dd8` 经[专项主审](reviews/20261116_g06b_attempt001_review.md)维持 **PARTIAL_NOT_ACCEPTED**；六格主链有实现与有界证据，GeoPhys接触异常和B16混合渲染停滞仍需修复。[attempt002](work-packages/20261116_g06b_attempt002_goal.md)已准备，待维护者转发；未启动，6b执行attempt计数仍为1。
+G06b attempt001 在 `1ad14dd8` 经[专项主审](reviews/20261116_g06b_attempt001_review.md)维持 **PARTIAL_NOT_ACCEPTED**；六格主链有实现与有界证据。[attempt002](work-packages/20261116_g06b_attempt002_goal.md)已执行，6b执行attempt计数为2，仍未完成或接收。GeoPhys显式discrete和迭代预算的受控对照改善了三组固定输入下的桌面穿透，尚须核实手指接触和其他物理边界；B16混合渲染旧停滞尚未定位根因，后续成功复跑不能单独证明问题已修复。窗口外观由维护者人工验收。
 
 ## 启动输入与工作归属
 
