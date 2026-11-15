@@ -364,8 +364,8 @@ renderer 实现／选择在创建时固定到 close；允许其为新 source／g
 
 | 窗口 | 内容与顺序 | 出口／转交条件 |
 | --- | --- | --- |
-| 6a attempt 1 | 读取审批 D1～D6；精确版本解析／MuJoCo 兼容修复；layout／身份／公共 device shape；共同 build 真实 caller；IPC 与 R0 renderer 前置验证；Pendulum 最短 batch 链 | 实际构建进入共同 owner；版本／ABI 缺口可定位；至少两条代表路线能与固定 renderer 同步短程，或明确未过 R0、不得进入依赖它的 6b 大改 |
-| 6a attempt 2 | 审核真实 diff；补行绑定／错误输入／终止保留／资源故障的关键合同；冻结经过验证的版本、source、相机、预算与能力表 | 6a 合同和必需实现成立；不只交 schema／fake；更新 API 的已实现部分；形成 6b 唯一 ready 包 |
+| 6a attempt 1 | 按[首包](../maintenance/work-packages/20261115_g06a_attempt001_goal.md)解析profile，接共同build／device生命周期，完成MJWarp Pendulum B=3真实链，验证Rasterizer公开数据链并定位R0缺口 | 正常caller与native实现成立；R0至少验证MJWarp来源、争取Isaac第二来源。未闭合项如实返包，不把首包完成称为6a通过 |
+| 6a attempt 2 | 审核真实diff；补跨解释器和第二物理来源的Rasterizer验证、行绑定／终止保留／资源故障；明确GeoPhys上游公开接口包；冻结经验证的版本、source、相机和预算 | 6a 合同和必需实现成立；不只交 schema／fake；更新 API 的已实现部分；形成 6b 唯一 ready 包 |
 | 6b attempt 1 | 三后端六格 canonical effort 小批量；PickCube device Task 计算；batch Robot；GeoPhys BRS 缺失公开能力在对应上游 owner 补齐 | 三后端两任务真实构建／reset／非零 step／RGB／obs；三条均验证 native batch；隔离与物理含义成立 |
 | 6b attempt 2 | 复核状态与相机、控制 cadence／传动、同次记录读回；修复实际问题；确认 GeoPhys／R3／gravity 具体交集 | 先完成六格 direct effort 与 batch Robot；随后开展独立 R3／model／gravity 包，后端名单在独立包启动前指定，单独接收，不阻塞 canonical 包；不跨出实际受测模型声明 |
 | 6c attempt 1 | 全 false／单行／多行 mask；staggered episode autoreset；同一个 public vector 对象 Pendulum A→B→A，再做 PickCube A→B→A；旧 generation／异常重建／close | 固定 renderer 与 schema；不重置未选行；旧资源／命令失效；退出与 worker／IPC／App 释放证据 |
@@ -464,3 +464,5 @@ G06 接收后再提出 Env／Robot 精简包，按真实重复和职责收益确
 本轮后续决议：CUDA uint8、Rasterizer 首选／MJWarp 备选、canonical 六格先接收、R3 指定后端独立接收均已确认；性能矩阵与扩容条件见第 12.3 节。本次仍仅修订计划，未启动实现或 native 性能测试。
 
 本轮文档相对链接与 `git diff --check` 通过；全仓 validator 仍仅报既存 `MUJOCO_LOG.TXT` 保护输入不一致。检查记录位于 ignored `workspace/maintenance/v211_g06_plan_20261115_003/`。
+
+具体子阶段职责与窗口边界见[工作分解](stage6-work-packages.md)；首包为6a attempt001，实现与R0验证同窗完成，未闭合技术门不得以schema或旧host路线替代。
