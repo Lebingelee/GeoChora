@@ -154,6 +154,16 @@ def live_pipeline(worker_python, *, camera_config, count, steps):
     import faulthandler
     import math
     from task_env import make_parallel_env
+    from visualization.rasterizer.scene_visualizer import RasterSceneVisualizer
+
+    if os.environ.get('G06B_DIAGNOSTIC_NATIVE_DEBUG') == '1':
+        # Permit same-user native debugger attachment to this diagnostic
+        # process only; never change the host's ptrace policy or product path.
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(0x59616D61, ctypes.c_ulong(-1), 0, 0, 0) != 0:
+            raise OSError(ctypes.get_errno(), 'PR_SET_PTRACER failed')
+        print('completed render native-debug permission', flush=True)
 
     config = {'execution': {'physics_provider': 'mujoco_warp', 'interpreter': worker_python},
               'controller': {'profile_id': 'panda-direct-effort-v1'},
@@ -164,6 +174,62 @@ def live_pipeline(worker_python, *, camera_config, count, steps):
     env = make_parallel_env('pick-cube-p16-reference-v1', env_config=config, num_env=count,
                             backend='cuda', execution='device', render_mode='human',
                             worker_directory=os.getcwd())
+    queue_file = None
+    queue_originals = {}
+    keep_views = os.environ.get('G06B_DIAGNOSTIC_KEEP_VIEWS') == '1'
+    view_module = None
+    view_original = None
+    retained_views = []
+    view_stats = {'created': 0, 'closed': 0, 'maximum_pending': 0}
+    if keep_views:
+        # Test-only hypothesis: keep Forge's automatically adapted DLPack
+        # views reachable until a completed render, then explicitly close them
+        # on the calling thread. This is not a production synchronization API.
+        from taichi_forge.interop import _dlpack as view_module
+        view_original = view_module._adapt_external_array
+
+        def retain_view(*args, **kwargs):
+            view = view_original(*args, **kwargs)
+            if view is not None:
+                retained_views.append(view)
+                view_stats['created'] += 1
+                view_stats['maximum_pending'] = max(view_stats['maximum_pending'], len(retained_views))
+            return view
+
+        view_module._adapt_external_array = retain_view
+    if os.environ.get('G06B_DIAGNOSTIC_RASTER_QUEUES') == '1' or keep_views:
+        if os.environ.get('G06B_DIAGNOSTIC_RASTER_QUEUES') == '1':
+            queue_file = Path('raster-queue-samples.jsonl').open('x')
+        queue_counts = {}
+
+        def wrap_queue(name, original):
+            def wrapped(visualizer, *args, **kwargs):
+                result = original(visualizer, *args, **kwargs)
+                camera = kwargs.get('camera_id', 'observer')
+                key = (name, str(camera))
+                queue_counts[key] = queue_counts.get(key, 0) + 1
+                # Each camera has 16 row captures per transition at B=16;
+                # this witnesses successive transitions without reading every row.
+                if queue_file is not None and (name == 'write_frame_rgb8' or queue_counts[key] % count == 1):
+                    geom = visualizer._engine._geom
+                    sample = {'method': name, 'camera': str(camera),
+                              'call': queue_counts[key],
+                              'framebuffer': [visualizer._fb.width, visualizer._fb.height],
+                              'opaque': geom.read_raster_task_diagnostics(),
+                              'alpha': geom.read_alpha_raster_task_diagnostics()}
+                    queue_file.write(json.dumps(sample, sort_keys=True) + '\n')
+                    queue_file.flush()
+                if keep_views:
+                    while retained_views:
+                        retained_views.pop().close()
+                        view_stats['closed'] += 1
+                return result
+            return wrapped
+
+        for name in ('write_task_camera_rgb8', 'write_frame_rgb8'):
+            original = getattr(RasterSceneVisualizer, name)
+            queue_originals[name] = original
+            setattr(RasterSceneVisualizer, name, wrap_queue(name, original))
     try:
         observation, _ = env.reset(seed=31)
         env.set_parallel_render_num(count)
@@ -202,10 +268,20 @@ def live_pipeline(worker_python, *, camera_config, count, steps):
         print('completed render close-and-sensor', flush=True)
         return {'scope': 'public MJWarp step, two sensors and Rasterizer presentation',
                 'batch': count, 'steps': steps, 'observer': [640, 480],
-                'sensors': [128, 128], 'close_twice_then_sensor': True}
+                'sensors': [128, 128], 'close_twice_then_sensor': True,
+                'diagnostic_retained_views': ({**view_stats, 'pending': len(retained_views)}
+                                              if keep_views else None)}
     finally:
         faulthandler.cancel_dump_traceback_later()
-        env.close()
+        try:
+            env.close()
+        finally:
+            for name, original in queue_originals.items():
+                setattr(RasterSceneVisualizer, name, original)
+            if view_module is not None:
+                view_module._adapt_external_array = view_original
+            if queue_file is not None:
+                queue_file.close()
 
 
 def nondefault_stream(worker_python, *, camera_config):

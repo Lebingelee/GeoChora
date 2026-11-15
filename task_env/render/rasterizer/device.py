@@ -235,9 +235,9 @@ class DeviceBatchRasterSource:
         positions = (positions + self._translation[:, None, :]).reshape(-1, 3).contiguous()
         orientations = orientations.reshape(-1, 4).contiguous()
         torch.cuda.current_stream(positions.device).synchronize()
-        self._pose_source.body_positions.from_torch(positions)
-        self._pose_source.body_orientations.from_torch(orientations)
-        self._ti.sync()
+        from .pose_transfer import copy_pose_fields
+        copy_pose_fields(positions, orientations, self._pose_source.body_positions,
+                         self._pose_source.body_orientations)
 
     def capture_cameras(self, *, state, world_ids, world_transforms, width, height):
         """Capture configured sensor cameras for each selected device world."""
